@@ -1740,7 +1740,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         val item = stackActions.lastOrNull() ?: return
         stackActions = stackActions.dropLast(1)
         val owner = players.indexOfFirst { it.id == item.controllerId }
-        if (owner >= 0 && item.card != null) {
+        if (owner >= 0 && item.card != null && stackResolutionMovesCardToZone(item.kind)) {
             val card = item.card
             val isPermanent = listOf("creature", "artifact", "enchantment", "planeswalker", "battle", "land").any { card.type.contains(it, true) }
             updatePlayer(owner) { p ->
@@ -1750,6 +1750,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             logAction(owner, "resolved ${item.title}")
             if (isPermanent && card.type.contains("creature", ignoreCase = true)) applyCreatureEntryLifeEffects(owner, card)
             if (!isPermanent && item.kind == "SPELL") applyAutomaticResolutionEffects(owner, card)
+        } else if (owner >= 0 && item.card != null) {
+            logAction(owner, "resolved ${item.title}; source permanent stays on the battlefield")
         } else logAction(activePlayer, "resolved ${item.title}")
         priorityPlayer = activePlayer
         priorityPassed = emptySet()
@@ -2529,6 +2531,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 70 · DUPLICATE PERMANENT FIX", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Resolving an activated or loyalty ability now leaves its source permanent in its current zone. Only resolving a spell moves that spell card to the battlefield or graveyard.", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 69 · SOURCE UPDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Added trigger detection for recognized spell-cast, draw, and creature-entry events. Triggers show their event and effect, offer target-player selection for supported player-target effects, and keep modes or unsupported effects on a manual-resolution path. Rhystic Study and Smothering Tithe keep their pay-or-resolve choices.\n• Expanded simple automatic effect handling for targeted player life, draw, and token effects after a target is chosen.\n• The Activity Log now includes turn phase, spell cost/payment detail, trigger events, automatic changes, and manual-resolution notes, with visual emphasis for payments, triggers, and effects.", color = SoftWhite, fontSize = 11.sp)
 
