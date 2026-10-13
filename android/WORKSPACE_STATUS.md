@@ -2,9 +2,15 @@
 
 ## Canonical project
 
-This is the complete Arcana Table **Build 67 source tree** (`0.15.48`, version code `67`). It contains the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The Build 67 debug APK was compiled from this source after the opening-hand, stun-counter, and swipe-navigation fixes.
+This is the complete Arcana Table **Build 68 source tree** (`0.15.49`, version code `68`). It contains the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. Build 68 adds card-face previews to the multiplayer opening-hand screen. No Build 68 APK has been compiled.
 
 The separate `ArcanaTable-build52-source/` folder is stale and should not be used as the project source. Its Gradle metadata still labels it Build 52 and its code is materially different.
+
+## Changes in Build 68
+
+- The opening-hand screen displays actual card faces in a horizontally scrollable hand.
+- Tapping a card opens the large card preview. During bottom selection, a separate button selects or deselects each card so previewing does not change the selection.
+- The selection count and required bottom count remain visible before confirming.
 
 ## Changes in Build 67
 
@@ -14,7 +20,6 @@ The separate `ArcanaTable-build52-source/` folder is stale and should not be use
 - Lobby game start preserves each chosen hand and library order.
 - Automatic untap removes one stun counter from a tapped permanent instead of untapping it; permanents without stun counters untap normally.
 - Horizontal gestures on a player board stay in its card and zone lists; use the player tabs to switch boards.
-- `testDebugUnitTest` and `assembleDebug` pass. APK metadata reports package `com.arcanatable.build52test2`, version `0.15.48`, version code `67`.
 
 ## Changes in Build 66
 
@@ -26,7 +31,7 @@ The separate `ArcanaTable-build52-source/` folder is stale and should not be use
 
 - Added a responsive landing page in `docs/index.html` with current Build 66 details and a direct test-APK download.
 - Added `.github/workflows/deploy-pages.yml` to deploy the page and APK through GitHub Pages Actions.
-- The published Pages content remains on Build 66; Build 67 source and APK are separate from the project page.
+- The published Pages content remains on Build 66; Build 68 source and the Build 67 APK are maintained separately from the project page.
 
 ## Fixes carried forward from Build 61
 
@@ -67,7 +72,7 @@ These fixes are retained in the Build 62 source and APK.
 
 ## Build status
 
-Build 67 (`0.15.48`, version code `67`) is the current source and compiled debug APK. It uses the established debug package ID `com.arcanatable.build52test2` and is signed with the Android debug key. APK SHA-256: `bb7e9bae7422495b83bc0848797fcd17644f478b26e4213700b2a525484af37a`.
+Build 68 (`0.15.49`, version code `68`) is the current source. Build 67 (`0.15.48`, version code `67`) is the latest compiled debug APK; it uses the established debug package ID `com.arcanatable.build52test2` and is signed with the Android debug key. APK SHA-256: `bb7e9bae7422495b83bc0848797fcd17644f478b26e4213700b2a525484af37a`.
 
 Build 62 gives every tutorial step a `NEXT` button, explains that the Join Game action needs a room code and password, and lets the tutorial continue without connecting.
 
