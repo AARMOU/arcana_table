@@ -17,8 +17,8 @@ android {
         applicationId = "com.arcanatable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 69
-        versionName = "0.15.50"
+        versionCode = 70
+        versionName = "0.15.51"
         manifestPlaceholders["appLabel"] = "Arcana Table"
     }
 
@@ -26,7 +26,7 @@ android {
         debug {
             // Keep the installable test build separate from earlier debug APKs.
             applicationIdSuffix = ".build52test2"
-        manifestPlaceholders["appLabel"] = "Arcana Table 0.15.50 Build 69"
+        manifestPlaceholders["appLabel"] = "Arcana Table 0.15.51 Build 70"
         }
     }
 
