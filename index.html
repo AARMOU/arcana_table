@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#111612">
+  <meta name="description" content="Arcana Table is a mobile-first digital tabletop for Magic: The Gathering Commander games.">
+  <title>Arcana Table — Your table, anywhere</title>
+  <style>
+    :root{color-scheme:dark;--bg:#101511;--panel:#171f19;--line:#2b392f;--ink:#eef5ed;--muted:#a4b2a5;--green:#a7f06c;--gold:#f0c778}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 78% 4%,#263a2a 0,transparent 40%),var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,sans-serif}
+    a{color:inherit}.wrap{width:min(1120px,calc(100% - 40px));margin:auto}.nav{height:76px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff13}.brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.02em}.sigil{display:grid;place-items:center;width:36px;height:36px;border:1px solid #85c95b;border-radius:11px;color:var(--green);font-weight:900}.navlinks{display:flex;gap:24px;color:var(--muted);font-size:14px}.navlinks a{text-decoration:none}.hero{padding:92px 0 76px;display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center}.eyebrow{color:var(--green);font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}.hero h1{font-size:clamp(44px,7vw,78px);line-height:.99;letter-spacing:-.055em;margin:18px 0 22px;max-width:680px}.hero h1 em{color:var(--green);font-style:normal}.lead{font-size:19px;color:var(--muted);max-width:580px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}.btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:750;border:1px solid var(--line);background:#ffffff08}.btn.primary{background:var(--green);border-color:var(--green);color:#14200e}.stamp{margin-top:20px;color:#879689;font-size:13px}
+    .table{background:linear-gradient(145deg,#26362a,#151c17);border:1px solid #42604a;border-radius:24px;padding:22px;box-shadow:0 30px 90px #0008;transform:rotate(1deg)}.tabletop{border:1px solid #49694e;background:#1c3422;border-radius:18px;padding:18px}.tablehead{display:flex;justify-content:space-between;align-items:center;color:#dcebdc;font-size:12px;font-weight:800;letter-spacing:.1em}.live{color:var(--green)}.player{margin-top:16px;padding:17px;background:#101711;border:1px solid #344738;border-radius:13px}.playerrow{display:flex;justify-content:space-between;align-items:center}.playername{font-weight:750}.life{font-size:32px;color:var(--green);font-weight:850}.cards{display:flex;gap:8px;margin-top:13px}.card{height:82px;flex:1;border-radius:9px;padding:9px;color:#121713;font-size:10px;font-weight:800;display:flex;align-items:end;background:linear-gradient(150deg,#e0c993,#887e60)}.card:nth-child(2){background:linear-gradient(150deg,#b6c9b6,#58735d)}.card:nth-child(3){background:linear-gradient(150deg,#d8a5a0,#805657)}.card:nth-child(4){background:linear-gradient(150deg,#abbcdd,#5b688d)}.tablefoot{color:#a8bbab;font-size:12px;text-align:center;margin-top:12px}
+    section{padding:56px 0}.sectionhead{max-width:620px;margin-bottom:26px}.sectionhead h2{font-size:clamp(28px,4vw,42px);letter-spacing:-.04em;margin:8px 0}.sectionhead p{color:var(--muted);margin:0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.feature{padding:22px;border:1px solid var(--line);background:#ffffff06;border-radius:15px}.feature .num{color:var(--gold);font-size:12px;font-weight:800;letter-spacing:.12em}.feature h3{margin:10px 0 6px;font-size:18px}.feature p{color:var(--muted);margin:0;font-size:14px}.callout{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:28px;border-radius:18px;border:1px solid #4b654a;background:linear-gradient(120deg,#1e3021,#171d18)}.callout h2{margin:0 0 5px;font-size:25px}.callout p{margin:0;color:var(--muted)}footer{padding:28px 0 40px;border-top:1px solid #ffffff13;color:#849187;font-size:13px}.footrow{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+    @media(max-width:760px){.hero{grid-template-columns:1fr;padding:62px 0 44px;gap:32px}.hero h1{font-size:56px}.table{transform:none}.grid{grid-template-columns:1fr}.navlinks{gap:13px;font-size:13px}.callout{align-items:flex-start;flex-direction:column}.wrap{width:min(100% - 28px,1120px)}}
+  </style>
+</head>
+<body>
+  <header class="wrap nav">
+    <a class="brand" href="#" style="text-decoration:none"><span class="sigil">A</span><span>ARCANA TABLE</span></a>
+    <nav class="navlinks" aria-label="Main navigation"><a href="#features">Features</a><a href="#project">Project</a><a href="https://github.com/AARMOU/arcana_table">GitHub ↗</a></nav>
+  </header>
+  <main>
+    <div class="wrap hero">
+      <div>
+        <div class="eyebrow">A digital Commander table</div>
+        <h1>Your table.<br><em>Anywhere.</em></h1>
+        <p class="lead">Arcana Table brings your multiplayer Magic: The Gathering games to your phone, with a shared table built for the way your group plays.</p>
+        <div class="actions"><a class="btn primary" href="#features">Explore the project</a><a class="btn" href="https://github.com/AARMOU/arcana_table">View source on GitHub ↗</a></div>
+        <div class="stamp">Android · Multiplayer · Built for Commander</div>
+      </div>
+      <div class="table" aria-label="Illustration of a multiplayer card table">
+        <div class="tabletop">
+          <div class="tablehead"><span>ARCANA TABLE</span><span class="live">● GAME IN PROGRESS</span></div>
+          <div class="player"><div class="playerrow"><span class="playername">Your battlefield</span><span class="life">40</span></div><div class="cards"><div class="card">LAND</div><div class="card">ARTIFACT</div><div class="card">CREATURE</div><div class="card">SPELL</div></div></div>
+          <div class="player"><div class="playerrow"><span class="playername">Player 2</span><span class="life">36</span></div><div class="cards"><div class="card">COMMANDER</div><div class="card">TOKEN</div><div class="card">LAND</div></div></div>
+          <div class="tablefoot">LIFE · BATTLEFIELDS · GAME ACTIONS</div>
+        </div>
+      </div>
+    </div>
+    <section class="wrap" id="features">
+      <div class="sectionhead"><div class="eyebrow">At the table</div><h2>Keep the game moving.</h2><p>A phone-friendly interface for managing the shared details of a multiplayer game while everyone stays focused on the table.</p></div>
+      <div class="grid">
+        <article class="feature"><div class="num">01 / PLAY TOGETHER</div><h3>Multiplayer rooms</h3><p>Create or join a room and bring your group into the same game.</p></article>
+        <article class="feature"><div class="num">02 / SEE THE BOARD</div><h3>Player battlefields</h3><p>Keep cards and game state organized in a readable, touch-first layout.</p></article>
+        <article class="feature"><div class="num">03 / STAY IN CONTROL</div><h3>Game tools</h3><p>Use the table’s built-in controls to manage turns and common game actions.</p></article>
+      </div>
+    </section>
+    <section class="wrap" id="project">
+      <div class="callout"><div><h2>Follow Arcana Table on GitHub</h2><p>Explore the source and follow the project as it develops.</p></div><a class="btn primary" href="https://github.com/AARMOU/arcana_table">Open the repository ↗</a></div>
+    </section>
+  </main>
+  <footer><div class="wrap footrow"><span>Arcana Table · An independent fan-made project.</span><span>Magic: The Gathering is owned by Wizards of the Coast.</span></div></footer>
+</body>
+</html>
