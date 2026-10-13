@@ -17,18 +17,18 @@ Arcana Table is under active development. Rules automation and individual card i
 
 Visit the [Arcana Table project page](https://aarmou.github.io/arcana_table/).
 
-## About this repository
+## Source code
 
-This repository currently contains the project landing page and its GitHub Pages deployment workflow:
+The Android app and internet room service source are in [android/](android/). This is Build 67 (version 0.15.48), a source-only update. The APK in the source archive was from Build 66 and is intentionally not included here. Installable APKs should be published separately as GitHub Releases.
 
-- `index.html` — responsive project site.
-- `.github/workflows/pages.yml` — publishes the site with GitHub Actions when the site or workflow changes on `main`.
+Open the android folder in Android Studio to build the app. See [android/README.md](android/README.md) for features, requirements, and build notes. The internet room service is in [android/cloud-room/](android/cloud-room/).
 
-The Android app source and APK are not included in this repository.
+## Project page and Pages deployment
 
-## Updating the site
+- index.html — responsive project site.
+- .github/workflows/pages.yml — publishes only the landing page with GitHub Actions when the page or workflow changes on main.
 
-Edit `index.html` and push the change to `main`. GitHub Actions will publish the update. You can also run **Deploy Arcana Table site** manually from the repository's **Actions** tab.
+Edit index.html to update the site. The Android source is stored separately under android/ and is not included in the published Pages artifact.
 
 ## Disclaimer
 

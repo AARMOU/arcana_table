@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0c1513">
+  <meta name="description" content="Arcana Table is an Android tabletop companion for organizing Magic: The Gathering games with friends over local Wi-Fi.">
+  <title>Arcana Table — Your game, together</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0c1513;
+      --panel: #14221f;
+      --panel-light: #20332e;
+      --mint: #83e2b3;
+      --mint-bright: #a2f2c9;
+      --gold: #f2cd78;
+      --text: #eef5f1;
+      --muted: #a7b8b1;
+      --line: rgba(194, 224, 210, .14);
+      --max: 1120px;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(ellipse at 78% 8%, rgba(43, 116, 88, .18), transparent 34rem),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.55;
+    }
+    a { color: inherit; }
+    .wrap { width: min(var(--max), calc(100% - 40px)); margin-inline: auto; }
+    .topbar { border-bottom: 1px solid var(--line); }
+    .nav { display: flex; min-height: 76px; align-items: center; justify-content: space-between; gap: 24px; }
+    .brand { display: flex; align-items: center; gap: 12px; text-decoration: none; font-weight: 900; letter-spacing: .12em; font-size: .9rem; }
+    .brand-mark { display: grid; width: 34px; aspect-ratio: 1; place-items: center; border-radius: 11px; color: #07251a; background: var(--mint); font-size: 1.15rem; }
+    .nav-links { display: flex; align-items: center; gap: 26px; color: var(--muted); font-size: .9rem; }
+    .nav-links a { text-decoration: none; }
+    .nav-links a:hover { color: var(--text); }
+    .button { display: inline-flex; min-height: 48px; align-items: center; justify-content: center; gap: 9px; padding: 0 20px; border: 1px solid transparent; border-radius: 999px; background: var(--mint); color: #082319; text-decoration: none; font-weight: 850; font-size: .88rem; transition: transform .18s ease, background .18s ease; }
+    .button:hover { transform: translateY(-2px); background: var(--mint-bright); }
+    .button.secondary { border-color: var(--line); background: rgba(255,255,255,.035); color: var(--text); }
+    .button.secondary:hover { background: var(--panel-light); }
+    .hero { display: grid; grid-template-columns: 1.05fr .95fr; align-items: center; gap: clamp(38px, 7vw, 92px); padding-block: clamp(64px, 10vw, 118px); }
+    .eyebrow { display: inline-flex; align-items: center; gap: 9px; color: var(--mint); font-weight: 850; font-size: .76rem; letter-spacing: .14em; text-transform: uppercase; }
+    .eyebrow::before { width: 8px; height: 8px; border-radius: 50%; background: var(--mint); content: ""; box-shadow: 0 0 18px rgba(131,226,179,.65); }
+    h1 { max-width: 650px; margin: 22px 0 20px; font-size: clamp(2.6rem, 6.3vw, 5.5rem); line-height: .99; letter-spacing: -.06em; }
+    h1 span { color: var(--mint); }
+    .hero-copy { max-width: 560px; color: var(--muted); font-size: clamp(1rem, 1.65vw, 1.2rem); }
+    .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+    .small-note { margin-top: 18px; color: #81958d; font-size: .82rem; }
+    .preview-shell { position: relative; padding: 16px; border: 1px solid rgba(166, 221, 192, .2); border-radius: 25px; background: linear-gradient(145deg, rgba(36, 61, 53, .88), rgba(16, 28, 25, .95)); box-shadow: 0 35px 100px rgba(0,0,0,.35); transform: rotate(1deg); }
+    .preview-shell::after { position: absolute; z-index: -1; inset: 14% -8% -8% 10%; border-radius: 28px; background: rgba(89, 197, 143, .12); filter: blur(28px); content: ""; }
+    .preview-top { display: flex; align-items: center; justify-content: space-between; padding: 6px 5px 15px; color: var(--muted); font-size: .72rem; font-weight: 800; letter-spacing: .1em; }
+    .preview-top b { color: var(--mint); }
+    .seat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 9px; }
+    .seat { min-height: 82px; padding: 12px; border: 1px solid var(--line); border-radius: 15px; background: rgba(7, 16, 14, .5); }
+    .seat.active { border-color: var(--mint); background: rgba(82, 173, 127, .18); }
+    .seat-name { color: var(--muted); font-size: .66rem; font-weight: 850; letter-spacing: .08em; }
+    .seat.active .seat-name { color: var(--mint); }
+    .life { margin-top: 5px; font-size: 1.65rem; font-weight: 900; }
+    .board-card { display: grid; grid-template-columns: 46px 1fr auto; align-items: center; gap: 12px; margin-top: 11px; padding: 12px; border: 1px solid var(--line); border-radius: 15px; background: rgba(7, 16, 14, .48); }
+    .card-art { display: grid; width: 46px; aspect-ratio: .72; place-items: center; border: 2px solid rgba(242,205,120,.6); border-radius: 7px; background: linear-gradient(145deg, #665536, #242e2a 55%, #6f795f); color: var(--gold); font-size: .82rem; }
+    .board-card strong { display: block; font-size: .8rem; }
+    .board-card span { display: block; color: var(--muted); font-size: .69rem; }
+    .cast { color: var(--mint); font-size: .68rem; font-weight: 900; }
+    .mock-battlefield { margin-top: 11px; padding: 13px; border: 1px solid var(--line); border-radius: 15px; background: rgba(7, 16, 14, .38); }
+    .mock-label { margin-bottom: 11px; color: var(--mint); font-size: .7rem; font-weight: 850; letter-spacing: .08em; }
+    .mock-cards { display: flex; gap: 8px; }
+    .mock-card { display: flex; width: 29%; aspect-ratio: .72; flex-direction: column; justify-content: space-between; padding: 7px; border: 1px solid rgba(240,239,219,.55); border-radius: 8px; background: linear-gradient(155deg, #788776, #343b32 42%, #25221c); }
+    .mock-card:nth-child(2) { background: linear-gradient(155deg, #73958b, #33473b 43%, #2d241f); }
+    .mock-card:nth-child(3) { background: linear-gradient(155deg, #b98955, #604e3a 42%, #211d1a); }
+    .mock-card i { height: 4px; border-radius: 5px; background: rgba(238,245,241,.8); }
+    .mock-card i:last-child { height: 38%; background: linear-gradient(135deg, rgba(250,233,185,.85), rgba(216,197,146,.25)); }
+    .section { padding-block: 78px; border-top: 1px solid var(--line); }
+    .section-heading { max-width: 660px; margin-bottom: 34px; }
+    h2 { margin: 12px 0; font-size: clamp(1.9rem, 4vw, 3rem); line-height: 1.05; letter-spacing: -.04em; }
+    .section-heading p { color: var(--muted); }
+    .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .feature { min-height: 205px; padding: 23px; border: 1px solid var(--line); border-radius: 19px; background: linear-gradient(145deg, rgba(28,47,41,.82), rgba(18,32,28,.74)); }
+    .feature-icon { display: grid; width: 42px; height: 42px; place-items: center; border: 1px solid rgba(131,226,179,.25); border-radius: 13px; background: rgba(131,226,179,.1); color: var(--mint); font-size: 1.15rem; }
+    .feature h3 { margin: 18px 0 7px; font-size: 1.03rem; }
+    .feature p { margin: 0; color: var(--muted); font-size: .91rem; }
+    .download { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 28px; padding: clamp(24px, 5vw, 48px); border: 1px solid rgba(131,226,179,.25); border-radius: 24px; background: radial-gradient(ellipse at 100% 0%, rgba(84,179,132,.17), transparent 45%), var(--panel); }
+    .download p { max-width: 620px; margin-bottom: 0; color: var(--muted); }
+    .requirements { margin-top: 17px; color: #879b92; font-size: .82rem; }
+    footer { padding-block: 28px; border-top: 1px solid var(--line); color: #81958d; font-size: .82rem; }
+    .footer-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+    .footer-row strong { color: var(--text); letter-spacing: .1em; }
+    @media (max-width: 780px) {
+      .hero { grid-template-columns: 1fr; padding-top: 58px; }
+      .preview-shell { max-width: 560px; width: 100%; margin: 0 auto; }
+      .features { grid-template-columns: 1fr 1fr; }
+      .download { grid-template-columns: 1fr; }
+      .download .button { justify-self: start; }
+    }
+    @media (max-width: 520px) {
+      .wrap { width: min(var(--max), calc(100% - 28px)); }
+      .nav { min-height: 66px; }
+      .brand { font-size: .74rem; }
+      .nav-links { gap: 13px; font-size: .78rem; }
+      .nav-links .nav-download { display: none; }
+      .hero { gap: 36px; }
+      .features { grid-template-columns: 1fr; }
+      .feature { min-height: 0; }
+      .seat { min-height: 72px; padding: 9px; }
+      .seat-name { font-size: .58rem; }
+      .life { font-size: 1.4rem; }
+      .board-card { grid-template-columns: 40px 1fr auto; gap: 9px; }
+      .card-art { width: 40px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <nav class="nav wrap" aria-label="Main navigation">
+      <a class="brand" href="#top"><span class="brand-mark" aria-hidden="true">✦</span> ARCANA TABLE</a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#download">Download</a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero wrap">
+      <div>
+        <div class="eyebrow">Android tabletop companion · Build 66</div>
+        <h1>Your game.<br><span>Your table.</span></h1>
+        <p class="hero-copy">Keep the whole Commander game moving from one shared table view. Track life, turns, cards, and the stack while you play with friends over local Wi-Fi.</p>
+        <div class="hero-actions">
+          <a class="button" href="downloads/ArcanaTable-0.15.47-build66.apk">↓&nbsp; Download test APK</a>
+          <a class="button secondary" href="#features">See what it does</a>
+        </div>
+        <p class="small-note">A growing community-built prototype for Android. Designed for casual games around a real table.</p>
+      </div>
+
+      <div class="preview-shell" role="img" aria-label="Illustration of the Arcana Table player board showing life totals, a commander, and battlefield cards">
+        <div class="preview-top"><b>● GAME IN PROGRESS</b><span>GAME 12:58 · TURN 04:43</span></div>
+        <div class="seat-row">
+          <div class="seat active"><div class="seat-name">YOU · ACTIVE</div><div class="life">40</div></div>
+          <div class="seat"><div class="seat-name">PLAYER 2</div><div class="life">36</div></div>
+          <div class="seat"><div class="seat-name">PLAYER 3</div><div class="life">40</div></div>
+        </div>
+        <div class="board-card"><div class="card-art">✦</div><div><strong>COMMAND ZONE · YOUR COMMANDER</strong><span>Cast count and commander tax</span></div><div class="cast">CAST</div></div>
+        <div class="mock-battlefield"><div class="mock-label">BATTLEFIELD · GROUPED BY TYPE</div><div class="mock-cards"><div class="mock-card"><i></i><i></i><i></i></div><div class="mock-card"><i></i><i></i><i></i></div><div class="mock-card"><i></i><i></i><i></i></div></div></div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="wrap">
+        <div class="section-heading">
+          <div class="eyebrow">Built for game night</div>
+          <h2>Less bookkeeping.<br>More playing.</h2>
+          <p>Arcana Table helps your group keep shared game state visible and organized without trying to replace the rules or the cards.</p>
+        </div>
+        <div class="features">
+          <article class="feature"><div class="feature-icon" aria-hidden="true">♙</div><h3>One view per player</h3><p>Check life totals, turns, commander status, hand and library counts, and public zones at a glance.</p></article>
+          <article class="feature"><div class="feature-icon" aria-hidden="true">⌁</div><h3>Play together nearby</h3><p>Connect Android devices over local Wi-Fi and keep the table, turn, readiness, and chat in sync.</p></article>
+          <article class="feature"><div class="feature-icon" aria-hidden="true">▤</div><h3>Bring your deck</h3><p>Import a deck list, review unmatched cards, and edit the cards you’re tracking across game zones.</p></article>
+          <article class="feature"><div class="feature-icon" aria-hidden="true">◷</div><h3>Keep the turn moving</h3><p>Track turn phases, draw cards, pass turns, and use quick access to the stack and game log.</p></article>
+          <article class="feature"><div class="feature-icon" aria-hidden="true">✧</div><h3>Useful automation</h3><p>Supported life, draw, and token effects can resolve automatically, with notices and manual prompts when needed.</p></article>
+          <article class="feature"><div class="feature-icon" aria-hidden="true">↕</div><h3>Make the board yours</h3><p>Resize the hand panel, inspect card details, move cards between zones, and keep the player view compact.</p></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="download">
+      <div class="wrap">
+        <div class="download">
+          <div>
+            <div class="eyebrow">Try the current build</div>
+            <h2>Arcana Table 0.15.47</h2>
+            <p>Build 66 is a test APK for Android. Install it on your device and connect with players on the same Wi-Fi network.</p>
+            <div class="requirements">Android 8.0 or newer · Debug-signed test build · Not a Play Store release</div>
+          </div>
+          <a class="button" href="downloads/ArcanaTable-0.15.47-build66.apk">↓&nbsp; Download APK</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer><div class="footer-row wrap"><strong>ARCANA TABLE</strong><span>A shared sandbox for your next game night.</span><span>Build 66 · 0.15.47</span></div></footer>
+</body>
+</html>

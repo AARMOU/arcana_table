@@ -1,0 +1,7 @@
+# Large generated build state; keep it local to a persistent project workspace.
+.codex-build-cache/
+.gradle/
+.kotlin/
+local.properties
+**/build/
+_site/
