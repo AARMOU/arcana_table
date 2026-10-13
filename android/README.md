@@ -1,6 +1,6 @@
-# Arcana Table 0.15.50 — Build 69 source update
+# Arcana Table 0.15.51 — Build 70 source update
 
-Arcana Table is a native Android Magic tabletop prototype. Build 69 adds broader trigger prompts for recognized spell-cast, draw, and creature-entry events, synchronizes pending prompts across online seats, offers target-player selection for supported life, draw, and token trigger effects, and adds a clearer Activity Log for costs, triggers, and effects. Unsupported modes or effects stay on a manual-resolution path. Build 68's card-face mulligan screen with tap-to-enlarge previews is included.
+Arcana Table is a native Android Magic tabletop prototype. Build 70 fixes battlefield activated-ability resolution so resolving an ability does not add its source permanent to the battlefield again. Only spell and commander stack items move their card to a new zone. Build 69's trigger prompts and Activity Log updates, plus Build 68's card-face mulligan screen with tap-to-enlarge previews, are included.
 
 ## Included
 
@@ -77,7 +77,7 @@ Arcana Table is a native Android Magic tabletop prototype. Build 69 adds broader
 
 ## Build status
 
-The source is labeled version 0.15.50, build 69. This is a source update; no Build 69 APK has been compiled. The optional full visual guide starts with the welcome message and follows the app screens with dimmed/blurred backgrounds, highlighted controls, and straight red arrows with solid arrowheads. It is available from the home screen and app menu and never launches automatically.
+The source is labeled version 0.15.51, build 70. No Build 70 APK has been compiled yet. The optional full visual guide starts with the welcome message and follows the app screens with dimmed/blurred backgrounds, highlighted controls, and straight red arrows with solid arrowheads. It is available from the home screen and app menu and never launches automatically.
 
 Build 66 adds a resizable hand panel, automatic stack-window closing after all resolutions, tighter player-view spacing, and stronger import/movement/sync diagnostics. It also includes the Build 65 import review, supported automatic life/draw/token effects with manual-resolution notices, quick Stack access, and earlier tutorial, card movement, privacy, and navigation updates.
 
