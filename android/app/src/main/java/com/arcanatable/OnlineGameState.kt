@@ -22,10 +22,22 @@ data class OnlineGameState(
     val gameEnded: Boolean = false,
     val stackActions: List<StackAction> = emptyList(),
     val priorityPlayer: Int = 0,
-    val priorityPassed: Set<String> = emptySet()
+    val priorityPassed: Set<String> = emptySet(),
+    val triggerPrompts: List<TriggerPrompt> = emptyList()
 )
 
 data class OnlineChatMessage(val author: String, val text: String, val timestamp: String)
+
+data class TriggerPrompt(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val cardName: String,
+    val controllerIndex: Int,
+    val eventPlayerIndex: Int,
+    val kind: String,
+    val triggerText: String = "",
+    val effectText: String = "",
+    val targetRule: String? = null
+)
 
 fun OnlineGameState.toJson(): String = JSONObject().apply {
     put("players", JSONArray().apply { players.forEach { put(it.toJson()) } })
@@ -47,6 +59,17 @@ fun OnlineGameState.toJson(): String = JSONObject().apply {
     } })
     put("priorityPlayer", priorityPlayer)
     put("priorityPassed", JSONArray().apply { priorityPassed.forEach { put(it) } })
+    put("triggerPrompts", JSONArray().apply { triggerPrompts.forEach { prompt ->
+        put(JSONObject()
+            .put("id", prompt.id)
+            .put("cardName", prompt.cardName)
+            .put("controllerIndex", prompt.controllerIndex)
+            .put("eventPlayerIndex", prompt.eventPlayerIndex)
+            .put("kind", prompt.kind)
+            .put("triggerText", prompt.triggerText)
+            .put("effectText", prompt.effectText)
+            .put("targetRule", prompt.targetRule ?: JSONObject.NULL))
+    } })
 }.toString()
 
 fun parseOnlineGameState(source: String): OnlineGameState? = runCatching {
@@ -72,7 +95,25 @@ fun parseOnlineGameState(source: String): OnlineGameState? = runCatching {
         gameEnded = json.optBoolean("gameEnded"),
         stackActions = json.optJSONArray("stackActions")?.let { array -> (0 until array.length()).mapNotNull { array.optJSONObject(it)?.let { item -> StackAction(item.optString("id"), item.optString("title"), item.optString("controllerId"), item.optString("kind", "SPELL"), item.optJSONObject("card")?.toGameCard()) } } }.orEmpty(),
         priorityPlayer = json.optInt("priorityPlayer").coerceIn(players.indices),
-        priorityPassed = json.optJSONArray("priorityPassed")?.let { array -> (0 until array.length()).map { array.optString(it) }.toSet() }.orEmpty()
+        priorityPassed = json.optJSONArray("priorityPassed")?.let { array -> (0 until array.length()).map { array.optString(it) }.toSet() }.orEmpty(),
+        triggerPrompts = json.optJSONArray("triggerPrompts")?.let { array ->
+            (0 until array.length()).mapNotNull { index ->
+                val item = array.optJSONObject(index) ?: return@mapNotNull null
+                val controller = item.optInt("controllerIndex", -1)
+                val eventPlayer = item.optInt("eventPlayerIndex", -1)
+                if (controller !in players.indices || eventPlayer !in players.indices) return@mapNotNull null
+                TriggerPrompt(
+                    id = item.optString("id").takeIf { it.isNotBlank() } ?: java.util.UUID.randomUUID().toString(),
+                    cardName = item.optString("cardName"),
+                    controllerIndex = controller,
+                    eventPlayerIndex = eventPlayer,
+                    kind = item.optString("kind", "MANUAL"),
+                    triggerText = item.optString("triggerText"),
+                    effectText = item.optString("effectText"),
+                    targetRule = item.optString("targetRule").takeUnless { it.isBlank() || it == "null" }
+                )
+            }
+        }.orEmpty()
     )
 }.getOrNull()
 
