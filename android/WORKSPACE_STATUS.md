@@ -2,9 +2,14 @@
 
 ## Canonical project
 
-This is the complete Arcana Table **Build 69 source tree** (`0.15.50`, version code `69`). It contains the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. Build 69 adds recognized event-trigger prompts, target-player selection for supported effects, and a more detailed Activity Log. No Build 69 APK has been compiled.
+This is the complete Arcana Table **Build 70 source tree** (`0.15.51`, version code `70`). It contains the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. Build 70 fixes duplicate permanent instances when resolving activated abilities, with a regression test.
 
 The separate `ArcanaTable-build52-source/` folder is stale and should not be used as the project source. Its Gradle metadata still labels it Build 52 and its code is materially different.
+
+## Changes in Build 70
+
+- Resolving activated and loyalty abilities no longer moves the source permanent; only spell and commander stack items change zones when they resolve.
+- Added a regression test confirming abilities and triggers do not move their source card, while spell and commander resolution still does.
 
 ## Changes in Build 69
 
@@ -78,7 +83,7 @@ These fixes are retained in the Build 62 source and APK.
 
 ## Build status
 
-Build 69 (`0.15.50`, version code `69`) is the current source. Build 67 (`0.15.48`, version code `67`) is the latest compiled debug APK; it uses the established debug package ID `com.arcanatable.build52test2` and is signed with the Android debug key. APK SHA-256: `bb7e9bae7422495b83bc0848797fcd17644f478b26e4213700b2a525484af37a`.
+Build 70 (`0.15.51`, version code `70`) is the current source. Build 69 (`0.15.50`, version code `69`) is the latest compiled debug APK. Build 70 has not been compiled.
 
 Build 62 gives every tutorial step a `NEXT` button, explains that the Join Game action needs a room code and password, and lets the tutorial continue without connecting.
 
