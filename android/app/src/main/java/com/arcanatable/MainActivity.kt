@@ -1255,10 +1255,18 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         }
     }
     fun untapPermanents(playerIndex: Int) {
-        val tappedCount = players.getOrNull(playerIndex)?.battlefield?.count { it.tapped } ?: return
-        if (tappedCount == 0) return
-        updatePlayer(playerIndex) { player -> player.copy(battlefield = player.battlefield.map { it.copy(tapped = false) }) }
-        logAction(playerIndex, "untapped $tappedCount permanents")
+        val battlefield = players.getOrNull(playerIndex)?.battlefield ?: return
+        val tappedCards = battlefield.filter { it.tapped }
+        if (tappedCards.isEmpty()) return
+        val results = tappedCards.associate { it.id to resolveUntapStep(it.tapped, it.counters) }
+        val untappedCount = results.values.count { !it.remainsTapped }
+        val stunCount = results.values.count { it.removedStunCounter }
+        updatePlayer(playerIndex) { player -> player.copy(battlefield = player.battlefield.map { card ->
+            val result = results[card.id] ?: return@map card
+            card.copy(tapped = result.remainsTapped, counters = result.counters)
+        }) }
+        if (untappedCount > 0) logAction(playerIndex, "untapped $untappedCount permanents")
+        if (stunCount > 0) logAction(playerIndex, "removed a stun counter from $stunCount tapped permanent(s); they stayed tapped")
     }
     fun makeCard(name: String, type: String, imageUrl: String? = null, token: Boolean = false, oracleText: String? = null, manaValue: Double? = null, artCropUrl: String? = null, manaCost: String? = null, power: String? = null, toughness: String? = null, keywords: List<String> = emptyList()): GameCard {
         val palette = listOf(Color(0xFF547D9A), Color(0xFF9F8C63), Color(0xFF6C9A75), Color(0xFF756348), Color(0xFF8D8C9E))
@@ -2262,6 +2270,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         HorizontalPager(
             state = viewPagerState,
             modifier = Modifier.weight(1f),
+            // Player boards contain horizontal card and zone lists. Keep
+            // gestures inside those lists; use the player tabs to switch boards.
+            userScrollEnabled = showOverview,
             verticalAlignment = Alignment.Top,
             key = { page -> if (page == 0) "table" else players.getOrNull(page - 1)?.id ?: page }
         ) { page ->
@@ -4428,7 +4439,7 @@ private fun OptionsPage(
                 SettingsToggle("Open hand after drawing", "Show the hand tray after a draw-step card is drawn.", openHandAfterDraw, onOpenHandAfterDraw, tutorialAnchor("options-open-hand"))
                 Text("GAME", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
                 SettingsToggle("Draw automatically", "Draw when turn progression reaches the draw step.", autoDrawOnDrawStep, onAutoDraw, tutorialAnchor("options-auto-draw"))
-                SettingsToggle("Untap automatically", "Untap your permanents as your new turn begins.", autoUntapOnUntapStep, onAutoUntap, tutorialAnchor("options-auto-untap"))
+                SettingsToggle("Untap automatically", "Untap your permanents as your new turn begins; stun counters are removed instead of untapping.", autoUntapOnUntapStep, onAutoUntap, tutorialAnchor("options-auto-untap"))
                 Text("Turn timer is ${if (timerRunning) "running" else "stopped"}. Timer controls are in the timer menu at the top of the table.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(vertical = 5.dp))
                 TextButton(onClick = onToggleTimerVisibility, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).then(tutorialAnchor("options-timer"))) { Text(if (timerVisible) "Hide turn timer display" else "Show turn timer display", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
                 Text("NOTIFICATIONS", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))

@@ -99,6 +99,26 @@ class GameRulesTest {
     }
 
     @Test
+    fun untapStepRemovesOneStunCounterInsteadOfUntapping() {
+        assertEquals(
+            UntapStepResult(true, emptyMap(), true),
+            resolveUntapStep(true, mapOf("Stun" to 1))
+        )
+        assertEquals(
+            UntapStepResult(true, mapOf("Stun" to 1), true),
+            resolveUntapStep(true, mapOf("Stun" to 2))
+        )
+        assertEquals(
+            UntapStepResult(false, mapOf("Stun" to 1), false),
+            resolveUntapStep(false, mapOf("Stun" to 1))
+        )
+        assertEquals(
+            UntapStepResult(false, emptyMap(), false),
+            resolveUntapStep(true, emptyMap())
+        )
+    }
+
+    @Test
     fun paysColoredSymbolsBeforeGeneric() {
         assertEquals(mapOf("G" to 1), paySimpleManaCost(mapOf("U" to 1, "C" to 1, "G" to 1), "{U}{1}"))
     }

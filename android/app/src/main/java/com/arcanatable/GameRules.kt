@@ -24,6 +24,22 @@ internal data class CreatureEntryLifeEffect(
     val controllerFilter: String?
 )
 
+internal data class UntapStepResult(
+    val remainsTapped: Boolean,
+    val counters: Map<String, Int>,
+    val removedStunCounter: Boolean
+)
+
+/** Applies the normal untap-step rule for stun counters to one permanent. */
+internal fun resolveUntapStep(tapped: Boolean, counters: Map<String, Int>): UntapStepResult {
+    if (!tapped) return UntapStepResult(remainsTapped = false, counters = counters, removedStunCounter = false)
+    val stun = counters.entries.firstOrNull { it.key.equals("Stun", ignoreCase = true) && it.value > 0 }
+        ?: return UntapStepResult(remainsTapped = false, counters = counters, removedStunCounter = false)
+    val nextCounters = counters.toMutableMap()
+    if (stun.value == 1) nextCounters.remove(stun.key) else nextCounters[stun.key] = stun.value - 1
+    return UntapStepResult(remainsTapped = true, counters = nextCounters, removedStunCounter = true)
+}
+
 private val automaticNumberWords = mapOf(
     "a" to 1, "an" to 1, "one" to 1, "two" to 2, "three" to 3, "four" to 4,
     "five" to 5, "six" to 6, "seven" to 7, "eight" to 8, "nine" to 9, "ten" to 10

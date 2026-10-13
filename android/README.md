@@ -1,6 +1,6 @@
 # Arcana Table 0.15.48 — Android multiplayer source update
 
-Arcana Table is a native Android Magic tabletop prototype. This source-only Build 67 update adds a pre-game opening-hand flow for multiplayer rooms: each player can keep or mulligan, and after keeping can select cards to put on the bottom. The Build 66 APK is still the last compiled APK and does not include this feature.
+Arcana Table is a native Android Magic tabletop prototype. Build 67 (version 0.15.48) adds a pre-game opening-hand flow for multiplayer rooms: each player can keep or mulligan, and after keeping can select cards to put on the bottom. It also applies stun counters correctly during automatic untap and prevents horizontal scrolling within a player board from switching to another player's board.
 
 ## Included
 
@@ -18,7 +18,8 @@ Arcana Table is a native Android Magic tabletop prototype. This source-only Buil
 - Display a persistent game status indicator and stop timers until a game starts
 - Require unanimous player approval before ending an online game; a decline cancels the proposal
 - Highlight the active player and step through turn phases; show session and current-turn timers
-- Use Next Step for manual progression or Pass Turn to advance through the remaining phases and begin the next player's turn; entering a new human turn untaps their permanents
+- Use Next Step for manual progression or Pass Turn to advance through the remaining phases and begin the next player's turn; automatic untap removes a stun counter from a tapped permanent instead of untapping it
+- Use the player tabs to change boards; horizontal card-list scrolling inside a player board will not switch to another player
 - Automatically draw when advancing into the draw step, open the hand, and highlight the drawn card
 - Snap the hand tray to a newly drawn card
 - Group battlefield cards into a vertically scrolling list by card type
@@ -76,13 +77,13 @@ Arcana Table is a native Android Magic tabletop prototype. This source-only Buil
 
 ## Build status
 
-The source is labeled version 0.15.48, build 67. This is a source-only update; no Build 67 APK has been compiled. `artifacts/ArcanaTable-0.15.47-build66.apk` is the previous compiled build and does not include the opening-hand flow. The optional full visual guide starts with the welcome message and follows the app screens with dimmed/blurred backgrounds, highlighted controls, and straight red arrows with solid arrowheads. It is available from the home screen and app menu and never launches automatically.
+The source is labeled version 0.15.48, build 67. The Build 67 debug APK is built separately from this source. The optional full visual guide starts with the welcome message and follows the app screens with dimmed/blurred backgrounds, highlighted controls, and straight red arrows with solid arrowheads. It is available from the home screen and app menu and never launches automatically.
 
 Build 66 adds a resizable hand panel, automatic stack-window closing after all resolutions, tighter player-view spacing, and stronger import/movement/sync diagnostics. It also includes the Build 65 import review, supported automatic life/draw/token effects with manual-resolution notices, quick Stack access, and earlier tutorial, card movement, privacy, and navigation updates.
 
 ## Project page
 
-The GitHub Pages site lives in `docs/`. Its published page and test APK remain on Build 66; Build 67 is a source-only update. See [`docs/README.md`](docs/README.md) for the Pages workflow setup.
+The GitHub Pages site lives in `docs/`. Its published project page remains on Build 66; Build 67 source and APK are separate from the page. See [`docs/README.md`](docs/README.md) for the Pages workflow setup.
 
 ## Repeat builds in this workspace
 
