@@ -2441,6 +2441,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 68 · SOURCE UPDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• The opening-hand screen now shows card faces. Tap any card to open a large preview; while choosing cards to bottom, use the separate button beneath each card to select it. The selection count and required bottom count remain visible.", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 67 · SOURCE UPDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Added a multiplayer opening-hand step before Ready Up. Each player can keep or mulligan; every mulligan shuffles the whole hand into the library and deals a fresh seven. The first multiplayer mulligan is free.\n• After keeping, players tap the exact number of cards to put on the bottom of their library.\n• Ready Up now requires a confirmed opening hand. LAN and Internet room state carries mulligan status, and room servers reject ready requests until both the deck and hand decision are set.\n• Starting the lobby game preserves each player's chosen hand and library order instead of dealing a new hand.\n\nThis is a source-only update; the Build 66 APK does not include these changes.", color = SoftWhite, fontSize = 11.sp)
 
@@ -4352,6 +4355,7 @@ private fun LobbyDialog(
 private fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKeep: (List<Int>) -> Unit, onDismiss: () -> Unit) {
     var choosingBottomCards by remember(player.id) { mutableStateOf(false) }
     var selectedCardIds by remember(player.id, player.hand.map { it.id }, player.mulligansTaken) { mutableStateOf(emptyList<Int>()) }
+    var previewCard by remember(player.id) { mutableStateOf<GameCard?>(null) }
     val bottomCount = (player.mulligansTaken - 1).coerceAtLeast(0)
     val canMulliganAgain = player.mulligansTaken < 8
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -4360,30 +4364,29 @@ private fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKee
                 Text("OPENING HAND · ${player.hand.size} CARDS", color = Mint, fontWeight = FontWeight.Black, fontSize = 15.sp)
                 Text("Mulligans taken: ${player.mulligansTaken} · First multiplayer mulligan is free", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
                 Text(
-                    if (choosingBottomCards) "Tap exactly $bottomCount card(s) to put on the bottom of your library, then confirm."
-                    else "Keep this hand or mulligan. A mulligan shuffles your whole hand into your library, then deals a fresh seven.",
+                    if (choosingBottomCards) "Select exactly $bottomCount card(s) to put on the bottom of your library, then confirm."
+                    else "Tap a card to enlarge it. Keep this hand or mulligan; a mulligan shuffles your whole hand into your library, then deals a fresh seven.",
                     color = SoftWhite, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp, bottom = 8.dp)
                 )
-                player.hand.forEach { card ->
-                    val selected = card.id in selectedCardIds
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp)
-                            .then(if (choosingBottomCards) Modifier.clickable {
-                                selectedCardIds = if (selected) selectedCardIds - card.id else selectedCardIds + card.id
-                            } else Modifier),
-                        color = if (selected) Mint.copy(alpha = 0.16f) else PanelLight,
-                        shape = RoundedCornerShape(9.dp),
-                        border = BorderStroke(1.dp, if (selected) Mint else Color.Transparent)
-                    ) {
-                        Row(Modifier.padding(horizontal = 11.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(25.dp).clip(CircleShape).background(if (selected) Mint else Panel).border(1.dp, if (selected) Mint else Muted, CircleShape), contentAlignment = Alignment.Center) {
-                                Text(if (selected) "${selectedCardIds.indexOf(card.id) + 1}" else "•", color = if (selected) Ink else Muted, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                if (choosingBottomCards) Text("Tap a card to enlarge it; use the button under a card to select it for the bottom.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(bottom = 6.dp))
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    player.hand.forEach { card ->
+                        val selected = card.id in selectedCardIds
+                        Column(Modifier.width(88.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Box(Modifier.fillMaxWidth().border(2.dp, if (selected) Mint else Color.Transparent, RoundedCornerShape(9.dp)).padding(2.dp)) {
+                                CardFace(card, Modifier.fillMaxWidth(), onClick = { previewCard = card }, onLongClick = { previewCard = card }, showCounters = false)
                             }
-                            Column(Modifier.weight(1f).padding(start = 10.dp)) {
-                                Text(card.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 2)
-                                Text(card.type.ifBlank { "Card" }, color = Muted, fontSize = 9.sp, maxLines = 1)
+                            Text(card.name, color = SoftWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
+                            if (choosingBottomCards) {
+                                OutlinedButton(
+                                    onClick = { selectedCardIds = if (selected) selectedCardIds - card.id else selectedCardIds + card.id },
+                                    modifier = Modifier.fillMaxWidth().padding(top = 3.dp).heightIn(min = 38.dp),
+                                    contentPadding = PaddingValues(horizontal = 3.dp, vertical = 4.dp),
+                                    border = BorderStroke(1.dp, if (selected) Mint else Muted)
+                                ) {
+                                    Text(if (selected) "${selectedCardIds.indexOf(card.id) + 1} · BOTTOM" else "SELECT", color = if (selected) Mint else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                                }
                             }
-                            if (selected) Text("BOTTOM", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Black)
                         }
                     }
                 }
@@ -4403,8 +4406,10 @@ private fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKee
             }
         }
     }
+    previewCard?.let { card ->
+        CardPreviewPopup(item = CardPreview(playerIndex = 0, card = card, fromHand = true), onDismiss = { previewCard = null })
+    }
 }
-
 @Composable
 private fun OptionsPage(
     tutorialStep: TutorialStop?, tutorialIndex: Int, tutorialTotal: Int, tutorialBounds: Map<String, Rect>, tutorialAnchor: (String) -> Modifier,
