@@ -44,6 +44,10 @@ internal data class UntapStepResult(
     val removedStunCounter: Boolean
 )
 
+/** Only spells and commanders change zones when their stack item resolves. */
+internal fun stackResolutionMovesCardToZone(kind: String): Boolean =
+    kind.equals("SPELL", ignoreCase = true) || kind.equals("COMMANDER", ignoreCase = true)
+
 /** Applies the normal untap-step rule for stun counters to one permanent. */
 internal fun resolveUntapStep(tapped: Boolean, counters: Map<String, Int>): UntapStepResult {
     if (!tapped) return UntapStepResult(remainsTapped = false, counters = counters, removedStunCounter = false)
