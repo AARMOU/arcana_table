@@ -1,6 +1,6 @@
-# Arcana Table 0.15.49 — Build 68 source update
+# Arcana Table 0.15.50 — Build 69 source update
 
-Arcana Table is a native Android Magic tabletop prototype. Build 68 updates the multiplayer opening-hand screen to show the actual cards. Tapping a card opens a large preview, and a separate control selects cards to put on the bottom after keeping. Build 67's multiplayer mulligan flow, stun-counter untap handling, and player-board swipe fix are included.
+Arcana Table is a native Android Magic tabletop prototype. Build 69 adds broader trigger prompts for recognized spell-cast, draw, and creature-entry events, synchronizes pending prompts across online seats, offers target-player selection for supported life, draw, and token trigger effects, and adds a clearer Activity Log for costs, triggers, and effects. Unsupported modes or effects stay on a manual-resolution path. Build 68's card-face mulligan screen with tap-to-enlarge previews is included.
 
 ## Included
 
@@ -77,7 +77,7 @@ Arcana Table is a native Android Magic tabletop prototype. Build 68 updates the 
 
 ## Build status
 
-The source is labeled version 0.15.49, build 68. This is a source update; no Build 68 APK has been compiled. The optional full visual guide starts with the welcome message and follows the app screens with dimmed/blurred backgrounds, highlighted controls, and straight red arrows with solid arrowheads. It is available from the home screen and app menu and never launches automatically.
+The source is labeled version 0.15.50, build 69. This is a source update; no Build 69 APK has been compiled. The optional full visual guide starts with the welcome message and follows the app screens with dimmed/blurred backgrounds, highlighted controls, and straight red arrows with solid arrowheads. It is available from the home screen and app menu and never launches automatically.
 
 Build 66 adds a resizable hand panel, automatic stack-window closing after all resolutions, tighter player-view spacing, and stronger import/movement/sync diagnostics. It also includes the Build 65 import review, supported automatic life/draw/token effects with manual-resolution notices, quick Stack access, and earlier tutorial, card movement, privacy, and navigation updates.
 
