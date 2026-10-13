@@ -830,7 +830,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     LaunchedEffect(players, onlineMode) { if (!onlineMode) savePlayers(context, players) }
     fun buildOnlineSnapshot(): String {
         val sharedOrder = if (gameStartedOnline) gameTurnOrder else lobbyTurnOrder.orEmpty()
-        return OnlineGameState(players, activePlayer, turnNumber, phaseIndex, elapsedGameSeconds, elapsedTurnSeconds, sharedOrder, lobbyReadyPlayers, gameLog.takeLast(250), chatMessages.takeLast(200).map { OnlineChatMessage(it.author, it.text, it.timestamp) }, gameStartedOnline, endProposalBy, endVotes, gameEndedOnline, stackActions, priorityPlayer, priorityPassed).toJson()
+        return OnlineGameState(players, activePlayer, turnNumber, phaseIndex, elapsedGameSeconds, elapsedTurnSeconds, sharedOrder, lobbyReadyPlayers, gameLog.takeLast(250), chatMessages.takeLast(200).map { OnlineChatMessage(it.author, it.text, it.timestamp) }, gameStartedOnline, endProposalBy, endVotes, gameEndedOnline, stackActions, priorityPlayer, priorityPassed, triggerPrompts).toJson()
     }
     fun publishOnlineSnapshot() {
         if ((roomHost != null || roomClient != null || cloudRoomClient != null) && roomConnected && onlineStateReady) {
@@ -842,7 +842,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             }
         }
     }
-    LaunchedEffect(players, activePlayer, turnNumber, phaseIndex, gameTurnOrder, lobbyReadyPlayers, lobbyTurnOrder, gameLog, chatMessages, gameStartedOnline, endProposalBy, endVotes, gameEndedOnline, stackActions, priorityPlayer, priorityPassed, roomHost, roomClient, cloudRoomClient, roomConnected, onlineStateReady) {
+    LaunchedEffect(players, activePlayer, turnNumber, phaseIndex, gameTurnOrder, lobbyReadyPlayers, lobbyTurnOrder, gameLog, chatMessages, gameStartedOnline, endProposalBy, endVotes, gameEndedOnline, stackActions, priorityPlayer, priorityPassed, triggerPrompts, roomHost, roomClient, cloudRoomClient, roomConnected, onlineStateReady) {
         delay(180)
         publishOnlineSnapshot()
     }
@@ -1025,7 +1025,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     }
     fun logAction(playerIndex: Int, action: String) {
         val playerName = players.getOrNull(playerIndex)?.name ?: "TABLE"
-        gameLog = (gameLog + "Turn $turnNumber · $playerName $action").takeLast(250)
+        val phase = phaseSteps.getOrNull(phaseIndex)?.let { " · $it" }.orEmpty()
+        gameLog = (gameLog + "Turn $turnNumber$phase · $playerName $action").takeLast(250)
         if (backgroundAlertsEnabled && !appInForeground && onlineMode && playerIndex != localSeat && !action.startsWith("sent a chat")) {
             postGameAlert(context, "Game activity", "$playerName $action")
         }
@@ -1124,6 +1125,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         endVotes = state.endVotes
         gameEndedOnline = state.gameEnded
         stackActions = state.stackActions
+        triggerPrompts = state.triggerPrompts
         priorityPlayer = state.priorityPlayer.coerceIn(players.indices)
         priorityPassed = state.priorityPassed
         val stackItemAdded = state.stackActions.any { it.id !in oldStackIds }
@@ -1172,7 +1174,12 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             readyPlayers = state.readyPlayers.map(::shift).filter { it >= 0 }.toSet(),
             endProposalBy = shiftedProposal,
             endVotes = state.endVotes.mapNotNull { (seat, vote) -> shift(seat).takeIf { it >= 0 }?.let { it to vote } }.toMap(),
-            priorityPassed = state.priorityPassed.intersect(shiftedPlayers.map { it.id }.toSet())
+            priorityPassed = state.priorityPassed.intersect(shiftedPlayers.map { it.id }.toSet()),
+            triggerPrompts = state.triggerPrompts.mapNotNull { prompt ->
+                val controller = shift(prompt.controllerIndex)
+                val eventPlayer = shift(prompt.eventPlayerIndex)
+                if (controller < 0 || eventPlayer < 0) null else prompt.copy(controllerIndex = controller, eventPlayerIndex = eventPlayer)
+            }
         )
         return shifted.toJson()
     }
@@ -1312,21 +1319,63 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         loadTestCardImages()
     }
 
-    fun queueKnownTriggers(event: String, eventPlayerIndex: Int) {
+    fun queueKnownTriggers(event: String, eventPlayerIndex: Int, enteringCard: GameCard? = null) {
+        if (eventPlayerIndex !in players.indices) return
         players.forEachIndexed { controllerIndex, player ->
-            if (controllerIndex == eventPlayerIndex) return@forEachIndexed
-            player.battlefield.forEach { card ->
-                val oracle = card.oracleText.orEmpty()
-                val kind = when {
-                    event == "CAST" && card.name.equals("Rhystic Study", ignoreCase = true) -> "RHYSTIC"
-                    event == "DRAW" && card.name.equals("Smothering Tithe", ignoreCase = true) -> "TITHE"
-                    event == "CAST" && oracle.contains("whenever an opponent casts a spell", ignoreCase = true) -> "REMINDER"
-                    event == "DRAW" && (oracle.contains("whenever an opponent draws a card", ignoreCase = true) || oracle.contains("whenever a player draws a card", ignoreCase = true)) -> "REMINDER"
+            if (player.isEliminated) return@forEachIndexed
+            player.battlefield.filterNot { it.isFaceDown }.forEach { card ->
+                val knownKind = when {
+                    event == "CAST" && controllerIndex != eventPlayerIndex && card.name.equals("Rhystic Study", ignoreCase = true) -> "RHYSTIC"
+                    event == "DRAW" && controllerIndex != eventPlayerIndex && card.name.equals("Smothering Tithe", ignoreCase = true) -> "TITHE"
                     else -> null
                 }
-                if (kind != null) {
-                    triggerPrompts = triggerPrompts + TriggerPrompt(card.name, controllerIndex, eventPlayerIndex, kind)
-                    logAction(controllerIndex, "triggered ${card.name}")
+                if (knownKind != null) {
+                    val prompt = TriggerPrompt(
+                        cardName = card.name,
+                        controllerIndex = controllerIndex,
+                        eventPlayerIndex = eventPlayerIndex,
+                        kind = knownKind,
+                        triggerText = if (knownKind == "RHYSTIC") "Whenever an opponent casts a spell" else "Whenever an opponent draws a card",
+                        effectText = if (knownKind == "RHYSTIC") "Draw a card unless that player pays {1}." else "Create a Treasure token unless that player pays {2}."
+                    )
+                    triggerPrompts = triggerPrompts + prompt
+                    logAction(controllerIndex, "triggered ${card.name} · ${prompt.triggerText}")
+                    return@forEach
+                }
+                parseRecognizedTriggeredAbilities(card.oracleText).filter { it.event == event }.forEach abilityLoop@{ ability ->
+                    val isControllerEvent = controllerIndex == eventPlayerIndex
+                    val actorMatches = when (ability.actorFilter) {
+                        "YOU" -> isControllerEvent
+                        "OPPONENT" -> !isControllerEvent
+                        else -> true
+                    }
+                    if (!actorMatches || (ability.anotherOnly && enteringCard?.id == card.id)) return@abilityLoop
+                    if (ability.controllerFilter == "under your control" && !isControllerEvent) return@abilityLoop
+                    if (ability.controllerFilter == "under an opponent's control" && isControllerEvent) return@abilityLoop
+
+                    val oldLifeTrigger = event == "CREATURE_ETB" && parseCreatureEntryLifeEffects(card.oracleText).isNotEmpty()
+                    val simpleEffects = parseAutomaticResolutionEffects(ability.effectText)
+                    if (oldLifeTrigger && !simpleEffects.requiresManualReview && simpleEffects.lifeGain > 0 &&
+                        simpleEffects.lifeLoss == 0 && simpleEffects.cardsDrawn == 0 && simpleEffects.tokens.isEmpty()) return@abilityLoop
+
+                    val targetEffect = parseTargetedAutomaticEffect(ability.effectText)
+                    val triggerKind = when {
+                        targetEffect != null -> "TARGET_EFFECT"
+                        simpleEffects.requiresManualReview -> "MANUAL"
+                        !simpleEffects.isEmpty -> "AUTO_EFFECT"
+                        else -> "MANUAL"
+                    }
+                    val prompt = TriggerPrompt(
+                        cardName = card.name,
+                        controllerIndex = controllerIndex,
+                        eventPlayerIndex = eventPlayerIndex,
+                        kind = triggerKind,
+                        triggerText = ability.conditionText,
+                        effectText = targetEffect?.effectText ?: ability.effectText,
+                        targetRule = targetEffect?.targetRule ?: parseTargetPlayerRule(ability.effectText)
+                    )
+                    triggerPrompts = triggerPrompts + prompt
+                    logAction(controllerIndex, "triggered ${card.name} · ${ability.conditionText}")
                 }
             }
         }
@@ -1361,6 +1410,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 }
             }
         }
+        queueKnownTriggers("CREATURE_ETB", eventPlayerIndex, enteringCard)
     }
 
     fun addTreasure(playerIndex: Int) {
@@ -1588,7 +1638,15 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         stackActions = stackActions + StackAction(title = title, controllerId = current.id, kind = if (commander) "COMMANDER" else "SPELL", card = card)
         priorityPlayer = index
         priorityPassed = emptySet()
-        logAction(index, if (commander) "cast ${card.name} from the command zone" else if (card.isFaceDown) "cast a face-down spell" else "cast ${card.name}")
+        val castDescription = if (commander) "cast ${card.name} from the command zone" else if (card.isFaceDown) "cast a face-down spell" else "cast ${card.name}"
+        val listedCost = card.manaCost?.takeIf { it.isNotBlank() }
+        val paymentDescription = when {
+            manualPayment -> "payment handled manually${listedCost?.let { " · listed cost $it" }.orEmpty()}${if (tax > 0) " · commander tax {$tax}" else ""}"
+            listedCost != null -> "paid $listedCost${if (tax > 0) " + commander tax {$tax}" else ""}"
+            tax > 0 -> "paid commander tax {$tax}; other payment untracked"
+            else -> "mana cost not listed"
+        }
+        logAction(index, "$castDescription · $paymentDescription")
         queueKnownTriggers("CAST", index)
         paymentCard = null
         handActionCard = null
@@ -1617,11 +1675,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     }
     fun concede(index: Int) = eliminatePlayer(index, "Conceded")
 
-    fun applyAutomaticResolutionEffects(playerIndex: Int, card: GameCard) {
-        if (playerIndex !in players.indices || card.isFaceDown) return
-        val effects = parseAutomaticResolutionEffects(card.oracleText)
+    fun applyParsedAutomaticEffects(playerIndex: Int, sourceName: String, effects: AutomaticResolutionEffects) {
         if (effects.requiresManualReview) {
-            val notice = "${card.name} resolved; its effects need manual resolution."
+            val notice = "$sourceName resolved; its effects need manual resolution."
             logAction(playerIndex, notice)
             val playerName = players[playerIndex].name
             scope.launch { automaticActionSnackbar.showSnackbar("$playerName · $notice") }
@@ -1630,18 +1686,18 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         if (effects.isEmpty) return
         if (effects.lifeGain > 0) {
             updatePlayer(playerIndex) { it.copy(life = it.life + effects.lifeGain) }
-            announceAutomaticAction(playerIndex, "gained ${effects.lifeGain} life from ${card.name}")
+            announceAutomaticAction(playerIndex, "gained ${effects.lifeGain} life from $sourceName")
         }
         if (effects.lifeLoss > 0) {
             val nextLife = (players[playerIndex].life - effects.lifeLoss).coerceAtLeast(0)
             updatePlayer(playerIndex) { it.copy(life = nextLife) }
-            announceAutomaticAction(playerIndex, "lost ${effects.lifeLoss} life from ${card.name}")
+            announceAutomaticAction(playerIndex, "lost ${effects.lifeLoss} life from $sourceName")
             if (nextLife == 0) eliminatePlayer(playerIndex, "Life total reached 0")
         }
         repeat(effects.cardsDrawn) {
             if (players[playerIndex].library.isNotEmpty()) {
-                drawCard(playerIndex, "automatically drew a card from ${card.name}")
-                announceAutomaticAction(playerIndex, "drew a card from ${card.name}", alreadyLogged = true)
+                drawCard(playerIndex, "automatically drew a card from $sourceName")
+                announceAutomaticAction(playerIndex, "drew a card from $sourceName", alreadyLogged = true)
             }
         }
         effects.tokens.forEach { spec ->
@@ -1658,9 +1714,21 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             generated.forEach { applyCreatureEntryLifeEffects(playerIndex, it) }
             announceAutomaticAction(
                 playerIndex,
-                "created ${generated.size} ${spec.name} ${if (generated.size == 1) "token" else "tokens"} from ${card.name}"
+                "created ${generated.size} ${spec.name} ${if (generated.size == 1) "token" else "tokens"} from $sourceName"
             )
         }
+    }
+
+    fun applyAutomaticResolutionEffects(playerIndex: Int, card: GameCard) {
+        if (playerIndex !in players.indices || card.isFaceDown) return
+        val targeted = parseTargetedAutomaticEffect(card.oracleText)
+        if (targeted != null) {
+            val notice = "${card.name} resolved; choose its target and resolve the effect manually."
+            logAction(playerIndex, notice)
+            scope.launch { automaticActionSnackbar.showSnackbar("${players[playerIndex].name} · $notice") }
+            return
+        }
+        applyParsedAutomaticEffects(playerIndex, card.name, parseAutomaticResolutionEffects(card.oracleText))
     }
 
     fun resolveTopOfStack() {
@@ -1706,14 +1774,34 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         }
     }
 
-    fun resolveTrigger(prompt: TriggerPrompt, paid: Boolean) {
+    fun resolveTrigger(prompt: TriggerPrompt, paid: Boolean, targetIndex: Int? = null, manual: Boolean = false) {
         val payment = when (prompt.kind) { "RHYSTIC" -> 1; "TITHE" -> 2; else -> 0 }
         if (paid && payment > 0 && !spendGenericMana(prompt.eventPlayerIndex, payment)) return
-        triggerPrompts = triggerPrompts.drop(1)
+        if (manual) {
+            triggerPrompts = triggerPrompts.filterNot { it.id == prompt.id }
+            val targetDetail = targetIndex?.let { " · targeted ${players.getOrNull(it)?.name ?: "player"}" }.orEmpty()
+            logAction(prompt.controllerIndex, "resolved ${prompt.cardName} trigger manually$targetDetail · ${prompt.effectText}")
+            return
+        }
+        if (prompt.kind == "TARGET_EFFECT") {
+            val validTarget = targetIndex?.takeIf { target ->
+                target in players.indices && !players[target].isEliminated &&
+                    (prompt.targetRule != "OPPONENT" || target != prompt.controllerIndex)
+            } ?: return
+            triggerPrompts = triggerPrompts.filterNot { it.id == prompt.id }
+            logAction(prompt.controllerIndex, "resolved ${prompt.cardName} trigger targeting ${players[validTarget].name}")
+            applyParsedAutomaticEffects(validTarget, prompt.cardName, parseAutomaticResolutionEffects(prompt.effectText))
+            return
+        }
+        triggerPrompts = triggerPrompts.filterNot { it.id == prompt.id }
         when (prompt.kind) {
             "RHYSTIC" -> if (paid) logAction(prompt.eventPlayerIndex, "paid {1} for Rhystic Study") else drawCard(prompt.controllerIndex, "drew a card from Rhystic Study")
             "TITHE" -> if (paid) logAction(prompt.eventPlayerIndex, "paid {2} for Smothering Tithe") else addTreasure(prompt.controllerIndex)
-            "REMINDER" -> logAction(prompt.controllerIndex, "reviewed a trigger reminder for ${prompt.cardName}")
+            "AUTO_EFFECT" -> applyParsedAutomaticEffects(prompt.controllerIndex, prompt.cardName, parseAutomaticResolutionEffects(prompt.effectText))
+            "MANUAL" -> {
+                val targetDetail = targetIndex?.let { " · targeted ${players.getOrNull(it)?.name ?: "player"}" }.orEmpty()
+                logAction(prompt.controllerIndex, "resolved ${prompt.cardName} trigger manually$targetDetail · ${prompt.effectText}")
+            }
         }
     }
 
@@ -2103,7 +2191,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         graveyard = if (permanent) current.graveyard else current.graveyard + spell
                     )
                 }
-                logAction(playerIndex, "cast ${spell.name} using tracked colored mana")
+                logAction(playerIndex, "cast ${spell.name} using tracked colored mana · cost ${spell.manaCost ?: "unlisted"}")
                 if (!permanent) logAction(playerIndex, "resolved ${spell.name} to graveyard")
                 if (permanent && spell.type.contains("creature", ignoreCase = true)) applyCreatureEntryLifeEffects(playerIndex, spell)
                 if (!permanent) applyAutomaticResolutionEffects(playerIndex, spell)
@@ -2441,6 +2529,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 69 · SOURCE UPDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Added trigger detection for recognized spell-cast, draw, and creature-entry events. Triggers show their event and effect, offer target-player selection for supported player-target effects, and keep modes or unsupported effects on a manual-resolution path. Rhystic Study and Smothering Tithe keep their pay-or-resolve choices.\n• Expanded simple automatic effect handling for targeted player life, draw, and token effects after a target is chosen.\n• The Activity Log now includes turn phase, spell cost/payment detail, trigger events, automatic changes, and manual-resolution notes, with visual emphasis for payments, triggers, and effects.", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 68 · SOURCE UPDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• The opening-hand screen now shows card faces. Tap any card to open a large preview; while choosing cards to bottom, use the separate button beneath each card to select it. The selection count and required bottom count remain visible.", color = SoftWhite, fontSize = 11.sp)
 
@@ -3740,27 +3831,66 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         )
     }
 
-    if (!manaPoolOpen && manaChoicePrompt == null) triggerPrompts.firstOrNull()?.let { prompt ->
+    val visibleTriggerPrompt = if (onlineMode) triggerPrompts.firstOrNull {
+        it.controllerIndex == localSeat || (roomHost != null && players.getOrNull(it.controllerIndex)?.isComputer == true)
+    } else triggerPrompts.firstOrNull()
+    if (!manaPoolOpen && manaChoicePrompt == null) visibleTriggerPrompt?.let { prompt ->
         val payment = when (prompt.kind) { "RHYSTIC" -> 1; "TITHE" -> 2; else -> 0 }
         val canPay = payment == 0 || trackedMana(prompt.eventPlayerIndex) >= payment
+        val targetCandidates = players.indices.filter { target ->
+            !players[target].isEliminated && (prompt.targetRule != "OPPONENT" || target != prompt.controllerIndex)
+        }
+        var selectedTriggerTarget by remember(prompt.cardName, prompt.controllerIndex, prompt.eventPlayerIndex, prompt.kind, prompt.effectText) { mutableIntStateOf(-1) }
         val promptText = when (prompt.kind) {
             "RHYSTIC" -> "${players[prompt.eventPlayerIndex].name} cast a spell. Pay {1} for ${prompt.cardName}, or let ${players[prompt.controllerIndex].name} draw a card?"
             "TITHE" -> "${players[prompt.eventPlayerIndex].name} drew a card. Pay {2} for ${prompt.cardName}, or create a Treasure for ${players[prompt.controllerIndex].name}?"
-            else -> "${prompt.cardName} may have a triggered ability for this action. Review the card and resolve it manually."
+            "AUTO_EFFECT" -> "${prompt.cardName} triggered: ${prompt.triggerText}. The app can apply this effect: ${prompt.effectText}"
+            "TARGET_EFFECT" -> "${prompt.cardName} triggered: ${prompt.triggerText}. Choose a target for: ${prompt.effectText}"
+            else -> "${prompt.cardName} triggered: ${prompt.triggerText}. Choose any modes, targets, and other decisions on the card, resolve it manually, then confirm. Effect: ${prompt.effectText}"
         }
         AlertDialog(
-            onDismissRequest = { resolveTrigger(prompt, paid = false) },
-            title = { Text("Triggered ability · ${prompt.cardName}") },
+            onDismissRequest = { if (prompt.kind == "RHYSTIC" || prompt.kind == "TITHE") resolveTrigger(prompt, paid = false) },
+            title = { Text(if (prompt.kind == "RHYSTIC" || prompt.kind == "TITHE") "Triggered choice · ${prompt.cardName}" else "Triggered ability · ${prompt.cardName}") },
             text = { Column {
-                Text(promptText)
+                Text(promptText, color = SoftWhite)
+                if (prompt.targetRule != null) {
+                    Text("TARGET", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+                    targetCandidates.forEach { target ->
+                        TextButton(onClick = { selectedTriggerTarget = target }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp)) {
+                            Text("${if (selectedTriggerTarget == target) "✓ " else ""}${players[target].name}", color = if (selectedTriggerTarget == target) Mint else SoftWhite, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
                 if (payment > 0) {
                     Text("Tracked mana for ${players.getOrNull(prompt.eventPlayerIndex)?.name ?: "player"}: ${trackedMana(prompt.eventPlayerIndex)}", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
                     if (!canPay) Text("Paying is unavailable until enough mana is tracked.", color = CounterGold, fontSize = 10.sp)
                     TextButton(onClick = { manaTarget = prompt.eventPlayerIndex; manaPoolOpen = true }, modifier = Modifier.heightIn(min = 42.dp)) { Text("UPDATE MANA POOL", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                 }
             } },
-            confirmButton = { TextButton(onClick = { resolveTrigger(prompt, paid = true) }, enabled = canPay) { Text(when (prompt.kind) { "RHYSTIC" -> "PAY {1}"; "TITHE" -> "PAY {2}"; else -> "GOT IT" }, color = if (canPay) Mint else Muted) } },
-            dismissButton = { if (prompt.kind != "REMINDER") TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text(if (prompt.kind == "RHYSTIC") "DRAW CARD" else "CREATE TREASURE") } },
+            confirmButton = {
+                val enabled = when (prompt.kind) {
+                    "RHYSTIC", "TITHE" -> canPay
+                    "TARGET_EFFECT" -> selectedTriggerTarget in targetCandidates
+                    "MANUAL" -> prompt.targetRule == null || selectedTriggerTarget in targetCandidates
+                    else -> true
+                }
+                TextButton(onClick = { resolveTrigger(prompt, paid = prompt.kind == "RHYSTIC" || prompt.kind == "TITHE", targetIndex = selectedTriggerTarget.takeIf { it >= 0 }) }, enabled = enabled) {
+                    Text(when (prompt.kind) {
+                        "RHYSTIC" -> "PAY {1}"
+                        "TITHE" -> "PAY {2}"
+                        "AUTO_EFFECT" -> "RESOLVE EFFECT"
+                        "TARGET_EFFECT" -> "APPLY TO TARGET"
+                        else -> "DONE · MANUAL RESOLUTION"
+                    }, color = if (enabled) Mint else Muted)
+                }
+            },
+            dismissButton = {
+                when (prompt.kind) {
+                    "RHYSTIC" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("DRAW CARD") }
+                    "TITHE" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("CREATE TREASURE") }
+                    "AUTO_EFFECT", "TARGET_EFFECT" -> TextButton(onClick = { resolveTrigger(prompt, paid = false, targetIndex = selectedTriggerTarget.takeIf { it >= 0 }, manual = true) }) { Text("RESOLVE MANUALLY", color = Muted) }
+                }
+            },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
@@ -3794,8 +3924,6 @@ private fun samplePlayers(): List<TablePlayer> {
 }
 
 private data class CardPreview(val playerIndex: Int, val card: GameCard, val fromHand: Boolean, val canManipulate: Boolean = true)
-private data class TriggerPrompt(val cardName: String, val controllerIndex: Int, val eventPlayerIndex: Int, val kind: String)
-
 @Composable
 private fun LibrarySearchDialog(
     player: TablePlayer,
@@ -4410,6 +4538,7 @@ private fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKee
         CardPreviewPopup(item = CardPreview(playerIndex = 0, card = card, fromHand = true), onDismiss = { previewCard = null })
     }
 }
+
 @Composable
 private fun OptionsPage(
     tutorialStep: TutorialStop?, tutorialIndex: Int, tutorialTotal: Int, tutorialBounds: Map<String, Rect>, tutorialAnchor: (String) -> Modifier,
@@ -5913,16 +6042,24 @@ private fun GameLogDialog(entries: List<String>, tutorialStep: TutorialStop?, tu
             Box(Modifier.fillMaxSize()) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("GAME LOG · ${entries.size}", color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text("ACTIVITY LOG · ${entries.size}", color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp).then(tutorialAnchor("log-close"))) { Icon(Icons.Filled.Close, "Close game log", tint = Muted) }
                 }
+                Text("Actions · mana payments · triggers · effects", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(bottom = 7.dp))
                 if (entries.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("No actions logged yet", color = Muted) }
                 else LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     items(entries.size) { index ->
-                        Text(entries[entries.lastIndex - index], color = SoftWhite, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).padding(10.dp))
+                        val entry = entries[entries.lastIndex - index]
+                        val entryColor = when {
+                            "trigger" in entry.lowercase() -> Mint
+                            "paid " in entry.lowercase() || "payment" in entry.lowercase() -> CounterGold
+                            "automatically" in entry.lowercase() || "effect" in entry.lowercase() || "life" in entry.lowercase() || "token" in entry.lowercase() -> Color(0xFF34749B)
+                            else -> SoftWhite
+                        }
+                        Text(entry, color = entryColor, fontSize = 12.sp, modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).padding(10.dp))
                     }
                 }
-                Text("Actions performed in the app are recorded here.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(top = 6.dp))
+                Text("Unsupported or ambiguous effects are marked for manual resolution.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(top = 6.dp))
             }
             tutorialStep?.let { step -> GuidedTutorialOverlay(step, tutorialIndex, tutorialTotal, tutorialBounds[step.target], onTutorialBack, onTutorialNext, onTutorialExit) }
             }
