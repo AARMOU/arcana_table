@@ -6,6 +6,15 @@ import org.junit.Test
 
 class GameRulesTest {
     @Test
+    fun onlySpellResolutionMovesItsCardOutOfTheStack() {
+        assertEquals(true, stackResolutionMovesCardToZone("SPELL"))
+        assertEquals(true, stackResolutionMovesCardToZone("COMMANDER"))
+        assertEquals(false, stackResolutionMovesCardToZone("ACTIVATED ABILITY"))
+        assertEquals(false, stackResolutionMovesCardToZone("LOYALTY ABILITY"))
+        assertEquals(false, stackResolutionMovesCardToZone("TRIGGER"))
+    }
+
+    @Test
     fun summarizesRepeatedMainDeckNamesAcrossPrintingRowsButOmitsCommander() {
         val repeated = repeatedDeckEntries(listOf(
             DeckEntry("Ancient Tomb", 1, setCode = "UMA"),
