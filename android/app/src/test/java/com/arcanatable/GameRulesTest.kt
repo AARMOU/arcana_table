@@ -60,6 +60,62 @@ class GameRulesTest {
     }
 
     @Test
+    fun recognizesSimpleCastDrawAndCreatureEntryTriggerEvents() {
+        val triggers = parseRecognizedTriggeredAbilities(
+            "Whenever you cast a spell, draw a card.\n" +
+                "Whenever an opponent draws a card, create a Treasure token.\n" +
+                "Whenever another creature enters the battlefield under your control, you gain 1 life."
+        )
+        assertEquals(listOf("CAST", "DRAW", "CREATURE_ETB"), triggers.map { it.event })
+        assertEquals(listOf("YOU", "OPPONENT", "YOU"), triggers.map { it.actorFilter })
+        assertEquals(true, triggers.last().anotherOnly)
+    }
+
+    @Test
+    fun parsesSimpleTargetPlayerEffectsForTargetPrompts() {
+        assertEquals(
+            TargetedAutomaticEffect("OPPONENT", "lose 3 life"),
+            parseTargetedAutomaticEffect("Target opponent loses 3 life.")
+        )
+        assertEquals(
+            TargetedAutomaticEffect("PLAYER", "draw a card"),
+            parseTargetedAutomaticEffect("Target player draws a card")
+        )
+        assertNull(parseTargetedAutomaticEffect("Target creature gets +1/+1."))
+        assertEquals("PLAYER", parseTargetPlayerRule("Target player mills two cards."))
+        assertNull(parseTargetPlayerRule("Target creature gets +1/+1."))
+    }
+
+    @Test
+    fun carriesTriggerPromptsAcrossOnlineSnapshots() {
+        val prompt = TriggerPrompt(
+            id = "trigger-1",
+            cardName = "Example Mentor",
+            controllerIndex = 1,
+            eventPlayerIndex = 0,
+            kind = "TARGET_EFFECT",
+            triggerText = "Whenever you cast a spell",
+            effectText = "lose 2 life",
+            targetRule = "OPPONENT"
+        )
+        val state = OnlineGameState(
+            players = listOf(TablePlayer("YOU"), TablePlayer("PLAYER 2")),
+            activePlayer = 0,
+            turnNumber = 1,
+            phaseIndex = 3,
+            elapsedGameSeconds = 0,
+            elapsedTurnSeconds = 0,
+            turnOrder = listOf(0, 1),
+            readyPlayers = emptySet(),
+            gameLog = emptyList(),
+            chat = emptyList(),
+            gameStarted = true,
+            triggerPrompts = listOf(prompt)
+        )
+        assertEquals(prompt, parseOnlineGameState(state.toJson())?.triggerPrompts?.single())
+    }
+
+    @Test
     fun spendsColorlessBeforeColoredMana() {
         assertEquals(mapOf("R" to 1, "G" to 1), spendGenericMana(mapOf("C" to 2, "R" to 1, "G" to 1), 2))
     }
