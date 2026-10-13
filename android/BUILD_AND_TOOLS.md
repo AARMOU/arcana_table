@@ -1,6 +1,6 @@
 # Arcana Table build and Worker tools
 
-This workspace keeps the app source, Cloudflare Worker, lockfiles, and build scripts together. Build 69 is the current source; Build 67 is the latest compiled debug APK. APKs are kept outside the GitHub source repository and project-page deployment.
+This workspace keeps the app source, Cloudflare Worker, lockfiles, and build scripts together. Build 70 is the current source; Build 69 is the latest compiled debug APK. APKs are kept outside the GitHub source repository and project-page deployment.
 
 The responsive GitHub Pages landing page is in `docs/`. Its Actions workflow stages the APK from `artifacts/` into the deployed site's `downloads/` path. See `docs/README.md` for publishing setup.
 
@@ -32,4 +32,4 @@ Login and deployment require the owner's Cloudflare credentials. No credentials 
 
 ## Current environment
 
-Build 67 was compiled with Android SDK Platform 36 and JDK 17; `testDebugUnitTest` passed. The Android SDK is not bundled in the source archive. Wrangler and TypeScript dependencies are recorded in the Worker lockfile; the Worker was not redeployed for this build.
+Build 70 has not been compiled. The Android SDK is not bundled in the source archive. Wrangler and TypeScript dependencies are recorded in the Worker lockfile; the Worker was not redeployed for this build.
