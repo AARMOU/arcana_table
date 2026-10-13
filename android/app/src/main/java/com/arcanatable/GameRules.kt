@@ -24,6 +24,20 @@ internal data class CreatureEntryLifeEffect(
     val controllerFilter: String?
 )
 
+internal data class RecognizedTriggeredAbility(
+    val event: String,
+    val actorFilter: String,
+    val conditionText: String,
+    val effectText: String,
+    val anotherOnly: Boolean = false,
+    val controllerFilter: String? = null
+)
+
+internal data class TargetedAutomaticEffect(
+    val targetRule: String,
+    val effectText: String
+)
+
 internal data class UntapStepResult(
     val remainsTapped: Boolean,
     val counters: Map<String, Int>,
@@ -111,6 +125,75 @@ internal fun parseAutomaticResolutionEffects(oracleText: String?): AutomaticReso
     }
     return AutomaticResolutionEffects(lifeGain, lifeLoss, cardsDrawn, tokens)
 }
+
+/** Recognizes trigger clauses for events that the table currently reports: casts, draws, and creature entry. */
+internal fun parseRecognizedTriggeredAbilities(oracleText: String?): List<RecognizedTriggeredAbility> {
+    val sentences = oracleText.orEmpty().lineSequence()
+        .flatMap { line -> line.split(Regex("(?<=\\.)\\s+" )).asSequence() }
+        .map { it.trim().trimEnd('.') }
+        .filter { it.isNotBlank() }
+    return sentences.mapNotNull { sentence ->
+        val comma = sentence.indexOf(',')
+        if (comma < 0) return@mapNotNull null
+        val condition = sentence.substringBefore(',').trim()
+        val effect = sentence.substring(comma + 1).trim()
+        if (effect.isBlank()) return@mapNotNull null
+
+        val cast = Regex("(?i)^whenever\\s+(you|a player|an opponent)\\s+casts?\\s+.+\\bspell$").matchEntire(condition)
+        if (cast != null) return@mapNotNull RecognizedTriggeredAbility(
+            event = "CAST",
+            actorFilter = when (cast.groupValues[1].lowercase()) { "you" -> "YOU"; "an opponent" -> "OPPONENT"; else -> "ANY" },
+            conditionText = condition,
+            effectText = effect
+        )
+
+        val draw = Regex("(?i)^whenever\\s+(you|a player|an opponent)\\s+draws?\\s+(?:a|one)\\s+card$").matchEntire(condition)
+        if (draw != null) return@mapNotNull RecognizedTriggeredAbility(
+            event = "DRAW",
+            actorFilter = when (draw.groupValues[1].lowercase()) { "you" -> "YOU"; "an opponent" -> "OPPONENT"; else -> "ANY" },
+            conditionText = condition,
+            effectText = effect
+        )
+
+        val creatureEntry = Regex("(?i)^whenever\\s+(another\\s+)?creature\\s+enters(?:\\s+the battlefield)?(?:\\s+(under your control|under an opponent's control))?$").matchEntire(condition)
+        if (creatureEntry != null) return@mapNotNull RecognizedTriggeredAbility(
+            event = "CREATURE_ETB",
+            actorFilter = when (creatureEntry.groupValues[2].lowercase()) {
+                "under your control" -> "YOU"
+                "under an opponent's control" -> "OPPONENT"
+                else -> "ANY"
+            },
+            conditionText = condition,
+            effectText = effect,
+            anotherOnly = creatureEntry.groupValues[1].isNotBlank(),
+            controllerFilter = creatureEntry.groupValues[2].takeIf { it.isNotBlank() }?.lowercase()
+        )
+        null
+    }.toList()
+}
+
+/** Extracts simple effects aimed at one player so the UI can ask who the target is before applying them. */
+internal fun parseTargetedAutomaticEffect(effectText: String?): TargetedAutomaticEffect? {
+    val match = Regex("(?i)^target\\s+(player|opponent)\\s+(gains?|loses?|draws?|creates?)\\s+(.+?)\\.?$")
+        .matchEntire(effectText.orEmpty().trim()) ?: return null
+    val verb = when (match.groupValues[2].lowercase()) {
+        "gain", "gains" -> "gain"
+        "lose", "loses" -> "lose"
+        "draw", "draws" -> "draw"
+        "create", "creates" -> "create"
+        else -> return null
+    }
+    val normalized = "$verb ${match.groupValues[3].trim().trimEnd('.')}"
+    val parsed = parseAutomaticResolutionEffects(normalized)
+    if (parsed.isEmpty || parsed.requiresManualReview) return null
+    return TargetedAutomaticEffect(
+        targetRule = match.groupValues[1].uppercase(),
+        effectText = normalized
+    )
+}
+
+internal fun parseTargetPlayerRule(effectText: String?): String? =
+    Regex("(?i)^target\\s+(player|opponent)\\b").find(effectText.orEmpty().trim())?.groupValues?.get(1)?.uppercase()
 
 /** Finds simple fixed-life triggers for creature entries, such as Soul Warden. */
 internal fun parseCreatureEntryLifeEffects(oracleText: String?): List<CreatureEntryLifeEffect> {
