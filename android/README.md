@@ -1,6 +1,6 @@
-# Arcana Table Targeting 0.15.59 — Experimental Build 78
+# Arcana Table Targeting 0.15.60 — Experimental Build 79
 
-Arcana Table is a native Android Magic tabletop prototype. Experimental Build 78 carries forward the targeting experiment and improves player-screen layout and customization: the battlefield grows into available space and resizes with the screen, footer buttons stay aligned to the bottom edge, and the UI editor lets you long-press and drag elements in its sample layout while neighboring elements animate out of the way. The editor also supports adding, removing, and reordering player sections and hand-tray actions. The targeting experiment lives on the `experimental/targeting` branch and installs as a separate app so it cannot replace the stable Arcana Table install.
+Arcana Table is a native Android Magic tabletop prototype. Experimental Build 79 carries forward the targeting experiment and improves player-screen layout, library privacy, and deck import: table-view cards expand to use the available panel width; the separate player mana-pool element and tap-to-open Player Status panel can be customized in Adjust UI; the battlefield window fills the player view; library browsing hides stack order; and deck imports automatically attempt close-match corrections before showing any review prompt. The editor highlights the selected list item when you select or drag it in the sample layout. The targeting experiment lives on the `experimental/targeting` branch and installs as a separate app so it cannot replace the stable Arcana Table install.
 
 Target legality still depends on the card's full wording, game state, and rules interactions. The picker estimates how many targets to select, but players must verify restrictions such as controller, color, type, shroud, hexproof, and protection. Hidden library cards are not listed; use manual target entry only when the card text makes an unlisted target legal and known to the choosing player.
 
@@ -83,7 +83,7 @@ Target legality still depends on the card's full wording, game state, and rules 
 
 ## Build status
 
-The source is labeled version 0.15.59-targeting, build 78. This experimental branch builds a separate debug app package `com.arcanatable.targeting`. The optional full visual guide remains available from the home screen and app menu and never launches automatically.
+The source is labeled version 0.15.60-targeting, build 79. This experimental branch builds a separate debug app package `com.arcanatable.targeting`. The optional full visual guide remains available from the home screen and app menu and never launches automatically.
 
 Build 66 adds a resizable hand panel, automatic stack-window closing after all resolutions, tighter player-view spacing, and stronger import/movement/sync diagnostics. It also includes the Build 65 import review, supported automatic life/draw/token effects with manual-resolution notices, quick Stack access, and earlier tutorial, card movement, privacy, and navigation updates.
 

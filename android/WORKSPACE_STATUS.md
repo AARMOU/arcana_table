@@ -2,7 +2,7 @@
 
 ## Canonical project
 
-This branch is the separate Arcana Table **Targeting Experimental Build 78** (`0.15.59-targeting`, version code `78`) source tree. It branches from stable Build 72 source and includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Keep this work on `experimental/targeting` until the targeting flow is accepted.
+This branch is the separate Arcana Table **Targeting Experimental Build 79** (`0.15.60-targeting`, version code `79`) source tree. It branches from stable Build 72 source and includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Keep this work on `experimental/targeting` until the targeting flow is accepted.
 
 Build 73 adds a target picker for targeted spells, Auras, activated abilities, and recognized targeted triggers. It records chosen targets on stack items and syncs them in room snapshots. The picker presents visible objects from battlefield, stack, graveyard, exile, revealed zones, and eligible hands, plus a manual-entry field. It estimates target count from card text, but does not certify Magic target legality; users must check the card text and game state. Hidden library cards are not listed.
 
@@ -14,6 +14,18 @@ Build 73 adds a target picker for targeted spells, Auras, activated abilities, a
 - Displays colored mana symbols as colored pips in mana controls and cost displays.
 - Prompts for a creature type after a matching permanent resolves, shows the chosen type on the permanent, and synchronizes that choice with online game state.
 - Adds a small game-log card preview button when a logged card is still present in a public zone.
+
+## Changes in Build 79
+
+- Automatically attempts close Scryfall name matches during import; the review menu appears only for unresolved card names or deck-limit issues, and successful corrections are reported.
+- Table overview cards adapt to player-panel width instead of staying in two narrow fixed columns.
+- The player battlefield window fills available space above the footer, and switching boards opens the battlefield list at its top.
+- Library browsing randomizes the displayed card order and omits stack position numbers while leaving actual deck order unchanged.
+- The Adjust UI editor highlights its selected list item when the matching sample element is tapped or dragged.
+- Larger Cards and Compact presets now make visible changes to card dimensions and footer controls, with separate sliders covering wider ranges.
+- Mana pool is a separate removable/reorderable player-screen element. Tapping the health/activity bar opens Player Status with life controls, commander damage, player counters, and turn/phase details.
+
+Build 79 `testDebugUnitTest` passed (34 tests, 0 failures), and `assembleDebug` completed successfully. The APK is `app/build/outputs/apk/debug/app-debug.apk`, package `com.arcanatable.targeting`, version `0.15.60-targeting`, version code `79`; APK signature verification passed with APK Signature Scheme v2. SHA-256: `05d7014f166a091ce2b926adc60f73033ecfbb2ed054993e1498df11fc043168`.
 
 ## Changes in Build 78
 
@@ -117,7 +129,7 @@ These fixes are retained in the Build 62 source and APK.
 
 ## Build status
 
-Targeting Experimental Build 78 (`0.15.59-targeting`, version code `78`) is the current source on `experimental/targeting`. Its debug package ID is `com.arcanatable.targeting`. Stable Build 72 remains on `main`; the Worker was not deployed for this build.
+Targeting Experimental Build 79 (`0.15.60-targeting`, version code `79`) is the current source prepared for `experimental/targeting`. Its debug package ID is `com.arcanatable.targeting`. Stable Build 72 remains on `main`; the Worker was not deployed for this build.
 
 Build 62 gives every tutorial step a `NEXT` button, explains that the Join Game action needs a room code and password, and lets the tutorial continue without connecting.
 

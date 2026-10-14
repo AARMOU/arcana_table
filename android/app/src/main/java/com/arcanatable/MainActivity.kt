@@ -1,6132 +1,1012 @@
-@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
-
-package com.arcanatable
-
-import android.graphics.Bitmap
-import android.graphics.drawable.ColorDrawable
-import android.os.Bundle
-import android.app.Activity
-import android.Manifest
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
-import android.content.Context
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.os.Build
-import android.util.Log
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyItemScope
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.text.InlineTextContent
-import androidx.compose.foundation.text.appendInlineContent
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Chat
-import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.ExpandLess
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.toArgb
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.boundsInRoot
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.zIndex
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.Placeholder
-import androidx.compose.ui.text.PlaceholderVerticalAlign
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import java.util.Locale
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
-import androidx.compose.ui.window.DialogWindowProvider
-import androidx.compose.ui.window.Popup
-import androidx.compose.ui.window.PopupProperties
-import kotlinx.coroutines.Dispatchers
-import kotlin.coroutines.cancellation.CancellationException
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
-import kotlinx.coroutines.withContext
-import org.json.JSONArray
-import org.json.JSONObject
-
-private data class TableColors(val background: Color, val panel: Color, val raised: Color, val accent: Color, val text: Color, val muted: Color, val counter: Color)
-private val darkTableColors = TableColors(Color(0xFF101615), Color(0xFF192220), Color(0xFF26332F), Color(0xFF89E3B0), Color(0xFFEAF1ED), Color(0xFFA4B1AB), Color(0xFFFFD166))
-private val lightTableColors = TableColors(Color(0xFFF2F5F1), Color(0xFFFFFFFF), Color(0xFFE4EBE6), Color(0xFF196E4A), Color(0xFF17231D), Color(0xFF5E6C64), Color(0xFF8D6500))
-private val LocalTableColors = staticCompositionLocalOf { darkTableColors }
-private var appInForeground by mutableStateOf(true)
-private const val GAME_ALERT_CHANNEL = "arcana_game_alerts"
-private const val DEFAULT_CLOUD_ROOM_ENDPOINT = "https://arcana-table-rooms.arcanamtg.workers.dev"
-private const val LEGACY_EXAMPLE_CLOUD_ROOM_ENDPOINT = "https://arcana-table-rooms.example.workers.dev"
-
-private fun isLegacyExampleCloudEndpoint(endpoint: String): Boolean =
-    endpoint.trim().trimEnd('/').equals(LEGACY_EXAMPLE_CLOUD_ROOM_ENDPOINT, ignoreCase = true)
-
-private fun postGameAlert(context: Context, title: String, text: String) {
-    if (Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
-    val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        manager.createNotificationChannel(NotificationChannel(GAME_ALERT_CHANNEL, "Game activity", NotificationManager.IMPORTANCE_DEFAULT).apply {
-            description = "Turn and play updates while Arcana Table is in the background."
-        })
-    }
-    val openApp = PendingIntent.getActivity(
-        context, 0,
-        Intent(context, MainActivity::class.java).apply { flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP },
-        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-    )
-    val notification = Notification.Builder(context, GAME_ALERT_CHANNEL)
-        .setSmallIcon(android.R.drawable.ic_dialog_info)
-        .setContentTitle(title)
-        .setContentText(text.take(180))
-        .setCategory(Notification.CATEGORY_EVENT)
-        .setAutoCancel(true)
-        .setContentIntent(openApp)
-        .build()
-    manager.notify((System.currentTimeMillis() % Int.MAX_VALUE).toInt(), notification)
-}
-private val Ink: Color @Composable get() = LocalTableColors.current.background
-private val Panel: Color @Composable get() = LocalTableColors.current.panel
-private val PanelLight: Color @Composable get() = LocalTableColors.current.raised
-private val Mint: Color @Composable get() = LocalTableColors.current.accent
-private val SoftWhite: Color @Composable get() = LocalTableColors.current.text
-private val Muted: Color @Composable get() = LocalTableColors.current.muted
-private val CounterGold: Color @Composable get() = LocalTableColors.current.counter
-
-private data class TutorialStop(
-    val title: String,
-    val explanation: String,
-    val target: String,
-    val view: String,
-    val executeAction: Boolean = true
-)
-private val tutorialStops = listOf(
-    TutorialStop("WELCOME TO ARCANA TABLE!", "Welcome to Arcana Table! Please follow this brief tutorial to show you everything Arcana has to offer!", "", "HOME", executeAction = false),
-    TutorialStop("PLAY MAGIC TOGETHER", "Arcana Table lets you play Magic: The Gathering with up to four people, anywhere in the world!", "", "HOME", executeAction = false),
-    TutorialStop("CREATE ROOM", "Create a new room. You choose the connection type, invite players, load decks, and start the game from the lobby.", "home-create", "HOME"),
-
-    TutorialStop("CREATE ROOM", "Choose this to host a room.", "lobby-create", "LOBBY"),
-    TutorialStop("JOIN ROOM", "Choose this to enter a room.", "lobby-join", "LOBBY"),
-    TutorialStop("LOCAL WI-FI", "Play with devices on your Wi-Fi.", "lobby-local", "LOBBY"),
-    TutorialStop("INTERNET", "Play with people on different networks using the secure room service.", "lobby-internet", "LOBBY"),
-    TutorialStop("ROOM SERVICE ADDRESS", "The Arcana room address is already filled in. You do not need to tap or change it. Continue past this step. Only edit it if you run your own room server and know its address.", "", "LOBBY", executeAction = false),
-    TutorialStop("CREATE OR JOIN", "Join Game needs a room code and password. Tap Next to continue without connecting.", "lobby-submit", "LOBBY", executeAction = false),
-    TutorialStop("CANCEL JOIN", "Stop the connection attempt.", "lobby-cancel", "LOBBY", executeAction = false),
-    TutorialStop("ROOM CODE", "Share this code and password so friends can join. Use Share Room to send the invite in one message.", "lobby-copy", "LOBBY", executeAction = false),
-    TutorialStop("SHARE ROOM", "Send the room code, password, and connection address with your phone's share menu.", "lobby-share", "LOBBY", executeAction = false),
-    TutorialStop("COPY ADDRESS", "Copy the host address for local players.", "lobby-copy-ip", "LOBBY", executeAction = false),
-    TutorialStop("IMPORT DECK", "Load a deck for this seat.", "lobby-import", "LOBBY"),
-    TutorialStop("READY UP", "Tell the host you are ready.", "lobby-ready", "LOBBY", executeAction = false),
-    TutorialStop("ADD AI OPPONENT", "Add a computer player.", "lobby-ai", "LOBBY", executeAction = false),
-    TutorialStop("RANDOMIZE ORDER", "Choose who takes the first turn.", "lobby-order", "LOBBY", executeAction = false),
-    TutorialStop("EXPORT DIAGNOSTIC LOG", "Save connection details for troubleshooting.", "lobby-diagnostics", "LOBBY", executeAction = false),
-    TutorialStop("START GAME", "Begin once every player is ready.", "lobby-start", "LOBBY", executeAction = false),
-    TutorialStop("CLOSE ROOM", "Leave or close this room.", "lobby-leave", "LOBBY", executeAction = false),
-    TutorialStop("CLOSE LOBBY", "Return to the home screen.", "lobby-close", "LOBBY"),
-
-    TutorialStop("JOIN ROOM", "Join a friend's room. It opens this same lobby screen with Join Room already selected.", "home-join", "HOME"),
-    TutorialStop("JOIN IS SELECTED", "This is the same lobby as Create Room. The Join Room choice is selected for you, so enter the host's room details.", "lobby-join", "LOBBY", executeAction = false),
-    TutorialStop("RETURN HOME", "Close the lobby to continue the guide.", "lobby-close", "LOBBY"),
-    TutorialStop("CONTINUE TO TABLE", "Open the game table on this device. The Table view shows everyone; the player view gives you more controls.", "home-continue", "HOME"),
-
-    TutorialStop("SESSION TIMER", "Tap the timer to open timer controls.", "timer", "TABLE"),
-    TutorialStop("CHAT", "Open messages for your room.", "chat-button", "TABLE"),
-    TutorialStop("APP MENU", "Open decks, game tools, room controls, and options.", "main-menu", "TABLE"),
-    TutorialStop("TABLE VIEW", "See every player at once.", "table-tab", "TABLE"),
-    TutorialStop("PLAYER VIEW", "Open this playerâ€™s board.", "player-tab", "TABLE"),
-    TutorialStop("PLAYER BOARD", "Tap a player panel to inspect their board.", "player-card", "TABLE"),
-    TutorialStop("NEXT STEP", "Move to the next phase.", "table-next", "TABLE", executeAction = false),
-    TutorialStop("PASS TURN", "Finish your turn and pass play.", "table-pass", "TABLE", executeAction = false),
-    TutorialStop("IMPORT DECK", "Load a deck for the selected player.", "table-import", "TABLE"),
-
-    TutorialStop("PLAYER STATUS", "See whose turn it is and the current phase.", "player-status", "PLAYER"),
-    TutorialStop("SESSION TIMER", "Tap the timer to open timer controls.", "timer", "PLAYER"),
-    TutorialStop("CHAT", "Open room messages.", "chat-button", "PLAYER"),
-    TutorialStop("APP MENU", "Open decks, game tools, room controls, and options.", "main-menu", "PLAYER"),
-    TutorialStop("LOWER LIFE", "Subtract one life.", "life-down", "PLAYER", executeAction = false),
-    TutorialStop("RAISE LIFE", "Add one life.", "life-up", "PLAYER", executeAction = false),
-    TutorialStop("MANA POOL", "Tap the MANA status to track or spend mana.", "mana-status", "PLAYER"),
-    TutorialStop("CAST COMMANDER", "Cast your commander from the command zone.", "commander-cast", "PLAYER", executeAction = false),
-    TutorialStop("NEXT STEP", "Move to the next phase.", "next-step", "PLAYER", executeAction = false),
-    TutorialStop("PASS TURN", "Finish your turn and pass play.", "pass-turn", "PLAYER", executeAction = false),
-    TutorialStop("LIBRARY", "Search or browse this library.", "zone-library", "PLAYER"),
-    TutorialStop("HAND", "Open this playerâ€™s hand.", "hand-button", "PLAYER"),
-    TutorialStop("HAND ZONE", "Open the hand from this zone button.", "zone-hand", "PLAYER"),
-    TutorialStop("GRAVEYARD", "View cards in the graveyard.", "zone-graveyard", "PLAYER"),
-    TutorialStop("EXILE", "View exiled cards.", "zone-exile", "PLAYER"),
-    TutorialStop("REVEALED", "View cards revealed to the table.", "zone-revealed", "PLAYER"),
-    TutorialStop("DRAW", "Draw one card.", "draw-action", "PLAYER", executeAction = false),
-    TutorialStop("COMBAT", "Set attackers, blockers, and damage.", "combat-action", "PLAYER", executeAction = false),
-    TutorialStop("MORE", "Open more player and game tools.", "more-actions", "PLAYER"),
-    TutorialStop("ADD TOKEN", "Open MORE, then choose Add token.", "token-action", "PLAYER", executeAction = false),
-    TutorialStop("STACK AND PRIORITY", "Open spells and abilities waiting to resolve.", "stack-open", "PLAYER"),
-    TutorialStop("BACK TO TABLE", "Return to the full table.", "player-back-table", "PLAYER"),
-    TutorialStop("TAP OR INSPECT A CARD", "Tap to tap or untap; long-press for details.", "battlefield", "PLAYER", executeAction = false),
-
-    TutorialStop("CARD DETAILS", "Tap a card to see its actions; long-press for full text.", "hand-card", "HAND"),
-    TutorialStop("PLAY CARD ACTIONS", "Choose what to do with this card.", "hand-actions", "HAND", executeAction = false),
-
-    TutorialStop("THEME", "Switch between light and dark.", "options-theme", "OPTIONS", executeAction = false),
-    TutorialStop("REDUCE SWIPE ANIMATION", "Use shorter screen transitions.", "options-motion", "OPTIONS", executeAction = false),
-    TutorialStop("CARD SIZE", "Choose how large cards appear.", "options-card-size", "OPTIONS", executeAction = false),
-    TutorialStop("RETURN TO TABLE", "Show the table after passing your turn.", "options-return-table", "OPTIONS", executeAction = false),
-    TutorialStop("OPEN HAND AFTER DRAW", "Show your hand after drawing.", "options-open-hand", "OPTIONS", executeAction = false),
-    TutorialStop("DRAW AUTOMATICALLY", "Draw when the draw step begins.", "options-auto-draw", "OPTIONS", executeAction = false),
-    TutorialStop("UNTAP AUTOMATICALLY", "Untap your permanents at turn start.", "options-auto-untap", "OPTIONS", executeAction = false),
-    TutorialStop("TURN TIMER DISPLAY", "Show or hide the turn timer.", "options-timer", "OPTIONS", executeAction = false),
-    TutorialStop("BACKGROUND ALERTS", "Get a notification when the game changes.", "options-alerts", "OPTIONS", executeAction = false),
-    TutorialStop("CLEAR ALL DATA", "Reset game settings; your decks and guide progress stay.", "clear-data", "OPTIONS", executeAction = false),
-    TutorialStop("DEVELOPER OPTIONS", "Open test tools.", "options-developer", "OPTIONS", executeAction = false),
-    TutorialStop("CLOSE OPTIONS", "Return to the table.", "options-close", "OPTIONS"),
-
-    TutorialStop("CAST FROM HAND", "Open your hand to choose a spell.", "stack-cast", "STACK"),
-    TutorialStop("PUT ON STACK", "Add a manual ability or effect.", "stack-add", "STACK", executeAction = false),
-    TutorialStop("PASS PRIORITY", "Let the next player respond. The AI passes automatically when it has no response.", "stack-pass", "STACK", executeAction = false),
-    TutorialStop("RESOLVE TOP", "Resolve the top item after everyone passes. The newest item resolves first.", "stack-resolve", "STACK", executeAction = false),
-    TutorialStop("STACK ITEM", "Tap an item to inspect it. If the AI has no response, it passes so the stack can resolve.", "stack-item", "STACK"),
-    TutorialStop("CLOSE STACK", "Close the stack view.", "stack-close", "STACK"),
-
-    TutorialStop("SEND MESSAGE", "Send a message to the table.", "chat-send", "CHAT", executeAction = false),
-    TutorialStop("CHAT CLOSE", "Close the chat panel.", "chat-close", "CHAT"),
-
-    TutorialStop("CLOSE GAME LOG", "Return to the table.", "log-close", "GAME_LOG"),
-
-    TutorialStop("DECKS MENU", "Open deck import, editing, and saved decks.", "menu-decks", "MENU_MAIN"),
-    TutorialStop("GAME TOOLS MENU", "Open tracking tools, the stack, log, and rules.", "menu-tools", "MENU_MAIN"),
-    TutorialStop("ROOM AND GAME MENU", "Open room, game, and reset controls.", "menu-game", "MENU_MAIN"),
-    TutorialStop("OPTIONS MENU", "Open preferences and Clear All Data.", "menu-options", "MENU_MAIN"),
-    TutorialStop("IMPORT DECK MENU", "Choose or paste a deck list.", "menu-import", "MENU_DECKS"),
-    TutorialStop("EDIT DECK MENU", "Change the selected deck.", "menu-edit", "MENU_DECKS"),
-    TutorialStop("SAVED DECKS MENU", "Load or remove a saved deck.", "menu-saved", "MENU_DECKS"),
-    TutorialStop("ADD AI", "Add a computer seat to a local game.", "menu-add-ai", "MENU_TOOLS", executeAction = false),
-    TutorialStop("ADD TOKEN", "Open the token picker.", "menu-add-token", "MENU_TOOLS", executeAction = false),
-    TutorialStop("MANA POOL", "Track colored mana for this player.", "menu-mana", "MENU_TOOLS", executeAction = false),
-    TutorialStop("SEARCH LIBRARY", "Search or browse cards in the library.", "menu-search", "MENU_TOOLS", executeAction = false),
-    TutorialStop("STACK MENU", "Open spells and abilities awaiting responses.", "menu-stack", "MENU_TOOLS"),
-    TutorialStop("GAME LOG MENU", "Review the recorded game actions.", "menu-log", "MENU_TOOLS"),
-    TutorialStop("RULES MENU", "Search the Magic rules reference.", "menu-rules", "MENU_TOOLS"),
-    TutorialStop("EXPORT DIAGNOSTICS", "Save a connection log for troubleshooting.", "menu-export", "MENU_TOOLS", executeAction = false),
-    TutorialStop("ROOM HOME MENU", "Return to the home screen.", "menu-home", "MENU_GAME"),
-    TutorialStop("START GAME MENU", "Begin a new local game.", "menu-start-game", "MENU_GAME", executeAction = false),
-    TutorialStop("GAME LOBBY MENU", "Open room and player controls.", "menu-lobby", "MENU_GAME"),
-    TutorialStop("END GAME MENU", "Ask all players to agree to end the game.", "menu-end", "MENU_GAME", executeAction = false),
-    TutorialStop("LEAVE GAME MENU", "Open the lobby to leave or hand off the room.", "menu-leave", "MENU_GAME"),
-    TutorialStop("RESET GAME MENU", "Start a fresh game with these decks.", "menu-reset", "MENU_GAME", executeAction = false),
-    TutorialStop("CLEAR GAME DATA MENU", "Open the confirmation before clearing data.", "menu-clear", "MENU_GAME", executeAction = false),
-
-    TutorialStop("CHOOSE FILE", "Pick a deck list file.", "deck-choose-file", "DECK_IMPORT", executeAction = false),
-    TutorialStop("RANDOM DECK", "Load an example deck list.", "deck-random", "DECK_IMPORT", executeAction = false),
-    TutorialStop("LOAD SAVED DECK", "Open your saved deck list.", "deck-load-saved", "DECK_IMPORT"),
-    TutorialStop("IMPORT DECK", "Replace this playerâ€™s deck.", "deck-import", "DECK_IMPORT", executeAction = false),
-    TutorialStop("CANCEL IMPORT", "Close without replacing this deck.", "deck-cancel", "DECK_IMPORT", executeAction = false),
-    TutorialStop("LOAD A SAVED DECK", "Put this deck into the import box.", "saved-load", "SAVED_DECKS", executeAction = false),
-    TutorialStop("DELETE A SAVED DECK", "Remove this saved deck from the device.", "saved-delete", "SAVED_DECKS", executeAction = false),
-    TutorialStop("CLOSE SAVED DECKS", "Return to deck import.", "saved-close", "SAVED_DECKS")
-)
-
-data class GameCard(
-    val id: Int,
-    val name: String,
-    val type: String,
-    val color: Color,
-    val tapped: Boolean = false,
-    val imageUrl: String? = null,
-    val isToken: Boolean = false,
-    val counters: Map<String, Int> = emptyMap(),
-    val isFaceDown: Boolean = false,
-    val oracleText: String? = null,
-    val manaValue: Double? = null,
-    val importIssue: String? = null,
-    val artCropUrl: String? = null,
-    val manaCost: String? = null,
-    val power: String? = null,
-    val toughness: String? = null,
-    val keywords: List<String> = emptyList(),
-    val chosenCreatureType: String? = null
-)
-
-private data class LandEntryPrompt(val playerIndex: Int, val card: GameCard, val isShockLand: Boolean, val conditionText: String)
-
-private fun shockLandChoiceRequired(card: GameCard): Boolean {
-    val text = card.oracleText.orEmpty().lowercase()
-    return card.type.contains("land", ignoreCase = true) &&
-        ("pay 2 life" in text || "pay 2 life" in card.name.lowercase()) &&
-        ("enters tapped" in text || "enters the battlefield tapped" in text)
-}
-
-private fun landEntryCondition(card: GameCard): String? {
-    if (!card.type.contains("land", ignoreCase = true)) return null
-    val text = card.oracleText.orEmpty()
-    val relevant = text.lines().firstOrNull { line ->
-        val lower = line.lowercase()
-        ("enters tapped" in lower || "enters the battlefield tapped" in lower) &&
-            ("unless" in lower || "if" in lower || "pay" in lower)
-    }
-    return relevant?.trim()?.takeIf(String::isNotBlank)
-}
-
-private fun landAlwaysEntersTapped(card: GameCard): Boolean {
-    val text = card.oracleText.orEmpty().lowercase()
-    return card.type.contains("land", ignoreCase = true) &&
-        ("enters tapped" in text || "enters the battlefield tapped" in text) &&
-        landEntryCondition(card) == null
-}
-
-private data class ManaChoicePrompt(
-    val playerIndex: Int,
-    val cardName: String,
-    val options: List<ManaProductionOption>
-)
-
-private data class CreatureTypeChoicePrompt(val playerIndex: Int, val cardId: Int, val cardName: String)
-
-internal fun needsCreatureTypeChoice(card: GameCard): Boolean =
-    !card.isFaceDown && Regex("\\bas this enters(?: the battlefield)?, choose a creature type\\b", RegexOption.IGNORE_CASE)
-        .containsMatchIn(card.oracleText.orEmpty())
-
-private data class AiManaPlan(val landIds: Set<Int>, val remainingPool: Map<String, Int>)
-
-private fun planAiMana(player: TablePlayer, card: GameCard): AiManaPlan? {
-    val cost = card.manaCost ?: return if (card.manaValue == 0.0) AiManaPlan(emptySet(), player.manaPool) else null
-    val symbols = simpleManaSymbols(cost) ?: return null
-    val required = symbols.filter { it in setOf("W", "U", "B", "R", "G", "C") }.groupingBy { it }.eachCount()
-    val generic = symbols.mapNotNull { it.toIntOrNull() }.sum()
-    val available = player.battlefield.filter { it.type.contains("land", true) && !it.tapped }.toMutableList()
-    val pool = player.manaPool.toMutableMap()
-    val usedLandIds = linkedSetOf<Int>()
-    fun addOption(land: GameCard, option: ManaProductionOption) {
-        option.pool.forEach { (color, count) -> pool[color] = ((pool[color] ?: 0) + count).coerceAtMost(99) }
-        available.removeAll { it.id == land.id }
-        usedLandIds += land.id
-    }
-    for (color in listOf("W", "U", "B", "R", "G", "C")) {
-        while ((pool[color] ?: 0) < (required[color] ?: 0)) {
-            val choice = available.asSequence().flatMap { land ->
-                manaProductionOptions(land).asSequence().filter { (it.pool[color] ?: 0) > 0 }.map { land to it }
-            }.maxByOrNull { (_, option) -> (option.pool[color] ?: 0) * 10 - (option.pool.values.sum() - (option.pool[color] ?: 0)) } ?: return null
-            addOption(choice.first, choice.second)
-        }
-    }
-    val totalRequired = required.values.sum() + generic
-    while (pool.values.sum() < totalRequired) {
-        val choice = available.asSequence().flatMap { land -> manaProductionOptions(land).asSequence().map { land to it } }
-            .maxByOrNull { (_, option) -> option.pool.values.sum() } ?: return null
-        addOption(choice.first, choice.second)
-    }
-    val remaining = paySimpleManaCost(pool, cost) ?: return null
-    return AiManaPlan(usedLandIds, remaining)
-}
-
-private fun aiCardPriority(card: GameCard): Double {
-    val text = card.oracleText.orEmpty().lowercase()
-    val type = card.type.lowercase()
-    var score = (card.manaValue ?: 0.0).coerceAtMost(8.0) * 0.25
-    if ("creature" in type) score += 2.3
-    if ("artifact" in type || "enchantment" in type || "planeswalker" in type || "battle" in type) score += 1.1
-    if ("draw" in text && "card" in text) score += 1.8
-    if ("search your library" in text && ("land" in text || "mana" in text)) score += 1.6
-    if (listOf("destroy target", "exile target", "counter target").any { it in text }) score += 1.4
-    if ("whenever" in text || "at the beginning" in text) score += 0.6
-    if ("instant" in type || "sorcery" in type) score -= 0.5
-    return score
-}
-
-private fun manaProductionOptions(card: GameCard): List<ManaProductionOption> {
-    return manaProductionPools(card.name, card.type, card.oracleText).map(::ManaProductionOption)
-}
-
-data class TablePlayer(
-    val name: String,
-    val id: String = java.util.UUID.randomUUID().toString(),
-    val isOnline: Boolean = false,
-    val commanderName: String? = null,
-    val commanderCard: GameCard? = null,
-    val isComputer: Boolean = false,
-    val deckLoaded: Boolean = false,
-    val mulligansTaken: Int = 0,
-    val openingHandKept: Boolean = false,
-    val life: Int = 40,
-    val manaPool: Map<String, Int> = emptyMap(),
-    val library: List<GameCard> = emptyList(),
-    val hand: List<GameCard> = emptyList(),
-    val battlefield: List<GameCard> = emptyList(),
-    val graveyard: List<GameCard> = emptyList(),
-    val exile: List<GameCard> = emptyList(),
-    val revealed: List<GameCard> = emptyList(),
-    val handRevealedToAll: Boolean = false,
-    val playerCounters: Map<String, Int> = emptyMap(),
-    val commanderDamageReceived: Map<String, Int> = emptyMap(),
-    val commanderCastCount: Int = 0,
-    val isEliminated: Boolean = false,
-    val eliminationReason: String? = null
-)
-
-data class StackAction(
-    val id: String = java.util.UUID.randomUUID().toString(),
-    val title: String,
-    val controllerId: String,
-    val kind: String = "SPELL",
-    val card: GameCard? = null,
-    val targetText: String = card?.oracleText.orEmpty(),
-    val targetCount: TargetCountRange? = parseTargetCountRange(targetText),
-    val targets: List<StackTarget> = emptyList(),
-    val targetsConfirmed: Boolean = targetCount == null
-)
-
-private data class SavedDeck(val name: String, val text: String)
-
-class MainActivity : ComponentActivity() {
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
-        Thread.setDefaultUncaughtExceptionHandler { thread, error ->
-            runCatching {
-                getSharedPreferences("arcana_crash", Context.MODE_PRIVATE).edit()
-                    .putString("last_crash", Log.getStackTraceString(error).take(24_000))
-                    .putString("last_crash_context", getSharedPreferences("arcana_options", Context.MODE_PRIVATE).getString("last_diagnostic_context", "No recent action context was recorded."))
-                    .putString("last_crash_at", java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.US).format(java.util.Date()))
-                    .commit()
-            }
-            previousHandler?.uncaughtException(thread, error)
-        }
-        setContent { TableScreen() }
-    }
-
-    override fun onResume() { super.onResume(); appInForeground = true }
-    override fun onPause() { appInForeground = false; super.onPause() }
-}
-
-@Composable
-fun TableScreen() {
-    val context = LocalContext.current
-    val optionPrefs = remember { context.getSharedPreferences("arcana_options", Context.MODE_PRIVATE) }
-    var darkMode by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("dark_mode", true)) }
-    val colors = if (darkMode) darkTableColors else lightTableColors
-    val scheme = if (darkMode) darkColorScheme(primary = colors.accent, background = colors.background, surface = colors.panel)
-        else lightColorScheme(primary = colors.accent, background = colors.background, surface = colors.panel)
-    CompositionLocalProvider(LocalTableColors provides colors) {
-        MaterialTheme(colorScheme = scheme) { TableScreenContent(darkMode, onToggleTheme = {
-            darkMode = !darkMode
-            optionPrefs.edit().putBoolean("dark_mode", darkMode).apply()
-        }) }
-    }
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val automaticActionSnackbar = remember { SnackbarHostState() }
-    val optionPrefs = remember { context.getSharedPreferences("arcana_options", Context.MODE_PRIVATE) }
-    val tutorialPrefs = remember { context.getSharedPreferences("arcana_tutorial", Context.MODE_PRIVATE) }
-    var backgroundAlertsEnabled by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("background_alerts", false)) }
-    var autoReturnTableAfterPass by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("auto_return_table", true)) }
-    var autoDrawOnDrawStep by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("auto_draw_step", true)) }
-    var autoUntapOnUntapStep by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("auto_untap_step", true)) }
-    var openHandAfterDraw by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("open_hand_after_draw", true)) }
-    var reducedSwipeMotion by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("reduced_swipe_motion", false)) }
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
-    val layoutOrientationSuffix = if (isLandscape) "landscape" else "portrait"
-    var cardSizeScale by rememberSaveable(layoutOrientationSuffix) { mutableFloatStateOf(optionPrefs.getFloat("layout_card_size_$layoutOrientationSuffix", optionPrefs.getFloat("card_size_scale", 1f)).coerceIn(0.82f, 1.18f)) }
-    var boardSpacingScale by rememberSaveable(layoutOrientationSuffix) { mutableFloatStateOf(optionPrefs.getFloat("layout_board_spacing_$layoutOrientationSuffix", 1f).coerceIn(0.5f, 2f)) }
-    var footerButtonScale by rememberSaveable(layoutOrientationSuffix) { mutableFloatStateOf(optionPrefs.getFloat("layout_footer_button_scale_$layoutOrientationSuffix", 1f).coerceIn(0.9f, 1.3f)) }
-    var handSheetHeightFraction by rememberSaveable(layoutOrientationSuffix) {
-        mutableFloatStateOf(optionPrefs.getFloat("layout_hand_sheet_height_$layoutOrientationSuffix", optionPrefs.getFloat("hand_sheet_height_fraction", 0.52f)).coerceIn(0.38f, 0.95f))
-    }
-    var playerSectionOrderRaw by rememberSaveable(layoutOrientationSuffix) { mutableStateOf(optionPrefs.getString("layout_player_sections_$layoutOrientationSuffix", "STATUS|COMMANDER|STEP|ZONES|REVEALED|BATTLEFIELD") ?: "STATUS|COMMANDER|STEP|ZONES|REVEALED|BATTLEFIELD") }
-    var handActionOrderRaw by rememberSaveable(layoutOrientationSuffix) { mutableStateOf(optionPrefs.getString("layout_hand_actions_$layoutOrientationSuffix", "DRAW|REVEAL|STACK|CAST_COMMANDER|COMBAT|NEXT_STEP|PASS_TURN|MORE") ?: "DRAW|REVEAL|STACK|CAST_COMMANDER|COMBAT|NEXT_STEP|PASS_TURN|MORE") }
-    val density = LocalDensity.current
-    val screenWidthDp = configuration.screenWidthDp
-    var nextId by remember { mutableIntStateOf(20) }
-    var players by remember { mutableStateOf(loadSavedPlayers(context) ?: samplePlayers()) }
-    var selectedPlayer by remember { mutableIntStateOf(0) }
-    var showOverview by remember { mutableStateOf(true) }
-    var showHand by remember { mutableStateOf(false) }
-    var importOpen by remember { mutableStateOf(false) }
-    var importText by remember { mutableStateOf("") }
-    var importSaveToLibrary by rememberSaveable { mutableStateOf(false) }
-    var importSaveName by rememberSaveable { mutableStateOf("") }
-    var savedDecks by remember { mutableStateOf(loadSavedDecks(context)) }
-    var savedDecksOpen by remember { mutableStateOf(false) }
-    var localDeckSyncConfirmed by remember { mutableStateOf(false) }
-    val diagnosticEvents = remember {
-        mutableStateListOf<String>().apply {
-            addAll(optionPrefs.getString("diagnostic_events", "").orEmpty().lineSequence().filter(String::isNotBlank).toList().takeLast(500))
-        }
-    }
-    var diagnosticEventSequence by remember { mutableIntStateOf(diagnosticEvents.size) }
-    var lastDiagnosticZoneSignature by remember { mutableStateOf<String?>(null) }
-    var lastDiagnosticZoneSnapshot by remember { mutableStateOf<List<TablePlayer>?>(null) }
-    var inboundSnapshotSequence by remember { mutableIntStateOf(0) }
-    var importing by remember { mutableStateOf(false) }
-    var randomDeckLoading by remember { mutableStateOf(false) }
-    var importError by remember { mutableStateOf<String?>(null) }
-    var importReviewOpen by remember { mutableStateOf(false) }
-    var importReviewMessage by remember { mutableStateOf("") }
-    var importReviewCardIds by remember { mutableStateOf(emptySet<Int>()) }
-    var importOverflowCardIds by remember { mutableStateOf(emptySet<Int>()) }
-    var importAutoFixInProgress by remember { mutableStateOf(false) }
-    var pendingAiPlayerIndex by remember { mutableIntStateOf(-1) }
-    var clearAllConfirmOpen by remember { mutableStateOf(false) }
-    var highlightedHandCardId by remember { mutableStateOf<Int?>(null) }
-    var tokenPickerOpen by remember { mutableStateOf(false) }
-    var tokenTarget by remember { mutableIntStateOf(0) }
-    var counterTarget by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    var preview by remember { mutableStateOf<CardPreview?>(null) }
-    var rulesOpen by remember { mutableStateOf(false) }
-    var battlefieldBounds by remember { mutableStateOf<Rect?>(null) }
-    var handSheetBounds by remember { mutableStateOf<Rect?>(null) }
-    var zoneDialog by remember { mutableStateOf<Pair<Int, String>?>(null) }
-    var message by remember { mutableStateOf<String?>(null) }
-    var cardActionTarget by remember { mutableStateOf<Pair<Int, Int>?>(null) }
-    var handActionCard by remember { mutableStateOf<GameCard?>(null) }
-    var activePlayer by remember { mutableIntStateOf(0) }
-    val viewPagerState = rememberPagerState(pageCount = { players.size + 1 })
-    LaunchedEffect(showOverview, selectedPlayer, players.size, reducedSwipeMotion) {
-        val targetPage = if (showOverview) 0 else (selectedPlayer + 1).coerceIn(0, players.size)
-        if (viewPagerState.currentPage != targetPage) {
-            if (reducedSwipeMotion) viewPagerState.scrollToPage(targetPage)
-            else viewPagerState.animateScrollToPage(targetPage)
-        }
-    }
-    LaunchedEffect(viewPagerState, players.size) {
-        snapshotFlow { viewPagerState.settledPage }
-            .distinctUntilChanged()
-            .collect { page ->
-                showOverview = page == 0
-                if (page in 1..players.size) selectedPlayer = page - 1
-                if (page == 0) showHand = false
-            }
-    }
-    var gameTurnOrder by remember { mutableStateOf(emptyList<Int>()) }
-    var turnNumber by remember { mutableIntStateOf(1) }
-    val phaseSteps = remember { listOf("UNTAP", "UPKEEP", "DRAW", "PRECOMBAT MAIN", "BEGIN COMBAT", "ATTACKERS", "BLOCKERS", "DAMAGE", "END COMBAT", "POSTCOMBAT MAIN", "END STEP", "CLEANUP") }
-    var phaseIndex by remember { mutableIntStateOf(0) }
-    var elapsedGameSeconds by remember { mutableLongStateOf(0L) }
-    var elapsedTurnSeconds by remember { mutableLongStateOf(0L) }
-    var gameLog by remember { mutableStateOf(listOf("Game session started")) }
-    var logOpen by remember { mutableStateOf(false) }
-    var chatOpen by remember { mutableStateOf(false) }
-    var topMenuExpanded by remember { mutableStateOf(false) }
-    var topMenuSection by remember { mutableStateOf<String?>(null) }
-    var resetConfirmOpen by remember { mutableStateOf(false) }
-    var chatDraft by remember { mutableStateOf("") }
-    var chatMessages by remember { mutableStateOf(emptyList<ChatMessage>()) }
-    var unreadChatCount by remember { mutableIntStateOf(0) }
-    var triggerPrompts by remember { mutableStateOf(emptyList<TriggerPrompt>()) }
-    var stackActions by remember { mutableStateOf(emptyList<StackAction>()) }
-    var targetSelectionStackItemId by remember { mutableStateOf<String?>(null) }
-    var priorityPlayer by remember { mutableIntStateOf(0) }
-    var priorityPassed by remember { mutableStateOf(emptySet<String>()) }
-    var stackOpen by remember { mutableStateOf(false) }
-    var pendingStackOpen by remember { mutableStateOf(false) }
-    var stackCycleActive by remember { mutableStateOf(false) }
-    var trackerPlayer by remember { mutableIntStateOf(-1) }
-    var concedePlayer by remember { mutableIntStateOf(-1) }
-    var shuffleConfirmPlayer by remember { mutableIntStateOf(-1) }
-    var paymentCard by remember { mutableStateOf<Pair<Int, GameCard>?>(null) }
-    var landEntryPrompt by remember { mutableStateOf<LandEntryPrompt?>(null) }
-    var librarySearchPlayer by remember { mutableIntStateOf(-1) }
-    var manaPoolOpen by remember { mutableStateOf(false) }
-    var manaTarget by remember { mutableIntStateOf(0) }
-    var manaChoicePrompt by remember { mutableStateOf<ManaChoicePrompt?>(null) }
-    var creatureTypeChoicePrompt by remember { mutableStateOf<CreatureTypeChoicePrompt?>(null) }
-    var timerMenuOpen by remember { mutableStateOf(false) }
-    var optionsOpen by remember { mutableStateOf(false) }
-    var layoutLabOpen by remember { mutableStateOf(false) }
-    var changelogOpen by remember { mutableStateOf(false) }
-    var developerOptionsOpen by remember { mutableStateOf(false) }
-    var tutorialOpen by remember { mutableStateOf(false) }
-    var tutorialIndex by remember { mutableIntStateOf(0) }
-    val tutorialParentIndices = remember { mutableStateListOf<Int>() }
-    val tutorialBounds = remember { mutableStateMapOf<String, Rect>() }
-    val previouslySeenTutorialScreens = remember {
-        val current = tutorialPrefs.getStringSet("first_visit_guides_v2", null)
-        val legacy = optionPrefs.getStringSet("first_visit_guides_v2", null)
-        val seen = current ?: legacy
-        if (current == null && legacy != null) {
-            tutorialPrefs.edit().putStringSet("first_visit_guides_v2", legacy.toSet()).apply()
-            optionPrefs.edit().remove("first_visit_guides_v2").apply()
-        }
-        seen.orEmpty().toSet()
-    }
-    var tutorialSeenScreens by remember { mutableStateOf(previouslySeenTutorialScreens) }
-    var lobbyOpen by remember { mutableStateOf(false) }
-    var homeOpen by rememberSaveable { mutableStateOf(true) }
-    var lobbyCreated by remember { mutableStateOf(false) }
-    var lobbyJoinMode by remember { mutableStateOf(false) }
-    var lobbyReadyPlayers by remember { mutableStateOf(emptySet<Int>()) }
-    var pendingReadyState by remember { mutableStateOf<Boolean?>(null) }
-    var lobbyTurnOrder by remember { mutableStateOf<List<Int>?>(null) }
-    var lobbyRoomCode by remember { mutableStateOf("") }
-    var lobbyPassword by remember { mutableStateOf("") }
-    var lobbyJoinCode by remember { mutableStateOf("") }
-    var lobbyJoinPassword by remember { mutableStateOf("") }
-    var lobbyHostInput by remember { mutableStateOf("") }
-    var lobbyInternetMode by rememberSaveable { mutableStateOf(false) }
-    var lobbyCloudEndpoint by rememberSaveable {
-        val savedEndpoint = optionPrefs.getString("cloud_room_endpoint", null)?.trim()
-        mutableStateOf(savedEndpoint?.takeIf { it.isNotBlank() && !isLegacyExampleCloudEndpoint(it) } ?: DEFAULT_CLOUD_ROOM_ENDPOINT)
-    }
-    LaunchedEffect(lobbyOpen, lobbyInternetMode) {
-        if (lobbyOpen && lobbyInternetMode && (lobbyCloudEndpoint.isBlank() || isLegacyExampleCloudEndpoint(lobbyCloudEndpoint))) {
-            lobbyCloudEndpoint = DEFAULT_CLOUD_ROOM_ENDPOINT
-            optionPrefs.edit().putString("cloud_room_endpoint", DEFAULT_CLOUD_ROOM_ENDPOINT).apply()
-        }
-    }
-    var lobbyPlayerName by remember { mutableStateOf("PLAYER") }
-    var lobbyHostAddress by remember { mutableStateOf("") }
-    var lobbyNotice by remember { mutableStateOf<String?>(null) }
-    var onlineStatus by remember { mutableStateOf("Offline") }
-    var roomConnected by remember { mutableStateOf(false) }
-    var connectionLost by remember { mutableStateOf(false) }
-    var connectionLostReason by remember { mutableStateOf<String?>(null) }
-    var reconnecting by remember { mutableStateOf(false) }
-    var reconnectJob by remember { mutableStateOf<Job?>(null) }
-    var localSeat by remember { mutableIntStateOf(0) }
-    var roomHost by remember { mutableStateOf<LanRoomHost?>(null) }
-    var roomClient by remember { mutableStateOf<LanRoomClient?>(null) }
-    var cloudRoomClient by remember { mutableStateOf<CloudRoomClient?>(null) }
-    var localPlayersBackup by remember { mutableStateOf<List<TablePlayer>?>(null) }
-    var lastRemoteSnapshot by remember { mutableStateOf<String?>(null) }
-    var gameStartedOnline by remember { mutableStateOf(false) }
-    var onlineStateReady by remember { mutableStateOf(false) }
-    var endProposalBy by remember { mutableIntStateOf(-1) }
-    var endVotes by remember { mutableStateOf(emptyMap<Int, Boolean>()) }
-    var gameEndedOnline by remember { mutableStateOf(false) }
-    var localGameStarted by rememberSaveable { mutableStateOf(false) }
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        backgroundAlertsEnabled = granted
-        context.getSharedPreferences("arcana_options", Context.MODE_PRIVATE).edit().putBoolean("background_alerts", granted).apply()
-        if (!granted) message = "Android notification permission is needed for background game alerts."
-    }
-    fun setBackgroundAlerts(enabled: Boolean) {
-        if (enabled && Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-        } else {
-            backgroundAlertsEnabled = enabled
-            context.getSharedPreferences("arcana_options", Context.MODE_PRIVATE).edit().putBoolean("background_alerts", enabled).apply()
-        }
-    }
-
-    fun recordDiagnostic(event: String) {
-        val safeEvent = event
-            .replace(Regex("(?:\\d{1,3}\\.){3}\\d{1,3}"), "<ip>")
-            .replace(Regex("(?i)(password\\s*[:=]\\s*)\\S+"), "$1<redacted>")
-            .replace(Regex("(?i)((?:room|join)\\s*code\\s*[:=]\\s*)[a-z0-9-]+"), "$1<redacted>")
-        val timestamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.US).format(java.util.Date())
-        diagnosticEventSequence += 1
-        diagnosticEvents.add("#${diagnosticEventSequence.toString().padStart(5, '0')}  $timestamp  $safeEvent")
-        while (diagnosticEvents.size > 500) diagnosticEvents.removeAt(0)
-        val contextLine = "$timestamp Â· $safeEvent Â· ${if (appInForeground) "foreground" else "background"} Â· ${if (roomHost != null || roomClient != null || cloudRoomClient != null) "online" else "offline"} Â· ${if (showOverview) "table" else "player view"} Â· P${(selectedPlayer + 1).coerceAtLeast(1)} Â· turn $turnNumber ${phaseSteps.getOrNull(phaseIndex).orEmpty()}"
-        optionPrefs.edit().putString("diagnostic_events", diagnosticEvents.joinToString("\n"))
-            .putString("last_diagnostic_context", contextLine).apply()
-    }
-
-    fun zoneCounts(player: TablePlayer): String = listOf(
-        "library=${player.library.size}", "hand=${player.hand.size}", "battlefield=${player.battlefield.size}",
-        "graveyard=${player.graveyard.size}", "exile=${player.exile.size}", "revealed=${player.revealed.size}"
-    ).joinToString(", ")
-
-    fun zoneIdentitySignature(seats: List<TablePlayer>): String = seats.joinToString("|") { player ->
-        listOf(player.library, player.hand, player.battlefield, player.graveyard, player.exile, player.revealed)
-            .joinToString("/") { zone -> zone.map { it.id }.sorted().joinToString(",") }
-    }
-
-    fun zoneCards(player: TablePlayer): List<Pair<String, GameCard>> = buildList {
-        player.library.forEach { add("library" to it) }
-        player.hand.forEach { add("hand" to it) }
-        player.battlefield.forEach { add("battlefield" to it) }
-        player.graveyard.forEach { add("graveyard" to it) }
-        player.exile.forEach { add("exile" to it) }
-        player.revealed.forEach { add("revealed" to it) }
-    }
-
-    fun zoneIsPublic(zone: String): Boolean = zone in setOf("battlefield", "graveyard", "exile", "revealed")
-
-    fun logZoneSnapshotChange(seats: List<TablePlayer>, source: String) {
-        val signature = zoneIdentitySignature(seats)
-        if (signature == lastDiagnosticZoneSignature) return
-        val previous = lastDiagnosticZoneSignature
-        val previousSnapshot = lastDiagnosticZoneSnapshot
-        lastDiagnosticZoneSignature = signature
-        lastDiagnosticZoneSnapshot = seats
-        if (previous == null) {
-            recordDiagnostic("Zone baseline captured ($source): ${seats.mapIndexed { i, p -> "P${i + 1} ${zoneCounts(p)}" }.joinToString("; ")}")
-            return
-        }
-        previousSnapshot?.let { oldSeats ->
-            seats.forEachIndexed { index, player ->
-                val oldPlayer = oldSeats.getOrNull(index) ?: return@forEachIndexed
-                val oldCards = zoneCards(oldPlayer).groupBy { it.second.id }
-                val newCards = zoneCards(player).groupBy { it.second.id }
-                (oldCards.keys + newCards.keys).forEach { id ->
-                    val before = oldCards[id]?.singleOrNull() ?: return@forEach
-                    val after = newCards[id]?.singleOrNull() ?: return@forEach
-                    if (before.first == after.first || (before.second.isFaceDown || after.second.isFaceDown)) return@forEach
-                    val identityVisible = index == localSeat || zoneIsPublic(before.first) || zoneIsPublic(after.first) ||
-                        (before.first == "hand" && oldPlayer.handRevealedToAll) || (after.first == "hand" && player.handRevealedToAll)
-                    if (identityVisible) {
-                        recordDiagnostic("Card move ($source): P${index + 1} ${after.second.name} #$id ${before.first} â†’ ${after.first}")
-                    }
-                }
-            }
-        }
-        val priorSeatSignatures = previous.split('|')
-        val changed = seats.mapIndexedNotNull { index, player ->
-            val currentSeat = listOf(player.library, player.hand, player.battlefield, player.graveyard, player.exile, player.revealed)
-                .joinToString("/") { zone -> zone.map { it.id }.sorted().joinToString(",") }
-            if (priorSeatSignatures.getOrNull(index) == currentSeat) null else {
-                val allIds = listOf(player.library, player.hand, player.battlefield, player.graveyard, player.exile, player.revealed).flatten().map { it.id }
-                val repeatedInstanceCount = allIds.groupingBy { it }.eachCount().count { it.value > 1 }
-                "P${index + 1} ${zoneCounts(player)}, repeated instance IDs=$repeatedInstanceCount"
-            }
-        }
-        if (changed.isNotEmpty()) recordDiagnostic("Zone state changed ($source): ${changed.joinToString("; ")}")
-    }
-
-    fun leaveOnlineRoom() {
-        val ownPlayer = players.getOrNull(localSeat)?.copy(isOnline = false)
-        roomClient?.close(); roomClient = null
-        cloudRoomClient?.leave(); cloudRoomClient = null
-        roomHost?.close(); roomHost = null
-        val backup = localPlayersBackup
-        val restoredOwn = when {
-            ownPlayer == null -> backup?.firstOrNull()
-            ownPlayer.deckLoaded || backup?.firstOrNull()?.deckLoaded != true -> ownPlayer
-            else -> backup.first()
-        }
-        players = if (restoredOwn != null && !backup.isNullOrEmpty()) backup.mapIndexed { index, player -> if (index == 0) restoredOwn else player.copy(isOnline = false) }
-            else if (restoredOwn != null) listOf(restoredOwn) else backup.orEmpty()
-        localPlayersBackup = null
-        roomConnected = false; lobbyCreated = false; onlineStatus = "Offline"; localSeat = 0
-        onlineStateReady = false; gameStartedOnline = false; pendingReadyState = null
-        selectedPlayer = 0
-        lobbyOpen = false; homeOpen = true; showOverview = true
-    }
-
-    fun diagnosticReport(): String = buildString {
-        appendLine("Arcana Table diagnostic report")
-        appendLine("App version: ${BuildConfig.VERSION_NAME} (build ${BuildConfig.VERSION_CODE})")
-        appendLine("Android API: ${android.os.Build.VERSION.SDK_INT}")
-        appendLine("Device: ${Build.MANUFACTURER} ${Build.MODEL}")
-        appendLine("Role: ${if (lobbyCreated) "host" else if (roomClient != null || cloudRoomClient != null) "client" else "offline"}")
-        appendLine("Connection: $onlineStatus")
-        appendLine("Sync revision: not provided by the current room protocol; local inbound snapshot counter=$inboundSnapshotSequence")
-        appendLine("Local seat: ${localSeat + 1}; seats present: ${players.size}")
-        appendLine("App state: ${if (appInForeground) "foreground" else "background"}; view=${if (showOverview) "table" else "player"}; selectedSeat=${selectedPlayer + 1}; activeSeat=${activePlayer + 1}; phase=${phaseSteps.getOrNull(phaseIndex).orEmpty()}")
-        appendLine("Game started: ${gameStartedOnline || localGameStarted}")
-        appendLine("Lobby readiness: ${lobbyReadyPlayers.sorted().joinToString { (it + 1).toString() }.ifBlank { "none" }}")
-        appendLine("Deck status: ${players.mapIndexed { index, player -> "P${index + 1}=${if (player.deckLoaded) "loaded" else "missing"}" }.joinToString()}")
-        context.getSharedPreferences("arcana_crash", Context.MODE_PRIVATE).getString("last_crash", null)?.let { crash ->
-            appendLine()
-            val crashPrefs = context.getSharedPreferences("arcana_crash", Context.MODE_PRIVATE)
-            appendLine("Crash time: ${crashPrefs.getString("last_crash_at", "unknown")}")
-            appendLine("Action context: ${crashPrefs.getString("last_crash_context", "unknown")}")
-            appendLine("Last uncaught app crash:")
-            appendLine(crash)
-        }
-        appendLine()
-        appendLine("Zone totals include counts only. Opponents' hidden card identities are excluded; own-deck duplicate summaries may include card names.")
-        appendLine("Recent event log (passwords, IP addresses, and room codes redacted):")
-        diagnosticEvents.forEach { appendLine(it) }
-    }
-
-    val diagnosticExportLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
-        if (uri == null) {
-            recordDiagnostic("Diagnostic export canceled")
-        } else {
-            val result = runCatching {
-                context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(diagnosticReport()) }
-                    ?: error("Could not open the selected file.")
-            }
-            if (result.isSuccess) {
-                recordDiagnostic("Diagnostic report exported")
-                message = "Diagnostic log exported."
-                lobbyNotice = "Diagnostic log exported."
-            } else {
-                recordDiagnostic("Diagnostic export failed")
-                message = "Could not write the diagnostic log."
-                lobbyNotice = "Could not write the diagnostic log."
-            }
-        }
-    }
-    fun exportDiagnosticLog() {
-        recordDiagnostic("Diagnostic export requested")
-        val filename = "ArcanaTable-diagnostics-${java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US).format(java.util.Date())}.txt"
-        diagnosticExportLauncher.launch(filename)
-    }
-    var pendingPlayerRemoval by remember { mutableIntStateOf(-1) }
-    var deckEditorOpen by remember { mutableStateOf(false) }
-    var combatDialogOpen by remember { mutableStateOf(false) }
-    var turnTimerRunning by rememberSaveable { mutableStateOf(false) }
-    var gameTimerRunning by rememberSaveable { mutableStateOf(false) }
-    var aiRoutineRunning by remember { mutableStateOf(false) }
-    var gameGeneration by remember { mutableIntStateOf(0) }
-    var turnTimerVisible by rememberSaveable { mutableStateOf(true) }
-    var lastSwipeDistance by remember { mutableFloatStateOf(0f) }
-    val onlineMode = roomHost != null || roomClient != null || cloudRoomClient != null || connectionLost
-    val gameInProgress = if (onlineMode) gameStartedOnline && roomConnected && !gameEndedOnline else localGameStarted
-    val canControlSelectedPlayer = (!onlineMode || selectedPlayer == localSeat) && !gameEndedOnline && players.getOrNull(selectedPlayer)?.isEliminated != true
-
-    LaunchedEffect(roomHost, roomClient, cloudRoomClient) {
-        if (roomHost != null || roomClient != null || cloudRoomClient != null) LanConnectionService.start(context)
-        else LanConnectionService.stop(context)
-    }
-
-    LaunchedEffect(Unit) {
-        recordDiagnostic("Application opened")
-        while (true) {
-            delay(1_000)
-            if (roomClient == null && cloudRoomClient == null) {
-                if (gameTimerRunning) elapsedGameSeconds++
-                if (turnTimerRunning) elapsedTurnSeconds++
-            }
-        }
-    }
-
-    LaunchedEffect(players, onlineMode) { if (!onlineMode) savePlayers(context, players) }
-    fun buildOnlineSnapshot(): String {
-        val sharedOrder = if (gameStartedOnline) gameTurnOrder else lobbyTurnOrder.orEmpty()
-        return OnlineGameState(players, activePlayer, turnNumber, phaseIndex, elapsedGameSeconds, elapsedTurnSeconds, sharedOrder, lobbyReadyPlayers, gameLog.takeLast(250), chatMessages.takeLast(200).map { OnlineChatMessage(it.author, it.text, it.timestamp) }, gameStartedOnline, endProposalBy, endVotes, gameEndedOnline, stackActions, priorityPlayer, priorityPassed, triggerPrompts).toJson()
-    }
-    fun publishOnlineSnapshot() {
-        if ((roomHost != null || roomClient != null || cloudRoomClient != null) && roomConnected && onlineStateReady) {
-            val snapshot = buildOnlineSnapshot()
-            if (snapshot != lastRemoteSnapshot) {
-                roomHost?.publish(snapshot)
-                roomClient?.publish(snapshot)
-                cloudRoomClient?.publish(snapshot)
-            }
-        }
-    }
-    LaunchedEffect(players, activePlayer, turnNumber, phaseIndex, gameTurnOrder, lobbyReadyPlayers, lobbyTurnOrder, gameLog, chatMessages, gameStartedOnline, endProposalBy, endVotes, gameEndedOnline, stackActions, priorityPlayer, priorityPassed, triggerPrompts, roomHost, roomClient, cloudRoomClient, roomConnected, onlineStateReady) {
-        delay(180)
-        publishOnlineSnapshot()
-    }
-    LaunchedEffect(elapsedGameSeconds, elapsedTurnSeconds, roomHost, roomClient, cloudRoomClient, roomConnected, onlineStateReady) {
-        if (elapsedGameSeconds % 5L == 0L || elapsedTurnSeconds % 5L == 0L) publishOnlineSnapshot()
-    }
-    // Capture the instances that this effect owns. Reading the delegated Compose
-    // state values inside onDispose would see the newly assigned room/client and
-    // could close it immediately when the keys change during recomposition.
-    val hostOwnedByEffect = roomHost
-    val clientOwnedByEffect = roomClient
-    val cloudClientOwnedByEffect = cloudRoomClient
-    DisposableEffect(hostOwnedByEffect, clientOwnedByEffect, cloudClientOwnedByEffect) {
-        onDispose {
-            hostOwnedByEffect?.close()
-            clientOwnedByEffect?.close()
-            cloudClientOwnedByEffect?.close()
-            LanConnectionService.stop(context)
-        }
-    }
-    LaunchedEffect(players) { nextId = maxOf(nextId, (players.flatMap { it.library + it.hand + it.battlefield + it.graveyard + it.exile + it.revealed }.maxOfOrNull { it.id } ?: 0) + 1) }
-    LaunchedEffect(stackActions, localSeat, onlineMode) {
-        targetSelectionStackItemId = stackActions.firstOrNull {
-            !it.targetsConfirmed && it.targetCount != null &&
-                (!onlineMode || it.controllerId == players.getOrNull(localSeat)?.id)
-        }?.id
-    }
-    var observedChatCount by remember { mutableIntStateOf(chatMessages.size) }
-    LaunchedEffect(chatMessages.size, chatOpen) {
-        if (chatMessages.size > observedChatCount && !chatOpen) unreadChatCount += chatMessages.size - observedChatCount
-        observedChatCount = chatMessages.size
-        if (chatOpen) unreadChatCount = 0
-    }
-    LaunchedEffect(gameStartedOnline) {
-        if (gameStartedOnline) { homeOpen = false; showOverview = true; showHand = false; lobbyOpen = false }
-    }
-    LaunchedEffect(gameEndedOnline) {
-        if (gameEndedOnline) { gameTimerRunning = false; turnTimerRunning = false; showOverview = true; showHand = false }
-    }
-    LaunchedEffect(pendingStackOpen, triggerPrompts.size, paymentCard, manaPoolOpen, targetSelectionStackItemId, creatureTypeChoicePrompt) {
-        if (pendingStackOpen && triggerPrompts.isEmpty() && paymentCard == null && !manaPoolOpen && targetSelectionStackItemId == null && creatureTypeChoicePrompt == null) {
-            delay(180)
-            stackOpen = true
-            pendingStackOpen = false
-        }
-    }
-    LaunchedEffect(stackActions.isNotEmpty(), triggerPrompts.size, paymentCard, manaPoolOpen, manaChoicePrompt, creatureTypeChoicePrompt, pendingStackOpen) {
-        if (stackActions.isNotEmpty()) {
-            stackCycleActive = true
-            return@LaunchedEffect
-        }
-        if (!stackCycleActive || triggerPrompts.isNotEmpty() || paymentCard != null || manaPoolOpen || manaChoicePrompt != null || creatureTypeChoicePrompt != null || pendingStackOpen) return@LaunchedEffect
-        delay(250)
-        if (stackActions.isEmpty() && triggerPrompts.isEmpty() && paymentCard == null && !manaPoolOpen && manaChoicePrompt == null && creatureTypeChoicePrompt == null && !pendingStackOpen) {
-            stackOpen = false
-            stackCycleActive = false
-        }
-    }
-
-    val activity = context as? Activity
-    SideEffect {
-        val systemBar = if (darkMode) android.graphics.Color.rgb(16, 22, 21) else android.graphics.Color.rgb(242, 245, 241)
-        activity?.window?.statusBarColor = systemBar
-        activity?.window?.navigationBarColor = systemBar
-    }
-
-    fun updatePlayer(index: Int, transform: (TablePlayer) -> TablePlayer) {
-        players = players.mapIndexed { i, p -> if (i == index) transform(p) else p }
-        logZoneSnapshotChange(players, "local player update")
-    }
-    fun takeOpeningMulligan(index: Int) {
-        val player = players.getOrNull(index) ?: return
-        if (index != localSeat || !onlineMode || gameStartedOnline || !player.deckLoaded || player.openingHandKept || index in lobbyReadyPlayers || player.mulligansTaken >= 8) return
-        val shuffled = (player.hand + player.library).shuffled()
-        updatePlayer(index) { it.copy(
-            hand = shuffled.take(7),
-            library = shuffled.drop(7),
-            mulligansTaken = player.mulligansTaken + 1,
-            openingHandKept = false
-        ) }
-        publishOnlineSnapshot()
-        lobbyNotice = if (player.mulligansTaken == 0) "Shuffled your hand into your library and dealt a new one. This multiplayer mulligan is free." else "Shuffled your hand into your library and dealt a new one."
-        recordDiagnostic("Opening hand mulligan: seat ${index + 1}, total=${player.mulligansTaken + 1}")
-    }
-    fun keepOpeningHand(index: Int, bottomIds: List<Int>) {
-        val player = players.getOrNull(index) ?: return
-        if (index != localSeat || !onlineMode || gameStartedOnline || !player.deckLoaded || player.openingHandKept || index in lobbyReadyPlayers) return
-        val requiredBottomCount = (player.mulligansTaken - 1).coerceAtLeast(0)
-        val selectedIds = bottomIds.distinct()
-        if (selectedIds.size != requiredBottomCount || selectedIds.any { id -> player.hand.none { it.id == id } }) return
-        val bottomCards = player.hand.filter { it.id in selectedIds }
-        updatePlayer(index) { current -> current.copy(
-            hand = current.hand.filterNot { it.id in selectedIds },
-            library = current.library + bottomCards,
-            openingHandKept = true
-        ) }
-        publishOnlineSnapshot()
-        lobbyNotice = if (requiredBottomCount == 0) "Opening hand kept. You can now ready up." else "Opening hand kept; $requiredBottomCount card(s) put on the bottom of your library."
-        recordDiagnostic("Opening hand kept: seat ${index + 1}, mulligans=${player.mulligansTaken}, cards bottomed=$requiredBottomCount")
-    }
-    fun trackedMana(index: Int): Int = players.getOrNull(index)?.manaPool?.values?.sum() ?: 0
-    fun changeMana(index: Int, color: String, delta: Int) {
-        if (index !in players.indices || color !in listOf("W", "U", "B", "R", "G", "C")) return
-        updatePlayer(index) { player ->
-            val amount = ((player.manaPool[color] ?: 0) + delta).coerceIn(0, 99)
-            player.copy(manaPool = player.manaPool.toMutableMap().apply {
-                if (amount == 0) remove(color) else put(color, amount)
-            })
-        }
-    }
-    fun clearMana(index: Int) {
-        if (players.getOrNull(index)?.manaPool?.isNotEmpty() == true) updatePlayer(index) { it.copy(manaPool = emptyMap()) }
-    }
-    fun spendGenericMana(index: Int, amount: Int): Boolean {
-        if (index !in players.indices) return false
-        val next = spendGenericMana(players[index].manaPool, amount) ?: return false
-        updatePlayer(index) { it.copy(manaPool = next) }
-        return true
-    }
-    fun updateCard(playerIndex: Int, cardId: Int, transform: (GameCard) -> GameCard) {
-        updatePlayer(playerIndex) { p -> p.copy(battlefield = p.battlefield.map { if (it.id == cardId) transform(it) else it }) }
-    }
-    fun editDeckCard(playerIndex: Int, cardId: Int, newName: String?, remove: Boolean = false) {
-        updatePlayer(playerIndex) { p ->
-            fun change(cards: List<GameCard>) = cards.mapNotNull { card ->
-                if (card.id != cardId) card else if (remove) null else card.copy(name = newName?.trim()?.takeIf { it.isNotEmpty() } ?: card.name)
-            }
-            val commander = p.commanderCard?.let { card ->
-                if (card.id != cardId) card else if (remove) null else card.copy(name = newName?.trim()?.takeIf { it.isNotEmpty() } ?: card.name)
-            }
-            p.copy(
-                library = change(p.library),
-                hand = change(p.hand),
-                battlefield = change(p.battlefield),
-                graveyard = change(p.graveyard),
-                exile = change(p.exile),
-                revealed = change(p.revealed),
-                commanderCard = commander,
-                commanderName = commander?.name
-            )
-        }
-    }
-    fun nextTurnPlayer(currentIndex: Int): Int {
-        return nextTurnIndex(currentIndex, gameTurnOrder, players.size, players.indices.filterNot { players[it].isEliminated }.toSet())
-    }
-    fun movePlayerCard(index: Int, direction: Int) {
-        val target = (index + direction).coerceIn(0, players.lastIndex)
-        if (target == index) return
-        val reordered = players.toMutableList().also { list ->
-            val item = list[index]; list[index] = list[target]; list[target] = item
-        }
-        players = reordered
-        fun remap(value: Int) = when (value) { index -> target; target -> index; else -> value }
-        selectedPlayer = remap(selectedPlayer)
-        activePlayer = remap(activePlayer)
-        priorityPlayer = remap(priorityPlayer)
-        gameTurnOrder = gameTurnOrder.map(::remap)
-        lobbyTurnOrder = lobbyTurnOrder?.map(::remap)
-        lobbyReadyPlayers = lobbyReadyPlayers.map(::remap).toSet()
-    }
-    fun removeLobbyPlayer(index: Int) {
-        if (!lobbyCreated || lobbyJoinMode || index <= 0 || index !in players.indices) return
-        roomHost?.removeSeat(index)
-        val removedName = players[index].name
-        players = players.filterIndexed { playerIndex, _ -> playerIndex != index }
-        fun remap(playerIndex: Int): Int = when {
-            playerIndex == index -> 0
-            playerIndex > index -> playerIndex - 1
-            else -> playerIndex
-        }
-        selectedPlayer = remap(selectedPlayer).coerceIn(players.indices)
-        activePlayer = remap(activePlayer).coerceIn(players.indices)
-        priorityPlayer = remap(priorityPlayer).coerceIn(players.indices)
-        gameTurnOrder = gameTurnOrder.filter { it != index }.map { if (it > index) it - 1 else it }
-        lobbyReadyPlayers = lobbyReadyPlayers.filter { it != index }.map { if (it > index) it - 1 else it }.toSet()
-        lobbyTurnOrder = lobbyTurnOrder?.filter { it != index }?.map { if (it > index) it - 1 else it }
-        if (pendingAiPlayerIndex == index) pendingAiPlayerIndex = -1 else if (pendingAiPlayerIndex > index) pendingAiPlayerIndex--
-        if (endProposalBy == index) { endProposalBy = -1; endVotes = emptyMap() }
-        else if (endProposalBy > index) endProposalBy--
-        endVotes = endVotes.filterKeys { it != index }.mapKeys { (seat, _) -> if (seat > index) seat - 1 else seat }
-        triggerPrompts = triggerPrompts.filter { it.controllerIndex != index && it.eventPlayerIndex != index }.map {
-            it.copy(controllerIndex = remap(it.controllerIndex), eventPlayerIndex = remap(it.eventPlayerIndex))
-        }
-        gameGeneration++
-        lobbyNotice = "$removedName was removed from the lobby."
-    }
-    fun logAction(playerIndex: Int, action: String) {
-        val playerName = players.getOrNull(playerIndex)?.name ?: "TABLE"
-        val phase = phaseSteps.getOrNull(phaseIndex)?.let { " Â· $it" }.orEmpty()
-        gameLog = (gameLog + "Turn $turnNumber$phase Â· $playerName $action").takeLast(250)
-        if (backgroundAlertsEnabled && !appInForeground && onlineMode && playerIndex != localSeat && !action.startsWith("sent a chat")) {
-            postGameAlert(context, "Game activity", "$playerName $action")
-        }
-    }
-    fun announceAutomaticAction(playerIndex: Int, action: String, alreadyLogged: Boolean = false) {
-        val playerName = players.getOrNull(playerIndex)?.name ?: "Player"
-        if (!alreadyLogged) logAction(playerIndex, "$action automatically")
-        scope.launch { automaticActionSnackbar.showSnackbar("$playerName Â· $action") }
-    }
-    fun tapPermanent(playerIndex: Int, card: GameCard) {
-        if (card.tapped) {
-            updateCard(playerIndex, card.id) { it.copy(tapped = false) }
-            logAction(playerIndex, "untapped ${card.name}")
-            return
-        }
-        updateCard(playerIndex, card.id) { it.copy(tapped = true) }
-        logAction(playerIndex, "tapped ${card.name}")
-        val options = manaProductionOptions(card)
-        if (options.size == 1) {
-            val onlyOption = options.single()
-            updatePlayer(playerIndex) { player ->
-                player.copy(manaPool = player.manaPool.toMutableMap().apply {
-                    onlyOption.pool.forEach { (color, count) -> put(color, ((get(color) ?: 0) + count).coerceAtMost(99)) }
-                })
-            }
-            logAction(playerIndex, "added ${onlyOption.label} mana")
-        } else if (options.size > 1) {
-            manaChoicePrompt = ManaChoicePrompt(playerIndex, card.name, options)
-        }
-    }
-    fun applyOnlineSnapshot(source: String) {
-        val state = parseOnlineGameState(source) ?: return
-        inboundSnapshotSequence += 1
-        val firstSnapshotForConnection = !onlineStateReady
-        val wasGameStarted = gameStartedOnline
-        val oldActivePlayer = activePlayer
-        val oldPriorityPlayer = priorityPlayer
-        val oldStackIds = stackActions.map { it.id }.toSet()
-        val oldGameLog = gameLog
-        val previousReady = lobbyReadyPlayers
-        val previousPlayers = players
-        lastRemoteSnapshot = state.toJson()
-        val receivedPlayers = state.players.mapIndexed { index, player ->
-            if (roomConnected && index == localSeat) player.copy(isOnline = true) else player
-        }.toMutableList()
-        while (receivedPlayers.size <= localSeat && receivedPlayers.size < 4) receivedPlayers += TablePlayer(name = if (receivedPlayers.size == localSeat) lobbyPlayerName else "PLAYER ${receivedPlayers.size + 1}")
-        // This device owns its assigned seat. Keep its current player data while
-        // connected so an older server snapshot cannot undo a local card move
-        // that is still waiting for its outbound snapshot to be published.
-        // The first snapshot after connecting remains authoritative so a
-        // reconnect can restore the room's saved state.
-        if (!firstSnapshotForConnection) {
-            previousPlayers.getOrNull(localSeat)?.let { localPlayer ->
-                if (localSeat in receivedPlayers.indices) {
-                    receivedPlayers[localSeat] = localPlayer.copy(isOnline = true)
-                }
-            }
-        }
-        players = receivedPlayers
-        logZoneSnapshotChange(players, "online snapshot #$inboundSnapshotSequence")
-        receivedPlayers.forEachIndexed { index, player ->
-            val oldLoaded = previousPlayers.getOrNull(index)?.deckLoaded
-            if (oldLoaded != null && oldLoaded != player.deckLoaded) recordDiagnostic("Lobby deck status updated: seat ${index + 1}, loaded=${player.deckLoaded}")
-            val oldOnline = previousPlayers.getOrNull(index)?.isOnline
-            if (!firstSnapshotForConnection && index != localSeat && oldOnline != null && oldOnline != player.isOnline) {
-                val event = if (player.isOnline) "${player.name} reconnected" else "${player.name} lost connection"
-                recordDiagnostic("Player connection changed: seat ${index + 1} ${if (player.isOnline) "online" else "offline"}")
-                if (lobbyOpen) lobbyNotice = "$event."
-                if (message == null) message = "$event."
-                if (backgroundAlertsEnabled && !appInForeground) {
-                    postGameAlert(context, if (player.isOnline) "Player reconnected" else "Player disconnected", event)
-                }
-            }
-        }
-        if (localSeat in players.indices) players = players.mapIndexed { index, player -> if (index == localSeat) player.copy(isOnline = true) else player }
-        activePlayer = state.activePlayer.coerceIn(players.indices)
-        turnNumber = state.turnNumber
-        phaseIndex = state.phaseIndex.coerceAtMost(phaseSteps.lastIndex)
-        elapsedGameSeconds = state.elapsedGameSeconds
-        elapsedTurnSeconds = state.elapsedTurnSeconds
-        gameTurnOrder = state.turnOrder
-        lobbyTurnOrder = state.turnOrder.takeIf { it.isNotEmpty() && !state.gameStarted }
-        lobbyReadyPlayers = state.readyPlayers
-        ((previousReady union state.readyPlayers) - (previousReady intersect state.readyPlayers)).sorted().forEach { seat ->
-            recordDiagnostic("Lobby readiness updated: seat ${seat + 1}, ready=${seat in state.readyPlayers}")
-        }
-        if (lobbyOpen && previousReady != state.readyPlayers) {
-            val becameReady = (state.readyPlayers - previousReady).firstOrNull()
-            val becameNotReady = (previousReady - state.readyPlayers).firstOrNull()
-            val changedSeat = becameReady ?: becameNotReady
-            if (changedSeat != null) {
-                val name = state.players.getOrNull(changedSeat)?.name ?: "A player"
-                lobbyNotice = if (becameReady != null) "$name is ready to start." else "$name is no longer ready."
-            }
-        }
-        gameLog = state.gameLog
-        if (backgroundAlertsEnabled && !appInForeground && wasGameStarted && state.gameStarted) {
-            if (state.activePlayer == localSeat && oldActivePlayer != localSeat) postGameAlert(context, "Your turn", "It is your turn in Arcana Table.")
-            val oldTail = oldGameLog.lastOrNull()
-            val additions = if (oldTail == null) emptyList() else state.gameLog.dropWhile { it != oldTail }.drop(1)
-            additions.takeLast(4).filterNot { it.contains("${players.getOrNull(localSeat)?.name.orEmpty()} ") }.forEach { entry ->
-                postGameAlert(context, "Game play", entry.substringAfter("Â· ", entry))
-            }
-        }
-        chatMessages = state.chat.map { ChatMessage(it.author, it.text, it.timestamp) }
-        gameStartedOnline = state.gameStarted
-        endProposalBy = state.endProposalBy
-        endVotes = state.endVotes
-        gameEndedOnline = state.gameEnded
-        stackActions = state.stackActions
-        targetSelectionStackItemId = state.stackActions.firstOrNull { !it.targetsConfirmed && it.targetCount != null && it.controllerId == players.getOrNull(localSeat)?.id }?.id
-        triggerPrompts = state.triggerPrompts
-        priorityPlayer = state.priorityPlayer.coerceIn(players.indices)
-        priorityPassed = state.priorityPassed
-        val stackItemAdded = state.stackActions.any { it.id !in oldStackIds }
-        val priorityArrivedForLocalPlayer = wasGameStarted && oldPriorityPlayer != priorityPlayer && priorityPlayer == localSeat
-        val joiningWithOpenStack = firstSnapshotForConnection && state.gameStarted && state.stackActions.isNotEmpty()
-        if (state.gameStarted && state.stackActions.isNotEmpty() &&
-            (stackItemAdded || priorityArrivedForLocalPlayer || joiningWithOpenStack)
-        ) {
-            pendingStackOpen = true
-            if (backgroundAlertsEnabled && !appInForeground) {
-                val title = if (priorityArrivedForLocalPlayer) "Your priority" else "Stack update"
-                val detail = if (priorityArrivedForLocalPlayer) "It is your turn to respond on the stack." else "A spell or ability was added to the stack."
-                postGameAlert(context, title, detail)
-            }
-            recordDiagnostic(if (priorityArrivedForLocalPlayer) "Stack priority arrived at local seat ${localSeat + 1}" else "Shared stack update received")
-        }
-        onlineStateReady = true
-        // Server snapshots arrive for every remote action (and periodically for
-        // timers). Preserve the local player's current view and open hand; only
-        // select the local seat when first syncing or when the game starts.
-        if (firstSnapshotForConnection || (!wasGameStarted && state.gameStarted)) {
-            selectedPlayer = localSeat.coerceIn(players.indices)
-            showOverview = true
-            showHand = false
-        } else {
-            selectedPlayer = selectedPlayer.coerceIn(players.indices)
-        }
-    }
-    fun makeHostTransferState(source: String, targetSeat: Int): String? {
-        val state = parseOnlineGameState(source) ?: return null
-        if (state.players.size < 2 || targetSeat !in 1 until state.players.size) return null
-        fun shift(seat: Int): Int = when {
-            seat == 0 || seat < 0 -> -1
-            seat == targetSeat -> 0
-            seat < targetSeat -> seat
-            else -> seat - 1
-        }
-        val shiftedPlayers = listOf(state.players[targetSeat]) + state.players.indices
-            .filter { it != 0 && it != targetSeat }.map { state.players[it] }
-        val shiftedProposal = shift(state.endProposalBy)
-        val shifted = state.copy(
-            players = shiftedPlayers,
-            activePlayer = shift(state.activePlayer).coerceAtLeast(0).coerceIn(shiftedPlayers.indices),
-            priorityPlayer = shift(state.priorityPlayer).coerceAtLeast(0).coerceIn(shiftedPlayers.indices),
-            turnOrder = state.turnOrder.map(::shift).filter { it >= 0 },
-            readyPlayers = state.readyPlayers.map(::shift).filter { it >= 0 }.toSet(),
-            endProposalBy = shiftedProposal,
-            endVotes = state.endVotes.mapNotNull { (seat, vote) -> shift(seat).takeIf { it >= 0 }?.let { it to vote } }.toMap(),
-            priorityPassed = state.priorityPassed.intersect(shiftedPlayers.map { it.id }.toSet()),
-            triggerPrompts = state.triggerPrompts.mapNotNull { prompt ->
-                val controller = shift(prompt.controllerIndex)
-                val eventPlayer = shift(prompt.eventPlayerIndex)
-                if (controller < 0 || eventPlayer < 0) null else prompt.copy(controllerIndex = controller, eventPlayerIndex = eventPlayer)
-            }
-        )
-        return shifted.toJson()
-    }
-    fun startTransferredHost(source: String, targetSeat: Int, predecessor: LanRoomClient) {
-        val shiftedSource = makeHostTransferState(source, targetSeat)
-        if (shiftedSource == null) {
-            lobbyNotice = "Host transfer needs another connected player. The room is still hosted here."
-            return
-        }
-        val shifted = parseOnlineGameState(shiftedSource) ?: return
-        roomHost?.close()
-        lobbyCreated = false
-        localSeat = 0
-        roomConnected = true
-        onlineStateReady = false
-        applyOnlineSnapshot(shiftedSource)
-        lobbyNotice = "Taking over the roomâ€¦"
-        onlineStatus = "Starting new room host"
-        fun revertFailedTransfer(message: String) {
-            roomHost?.close()
-            roomHost = null
-            lobbyCreated = false
-            localSeat = targetSeat
-            roomConnected = true
-            onlineStateReady = true
-            applyOnlineSnapshot(source)
-            onlineStatus = "Connected to host"
-            lobbyNotice = message
-            recordDiagnostic("Host transfer could not start; returned to the original room")
-        }
-        val host = LanRoomHost(
-            roomCode = lobbyRoomCode,
-            password = lobbyPassword,
-            onStarted = { address -> scope.launch(Dispatchers.Main) {
-                lobbyHostAddress = address
-                onlineStatus = if (address.isBlank()) "New host address unavailable" else "Room host transferred"
-                onlineStateReady = true
-                if (address.isBlank() || !predecessor.requestHostTransfer(address)) {
-                    revertFailedTransfer("Could not start the new room host. You are still connected to the original host.")
-                } else {
-                    lobbyNotice = "Room transferred. Waiting for players to reconnectâ€¦"
-                    recordDiagnostic("Successor started the new room host")
-                }
-            } },
-            onSnapshot = { snapshot -> scope.launch(Dispatchers.Main) { applyOnlineSnapshot(snapshot) } },
-            onPeerJoined = { seat, name -> scope.launch(Dispatchers.Main) {
-                if (players.size <= seat) players = players + TablePlayer(name = name, isOnline = true)
-                else players = players.mapIndexed { index, player -> if (index == seat) player.copy(name = name, isOnline = true) else player }
-                recordDiagnostic("Player reconnected after host transfer: seat ${seat + 1}")
-            } },
-            onPeerLeft = { seat -> scope.launch(Dispatchers.Main) {
-                if (seat in players.indices && seat > 0) removeLobbyPlayer(seat)
-            } },
-            onEvent = { event -> scope.launch(Dispatchers.Main) { recordDiagnostic(event) } },
-            onError = { error -> scope.launch(Dispatchers.Main) {
-                revertFailedTransfer("New host could not start the room: $error. You are still connected to the original host.")
-                recordDiagnostic("Transferred room host error: $error")
-            } },
-            initialSnapshot = shiftedSource,
-            onHostMigrationFinished = { scope.launch(Dispatchers.Main) { leaveOnlineRoom() } }
-        )
-        shifted.players.forEachIndexed { seat, player -> if (seat > 0 && player.isOnline) host.reserveSeat(seat) }
-        roomHost = host
-        host.start()
-    }
-    fun submitEndVote(approve: Boolean) {
-        if (endProposalBy < 0 || localSeat !in players.indices) return
-        val nextVotes = endVotes + (localSeat to approve)
-        if (!approve) {
-            endProposalBy = -1
-            endVotes = emptyMap()
-            logAction(localSeat, "voted to continue playing; end proposal declined")
-            return
-        }
-        endVotes = nextVotes
-        logAction(localSeat, "approved ending the game")
-        if (players.indices.all { nextVotes[it] == true }) {
-            gameEndedOnline = true
-            logAction(localSeat, "all players agreed to end the game")
-        }
-    }
-    fun untapPermanents(playerIndex: Int) {
-        val battlefield = players.getOrNull(playerIndex)?.battlefield ?: return
-        val tappedCards = battlefield.filter { it.tapped }
-        if (tappedCards.isEmpty()) return
-        val results = tappedCards.associate { it.id to resolveUntapStep(it.tapped, it.counters) }
-        val untappedCount = results.values.count { !it.remainsTapped }
-        val stunCount = results.values.count { it.removedStunCounter }
-        updatePlayer(playerIndex) { player -> player.copy(battlefield = player.battlefield.map { card ->
-            val result = results[card.id] ?: return@map card
-            card.copy(tapped = result.remainsTapped, counters = result.counters)
-        }) }
-        if (untappedCount > 0) logAction(playerIndex, "untapped $untappedCount permanents")
-        if (stunCount > 0) logAction(playerIndex, "removed a stun counter from $stunCount tapped permanent(s); they stayed tapped")
-    }
-    fun makeCard(name: String, type: String, imageUrl: String? = null, token: Boolean = false, oracleText: String? = null, manaValue: Double? = null, artCropUrl: String? = null, manaCost: String? = null, power: String? = null, toughness: String? = null, keywords: List<String> = emptyList()): GameCard {
-        val palette = listOf(Color(0xFF547D9A), Color(0xFF9F8C63), Color(0xFF6C9A75), Color(0xFF756348), Color(0xFF8D8C9E))
-        val id = nextId++
-        return GameCard(id, name, type, palette[id % palette.size], imageUrl = imageUrl, isToken = token, oracleText = oracleText, manaValue = manaValue, artCropUrl = artCropUrl, manaCost = manaCost, power = power, toughness = toughness, keywords = keywords)
-    }
-    fun loadTestCardImages() {
-        val names = players.flatMap { it.library + it.hand + it.battlefield + it.graveyard + it.exile + it.revealed }
-            .filterNot { it.isToken }.map { it.name }.distinct()
-        scope.launch {
-            runCatching { Scryfall.lookup(names.map { DeckEntry(it, 1) }) }.onSuccess { found ->
-                fun enrich(cards: List<GameCard>) = cards.map { card ->
-                    val art = found.entries.firstOrNull { it.key.name.equals(card.name, true) }?.value
-                    if (art == null) card else card.copy(imageUrl = art.imageUrl, artCropUrl = art.artCropUrl, oracleText = art.oracleText, manaValue = art.manaValue, manaCost = art.manaCost, power = art.power, toughness = art.toughness, keywords = art.keywords)
-                }
-                players = players.map { player -> player.copy(
-                    library = enrich(player.library), hand = enrich(player.hand), battlefield = enrich(player.battlefield),
-                    graveyard = enrich(player.graveyard), exile = enrich(player.exile), revealed = enrich(player.revealed)
-                ) }
-            }
-        }
-    }
-    fun makeRandomDecks() {
-        players = players.map { player ->
-            val cards = List(100) { index ->
-                val entry = debugCardPool.random()
-                makeCard(entry.first, entry.second)
-            }.shuffled()
-            player.copy(deckLoaded = true, commanderName = null, commanderCard = null, hand = cards.take(7), library = cards.drop(7), battlefield = emptyList(), graveyard = emptyList(), exile = emptyList(), revealed = emptyList())
-        }
-        turnNumber = 1; phaseIndex = 0; activePlayer = 0; elapsedTurnSeconds = 0; showOverview = true; showHand = false
-        logAction(0, "loaded randomized test decks")
-        loadTestCardImages()
-    }
-    fun randomizeMidgame() {
-        players = players.map { player ->
-            val deck = List(75) { val entry = debugCardPool.random(); makeCard(entry.first, entry.second) }.shuffled()
-            val handSize = (3..7).random(); val boardSize = (3..8).random(); val graveSize = (0..8).random()
-            player.copy(deckLoaded = true, life = (12..48).random(), hand = deck.take(handSize), battlefield = deck.drop(handSize).take(boardSize).map { it.copy(tapped = listOf(true, false, false, false).random()) }, graveyard = deck.drop(handSize + boardSize).take(graveSize), library = deck.drop(handSize + boardSize + graveSize), exile = emptyList(), revealed = emptyList())
-        }
-        activePlayer = players.indices.random(); phaseIndex = (3..10).random(); turnNumber = (4..14).random(); elapsedTurnSeconds = (0..2100).random().toLong(); elapsedGameSeconds = (1200..9000).random().toLong(); showOverview = true; showHand = false
-        logAction(activePlayer, "randomized a mid-game test state")
-        loadTestCardImages()
-    }
-
-    fun queueKnownTriggers(event: String, eventPlayerIndex: Int, enteringCard: GameCard? = null) {
-        if (eventPlayerIndex !in players.indices) return
-        players.forEachIndexed { controllerIndex, player ->
-            if (player.isEliminated) return@forEachIndexed
-            player.battlefield.filterNot { it.isFaceDown }.forEach { card ->
-                val knownKind = when {
-                    event == "CAST" && controllerIndex != eventPlayerIndex && card.name.equals("Rhystic Study", ignoreCase = true) -> "RHYSTIC"
-                    event == "DRAW" && controllerIndex != eventPlayerIndex && card.name.equals("Smothering Tithe", ignoreCase = true) -> "TITHE"
-                    else -> null
-                }
-                if (knownKind != null) {
-                    val prompt = TriggerPrompt(
-                        cardName = card.name,
-                        controllerIndex = controllerIndex,
-                        eventPlayerIndex = eventPlayerIndex,
-                        kind = knownKind,
-                        triggerText = if (knownKind == "RHYSTIC") "Whenever an opponent casts a spell" else "Whenever an opponent draws a card",
-                        effectText = if (knownKind == "RHYSTIC") "Draw a card unless that player pays {1}." else "Create a Treasure token unless that player pays {2}."
-                    )
-                    triggerPrompts = triggerPrompts + prompt
-                    logAction(controllerIndex, "triggered ${card.name} Â· ${prompt.triggerText}")
-                    return@forEach
-                }
-                parseRecognizedTriggeredAbilities(card.oracleText).filter { it.event == event }.forEach abilityLoop@{ ability ->
-                    val isControllerEvent = controllerIndex == eventPlayerIndex
-                    val actorMatches = when (ability.actorFilter) {
-                        "YOU" -> isControllerEvent
-                        "OPPONENT" -> !isControllerEvent
-                        else -> true
-                    }
-                    if (!actorMatches || (ability.anotherOnly && enteringCard?.id == card.id)) return@abilityLoop
-                    if (ability.controllerFilter == "under your control" && !isControllerEvent) return@abilityLoop
-                    if (ability.controllerFilter == "under an opponent's control" && isControllerEvent) return@abilityLoop
-
-                    val oldLifeTrigger = event == "CREATURE_ETB" && parseCreatureEntryLifeEffects(card.oracleText).isNotEmpty()
-                    val simpleEffects = parseAutomaticResolutionEffects(ability.effectText)
-                    if (oldLifeTrigger && !simpleEffects.requiresManualReview && simpleEffects.lifeGain > 0 &&
-                        simpleEffects.lifeLoss == 0 && simpleEffects.cardsDrawn == 0 && simpleEffects.tokens.isEmpty()) return@abilityLoop
-
-                    val targetEffect = parseTargetedAutomaticEffect(ability.effectText)
-                    val triggerKind = when {
-                        targetEffect != null -> "TARGET_EFFECT"
-                        simpleEffects.requiresManualReview -> "MANUAL"
-                        !simpleEffects.isEmpty -> "AUTO_EFFECT"
-                        else -> "MANUAL"
-                    }
-                    val prompt = TriggerPrompt(
-                        cardName = card.name,
-                        controllerIndex = controllerIndex,
-                        eventPlayerIndex = eventPlayerIndex,
-                        kind = triggerKind,
-                        triggerText = ability.conditionText,
-                        effectText = targetEffect?.effectText ?: ability.effectText,
-                        targetRule = targetEffect?.targetRule ?: parseTargetPlayerRule(ability.effectText)
-                    )
-                    if (parseTargetCountRange(ability.effectText) != null) {
-                        val triggerStackItem = StackAction(
-                            title = "${card.name}: ${ability.effectText}",
-                            controllerId = player.id,
-                            kind = "TRIGGER",
-                            card = card,
-                            targetText = ability.effectText
-                        )
-                        stackActions = stackActions + triggerStackItem
-                        priorityPassed = emptySet()
-                        pendingStackOpen = true
-                        logAction(controllerIndex, "triggered ${card.name} Â· ${ability.conditionText}; choose its target")
-                    } else {
-                        triggerPrompts = triggerPrompts + prompt
-                        logAction(controllerIndex, "triggered ${card.name} Â· ${ability.conditionText}")
-                    }
-                }
-            }
-        }
-    }
-
-    fun drawCard(playerIndex: Int, reason: String = "drew a card") {
-        val player = players[playerIndex]
-        if (player.library.isEmpty()) { message = "${player.name}'s library is empty."; return }
-        val drawn = player.library.first()
-        updatePlayer(playerIndex) { it.copy(library = it.library.drop(1), hand = it.hand + drawn) }
-        highlightedHandCardId = drawn.id
-        logAction(playerIndex, reason)
-        queueKnownTriggers("DRAW", playerIndex)
-    }
-
-    fun applyCreatureEntryLifeEffects(eventPlayerIndex: Int, enteringCard: GameCard) {
-        if (enteringCard.isFaceDown || !enteringCard.type.contains("creature", ignoreCase = true)) return
-        players.forEachIndexed { controllerIndex, player ->
-            player.battlefield.filterNot { it.isFaceDown }.forEach { source ->
-                parseCreatureEntryLifeEffects(source.oracleText).forEach { effect ->
-                    if (!effect.anotherOnly || source.id != enteringCard.id) {
-                        val eventMatches = when (effect.controllerFilter) {
-                            "under your control" -> controllerIndex == eventPlayerIndex
-                            "under an opponent's control" -> controllerIndex != eventPlayerIndex
-                            else -> true
-                        }
-                        if (eventMatches) {
-                            updatePlayer(controllerIndex) { it.copy(life = it.life + effect.amount) }
-                            announceAutomaticAction(controllerIndex, "gained ${effect.amount} life from ${source.name}")
-                        }
-                    }
-                }
-            }
-        }
-        queueKnownTriggers("CREATURE_ETB", eventPlayerIndex, enteringCard)
-    }
-
-    fun addTreasure(playerIndex: Int) {
-        val token = makeCard("Treasure", "Artifact Token â€” Treasure", token = true)
-        updatePlayer(playerIndex) { it.copy(battlefield = it.battlefield + token) }
-        logAction(playerIndex, "created a Treasure token")
-    }
-
-    fun resetGame(startImmediately: Boolean = false, order: List<Int>? = null, preserveOpeningHands: Boolean = false) {
-        players = players.map { player ->
-            val deck = if (preserveOpeningHands) emptyList() else (player.library + player.hand + player.battlefield + player.graveyard + player.exile + player.revealed)
-                .filterNot { it.isToken }
-                .map { it.copy(tapped = false, counters = emptyMap(), isFaceDown = false) }
-                .shuffled()
-            val opening = if (preserveOpeningHands) player.hand else deck.take(7)
-            player.copy(
-                life = 40,
-                playerCounters = emptyMap(),
-                commanderDamageReceived = emptyMap(),
-                commanderCastCount = 0,
-                isEliminated = false,
-                eliminationReason = null,
-                hand = opening,
-                library = if (preserveOpeningHands) player.library else deck.drop(opening.size),
-                battlefield = emptyList(),
-                graveyard = emptyList(),
-                exile = emptyList(),
-                revealed = emptyList(),
-                commanderCard = player.commanderCard?.copy(tapped = false, counters = emptyMap(), isFaceDown = false)
-            )
-        }
-        val validOrder = order?.takeIf { candidate -> candidate.size == players.size && candidate.toSet() == players.indices.toSet() }
-            ?: players.indices.toList()
-        players = players.map { it.copy(manaPool = emptyMap()) }
-        gameTurnOrder = validOrder
-        activePlayer = validOrder.firstOrNull() ?: 0
-        selectedPlayer = activePlayer
-        turnNumber = 1
-        phaseIndex = 0
-        elapsedGameSeconds = 0
-        elapsedTurnSeconds = 0
-        gameLog = listOf(if (startImmediately) "Game started" else "Game reset")
-        chatMessages = emptyList()
-        unreadChatCount = 0
-        triggerPrompts = emptyList()
-        stackActions = emptyList()
-        creatureTypeChoicePrompt = null
-        priorityPlayer = activePlayer
-        priorityPassed = emptySet()
-        endProposalBy = -1
-        endVotes = emptyMap()
-        gameEndedOnline = false
-        localGameStarted = startImmediately
-        gameStartedOnline = onlineMode && startImmediately
-        gameTimerRunning = startImmediately
-        turnTimerRunning = startImmediately
-        showOverview = true
-        showHand = false
-        combatDialogOpen = false
-        gameGeneration++
-        resetConfirmOpen = false
-        if (startImmediately) {
-            homeOpen = false
-            lobbyOpen = false
-            showOverview = true
-            showHand = false
-        }
-    }
-
-    fun clearAllData() {
-        if (tutorialOpen) {
-            tutorialStops.getOrNull(tutorialIndex)?.let { step ->
-                tutorialSeenScreens = tutorialSeenScreens + step.view
-                tutorialPrefs.edit().putStringSet("first_visit_guides_v2", tutorialSeenScreens.toSet()).apply()
-            }
-            tutorialOpen = false
-        }
-        roomClient?.close(); roomClient = null
-        roomHost?.close(); roomHost = null
-        cloudRoomClient?.leave(); cloudRoomClient = null
-        context.getSharedPreferences("arcana-table", android.content.Context.MODE_PRIVATE).edit().clear().apply()
-        optionPrefs.edit().clear().putString("cloud_room_endpoint", DEFAULT_CLOUD_ROOM_ENDPOINT).apply()
-        runCatching { java.io.File(context.filesDir, "magic-comprehensive-rules.txt").delete() }
-        backgroundAlertsEnabled = false
-        autoReturnTableAfterPass = true
-        autoDrawOnDrawStep = true
-        autoUntapOnUntapStep = true
-        openHandAfterDraw = true
-        reducedSwipeMotion = false
-        cardSizeScale = 1f
-        boardSpacingScale = 1f
-        handSheetHeightFraction = 0.52f
-        footerButtonScale = 1f
-        layoutLabOpen = false
-        lobbyInternetMode = false
-        lobbyCloudEndpoint = DEFAULT_CLOUD_ROOM_ENDPOINT
-        players = listOf(TablePlayer("YOU"))
-        savedDecks = loadSavedDecks(context)
-        selectedPlayer = 0; activePlayer = 0; gameTurnOrder = listOf(0)
-        turnNumber = 1; phaseIndex = 0; elapsedGameSeconds = 0; elapsedTurnSeconds = 0
-        gameLog = listOf("New game"); chatMessages = emptyList(); unreadChatCount = 0
-        lobbyReadyPlayers = emptySet(); lobbyTurnOrder = null; lobbyRoomCode = ""; lobbyPassword = ""
-        localPlayersBackup = null; roomConnected = false; onlineStateReady = false; lobbyCreated = false
-        onlineStatus = "Offline"; localSeat = 0; gameStartedOnline = false; gameEndedOnline = false
-        gameTimerRunning = false; turnTimerRunning = false; localGameStarted = false
-        turnTimerVisible = true
-        if (!darkMode) onToggleTheme()
-        triggerPrompts = emptyList(); endProposalBy = -1; endVotes = emptyMap()
-        stackActions = emptyList(); priorityPlayer = 0; trackerPlayer = -1; concedePlayer = -1; paymentCard = null; creatureTypeChoicePrompt = null
-        priorityPassed = emptySet()
-        importText = ""; importError = null; importReviewCardIds = emptySet(); importOverflowCardIds = emptySet()
-        lobbyNotice = null; chatDraft = ""; preview = null; zoneDialog = null; handActionCard = null; cardActionTarget = null
-        showOverview = true; showHand = false; homeOpen = true; clearAllConfirmOpen = false
-        gameGeneration++
-    }
-
-    fun performHandAction(card: GameCard, action: String) {
-        val owner = selectedPlayer
-        if (owner !in players.indices || (onlineMode && owner != localSeat) || gameEndedOnline) {
-            handActionCard = null
-            return
-        }
-        when (action) {
-            "INSPECT" -> { preview = CardPreview(owner, card, fromHand = true); handActionCard = null; return }
-            "SET COMMANDER" -> {
-                if (players[owner].commanderCard == null && players[owner].commanderName.isNullOrBlank()) {
-                    updatePlayer(owner) { it.copy(commanderName = card.name, commanderCard = card, hand = it.hand.filterNot { held -> held.id == card.id }) }
-                    logAction(owner, "set ${card.name} as commander")
-                }
-            }
-            "COMMAND ZONE" -> {
-                updatePlayer(owner) { it.copy(commanderName = card.name, commanderCard = card, hand = it.hand.filterNot { held -> held.id == card.id }) }
-                logAction(owner, "moved ${card.name} to the command zone")
-            }
-            "PLAY", "PLAY FACE DOWN" -> {
-                recordDiagnostic("Hand play selected; starting spell-cast flow")
-                if (card.type.contains("Land", ignoreCase = true)) {
-                    val condition = landEntryCondition(card)
-                    if (shockLandChoiceRequired(card) || condition != null) {
-                        handActionCard = null
-                        landEntryPrompt = LandEntryPrompt(owner, card, shockLandChoiceRequired(card), condition.orEmpty())
-                        return
-                    }
-                    val tapped = landAlwaysEntersTapped(card)
-                    updatePlayer(owner) { it.copy(hand = it.hand.filterNot { held -> held.id == card.id }, battlefield = it.battlefield + card.copy(tapped = tapped)) }
-                    logAction(owner, "played ${card.name}${if (tapped) " tapped" else ""}")
-                    if (needsCreatureTypeChoice(card)) creatureTypeChoicePrompt = CreatureTypeChoicePrompt(owner, card.id, card.name)
-                } else {
-                    val castRequest = owner to card.copy(isFaceDown = action == "PLAY FACE DOWN")
-                    val actionDialogIsOpen = handActionCard?.id == card.id
-                    handActionCard = null
-                    if (actionDialogIsOpen) {
-                        // Let Compose fully dismiss the hand-action window before opening
-                        // the payment window. Some Android builds crash when two Dialog
-                        // windows are replaced in the same frame.
-                        scope.launch {
-                            delay(120)
-                            paymentCard = castRequest
-                        }
-                    } else {
-                        paymentCard = castRequest
-                    }
-                    return
-                }
-            }
-            "DISCARD" -> {
-                updatePlayer(owner) { it.copy(hand = it.hand.filterNot { held -> held.id == card.id }, graveyard = it.graveyard + card) }
-                logAction(owner, "discarded ${card.name}")
-            }
-            "REVEAL" -> {
-                updatePlayer(owner) { it.copy(hand = it.hand.filterNot { held -> held.id == card.id }, revealed = it.revealed + card) }
-                logAction(owner, "revealed ${card.name}")
-            }
-            "EXILE" -> {
-                updatePlayer(owner) { it.copy(hand = it.hand.filterNot { held -> held.id == card.id }, exile = it.exile + card) }
-                logAction(owner, "exiled ${card.name} from hand")
-            }
-        }
-        handActionCard = null
-    }
-
-    fun advanceStep() {
-        if (activePlayer !in players.indices || players[activePlayer].isComputer) return
-        players.indices.forEach(::clearMana)
-        val progression = advanceTurnProgression(phaseIndex, phaseSteps.lastIndex, activePlayer, turnNumber, gameTurnOrder, players.size, players.indices.filterNot { players[it].isEliminated }.toSet())
-        phaseIndex = progression.phaseIndex
-        if (progression.startedNewTurn) {
-            activePlayer = progression.activePlayer
-            priorityPlayer = progression.activePlayer
-            priorityPassed = emptySet()
-            turnNumber = progression.turnNumber
-            elapsedTurnSeconds = 0
-            if (autoUntapOnUntapStep && !players[activePlayer].isComputer) untapPermanents(activePlayer)
-            logAction(activePlayer, "started turn $turnNumber")
-        } else {
-            logAction(activePlayer, "advanced to ${phaseSteps[phaseIndex]}")
-            if (phaseSteps[phaseIndex] == "DRAW" && autoDrawOnDrawStep) {
-                val nextCard = players[activePlayer].library.firstOrNull()
-                if (nextCard != null) {
-                    drawCard(activePlayer, "drew for turn")
-                    selectedPlayer = activePlayer
-                    if (openHandAfterDraw) {
-                        showOverview = false
-                        showHand = true
-                    }
-                }
-            }
-        }
-    }
-
-    fun castFromPayment(index: Int, card: GameCard, commander: Boolean = false, manualPayment: Boolean = false) {
-        if (index !in players.indices || (onlineMode && index != localSeat) || gameEndedOnline) {
-            paymentCard = null
-            handActionCard = null
-            return
-        }
-        val current = players[index]
-        recordDiagnostic("Spell-cast confirmation accepted; processing tracked or manual mana")
-        val tax = if (commander) current.commanderCastCount * 2 else 0
-        val remainingMana = if (manualPayment) current.manaPool else paySimpleManaCost(current.manaPool, card.manaCost, tax)
-        if (remainingMana == null) {
-            message = "Not enough tracked mana for ${card.name}${if (tax > 0) " and commander tax" else ""}."
-            return
-        }
-        updatePlayer(index) { p -> p.copy(
-            manaPool = if (manualPayment) p.manaPool else remainingMana,
-            hand = if (commander) p.hand else p.hand.filterNot { it.id == card.id },
-            commanderCastCount = if (commander) p.commanderCastCount + 1 else p.commanderCastCount
-        ) }
-        val title = if (card.isFaceDown) "Face-down spell" else card.name
-        val typeText = card.type.lowercase()
-        val isAura = Regex("\\baura\\b").containsMatchIn(typeText)
-        val canTargetWhenCast = !card.isFaceDown && ("instant" in typeText || "sorcery" in typeText || isAura)
-        val targetText = if (canTargetWhenCast) card.oracleText.orEmpty() else ""
-        val targetCount = if (!canTargetWhenCast) null else if (isAura) TargetCountRange(1, 1) else parseTargetCountRange(targetText)
-        val stackItem = StackAction(
-            title = title,
-            controllerId = current.id,
-            kind = if (commander) "COMMANDER" else "SPELL",
-            card = card,
-            targetText = targetText,
-            targetCount = targetCount,
-            targetsConfirmed = targetCount == null
-        )
-        stackActions = stackActions + stackItem
-        if (stackItem.targetCount != null) targetSelectionStackItemId = stackItem.id
-        priorityPlayer = index
-        priorityPassed = emptySet()
-        val castDescription = if (commander) "cast ${card.name} from the command zone" else if (card.isFaceDown) "cast a face-down spell" else "cast ${card.name}"
-        val listedCost = card.manaCost?.takeIf { it.isNotBlank() }
-        val paymentDescription = when {
-            manualPayment -> "payment handled manually${listedCost?.let { " Â· listed cost $it" }.orEmpty()}${if (tax > 0) " Â· commander tax {$tax}" else ""}"
-            listedCost != null -> "paid $listedCost${if (tax > 0) " + commander tax {$tax}" else ""}"
-            tax > 0 -> "paid commander tax {$tax}; other payment untracked"
-            else -> "mana cost not listed"
-        }
-        logAction(index, "$castDescription Â· $paymentDescription")
-        queueKnownTriggers("CAST", index)
-        paymentCard = null
-        handActionCard = null
-        pendingStackOpen = true
-        recordDiagnostic("Spell added to stack; waiting for payment and trigger dialogs to close")
-    }
-
-    fun eliminatePlayer(index: Int, reason: String) {
-        if (index !in players.indices || players[index].isEliminated) return
-        val oldActive = activePlayer
-        players = players.mapIndexed { i, p -> if (i == index) p.copy(isEliminated = true, eliminationReason = reason) else p }
-        logAction(index, if (reason == "Conceded") "conceded and was eliminated" else "was eliminated Â· $reason")
-        val survivors = players.indices.filterNot { players[it].isEliminated }.toSet()
-        if (survivors.size <= 1) {
-            gameEndedOnline = true
-            localGameStarted = false
-            gameTimerRunning = false
-            turnTimerRunning = false
-        } else if (oldActive == index) {
-            activePlayer = nextTurnIndex(index, gameTurnOrder, players.size, survivors)
-            phaseIndex = 0
-            turnNumber++
-            elapsedTurnSeconds = 0
-        }
-        if (priorityPlayer == index) priorityPlayer = survivors.firstOrNull() ?: 0
-    }
-    fun concede(index: Int) = eliminatePlayer(index, "Conceded")
-
-    fun applyParsedAutomaticEffects(playerIndex: Int, sourceName: String, effects: AutomaticResolutionEffects) {
-        if (effects.requiresManualReview) {
-            val notice = "$sourceName resolved; its effects need manual resolution."
-            logAction(playerIndex, notice)
-            val playerName = players[playerIndex].name
-            scope.launch { automaticActionSnackbar.showSnackbar("$playerName Â· $notice") }
-            return
-        }
-        if (effects.isEmpty) return
-        if (effects.lifeGain > 0) {
-            updatePlayer(playerIndex) { it.copy(life = it.life + effects.lifeGain) }
-            announceAutomaticAction(playerIndex, "gained ${effects.lifeGain} life from $sourceName")
-        }
-        if (effects.lifeLoss > 0) {
-            val nextLife = (players[playerIndex].life - effects.lifeLoss).coerceAtLeast(0)
-            updatePlayer(playerIndex) { it.copy(life = nextLife) }
-            announceAutomaticAction(playerIndex, "lost ${effects.lifeLoss} life from $sourceName")
-            if (nextLife == 0) eliminatePlayer(playerIndex, "Life total reached 0")
-        }
-        repeat(effects.cardsDrawn) {
-            if (players[playerIndex].library.isNotEmpty()) {
-                drawCard(playerIndex, "automatically drew a card from $sourceName")
-                announceAutomaticAction(playerIndex, "drew a card from $sourceName", alreadyLogged = true)
-            }
-        }
-        effects.tokens.forEach { spec ->
-            val generated = List(spec.count) {
-                makeCard(
-                    spec.name,
-                    spec.type,
-                    token = true,
-                    power = spec.power,
-                    toughness = spec.toughness
-                )
-            }
-            updatePlayer(playerIndex) { it.copy(battlefield = it.battlefield + generated) }
-            generated.forEach { applyCreatureEntryLifeEffects(playerIndex, it) }
-            announceAutomaticAction(
-                playerIndex,
-                "created ${generated.size} ${spec.name} ${if (generated.size == 1) "token" else "tokens"} from $sourceName"
-            )
-        }
-    }
-
-    fun applyAutomaticResolutionEffects(playerIndex: Int, card: GameCard) {
-        if (playerIndex !in players.indices || card.isFaceDown) return
-        if (parseTargetCountRange(card.oracleText) != null) {
-            val notice = "${card.name} resolved; resolve its targeted effect manually."
-            logAction(playerIndex, notice)
-            scope.launch { automaticActionSnackbar.showSnackbar("${players[playerIndex].name} Â· $notice") }
-            return
-        }
-        applyParsedAutomaticEffects(playerIndex, card.name, parseAutomaticResolutionEffects(card.oracleText))
-    }
-
-    fun resolveTopOfStack() {
-        if (stackActions.lastOrNull()?.targetsConfirmed == false) {
-            message = "Choose targets for the top stack item first."
-            return
-        }
-        val eligibleIds = players.filterNot { it.isEliminated }.map { it.id }.toSet()
-        if (eligibleIds.isNotEmpty() && !eligibleIds.all { it in priorityPassed }) {
-            message = "Each remaining player must pass priority before the top item can resolve."
-            return
-        }
-        val item = stackActions.lastOrNull() ?: return
-        stackActions = stackActions.dropLast(1)
-        val owner = players.indexOfFirst { it.id == item.controllerId }
-        val selectedTargets = item.targets.takeIf { it.isNotEmpty() }?.joinToString { it.label }?.let { " Â· targets: $it" }.orEmpty()
-        if (owner >= 0 && item.card != null && stackResolutionMovesCardToZone(item.kind)) {
-            val card = item.card
-            val isPermanent = listOf("creature", "artifact", "enchantment", "planeswalker", "battle", "land").any { card.type.contains(it, true) }
-            updatePlayer(owner) { p ->
-                if (isPermanent) p.copy(battlefield = p.battlefield + card)
-                else p.copy(graveyard = p.graveyard + card)
-            }
-            logAction(owner, "resolved ${item.title}$selectedTargets")
-            if (isPermanent && needsCreatureTypeChoice(card)) {
-                creatureTypeChoicePrompt = CreatureTypeChoicePrompt(owner, card.id, card.name)
-            }
-            if (isPermanent && card.type.contains("creature", ignoreCase = true)) applyCreatureEntryLifeEffects(owner, card)
-            if (!isPermanent && item.kind == "SPELL") applyAutomaticResolutionEffects(owner, card)
-        } else if (owner >= 0 && item.card != null) {
-            logAction(owner, "resolved ${item.title}$selectedTargets; source permanent stays on the battlefield")
-        } else logAction(activePlayer, "resolved ${item.title}$selectedTargets")
-        priorityPlayer = activePlayer
-        priorityPassed = emptySet()
-    }
-
-    fun passTurn() {
-        if (activePlayer !in players.indices || players[activePlayer].isComputer) return
-        val passingPlayer = activePlayer
-        val originalSelection = selectedPlayer
-        val originallyOnTable = showOverview
-        val startingTurn = turnNumber
-        var advances = 0
-        while (turnNumber == startingTurn && advances < phaseSteps.size) {
-            advanceStep()
-            advances++
-        }
-        showHand = false
-        showOverview = autoReturnTableAfterPass || originallyOnTable
-        selectedPlayer = originalSelection.coerceIn(players.indices)
-        if (turnNumber != startingTurn) {
-            logAction(passingPlayer, "passed the turn to ${players[activePlayer].name}")
-        }
-    }
-
-    fun resolveTrigger(prompt: TriggerPrompt, paid: Boolean, targetIndex: Int? = null, manual: Boolean = false) {
-        val payment = when (prompt.kind) { "RHYSTIC" -> 1; "TITHE" -> 2; else -> 0 }
-        if (paid && payment > 0 && !spendGenericMana(prompt.eventPlayerIndex, payment)) return
-        if (manual) {
-            triggerPrompts = triggerPrompts.filterNot { it.id == prompt.id }
-            val targetDetail = targetIndex?.let { " Â· targeted ${players.getOrNull(it)?.name ?: "player"}" }.orEmpty()
-            logAction(prompt.controllerIndex, "resolved ${prompt.cardName} trigger manually$targetDetail Â· ${prompt.effectText}")
-            return
-        }
-        if (prompt.kind == "TARGET_EFFECT") {
-            val validTarget = targetIndex?.takeIf { target ->
-                target in players.indices && !players[target].isEliminated &&
-                    (prompt.targetRule != "OPPONENT" || target != prompt.controllerIndex)
-            } ?: return
-            triggerPrompts = triggerPrompts.filterNot { it.id == prompt.id }
-            logAction(prompt.controllerIndex, "resolved ${prompt.cardName} trigger targeting ${players[validTarget].name}")
-            applyParsedAutomaticEffects(validTarget, prompt.cardName, parseAutomaticResolutionEffects(prompt.effectText))
-            return
-        }
-        triggerPrompts = triggerPrompts.filterNot { it.id == prompt.id }
-        when (prompt.kind) {
-            "RHYSTIC" -> if (paid) logAction(prompt.eventPlayerIndex, "paid {1} for Rhystic Study") else drawCard(prompt.controllerIndex, "drew a card from Rhystic Study")
-            "TITHE" -> if (paid) logAction(prompt.eventPlayerIndex, "paid {2} for Smothering Tithe") else addTreasure(prompt.controllerIndex)
-            "AUTO_EFFECT" -> applyParsedAutomaticEffects(prompt.controllerIndex, prompt.cardName, parseAutomaticResolutionEffects(prompt.effectText))
-            "MANUAL" -> {
-                val targetDetail = targetIndex?.let { " Â· targeted ${players.getOrNull(it)?.name ?: "player"}" }.orEmpty()
-                logAction(prompt.controllerIndex, "resolved ${prompt.cardName} trigger manually$targetDetail Â· ${prompt.effectText}")
-            }
-        }
-    }
-
-    fun importDeck(text: String) {
-        val entries = parseDeckList(text)
-        if (entries.isEmpty()) { importError = "No card names found. Try a list such as â€˜2 Sol Ringâ€™."; return }
-        importing = true
-        importError = null
-        scope.launch {
-            try {
-                val found = Scryfall.lookup(entries)
-                var importedCommander: GameCard? = null
-                val issueCardIds = linkedSetOf<Int>()
-                val issueDescriptions = mutableListOf<String>()
-                val deck = entries.flatMap { entry ->
-                    val match = found[entry]
-                    val printingRequested = !entry.setCode.isNullOrBlank() && !entry.collectorNumber.isNullOrBlank()
-                    val nameConflict = match != null && !match.name.equals(entry.name, ignoreCase = true)
-                    val issue = when {
-                        nameConflict -> "Requested ${entry.name}, but ${entry.setCode?.uppercase()} #${entry.collectorNumber} resolves to ${match?.name}. Youâ€™ll need to resolve it manually in the editor."
-                        match == null && printingRequested -> "Could not verify ${entry.name} in ${entry.setCode?.uppercase()} #${entry.collectorNumber}. Youâ€™ll need to resolve it manually in the editor."
-                        match == null -> "Could not match â€˜${entry.name}â€™ to a Magic card. Youâ€™ll need to resolve it manually in the editor."
-                        else -> null
-                    }
-                    if (issue != null) issueDescriptions += issue
-                    // Keep the requested card name when a printing identifier resolves to a
-                    // different card. The review search must be for what the user imported.
-                    val verifiedMatch = match?.takeUnless { nameConflict }
-                    val copies = List(entry.count) {
-                        makeCard(verifiedMatch?.name ?: entry.name, verifiedMatch?.type ?: "NEEDS REVIEW", verifiedMatch?.imageUrl, oracleText = verifiedMatch?.oracleText, manaValue = verifiedMatch?.manaValue, artCropUrl = verifiedMatch?.artCropUrl, manaCost = verifiedMatch?.manaCost, power = verifiedMatch?.power, toughness = verifiedMatch?.toughness, keywords = verifiedMatch?.keywords.orEmpty())
-                            .copy(importIssue = issue)
-                            .also { if (issue != null) issueCardIds += it.id }
-                    }
-                    if (entry.commander && importedCommander == null) {
-                        importedCommander = copies.firstOrNull()
-                        copies.drop(1)
-                    } else copies
-                }.shuffled()
-                if (deck.isEmpty()) error("No cards found in that list.")
-                val allowedMainDeckSize = if (importedCommander != null) 99 else 100
-                val overflowIds = deck.drop(allowedMainDeckSize).map { it.id }.toSet()
-                val importTraceId = java.util.UUID.randomUUID().toString().take(8)
-                val repeated = repeatedDeckEntries(entries)
-                val duplicateDetail = if (roomConnected && selectedPlayer != localSeat) {
-                    "${repeated.size} repeated card name(s) withheld for a remote seat"
-                } else {
-                    repeated.joinToString { "${it.name} Ã—${it.quantity}" }.ifBlank { "none" }
-                }
-                recordDiagnostic("Deck import [$importTraceId]: target seat ${selectedPlayer + 1}, parsed entries=${entries.size}, requested main-deck copies=${entries.filterNot { it.commander }.sumOf { it.count }}, commander entries=${entries.count { it.commander }}, built main-deck copies=${deck.size}, duplicate quantities=$duplicateDetail, unresolved entries=${issueDescriptions.size}, over-limit copies=${overflowIds.size}")
-                val opening = deck.take(7)
-                if (onlineMode && selectedPlayer == localSeat && localSeat in lobbyReadyPlayers) {
-                    lobbyReadyPlayers = lobbyReadyPlayers - localSeat
-                    roomClient?.publishReady(false)
-                    cloudRoomClient?.publishReady(false)
-                }
-                updatePlayer(selectedPlayer) { it.copy(deckLoaded = true, mulligansTaken = 0, openingHandKept = it.isComputer, commanderName = importedCommander?.name, commanderCard = importedCommander, library = deck.drop(opening.size), hand = opening, battlefield = emptyList(), graveyard = emptyList(), exile = emptyList(), revealed = emptyList()) }
-                val importedTarget = players.getOrNull(selectedPlayer)
-                if (lobbyCreated && !gameStartedOnline && importedTarget?.isComputer == true) {
-                    lobbyReadyPlayers = lobbyReadyPlayers + selectedPlayer
-                }
-                if (importSaveToLibrary) {
-                    val savedName = importSaveName.trim().ifBlank { importedCommander?.name ?: importedTarget?.name ?: "Saved deck" }
-                    val saved = SavedDeck(savedName, importText.trim())
-                    savedDecks = listOf(saved) + savedDecks.filterNot { it.name.equals(savedName, ignoreCase = true) }
-                    saveSavedDecks(context, savedDecks)
-                    importSaveToLibrary = false
-                    importSaveName = ""
-                }
-                if (roomClient != null || cloudRoomClient != null) {
-                    // The room host can import a deck for an AI seat. Publish that
-                    // whole host-owned state, but only send a deck-status packet
-                    // when importing for this device's own seat. The Worker assigns
-                    // deck-status to the connected socket's seat, so sending the AI
-                    // name here would rename the host to e.g. "COMPUTER 4".
-                    publishOnlineSnapshot()
-                    if (selectedPlayer == localSeat) {
-                        val importedPlayer = players.getOrNull(localSeat)
-                        localDeckSyncConfirmed = false
-                        recordDiagnostic("Deck status sent to host: loaded=true, seat ${localSeat + 1}")
-                        val sent = roomClient?.publishDeckStatus(true, importedPlayer?.name ?: lobbyPlayerName, importedPlayer?.commanderName)
-                            ?: cloudRoomClient?.publishDeckStatus(true, importedPlayer?.name ?: lobbyPlayerName, importedPlayer?.commanderName)
-                            ?: false
-                        if (!sent) {
-                            lobbyNotice = "Your deck loaded on this phone, but its status could not be sent to the host. Check the connection and retry."
-                            recordDiagnostic("Deck status send failed: seat ${localSeat + 1}")
-                        } else {
-                            scope.launch {
-                                delay(5_000)
-                                if (!localDeckSyncConfirmed && (roomClient != null || cloudRoomClient != null) && selectedPlayer == localSeat) {
-                                    lobbyNotice = "Your deck is on this phone, but the host has not confirmed receiving it. Check both phones are on the same build and retry."
-                                    recordDiagnostic("Deck confirmation timed out: seat ${localSeat + 1}")
-                                }
-                            }
-                        }
-                    } else {
-                        recordDiagnostic("Host published deck for computer seat ${selectedPlayer + 1}")
-                    }
-                }
-                pendingAiPlayerIndex = -1
-                logAction(selectedPlayer, "imported a ${deck.size}-card deck")
-                showOverview = false
-                showHand = false
-                importOpen = false
-                if (issueDescriptions.isNotEmpty() || overflowIds.isNotEmpty()) {
-                    importReviewCardIds = issueCardIds + overflowIds
-                    importOverflowCardIds = overflowIds
-                    importReviewMessage = buildString {
-                        if (issueDescriptions.isNotEmpty()) {
-                            append("Import check found ${issueDescriptions.size} card ${if (issueDescriptions.size == 1) "name" else "names"} that need manual review. ")
-                        } else {
-                            append("Card name check passed. ")
-                        }
-                        append("Imported ${deck.size} main-deck cards${if (importedCommander != null) " plus ${importedCommander!!.name} as commander" else ""}.")
-                        if (overflowIds.isNotEmpty()) append(" This is ${overflowIds.size} card(s) over the ${if (importedCommander != null) "99-card Commander deck" else "100-card deck"} limit.")
-                        if (issueDescriptions.isNotEmpty()) {
-                            append("\n\n${issueDescriptions.size} entr${if (issueDescriptions.size == 1) "y needs" else "ies need"} review:\n")
-                            append(issueDescriptions.take(5).joinToString("\n"))
-                            if (issueDescriptions.size > 5) append("\nâ€¦and ${issueDescriptions.size - 5} more.")
-                        }
-                    }
-                    importReviewOpen = true
-                } else {
-                    message = "Import check passed: all ${entries.size} card names matched. Imported ${deck.size} cards. Your opening hand is ready."
-                }
-                if (onlineMode && !gameStartedOnline) { showOverview = true; showHand = false; lobbyOpen = true }
-            } catch (e: Exception) {
-                importError = e.message ?: "Could not load the deck. Check your internet connection and try again."
-            } finally { importing = false }
-        }
-    }
-
-    fun addAiOpponent() {
-        topMenuExpanded = false
-        if (onlineMode && (!lobbyCreated || lobbyJoinMode || gameStartedOnline)) {
-            message = "Only the host can add an AI player before the game starts."
-            return
-        }
-        if (players.size >= 4) {
-            message = "This game already has the maximum of four players."
-            return
-        }
-        players = players + TablePlayer("COMPUTER ${players.size + 1}", isComputer = true)
-        pendingAiPlayerIndex = players.lastIndex
-        recordDiagnostic("AI seat added: seat ${pendingAiPlayerIndex + 1}; awaiting deck import")
-        if (lobbyCreated) roomHost?.reserveSeat(pendingAiPlayerIndex)
-        selectedPlayer = players.lastIndex
-        gameTurnOrder = (gameTurnOrder + selectedPlayer).distinct()
-        // Keep the table visible behind the import dialog so the add-AI action
-        // has an immediate, obvious result. The player view opens after import.
-        showOverview = true
-        showHand = false
-        importText = ""
-        importError = null
-        importOpen = true
-        message = null
-    }
-
-    fun cancelDeckImport() {
-        importOpen = false
-        val index = pendingAiPlayerIndex
-        if (index in players.indices && players[index].isComputer && !players[index].deckLoaded) {
-            if (lobbyCreated) {
-                removeLobbyPlayer(index)
-            } else {
-                players = players.filterIndexed { playerIndex, _ -> playerIndex != index }
-                if (players.isNotEmpty()) {
-                    selectedPlayer = if (selectedPlayer >= index) (selectedPlayer - 1).coerceIn(players.indices) else selectedPlayer.coerceIn(players.indices)
-                    activePlayer = if (activePlayer >= index) (activePlayer - 1).coerceIn(players.indices) else activePlayer.coerceIn(players.indices)
-                    gameTurnOrder = gameTurnOrder.filter { it != index }.map { if (it > index) it - 1 else it }
-                }
-            }
-        }
-        pendingAiPlayerIndex = -1
-        importSaveToLibrary = false
-    }
-
-    fun changeTutorialStep(index: Int) {
-        tutorialIndex = index.coerceIn(tutorialStops.indices)
-        tutorialBounds.clear()
-    }
-
-    fun currentTutorialView(): String = when {
-        topMenuExpanded -> when (topMenuSection) {
-            "decks" -> "MENU_DECKS"
-            "tools" -> "MENU_TOOLS"
-            "game" -> "MENU_GAME"
-            else -> "MENU_MAIN"
-        }
-        lobbyOpen -> "LOBBY"
-        optionsOpen || developerOptionsOpen -> "OPTIONS"
-        stackOpen -> "STACK"
-        savedDecksOpen -> "SAVED_DECKS"
-        importOpen -> "DECK_IMPORT"
-        chatOpen -> "CHAT"
-        logOpen -> "GAME_LOG"
-        homeOpen -> "HOME"
-        showHand -> "HAND"
-        showOverview -> "TABLE"
-        else -> "PLAYER"
-    }
-
-    fun showTutorialView(view: String) {
-        topMenuExpanded = false
-        topMenuSection = null
-        lobbyOpen = false
-        optionsOpen = false
-        developerOptionsOpen = false
-        stackOpen = false
-        chatOpen = false
-        logOpen = false
-        importOpen = false
-        savedDecksOpen = false
-        deckEditorOpen = false
-        homeOpen = false
-        showOverview = true
-        showHand = false
-        when (view) {
-            "HOME" -> homeOpen = true
-            "LOBBY" -> lobbyOpen = true
-            "TABLE" -> Unit
-            "PLAYER" -> showOverview = false
-            "HAND" -> { showOverview = false; showHand = true }
-            "OPTIONS" -> optionsOpen = true
-            "STACK" -> stackOpen = true
-            "CHAT" -> chatOpen = true
-            "GAME_LOG" -> logOpen = true
-            "DECK_IMPORT" -> importOpen = true
-            "SAVED_DECKS" -> savedDecksOpen = true
-            "MENU_MAIN" -> topMenuExpanded = true
-            "MENU_DECKS" -> { topMenuExpanded = true; topMenuSection = "decks" }
-            "MENU_TOOLS" -> { topMenuExpanded = true; topMenuSection = "tools" }
-            "MENU_GAME" -> { topMenuExpanded = true; topMenuSection = "game" }
-        }
-    }
-
-    fun goBackTutorial() {
-        val previous = tutorialIndex - 1
-        if (previous >= 0) {
-            changeTutorialStep(previous)
-            showTutorialView(tutorialStops[previous].view)
-        }
-    }
-
-    fun startTutorial() {
-        tutorialOpen = true
-        tutorialIndex = 0
-        tutorialParentIndices.clear()
-        tutorialBounds.clear()
-        topMenuExpanded = false
-        topMenuSection = null
-        lobbyOpen = false
-        optionsOpen = false
-        developerOptionsOpen = false
-        stackOpen = false
-        chatOpen = false
-        logOpen = false
-        importOpen = false
-        savedDecksOpen = false
-        deckEditorOpen = false
-        handActionCard = null
-        showHand = false
-        showOverview = true
-        homeOpen = true
-    }
-
-    fun markTutorialSeen(view: String) {
-        tutorialSeenScreens = tutorialSeenScreens + view
-        tutorialPrefs.edit().putStringSet("first_visit_guides_v2", tutorialSeenScreens.toSet()).apply()
-    }
-
-    fun guidedAction(target: String, action: () -> Unit) {
-        val step = tutorialStops.getOrNull(tutorialIndex)
-        if (tutorialOpen && step?.target == target) {
-            markTutorialSeen(step.view)
-            if (step.executeAction) action()
-            val resultingView = currentTutorialView()
-            val openedAnotherView = resultingView != step.view
-            val isClosingView = target in setOf("lobby-close", "stack-close", "saved-close", "log-close", "chat-close", "options-close", "deck-cancel")
-            val nextIndex = when {
-                !openedAnotherView -> tutorialIndex + 1
-                isClosingView && tutorialParentIndices.isNotEmpty() -> {
-                    val parentIndex = tutorialParentIndices.removeAt(tutorialParentIndices.lastIndex)
-                    (tutorialIndex + 1 until tutorialStops.size).firstOrNull { tutorialStops[it].view == resultingView }
-                        ?: (parentIndex + 1).takeIf { it < tutorialStops.size }
-                        ?: tutorialStops.size
-                }
-                openedAnotherView -> {
-                    tutorialParentIndices.add(tutorialIndex)
-                    (tutorialIndex + 1 until tutorialStops.size).firstOrNull { tutorialStops[it].view == resultingView }
-                        ?: tutorialStops.indexOfFirst { it.view == resultingView }.takeIf { it >= 0 }
-                        ?: tutorialIndex + 1
-                }
-                else -> tutorialIndex + 1
-            }
-            if (nextIndex < tutorialStops.size) {
-                changeTutorialStep(nextIndex)
-                val nextStep = tutorialStops[nextIndex]
-                if (currentTutorialView() != nextStep.view) showTutorialView(nextStep.view)
-            } else tutorialOpen = false
-        } else {
-            action()
-            if (tutorialOpen && target == "menu-back") tutorialOpen = false
-        }
-    }
-
-    fun advanceTutorial() {
-        val step = tutorialStops.getOrNull(tutorialIndex) ?: return
-        markTutorialSeen(step.view)
-        val next = tutorialIndex + 1
-        if (next < tutorialStops.size) {
-            changeTutorialStep(next)
-            showTutorialView(tutorialStops[next].view)
-        } else tutorialOpen = false
-    }
-
-    fun openLobby(joining: Boolean) {
-        topMenuExpanded = false
-        lobbyOpen = true
-        lobbyCreated = roomHost != null || (cloudRoomClient != null && localSeat == 0)
-        lobbyJoinMode = joining && roomHost == null && roomClient == null && cloudRoomClient == null
-        lobbyNotice = null
-        lobbyTurnOrder = null
-    }
-
-    fun tutorialAnchor(key: String): Modifier = Modifier.onGloballyPositioned { coordinates ->
-        val rect = coordinates.boundsInRoot()
-        if (tutorialBounds[key] != rect) tutorialBounds[key] = rect
-    }
-
-    val firstVisitScreen = when {
-        topMenuExpanded -> when (topMenuSection) {
-            "decks" -> "MENU_DECKS"
-            "tools" -> "MENU_TOOLS"
-            "game" -> "MENU_GAME"
-            else -> "MENU_MAIN"
-        }
-        lobbyOpen -> "LOBBY"
-        optionsOpen || developerOptionsOpen -> "OPTIONS"
-        stackOpen -> "STACK"
-        savedDecksOpen -> "SAVED_DECKS"
-        importOpen -> "DECK_IMPORT"
-        chatOpen -> "CHAT"
-        logOpen -> "GAME_LOG"
-        homeOpen -> "HOME"
-        showHand -> "HAND"
-        showOverview -> "TABLE"
-        else -> "PLAYER"
-    }
-    LaunchedEffect(firstVisitScreen, tutorialOpen, tutorialSeenScreens) {
-        // Screen visits never start the guide automatically. It is always opt-in.
-    }
-
-    suspend fun runComputerTurn(playerIndex: Int) {
-        if (playerIndex !in players.indices || !players[playerIndex].isComputer || !players[playerIndex].deckLoaded) return
-        aiRoutineRunning = true
-        try {
-            delay(450)
-            clearMana(playerIndex)
-            untapPermanents(playerIndex)
-            phaseIndex = 2
-            if (players[playerIndex].library.isNotEmpty()) drawCard(playerIndex, "drew for turn")
-            delay(450)
-
-            phaseIndex = 3
-            val land = players[playerIndex].hand.firstOrNull { it.type.contains("land", true) }
-            if (land != null) {
-                val entersTapped = landAlwaysEntersTapped(land) || landEntryCondition(land) != null
-                updatePlayer(playerIndex) { player -> player.copy(hand = player.hand.filterNot { it.id == land.id }, battlefield = player.battlefield + land.copy(tapped = entersTapped)) }
-                logAction(playerIndex, "played ${land.name} as a land${if (entersTapped) " tapped" else ""}")
-                if (needsCreatureTypeChoice(land)) creatureTypeChoicePrompt = CreatureTypeChoicePrompt(playerIndex, land.id, land.name)
-                delay(350)
-            }
-
-            while (true) {
-                val player = players[playerIndex]
-                val choice = player.hand.asSequence()
-                    .filterNot { it.type.contains("land", true) }
-                    .mapNotNull { card -> planAiMana(player, card)?.let { card to it } }
-                    .maxByOrNull { (card, _) -> aiCardPriority(card) } ?: break
-                val spell = choice.first
-                val plan = choice.second
-                val permanent = Regex("creature|artifact|enchantment|planeswalker|battle", RegexOption.IGNORE_CASE).containsMatchIn(spell.type)
-                updatePlayer(playerIndex) { current ->
-                    current.copy(
-                        hand = current.hand.filterNot { it.id == spell.id },
-                        manaPool = plan.remainingPool,
-                        battlefield = current.battlefield.map { if (it.id in plan.landIds) it.copy(tapped = true) else it } + if (permanent) listOf(spell) else emptyList(),
-                        graveyard = if (permanent) current.graveyard else current.graveyard + spell
-                    )
-                }
-                logAction(playerIndex, "cast ${spell.name} using tracked colored mana Â· cost ${spell.manaCost ?: "unlisted"}")
-                if (!permanent) logAction(playerIndex, "resolved ${spell.name} to graveyard")
-                if (permanent && needsCreatureTypeChoice(spell)) creatureTypeChoicePrompt = CreatureTypeChoicePrompt(playerIndex, spell.id, spell.name)
-                if (permanent && spell.type.contains("creature", ignoreCase = true)) applyCreatureEntryLifeEffects(playerIndex, spell)
-                if (!permanent) applyAutomaticResolutionEffects(playerIndex, spell)
-                queueKnownTriggers("CAST", playerIndex)
-                delay(500)
-            }
-
-            phaseIndex = 6
-            logAction(playerIndex, "skipped combat and passed")
-            delay(450)
-            clearMana(playerIndex)
-            phaseIndex = 0
-            activePlayer = nextTurnPlayer(playerIndex)
-            turnNumber++
-            elapsedTurnSeconds = 0
-            if (!players[activePlayer].isComputer) untapPermanents(activePlayer)
-            logAction(activePlayer, "started turn $turnNumber")
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (error: Exception) {
-            recordDiagnostic("AI turn recovered for seat ${playerIndex + 1}: ${error.message ?: error::class.java.simpleName}")
-            // Keep a malformed card or unexpected rules edge case from trapping
-            // the whole table on an AI turn. The human can inspect the diagnostic.
-            if (activePlayer == playerIndex && !gameEndedOnline && players.getOrNull(playerIndex)?.isEliminated == false) {
-                clearMana(playerIndex)
-                phaseIndex = 0
-                activePlayer = nextTurnPlayer(playerIndex)
-                turnNumber++
-                elapsedTurnSeconds = 0
-                if (!players[activePlayer].isComputer) untapPermanents(activePlayer)
-                logAction(activePlayer, "started turn $turnNumber after AI recovery")
-            }
-        } finally {
-            aiRoutineRunning = false
-        }
-    }
-
-    LaunchedEffect(stackActions, priorityPlayer, priorityPassed, players, gameGeneration, onlineMode) {
-        val current = players.getOrNull(priorityPlayer)
-        if ((!onlineMode || localSeat == 0) && stackActions.isNotEmpty() && current?.isComputer == true && !current.isEliminated) {
-            delay(350)
-            val passed = priorityPassed + current.id
-            priorityPassed = passed
-            val eligibleIds = players.filterNot { it.isEliminated }.map { it.id }.toSet()
-            if (eligibleIds.isNotEmpty() && eligibleIds.all { it in passed }) {
-                resolveTopOfStack()
-            } else {
-                priorityPlayer = nextTurnIndex(priorityPlayer, gameTurnOrder, players.size, players.indices.filterNot { players[it].isEliminated }.toSet())
-            }
-        }
-    }
-
-    LaunchedEffect(activePlayer, turnNumber, players.getOrNull(activePlayer)?.deckLoaded, gameGeneration) {
-        if ((!onlineMode || localSeat == 0) && !aiRoutineRunning && players.getOrNull(activePlayer)?.let { it.isComputer && it.deckLoaded } == true) {
-            runComputerTurn(activePlayer)
-        }
-    }
-
-    val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) scope.launch {
-            try {
-                val text = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } }
-                if (text.isNullOrBlank()) importError = "That file is empty or couldn't be read." else importText = text
-            } catch (_: Exception) { importError = "Couldn't read the file. Choose a text or CSV deck export." }
-        }
-    }
-
-    Box(Modifier.fillMaxSize().background(Ink)) {
-    Column(
-        Modifier.fillMaxSize().background(Ink)
-            .then(if (tutorialOpen) Modifier.blur(4.dp) else Modifier)
-            .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(start = 10.dp, top = 8.dp, end = 10.dp)
-    ) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column {
-                Text("ARCANA TABLE", color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
-                Text("VERSION ${BuildConfig.VERSION_NAME} Â· BUILD ${BuildConfig.VERSION_CODE}", color = Muted, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.4.sp)
-                val inProgress = if (onlineMode) gameStartedOnline && !gameEndedOnline else localGameStarted
-                Text(if (inProgress) "â— GAME IN PROGRESS" else "â— GAME NOT STARTED", color = if (inProgress) Mint else CounterGold, fontSize = 7.sp, fontWeight = FontWeight.Black, letterSpacing = 0.7.sp)
-            }
-            Spacer(Modifier.weight(1f))
-            Box(Modifier.then(tutorialAnchor("timer"))) {
-                Text("GAME ${formatClock(elapsedGameSeconds)} Â· TURN ${if (turnTimerVisible) formatClock(elapsedTurnSeconds) else "HIDDEN"}", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.heightIn(min = 44.dp).wrapContentHeight(Alignment.CenterVertically).combinedClickable(enabled = !onlineMode || localSeat == 0, onClick = { guidedAction("timer") { timerMenuOpen = true } }, onLongClick = { turnTimerVisible = !turnTimerVisible }))
-                DropdownMenu(expanded = timerMenuOpen, onDismissRequest = { timerMenuOpen = false }) {
-                    DropdownMenuItem(text = { Text(if (gameTimerRunning) "Stop session timer" else "Start session timer") }, onClick = { gameTimerRunning = !gameTimerRunning; timerMenuOpen = false })
-                    DropdownMenuItem(text = { Text("Reset session timer") }, onClick = { elapsedGameSeconds = 0; timerMenuOpen = false })
-                    DropdownMenuItem(text = { Text(if (turnTimerRunning) "Stop turn timer" else "Start turn timer") }, onClick = { turnTimerRunning = !turnTimerRunning; timerMenuOpen = false })
-                    DropdownMenuItem(text = { Text("Reset turn timer") }, onClick = { elapsedTurnSeconds = 0; timerMenuOpen = false })
-                    DropdownMenuItem(text = { Text(if (turnTimerVisible) "Hide turn timer display" else "Show turn timer display") }, onClick = { turnTimerVisible = !turnTimerVisible; timerMenuOpen = false })
-                }
-            }
-            Box(Modifier.then(tutorialAnchor("chat-button"))) {
-                IconButton(onClick = { guidedAction("chat-button") { chatOpen = true; unreadChatCount = 0 } }, modifier = Modifier.size(44.dp)) {
-                    Icon(Icons.Filled.Chat, "Open chat${if (unreadChatCount > 0) ", $unreadChatCount unread" else ""}", tint = if (unreadChatCount > 0) CounterGold else SoftWhite)
-                }
-                if (unreadChatCount > 0) Box(Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 5.dp).size(9.dp).clip(CircleShape).background(Color(0xFFE35656)))
-            }
-            Box(Modifier.then(tutorialAnchor("main-menu"))) {
-                IconButton(onClick = { guidedAction("main-menu") { topMenuSection = null; topMenuExpanded = true } }, modifier = Modifier.size(46.dp)) { Icon(Icons.Filled.MoreVert, "App menu", tint = SoftWhite) }
-                DropdownMenu(expanded = topMenuExpanded, onDismissRequest = { topMenuExpanded = false; topMenuSection = null }) {
-                    if (topMenuSection == null) {
-                        DropdownMenuItem(text = { Text("Full visual guide") }, onClick = { startTutorial() }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
-                        DropdownMenuItem(text = { Text("Decks") }, modifier = tutorialAnchor("menu-decks"), onClick = { guidedAction("menu-decks") { topMenuSection = "decks" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
-                        DropdownMenuItem(text = { Text("Game tools") }, modifier = tutorialAnchor("menu-tools"), onClick = { guidedAction("menu-tools") { topMenuSection = "tools" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
-                        DropdownMenuItem(text = { Text("Room & game") }, modifier = tutorialAnchor("menu-game"), onClick = { guidedAction("menu-game") { topMenuSection = "game" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
-                        DropdownMenuItem(text = { Text("What's new") }, onClick = { topMenuExpanded = false; changelogOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
-                        DropdownMenuItem(text = { Text("Adjust UI") }, onClick = { topMenuExpanded = false; topMenuSection = null; layoutLabOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
-                        DropdownMenuItem(text = { Text("Options") }, modifier = tutorialAnchor("menu-options"), onClick = { guidedAction("menu-options") { topMenuExpanded = false; optionsOpen = true } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
-                    } else {
-                        DropdownMenuItem(text = { Text("â€¹  MAIN MENU") }, modifier = tutorialAnchor("menu-back"), onClick = { guidedAction("menu-back") { topMenuSection = null } })
-                        when (topMenuSection) {
-                            "decks" -> {
-                                DropdownMenuItem(text = { Text(if (players[if (onlineMode) localSeat else selectedPlayer].deckLoaded) "Replace imported deck" else "Import deck") }, modifier = tutorialAnchor("menu-import"), onClick = { guidedAction("menu-import") { topMenuExpanded = false; topMenuSection = null; if (onlineMode) selectedPlayer = localSeat; importError = null; importOpen = true } })
-                                if (players[if (onlineMode) localSeat else selectedPlayer].deckLoaded) DropdownMenuItem(text = { Text("Edit imported deck") }, modifier = tutorialAnchor("menu-edit"), onClick = { guidedAction("menu-edit") { topMenuExpanded = false; topMenuSection = null; if (onlineMode) selectedPlayer = localSeat; deckEditorOpen = true } })
-                                DropdownMenuItem(text = { Text("Saved decks Â· ${savedDecks.size}") }, modifier = tutorialAnchor("menu-saved"), onClick = { guidedAction("menu-saved") { topMenuExpanded = false; topMenuSection = null; savedDecksOpen = true } })
-                            }
-                            "tools" -> {
-                                if (!onlineMode) DropdownMenuItem(text = { Text("Add AI opponent Â· ${players.size}/4") }, modifier = tutorialAnchor("menu-add-ai"), onClick = { guidedAction("menu-add-ai") { topMenuExpanded = false; topMenuSection = null; addAiOpponent() } })
-                                if (gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Add token") }, modifier = tutorialAnchor("menu-add-token"), onClick = { guidedAction("menu-add-token") { topMenuExpanded = false; topMenuSection = null; tokenTarget = selectedPlayer; tokenPickerOpen = true } })
-                                if (gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Mana pool Â· ${trackedMana(selectedPlayer)}") }, modifier = tutorialAnchor("menu-mana"), onClick = { guidedAction("menu-mana") { topMenuExpanded = false; topMenuSection = null; manaTarget = selectedPlayer; manaPoolOpen = true } })
-                                if (!gameEndedOnline && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Search / browse library") }, modifier = tutorialAnchor("menu-search"), onClick = { guidedAction("menu-search") { topMenuExpanded = false; topMenuSection = null; librarySearchPlayer = selectedPlayer } })
-                                if (gameInProgress) DropdownMenuItem(text = { Text("Stack and priority Â· ${stackActions.size}") }, modifier = tutorialAnchor("menu-stack"), onClick = { guidedAction("menu-stack") { topMenuExpanded = false; topMenuSection = null; stackOpen = true } })
-                                DropdownMenuItem(text = { Text("Game log") }, modifier = tutorialAnchor("menu-log"), onClick = { guidedAction("menu-log") { topMenuExpanded = false; topMenuSection = null; logOpen = true } })
-                                DropdownMenuItem(text = { Text("MTG rules") }, modifier = tutorialAnchor("menu-rules"), onClick = { guidedAction("menu-rules") { topMenuExpanded = false; topMenuSection = null; rulesOpen = true } })
-                                DropdownMenuItem(text = { Text("Export diagnostic log") }, modifier = tutorialAnchor("menu-export"), onClick = { guidedAction("menu-export") { topMenuExpanded = false; topMenuSection = null; exportDiagnosticLog() } })
-                            }
-                            "game" -> {
-                                DropdownMenuItem(text = { Text("Room home") }, modifier = tutorialAnchor("menu-home"), onClick = { guidedAction("menu-home") { topMenuExpanded = false; topMenuSection = null; homeOpen = true; showOverview = true; showHand = false } })
-                                if (!onlineMode && !localGameStarted) DropdownMenuItem(text = { Text("Start game") }, modifier = tutorialAnchor("menu-start-game"), onClick = { guidedAction("menu-start-game") { topMenuExpanded = false; topMenuSection = null; resetGame(startImmediately = true, order = gameTurnOrder); logAction(activePlayer, "started the game") } })
-                                DropdownMenuItem(text = { Text("Game lobby") }, modifier = tutorialAnchor("menu-lobby"), onClick = { guidedAction("menu-lobby") { topMenuSection = null; openLobby(joining = false) } })
-                                if (onlineMode && gameStartedOnline && !gameEndedOnline) DropdownMenuItem(text = { Text("Propose ending the game") }, modifier = tutorialAnchor("menu-end"), onClick = { guidedAction("menu-end") {
-                                    topMenuExpanded = false; topMenuSection = null
-                                    if (endProposalBy < 0) { endProposalBy = localSeat; endVotes = mapOf(localSeat to true); logAction(localSeat, "proposed ending the game") }
-                                } })
-                                if (onlineMode) DropdownMenuItem(text = { Text("Leave gameâ€¦") }, modifier = tutorialAnchor("menu-leave"), onClick = { guidedAction("menu-leave") { topMenuExpanded = false; topMenuSection = null; lobbyOpen = true } })
-                                if (!onlineMode || localSeat == 0 && gameEndedOnline) DropdownMenuItem(text = { Text("Reset game", color = Color(0xFFE9978B)) }, modifier = tutorialAnchor("menu-reset"), onClick = { guidedAction("menu-reset") { topMenuExpanded = false; topMenuSection = null; resetConfirmOpen = true } })
-                                if (!onlineMode) DropdownMenuItem(text = { Text("Reset and clear all data", color = Color(0xFFE9978B)) }, modifier = tutorialAnchor("menu-clear"), onClick = { guidedAction("menu-clear") { topMenuExpanded = false; topMenuSection = null; clearAllConfirmOpen = true } })
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Box(Modifier.then(tutorialAnchor("table-tab"))) { ViewChip("TABLE", selected = showOverview, onClick = { guidedAction("table-tab") { showOverview = true; showHand = false } }) }
-                players.forEachIndexed { index, player ->
-                    Box(Modifier.then(tutorialAnchor("player-tab"))) {
-                        PlayerViewTab(
-                            name = if (onlineMode && index == localSeat) "YOU" else player.name,
-                            commander = player.commanderCard,
-                            selected = !showOverview && selectedPlayer == index,
-                            onClick = { guidedAction("player-tab") { selectedPlayer = index; showOverview = false; showHand = false } }
-                        )
-                    }
-                }
-            }
-        }
-
-        HorizontalPager(
-            state = viewPagerState,
-            modifier = Modifier.weight(1f),
-            // Player boards contain horizontal card and zone lists. Keep
-            // gestures inside those lists; use the player tabs to switch boards.
-            userScrollEnabled = showOverview,
-            verticalAlignment = Alignment.Top,
-            key = { page -> if (page == 0) "table" else players.getOrNull(page - 1)?.id ?: page }
-        ) { page ->
-        // Pager pages need their own Column scope: the overview grid and player
-        // board use weight to fill the page beneath the player tabs.
-        Column(Modifier.fillMaxSize()) {
-        val showingView = page - 1
-        if (showingView < 0) {
-            Row(Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("FULL TABLE Â· ${players.size}/4 PLAYERS", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.1.sp)
-            }
-            val compactOverview = screenWidthDp < 900 && isLandscape && players.size >= 3
-            val overviewColumns = when {
-                screenWidthDp >= 1800 -> 4
-                screenWidthDp >= 1300 -> minOf(3, players.size)
-                screenWidthDp >= 700 -> 2
-                else -> 1
-            }
-            val overviewGridState = rememberLazyGridState()
-            LaunchedEffect(activePlayer, players.size) {
-                if (activePlayer in players.indices) {
-                    if (reducedSwipeMotion) overviewGridState.scrollToItem(activePlayer)
-                    else overviewGridState.animateScrollToItem(activePlayer)
-                }
-            }
-            LazyVerticalGrid(
-                columns = GridCells.Fixed(overviewColumns.coerceAtLeast(1)),
-                state = overviewGridState,
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(bottom = 4.dp)
-            ) {
-                items(players.size) { index ->
-                    val player = players[index]
-                    PlayerOverview(
-                        player.copy(name = if (onlineMode && index == localSeat) "YOU" else player.name), index,
-                        Modifier.fillMaxWidth().then(if (index == selectedPlayer) tutorialAnchor("player-card") else Modifier),
-                        tutorialAnchor = ::tutorialAnchor,
-                        compact = compactOverview,
-                        isActivePlayer = index == activePlayer,
-                        turnNumber = turnNumber,
-                        phaseName = if (index == activePlayer) phaseSteps[phaseIndex] else "WAITING",
-                        turnTime = if (index == activePlayer) elapsedTurnSeconds else null,
-                        showTurnTimer = turnTimerVisible,
-                        onToggleTimer = { if (!onlineMode || localSeat == 0) turnTimerVisible = !turnTimerVisible },
-                        onMoveUp = { if (!onlineMode) movePlayerCard(index, -1) }, onMoveDown = { if (!onlineMode) movePlayerCard(index, 1) },
-                        onOpen = { guidedAction("player-card") { selectedPlayer = index; showOverview = false } },
-                        onZone = { zoneDialog = index to it },
-                        onPreview = { preview = CardPreview(index, it, fromHand = false, canManipulate = gameInProgress && (!onlineMode || index == localSeat) && !gameEndedOnline) },
-                        onPublicPreview = { preview = CardPreview(index, it, fromHand = false, canManipulate = false) }
-                    )
-                }
-            }
-        } else {
-            val boardIndex = showingView.coerceIn(players.indices)
-            val boardCanControl = gameInProgress && (!onlineMode || boardIndex == localSeat) && !gameEndedOnline && !players[boardIndex].isEliminated
-            PlayerBoard(
-                player = players[boardIndex].copy(name = if (onlineMode && boardIndex == localSeat) "YOU" else players[boardIndex].name), playerIndex = boardIndex, isLandscape = isLandscape, cardSizeScale = cardSizeScale,
-                boardSpacingScale = boardSpacingScale,
-                playerSectionOrder = playerSectionOrderRaw.split('|').filter(String::isNotBlank),
-                gameInProgress = gameInProgress,
-                tutorialAnchor = ::tutorialAnchor,
-                stackCount = stackActions.size,
-                commanderUnavailable = players[boardIndex].commanderCard?.let { commander ->
-                    players[boardIndex].library.any { it.id == commander.id } || players[boardIndex].hand.any { it.id == commander.id } || players[boardIndex].battlefield.any { it.id == commander.id } || players[boardIndex].graveyard.any { it.id == commander.id } || players[boardIndex].exile.any { it.id == commander.id } || players[boardIndex].revealed.any { it.id == commander.id } || stackActions.any { it.card?.id == commander.id }
-                } ?: false,
-                canControl = boardCanControl,
-                isActivePlayer = boardIndex == activePlayer, turnNumber = turnNumber, phaseName = phaseSteps[phaseIndex],
-                modifier = Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { battlefieldBounds = it.boundsInRoot() },
-                onLife = { delta -> guidedAction(if (delta > 0) "life-up" else "life-down") { if (boardCanControl) { val nextLife = (players[boardIndex].life + delta).coerceAtLeast(0); updatePlayer(boardIndex) { it.copy(life = nextLife) }; logAction(boardIndex, if (delta > 0) "gained life" else "lost life"); if (nextLife == 0) eliminatePlayer(boardIndex, "Life total reached 0") } } },
-                onDraw = { guidedAction("draw-action") { if (boardCanControl) { drawCard(boardIndex); showHand = true } } },
-                onShowHand = { guidedAction("hand-button") { if (boardCanControl) showHand = true } },
-                onShowHandFromZone = { guidedAction("zone-hand") { if (boardCanControl) showHand = true } },
-                onToken = { guidedAction("token-action") { if (boardCanControl) { tokenTarget = boardIndex; tokenPickerOpen = true } } },
-                onManageMana = { guidedAction("mana-status") { if (boardCanControl) { manaTarget = boardIndex; manaPoolOpen = true } } },
-                onZone = { zone -> guidedAction("zone-${zone.lowercase()}") { zoneDialog = boardIndex to zone } },
-                onPreview = { preview = CardPreview(boardIndex, it, fromHand = false, canManipulate = boardCanControl) },
-                onPublicPreview = { preview = CardPreview(boardIndex, it, fromHand = false, canManipulate = false) },
-                onTapCard = { id -> guidedAction("battlefield") { if (boardCanControl) players.getOrNull(boardIndex)?.battlefield?.firstOrNull { it.id == id }?.let { tapPermanent(boardIndex, it) } } },
-                onCardAction = { card, action ->
-                    if (boardCanControl || action == "INSPECT") when (action) {
-                        "COUNTER" -> counterTarget = boardIndex to card.id
-                        "TOKEN" -> { tokenTarget = boardIndex; tokenPickerOpen = true }
-                        "TAP" -> tapPermanent(boardIndex, card)
-                        "FACE UP" -> { updateCard(boardIndex, card.id) { it.copy(isFaceDown = false) }; logAction(boardIndex, "turned a face-down card face up") }
-                        "SET COMMANDER" -> if (players[boardIndex].commanderCard == null && players[boardIndex].commanderName.isNullOrBlank()) { updatePlayer(boardIndex) { it.copy(commanderName = card.name, commanderCard = card) }; logAction(boardIndex, "marked ${card.name} as commander") }
-                        "COMMAND ZONE" -> if (players[boardIndex].commanderCard?.id == card.id) {
-                            updatePlayer(boardIndex) { p -> p.copy(battlefield = p.battlefield.filterNot { it.id == card.id }, commanderCard = card, commanderName = card.name) }
-                            logAction(boardIndex, "moved ${card.name} to the command zone")
-                        } else message = "Only your designated commander can move to the command zone."
-                        "GRAVEYARD" -> { updatePlayer(boardIndex) { p -> p.copy(battlefield = p.battlefield.filterNot { it.id == card.id }, graveyard = p.graveyard + card) }; logAction(boardIndex, "moved ${card.name} to graveyard") }
-                        "EXILE" -> { updatePlayer(boardIndex) { p -> p.copy(battlefield = p.battlefield.filterNot { it.id == card.id }, exile = p.exile + card) }; logAction(boardIndex, "exiled ${card.name}") }
-                        "INSPECT" -> preview = CardPreview(boardIndex, card, fromHand = false)
-                        else -> if (action.startsWith("ABILITY:")) {
-                            val abilityText = action.removePrefix("ABILITY:")
-                            val kind = if (card.type.contains("planeswalker", ignoreCase = true)) "LOYALTY ABILITY" else "ACTIVATED ABILITY"
-                            val stackItem = StackAction(title = "${card.name}: $abilityText", controllerId = players[boardIndex].id, kind = kind, card = card, targetText = abilityText)
-                            stackActions = stackActions + stackItem
-                            if (stackItem.targetCount != null) targetSelectionStackItemId = stackItem.id
-                            priorityPassed = emptySet()
-                            priorityPlayer = boardIndex
-                            stackOpen = stackItem.targetCount == null
-                            logAction(boardIndex, "activated an ability of ${card.name}; resolve its effect manually")
-                        }
-                    }
-                },
-                onNextStep = { guidedAction("next-step") { if (boardCanControl && boardIndex == activePlayer) advanceStep() } }, onOpenLog = { logOpen = true }, onOpenChat = { chatOpen = true },
-                onCombat = { guidedAction("combat-action") { if (boardCanControl && boardIndex == activePlayer) combatDialogOpen = true } },
-                onTrackers = { if (boardCanControl) trackerPlayer = boardIndex },
-                onSearchLibrary = { guidedAction("zone-library") { if (boardCanControl) librarySearchPlayer = boardIndex } },
-                onStack = { guidedAction("stack-open") { stackOpen = true } },
-                onOpenMore = { guidedAction("more-actions") {} },
-                onCastCommander = { guidedAction("commander-cast") {
-                    if (boardCanControl) {
-                        val commander = players[boardIndex].commanderCard
-                        if (commander == null) message = "Set a commander from your deck or battlefield first."
-                        else paymentCard = boardIndex to commander
-                    }
-                } },
-                onConcede = { if (boardCanControl) concedePlayer = boardIndex },
-                onReveal = {
-                    if (boardCanControl) {
-                        updatePlayer(boardIndex) { p ->
-                            if (p.library.isEmpty()) p else p.copy(library = p.library.drop(1), revealed = p.revealed + p.library.first())
-                        }
-                        logAction(boardIndex, "revealed the top card")
-                    }
-                },
-                onShuffle = { if (boardCanControl) { updatePlayer(boardIndex) { it.copy(library = it.library.shuffled()) }; logAction(boardIndex, "shuffled their library") } }
-            )
-        }
-        }
-        }
-
-        if (showOverview) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Tap a player to inspect their board", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
-                if (gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) HeaderButton("NEXT Â· ${phaseSteps[phaseIndex]}", onClick = { guidedAction("table-next") { advanceStep() } }, modifier = tutorialAnchor("table-next"))
-                if (gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) {
-                    Spacer(Modifier.width(5.dp))
-                    HeaderButton("PASS TURN", onClick = { guidedAction("table-pass") { passTurn() } }, modifier = tutorialAnchor("table-pass"))
-                } else if (gameInProgress) Text(if (players[activePlayer].deckLoaded) "COMPUTER TURN" else "AI NEEDS DECK", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
-                else Text("START GAME TO PLAY", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
-                if (!players[selectedPlayer].deckLoaded && !gameEndedOnline && (!onlineMode || selectedPlayer == localSeat)) {
-                    Spacer(Modifier.width(6.dp))
-                    HeaderButton("IMPORT DECK", onClick = { guidedAction("table-import") { if (onlineMode) selectedPlayer = localSeat; importError = null; importOpen = true } }, modifier = tutorialAnchor("table-import"))
-                }
-            }
-        } else {
-            val canPassTurnFromBoard = gameInProgress && !gameEndedOnline && selectedPlayer == activePlayer && !players[selectedPlayer].isComputer && !players[selectedPlayer].isEliminated && (!onlineMode || localSeat == activePlayer)
-            val footerControlHeight = (54.dp * footerButtonScale).coerceIn(50.dp, 76.dp)
-            val handControlHeight = (62.dp * footerButtonScale).coerceIn(56.dp, 82.dp)
-            Spacer(Modifier.weight(1f))
-            Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.Bottom) {
-                HeaderButton(
-                    "PASS TURN", onClick = { guidedAction("pass-turn") { passTurn() } }, enabled = canPassTurnFromBoard,
-                    modifier = Modifier.weight(1f).height(footerControlHeight).then(tutorialAnchor("pass-turn"))
-                )
-                Box(Modifier.weight(1.18f).then(tutorialAnchor("hand-button"))) {
-                    HandPeekBar(
-                        players[selectedPlayer].hand.size,
-                        modifier = Modifier.fillMaxWidth().height(handControlHeight),
-                        onClick = { guidedAction("hand-button") { if (canControlSelectedPlayer) showHand = true } }
-                    )
-                }
-                HeaderButton(
-                    "BACK TO TABLE", onClick = { guidedAction("player-back-table") { showOverview = true; showHand = false } },
-                    modifier = Modifier.weight(1f).height(footerControlHeight).then(tutorialAnchor("player-back-table"))
-                )
-            }
-        }
-    }
-
-        @Composable
-        fun TableOverlays() {
-            Box(Modifier.fillMaxSize()) {
-        if (homeOpen) RoomHomeScreen(
-        wide = screenWidthDp >= 700,
-            tutorialAnchor = ::tutorialAnchor,
-        onCreateRoom = { guidedAction("home-create") { openLobby(joining = false) } },
-        onJoinRoom = { guidedAction("home-join") { openLobby(joining = true) } },
-        onContinue = { guidedAction("home-continue") { homeOpen = false; if (!onlineMode) { localGameStarted = true; gameTimerRunning = true; turnTimerRunning = true } } },
-        onTutorial = { startTutorial() }
-    )
-
-    if (changelogOpen) AlertDialog(
-        onDismissRequest = { changelogOpen = false },
-        title = { Text("What's new Â· Build ${BuildConfig.VERSION_CODE}") },
-        text = {
-            Column(
-                Modifier.fillMaxWidth()
-                    .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.62f)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text("BUILD 78 Â· DRAGGABLE UI EDITOR AND PLAYER LAYOUT", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("â€¢ Long-press and drag player-screen elements or hand-tray buttons in the editor's sample layout. The active item lifts and tracks your finger while neighboring items animate into place.\nâ€¢ Player-screen footer controls stay aligned to the bottom, with a larger hand button. The battlefield automatically fills available space and scrolls when its cards exceed that space.\nâ€¢ Removed the Large View toggle from the table view.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 77 Â· DRAG-AND-DROP UI EDITOR", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("â€¢ Adjust UI now lets you drag to reorder player-screen sections, remove and restore sections such as the health/activity bar and commander strip, and add, remove, and reorder hand-tray buttons. Layouts are saved separately for portrait and landscape.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 76 Â· PLAYER LAYOUT AND HAND ACTIONS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("â€¢ Player-screen footer buttons now align on the bottom edge. Opening-hand cards are larger, and the hand tray includes Cast Commander when it can be cast. Pass Priority is the primary stack action; Resolve Top remains available as a smaller action after everyone passes.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 75 Â· MANA PIPS AND UI ADJUSTMENT", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("â€¢ Mana-choice buttons show colored mana pips. Open the app menu and tap Adjust UI to go straight to the layout controls.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 74 Â· HAND TRAY AND PLAYER CONTROLS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("â€¢ Opening-hand cards are larger, and hand-tray cards grow or shrink with the drawer. The tray now holds Draw, Combat, Stack, turn flow, and secondary game commands; the Stack shortcut is off the view selector. The player footer stays at the bottom, and the old drag-to-play hint is gone.\nâ€¢ Mana symbols use colored pips. Permanents that say to choose a creature type prompt for one as they enter and display the choice. Public card mentions in the game log can open a card preview.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 73 Â· TARGETING EXPERIMENT", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("â€¢ Targeted spells, Auras, activated abilities, and recognized targeted triggers pause for target selection. The picker lists visible players, permanents, stack items, and cards in visible zones; add a legal target by name if it is not listed. Chosen targets appear on the stack and in the game log, and sync to the room. The picker estimates target count, but players still verify card-specific restrictions. This experimental app installs separately from the stable release.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 72 Â· PLAYER TABS AND ACTIVE BOARD", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("â€¢ Player view tabs use cropped commander artwork with the player name at the bottom. On the full table, the active player's board opens automatically and the view scrolls to it; the previous active board closes when the turn changes. The player footer has PASS TURN, a larger centered HAND button, and BACK TO TABLE. Mana access is now in the player status header. ADD TOKEN is in MORE; the footer no longer shows the library count. The command-zone strip is more compact while preserving commander casting, cast count, tax, and status.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 71 Â· CHAT COPY AND PASTE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("â€¢ Chat messages support text selection by long-pressing, with Android's copy action. Added a PASTE control to append clipboard text to the draft; the message field also keeps Android's normal text paste menu.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 70 Â· DUPLICATE PERMANENT FIX", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("â€¢ Resolving an activated or loyalty ability now leaves its source permanent in its current zone. Only resolving a spell moves that spell card to the battlefield or graveyard.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 69 Â· SOURCE UPDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("â€¢ Added trigger detection for recognized spell-cast, draw, and creature-entry events. Triggers show their event and effect, offer target-player selection for supported player-target effects, and keep modes or unsupported effects on a manual-resolution path. Rhystic Study and Smothering Tithe keep their pay-or-resolve choices.\nâ€¢ Expanded simple automatic effect handling for targeted player life, draw, and token effects after a target is chosen.\nâ€¢ The Activity Log now includes turn phase, spell cost/payment detail, trigger events, automatic changes, and manual-resolution notes, with visual emphasis for payments, triggers, and effects.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 68 Â· SOURCE UPDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("â€¢ The opening-hand screen now shows card faces. Tap any card to open a large preview; while choosing cards to bottom, use the separate button beneath each card to select it. The selection count and required bottom count remain visible.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 67 Â· SOURCE UPDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("â€¢ Added a multiplayer opening-hand step before Ready Up. Each player can keep or mulligan; every mulligan shuffles the whole hand into the library and deals a fresh seven. The first multiplayer mulligan is free.\nâ€¢ After keeping, players tap the exact number of cards to put on the bottom of their library.\nâ€¢ Ready Up now requires a confirmed opening hand. LAN and Internet room state carries mulligan status, and room servers reject ready requests until both the deck and hand decision are set.\nâ€¢ Starting the lobby game preserves each player's chosen hand and library order instead of dealing a new hand.\n\nThis is a source-only update; the Build 66 APK does not include these changes.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 66 Â· CHANGES SINCE BUILD 65", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("â€¢ The hand panel can now be resized by dragging its top handle and remembers its height.\nâ€¢ The stack window closes automatically when the stack is empty and pending triggers or payment choices have finished; reopen it any time from the Stack button.\nâ€¢ Player views use tighter spacing, compact zone chips, and a battlefield area sized to its cards that scrolls when crowded.\nâ€¢ Diagnostic logs now capture repeated deck quantities, visible card moves, zone totals, repeated card-instance IDs, and inbound snapshot sequence numbers to help trace import and sync problems.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 65", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                Text("â€¢ Added an import check that flags unmatched or unverifiable cards. Auto Fix closes the review when every card is matched; unresolved cards can be opened in the editor for manual correction.\nâ€¢ Added automatic handling for supported fixed life, draw, and token effects, plus simple creature-entry life triggers. Effects the app cannot safely parse prompt the player to resolve them manually.\nâ€¢ Added a persistent Stack button beside the view tabs and another in the hand tray; the tab button highlights while the stack has items.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("EARLIER CHANGES Â· BUILDS 60â€“64", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("BUILD 60", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                Text("â€¢ Rebuilt the optional visual guide with screen highlights and straight red arrows.\nâ€¢ Added Share Room, the default room URL reminder, tapped-entry choices, and shock-land life prompts.\nâ€¢ Added an empty-stack notice and simplified menu labels.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 61", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                Text("â€¢ Enlarged the tutorial panels and controls. The room URL step now explains that the default address is already set and can continue without opening the keyboard.\nâ€¢ Improved card-action dialog layout so titles and actions fit.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 62", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                Text("â€¢ Added Next to every tutorial step, plus an import review with Auto Fix and Trim Excess.\nâ€¢ Added per-card moves from Graveyard and Exile, and hid Set as Commander after one is assigned.\nâ€¢ Concealed face-down card details. Made Cast from Hand the primary stack action and tucked manual ability entry behind a small control.\nâ€¢ Replaced clunky view swipes with synchronized table/player paging and aligned the hand-sheet drag handle.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 63", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                Text("â€¢ Improved stack-window sizing.\nâ€¢ Updated the deck editor to track cards in every zone and keep rename/remove actions available after cards move.\nâ€¢ Improved AI readiness and recovery from unexpected turn errors.\nâ€¢ Expanded mana-ability tracking for common mana rocks, dual-color choices, and basic lands.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 64", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                Text("â€¢ Fixed the Table overview layout so player panels remain visible.", color = SoftWhite, fontSize = 11.sp)
-            }
-        },
-        confirmButton = { TextButton(onClick = { changelogOpen = false }) { Text("CLOSE", color = Mint) } },
-        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
-    )
-
-    // The guide is layered over the real screen at the end of this composition.
-
-    AnimatedVisibility(
-        visible = showHand && !showOverview && gameInProgress && canControlSelectedPlayer,
-        modifier = Modifier.fillMaxSize(),
-        enter = fadeIn(),
-        exit = fadeOut()
-    ) {
-        Box(
-            Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).clickable { showHand = false }
-        ) {
-            AnimatedVisibility(
-                visible = showHand && !showOverview && gameInProgress && canControlSelectedPlayer,
-                modifier = Modifier.align(Alignment.BottomCenter),
-                enter = slideInVertically { it } + fadeIn(),
-                exit = slideOutVertically { it } + fadeOut()
-            ) {
-                Column(
-                    Modifier.fillMaxWidth()
-                        .fillMaxHeight(handSheetHeightFraction)
-                        .verticalScroll(rememberScrollState())
-                        .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
-                        .background(Panel)
-                        .navigationBarsPadding()
-                        .onGloballyPositioned { handSheetBounds = it.boundsInRoot() }
-                        .clickable { }
-                ) {
-                    Box(
-                        Modifier.fillMaxWidth().height(36.dp)
-                            .pointerInput(configuration.screenHeightDp) {
-                                var dragDistance = 0f
-                                val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }.coerceAtLeast(1f)
-                                val dismissDistancePx = with(density) { 120.dp.toPx() }
-                                detectVerticalDragGestures(
-                                    onVerticalDrag = { change, amount ->
-                                        change.consume()
-                                        dragDistance += amount
-                                        handSheetHeightFraction = (handSheetHeightFraction - amount / screenHeightPx).coerceIn(0.38f, 0.95f)
-                                    },
-                                    onDragEnd = {
-                                        optionPrefs.edit().putFloat("hand_sheet_height_fraction", handSheetHeightFraction).putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction).apply()
-                                        if (dragDistance > dismissDistancePx && handSheetHeightFraction <= 0.40f) showHand = false
-                                        dragDistance = 0f
-                                    }
-                                )
-                            },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        BottomSheetDefaults.DragHandle(color = Muted)
-                    }
-                    Text("DRAG UP TO EXPAND Â· DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
-                    HandSheet(
-                        cards = players[selectedPlayer].hand, isLandscape = isLandscape,
-                        availableHeight = LocalConfiguration.current.screenHeightDp.dp * handSheetHeightFraction,
-                        stackCount = stackActions.size,
-                        tutorialAnchor = ::tutorialAnchor,
-                        highlightedCardId = highlightedHandCardId,
-                        actionOrder = handActionOrderRaw.split('|').filter(String::isNotBlank),
-                        handRevealed = players[selectedPlayer].handRevealedToAll,
-                        canAdvance = canControlSelectedPlayer && selectedPlayer == activePlayer && !players[activePlayer].isComputer,
-                        canControl = canControlSelectedPlayer,
-                        commanderCanCast = players[selectedPlayer].commanderCard?.let { commander ->
-                            val owner = players[selectedPlayer]
-                            canControlSelectedPlayer && !owner.isEliminated && !owner.library.any { it.id == commander.id } && !owner.hand.any { it.id == commander.id } && !owner.battlefield.any { it.id == commander.id } && !owner.graveyard.any { it.id == commander.id } && !owner.exile.any { it.id == commander.id } && !owner.revealed.any { it.id == commander.id } && stackActions.none { it.card?.id == commander.id }
-                        } == true,
-                        onToggleReveal = { revealed ->
-                            updatePlayer(selectedPlayer) { it.copy(handRevealedToAll = revealed) }
-                            logAction(selectedPlayer, if (revealed) "revealed their hand to everyone" else "hid their hand")
-                        },
-                        onClose = { showHand = false },
-                        onDraw = { drawCard(selectedPlayer); showHand = true },
-                        onNextStep = { advanceStep() },
-                        onPassTurn = { passTurn() },
-                        onStack = { guidedAction("stack-open") { stackOpen = true } },
-                        onCastCommander = {
-                            val commander = players.getOrNull(selectedPlayer)?.commanderCard
-                            if (commander == null) message = "Set a commander from your deck or battlefield first."
-                            else paymentCard = selectedPlayer to commander
-                        },
-                        onCombat = { guidedAction("combat-action") { if (canControlSelectedPlayer && selectedPlayer == activePlayer) combatDialogOpen = true } },
-                        onMoreAction = { action ->
-                            if (action in setOf("LOG", "CHAT") || canControlSelectedPlayer) when (action) {
-                                "TOKEN" -> { tokenTarget = selectedPlayer; tokenPickerOpen = true }
-                                "REVEAL" -> {
-                                    val player = players[selectedPlayer]
-                                    if (player.library.isNotEmpty()) {
-                                        updatePlayer(selectedPlayer) { it.copy(library = it.library.drop(1), revealed = it.revealed + player.library.first()) }
-                                        logAction(selectedPlayer, "revealed the top card")
-                                    }
-                                }
-                                "SHUFFLE" -> shuffleConfirmPlayer = selectedPlayer
-                                "LOG" -> logOpen = true
-                                "TRACKERS" -> trackerPlayer = selectedPlayer
-                                "SEARCH" -> librarySearchPlayer = selectedPlayer
-                                "CONCEDE" -> concedePlayer = selectedPlayer
-                                "CHAT" -> chatOpen = true
-                                "GRAVEYARD" -> zoneDialog = selectedPlayer to "Graveyard"
-                                "EXILE" -> zoneDialog = selectedPlayer to "Exile"
-                                "REVEALED" -> zoneDialog = selectedPlayer to "Revealed"
-                            }
-                        },
-                        onSelect = { card -> guidedAction("hand-card") { handActionCard = card } },
-                        onDragDrop = { card, point ->
-                            val validTarget = battlefieldBounds?.contains(point) == true && handSheetBounds?.contains(point) != true
-                            if (validTarget && canControlSelectedPlayer) {
-                                showHand = false
-                                performHandAction(card, "PLAY")
-                            }
-                        }
-                    )
-                }
-            }
-        }
-    }
-
-    if (deckEditorOpen) DeckEditorDialog(
-        player = players[selectedPlayer],
-        highlightedCardIds = importReviewCardIds,
-        onRename = { card, name -> editDeckCard(selectedPlayer, card.id, name) },
-        onRemove = { card -> editDeckCard(selectedPlayer, card.id, null, remove = true) },
-        onAdd = { result -> updatePlayer(selectedPlayer) { p -> p.copy(library = p.library + makeCard(result.name, result.type, result.imageUrl, oracleText = result.oracleText, manaValue = result.manaValue, artCropUrl = result.artCropUrl, manaCost = result.manaCost, power = result.power, toughness = result.toughness, keywords = result.keywords)) } },
-        onReplace = { card, result ->
-            updatePlayer(selectedPlayer) { p ->
-                fun replace(cards: List<GameCard>) = cards.map { current ->
-                    if (current.id == card.id) current.copy(name = result.name, type = result.type, imageUrl = result.imageUrl, oracleText = result.oracleText, manaValue = result.manaValue, importIssue = null, artCropUrl = result.artCropUrl, manaCost = result.manaCost, power = result.power, toughness = result.toughness, keywords = result.keywords) else current
-                }
-                val commander = p.commanderCard?.let { current ->
-                    if (current.id == card.id) current.copy(name = result.name, type = result.type, imageUrl = result.imageUrl, oracleText = result.oracleText, manaValue = result.manaValue, importIssue = null, artCropUrl = result.artCropUrl, manaCost = result.manaCost, power = result.power, toughness = result.toughness, keywords = result.keywords) else current
-                }
-                p.copy(library = replace(p.library), hand = replace(p.hand), commanderCard = commander, commanderName = commander?.name ?: p.commanderName)
-            }
-            importReviewCardIds = importReviewCardIds - card.id
-        },
-        onDismiss = { deckEditorOpen = false }
-    )
-    if (combatDialogOpen && !showOverview) CombatDialog(
-        players = players, attackerIndex = activePlayer,
-        onDismiss = { combatDialogOpen = false },
-        onLog = { logAction(activePlayer, it) },
-        onCombatDamage = { sourceCard, defender, amount ->
-            if (amount > 0 && defender in players.indices) {
-                val source = players[activePlayer]
-                val isCommander = source.commanderCard?.id == sourceCard.id
-                val sourceId = source.id
-                val newCommanderDamage = (players[defender].commanderDamageReceived[sourceId] ?: 0) + if (isCommander) amount else 0
-                val newLife = (players[defender].life - amount).coerceAtLeast(0)
-                updatePlayer(defender) { p -> p.copy(
-                    life = newLife,
-                    commanderDamageReceived = if (isCommander) p.commanderDamageReceived + (sourceId to newCommanderDamage) else p.commanderDamageReceived
-                ) }
-                logAction(activePlayer, "dealt $amount combat damage to ${players.getOrNull(defender)?.name ?: "player"}")
-                if (newLife == 0) eliminatePlayer(defender, "Life total reached 0")
-                if (isCommander && newCommanderDamage >= 21) eliminatePlayer(defender, "21 commander damage from ${source.name}")
-            }
-        }
-    )
-
-    fun makeRoomClient(hostAddress: String, code: String, password: String, preferredSeat: Int? = null): LanRoomClient {
-        return LanRoomClient(
-            onSeatAssigned = { seat -> scope.launch(Dispatchers.Main) {
-                val previousSeat = localSeat
-                localSeat = seat.coerceAtLeast(0)
-                if (roomConnected) {
-                    if (selectedPlayer == previousSeat) selectedPlayer = localSeat
-                } else {
-                    selectedPlayer = localSeat
-                    lobbyCreated = false
-                    lobbyJoinMode = false
-                    lobbyRoomCode = code
-                    lobbyPassword = password
-                    roomConnected = true
-                        connectionLost = false
-                        connectionLostReason = null
-                    onlineStatus = "Connected to host"
-                    recordDiagnostic("Connected to host and assigned seat ${localSeat + 1}")
-                    lobbyNotice = "Connected. Import your deck, choose Keep Hand or Mulligan, then mark yourself ready."
-                }
-            } },
-            onSnapshot = { snapshot -> scope.launch(Dispatchers.Main) { applyOnlineSnapshot(snapshot) } },
-            onReadyConfirmed = { seat, ready, accepted -> scope.launch(Dispatchers.Main) {
-                recordDiagnostic("Host confirmed readiness: seat ${seat + 1}, ready=$ready, accepted=$accepted")
-                if (seat == localSeat) {
-                    if (accepted) lobbyReadyPlayers = if (ready) lobbyReadyPlayers + seat else lobbyReadyPlayers - seat
-                    pendingReadyState = null
-                    lobbyNotice = when {
-                        !accepted -> "The host has not received your opening-hand choice yet. Wait a moment, then try readying up again."
-                        ready -> "The host confirmed you are ready."
-                        else -> "The host confirmed you are not ready."
-                    }
-                }
-            } },
-            onDeckStatusConfirmed = { seat, loaded -> scope.launch(Dispatchers.Main) {
-                recordDiagnostic("Host confirmed deck status: seat ${seat + 1}, loaded=$loaded")
-                if (seat == localSeat) {
-                    localDeckSyncConfirmed = loaded
-                    lobbyNotice = if (loaded) "The host confirmed your deck is loaded. Choose Keep Hand or Mulligan before readying up." else "The host confirmed your deck was removed."
-                }
-            } },
-            onDisconnected = { reason -> scope.launch(Dispatchers.Main) {
-                val interruptedSession = roomConnected || onlineStateReady || gameStartedOnline
-                roomConnected = false
-                onlineStatus = "Disconnected"
-                pendingReadyState = null
-                localDeckSyncConfirmed = false
-                recordDiagnostic("Disconnected from host: $reason")
-                lobbyNotice = reason
-                if (interruptedSession) {
-                    connectionLost = true
-                    if (!reconnecting) connectionLostReason = reason
-                    if (backgroundAlertsEnabled && !appInForeground) postGameAlert(context, "Connection interrupted", "Connection to the game host was lost. Open Arcana Table to reconnect.")
-                }
-                roomClient?.close()
-                roomClient = null
-            } },
-            onHostTransfer = { source, targetSeat -> scope.launch(Dispatchers.Main) {
-                val predecessor = roomClient ?: return@launch
-                recordDiagnostic("Received host transfer offer")
-                startTransferredHost(source, targetSeat, predecessor)
-            } },
-            onRedirect = { address, seat -> scope.launch(Dispatchers.Main) {
-                val oldClient = roomClient
-                oldClient?.close()
-                lobbyHostInput = address
-                roomConnected = false
-                onlineStateReady = false
-                onlineStatus = "Reconnecting to new host"
-                lobbyNotice = "Host changed. Reconnecting to the roomâ€¦"
-                recordDiagnostic("Room redirected to the new host")
-                val redirected = makeRoomClient(address, lobbyRoomCode, lobbyPassword, seat)
-                roomClient = redirected
-                redirected.connect(address, lobbyRoomCode, lobbyPassword, lobbyPlayerName, seat)
-            } },
-            onMigrationAccepted = { scope.launch(Dispatchers.Main) {
-                if (lobbyCreated && localSeat == 0) {
-                    roomClient?.close()
-                    roomClient = null
-                    roomConnected = true
-                    onlineStateReady = true
-                    onlineStatus = "Room host transferred"
-                    lobbyNotice = "The room is yours. Other players are reconnecting."
-                    recordDiagnostic("Host transfer confirmed by previous host")
-                }
-            } }
-        )
-    }
-
-    fun makeCloudRoomClient(code: String, password: String, creating: Boolean, preferredSeat: Int? = null): CloudRoomClient {
-        return CloudRoomClient(
-            onSeatAssigned = { seat -> scope.launch(Dispatchers.Main) {
-                localSeat = seat
-                selectedPlayer = seat
-                lobbyCreated = creating
-                lobbyJoinMode = false
-                lobbyRoomCode = code
-                lobbyPassword = password
-                roomConnected = true
-                onlineStateReady = true
-                connectionLost = false
-                connectionLostReason = null
-                onlineStatus = "Connected to internet room"
-                lobbyNotice = if (creating) "Internet room is open. Share the room code and password." else "Connected. Import your deck, choose Keep Hand or Mulligan, then mark yourself ready."
-                recordDiagnostic("Internet room connected; assigned seat ${seat + 1}")
-            } },
-            onSnapshot = { snapshot -> scope.launch(Dispatchers.Main) { applyOnlineSnapshot(snapshot) } },
-            onReadyConfirmed = { seat, ready, accepted -> scope.launch(Dispatchers.Main) {
-                recordDiagnostic("Internet room confirmed readiness: seat ${seat + 1}, ready=$ready, accepted=$accepted")
-                if (seat == localSeat) {
-                    if (accepted) lobbyReadyPlayers = if (ready) lobbyReadyPlayers + seat else lobbyReadyPlayers - seat
-                    pendingReadyState = null
-                    lobbyNotice = when {
-                        !accepted -> "The room has not received your opening-hand choice yet. Wait a moment, then try readying up again."
-                        ready -> "The room confirmed you are ready."
-                        else -> "The room confirmed you are not ready."
-                    }
-                }
-            } },
-            onDeckStatusConfirmed = { seat, loaded -> scope.launch(Dispatchers.Main) {
-                recordDiagnostic("Internet room confirmed deck status: seat ${seat + 1}, loaded=$loaded")
-                if (seat == localSeat) {
-                    localDeckSyncConfirmed = loaded
-                    lobbyNotice = if (loaded) "The room confirmed your deck is loaded. Choose Keep Hand or Mulligan before readying up." else "The room confirmed your deck was removed."
-                }
-            } },
-            onDisconnected = { reason -> scope.launch(Dispatchers.Main) {
-                val hadConnection = roomConnected || onlineStateReady || gameStartedOnline
-                roomConnected = false
-                onlineStatus = "Disconnected from internet room"
-                pendingReadyState = null
-                localDeckSyncConfirmed = false
-                lobbyNotice = reason
-                recordDiagnostic("Internet room disconnected: $reason")
-                if (hadConnection) {
-                    connectionLost = true
-                    connectionLostReason = reason
-                    if (backgroundAlertsEnabled && !appInForeground) postGameAlert(context, "Connection interrupted", "Connection to the internet room was lost. Open Arcana Table to reconnect.")
-                } else if (creating && !reconnecting) {
-                    lobbyCreated = false
-                }
-                if (cloudRoomClient != null) cloudRoomClient = null
-            } }
-        )
-    }
-
-    fun startInternetRoom() {
-        if (lobbyCloudEndpoint.isBlank()) {
-            lobbyNotice = "Enter your deployed Cloudflare Worker URL first."
-            return
-        }
-        lobbyCloudEndpoint = lobbyCloudEndpoint.trim().removeSuffix("/")
-        optionPrefs.edit().putString("cloud_room_endpoint", lobbyCloudEndpoint).apply()
-        lobbyRoomCode = (1..6).map { "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".random() }.joinToString("")
-        roomClient?.close(); roomClient = null
-        roomHost?.close(); roomHost = null
-        cloudRoomClient?.close()
-        localPlayersBackup = players
-        players = listOf(players.first().copy(name = lobbyPlayerName.trim().ifBlank { "PLAYER" }, isOnline = true))
-        selectedPlayer = 0
-        activePlayer = 0
-        localSeat = 0
-        lobbyCreated = false
-        roomConnected = false
-        gameStartedOnline = false
-        endProposalBy = -1
-        endVotes = emptyMap()
-        gameEndedOnline = false
-        onlineStateReady = false
-        lobbyReadyPlayers = emptySet()
-        pendingReadyState = null
-        lobbyTurnOrder = null
-        lobbyHostAddress = ""
-        onlineStatus = "Connecting"
-        lobbyNotice = "Opening a secure internet roomâ€¦"
-        val client = makeCloudRoomClient(lobbyRoomCode, lobbyPassword, creating = true)
-        cloudRoomClient = client
-        client.connect(lobbyCloudEndpoint, lobbyRoomCode, lobbyPassword, lobbyPlayerName, create = true, initialSnapshot = buildOnlineSnapshot())
-        scope.launch {
-            delay(15_000)
-            if (cloudRoomClient === client && !roomConnected) {
-                client.close()
-                cloudRoomClient = null
-                lobbyCreated = false
-                onlineStatus = "Connection timed out"
-                lobbyNotice = "The room service did not answer in time. Check the Worker URL and internet connection, then try again."
-            }
-        }
-    }
-
-    fun reconnectToRoom() {
-        if (reconnecting) return
-        if ((!lobbyInternetMode && lobbyHostInput.isBlank()) || (lobbyInternetMode && lobbyCloudEndpoint.isBlank()) || lobbyRoomCode.isBlank() || lobbyPassword.isBlank()) {
-            connectionLostReason = "The saved room details are incomplete. Rejoin from the lobby."
-            return
-        }
-        reconnecting = true
-        connectionLostReason = null
-        lobbyOpen = true
-        lobbyJoinMode = true
-        lobbyNotice = "Trying to reconnect to the gameâ€¦"
-        onlineStatus = "Reconnecting"
-        roomConnected = false
-        onlineStateReady = false
-        reconnectJob = scope.launch {
-            var recovered = false
-            if (!lobbyInternetMode) {
-                // Give the host's heartbeat timeout a moment to reserve this seat.
-                delay(3_200)
-            }
-            repeat(4) { attempt ->
-                if (!reconnecting) return@launch
-                if (lobbyInternetMode) {
-                    val reconnectClient = makeCloudRoomClient(lobbyRoomCode, lobbyPassword, creating = lobbyCreated, preferredSeat = localSeat)
-                    cloudRoomClient = reconnectClient
-                    val name = players.getOrNull(localSeat)?.name?.takeIf { it.isNotBlank() && it != "YOU" } ?: lobbyPlayerName
-                    reconnectClient.connect(lobbyCloudEndpoint, lobbyRoomCode, lobbyPassword, name, create = false, preferredSeat = localSeat)
-                    recovered = withTimeoutOrNull(12_000L) {
-                        while (!roomConnected) delay(120)
-                        true
-                    } ?: false
-                    if (recovered) {
-                        reconnecting = false
-                        connectionLost = false
-                        connectionLostReason = null
-                        lobbyNotice = "Reconnected to the internet room."
-                        recordDiagnostic("Reconnected to the internet room")
-                        return@launch
-                    }
-                    reconnectClient.close()
-                    if (cloudRoomClient === reconnectClient) cloudRoomClient = null
-                    if (attempt < 3) delay(900L * (attempt + 1))
-                    return@repeat
-                }
-                val client = makeRoomClient(lobbyHostInput, lobbyRoomCode, lobbyPassword, localSeat)
-                roomClient = client
-                val name = players.getOrNull(localSeat)?.name?.takeIf { it.isNotBlank() && it != "YOU" } ?: lobbyPlayerName
-                client.connect(lobbyHostInput, lobbyRoomCode, lobbyPassword, name, localSeat)
-                recovered = withTimeoutOrNull(9_000L) {
-                    while (!roomConnected) delay(120)
-                    true
-                } ?: false
-                if (recovered) {
-                    reconnecting = false
-                    connectionLost = false
-                    connectionLostReason = null
-                    lobbyNotice = "Reconnected to the room."
-                    recordDiagnostic("Reconnected to the game room")
-                    return@launch
-                }
-                client.close()
-                if (roomClient === client) roomClient = null
-                if (attempt < 3) delay(900L * (attempt + 1))
-            }
-            reconnecting = false
-            if (!recovered) {
-                connectionLost = true
-                onlineStatus = "Disconnected"
-                connectionLostReason = "Couldn't reconnect after four attempts. Check that the host is still in the room and both phones are on the same Wi-Fi, then try again."
-                lobbyNotice = connectionLostReason
-                recordDiagnostic("Automatic reconnect failed after four attempts")
-            }
-        }
-    }
-
-    fun cancelRoomJoin() {
-        if (onlineStatus != "Connecting") return
-        roomClient?.close()
-        roomClient = null
-        cloudRoomClient?.close()
-        cloudRoomClient = null
-        roomConnected = false
-        onlineStateReady = false
-        onlineStatus = "Offline"
-        lobbyNotice = "Join canceled. You can change the details and try again."
-    }
-
-    if (lobbyOpen) LobbyDialog(
-        tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "LOBBY" },
-        tutorialIndex = tutorialIndex, tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
-        onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
-        onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
-        players = players,
-        roomCreated = lobbyCreated || roomConnected,
-        isHost = lobbyCreated,
-        gameStarted = gameStartedOnline,
-        gameEnded = gameEndedOnline,
-        joining = lobbyJoinMode,
-        roomCode = lobbyRoomCode,
-        password = lobbyPassword,
-        joinCode = lobbyJoinCode,
-        joinPassword = lobbyJoinPassword,
-        hostInput = lobbyHostInput,
-        internetMode = lobbyInternetMode,
-        cloudEndpoint = lobbyCloudEndpoint,
-        playerName = lobbyPlayerName,
-        hostAddress = lobbyHostAddress,
-        localSeat = localSeat,
-        onlineStatus = onlineStatus,
-        readyPlayers = lobbyReadyPlayers,
-        pendingReady = pendingReadyState,
-        deckSyncConfirmed = localDeckSyncConfirmed,
-        onTakeMulligan = { takeOpeningMulligan(localSeat) },
-        onKeepOpeningHand = { bottomIds -> keepOpeningHand(localSeat, bottomIds) },
-        turnOrder = lobbyTurnOrder,
-        notice = lobbyNotice,
-        onRemovePlayer = ::removeLobbyPlayer,
-        onExportDiagnostics = { guidedAction("lobby-diagnostics") { exportDiagnosticLog() } },
-        onTutorialTarget = { key -> guidedAction(key) {} },
-        onDismiss = { guidedAction("lobby-close") { cancelRoomJoin(); lobbyOpen = false } },
-        onCancelJoin = { guidedAction("lobby-cancel") { cancelRoomJoin() } },
-        onSelectJoin = { guidedAction("lobby-join") { lobbyJoinMode = true; lobbyNotice = null } },
-        onSelectCreate = { guidedAction("lobby-create") { lobbyJoinMode = false; lobbyNotice = null } },
-        onSelectNetwork = { internet -> guidedAction(if (internet) "lobby-internet" else "lobby-local") {
-            lobbyInternetMode = internet
-            if (internet && (lobbyCloudEndpoint.isBlank() || isLegacyExampleCloudEndpoint(lobbyCloudEndpoint))) {
-                lobbyCloudEndpoint = DEFAULT_CLOUD_ROOM_ENDPOINT
-                optionPrefs.edit().putString("cloud_room_endpoint", DEFAULT_CLOUD_ROOM_ENDPOINT).apply()
-            }
-            lobbyNotice = null
-        } },
-        onCloudEndpoint = { lobbyCloudEndpoint = it.trim(); optionPrefs.edit().putString("cloud_room_endpoint", lobbyCloudEndpoint).apply() },
-        onPassword = { lobbyPassword = it },
-        onJoinCode = { lobbyJoinCode = it.uppercase().filter(Char::isLetterOrDigit).take(8) },
-        onJoinPassword = { lobbyJoinPassword = it },
-        onHostInput = { lobbyHostInput = it.trim() },
-        onPlayerName = { lobbyPlayerName = it.take(24) },
-        onCreate = { guidedAction("lobby-submit") { if (lobbyInternetMode) startInternetRoom() else {
-            recordDiagnostic("Lobby creation requested")
-            lobbyRoomCode = (1..6).map { "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".random() }.joinToString("")
-            roomClient?.close(); roomClient = null
-            roomHost?.close()
-            localPlayersBackup = players
-            players = listOf(players.first().copy(name = lobbyPlayerName.trim().ifBlank { "PLAYER" }, isOnline = true))
-            selectedPlayer = 0
-            activePlayer = 0
-            localSeat = 0
-            lobbyCreated = true
-            roomConnected = false
-            gameStartedOnline = false
-            endProposalBy = -1
-            endVotes = emptyMap()
-            gameEndedOnline = false
-            onlineStateReady = false
-            lobbyReadyPlayers = emptySet()
-            pendingReadyState = null
-            lobbyTurnOrder = null
-            lobbyHostAddress = ""
-            onlineStatus = "Starting room host"
-            val host = LanRoomHost(
-                roomCode = lobbyRoomCode,
-                password = lobbyPassword,
-                onStarted = { address -> scope.launch(Dispatchers.Main) {
-                    lobbyHostAddress = address
-                    onlineStatus = if (address.isBlank()) "Room is open Â· local IP not found" else "Room is open"
-                    roomConnected = true
-                    onlineStateReady = true
-                    recordDiagnostic(if (address.isBlank()) "Lobby host started without a detected local IP" else "Lobby host started with a detected local IP")
-                    if (address.isBlank()) lobbyNotice = "The room server is open, but this phone's Wi-Fi IP could not be detected. Check Wi-Fi or hotspot settings before inviting players."
-                } },
-                onSnapshot = { snapshot -> scope.launch(Dispatchers.Main) { applyOnlineSnapshot(snapshot) } },
-                onPeerJoined = { seat, name -> scope.launch(Dispatchers.Main) {
-                    if (players.size <= seat) players = players + TablePlayer(name = name, isOnline = true)
-                    else players = players.mapIndexed { index, player -> if (index == seat) player.copy(name = name, isOnline = true) else player }
-                    recordDiagnostic("Remote player joined: seat ${seat + 1}")
-                    lobbyNotice = "$name joined the room."
-                    if (backgroundAlertsEnabled && !appInForeground) postGameAlert(context, "Player connected", "$name joined the game room.")
-                } },
-                onPeerLeft = { seat -> scope.launch(Dispatchers.Main) {
-                    if (seat in players.indices && seat > 0) {
-                        val departed = players[seat].name
-                        roomHost?.reserveSeat(seat)
-                        players = players.mapIndexed { index, player -> if (index == seat) player.copy(isOnline = false) else player }
-                        lobbyReadyPlayers = lobbyReadyPlayers - seat
-                        recordDiagnostic("Remote player disconnected; reserved seat ${seat + 1} for reconnect")
-                        lobbyNotice = "$departed lost connection. Their seat is reserved; they can try to reconnect."
-                        if (message == null) message = "$departed lost connection. Their seat is reserved while they reconnect."
-                        if (backgroundAlertsEnabled && !appInForeground) postGameAlert(context, "Player disconnected", "$departed lost connection. Their seat is reserved for reconnect.")
-                    }
-                } },
-                onEvent = { event -> scope.launch(Dispatchers.Main) { recordDiagnostic(event) } },
-                onError = { error -> scope.launch(Dispatchers.Main) {
-                    recordDiagnostic("Room host error: $error")
-                    lobbyHostAddress = ""
-                    roomConnected = false
-                    onlineStateReady = false
-                    onlineStatus = "Host failed to start"
-                    lobbyNotice = "Couldn't start the room host: $error. Close this lobby and try creating it again."
-                    roomHost?.close()
-                    roomHost = null
-                    lobbyCreated = false
-                } },
-                onHostMigrationFinished = { scope.launch(Dispatchers.Main) {
-                    recordDiagnostic("Previous host left after successful handoff")
-                    leaveOnlineRoom()
-                } }
-            )
-            roomHost = host
-            host.start()
-            scope.launch {
-                delay(10_000)
-                if (roomHost === host && onlineStatus == "Starting room host") {
-                    recordDiagnostic("Lobby host startup timed out")
-                    host.close()
-                    roomHost = null
-                    lobbyCreated = false
-                    roomConnected = false
-                    onlineStateReady = false
-                    lobbyHostAddress = ""
-                    onlineStatus = "Host startup timed out"
-                    lobbyNotice = "The room didn't start. Check that no other Arcana Table room is open, then try again."
-                }
-            }
-        } } },
-        onJoin = { guidedAction("lobby-submit") { if (lobbyInternetMode) {
-            if (lobbyCloudEndpoint.isBlank()) {
-                lobbyNotice = "Enter your deployed Cloudflare Worker URL first."
-            } else {
-                lobbyCloudEndpoint = lobbyCloudEndpoint.trim().removeSuffix("/")
-                optionPrefs.edit().putString("cloud_room_endpoint", lobbyCloudEndpoint).apply()
-                roomHost?.close(); roomHost = null
-                roomClient?.close(); roomClient = null
-                cloudRoomClient?.close()
-                localPlayersBackup = players
-                roomConnected = false
-                onlineStateReady = false
-                localDeckSyncConfirmed = false
-                pendingReadyState = null
-                lobbyCreated = false
-                lobbyRoomCode = lobbyJoinCode
-                lobbyPassword = lobbyJoinPassword
-                recordDiagnostic("Internet lobby join requested")
-                lobbyNotice = "Connecting securely to the internet roomâ€¦"
-                onlineStatus = "Connecting"
-                val client = makeCloudRoomClient(lobbyJoinCode, lobbyJoinPassword, creating = false)
-                cloudRoomClient = client
-                client.connect(lobbyCloudEndpoint, lobbyJoinCode, lobbyJoinPassword, lobbyPlayerName, create = false)
-                scope.launch {
-                    delay(15_000)
-                    if (cloudRoomClient === client && !roomConnected) {
-                        client.close()
-                        cloudRoomClient = null
-                        onlineStatus = "Connection timed out"
-                        lobbyNotice = "The room service did not answer in time. Check the Worker URL and internet connection, then try again."
-                    }
-                }
-            }
-        } else {
-            roomHost?.close(); roomHost = null
-            cloudRoomClient?.close(); cloudRoomClient = null
-            roomClient?.close()
-            localPlayersBackup = players
-            roomConnected = false
-            onlineStateReady = false
-            localDeckSyncConfirmed = false
-            pendingReadyState = null
-            recordDiagnostic("Lobby join requested")
-            lobbyNotice = "Connecting to $lobbyHostInputâ€¦"
-            onlineStatus = "Connecting"
-            val client = makeRoomClient(lobbyHostInput, lobbyJoinCode, lobbyJoinPassword)
-            roomClient = client
-            client.connect(lobbyHostInput, lobbyJoinCode, lobbyJoinPassword, lobbyPlayerName)
-        } } },
-        onToggleReady = { index -> guidedAction("lobby-ready") {
-            val isHostAi = lobbyCreated && index in players.indices && players[index].isComputer
-            if (index != localSeat && !isHostAi) lobbyNotice = "Each player marks their own seat ready on their device."
-            else if (!players[index].deckLoaded) lobbyNotice = "${players[index].name} needs an imported deck before becoming ready."
-            else if (!players[index].openingHandKept && !players[index].isComputer) lobbyNotice = "Choose Keep Hand or Mulligan before marking ready."
-            else {
-                val isBecomingReady = index !in lobbyReadyPlayers
-                if ((roomClient != null || cloudRoomClient != null) && index == localSeat) {
-                    pendingReadyState = isBecomingReady
-                    recordDiagnostic("Ready status sent: seat ${localSeat + 1}, ready=$isBecomingReady")
-                    val sent = roomClient?.publishReady(isBecomingReady) ?: cloudRoomClient?.publishReady(isBecomingReady) ?: false
-                    if (!sent) {
-                        pendingReadyState = null
-                        lobbyNotice = "Your ready status could not be sent. Check the connection and retry."
-                        recordDiagnostic("Ready status send failed: seat ${localSeat + 1}")
-                    } else lobbyNotice = if (isBecomingReady) "Sending ready status to the hostâ€¦" else "Sending your not-ready status to the hostâ€¦"
-                    scope.launch {
-                        delay(5_000)
-                        if (pendingReadyState == isBecomingReady) {
-                            pendingReadyState = null
-                            lobbyNotice = "The host has not confirmed that readiness change. Reopen the lobby or try again."
-                            recordDiagnostic("Ready confirmation timed out: seat ${localSeat + 1}, requested=$isBecomingReady")
-                        }
-                    }
-                } else {
-                    lobbyReadyPlayers = if (isBecomingReady) lobbyReadyPlayers + index else lobbyReadyPlayers - index
-                    recordDiagnostic("Ready status changed locally: seat ${index + 1}, ready=$isBecomingReady")
-                    lobbyNotice = if (isBecomingReady) "${players[index].name} is ready to start." else "${players[index].name} is not ready yet."
-                }
-            }
-        } },
-        onImportDeck = { index -> guidedAction("lobby-import") {
-            selectedPlayer = index
-            lobbyOpen = false
-            importError = null
-            importOpen = true
-        } },
-        onAddAi = { guidedAction("lobby-ai") {
-            lobbyOpen = false
-            addAiOpponent()
-        } },
-        onRandomizeTurnOrder = { guidedAction("lobby-order") {
-            val randomized = players.indices.shuffled()
-            lobbyTurnOrder = randomized
-            lobbyNotice = "${players[randomized.first()].name} will take the first turn."
-        } },
-        onStartGame = { guidedAction("lobby-start") {
-            val order = lobbyTurnOrder ?: players.indices.toList()
-            recordDiagnostic("Host started game with ${players.size} occupied seat(s)")
-            resetGame(startImmediately = true, order = order, preserveOpeningHands = true)
-            endProposalBy = -1
-            endVotes = emptyMap()
-            logAction(activePlayer, "started the game and goes first")
-        } },
-        onLeave = { guidedAction("lobby-leave") {
-            if (cloudRoomClient != null) {
-                lobbyNotice = "Leaving the room. The internet room stays available for the other players."
-                recordDiagnostic("Player left the internet room")
-                leaveOnlineRoom()
-            } else if (lobbyCreated && gameStartedOnline && !gameEndedOnline) {
-                val successorSeat = roomHost?.beginHostTransfer()
-                if (successorSeat == null) {
-                    lobbyNotice = "The room needs another connected player before you can hand off hosting. The game is still running here."
-                    recordDiagnostic("Host leave blocked because no successor could accept the room")
-                } else {
-                    lobbyNotice = "Handing the room to ${players.getOrNull(successorSeat)?.name ?: "the next player"}â€¦ Keep this screen open until the transfer finishes."
-                    onlineStatus = "Transferring host"
-                    recordDiagnostic("Host initiated transfer to seat ${successorSeat + 1}")
-                }
-            } else {
-                leaveOnlineRoom()
-            }
-        } },
-    )
-
-    handActionCard?.let { card -> HandCardActionsDialog(
-        card, hasCommander = players.getOrNull(selectedPlayer)?.let { it.commanderCard != null || !it.commanderName.isNullOrBlank() } == true,
-        isCommanderCard = players.getOrNull(selectedPlayer)?.commanderCard?.id == card.id,
-        tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.target == "hand-actions" },
-        tutorialIndex = tutorialIndex, tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
-        onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
-        onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
-        onDismiss = { handActionCard = null }, onAction = { action -> guidedAction("hand-actions") { performHandAction(card, action) } }
-    ) }
-
-    if (connectionLostReason != null || reconnecting) AlertDialog(
-        onDismissRequest = { if (!reconnecting) connectionLostReason = null },
-        title = { Text(if (reconnecting) "Reconnectingâ€¦" else "Connection interrupted") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (reconnecting) CircularProgressIndicator(color = Mint, strokeWidth = 2.dp)
-                Text(connectionLostReason ?: "Arcana Table is trying to restore your room connection.", color = Muted)
-                if (reconnecting) Text("The host keeps your seat reserved while you reconnect.", color = Mint, fontSize = 11.sp)
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { reconnectToRoom() }, enabled = !reconnecting) {
-                Text(if (reconnecting) "TRYINGâ€¦" else "AUTO RECONNECT", color = if (reconnecting) Muted else Mint)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = {
-                reconnectJob?.cancel()
-                reconnectJob = null
-                reconnecting = false
-                roomClient?.close()
-                roomClient = null
-                if (connectionLost) {
-                    roomConnected = false
-                    onlineStatus = "Disconnected"
-                }
-                connectionLostReason = null
-            }) { Text(if (reconnecting) "CANCEL" else "LATER", color = Muted) }
-        },
-        containerColor = Panel,
-        titleContentColor = SoftWhite,
-        textContentColor = Muted
-    )
-
-    if (importOpen) {
-        Dialog(onDismissRequest = { if (!importing) cancelDeckImport() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-            val maxImportDialogHeight = LocalConfiguration.current.screenHeightDp.dp * 0.86f
-            Surface(Modifier.fillMaxWidth(0.96f).heightIn(max = maxImportDialogHeight), shape = RoundedCornerShape(18.dp), color = Panel) {
-                Box(Modifier.fillMaxWidth().heightIn(max = maxImportDialogHeight)) {
-                    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text("${if (players[selectedPlayer].deckLoaded) "Replace deck for" else "Import deck for"} ${players[selectedPlayer].name}", color = SoftWhite, fontSize = 19.sp, modifier = Modifier.weight(1f))
-                            IconButton(onClick = { guidedAction("deck-cancel") { if (!importing) cancelDeckImport() } }, modifier = Modifier.size(44.dp).then(tutorialAnchor("deck-cancel"))) { Icon(Icons.Filled.Close, "Cancel deck import", tint = Muted) }
-                        }
-                        Text("Paste a deck list or choose a .txt/.csv file. Import replaces this player's deck.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-                        TextButton(onClick = { guidedAction("deck-load-saved") { savedDecksOpen = true } }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp).then(tutorialAnchor("deck-load-saved"))) { Text("SAVED DECKS Â· ${savedDecks.size}", color = Mint) }
-                        Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            OutlinedButton(onClick = { guidedAction("deck-choose-file") { filePicker.launch(arrayOf("text/*", "application/*")) } }, enabled = !importing && !randomDeckLoading, modifier = Modifier.weight(1f).heightIn(min = 48.dp).then(tutorialAnchor("deck-choose-file"))) { Text("CHOOSE FILE", fontSize = 9.sp) }
-                            OutlinedButton(
-                                onClick = { guidedAction("deck-random") {
-                                    randomDeckLoading = true
-                                    importError = null
-                                    scope.launch {
-                                        try {
-                                            importText = fetchRandomCommanderDecklist()
-                                            message = "Random Commander deck loaded. Review it, then tap Import."
-                                        } catch (error: Exception) {
-                                            importError = error.message ?: "Could not fetch a random deck. Check your connection and try again."
-                                        } finally { randomDeckLoading = false }
-                                    }
-                                } },
-                                enabled = !importing && !randomDeckLoading,
-                                modifier = Modifier.weight(1f).heightIn(min = 48.dp).then(tutorialAnchor("deck-random"))
-                            ) { Text(if (randomDeckLoading) "FETCHINGâ€¦" else "RANDOM DECK", fontSize = 9.sp, color = Mint) }
-                        }
-                        OutlinedTextField(
-                            value = importText,
-                            onValueChange = { importText = it; importError = null },
-                            modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 260.dp).padding(top = 6.dp),
-                            placeholder = { Text("1 Sol Ring\n36 Island\n...") },
-                            minLines = 5,
-                            maxLines = 10,
-                            enabled = !importing && !randomDeckLoading
-                        )
-                        if (importText.isNotBlank()) {
-                            val importedCardCount = remember(importText) { parseDeckList(importText).sumOf { it.count } }
-                            Text("${importedCardCount} cards in list Â· scroll inside the box to review", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
-                        }
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Checkbox(checked = importSaveToLibrary, onCheckedChange = { importSaveToLibrary = it }, enabled = !importing)
-                            Text("Save this imported deck for later", color = SoftWhite, fontSize = 11.sp)
-                        }
-                        if (importSaveToLibrary) OutlinedTextField(importSaveName, { importSaveName = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Saved deck name (optional)") }, enabled = !importing)
-                        importError?.let { Text(it, color = Color(0xFFFF9C91), fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp)) }
-                        if (importing) Text("Checking every card name against the card catalogâ€¦", color = Mint, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                            TextButton(onClick = { guidedAction("deck-cancel") { if (!importing) cancelDeckImport() } }, modifier = Modifier.heightIn(min = 48.dp).then(tutorialAnchor("deck-cancel"))) { Text("CANCEL", color = Muted) }
-                            Button(onClick = { guidedAction("deck-import") { importDeck(importText) } }, enabled = !importing && !randomDeckLoading, modifier = Modifier.heightIn(min = 48.dp).then(tutorialAnchor("deck-import"))) { Text(if (importing || randomDeckLoading) "LOADING" else "IMPORT") }
-                        }
-                    }
-                    tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "DECK_IMPORT" }?.let { step ->
-                        GuidedTutorialOverlay(step, tutorialIndex, tutorialStops.size, tutorialBounds[step.target], { goBackTutorial() }, { advanceTutorial() }, { markTutorialSeen(step.view); tutorialOpen = false })
-                    }
-                }
-            }
-        }
-    }
-
-    if (savedDecksOpen) SavedDecksDialog(
-        decks = savedDecks,
-        tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "SAVED_DECKS" },
-        tutorialIndex = tutorialIndex, tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
-        onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
-        onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
-        onLoad = { deck -> guidedAction("saved-load") {
-            if (onlineMode) selectedPlayer = localSeat
-            importText = deck.text
-            importError = null
-            importOpen = true
-            savedDecksOpen = false
-        } },
-        onDelete = { deck -> guidedAction("saved-delete") {
-            savedDecks = savedDecks.filterNot { it.name == deck.name && it.text == deck.text }
-            saveSavedDecks(context, savedDecks)
-        } },
-        onDismiss = { guidedAction("saved-close") { savedDecksOpen = false } }
-    )
-
-    if (importReviewOpen) {
-        val reviewPlayerIndex = selectedPlayer
-        val reviewPlayer = players.getOrNull(reviewPlayerIndex)
-        val cardsNeedingReview = reviewPlayer?.let { player ->
-            (player.library + player.hand + listOfNotNull(player.commanderCard))
-                .filter { it.id in importReviewCardIds && it.importIssue != null }
-                .distinctBy { it.id }
-        }.orEmpty()
-        AlertDialog(
-            onDismissRequest = { if (!importAutoFixInProgress) importReviewOpen = false },
-            title = { Text("Review imported cards") },
-            text = { Text(importReviewMessage, color = Muted, fontSize = 12.sp) },
-            confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    Row {
-                        if (cardsNeedingReview.isNotEmpty()) TextButton(
-                            enabled = !importAutoFixInProgress,
-                            onClick = {
-                                val groupedCards = cardsNeedingReview.groupBy { it.name }
-                                importAutoFixInProgress = true
-                                importReviewMessage = "Checking ${groupedCards.size} card ${if (groupedCards.size == 1) "name" else "names"} for close matchesâ€¦"
-                                scope.launch {
-                                    val fixedIds = mutableSetOf<Int>()
-                                    val matchedNames = mutableListOf<Pair<String, String>>()
-                                    val unresolvedNames = mutableListOf<String>()
-                                    var lookupFailures = 0
-                                    for ((name, copies) in groupedCards) {
-                                        val lookup = runCatching { Scryfall.fuzzyNamedCard(name) }
-                                        val candidate = lookup.getOrNull()?.takeIf {
-                                            cardNameSimilarity(name, it.name) >= 0.78
-                                        }
-                                        if (candidate == null) {
-                                            unresolvedNames += name
-                                            if (lookup.isFailure) lookupFailures++
-                                            continue
-                                        }
-                                        val ids = copies.mapTo(mutableSetOf()) { it.id }
-                                        updatePlayer(reviewPlayerIndex) { player ->
-                                            fun fix(card: GameCard) = if (card.id in ids) card.copy(
-                                                name = candidate.name,
-                                                type = candidate.type,
-                                                imageUrl = candidate.imageUrl,
-                                                oracleText = candidate.oracleText,
-                                                manaValue = candidate.manaValue,
-                                                importIssue = null,
-                                                artCropUrl = candidate.artCropUrl,
-                                                manaCost = candidate.manaCost,
-                                                power = candidate.power,
-                                                toughness = candidate.toughness,
-                                                keywords = candidate.keywords
-                                            ) else card
-                                            val commander = player.commanderCard?.let(::fix)
-                                            val commanderWasFixed = player.commanderCard?.id?.let(ids::contains) == true
-                                            player.copy(
-                                                library = player.library.map(::fix),
-                                                hand = player.hand.map(::fix),
-                                                commanderCard = commander,
-                                                commanderName = if (commanderWasFixed) commander?.name else player.commanderName
-                                            )
-                                        }
-                                        fixedIds += ids
-                                        matchedNames += name to candidate.name
-                                    }
-                                    importReviewCardIds = importReviewCardIds - fixedIds
-                                    val allReviewCardsFixed = unresolvedNames.isEmpty() && lookupFailures == 0
-                                    if (allReviewCardsFixed && importOverflowCardIds.isEmpty()) {
-                                        importReviewCardIds = emptySet()
-                                        importReviewOpen = false
-                                        message = "Auto Fix succeeded. All cards needing review were matched."
-                                    } else {
-                                        importReviewMessage = buildString {
-                                            if (matchedNames.isNotEmpty()) {
-                                                append("Auto Fix matched ${matchedNames.size} card ${if (matchedNames.size == 1) "name" else "names"} and updated ${fixedIds.size} flagged ${if (fixedIds.size == 1) "card" else "cards"}.")
-                                            } else if (lookupFailures == 0) {
-                                                append("Auto Fix couldnâ€™t identify the cards.")
-                                            }
-                                            if (unresolvedNames.isNotEmpty()) {
-                                                append("\n\nYouâ€™ll need to resolve these manually: ")
-                                                append(unresolvedNames.take(5).joinToString(", "))
-                                                if (unresolvedNames.size > 5) append(" and ${unresolvedNames.size - 5} more")
-                                                append(".")
-                                            }
-                                            if (lookupFailures > 0) append("\n\nCouldnâ€™t check $lookupFailures ${if (lookupFailures == 1) "name" else "names"}. Check your connection and try Auto Fix again.")
-                                            if (importOverflowCardIds.isNotEmpty()) append("\n\n${importOverflowCardIds.size} over-limit ${if (importOverflowCardIds.size == 1) "card remains" else "cards remain"}.")
-                                            if (unresolvedNames.isNotEmpty() || lookupFailures > 0) append("\n\nOpen Editor to resolve the remaining cards manually.")
-                                        }
-                                    }
-                                    importAutoFixInProgress = false
-                                }
-                            }
-                        ) { Text(if (importAutoFixInProgress) "FIXINGâ€¦" else "AUTO FIX", color = Mint) }
-                        if (importOverflowCardIds.isNotEmpty()) TextButton(
-                            enabled = !importAutoFixInProgress,
-                            onClick = {
-                                val overflow = importOverflowCardIds
-                                updatePlayer(reviewPlayerIndex) { p -> p.copy(hand = p.hand.filterNot { it.id in overflow }, library = p.library.filterNot { it.id in overflow }) }
-                                importReviewCardIds = importReviewCardIds - overflow
-                                importOverflowCardIds = emptySet()
-                                importReviewMessage = "Removed ${overflow.size} card(s) over the deck limit."
-                            }
-                        ) { Text("TRIM EXCESS", color = Mint) }
-                    }
-                    if (cardsNeedingReview.isNotEmpty()) TextButton(onClick = { if (!importAutoFixInProgress) { importReviewOpen = false; deckEditorOpen = true } }, enabled = !importAutoFixInProgress) {
-                        Text("OPEN EDITOR", color = Mint)
-                    }
-                }
-            },
-            dismissButton = { TextButton(onClick = { if (!importAutoFixInProgress) importReviewOpen = false }, enabled = !importAutoFixInProgress) { Text("LATER") } },
-            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
-        )
-    }
-
-    if (tokenPickerOpen) TokenPickerDialog(
-        onDismiss = { tokenPickerOpen = false },
-        onAdd = { token ->
-            val created = makeCard(token.name, token.type, token.imageUrl, token = true)
-            updatePlayer(tokenTarget) { it.copy(battlefield = it.battlefield + created) }
-            logAction(tokenTarget, "created a ${token.name} token")
-            applyCreatureEntryLifeEffects(tokenTarget, created)
-            tokenPickerOpen = false
-        }
-    )
-
-    counterTarget?.let { (playerIndex, cardId) ->
-        val card = players[playerIndex].battlefield.firstOrNull { it.id == cardId }
-        if (card != null) CounterPickerDialog(card, onDismiss = { counterTarget = null }, onAdd = { counter ->
-            updateCard(playerIndex, cardId) { current -> current.copy(counters = current.counters + (counter to ((current.counters[counter] ?: 0) + 1))) }
-            logAction(playerIndex, "put a $counter counter on ${card.name}")
-            counterTarget = null
-        })
-    }
-
-    preview?.let { item ->
-        CardPreviewPopup(item = item, onDismiss = { preview = null })
-    }
-
-    zoneDialog?.let { (index, zone) ->
-        val cards = when (zone) {
-            "Graveyard" -> players[index].graveyard
-            "Exile" -> players[index].exile
-            else -> players[index].revealed
-        }
-        CardZoneDialog(
-            zone, players[index].name, cards, onDismiss = { zoneDialog = null },
-            onPreview = { preview = CardPreview(index, it, fromHand = false, canManipulate = false) },
-            canMoveCards = zone in listOf("Graveyard", "Exile") && (!onlineMode || index == localSeat && !gameEndedOnline),
-            onMoveCard = { card, destination ->
-                val canControlZone = !onlineMode || index == localSeat && !gameEndedOnline
-                if (canControlZone && destination == "Command Zone" && card.id == players[index].commanderCard?.id) {
-                    updatePlayer(index) { p -> p.copy(graveyard = p.graveyard.filterNot { it.id == card.id }, exile = p.exile.filterNot { it.id == card.id }, revealed = p.revealed.filterNot { it.id == card.id }, commanderCard = card, commanderName = card.name) }
-                    logAction(index, "moved ${card.name} to the command zone")
-                } else if (canControlZone) {
-                    updatePlayer(index) { p ->
-                        val sourceCards = when (zone) {
-                            "Graveyard" -> p.graveyard
-                            "Exile" -> p.exile
-                            else -> p.revealed
-                        }
-                        if (sourceCards.none { it.id == card.id }) p else {
-                            val withoutCard = when (zone) {
-                                "Graveyard" -> p.copy(graveyard = p.graveyard.filterNot { it.id == card.id })
-                                "Exile" -> p.copy(exile = p.exile.filterNot { it.id == card.id })
-                                else -> p.copy(revealed = p.revealed.filterNot { it.id == card.id })
-                            }
-                            when (destination) {
-                                "Hand" -> withoutCard.copy(hand = withoutCard.hand + card)
-                                "Battlefield" -> withoutCard.copy(battlefield = withoutCard.battlefield + card.copy(tapped = false))
-                                "Library (top)" -> withoutCard.copy(library = listOf(card) + withoutCard.library)
-                                "Library (bottom)" -> withoutCard.copy(library = withoutCard.library + card)
-                                "Graveyard" -> withoutCard.copy(graveyard = withoutCard.graveyard + card)
-                                "Exile" -> withoutCard.copy(exile = withoutCard.exile + card)
-                                "Revealed" -> withoutCard.copy(revealed = withoutCard.revealed + card)
-                                else -> p
-                            }
-                        }
-                    }
-                    val destinationLabel = if (destination == "Library (top)") "the top of the library" else if (destination == "Library (bottom)") "the bottom of the library" else destination.lowercase()
-                    logAction(index, "moved ${card.name} from ${zone.lowercase()} to $destinationLabel")
-                    if (destination == "Battlefield" && needsCreatureTypeChoice(card)) creatureTypeChoicePrompt = CreatureTypeChoicePrompt(index, card.id, card.name)
-                    if (destination == "Battlefield") applyCreatureEntryLifeEffects(index, card)
-                }
-            },
-            commanderId = players[index].commanderCard?.id,
-            canMoveCommander = !onlineMode || index == localSeat && !gameEndedOnline
-        )
-    }
-
-    if (message != null) AlertDialog(onDismissRequest = { message = null }, title = { Text("Arcana Table") }, text = { Text(message!!) }, confirmButton = { TextButton(onClick = { message = null }) { Text("OK") } }, containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted)
-
-    if (logOpen) GameLogDialog(
-        entries = gameLog,
-        previewableCards = players.flatMapIndexed { index, player ->
-            (player.battlefield + player.graveyard + player.exile + player.revealed.filterNot { it.isFaceDown } + listOfNotNull(player.commanderCard))
-                .filterNot { it.isFaceDown }.map { index to it }
-        },
-        onPreviewCard = { owner, card -> preview = CardPreview(owner, card, fromHand = false, canManipulate = false) },
-        tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "GAME_LOG" },
-        tutorialIndex = tutorialIndex, tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
-        onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
-        onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
-        onDismiss = { guidedAction("log-close") { logOpen = false } }
-    )
-    if (rulesOpen) RulesLookupDialog(onDismiss = { rulesOpen = false })
-    AnimatedVisibility(
-        visible = chatOpen,
-        modifier = Modifier.fillMaxSize(),
-        enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
-        exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
-    ) {
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.28f)).clickable { chatOpen = false }, contentAlignment = Alignment.CenterEnd) {
-            LocalChatPanel(
-                players = players, activePlayer = if (onlineMode) localSeat else activePlayer, messages = chatMessages, draft = chatDraft,
-                modifier = Modifier.fillMaxHeight().fillMaxWidth(0.88f).clickable(enabled = false) {},
-                tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "CHAT" },
-                tutorialIndex = tutorialIndex, tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
-                onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
-                onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
-                onDraft = { chatDraft = it }, onDismiss = { guidedAction("chat-close") { chatOpen = false } }, onSend = { guidedAction("chat-send") {
-            val text = chatDraft.trim()
-            if (text.isNotEmpty()) {
-                val speaker = if (onlineMode) localSeat else activePlayer
-                chatMessages = chatMessages + ChatMessage(players[speaker.coerceIn(players.indices)].name, text, formatClock(elapsedGameSeconds))
-                logAction(speaker, "sent a chat message")
-                chatDraft = ""
-            }
-                } }
-            )
-        }
-    }
-
-    if (optionsOpen) OptionsPage(
-        tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "OPTIONS" },
-        tutorialIndex = tutorialIndex, tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
-        onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
-        onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
-        darkMode = darkMode, timerRunning = turnTimerRunning, timerVisible = turnTimerVisible,
-        backgroundAlertsEnabled = backgroundAlertsEnabled,
-        autoReturnTableAfterPass = autoReturnTableAfterPass, autoDrawOnDrawStep = autoDrawOnDrawStep,
-        autoUntapOnUntapStep = autoUntapOnUntapStep, openHandAfterDraw = openHandAfterDraw,
-        reducedSwipeMotion = reducedSwipeMotion, cardSizeScale = cardSizeScale,
-        onOpenLayoutLab = { guidedAction("options-layout-lab") { optionsOpen = false; layoutLabOpen = true } },
-        onToggleTheme = { guidedAction("options-theme") { onToggleTheme() } },
-        onToggleTimerVisibility = { guidedAction("options-timer") { turnTimerVisible = !turnTimerVisible } },
-        onToggleBackgroundAlerts = { enabled -> guidedAction("options-alerts") { setBackgroundAlerts(enabled) } },
-        onAutoReturnTable = { value -> guidedAction("options-return-table") { autoReturnTableAfterPass = value; optionPrefs.edit().putBoolean("auto_return_table", value).apply() } },
-        onAutoDraw = { value -> guidedAction("options-auto-draw") { autoDrawOnDrawStep = value; optionPrefs.edit().putBoolean("auto_draw_step", value).apply() } },
-        onAutoUntap = { value -> guidedAction("options-auto-untap") { autoUntapOnUntapStep = value; optionPrefs.edit().putBoolean("auto_untap_step", value).apply() } },
-        onOpenHandAfterDraw = { value -> guidedAction("options-open-hand") { openHandAfterDraw = value; optionPrefs.edit().putBoolean("open_hand_after_draw", value).apply() } },
-        onReducedMotion = { value -> guidedAction("options-motion") { reducedSwipeMotion = value; optionPrefs.edit().putBoolean("reduced_swipe_motion", value).apply() } },
-        onCardSizeScale = { value -> guidedAction("options-card-size") { cardSizeScale = value; optionPrefs.edit().putFloat("card_size_scale", value).putFloat("layout_card_size_$layoutOrientationSuffix", value).apply() } },
-        onOpenDeveloperOptions = { guidedAction("options-developer") { optionsOpen = false; developerOptionsOpen = true } },
-        onClearAllData = { guidedAction("clear-data") { optionsOpen = false; clearAllConfirmOpen = true } },
-        onDismiss = { guidedAction("options-close") { optionsOpen = false } }
-    )
-    if (layoutLabOpen) LayoutLabPage(
-        orientationName = if (isLandscape) "LANDSCAPE" else "PORTRAIT",
-        cardSizeScale = cardSizeScale,
-        boardSpacingScale = boardSpacingScale,
-        handSheetHeightFraction = handSheetHeightFraction,
-        footerButtonScale = footerButtonScale,
-        playerSectionOrder = playerSectionOrderRaw.split('|').filter(String::isNotBlank),
-        handActionOrder = handActionOrderRaw.split('|').filter(String::isNotBlank),
-        onCardSizeScale = { value -> cardSizeScale = value.coerceIn(0.82f, 1.18f); optionPrefs.edit().putFloat("card_size_scale", cardSizeScale).putFloat("layout_card_size_$layoutOrientationSuffix", cardSizeScale).apply() },
-        onBoardSpacingScale = { value -> boardSpacingScale = value.coerceIn(0.5f, 2f); optionPrefs.edit().putFloat("layout_board_spacing_$layoutOrientationSuffix", boardSpacingScale).apply() },
-        onHandSheetHeightFraction = { value -> handSheetHeightFraction = value.coerceIn(0.38f, 0.95f); optionPrefs.edit().putFloat("hand_sheet_height_fraction", handSheetHeightFraction).putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction).apply() },
-        onFooterButtonScale = { value -> footerButtonScale = value.coerceIn(0.9f, 1.3f); optionPrefs.edit().putFloat("layout_footer_button_scale_$layoutOrientationSuffix", footerButtonScale).apply() },
-        onPlayerSectionOrder = { order -> playerSectionOrderRaw = order.joinToString("|"); optionPrefs.edit().putString("layout_player_sections_$layoutOrientationSuffix", playerSectionOrderRaw).apply() },
-        onHandActionOrder = { order -> handActionOrderRaw = order.joinToString("|"); optionPrefs.edit().putString("layout_hand_actions_$layoutOrientationSuffix", handActionOrderRaw).apply() },
-        onReset = {
-            cardSizeScale = 1f; boardSpacingScale = 1f
-            handSheetHeightFraction = 0.52f; footerButtonScale = 1f
-            playerSectionOrderRaw = "STATUS|COMMANDER|STEP|ZONES|REVEALED|BATTLEFIELD"
-            handActionOrderRaw = "DRAW|REVEAL|STACK|CAST_COMMANDER|COMBAT|NEXT_STEP|PASS_TURN|MORE"
-            optionPrefs.edit()
-                .putFloat("card_size_scale", cardSizeScale)
-                .putFloat("layout_card_size_$layoutOrientationSuffix", cardSizeScale)
-                .putFloat("layout_board_spacing_$layoutOrientationSuffix", boardSpacingScale)
-                .putFloat("hand_sheet_height_fraction", handSheetHeightFraction)
-                .putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction)
-                .putFloat("layout_footer_button_scale_$layoutOrientationSuffix", footerButtonScale)
-                .putString("layout_player_sections_$layoutOrientationSuffix", playerSectionOrderRaw)
-                .putString("layout_hand_actions_$layoutOrientationSuffix", handActionOrderRaw)
-                .apply()
-        },
-        onDismiss = { layoutLabOpen = false; optionsOpen = true }
-    )
-    if (developerOptionsOpen) DeveloperOptionsPage(
-        players = players,
-        selectedPlayer = selectedPlayer,
-        onSelectPlayer = { index -> selectedPlayer = index; showOverview = false; developerOptionsOpen = false },
-        onLoadRandomDecks = { makeRandomDecks(); developerOptionsOpen = false },
-        onRandomizeMidgame = { randomizeMidgame(); developerOptionsOpen = false },
-        onOpenWalkthrough = { startTutorial() },
-        onDismiss = { developerOptionsOpen = false }
-    )
-
-    if (resetConfirmOpen) AlertDialog(
-        onDismissRequest = { resetConfirmOpen = false },
-        title = { Text("Reset this game?") },
-        text = { Text("This will shuffle each player's non-token cards into a new library, deal a new opening hand, reset life and timers, and clear the current board and game log. Player names, decks, and commanders will stay.") },
-        confirmButton = { TextButton(onClick = { resetGame() }) { Text("RESET GAME", color = Color(0xFFE9978B)) } },
-        dismissButton = { TextButton(onClick = { resetConfirmOpen = false }) { Text("CANCEL") } }
-    )
-
-    if (onlineMode && endProposalBy >= 0 && localSeat !in endVotes && !gameEndedOnline) {
-        val proposer = players.getOrNull(endProposalBy)?.name ?: "A player"
-        AlertDialog(
-            onDismissRequest = { submitEndVote(false) },
-            title = { Text("End this game?") },
-            text = { Text("$proposer proposes ending the game. Everyone must agree. If you decline, the game continues.") },
-            confirmButton = { TextButton(onClick = { submitEndVote(true) }) { Text("AGREE TO END", color = Mint) } },
-            dismissButton = { TextButton(onClick = { submitEndVote(false) }) { Text("KEEP PLAYING", color = SoftWhite) } },
-            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
-        )
-    }
-    if (onlineMode && gameEndedOnline) AlertDialog(
-        onDismissRequest = {},
-        title = { Text("Game ended by unanimous vote") },
-        text = { Text("Every player agreed to end the game. The table is now read-only.") },
-        confirmButton = { TextButton(onClick = { homeOpen = true; showOverview = true; lobbyOpen = true }) { Text("ROOM LOBBY", color = Mint) } },
-        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
-    )
-
-    if (clearAllConfirmOpen) AlertDialog(
-        onDismissRequest = { clearAllConfirmOpen = false },
-        title = { Text("Clear all app data?") },
-        text = { Text("This clears the current game, room, chat, logs, and game settings. The Internet room URL resets to your default. Saved decks and tutorial progress are kept.") },
-        confirmButton = { TextButton(onClick = { clearAllData() }) { Text("CLEAR EVERYTHING", color = Color(0xFFE9978B)) } },
-        dismissButton = { TextButton(onClick = { clearAllConfirmOpen = false }) { Text("CANCEL") } },
-        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
-    )
-
-    if (manaPoolOpen) ManaPoolDialog(
-        player = players.getOrNull(manaTarget) ?: players.first(),
-        onChange = { color, delta -> changeMana(manaTarget, color, delta) },
-        onClear = { clearMana(manaTarget) },
-        onDismiss = { manaPoolOpen = false }
-    )
-
-    landEntryPrompt?.let { prompt ->
-        val life = players.getOrNull(prompt.playerIndex)?.life ?: 0
-        fun placeLand(enterTapped: Boolean, payTwoLife: Boolean = false) {
-            val playerIndex = prompt.playerIndex
-            if (playerIndex in players.indices) {
-                updatePlayer(playerIndex) { player ->
-                    player.copy(
-                        life = if (payTwoLife) player.life - 2 else player.life,
-                        hand = player.hand.filterNot { it.id == prompt.card.id },
-                        battlefield = player.battlefield + prompt.card.copy(tapped = enterTapped)
-                    )
-                }
-                logAction(playerIndex, "played ${prompt.card.name}${if (payTwoLife) " and paid 2 life" else if (enterTapped) " tapped" else " untapped"}")
-                if (needsCreatureTypeChoice(prompt.card)) creatureTypeChoicePrompt = CreatureTypeChoicePrompt(playerIndex, prompt.card.id, prompt.card.name)
-            }
-            landEntryPrompt = null
-        }
-        AlertDialog(
-            onDismissRequest = { landEntryPrompt = null },
-            title = { Text(if (prompt.isShockLand) "Pay 2 life for ${prompt.card.name}?" else "How should ${prompt.card.name} enter?") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (prompt.conditionText.isNotBlank()) Text(prompt.conditionText, color = Muted)
-                    if (prompt.isShockLand) Text("Pay 2 life to have it enter untapped, or let it enter tapped.", color = SoftWhite)
-                    else Text("Choose the entry state. Check the condition above; Arcana will track the tapped state you choose.", color = SoftWhite)
-                }
-            },
-            confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    if (prompt.isShockLand) TextButton(onClick = { placeLand(enterTapped = false, payTwoLife = true) }, enabled = life >= 2) {
-                        Text("PAY 2 LIFE Â· ENTER UNTAPPED", color = if (life >= 2) Mint else Muted)
-                    } else TextButton(onClick = { placeLand(enterTapped = false) }) {
-                        Text("ENTER UNTAPPED", color = Mint)
-                    }
-                    TextButton(onClick = { placeLand(enterTapped = true) }) { Text("ENTER TAPPED", color = Mint) }
-                }
-            },
-            dismissButton = { TextButton(onClick = { landEntryPrompt = null }) { Text("CANCEL", color = Muted) } },
-            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
-        )
-    }
-
-    paymentCard?.let { (owner, card) ->
-        val commanderCast = players.getOrNull(owner)?.commanderCard?.id == card.id
-        val tax = if (commanderCast) (players.getOrNull(owner)?.commanderCastCount ?: 0) * 2 else 0
-        val payable = paySimpleManaCost(players.getOrNull(owner)?.manaPool.orEmpty(), card.manaCost, tax)
-        val costKnown = card.manaCost != null
-        AlertDialog(
-            onDismissRequest = { paymentCard = null; handActionCard = null },
-            title = { Text(if (commanderCast) "Cast commander?" else "Cast ${if (card.isFaceDown) "face down" else card.name}?") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text("Mana cost:")
-                    if (card.manaCost.isNullOrBlank()) Text("unknown") else ManaCostPips(card.manaCost.orEmpty())
-                    if (tax > 0) Text("+ $tax commander tax")
-                }
-                    Text("Tracked pool: ${players.getOrNull(owner)?.manaPool?.entries?.joinToString { (color, amount) -> "${color} $amount" }?.ifBlank { "empty" } ?: "empty"}", color = Muted)
-                    if (!costKnown) Text("No parsed mana cost is available. Use manual payment after checking the card.", color = CounterGold)
-                    else if (!supportsSimpleManaCost(card.manaCost)) Text("This cost uses hybrid, phyrexian, X, or other special symbols. Review and pay it manually.", color = CounterGold)
-                    else if (payable == null) Text("The tracked pool does not have the required colored and generic mana.", color = CounterGold)
-                }
-            },
-            confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    TextButton(onClick = { castFromPayment(owner, card, commanderCast) }, enabled = payable != null && costKnown) { Text("PAY FROM MANA POOL", color = if (payable != null && costKnown) Mint else Muted) }
-                    TextButton(onClick = { castFromPayment(owner, card, commanderCast, manualPayment = true) }) { Text("I PAID MANUALLY", color = CounterGold) }
-                }
-            },
-            dismissButton = { TextButton(onClick = { paymentCard = null; handActionCard = null }) { Text("CANCEL") } },
-            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = SoftWhite
-        )
-    }
-
-    if (stackOpen) StackPriorityDialog(
-        players = players, stack = stackActions, priorityPlayer = priorityPlayer, passedCount = priorityPassed.size,
-        eligibleCount = players.count { !it.isEliminated }, canResolve = stackActions.isNotEmpty() && stackActions.none { !it.targetsConfirmed } && players.filterNot { it.isEliminated }.all { it.id in priorityPassed },
-        canAct = !gameEndedOnline && stackActions.none { !it.targetsConfirmed } && players.getOrNull(priorityPlayer)?.isEliminated == false && (if (onlineMode) priorityPlayer == localSeat else priorityPlayer == selectedPlayer),
-        tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "STACK" }, tutorialIndex = tutorialIndex,
-        tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
-        onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
-        onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
-        onPreviewCard = { action, card ->
-            val ownerIndex = players.indexOfFirst { it.id == action.controllerId }.coerceAtLeast(0)
-            preview = CardPreview(ownerIndex, card, fromHand = false, canManipulate = false)
-        },
-        onStackItemTap = { guidedAction("stack-item") {} },
-        onCastFromHand = { guidedAction("stack-cast") {
-            selectedPlayer = if (onlineMode) localSeat else priorityPlayer
-            showOverview = false
-            showHand = true
-            stackOpen = false
-        } },
-        onAddTrigger = { title -> guidedAction("stack-add") { stackActions = stackActions + StackAction(title = title, controllerId = players.getOrNull(priorityPlayer)?.id.orEmpty(), kind = "TRIGGER"); priorityPassed = emptySet() } },
-        onPassPriority = { guidedAction("stack-pass") {
-            val currentId = players.getOrNull(priorityPlayer)?.id
-            if (currentId != null) priorityPassed = priorityPassed + currentId
-            priorityPlayer = nextTurnIndex(priorityPlayer, gameTurnOrder, players.size, players.indices.filterNot { players[it].isEliminated }.toSet())
-        } },
-        onResolve = { guidedAction("stack-resolve") { resolveTopOfStack() } },
-        onDismiss = { guidedAction("stack-close") { stackOpen = false } }
-    )
-
-    val targetSelectionItem = stackActions.firstOrNull { it.id == targetSelectionStackItemId }
-    targetSelectionItem?.let { item ->
-        val controllerIndex = players.indexOfFirst { it.id == item.controllerId }.coerceAtLeast(0)
-        TargetSelectionDialog(
-            stackItem = item,
-            candidates = buildTargetCandidates(players, stackActions, item.id, players.getOrNull(controllerIndex)?.id.orEmpty()),
-            onConfirm = { selectedTargets ->
-                stackActions = stackActions.map { current -> if (current.id == item.id) current.copy(targets = selectedTargets, targetsConfirmed = true) else current }
-                logAction(controllerIndex, "chose ${selectedTargets.size} target${if (selectedTargets.size == 1) "" else "s"} for ${item.title}")
-                targetSelectionStackItemId = null
-                if (stackActions.none { !it.targetsConfirmed && it.targetCount != null }) {
-                    stackOpen = true
-                    pendingStackOpen = false
-                }
-            }
-        )
-    }
-
-    if (trackerPlayer in players.indices) PlayerTrackerDialog(
-        player = players[trackerPlayer], players = players, playerIndex = trackerPlayer,
-        onUpdate = { updated ->
-            val target = trackerPlayer
-            updatePlayer(target) { updated }
-            if (!players[target].isEliminated && (updated.playerCounters["Poison"] ?: 0) >= 10) eliminatePlayer(target, "10 poison counters")
-        },
-        onDismiss = { trackerPlayer = -1 }
-    )
-
-    if (concedePlayer in players.indices) AlertDialog(
-        onDismissRequest = { concedePlayer = -1 },
-        title = { Text("Concede and leave the game?") },
-        text = { Text("${players[concedePlayer].name} will be marked eliminated and cannot take further game actions. This does not close the room for other players.") },
-        confirmButton = { TextButton(onClick = { concede(concedePlayer); concedePlayer = -1 }) { Text("CONCEDE", color = Color(0xFFE9978B)) } },
-        dismissButton = { TextButton(onClick = { concedePlayer = -1 }) { Text("CANCEL") } },
-        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
-    )
-
-    if (shuffleConfirmPlayer in players.indices) AlertDialog(
-        onDismissRequest = { shuffleConfirmPlayer = -1 },
-        title = { Text("Shuffle library?") },
-        text = { Text("This will randomize ${players[shuffleConfirmPlayer].name}â€™s library order.") },
-        confirmButton = {
-            TextButton(onClick = {
-                val target = shuffleConfirmPlayer
-                shuffleConfirmPlayer = -1
-                updatePlayer(target) { it.copy(library = it.library.shuffled()) }
-                logAction(target, "shuffled their library")
-            }) { Text("SHUFFLE") }
-        },
-        dismissButton = { TextButton(onClick = { shuffleConfirmPlayer = -1 }) { Text("CANCEL") } },
-        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
-    )
-
-    if (tutorialOpen && !lobbyOpen && !optionsOpen && !layoutLabOpen && !developerOptionsOpen && !stackOpen && !chatOpen && !logOpen && !importOpen && !savedDecksOpen && !deckEditorOpen && handActionCard == null) {
-        val step = tutorialStops.getOrNull(tutorialIndex)
-        if (step != null && step.view == currentTutorialView()) {
-            GuidedTutorialOverlay(
-                step = step, index = tutorialIndex, total = tutorialStops.size,
-                targetBounds = tutorialBounds[step.target],
-                onBack = { goBackTutorial() },
-                onNext = { advanceTutorial() },
-                onExit = { markTutorialSeen(step.view); tutorialOpen = false }
-            )
-        }
-    }
-
-    if (librarySearchPlayer in players.indices) {
-        val owner = librarySearchPlayer
-        LibrarySearchDialog(
-            player = players[owner],
-            onPreview = { preview = CardPreview(owner, it, fromHand = false, canManipulate = false) },
-            onTakeToHand = { card -> updatePlayer(owner) { p -> p.copy(library = p.library.filterNot { it.id == card.id }, hand = p.hand + card) }; logAction(owner, "found ${card.name} and put it into hand") },
-            onPutBattlefield = { card ->
-                updatePlayer(owner) { p -> p.copy(library = p.library.filterNot { it.id == card.id }, battlefield = p.battlefield + card) }
-                logAction(owner, "found ${card.name} and put it onto the battlefield")
-                if (needsCreatureTypeChoice(card)) creatureTypeChoicePrompt = CreatureTypeChoicePrompt(owner, card.id, card.name)
-                applyCreatureEntryLifeEffects(owner, card)
-            },
-            onPutGraveyard = { card -> updatePlayer(owner) { p -> p.copy(library = p.library.filterNot { it.id == card.id }, graveyard = p.graveyard + card) }; logAction(owner, "found ${card.name} and put it into the graveyard") },
-            onPutExile = { card -> updatePlayer(owner) { p -> p.copy(library = p.library.filterNot { it.id == card.id }, exile = p.exile + card) }; logAction(owner, "found ${card.name} and exiled it") },
-            onMoveToTop = { card -> updatePlayer(owner) { p -> p.copy(library = listOf(card) + p.library.filterNot { it.id == card.id }) }; logAction(owner, "put ${card.name} on top of the library") },
-            onMoveToBottom = { card -> updatePlayer(owner) { p -> p.copy(library = p.library.filterNot { it.id == card.id } + card) }; logAction(owner, "put ${card.name} on the bottom of the library") },
-            onShuffle = { updatePlayer(owner) { it.copy(library = it.library.shuffled()) }; logAction(owner, "shuffled their library") },
-            onDismiss = { librarySearchPlayer = -1 }
-        )
-    }
-
-    manaChoicePrompt?.let { prompt ->
-        AlertDialog(
-            onDismissRequest = { manaChoicePrompt = null },
-            title = { Text("Choose mana Â· ${prompt.cardName}") },
-            text = { Text("Which mana did this permanent produce?") },
-            confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    prompt.options.forEach { option ->
-                        TextButton(onClick = {
-                            updatePlayer(prompt.playerIndex) { player ->
-                                player.copy(manaPool = player.manaPool.toMutableMap().apply {
-                                    option.pool.forEach { (color, count) -> put(color, ((get(color) ?: 0) + count).coerceAtMost(99)) }
-                                })
-                            }
-                            logAction(prompt.playerIndex, "added ${option.label} mana")
-                            manaChoicePrompt = null
-                        }, modifier = Modifier.heightIn(min = 44.dp)) {
-                            ManaSymbolText(option.label, color = Mint, fontSize = 14.sp)
-                        }
-                    }
-                }
-            },
-            dismissButton = { TextButton(onClick = { manaChoicePrompt = null }) { Text("CANCEL", color = Muted) } },
-            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
-        )
-    }
-
-    val visibleTriggerPrompt = if (onlineMode) triggerPrompts.firstOrNull {
-        it.controllerIndex == localSeat || (roomHost != null && players.getOrNull(it.controllerIndex)?.isComputer == true)
-    } else triggerPrompts.firstOrNull()
-    creatureTypeChoicePrompt?.let { prompt ->
-        CreatureTypeChoiceDialog(
-            cardName = prompt.cardName,
-            onConfirm = { chosenType ->
-                updatePlayer(prompt.playerIndex) { player ->
-                    player.copy(battlefield = player.battlefield.map { card ->
-                        if (card.id == prompt.cardId) card.copy(chosenCreatureType = chosenType) else card
-                    })
-                }
-                logAction(prompt.playerIndex, "chose $chosenType for ${prompt.cardName}")
-                creatureTypeChoicePrompt = null
-            }
-        )
-    }
-
-    if (!manaPoolOpen && manaChoicePrompt == null && creatureTypeChoicePrompt == null) visibleTriggerPrompt?.let { prompt ->
-        val payment = when (prompt.kind) { "RHYSTIC" -> 1; "TITHE" -> 2; else -> 0 }
-        val canPay = payment == 0 || trackedMana(prompt.eventPlayerIndex) >= payment
-        val targetCandidates = players.indices.filter { target ->
-            !players[target].isEliminated && (prompt.targetRule != "OPPONENT" || target != prompt.controllerIndex)
-        }
-        var selectedTriggerTarget by remember(prompt.cardName, prompt.controllerIndex, prompt.eventPlayerIndex, prompt.kind, prompt.effectText) { mutableIntStateOf(-1) }
-        val promptText = when (prompt.kind) {
-            "RHYSTIC" -> "${players[prompt.eventPlayerIndex].name} cast a spell. Pay {1} for ${prompt.cardName}, or let ${players[prompt.controllerIndex].name} draw a card?"
-            "TITHE" -> "${players[prompt.eventPlayerIndex].name} drew a card. Pay {2} for ${prompt.cardName}, or create a Treasure for ${players[prompt.controllerIndex].name}?"
-            "AUTO_EFFECT" -> "${prompt.cardName} triggered: ${prompt.triggerText}. The app can apply this effect: ${prompt.effectText}"
-            "TARGET_EFFECT" -> "${prompt.cardName} triggered: ${prompt.triggerText}. Choose a target for: ${prompt.effectText}"
-            else -> "${prompt.cardName} triggered: ${prompt.triggerText}. Choose any modes, targets, and other decisions on the card, resolve it manually, then confirm. Effect: ${prompt.effectText}"
-        }
-        AlertDialog(
-            onDismissRequest = { if (prompt.kind == "RHYSTIC" || prompt.kind == "TITHE") resolveTrigger(prompt, paid = false) },
-            title = { Text(if (prompt.kind == "RHYSTIC" || prompt.kind == "TITHE") "Triggered choice Â· ${prompt.cardName}" else "Triggered ability Â· ${prompt.cardName}") },
-            text = { Column {
-                Text(promptText, color = SoftWhite)
-                if (prompt.targetRule != null) {
-                    Text("TARGET", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
-                    targetCandidates.forEach { target ->
-                        TextButton(onClick = { selectedTriggerTarget = target }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp)) {
-                            Text("${if (selectedTriggerTarget == target) "âœ“ " else ""}${players[target].name}", color = if (selectedTriggerTarget == target) Mint else SoftWhite, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                }
-                if (payment > 0) {
-                    Text("Tracked mana for ${players.getOrNull(prompt.eventPlayerIndex)?.name ?: "player"}: ${trackedMana(prompt.eventPlayerIndex)}", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
-                    if (!canPay) Text("Paying is unavailable until enough mana is tracked.", color = CounterGold, fontSize = 10.sp)
-                    TextButton(onClick = { manaTarget = prompt.eventPlayerIndex; manaPoolOpen = true }, modifier = Modifier.heightIn(min = 42.dp)) { Text("UPDATE MANA POOL", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
-                }
-            } },
-            confirmButton = {
-                val enabled = when (prompt.kind) {
-                    "RHYSTIC", "TITHE" -> canPay
-                    "TARGET_EFFECT" -> selectedTriggerTarget in targetCandidates
-                    "MANUAL" -> prompt.targetRule == null || selectedTriggerTarget in targetCandidates
-                    else -> true
-                }
-                TextButton(onClick = { resolveTrigger(prompt, paid = prompt.kind == "RHYSTIC" || prompt.kind == "TITHE", targetIndex = selectedTriggerTarget.takeIf { it >= 0 }) }, enabled = enabled) {
-                    Text(when (prompt.kind) {
-                        "RHYSTIC" -> "PAY {1}"
-                        "TITHE" -> "PAY {2}"
-                        "AUTO_EFFECT" -> "RESOLVE EFFECT"
-                        "TARGET_EFFECT" -> "APPLY TO TARGET"
-                        else -> "DONE Â· MANUAL RESOLUTION"
-                    }, color = if (enabled) Mint else Muted)
-                }
-            },
-            dismissButton = {
-                when (prompt.kind) {
-                    "RHYSTIC" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("DRAW CARD") }
-                    "TITHE" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("CREATE TREASURE") }
-                    "AUTO_EFFECT", "TARGET_EFFECT" -> TextButton(onClick = { resolveTrigger(prompt, paid = false, targetIndex = selectedTriggerTarget.takeIf { it >= 0 }, manual = true) }) { Text("RESOLVE MANUALLY", color = Muted) }
-                }
-            },
-            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
-        )
-    }
-            }
-        }
-        TableOverlays()
-        SnackbarHost(
-            hostState = automaticActionSnackbar,
-            modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 12.dp, vertical = 4.dp),
-            snackbar = { data -> Snackbar(snackbarData = data, containerColor = PanelLight, contentColor = SoftWhite) }
-        )
-}
-}
-
-private fun samplePlayers(): List<TablePlayer> {
-    val one = listOf(
-        GameCard(1, "Sol Ring", "Artifact", Color(0xFF9F8C63)),
-        GameCard(2, "Arcane Signet", "Artifact", Color(0xFF8D8C9E)),
-        GameCard(3, "Command Tower", "Land", Color(0xFF6C9A75)),
-        GameCard(4, "Sai, Master Thopterist", "Creature Â· 1/4", Color(0xFF547D9A))
-    )
-    val two = listOf(
-        GameCard(11, "Forest", "Land", Color(0xFF496B4F), tapped = true),
-        GameCard(12, "Llanowar Elves", "Creature Â· 1/1", Color(0xFF596C4B)),
-        GameCard(13, "Cultivate", "Sorcery", Color(0xFF756348))
-    )
-    return listOf(
-        TablePlayer("YOU", library = List(92) { GameCard(100 + it, "Face-down card", "", Color(0xFF263B35)) }, hand = List(7) { GameCard(200 + it, "Face-down card", "", Color(0xFF263B35)) }, battlefield = one),
-        TablePlayer("PLAYER 2", library = List(92) { GameCard(300 + it, "Face-down card", "", Color(0xFF263B35)) }, hand = List(7) { GameCard(400 + it, "Face-down card", "", Color(0xFF263B35)) }, battlefield = two)
-    )
-}
-
-private data class CardPreview(val playerIndex: Int, val card: GameCard, val fromHand: Boolean, val canManipulate: Boolean = true)
-@Composable
-private fun LibrarySearchDialog(
-    player: TablePlayer,
-    onPreview: (GameCard) -> Unit,
-    onTakeToHand: (GameCard) -> Unit,
-    onPutBattlefield: (GameCard) -> Unit,
-    onPutGraveyard: (GameCard) -> Unit,
-    onPutExile: (GameCard) -> Unit,
-    onMoveToTop: (GameCard) -> Unit,
-    onMoveToBottom: (GameCard) -> Unit,
-    onShuffle: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    var query by remember { mutableStateOf("") }
-    var selectedCardId by remember { mutableIntStateOf(-1) }
-    val matches = remember(player.library, query) {
-        player.library.withIndex().filter { (_, card) ->
-            query.isBlank() || card.name.contains(query.trim(), ignoreCase = true) || card.type.contains(query.trim(), ignoreCase = true) || card.oracleText.orEmpty().contains(query.trim(), ignoreCase = true)
-        }
-    }
-    val selected = player.library.firstOrNull { it.id == selectedCardId }
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
-    ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.92f),
-            shape = RoundedCornerShape(16.dp),
-            color = Panel
-        ) {
-            Column(Modifier.padding(12.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("${player.name} Â· LIBRARY", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
-                        Text("${player.library.size} cards Â· library order", color = Muted, fontSize = 10.sp)
-                    }
-                    TextButton(onClick = onShuffle, modifier = Modifier.heightIn(min = 44.dp)) { Text("SHUFFLE", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close library", tint = Muted) }
-                }
-                OutlinedTextField(
-                    value = query,
-                    onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 6.dp),
-                    singleLine = true,
-                    label = { Text("Search name, type, or rules text") },
-                    placeholder = { Text("Blank search shows the full library") }
-                )
-                if (selected != null) {
-                    Text("SELECTED Â· ${selected.name}", color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                        listOf(
-                            "TO HAND" to onTakeToHand,
-                            "TO BATTLEFIELD" to onPutBattlefield,
-                            "TO GRAVEYARD" to onPutGraveyard,
-                            "EXILE" to onPutExile,
-                            "TOP" to onMoveToTop,
-                            "BOTTOM" to onMoveToBottom
-                        ).forEach { (label, action) ->
-                            TextButton(onClick = { action(selected); selectedCardId = -1 }, modifier = Modifier.heightIn(min = 44.dp)) {
-                                Text(label, color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                            }
-                        }
-                    }
-                } else {
-                    Text("Select a card to move it. Long press a card to inspect it.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(vertical = 5.dp))
-                }
-                HorizontalDivider(color = PanelLight)
-                when {
-                    player.library.isEmpty() -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { Text("Library is empty", color = Muted) }
-                    matches.isEmpty() -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { Text("No matching cards", color = Muted) }
-                    else -> LazyColumn(
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        contentPadding = PaddingValues(vertical = 5.dp),
-                        verticalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        items(matches.size, key = { matches[it].value.id }) { index ->
-                            val (libraryIndex, card) = matches[index]
-                            val isSelected = card.id == selectedCardId
-                            Row(
-                                Modifier.fillMaxWidth()
-                                    .clip(RoundedCornerShape(9.dp))
-                                    .background(if (isSelected) PanelLight else Panel)
-                                    .border(if (isSelected) 1.dp else 0.dp, if (isSelected) Mint else Panel, RoundedCornerShape(9.dp))
-                                    .combinedClickable(onClick = { selectedCardId = card.id }, onLongClick = { onPreview(card) })
-                                    .padding(horizontal = 7.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text("${libraryIndex + 1}", color = Muted, fontSize = 9.sp, modifier = Modifier.width(28.dp))
-                                CardFace(card, Modifier.width(37.dp), onClick = { selectedCardId = card.id }, onLongClick = { onPreview(card) }, showCounters = false)
-                                Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                                    Text(card.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(card.type, color = Muted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                }
-                                if (isSelected) Text("SELECTED", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-                Text("Draw and common turn commands are in the hand tray.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(top = 5.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun ManaPoolDialog(
-    player: TablePlayer,
-    onChange: (String, Int) -> Unit,
-    onClear: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val manaColors = listOf("W" to "White", "U" to "Blue", "B" to "Black", "R" to "Red", "G" to "Green", "C" to "Colorless")
-    val total = player.manaPool.values.sum()
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxWidth(0.92f), shape = RoundedCornerShape(14.dp), color = Panel) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("${player.name.uppercase()} Â· MANA POOL", color = SoftWhite, fontSize = 15.sp, fontWeight = FontWeight.Black)
-                        Text("$total mana tracked", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close mana pool", tint = Muted) }
-                }
-                Text("Tap + when you produce mana. Payments spend from this pool; it empties when you advance to another step.", color = Muted, fontSize = 10.sp)
-                manaColors.forEach { (symbol, name) ->
-                    val amount = player.manaPool[symbol] ?: 0
-                    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            ManaPip(symbol)
-                            Text(name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        }
-                        TextButton(onClick = { onChange(symbol, -1) }, enabled = amount > 0, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Text("âˆ’", color = if (amount > 0) SoftWhite else Muted, fontSize = 20.sp) }
-                        Text("$amount", color = Mint, fontSize = 14.sp, fontWeight = FontWeight.Black, modifier = Modifier.widthIn(min = 28.dp))
-                        TextButton(onClick = { onChange(symbol, 1) }, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Text("+", color = Mint, fontSize = 20.sp) }
-                    }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onClear, enabled = total > 0, modifier = Modifier.heightIn(min = 44.dp)) { Text("CLEAR POOL", color = Color(0xFFE9978B), fontWeight = FontWeight.Bold) }
-                    TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 44.dp)) { Text("DONE", color = Mint, fontWeight = FontWeight.Bold) }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CreatureTypeChoiceDialog(cardName: String, onConfirm: (String) -> Unit) {
-    var creatureType by remember(cardName) { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = {},
-        title = { Text("Choose a creature type") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("${cardName} asks you to choose a creature type as it enters.", color = Muted)
-                OutlinedTextField(
-                    value = creatureType,
-                    onValueChange = { creatureType = it.take(40) },
-                    singleLine = true,
-                    label = { Text("Creature type") },
-                    placeholder = { Text("e.g. Elf") }
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(creatureType.trim()) }, enabled = creatureType.isNotBlank()) {
-                Text("CONFIRM", color = if (creatureType.isNotBlank()) Mint else Muted, fontWeight = FontWeight.Bold)
-            }
-        },
-        containerColor = Panel,
-        titleContentColor = SoftWhite,
-        textContentColor = Muted
-    )
-}
-private data class ChatMessage(val author: String, val text: String, val timestamp: String)
-private val debugCardPool = listOf(
-    "Sol Ring" to "Artifact", "Arcane Signet" to "Artifact", "Command Tower" to "Land", "Island" to "Basic Land â€” Island", "Forest" to "Basic Land â€” Forest", "Plains" to "Basic Land â€” Plains", "Mountain" to "Basic Land â€” Mountain", "Swamp" to "Basic Land â€” Swamp",
-    "Swords to Plowshares" to "Instant", "Counterspell" to "Instant", "Cultivate" to "Sorcery", "Beast Within" to "Instant", "Lightning Bolt" to "Instant", "Rhystic Study" to "Enchantment", "Smothering Tithe" to "Enchantment", "Llanowar Elves" to "Creature â€” Elf", "Sakura-Tribe Elder" to "Creature â€” Snake", "Mulldrifter" to "Creature â€” Elemental", "Solemn Simulacrum" to "Artifact Creature", "Swiftfoot Boots" to "Artifact", "Commander's Sphere" to "Artifact", "Murder" to "Instant", "Negate" to "Instant", "Elvish Mystic" to "Creature â€” Elf", "Treasure Token" to "Artifact Token â€” Treasure", "Goblin Token" to "Creature Token â€” Goblin", "Thopter Token" to "Artifact Creature Token â€” Thopter"
-)
-
-@Composable
-private fun RoomHomeScreen(
-    wide: Boolean,
-    tutorialAnchor: (String) -> Modifier,
-    onCreateRoom: () -> Unit,
-    onJoinRoom: () -> Unit,
-    onContinue: () -> Unit,
-    onTutorial: () -> Unit
-) {
-    Column(
-        Modifier.fillMaxSize().background(Ink).windowInsetsPadding(WindowInsets.safeDrawing)
-            .verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 18.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Column(Modifier.widthIn(max = if (wide) 560.dp else 460.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("ARCANA TABLE", color = SoftWhite, fontSize = 24.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
-            Text("VERSION ${BuildConfig.VERSION_NAME} Â· BUILD ${BuildConfig.VERSION_CODE}", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp, modifier = Modifier.padding(top = 4.dp))
-            Text("Play Magic together", color = Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 5.dp, bottom = 22.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = onCreateRoom,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp).then(tutorialAnchor("home-create")),
-                    colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)
-                ) { Text("CREATE ROOM", fontSize = 14.sp, fontWeight = FontWeight.Black) }
-                OutlinedButton(
-                    onClick = onJoinRoom,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp).then(tutorialAnchor("home-join")),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = SoftWhite)
-                ) { Text("JOIN ROOM", fontSize = 14.sp, fontWeight = FontWeight.Bold) }
-            }
-            TextButton(onClick = onContinue, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).then(tutorialAnchor("home-continue"))) {
-                Text("CONTINUE TO TABLE", color = Mint, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            }
-            TextButton(onClick = onTutorial, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).then(tutorialAnchor("home-tutorial"))) {
-                Text("FULL VISUAL GUIDE", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
-@Composable
-private fun HeaderButton(label: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
-    Text(label, color = if (enabled) Mint else Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = modifier.heightIn(min = 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick).padding(horizontal = 13.dp, vertical = 12.dp))
-}
-
-@Composable
-private fun ManaPip(symbol: String) {
-    val normalized = symbol.uppercase()
-    val fill = when (normalized.firstOrNull()) {
-        'W' -> Color(0xFFF3EAD2)
-        'U' -> Color(0xFF4E93C8)
-        'B' -> Color(0xFF69636F)
-        'R' -> Color(0xFFC85450)
-        'G' -> Color(0xFF4F9363)
-        'C' -> Color(0xFF87918D)
-        else -> Color(0xFF747D79)
-    }
-    Box(Modifier.size(22.dp).clip(CircleShape).background(fill).border(1.dp, Color.White.copy(alpha = 0.7f), CircleShape), contentAlignment = Alignment.Center) {
-        Text(normalized, color = if (normalized == "W") Color(0xFF40362A) else Color.White, fontSize = if (normalized.length > 1) 7.sp else 10.sp, fontWeight = FontWeight.Black, maxLines = 1)
-    }
-}
-
-@Composable
-private fun ManaCostPips(cost: String) {
-    val tokenPattern = remember { Regex("[\\[{]([^}\\]]+)[}\\]]") }
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        var cursor = 0
-        tokenPattern.findAll(cost).forEach { match ->
-            if (match.range.first > cursor) Text(cost.substring(cursor, match.range.first), fontSize = 12.sp)
-            val symbol = match.groupValues[1]
-            if (symbol.length == 1 && symbol.first().uppercaseChar() in "WUBRGC") ManaPip(symbol)
-            else Box(Modifier.size(22.dp).clip(CircleShape).background(Color(0xFF737C78)).border(1.dp, Color.White.copy(alpha = 0.7f), CircleShape), contentAlignment = Alignment.Center) {
-                Text(symbol, color = Color.White, fontSize = 8.sp, fontWeight = FontWeight.Black, maxLines = 1)
-            }
-            cursor = match.range.last + 1
-        }
-        if (cursor < cost.length) Text(cost.substring(cursor), fontSize = 12.sp)
-    }
-}
-
-@Composable
-private fun ManaSymbolText(text: String, color: Color, fontSize: androidx.compose.ui.unit.TextUnit, modifier: Modifier = Modifier) {
-    val tokenPattern = remember { Regex("[\\[{]([WUBRGC])[}\\]]") }
-    val matches = remember(text) { tokenPattern.findAll(text).toList() }
-    val annotated = buildAnnotatedString {
-        var cursor = 0
-        matches.forEachIndexed { index, match ->
-            append(text.substring(cursor, match.range.first))
-            appendInlineContent("mana-pip-$index", alternateText = match.value)
-            cursor = match.range.last + 1
-        }
-        append(text.substring(cursor))
-    }
-    val inline = matches.mapIndexed { index, match ->
-        "mana-pip-$index" to InlineTextContent(
-            Placeholder(fontSize * 1.25f, fontSize * 1.25f, PlaceholderVerticalAlign.Center)
-        ) { ManaPip(match.groupValues[1]) }
-    }.toMap()
-    Text(annotated, modifier = modifier, color = color, fontSize = fontSize, inlineContent = inline)
-}
-
-@Composable
-private fun HandPeekBar(cardCount: Int, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Row(
-        modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(10.dp)).background(PanelLight)
-            .combinedClickable(onClick = onClick).padding(horizontal = 11.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
-    ) {
-        Text("HAND  $cardCount", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black)
-        if (cardCount > 0) {
-            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                repeat(cardCount.coerceAtMost(3)) {
-                    Box(Modifier.size(width = 12.dp, height = 25.dp).clip(RoundedCornerShape(3.dp)).background(Panel).border(1.dp, Muted.copy(alpha = 0.6f), RoundedCornerShape(3.dp)))
-                }
-            }
-        }
-        Icon(Icons.Filled.ExpandLess, contentDescription = "Open hand tray", tint = Mint, modifier = Modifier.size(18.dp))
-    }
-}
-
-@Composable
-private fun ViewChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Text(label, color = if (selected) Ink else SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.heightIn(min = 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(if (selected) Mint else PanelLight).combinedClickable(onClick = onClick).padding(horizontal = 15.dp, vertical = 12.dp))
-}
-
-@Composable
-private fun PlayerViewTab(name: String, commander: GameCard?, selected: Boolean, onClick: () -> Unit) {
-    val shape = RoundedCornerShape(9.dp)
-    val artUrl = commander?.artCropUrl ?: commander?.imageUrl
-    Box(
-        Modifier.width(96.dp).height(50.dp).clip(shape)
-            .background(PanelLight)
-            .border(if (selected) 2.dp else 1.dp, if (selected) Mint else Color(0xFF33423D), shape)
-            .combinedClickable(onClick = onClick)
-    ) {
-        if (!artUrl.isNullOrBlank()) {
-            CardArt(artUrl, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        } else {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("NO COMMANDER", color = Muted, fontSize = 7.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-        Text(
-            name.uppercase(), color = SoftWhite, fontSize = 8.sp, fontWeight = FontWeight.Black,
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                .background(Color(0xD9000000)).padding(horizontal = 5.dp, vertical = 4.dp)
-        )
-    }
-}
-
-@Composable
-private fun LobbyDialog(
-    tutorialStep: TutorialStop?, tutorialIndex: Int, tutorialTotal: Int, tutorialBounds: Map<String, Rect>, tutorialAnchor: (String) -> Modifier,
-    onTutorialBack: () -> Unit, onTutorialNext: () -> Unit, onTutorialExit: () -> Unit, onTutorialTarget: (String) -> Unit,
-    players: List<TablePlayer>, roomCreated: Boolean, isHost: Boolean, gameStarted: Boolean, gameEnded: Boolean, joining: Boolean, roomCode: String,
-    password: String, joinCode: String, joinPassword: String, readyPlayers: Set<Int>, pendingReady: Boolean?, deckSyncConfirmed: Boolean,
-    onTakeMulligan: () -> Unit, onKeepOpeningHand: (List<Int>) -> Unit,
-    hostInput: String, internetMode: Boolean, cloudEndpoint: String, playerName: String, hostAddress: String, localSeat: Int, onlineStatus: String,
-    turnOrder: List<Int>?, notice: String?, onRemovePlayer: (Int) -> Unit, onExportDiagnostics: () -> Unit, onDismiss: () -> Unit, onCancelJoin: () -> Unit,
-    onSelectJoin: () -> Unit, onSelectCreate: () -> Unit, onSelectNetwork: (Boolean) -> Unit, onCloudEndpoint: (String) -> Unit, onPassword: (String) -> Unit,
-    onJoinCode: (String) -> Unit, onJoinPassword: (String) -> Unit, onHostInput: (String) -> Unit, onPlayerName: (String) -> Unit,
-    onCreate: () -> Unit, onJoin: () -> Unit, onToggleReady: (Int) -> Unit,
-    onImportDeck: (Int) -> Unit, onAddAi: () -> Unit, onRandomizeTurnOrder: () -> Unit, onStartGame: () -> Unit, onLeave: () -> Unit
-) {
-    val context = LocalContext.current
-    var removeTarget by remember { mutableIntStateOf(-1) }
-    var openingHandDialogOpen by remember { mutableStateOf(false) }
-    val decksReady = players.size in 1..4 && players.all { it.deckLoaded }
-    val allReady = players.indices.all { it in readyPlayers }
-    val canStart = isHost && roomCreated && !gameStarted && decksReady && allReady
-    val canHostHandOff = players.drop(1).any { it.isOnline && !it.isComputer }
-    val canLeaveRoom = internetMode || !isHost || !gameStarted || gameEnded || canHostHandOff
-    val displayedOrder = turnOrder?.takeIf { it.size == players.size } ?: players.indices.toList()
-    val firstPlayer = players.getOrNull(displayedOrder.firstOrNull() ?: 0)?.name ?: "â€”"
-
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.94f), shape = RoundedCornerShape(16.dp), color = Panel) {
-            Box(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("GAME LOBBY", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 17.sp, letterSpacing = 0.8.sp)
-                        Text("COMMANDER Â· UP TO 4 PLAYERS", color = Muted, fontWeight = FontWeight.Bold, fontSize = 9.sp)
-                        Text("APP VERSION ${BuildConfig.VERSION_NAME} Â· BUILD ${BuildConfig.VERSION_CODE}", color = Muted, fontWeight = FontWeight.Bold, fontSize = 8.sp, letterSpacing = 0.5.sp)
-                    }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp).then(tutorialAnchor("lobby-close"))) { Icon(Icons.Filled.Close, "Close game lobby", tint = Muted) }
-                }
-
-                Surface(Modifier.fillMaxWidth().padding(top = 10.dp), color = Color(0xFF3A3021), shape = RoundedCornerShape(9.dp)) {
-                    Text(if (internetMode) "INTERNET ROOM Â· Connect from different networks using the secure room service." else "SAME WI-FI ROOM Â· All phones must be on the same local network.", color = CounterGold, fontSize = 10.sp, modifier = Modifier.padding(10.dp))
-                }
-
-                if (!roomCreated && onlineStatus != "Connecting") Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val createSelected = !joining
-                    Button(
-                        onClick = onSelectCreate,
-                        modifier = Modifier.weight(1f).heightIn(min = 58.dp).then(tutorialAnchor("lobby-create")),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (createSelected) Mint else PanelLight,
-                            contentColor = if (createSelected) Ink else SoftWhite
-                        ),
-                        border = if (createSelected) null else BorderStroke(1.dp, Color(0xFF52635F)),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("CREATE ROOM", fontSize = 10.sp, fontWeight = FontWeight.Black, maxLines = 1)
-                            if (createSelected) Text("SELECTED", fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
-                        }
-                    }
-                    val joinSelected = joining
-                    Button(
-                        onClick = onSelectJoin,
-                        modifier = Modifier.weight(1f).heightIn(min = 58.dp).then(tutorialAnchor("lobby-join")),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (joinSelected) Mint else PanelLight,
-                            contentColor = if (joinSelected) Ink else SoftWhite
-                        ),
-                        border = if (joinSelected) null else BorderStroke(1.dp, Color(0xFF52635F)),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 6.dp)
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("JOIN ROOM", fontSize = 10.sp, fontWeight = FontWeight.Black, maxLines = 1)
-                            if (joinSelected) Text("SELECTED", fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
-                        }
-                    }
-                }
-
-                if (!roomCreated && onlineStatus != "Connecting") Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val localSelected = !internetMode
-                    Button(
-                        onClick = { onSelectNetwork(false) },
-                        modifier = Modifier.weight(1f).heightIn(min = 52.dp).then(tutorialAnchor("lobby-local")),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (localSelected) Mint else PanelLight,
-                            contentColor = if (localSelected) Ink else SoftWhite
-                        ),
-                        border = if (localSelected) null else BorderStroke(1.dp, Color(0xFF52635F)),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 5.dp)
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("LOCAL WI-FI", fontSize = 9.sp, fontWeight = FontWeight.Black, maxLines = 1)
-                            if (localSelected) Text("SELECTED", fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
-                        }
-                    }
-                    val internetSelected = internetMode
-                    Button(
-                        onClick = { onSelectNetwork(true) },
-                        modifier = Modifier.weight(1f).heightIn(min = 52.dp).then(tutorialAnchor("lobby-internet")),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = if (internetSelected) Mint else PanelLight,
-                            contentColor = if (internetSelected) Ink else SoftWhite
-                        ),
-                        border = if (internetSelected) null else BorderStroke(1.dp, Color(0xFF52635F)),
-                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 5.dp)
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("INTERNET", fontSize = 9.sp, fontWeight = FontWeight.Black, maxLines = 1)
-                            if (internetSelected) Text("SELECTED", fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp)
-                        }
-                    }
-                }
-
-                if (!roomCreated || joining) {
-                    if (joining) {
-                        val isConnecting = onlineStatus == "Connecting"
-                        Text(if (internetMode) "Join an internet room" else "Join a room on the same Wi-Fi network", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
-                        if (internetMode) {
-                            OutlinedTextField(cloudEndpoint, onCloudEndpoint, modifier = Modifier.fillMaxWidth().padding(top = 5.dp), singleLine = true, label = { Text("Room service URL") })
-                            Text("Default address is set for you. You do not need to edit it.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(start = 5.dp, top = 3.dp))
-                        }
-                        else OutlinedTextField(hostInput, onHostInput, modifier = Modifier.fillMaxWidth().padding(top = 5.dp), singleLine = true, label = { Text("Host IP address Â· port is automatic") }, placeholder = { Text("192.168.1.25") })
-                        OutlinedTextField(playerName, onPlayerName, modifier = Modifier.fillMaxWidth().padding(top = 5.dp), singleLine = true, label = { Text("Your player name") })
-                        OutlinedTextField(joinCode, onJoinCode, modifier = Modifier.fillMaxWidth().padding(top = 5.dp), singleLine = true, label = { Text("Room code") })
-                        OutlinedTextField(joinPassword, onJoinPassword, modifier = Modifier.fillMaxWidth().padding(top = 5.dp), singleLine = true, label = { Text("Password") }, visualTransformation = PasswordVisualTransformation())
-                        Button(onClick = onJoin, enabled = !isConnecting && (if (internetMode) cloudEndpoint.isNotBlank() else hostInput.isNotBlank()) && joinCode.isNotBlank() && joinPassword.isNotBlank(), modifier = Modifier.fillMaxWidth().padding(top = 10.dp).heightIn(min = 56.dp).then(tutorialAnchor("lobby-submit"))) {
-                            Text(if (isConnecting) "CONNECTINGâ€¦" else "JOIN GAME")
-                        }
-                        if (isConnecting) {
-                            OutlinedButton(onClick = onCancelJoin, modifier = Modifier.fillMaxWidth().padding(top = 6.dp).heightIn(min = 48.dp).then(tutorialAnchor("lobby-cancel"))) {
-                                Text("CANCEL JOIN", color = Color(0xFFE9978B), fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        if (isConnecting || notice != null) {
-                            Surface(
-                                Modifier.fillMaxWidth().padding(top = 8.dp),
-                                color = if (isConnecting) PanelLight else Color(0xFF3A3021),
-                                shape = RoundedCornerShape(9.dp)
-                            ) {
-                                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    if (isConnecting) CircularProgressIndicator(Modifier.size(18.dp), color = Mint, strokeWidth = 2.dp)
-                                    Text(
-                                        notice ?: onlineStatus,
-                                        color = if (isConnecting) Mint else Color(0xFFE9978B),
-                                        fontSize = 11.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        modifier = Modifier.padding(start = if (isConnecting) 10.dp else 0.dp)
-                                    )
-                                }
-                            }
-                        }
-                    } else {
-                        Text(if (internetMode) "Create a password-protected internet room" else "Create a password-protected room", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(top = 10.dp))
-                        if (internetMode && onlineStatus == "Connecting") {
-                            Surface(Modifier.fillMaxWidth().padding(top = 8.dp), color = PanelLight, shape = RoundedCornerShape(9.dp)) {
-                                Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    CircularProgressIndicator(Modifier.size(18.dp), color = Mint, strokeWidth = 2.dp)
-                                    Text("Opening a secure internet roomâ€¦", color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 10.dp).weight(1f))
-                                }
-                            }
-                            OutlinedButton(onClick = onCancelJoin, modifier = Modifier.fillMaxWidth().padding(top = 6.dp).heightIn(min = 48.dp).then(tutorialAnchor("lobby-cancel"))) {
-                                Text("CANCEL", color = Color(0xFFE9978B), fontWeight = FontWeight.Bold)
-                            }
-                        } else {
-                            if (internetMode) {
-                                OutlinedTextField(cloudEndpoint, onCloudEndpoint, modifier = Modifier.fillMaxWidth().padding(top = 5.dp), singleLine = true, label = { Text("Room service URL") })
-                                Text("Default address is set for you. You do not need to edit it.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(start = 5.dp, top = 3.dp))
-                                OutlinedTextField(playerName, onPlayerName, modifier = Modifier.fillMaxWidth().padding(top = 5.dp), singleLine = true, label = { Text("Your player name") })
-                            }
-                            OutlinedTextField(password, onPassword, modifier = Modifier.fillMaxWidth().padding(top = 5.dp), singleLine = true, label = { Text("Room password Â· 4 characters minimum") }, visualTransformation = PasswordVisualTransformation())
-                            if (notice != null) Text(notice, color = Color(0xFFFF9C91), fontSize = 10.sp, modifier = Modifier.padding(top = 8.dp))
-                            Button(onClick = onCreate, enabled = password.length >= 4 && (!internetMode || cloudEndpoint.isNotBlank()), modifier = Modifier.fillMaxWidth().padding(top = 10.dp).heightIn(min = 56.dp).then(tutorialAnchor("lobby-submit"))) { Text("CREATE LOBBY") }
-                        }
-                    }
-                } else {
-                    Surface(Modifier.fillMaxWidth().padding(top = 8.dp), color = PanelLight, shape = RoundedCornerShape(11.dp)) {
-                        Column(Modifier.padding(12.dp)) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Column(Modifier.weight(1f)) {
-                                    Text("ROOM CODE", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                    Text(roomCode, color = Mint, fontSize = 24.sp, fontWeight = FontWeight.Black, letterSpacing = 3.sp)
-                                }
-                                TextButton(onClick = {
-                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                                    clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("Arcana Table room code", roomCode))
-                                    onTutorialTarget("lobby-copy")
-                                }, modifier = Modifier.then(tutorialAnchor("lobby-copy"))) { Text("COPY", color = Mint, fontWeight = FontWeight.Bold) }
-                            }
-                            TextButton(onClick = {
-                                val network = if (internetMode) "Internet room Â· $cloudEndpoint" else "Same Wi-Fi Â· ${hostAddress.ifBlank { "ask the host to share their IP" }}"
-                                val invite = "Join my Arcana Table game!\nRoom code: $roomCode\nPassword: $password\n$network"
-                                runCatching {
-                                    context.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(android.content.Intent.EXTRA_TEXT, invite)
-                                    }, "Share room invite"))
-                                }
-                                onTutorialTarget("lobby-share")
-                            }, modifier = Modifier.align(Alignment.End).heightIn(min = 44.dp).then(tutorialAnchor("lobby-share"))) {
-                                Text("SHARE ROOM", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                            }
-                            Text("PASSWORD PROTECTED Â· ${"â€¢".repeat(password.length.coerceAtMost(12))}", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                            Row(Modifier.fillMaxWidth().padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(if (hostAddress.isBlank()) onlineStatus else "SAME WI-FI Â· $hostAddress", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                                if (hostAddress.isNotBlank()) TextButton(onClick = {
-                                    val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
-                                    clipboard?.setPrimaryClip(android.content.ClipData.newPlainText("Arcana Table host address", hostAddress))
-                                    onTutorialTarget("lobby-copy-ip")
-                                }, modifier = Modifier.then(tutorialAnchor("lobby-copy-ip"))) { Text("COPY IP", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
-                            }
-                        }
-                    }
-
-                    Row(Modifier.fillMaxWidth().padding(top = 13.dp, bottom = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text("PLAYERS", color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
-                        Text("${players.size}/4 SEATS", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                    }
-
-                    players.forEachIndexed { index, player ->
-                        val ready = index in readyPlayers
-                        val canMarkReady = index == localSeat || isHost && player.isComputer
-                        val deckConfirmed = index != localSeat || !roomCreated || isHost || deckSyncConfirmed
-                        val deckReady = player.deckLoaded && deckConfirmed
-                        val handDecisionMade = player.openingHandKept || player.isComputer
-                        val canToggleReady = !gameStarted && deckReady && handDecisionMade && canMarkReady && (index != localSeat || pendingReady == null)
-                        Surface(Modifier.fillMaxWidth().padding(vertical = 4.dp).then(if (index == 0) tutorialAnchor("lobby-player") else Modifier), color = PanelLight, shape = RoundedCornerShape(10.dp)) {
-                            Column(Modifier.padding(10.dp)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(Modifier.size(30.dp).clip(CircleShape).background(if (ready) Mint else Panel).border(1.dp, if (ready) Mint else Muted, CircleShape), contentAlignment = Alignment.Center) {
-                                        Text("P${index + 1}", color = if (ready) Ink else SoftWhite, fontSize = 9.sp, fontWeight = FontWeight.Black)
-                                    }
-                                    Column(Modifier.weight(1f).padding(horizontal = 9.dp)) {
-                                        Text(player.name, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                        Text("${if (index == 0) "HOST Â· " else ""}${if (player.isComputer) "AI Â· " else if (player.isOnline) "ONLINE Â· " else "OFFLINE Â· "}${when { !player.deckLoaded -> "DECK REQUIRED"; !deckConfirmed -> "DECK SYNCING"; !handDecisionMade -> "OPENING HAND NEEDED"; else -> "DECK READY" }}${if (index == localSeat) " Â· YOU" else ""}",
-                                            color = if ((player.isOnline || player.isComputer || index == localSeat) && deckReady && handDecisionMade) Mint else CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                    Text(if (ready) "READY" else "NOT READY", color = if (ready) Mint else Muted, fontSize = 8.sp, fontWeight = FontWeight.Black)
-                                }
-                                Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
-                                    if (!player.deckLoaded && index == localSeat) TextButton(onClick = { onImportDeck(index) }, modifier = Modifier.heightIn(min = 48.dp).then(tutorialAnchor("lobby-import"))) { Text("IMPORT DECK", color = CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-                                    if (!gameStarted && index == localSeat && deckReady && !player.openingHandKept && !player.isComputer) TextButton(onClick = { openingHandDialogOpen = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("OPENING HAND Â· ${player.hand.size}", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
-                                    TextButton(onClick = { onToggleReady(index) }, enabled = canToggleReady || ready, modifier = Modifier.heightIn(min = 48.dp).then(tutorialAnchor("lobby-ready"))) { Text(if (gameStarted) "GAME STARTED" else if (index == localSeat && pendingReady != null) "SENDINGâ€¦" else if (ready) "CANCEL READY" else if (!handDecisionMade && index == localSeat) "CHOOSE HAND" else if (canMarkReady) if (!deckConfirmed) "SYNCINGâ€¦" else "READY UP" else "WAITING", color = if (canToggleReady || ready) Mint else Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-                                    if (isHost && index > 0 && !internetMode) TextButton(onClick = { removeTarget = index }, modifier = Modifier.heightIn(min = 48.dp)) { Text("REMOVE", color = Color(0xFFE9978B), fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-                                }
-                            }
-                        }
-                    }
-                    if (isHost && !gameStarted && players.size < 4) {
-                        OutlinedButton(onClick = onAddAi, modifier = Modifier.fillMaxWidth().padding(top = 6.dp).heightIn(min = 48.dp).then(tutorialAnchor("lobby-ai"))) {
-                            Text("ADD AI OPPONENT Â· ${players.size}/4", color = Mint, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                        }
-                    }
-                    if (players.size < 4) {
-                        repeat(4 - players.size) { seat ->
-                            Surface(Modifier.fillMaxWidth().padding(vertical = 3.dp), color = Panel.copy(alpha = 0.55f), shape = RoundedCornerShape(9.dp)) {
-                                Text("P${players.size + seat + 1} Â· Waiting for a player to join with the room code", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(11.dp))
-                            }
-                        }
-                    }
-
-                    Surface(Modifier.fillMaxWidth().padding(top = 10.dp), color = PanelLight, shape = RoundedCornerShape(10.dp)) {
-                        Row(Modifier.padding(horizontal = 11.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text("GOES FIRST", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
-                                Text(firstPlayer, color = Mint, fontSize = 16.sp, fontWeight = FontWeight.Black)
-                                Text(if (turnOrder == null) "Current seat order" else "Randomized turn order", color = Muted, fontSize = 8.sp)
-                            }
-                            if (isHost) TextButton(onClick = onRandomizeTurnOrder, modifier = Modifier.heightIn(min = 44.dp).then(tutorialAnchor("lobby-order"))) { Text("RANDOMIZE ORDER", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-                        }
-                    }
-
-                    if (notice != null) Text(notice, color = CounterGold, fontSize = 10.sp, modifier = Modifier.padding(top = 8.dp))
-                    if (!decksReady) {
-                        val missingDecks = players.filterNot { it.deckLoaded }.joinToString { it.name }
-                        Text("Waiting for a deck from: $missingDecks", color = CounterGold, fontSize = 9.sp, modifier = Modifier.padding(top = 6.dp))
-                    } else if (!allReady) {
-                        val notReady = players.mapIndexedNotNull { index, player -> player.name.takeIf { index !in readyPlayers } }.joinToString()
-                        Text("Waiting for ready confirmation from: $notReady", color = CounterGold, fontSize = 9.sp, modifier = Modifier.padding(top = 6.dp))
-                    } else if (isHost && canStart) {
-                        Text("Everyone is ready. Start the game when youâ€™re set.", color = Mint, fontSize = 9.sp, modifier = Modifier.padding(top = 6.dp))
-                    }
-
-                    OutlinedButton(onClick = onExportDiagnostics, modifier = Modifier.fillMaxWidth().padding(top = 10.dp).heightIn(min = 48.dp).then(tutorialAnchor("lobby-diagnostics"))) {
-                        Text("EXPORT DIAGNOSTIC LOG", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    }
-                    if (isHost && !gameStarted) Button(onClick = onStartGame, enabled = canStart, modifier = Modifier.fillMaxWidth().padding(top = 11.dp).heightIn(min = 50.dp).then(tutorialAnchor("lobby-start")), colors = ButtonDefaults.buttonColors(disabledContainerColor = PanelLight, disabledContentColor = Muted)) {
-                        Text("START GAME", fontWeight = FontWeight.Black, letterSpacing = 0.7.sp)
-                    } else if (isHost) Text(if (gameEnded) "GAME ENDED Â· unanimous vote" else "GAME IN PROGRESS", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
-                    else Text("$onlineStatus Â· Waiting for the host to start", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
-                    if (isHost && gameStarted && !gameEnded && !canHostHandOff) {
-                        Text("A connected player must be available to take over hosting before you can leave.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(top = 8.dp))
-                    }
-                    TextButton(onClick = onLeave, enabled = canLeaveRoom, modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp).then(tutorialAnchor("lobby-leave"))) {
-                        Text(
-                            when {
-                                isHost && internetMode && gameStarted && !gameEnded -> "LEAVE GAME Â· KEEP ROOM OPEN"
-                                isHost && gameStarted && !gameEnded -> "LEAVE GAME Â· TRANSFER HOST"
-                                isHost -> "CLOSE ROOM"
-                                else -> "LEAVE GAME"
-                            },
-                            color = if (canLeaveRoom) Color(0xFFE9978B) else Muted,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-            tutorialStep?.let { step -> GuidedTutorialOverlay(step, tutorialIndex, tutorialTotal, tutorialBounds[step.target], onTutorialBack, onTutorialNext, onTutorialExit) }
-            }
-        }
-    }
-    if (removeTarget in players.indices && removeTarget > 0) {
-        val targetName = players[removeTarget].name
-        AlertDialog(
-            onDismissRequest = { removeTarget = -1 },
-            title = { Text("Remove $targetName?") },
-            text = { Text("This removes the player and their seat from the online room.") },
-            confirmButton = {
-                TextButton(onClick = { onRemovePlayer(removeTarget); removeTarget = -1 }) {
-                    Text("REMOVE PLAYER", color = Color(0xFFE9978B), fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = { TextButton(onClick = { removeTarget = -1 }) { Text("CANCEL") } }
-        )
-    }
-    if (openingHandDialogOpen && !gameStarted && localSeat in players.indices && players[localSeat].deckLoaded && !players[localSeat].openingHandKept) {
-        OpeningHandDialog(
-            player = players[localSeat],
-            onMulligan = onTakeMulligan,
-            onKeep = { bottomIds -> onKeepOpeningHand(bottomIds); openingHandDialogOpen = false },
-            onDismiss = { openingHandDialogOpen = false }
-        )
-    }
-}
-
-@Composable
-private fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKeep: (List<Int>) -> Unit, onDismiss: () -> Unit) {
-    var choosingBottomCards by remember(player.id) { mutableStateOf(false) }
-    var selectedCardIds by remember(player.id, player.hand.map { it.id }, player.mulligansTaken) { mutableStateOf(emptyList<Int>()) }
-    var previewCard by remember(player.id) { mutableStateOf<GameCard?>(null) }
-    val bottomCount = (player.mulligansTaken - 1).coerceAtLeast(0)
-    val canMulliganAgain = player.mulligansTaken < 8
-    val openingCardWidth = (LocalConfiguration.current.screenWidthDp * 0.36f).dp.coerceIn(132.dp, 190.dp)
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxWidth(0.94f).heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.88f), shape = RoundedCornerShape(16.dp), color = Panel) {
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(18.dp)) {
-                Text("OPENING HAND Â· ${player.hand.size} CARDS", color = Mint, fontWeight = FontWeight.Black, fontSize = 15.sp)
-                Text("Mulligans taken: ${player.mulligansTaken} Â· First multiplayer mulligan is free", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
-                Text(
-                    if (choosingBottomCards) "Select exactly $bottomCount card(s) to put on the bottom of your library, then confirm."
-                    else "Tap a card to enlarge it. Keep this hand or mulligan; a mulligan shuffles your whole hand into your library, then deals a fresh seven.",
-                    color = SoftWhite, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp, bottom = 8.dp)
-                )
-                if (choosingBottomCards) Text("Tap a card to enlarge it; use the button under a card to select it for the bottom.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(bottom = 6.dp))
-                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                    player.hand.forEach { card ->
-                        val selected = card.id in selectedCardIds
-                        Column(Modifier.width(openingCardWidth), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Box(Modifier.fillMaxWidth().border(2.dp, if (selected) Mint else Color.Transparent, RoundedCornerShape(9.dp)).padding(2.dp)) {
-                                CardFace(card, Modifier.fillMaxWidth(), onClick = { previewCard = card }, onLongClick = { previewCard = card }, showCounters = false)
-                            }
-                            Text(card.name, color = SoftWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().padding(top = 4.dp))
-                            if (choosingBottomCards) {
-                                OutlinedButton(
-                                    onClick = { selectedCardIds = if (selected) selectedCardIds - card.id else selectedCardIds + card.id },
-                                    modifier = Modifier.fillMaxWidth().padding(top = 3.dp).heightIn(min = 38.dp),
-                                    contentPadding = PaddingValues(horizontal = 3.dp, vertical = 4.dp),
-                                    border = BorderStroke(1.dp, if (selected) Mint else Muted)
-                                ) {
-                                    Text(if (selected) "${selectedCardIds.indexOf(card.id) + 1} Â· BOTTOM" else "SELECT", color = if (selected) Mint else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                                }
-                            }
-                        }
-                    }
-                }
-                if (choosingBottomCards) {
-                    Text("Selected: ${selectedCardIds.size}/$bottomCount", color = if (selectedCardIds.size == bottomCount) Mint else CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
-                    Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = { choosingBottomCards = false; selectedCardIds = emptyList() }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("BACK", color = Muted) }
-                        Button(onClick = { onKeep(selectedCardIds) }, enabled = selectedCardIds.size == bottomCount, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("CONFIRM KEEP") }
-                    }
-                } else {
-                    Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
-                        OutlinedButton(onClick = onMulligan, enabled = canMulliganAgain, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("MULLIGAN", color = if (canMulliganAgain) CounterGold else Muted) }
-                        Button(onClick = { if (bottomCount == 0) onKeep(emptyList()) else choosingBottomCards = true }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(if (bottomCount == 0) "KEEP HAND" else "KEEP Â· BOTTOM $bottomCount") }
-                    }
-                }
-            }
-        }
-    }
-    previewCard?.let { card ->
-        CardPreviewPopup(item = CardPreview(playerIndex = 0, card = card, fromHand = true), onDismiss = { previewCard = null })
-    }
-}
-
-@Composable
-private fun OptionsPage(
-    tutorialStep: TutorialStop?, tutorialIndex: Int, tutorialTotal: Int, tutorialBounds: Map<String, Rect>, tutorialAnchor: (String) -> Modifier,
-    onTutorialBack: () -> Unit, onTutorialNext: () -> Unit, onTutorialExit: () -> Unit,
-    darkMode: Boolean, timerRunning: Boolean, timerVisible: Boolean, backgroundAlertsEnabled: Boolean,
-    autoReturnTableAfterPass: Boolean, autoDrawOnDrawStep: Boolean, autoUntapOnUntapStep: Boolean, openHandAfterDraw: Boolean,
-    reducedSwipeMotion: Boolean, cardSizeScale: Float, onOpenLayoutLab: () -> Unit,
-    onToggleTheme: () -> Unit, onToggleTimerVisibility: () -> Unit, onToggleBackgroundAlerts: (Boolean) -> Unit,
-    onAutoReturnTable: (Boolean) -> Unit, onAutoDraw: (Boolean) -> Unit, onAutoUntap: (Boolean) -> Unit,
-    onOpenHandAfterDraw: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, onCardSizeScale: (Float) -> Unit,
-    onOpenDeveloperOptions: () -> Unit, onClearAllData: () -> Unit, onDismiss: () -> Unit
-) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.9f), shape = RoundedCornerShape(16.dp), color = Panel) {
-            Box(Modifier.fillMaxSize()) {
-            Column(Modifier.fillMaxSize().padding(16.dp).verticalScroll(rememberScrollState())) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("OPTIONS", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp).then(tutorialAnchor("options-close"))) { Icon(Icons.Filled.Close, "Close options", tint = Muted) }
-                }
-                Text("APPEARANCE", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
-                TextButton(onClick = onToggleTheme, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).then(tutorialAnchor("options-theme"))) { Text("Theme  Â·  ${if (darkMode) "Dark" else "Light"}", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
-                SettingsToggle("Reduce swipe animation", "Skip the animated jump when selecting a view tab.", reducedSwipeMotion, onReducedMotion, tutorialAnchor("options-motion"))
-                Text("CARD SIZE", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
-                Row(Modifier.fillMaxWidth().then(tutorialAnchor("options-card-size")), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(0.82f to "SMALL", 1f to "STANDARD", 1.18f to "LARGE").forEach { (scale, label) ->
-                        TextButton(onClick = { onCardSizeScale(scale) }, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) { Text(if (kotlin.math.abs(cardSizeScale - scale) < 0.03f) "âœ“ $label" else label, color = if (kotlin.math.abs(cardSizeScale - scale) < 0.03f) Mint else SoftWhite, fontSize = 9.sp) }
-                    }
-                }
-                TextButton(onClick = onOpenLayoutLab, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
-                    Text("ADJUST UI LAYOUT  â€º", color = Mint, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
-                }
-                Text("NAVIGATION", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
-                SettingsToggle("Return to Table after passing", "Show the full table when your turn passes.", autoReturnTableAfterPass, onAutoReturnTable, tutorialAnchor("options-return-table"))
-                SettingsToggle("Open hand after drawing", "Show the hand tray after a draw-step card is drawn.", openHandAfterDraw, onOpenHandAfterDraw, tutorialAnchor("options-open-hand"))
-                Text("GAME", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
-                SettingsToggle("Draw automatically", "Draw when turn progression reaches the draw step.", autoDrawOnDrawStep, onAutoDraw, tutorialAnchor("options-auto-draw"))
-                SettingsToggle("Untap automatically", "Untap your permanents as your new turn begins; stun counters are removed instead of untapping.", autoUntapOnUntapStep, onAutoUntap, tutorialAnchor("options-auto-untap"))
-                Text("Turn timer is ${if (timerRunning) "running" else "stopped"}. Timer controls are in the timer menu at the top of the table.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(vertical = 5.dp))
-                TextButton(onClick = onToggleTimerVisibility, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).then(tutorialAnchor("options-timer"))) { Text(if (timerVisible) "Hide turn timer display" else "Show turn timer display", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
-                Text("NOTIFICATIONS", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
-                Row(Modifier.fillMaxWidth().heightIn(min = 54.dp).then(tutorialAnchor("options-alerts")), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Background game alerts", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("Notify when your turn starts or another player makes a play.", color = Muted, fontSize = 10.sp)
-                    }
-                    Switch(checked = backgroundAlertsEnabled, onCheckedChange = onToggleBackgroundAlerts)
-                }
-                TextButton(onClick = onClearAllData, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).then(tutorialAnchor("clear-data"))) {
-                    Text("CLEAR ALL DATA", color = Color(0xFFE9978B), fontWeight = FontWeight.Black, modifier = Modifier.fillMaxWidth())
-                }
-                Text("Saved decks and tutorial progress are kept when game data is cleared.", color = Muted, fontSize = 10.sp)
-                Text("TESTING", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
-                TextButton(onClick = onOpenDeveloperOptions, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp).then(tutorialAnchor("options-developer"))) { Text("Open Developer Options  â€º", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
-                Text("Room tests connect devices on the same Wi-Fi network. Connections are not encrypted and cannot cross networks yet.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 14.dp))
-            }
-            tutorialStep?.let { step -> GuidedTutorialOverlay(step, tutorialIndex, tutorialTotal, tutorialBounds[step.target], onTutorialBack, onTutorialNext, onTutorialExit) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LayoutLabPage(
-    orientationName: String,
-    cardSizeScale: Float,
-    boardSpacingScale: Float,
-    handSheetHeightFraction: Float,
-    footerButtonScale: Float,
-    playerSectionOrder: List<String>,
-    handActionOrder: List<String>,
-    onCardSizeScale: (Float) -> Unit,
-    onBoardSpacingScale: (Float) -> Unit,
-    onHandSheetHeightFraction: (Float) -> Unit,
-    onFooterButtonScale: (Float) -> Unit,
-    onPlayerSectionOrder: (List<String>) -> Unit,
-    onHandActionOrder: (List<String>) -> Unit,
-    onReset: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    var previewScreen by remember { mutableStateOf("PLAYER") }
-    var selectedElement by remember { mutableStateOf("BATTLEFIELD") }
-    var addElementMenuOpen by remember { mutableStateOf(false) }
-    val playerSectionCatalog = listOf("STATUS", "COMMANDER", "STEP", "ZONES", "REVEALED", "BATTLEFIELD")
-    val handActionCatalog = listOf("DRAW", "REVEAL", "STACK", "CAST_COMMANDER", "COMBAT", "NEXT_STEP", "PASS_TURN", "MORE")
-    fun moveItem(items: List<String>, index: Int, direction: Int, save: (List<String>) -> Unit) {
-        val destination = (index + direction).coerceIn(0, items.lastIndex)
-        if (destination == index) return
-        val updated = items.toMutableList().apply { add(destination, removeAt(index)) }
-        save(updated)
-    }
-    fun setPreset(card: Float, spacing: Float, hand: Float, footer: Float) {
-        onCardSizeScale(card)
-        onBoardSpacingScale(spacing)
-        onHandSheetHeightFraction(hand)
-        onFooterButtonScale(footer)
-    }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(
-            Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.94f),
-            shape = RoundedCornerShape(18.dp),
-            color = Panel
-        ) {
-            Column(Modifier.fillMaxSize().padding(14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("ADJUST UI Â· $orientationName", color = SoftWhite, fontSize = 17.sp, fontWeight = FontWeight.Black)
-                        Text("$orientationName layout Â· saves automatically", color = Muted, fontSize = 10.sp)
-                    }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) {
-                        Icon(Icons.Filled.Close, "Close layout lab", tint = Muted)
-                    }
-                }
-                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    listOf("PLAYER", "HAND").forEach { screen ->
-                        val selected = previewScreen == screen
-                        TextButton(
-                            onClick = { previewScreen = screen; selectedElement = if (screen == "HAND") "HAND" else "BATTLEFIELD" },
-                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(9.dp)).background(if (selected) PanelLight else Color.Transparent)
-                        ) { Text(screen, color = if (selected) Mint else Muted, fontWeight = FontWeight.Bold) }
-                    }
-                }
-                LayoutLabPreview(
-                    previewScreen = previewScreen,
-                    selectedElement = selectedElement,
-                    cardSizeScale = cardSizeScale,
-                    boardSpacingScale = boardSpacingScale,
-                    handSheetHeightFraction = handSheetHeightFraction,
-                    footerButtonScale = footerButtonScale,
-                    playerSectionOrder = playerSectionOrder,
-                    handActionOrder = handActionOrder,
-                    onSelectElement = { selectedElement = it },
-                    onMovePlayerElement = { id, direction ->
-                        val index = playerSectionOrder.indexOf(id)
-                        if (index >= 0) moveItem(playerSectionOrder, index, direction, onPlayerSectionOrder)
-                    },
-                    onMoveHandAction = { id, direction ->
-                        val index = handActionOrder.indexOf(id)
-                        if (index >= 0) moveItem(handActionOrder, index, direction, onHandActionOrder)
-                    }
-                )
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    listOf("COMFORTABLE", "LARGER CARDS", "COMPACT").forEach { preset ->
-                        TextButton(
-                            onClick = {
-                                when (preset) {
-                                    "LARGER CARDS" -> setPreset(1.16f, 1.05f, 0.64f, 1f)
-                                    "COMPACT" -> setPreset(0.88f, 0.72f, 0.46f, 0.92f)
-                                    else -> setPreset(1f, 1.2f, 0.58f, 1.05f)
-                                }
-                            },
-                            modifier = Modifier.weight(1f).heightIn(min = 42.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight),
-                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 3.dp)
-                        ) {
-                            Text(preset, color = SoftWhite, fontSize = 8.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 10.sp)
-                        }
-                    }
-                }
-                Text("ADJUST Â· $selectedElement", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 3.dp))
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                    when (selectedElement) {
-                        "BATTLEFIELD" -> {
-                            LayoutTuningSlider("Card size", cardSizeScale, 0.82f..1.18f, { "${(it * 100).toInt()}%" }, onCardSizeScale)
-                        }
-                        "STATUS", "COMMANDER" -> Text("This element can be removed below and restored from ADD ELEMENT.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp))
-                        "SPACING" -> LayoutTuningSlider("Space between sections", boardSpacingScale, 0.5f..2f, { "${(it * 100).toInt()}%" }, onBoardSpacingScale)
-                        "HAND" -> {
-                            LayoutTuningSlider("Hand tray height", handSheetHeightFraction, 0.38f..0.95f, { "${(it * 100).toInt()}%" }, onHandSheetHeightFraction)
-                            LayoutTuningSlider("Hand card size", cardSizeScale, 0.82f..1.18f, { "${(it * 100).toInt()}%" }, onCardSizeScale)
-                        }
-                        "FOOTER" -> LayoutTuningSlider("Footer button size", footerButtonScale, 0.9f..1.3f, { "${(it * 100).toInt()}%" }, onFooterButtonScale)
-                    }
-                    Text("Tap an element to tune it. Long-press and drag elements in the sample layout; nearby items animate aside as you move.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp, bottom = 8.dp))
-                    if (previewScreen == "PLAYER") {
-                        Text("PLAYER SCREEN ELEMENTS Â· HOLD AND DRAG TO REORDER", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 3.dp))
-                        playerSectionOrder.forEachIndexed { index, id ->
-                            LayoutOrderRow(
-                                title = layoutSectionTitle(id),
-                                subtitle = if (id == "STATUS") "Health, mana and activity" else if (id == "COMMANDER") "Commander card and cast control" else "Drag handle Â· long press to move",
-                                onMove = { direction -> moveItem(playerSectionOrder, index, direction, onPlayerSectionOrder) },
-                                onRemove = { onPlayerSectionOrder(playerSectionOrder - id) }
-                            )
-                        }
-                        Box {
-                            TextButton(onClick = { addElementMenuOpen = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp)) { Text("ADD ELEMENT  +", color = Mint, fontWeight = FontWeight.Bold) }
-                            DropdownMenu(expanded = addElementMenuOpen, onDismissRequest = { addElementMenuOpen = false }) {
-                                playerSectionCatalog.filterNot { it in playerSectionOrder }.forEach { id ->
-                                    DropdownMenuItem(text = { Text("Add ${layoutSectionTitle(id)}") }, onClick = { addElementMenuOpen = false; onPlayerSectionOrder(playerSectionOrder + id) })
-                                }
-                            }
-                        }
-                    } else {
-                        Text("HAND TRAY BUTTONS Â· HOLD AND DRAG TO REORDER", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 3.dp))
-                        handActionOrder.forEachIndexed { index, id ->
-                            LayoutOrderRow(
-                                title = layoutHandActionTitle(id),
-                                subtitle = "Shown when the action is available",
-                                onMove = { direction -> moveItem(handActionOrder, index, direction, onHandActionOrder) },
-                                onRemove = { onHandActionOrder(handActionOrder - id) }
-                            )
-                        }
-                        Box {
-                            TextButton(onClick = { addElementMenuOpen = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp)) { Text("ADD BUTTON  +", color = Mint, fontWeight = FontWeight.Bold) }
-                            DropdownMenu(expanded = addElementMenuOpen, onDismissRequest = { addElementMenuOpen = false }) {
-                                handActionCatalog.filterNot { it in handActionOrder }.forEach { id ->
-                                    DropdownMenuItem(text = { Text("Add ${layoutHandActionTitle(id)}") }, onClick = { addElementMenuOpen = false; onHandActionOrder(handActionOrder + id) })
-                                }
-                            }
-                        }
-                    }
-                }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onReset, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
-                        Text("RESET TO DEFAULT", color = Color(0xFFE5B2A7), fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                    }
-                    Button(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = PanelLight)) {
-                        Text("DONE", color = Mint, fontWeight = FontWeight.Black)
-                    }
-                }
-            }
-        }
-    }
-}
-
-private fun layoutSectionTitle(id: String): String = when (id) {
-    "STATUS" -> "Health and activity bar"
-    "COMMANDER" -> "Commander strip"
-    "STEP" -> "Next step"
-    "ZONES" -> "Library and zone buttons"
-    "REVEALED" -> "Public reveals"
-    "BATTLEFIELD" -> "Battlefield"
-    else -> id
-}
-
-private fun layoutHandActionTitle(id: String): String = when (id) {
-    "DRAW" -> "Draw"
-    "REVEAL" -> "Reveal hand"
-    "STACK" -> "Stack"
-    "CAST_COMMANDER" -> "Cast Commander"
-    "COMBAT" -> "Combat"
-    "NEXT_STEP" -> "Next step"
-    "PASS_TURN" -> "Pass turn"
-    "MORE" -> "More actions"
-    else -> id
-}
-
-@Composable
-private fun LayoutOrderRow(title: String, subtitle: String, onMove: (Int) -> Unit, onRemove: () -> Unit) {
-    val density = LocalDensity.current
-    val dragThreshold = with(density) { 34.dp.toPx() }
-    val currentMove by rememberUpdatedState(onMove)
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 52.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)
-            .pointerInput(title, dragThreshold) {
-                var accumulatedDrag = 0f
-                detectDragGesturesAfterLongPress(
-                    onDragStart = { accumulatedDrag = 0f },
-                    onDrag = { change, amount ->
-                        change.consume()
-                        accumulatedDrag += amount.y
-                        if (accumulatedDrag >= dragThreshold) { currentMove(1); accumulatedDrag -= dragThreshold }
-                        else if (accumulatedDrag <= -dragThreshold) { currentMove(-1); accumulatedDrag += dragThreshold }
-                    }
-                )
-            },
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text("â ¿", color = Mint, fontSize = 19.sp, modifier = Modifier.padding(start = 10.dp, end = 9.dp))
-        Column(Modifier.weight(1f).padding(vertical = 5.dp)) {
-            Text(title, color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = Muted, fontSize = 8.sp)
-        }
-        IconButton(onClick = onRemove, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Remove $title", tint = Color(0xFFE9978B)) }
-    }
-}
-
-@Composable
-private fun LayoutLabPreview(
-    previewScreen: String,
-    selectedElement: String,
-    cardSizeScale: Float,
-    boardSpacingScale: Float,
-    handSheetHeightFraction: Float,
-    footerButtonScale: Float,
-    playerSectionOrder: List<String>,
-    handActionOrder: List<String>,
-    onSelectElement: (String) -> Unit,
-    onMovePlayerElement: (String, Int) -> Unit,
-    onMoveHandAction: (String, Int) -> Unit
-) {
-    val sectionGap = (4.dp * boardSpacingScale).coerceIn(2.dp, 10.dp)
-    val previewHeight = if (previewScreen == "HAND") (160.dp + 150.dp * handSheetHeightFraction).coerceIn(205.dp, 285.dp) else 226.dp
-    Box(Modifier.fillMaxWidth().height(previewHeight).clip(RoundedCornerShape(13.dp)).background(Color(0xFF101917))) {
-        if (previewScreen == "PLAYER") {
-            LazyColumn(
-                Modifier.fillMaxSize().padding(8.dp),
-                verticalArrangement = Arrangement.spacedBy(sectionGap)
-            ) {
-                items(playerSectionOrder, key = { "section-$it" }) { section ->
-                    LayoutPreviewDraggable(
-                        elementId = "section-$section",
-                        onMove = { direction -> onMovePlayerElement(section, direction) }
-                    ) { dragModifier -> when (section) {
-                    "STATUS" -> Row(
-                        dragModifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)
-                            .border(if (selectedElement == "STATUS") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp))
-                            .clickable { onSelectElement("STATUS") }.padding(horizontal = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("â— YOU Â· ONLINE Â· ACTIVE", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                        Text("40  +", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Black)
-                    }
-                    "COMMANDER" -> Row(
-                        dragModifier.fillMaxWidth().height(28.dp).clip(RoundedCornerShape(7.dp)).background(PanelLight)
-                            .border(if (selectedElement == "COMMANDER") 2.dp else 0.dp, Mint, RoundedCornerShape(7.dp))
-                            .clickable { onSelectElement("COMMANDER") }.padding(horizontal = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) { Text("COMMAND ZONE Â· COMMANDER", color = CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
-                    "STEP" -> Row(dragModifier.fillMaxWidth().height(24.dp).clickable { onSelectElement("SPACING") }, verticalAlignment = Alignment.CenterVertically) {
-                        Text("NEXT STEP  â€º", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterVertically).padding(start = 5.dp))
-                    }
-                    "ZONES" -> Row(dragModifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        listOf("LIBRARY", "HAND", "GRAVEYARD").forEach { label -> Text(label, color = SoftWhite, fontSize = 6.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(PanelLight).padding(horizontal = 5.dp, vertical = 4.dp)) }
-                    }
-                    "REVEALED" -> Text("PUBLIC REVEALS", color = CounterGold, fontSize = 7.sp, modifier = dragModifier.clickable { onSelectElement("SPACING") }.padding(start = 4.dp))
-                    "BATTLEFIELD" -> Column(
-                        dragModifier.fillMaxWidth().height(92.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)
-                            .border(if (selectedElement == "BATTLEFIELD") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp))
-                            .clickable { onSelectElement("BATTLEFIELD") }.padding(6.dp),
-                        verticalArrangement = Arrangement.spacedBy(3.dp)
-                    ) {
-                        Text("BATTLEFIELD Â· grouped by type", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                            val tileWidth = (38.dp * cardSizeScale).coerceIn(31.dp, 46.dp)
-                            val tileHeight = tileWidth / 0.72f
-                            listOf("CREATURE", "ARTIFACT", "LAND").forEachIndexed { index, label ->
-                                Column(Modifier.width(tileWidth).height(tileHeight).clip(RoundedCornerShape(5.dp)).background(listOf(Color(0xFF66513D), Color(0xFF364C52), Color(0xFF4A644C))[index]).padding(3.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                                    Text(label, color = SoftWhite, fontSize = 5.sp, maxLines = 1)
-                                    Box(Modifier.fillMaxWidth().height((tileHeight * 0.5f).coerceAtLeast(18.dp)).clip(RoundedCornerShape(3.dp)).background(Color.White.copy(alpha = 0.14f)))
-                                    Text("CARD NAME", color = SoftWhite, fontSize = 5.sp, maxLines = 1)
-                                }
-                            }
-                        }
-                    }
-                }
-                    }
-                }
-                item(key = "preview-footer") {
-                    Row(
-                        Modifier.fillMaxWidth().height((34.dp * footerButtonScale).coerceIn(31.dp, 46.dp)).clip(RoundedCornerShape(8.dp)).background(PanelLight)
-                            .border(if (selectedElement == "FOOTER") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp)).clickable { onSelectElement("FOOTER") },
-                        horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        listOf("PASS TURN", "HAND", "BACK TO TABLE").forEach { label ->
-                            Box(Modifier.weight(1f).fillMaxHeight().padding(3.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xFF293934)), contentAlignment = Alignment.Center) {
-                                Text(label, color = Mint, fontSize = 6.sp, fontWeight = FontWeight.Bold, maxLines = 1)
-                            }
-                        }
-                    }
-                }
-            }
-        } else {
-            Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(sectionGap)) {
-            Row(Modifier.fillMaxWidth().height(30.dp).clickable { onSelectElement("HAND") }, verticalAlignment = Alignment.CenterVertically) {
-                Text("YOUR HAND Â· 5 CARDS", color = SoftWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text("Ã—", color = SoftWhite, fontSize = 18.sp)
-            }
-            androidx.compose.foundation.lazy.LazyRow(
-                Modifier.fillMaxWidth().height(30.dp).clip(RoundedCornerShape(7.dp)).background(PanelLight)
-                    .border(if (selectedElement == "HAND") 2.dp else 0.dp, Mint, RoundedCornerShape(7.dp)).clickable { onSelectElement("HAND") }
-                    ,
-                horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically
-            ) {
-                items(handActionOrder, key = { "hand-action-$it" }) { id ->
-                    LayoutPreviewDraggable(
-                        elementId = "hand-action-$id",
-                        horizontal = true,
-                        onMove = { direction -> onMoveHandAction(id, direction) }
-                    ) { dragModifier ->
-                        Text(layoutHandActionTitle(id).uppercase(), color = Mint, fontSize = 6.sp, fontWeight = FontWeight.Bold, modifier = dragModifier.padding(horizontal = 5.dp), maxLines = 1)
-                    }
-                }
-            }
-            Row(
-                Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(8.dp)).background(PanelLight)
-                    .border(if (selectedElement == "HAND") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp)).clickable { onSelectElement("HAND") }.padding(5.dp),
-                horizontalArrangement = Arrangement.spacedBy(5.dp)
-            ) {
-                val cardWidth = (44.dp * cardSizeScale).coerceIn(36.dp, 52.dp)
-                repeat(3) { index ->
-                    Box(Modifier.width(cardWidth).fillMaxHeight().clip(RoundedCornerShape(5.dp)).background(listOf(Color(0xFF7A513F), Color(0xFF3D6674), Color(0xFF665A3D))[index]), contentAlignment = Alignment.BottomCenter) {
-                        Text("SAMPLE CARD", color = SoftWhite, fontSize = 5.sp, modifier = Modifier.padding(bottom = 5.dp))
-                    }
-                }
-            }
-            }
-        }
-    }
-}
-
-@Composable
-private fun LazyItemScope.LayoutPreviewDraggable(
-    elementId: String,
-    horizontal: Boolean = false,
-    onMove: (Int) -> Unit,
-    content: @Composable (Modifier) -> Unit
-) {
-    val density = LocalDensity.current
-    val dragThreshold = with(density) { 30.dp.toPx() }
-    val moveCurrent by rememberUpdatedState(onMove)
-    var dragging by remember(elementId) { mutableStateOf(false) }
-    var dragOffset by remember(elementId) { mutableFloatStateOf(0f) }
-    val dragModifier = Modifier
-        .animateItem()
-        .graphicsLayer {
-            if (horizontal) translationX = dragOffset else translationY = dragOffset
-            scaleX = if (dragging) 1.035f else 1f
-            scaleY = if (dragging) 1.035f else 1f
-            shadowElevation = if (dragging) 12.dp.toPx() else 0f
-        }
-        .zIndex(if (dragging) 1f else 0f)
-        .pointerInput(elementId, horizontal, dragThreshold) {
-            var accumulated = 0f
-            detectDragGesturesAfterLongPress(
-                onDragStart = { accumulated = 0f; dragOffset = 0f; dragging = true },
-                onDragEnd = { dragOffset = 0f; dragging = false },
-                onDragCancel = { dragOffset = 0f; dragging = false },
-                onDrag = { change, amount ->
-                    change.consume()
-                    val delta = if (horizontal) amount.x else amount.y
-                    accumulated += delta
-                    dragOffset += delta
-                    while (accumulated >= dragThreshold) {
-                        moveCurrent(1)
-                        accumulated -= dragThreshold
-                        dragOffset -= dragThreshold
-                    }
-                    while (accumulated <= -dragThreshold) {
-                        moveCurrent(-1)
-                        accumulated += dragThreshold
-                        dragOffset += dragThreshold
-                    }
-                }
-            )
-        }
-    content(dragModifier)
-}
-
-@Composable
-private fun LayoutTuningSlider(
-    label: String,
-    value: Float,
-    valueRange: ClosedFloatingPointRange<Float>,
-    valueLabel: (Float) -> String,
-    onValueChange: (Float) -> Unit
-) {
-    Column(Modifier.fillMaxWidth().padding(top = 5.dp, bottom = 1.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(label, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-            Text(valueLabel(value), color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        }
-        Slider(value = value, onValueChange = onValueChange, valueRange = valueRange)
-    }
-}
-
-@Composable
-private fun SettingsToggle(title: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth().heightIn(min = 54.dp), verticalAlignment = Alignment.CenterVertically) {
-        Column(Modifier.weight(1f).padding(end = 8.dp)) {
-            Text(title, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            Text(detail, color = Muted, fontSize = 10.sp)
-        }
-        Switch(checked = checked, onCheckedChange = onChange)
-    }
-}
-
-@Composable
-private fun RulesLookupDialog(onDismiss: () -> Unit) {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val cacheFile = remember { java.io.File(context.filesDir, "magic-comprehensive-rules.txt") }
-    var rulesText by remember { mutableStateOf("") }
-    var query by remember { mutableStateOf("") }
-    var loading by remember { mutableStateOf(false) }
-    var status by remember { mutableStateOf("") }
-    LaunchedEffect(Unit) {
-        if (cacheFile.exists()) rulesText = withContext(Dispatchers.IO) { cacheFile.readText() }
-    }
-    val ruleLines = remember(rulesText, query) {
-        val all = rulesText.lineSequence().toList()
-        if (query.isBlank()) all else all.filter { it.contains(query.trim(), ignoreCase = true) }
-    }
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.94f), shape = RoundedCornerShape(16.dp), color = Panel) {
-            Column {
-                Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 6.dp, top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("MAGIC RULEBOOK", color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Black)
-                        Text(if (rulesText.isNotBlank()) rulesText.lineSequence().take(3).lastOrNull { it.contains("effective as of", true) } ?: "Official Wizards Comprehensive Rules" else "Official Wizards Comprehensive Rules Â· offline after download", color = Muted, fontSize = 9.sp)
-                    }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close rules", tint = Muted) }
-                }
-                Text("This reader uses Wizardsâ€™ official Comprehensive Rules text. Download it once to browse offline; check for updates when connected.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 3.dp))
-                Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(query, { query = it }, Modifier.weight(1f), singleLine = true, label = { Text("Search rule number or phrase") })
-                    TextButton(onClick = {
-                        loading = true
-                        status = "Downloading official rulesâ€¦"
-                        scope.launch {
-                            val result = runCatching {
-                                withContext(Dispatchers.IO) {
-                                    val connection = java.net.URL("https://media.wizards.com/2026/downloads/MagicCompRules%2020260925.txt").openConnection() as java.net.HttpURLConnection
-                                    connection.connectTimeout = 15_000
-                                    connection.readTimeout = 25_000
-                                    connection.setRequestProperty("User-Agent", "ArcanaTable/0.15.24")
-                                    try {
-                                        if (connection.responseCode !in 200..299) error("Wizards returned ${connection.responseCode}.")
-                                        val text = connection.inputStream.bufferedReader().use { it.readText() }
-                                        if (!text.startsWith("Magic: The Gathering Comprehensive Rules")) error("The downloaded file was not recognized as the official rules text.")
-                                        cacheFile.writeText(text)
-                                        text
-                                    } finally { connection.disconnect() }
-                                }
-                            }
-                            result.onSuccess { rulesText = it; status = "Official rules downloaded for offline use." }
-                                .onFailure { status = "Download failed. Check your connection and try again." }
-                            loading = false
-                        }
-                    }, enabled = !loading, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (loading) "DOWNLOADING" else if (rulesText.isBlank()) "DOWNLOAD" else "UPDATE", color = Mint, fontSize = 8.sp) }
-                }
-                if (status.isNotBlank()) Text(status, color = if (rulesText.isNotBlank()) Mint else CounterGold, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 3.dp))
-                if (rulesText.isBlank()) {
-                    Column(Modifier.weight(1f).fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Download the official Comprehensive Rules to start browsing and searching. The downloaded copy stays on this device for offline use.", color = Muted, fontSize = 12.sp)
-                    }
-                } else {
-                    Text("${ruleLines.size} matching lines", color = Muted, fontSize = 8.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 3.dp))
-                    LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(horizontal = 10.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        items(ruleLines.size) { index ->
-                            Text(ruleLines[index], color = if (ruleLines[index].matches(Regex("^\\d+(?:\\.[a-z]+)?\\..*"))) Mint else SoftWhite, fontSize = 9.sp, modifier = Modifier.fillMaxWidth().padding(horizontal = 5.dp, vertical = 2.dp))
-                        }
-                    }
-                }
-                Text("Source: Wizards of the Coast Â· magic.wizards.com/en/rules", color = Muted, fontSize = 8.sp, modifier = Modifier.padding(10.dp))
-            }
-        }
-    }
-}
-
-@Composable
-private fun DeveloperOptionsPage(players: List<TablePlayer>, selectedPlayer: Int, onSelectPlayer: (Int) -> Unit, onLoadRandomDecks: () -> Unit, onRandomizeMidgame: () -> Unit, onOpenWalkthrough: () -> Unit, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.9f), shape = RoundedCornerShape(16.dp), color = Panel) {
-            Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("DEVELOPER OPTIONS", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close developer options", tint = Muted) }
-                }
-                Text("Temporarily control a player's view to test how the table behaves.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(vertical = 8.dp))
-                players.forEachIndexed { index, player ->
-                    TextButton(onClick = { onSelectPlayer(index) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                        Text("${if (index == selectedPlayer) "â—  " else "â—‹  "}${player.name}  Â·  Act as player", color = if (index == selectedPlayer) Mint else SoftWhite, modifier = Modifier.fillMaxWidth())
-                    }
-                }
-                HorizontalDivider(color = PanelLight, modifier = Modifier.padding(vertical = 10.dp))
-                Text("RANDOM TEST SETUPS", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Text("Replace current player zones with test data.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
-                TextButton(onClick = onLoadRandomDecks, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) { Text("Load randomized decks for all players", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
-                TextButton(onClick = onRandomizeMidgame, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) { Text("Randomize a mid-game state", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun GuidedTutorialOverlay(step: TutorialStop, index: Int, total: Int, targetBounds: Rect?, onBack: () -> Unit, onNext: () -> Unit, onExit: () -> Unit) {
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val density = LocalDensity.current
-        val accent = Color(0xFFFF3344)
-        val viewSteps = tutorialStops.filter { it.view == step.view }
-        val viewIndex = (viewSteps.indexOf(step) + 1).coerceAtLeast(1)
-        val targetBelowCenter = with(density) { targetBounds?.center?.y?.let { it > maxHeight.toPx() / 2f } ?: true }
-        Canvas(
-            Modifier.fillMaxSize().graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-        ) {
-            drawRect(Color.Black.copy(alpha = 0.76f))
-            targetBounds?.let { bounds ->
-                val margin = 6.dp.toPx()
-                val left = (bounds.left - margin).coerceAtLeast(0f)
-                val top = (bounds.top - margin).coerceAtLeast(0f)
-                val right = (bounds.right + margin).coerceAtMost(size.width)
-                val bottom = (bounds.bottom + margin).coerceAtMost(size.height)
-                val origin = Offset(left, top)
-                val targetSize = Size((right - left).coerceAtLeast(0f), (bottom - top).coerceAtLeast(0f))
-                val radius = CornerRadius(14.dp.toPx())
-                drawRoundRect(Color.Transparent, topLeft = origin, size = targetSize, cornerRadius = radius, blendMode = BlendMode.Clear)
-                drawRoundRect(accent, topLeft = origin, size = targetSize, cornerRadius = radius, style = Stroke(3.dp.toPx()))
-                // A straight shaft and solid triangular head: a conventional arrow, not a sketch.
-                val startY = if (targetBelowCenter) 184.dp.toPx() else size.height - 184.dp.toPx()
-                val start = Offset(bounds.center.x.coerceIn(18.dp.toPx(), size.width - 18.dp.toPx()), startY.coerceIn(18.dp.toPx(), size.height - 18.dp.toPx()))
-                val tip = if (targetBelowCenter) Offset(bounds.center.x, (bounds.top - 10.dp.toPx()).coerceAtLeast(0f))
-                    else Offset(bounds.center.x, (bounds.bottom + 10.dp.toPx()).coerceAtMost(size.height))
-                val dx = tip.x - start.x
-                val dy = tip.y - start.y
-                val length = kotlin.math.sqrt(dx * dx + dy * dy).coerceAtLeast(1f)
-                val ux = dx / length
-                val uy = dy / length
-                val headLength = 16.dp.toPx()
-                val headHalfWidth = 7.dp.toPx()
-                val base = Offset(tip.x - ux * headLength, tip.y - uy * headLength)
-                val px = -uy * headHalfWidth
-                val py = ux * headHalfWidth
-                drawLine(accent, start, base, strokeWidth = 3.5.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-                val arrowHead = Path().apply {
-                    moveTo(tip.x, tip.y)
-                    lineTo(base.x + px, base.y + py)
-                    lineTo(base.x - px, base.y - py)
-                    close()
-                }
-                drawPath(arrowHead, accent)
-            }
-        }
-        Surface(
-            Modifier.align(if (targetBelowCenter) Alignment.TopCenter else Alignment.BottomCenter)
-                .padding(horizontal = 12.dp, vertical = 20.dp).fillMaxWidth(0.96f).heightIn(min = 224.dp, max = 320.dp),
-            shape = RoundedCornerShape(16.dp), color = Panel, shadowElevation = 12.dp
-        ) {
-            Column(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("${step.view} Â· $viewIndex/${viewSteps.size}", color = Mint, fontWeight = FontWeight.Black, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onExit, modifier = Modifier.size(48.dp)) { Icon(Icons.Filled.Close, "Exit tutorial", tint = Muted) }
-                }
-                Text(step.title, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(step.explanation, color = Muted, fontSize = 16.sp, lineHeight = 22.sp, modifier = Modifier.padding(top = 5.dp))
-                if (targetBounds == null && step.target.isNotBlank()) Text("This control is hidden right now. Tap Next to keep going.", color = CounterGold, fontSize = 13.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onBack, enabled = index > 0, modifier = Modifier.heightIn(min = 48.dp)) { Text("BACK", color = if (index > 0) SoftWhite else Muted, fontSize = 13.sp) }
-                    Spacer(Modifier.weight(1f))
-                    TextButton(onClick = onNext, modifier = Modifier.heightIn(min = 48.dp)) { Text("NEXT â€º", color = Mint, fontWeight = FontWeight.Bold, fontSize = 13.sp) }
-                }
-                if (targetBounds != null && step.target.isNotBlank()) Text("Tap the highlighted control or Next to continue.", color = accent, fontSize = 11.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            }
-        }
-    }
-}
-
-@Composable
-private fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier = Modifier, compact: Boolean = false, isActivePlayer: Boolean = false, turnNumber: Int, phaseName: String, turnTime: Long?, showTurnTimer: Boolean, tutorialAnchor: (String) -> Modifier, onToggleTimer: () -> Unit, onMoveUp: () -> Unit, onMoveDown: () -> Unit, onOpen: () -> Unit, onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit) {
-    var expanded by remember(player.id) { mutableStateOf(isActivePlayer) }
-    LaunchedEffect(player.id, isActivePlayer) { expanded = isActivePlayer }
-    val paymentCards = player.battlefield.filter { card ->
-        if (card.isFaceDown) return@filter false
-        val name = card.name.lowercase()
-        val oracle = card.oracleText.orEmpty().lowercase()
-        name == "rhystic study" || name == "smothering tithe" ||
-            (("whenever an opponent" in oracle || "whenever a player" in oracle) && ("unless" in oracle && "pay" in oracle || "may pay" in oracle))
-    }
-    Column(modifier.animateContentSize().clip(RoundedCornerShape(14.dp)).background(Panel).border(if (isActivePlayer) 2.dp else 1.dp, if (isActivePlayer) Mint else Color(0xFF33423D), RoundedCornerShape(14.dp)).combinedClickable(onClick = onOpen).padding(if (compact) 6.dp else 10.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("${if (player.isEliminated) "âœ• " else if (player.isOnline) "â— " else ""}${player.name} Â· P${index + 1}${if (player.isComputer) " Â· AI" else ""}${if (player.isEliminated) " Â· OUT" else if (isActivePlayer) " Â· TURN" else ""}", color = if (player.isEliminated) Muted else if (isActivePlayer || player.isOnline) Mint else SoftWhite, fontWeight = FontWeight.Bold, fontSize = if (compact) 9.sp else 12.sp, letterSpacing = 0.3.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (!compact) Text("${player.hand.size} in hand  Â·  ${player.library.size} in library", color = Muted, fontSize = 10.sp)
-            }
-            if (compact) TextButton(onClick = onOpen, modifier = Modifier.heightIn(min = 48.dp)) { Text("VIEW", color = Mint, fontSize = 9.sp) }
-            Text("${player.life}", color = Mint, fontSize = if (compact) 20.sp else 27.sp, fontWeight = FontWeight.Black)
-        }
-        if (player.commanderName != null) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                player.commanderCard?.let { commander ->
-                    val crop = commander.artCropUrl ?: commander.imageUrl
-                    if (!crop.isNullOrBlank()) CardArt(
-                        crop,
-                        Modifier.size(width = if (compact) 60.dp else 92.dp, height = if (compact) 38.dp else 58.dp)
-                            .clip(RoundedCornerShape(6.dp)).border(1.dp, CounterGold.copy(alpha = 0.8f), RoundedCornerShape(6.dp))
-                            .combinedClickable(onClick = { onPreview(commander) }, onLongClick = { onPreview(commander) }).then(tutorialAnchor("commander-art")),
-                        contentScale = ContentScale.Crop
-                    ) else Box(
-                        Modifier.size(width = if (compact) 60.dp else 92.dp, height = if (compact) 38.dp else 58.dp)
-                            .clip(RoundedCornerShape(6.dp)).background(PanelLight).border(1.dp, CounterGold, RoundedCornerShape(6.dp))
-                            .combinedClickable(onClick = { onPreview(commander) }, onLongClick = { onPreview(commander) }),
-                        contentAlignment = Alignment.Center
-                    ) { Text("COMMANDER", color = CounterGold, fontSize = 7.sp, fontWeight = FontWeight.Bold) }
-                }
-                Text("COMMANDER Â· ${player.commanderName}", color = CounterGold, fontSize = if (compact) 7.sp else 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        val commanderDamageTotal = player.commanderDamageReceived.values.sum()
-        val visibleCounters = player.playerCounters.filterValues { it > 0 }
-        if (commanderDamageTotal > 0 || visibleCounters.isNotEmpty() || player.isEliminated) {
-            Text(buildList {
-                if (commanderDamageTotal > 0) add("CMD DAMAGE $commanderDamageTotal")
-                visibleCounters.forEach { (name, amount) -> add("$name $amount") }
-                if (player.isEliminated) add(player.eliminationReason ?: "ELIMINATED")
-            }.joinToString("  Â·  "), color = if (player.isEliminated) Color(0xFFE9978B) else CounterGold, fontSize = if (compact) 7.sp else 8.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        }
-        Text("TURN $turnNumber Â· $phaseName${if (showTurnTimer && turnTime != null) " Â· ${formatClock(turnTime)}" else ""}", color = if (isActivePlayer) Mint else Muted, fontSize = if (compact) 7.sp else 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = if (turnTime != null) Modifier.combinedClickable(onClick = {}, onLongClick = onToggleTimer) else Modifier)
-        if (paymentCards.isNotEmpty()) {
-            Text("PAYMENT TRIGGER${if (paymentCards.size > 1) "S" else ""} Â· ${paymentCards.joinToString { it.name }}", color = CounterGold, fontSize = if (compact) 7.sp else 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-        Spacer(Modifier.height(if (compact) 2.dp else 8.dp))
-        val typeCounts = player.battlefield.groupingBy { battlefieldGroups(listOf(it)).firstOrNull()?.first ?: "Other" }.eachCount()
-        val zoneSummary = listOfNotNull(
-            player.graveyard.size.takeIf { it > 0 }?.let { "GY $it" },
-            player.exile.size.takeIf { it > 0 }?.let { "EX $it" },
-            player.revealed.size.takeIf { it > 0 }?.let { "PUBLIC $it" }
-        ).joinToString("  Â·  ")
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text("BOARD Â· ${player.battlefield.size} permanents", color = Muted, fontSize = if (compact) 8.sp else 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.7.sp)
-        }
-        if (typeCounts.isNotEmpty()) Text(typeCounts.entries.joinToString("  Â·  ") { "${it.key} ${it.value}" }, color = Muted, fontSize = if (compact) 7.sp else 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (zoneSummary.isNotBlank()) Text(zoneSummary, color = Muted, fontSize = if (compact) 7.sp else 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-
-        if (expanded) {
-            Spacer(Modifier.height(5.dp))
-            val cardGroups = listOf(
-                "BATTLEFIELD" to player.battlefield,
-                "GRAVEYARD" to player.graveyard,
-                "EXILE" to player.exile,
-                "PUBLICLY REVEALED" to player.revealed
-            ).filter { it.second.isNotEmpty() }
-            if (cardGroups.isEmpty()) Text("No public cards to show", color = Muted, fontSize = 10.sp)
-            else {
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    cardGroups.forEach { (title, cards) ->
-                        Text(title, color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
-                        Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                            cards.chunked(2).forEach { rowCards ->
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    rowCards.forEach { card ->
-                                        OverviewCard(card, if (compact) 48.dp else 72.dp, onClick = { if (title == "BATTLEFIELD") onOpen() else onPublicPreview(card) }, onLongClick = { onPublicPreview(card) })
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if (player.handRevealedToAll && player.hand.isNotEmpty()) {
-                        Text("HAND REVEALED TO EVERYONE", color = CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                        Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            player.hand.forEach { card -> CardFace(card, Modifier.width(if (compact) 30.dp else 44.dp), onClick = { onPreview(card) }, onLongClick = { onPreview(card) }, showCounters = false) }
-                        }
-                    }
-                }
-            }
-            if (!compact) Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (player.graveyard.isNotEmpty()) ZoneChip("GRAVEYARD", player.graveyard.size) { onZone("Graveyard") }
-                if (player.exile.isNotEmpty()) ZoneChip("EXILE", player.exile.size) { onZone("Exile") }
-                if (player.revealed.isNotEmpty()) ZoneChip("REVEALED", player.revealed.size) { onZone("Revealed") }
-            }
-        }
-        Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = if (expanded) "Collapse player details" else "Expand player details",
-            tint = Muted, modifier = Modifier.align(Alignment.CenterHorizontally).size(28.dp).clip(CircleShape).combinedClickable(onClick = { expanded = !expanded }))
-        if (expanded) {
-            Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                TextButton(onClick = onMoveUp, enabled = index > 0, modifier = Modifier.heightIn(min = 48.dp)) { Text("MOVE â†‘", color = Mint, fontSize = 9.sp) }
-                TextButton(onClick = onMoveDown, modifier = Modifier.heightIn(min = 48.dp)) { Text("MOVE â†“", color = Mint, fontSize = 9.sp) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ZoneChip(name: String, count: Int, enabled: Boolean = true, onClick: () -> Unit) {
-    Text("$name  $count", color = if (enabled) SoftWhite else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.heightIn(min = 34.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(6.dp)).background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp))
-}
-
-@Composable
-private fun PlayerBoard(
-    player: TablePlayer, playerIndex: Int, isLandscape: Boolean, cardSizeScale: Float = 1f, boardSpacingScale: Float = 1f, gameInProgress: Boolean, isActivePlayer: Boolean, canControl: Boolean, turnNumber: Int, phaseName: String, modifier: Modifier,
-    playerSectionOrder: List<String>,
-    tutorialAnchor: (String) -> Modifier, stackCount: Int, commanderUnavailable: Boolean,
-    onLife: (Int) -> Unit, onDraw: () -> Unit, onShowHand: () -> Unit, onShowHandFromZone: () -> Unit, onToken: () -> Unit, onManageMana: () -> Unit,
-    onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit, onTapCard: (Int) -> Unit,
-    onCardAction: (GameCard, String) -> Unit, onReveal: () -> Unit, onShuffle: () -> Unit,
-    onNextStep: () -> Unit, onOpenLog: () -> Unit, onOpenChat: () -> Unit, onCombat: () -> Unit,
-    onTrackers: () -> Unit, onStack: () -> Unit, onOpenMore: () -> Unit, onSearchLibrary: () -> Unit, onCastCommander: () -> Unit, onConcede: () -> Unit
-) {
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp
-    val battlefieldCardWidth = when {
-        screenWidthDp >= 1000 -> (142 * cardSizeScale).dp
-        screenWidthDp >= 700 -> (128 * cardSizeScale).dp
-        isLandscape -> (108 * cardSizeScale).dp
-        else -> (126 * cardSizeScale).dp
-    }
-    var moreOpen by remember { mutableStateOf(false) }
-    var shuffleConfirm by remember { mutableStateOf(false) }
-    val sectionContent: Map<String, @Composable ColumnScope.() -> Unit> = mapOf(
-            "STATUS" to {
-        Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(RoundedCornerShape(12.dp)).background(Panel).border(if (isActivePlayer) 2.dp else 0.dp, if (isActivePlayer) Mint else Panel, RoundedCornerShape(12.dp)).padding(horizontal = 9.dp).then(tutorialAnchor("player-status")), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("${if (player.isEliminated) "âœ• " else if (player.isOnline) "â— " else ""}${player.name}${if (player.isEliminated) " Â· ELIMINATED" else if (player.isOnline) " Â· ONLINE" else ""}${if (player.isComputer) " Â· AI" else ""}${if (isActivePlayer && !player.isEliminated) " Â· ACTIVE" else ""}", color = if (player.isEliminated) Muted else if (isActivePlayer || player.isOnline) Mint else SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                Text("TURN $turnNumber Â· ${phaseName} Â· P${playerIndex + 1} Â· ${player.hand.size} IN HAND Â· ${player.library.size} IN LIBRARY", color = Muted, fontSize = 8.sp, letterSpacing = 0.4.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Box(Modifier.padding(end = 3.dp).then(tutorialAnchor("mana-status"))) {
-                Column(
-                    Modifier.widthIn(min = 48.dp).heightIn(min = 40.dp).clip(RoundedCornerShape(8.dp))
-                        .background(if (canControl) PanelLight else Panel)
-                        .combinedClickable(enabled = canControl, onClick = onManageMana)
-                        .padding(horizontal = 6.dp, vertical = 3.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text("MANA", color = if (canControl) Muted else Muted.copy(alpha = 0.7f), fontSize = 7.sp, fontWeight = FontWeight.Bold)
-                    Text("${player.manaPool.values.sum()}", color = if (canControl) Mint else Muted, fontSize = 13.sp, fontWeight = FontWeight.Black)
-                }
-            }
-            IconButton(onClick = { onLife(-1) }, enabled = canControl, modifier = Modifier.size(44.dp).then(tutorialAnchor("life-down"))) { Icon(Icons.Filled.Remove, "Decrease life", tint = if (canControl) SoftWhite else Muted) }
-            Text("${player.life}", color = Mint, fontSize = 25.sp, fontWeight = FontWeight.Black, modifier = Modifier.widthIn(min = 36.dp))
-            IconButton(onClick = { onLife(1) }, enabled = canControl, modifier = Modifier.size(44.dp).then(tutorialAnchor("life-up"))) { Icon(Icons.Filled.Add, "Increase life", tint = if (canControl) Mint else Muted) }
-        }
-
-            },
-            "COMMANDER" to {
-        val commander = player.commanderCard
-        if (commander != null || player.commanderDamageReceived.isNotEmpty() || player.playerCounters.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(Panel).padding(horizontal = 5.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (commander != null) {
-                    CardFace(commander, Modifier.width(30.dp), onClick = { if (!commanderUnavailable && canControl) onCastCommander() }, onLongClick = { if (!commanderUnavailable && canControl) onCastCommander() }, showCounters = false)
-                    Column(Modifier.weight(1f).padding(start = 6.dp)) {
-                        Text("${if (commanderUnavailable) "IN PLAY / STACK" else "COMMAND ZONE"} Â· ${commander.name}", color = CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        val trackerSummary = player.playerCounters.entries.joinToString(" Â· ") { "${it.key} ${it.value}" }
-                        Text("Cast ${player.commanderCastCount} Â· tax +{${player.commanderCastCount * 2}}${if (trackerSummary.isNotBlank()) " Â· $trackerSummary" else ""}", color = Muted, fontSize = 7.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    TextButton(onClick = onCastCommander, enabled = canControl && !commanderUnavailable && !player.isEliminated, modifier = Modifier.heightIn(min = 32.dp).then(tutorialAnchor("commander-cast")), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) { Text("CAST", color = if (canControl && !commanderUnavailable && !player.isEliminated) Mint else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
-                } else Text("PLAYER TRACKERS Â· ${player.playerCounters.entries.joinToString { "${it.key} ${it.value}" }.ifBlank { "none" }}", color = Muted, fontSize = 9.sp, modifier = Modifier.weight(1f))
-                val incomingDamage = player.commanderDamageReceived.entries.sumOf { it.value }
-                if (incomingDamage > 0) Text("CMD DMG $incomingDamage", color = if (player.commanderDamageReceived.values.any { it >= 21 }) Color(0xFFE9978B) else CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-
-            },
-            "STEP" to {
-        if (gameInProgress) {
-            Row(Modifier.fillMaxWidth().then(tutorialAnchor("next-step")), verticalAlignment = Alignment.CenterVertically) {
-                Spacer(Modifier.weight(1f))
-                if (player.isComputer || player.isEliminated) Text(if (player.isEliminated) "ELIMINATED Â· ${player.eliminationReason ?: "OUT"}" else if (player.deckLoaded) "AI TURN IN PROGRESS" else "IMPORT A DECK FOR THE AI", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(10.dp))
-                else {
-                    TextButton(onClick = onNextStep, enabled = isActivePlayer && canControl, modifier = Modifier.heightIn(min = 38.dp).then(tutorialAnchor("next-step"))) {
-                        Text(if (!canControl) "OTHER PLAYER Â· READ ONLY" else if (isActivePlayer) "NEXT STEP  â€º" else "WAITING FOR TURN", color = if (isActivePlayer && canControl) Mint else Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
-
-            },
-            "ZONES" to {
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).then(tutorialAnchor("zones")), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            Box(Modifier.then(tutorialAnchor("zone-library"))) { ZoneChip("LIBRARY", player.library.size, enabled = canControl, onClick = onSearchLibrary) }
-            Box(Modifier.then(tutorialAnchor("zone-hand"))) { ZoneChip("HAND", player.hand.size, enabled = canControl, onClick = onShowHandFromZone) }
-            if (player.graveyard.isNotEmpty()) Box(Modifier.then(tutorialAnchor("zone-graveyard"))) { ZoneChip("GRAVEYARD", player.graveyard.size) { onZone("Graveyard") } }
-            if (player.exile.isNotEmpty()) Box(Modifier.then(tutorialAnchor("zone-exile"))) { ZoneChip("EXILE", player.exile.size) { onZone("Exile") } }
-            if (player.revealed.isNotEmpty()) Box(Modifier.then(tutorialAnchor("zone-revealed"))) { ZoneChip("REVEALED", player.revealed.size) { onZone("Revealed") } }
-        }
-
-            },
-            "REVEALED" to {
-        if (player.revealed.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Panel).padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("PUBLIC REVEALS", color = CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 7.dp))
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                    player.revealed.take(10).forEach { card -> CardFace(card, Modifier.width(40.dp), onClick = {}, onLongClick = { onPublicPreview(card) }, showCounters = false) }
-                }
-            }
-        }
-
-            },
-            "BATTLEFIELD" to {
-        Text("BATTLEFIELD  Â·  grouped by type  Â·  tap to tap/untap  Â·  long-press to inspect", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp, modifier = Modifier.padding(start = 3.dp))
-        if (player.battlefield.isEmpty()) {
-            Box(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)).background(Panel), contentAlignment = Alignment.Center) {
-                Text("Your battlefield is empty", color = Muted, fontSize = 12.sp)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)).background(Panel).padding(5.dp).then(tutorialAnchor("battlefield")),
-                verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(3.dp)
-            ) {
-                battlefieldGroups(player.battlefield).forEach { (type, cards) ->
-                    item(key = "header-$type") { Text("$type  Â·  ${cards.size}", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, modifier = Modifier.padding(start = 3.dp, top = 2.dp)) }
-                    item(key = "cards-$type") {
-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            cards.forEach { card ->
-                                BattlefieldCard(
-                                    card, battlefieldCardWidth,
-                                    interactive = canControl,
-                                    isCommander = card.id == player.commanderCard?.id,
-                                    canSetCommander = player.commanderCard == null && player.commanderName.isNullOrBlank(),
-                                    onTap = { onTapCard(card.id) }, onPreview = { onPreview(card) },
-                                    onAction = { action -> onCardAction(card, action) },
-                                    tutorialAnchor = if (card.id == player.battlefield.firstOrNull()?.id) tutorialAnchor("card-menu") else Modifier
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-            }
-    )
-    val defaultSectionOrder = listOf("STATUS", "COMMANDER", "STEP", "ZONES", "REVEALED", "BATTLEFIELD")
-    val normalizedSectionOrder = playerSectionOrder.filter { it in defaultSectionOrder }.distinct()
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp * boardSpacingScale)) {
-        normalizedSectionOrder.forEach { section -> sectionContent[section]?.invoke(this) }
-    }
-}
-
-private fun battlefieldGroups(cards: List<GameCard>): List<Pair<String, List<GameCard>>> {
-    val order = listOf("Creatures", "Planeswalkers", "Battles", "Artifacts", "Enchantments", "Lands", "Instants", "Sorceries", "Other", "Face-down")
-    fun category(card: GameCard): String {
-        if (card.isFaceDown) return "Face-down"
-        val type = card.type.lowercase()
-        return when {
-            "creature" in type -> "Creatures"
-            "planeswalker" in type -> "Planeswalkers"
-            "battle" in type -> "Battles"
-            "artifact" in type -> "Artifacts"
-            "enchantment" in type -> "Enchantments"
-            "land" in type -> "Lands"
-            "instant" in type -> "Instants"
-            "sorcery" in type -> "Sorceries"
-            else -> "Other"
-        }
-    }
-    val grouped = cards.groupBy(::category)
-    return order.mapNotNull { type -> grouped[type]?.let { type to it } }
-}
-
-@Composable
-private fun BattlefieldCard(card: GameCard, tileWidth: androidx.compose.ui.unit.Dp, interactive: Boolean = true, isCommander: Boolean = false, canSetCommander: Boolean = false, onTap: () -> Unit, onPreview: () -> Unit, onAction: (String) -> Unit, tutorialAnchor: Modifier = Modifier) {
-    var menuOpen by remember { mutableStateOf(false) }
-    val activatedAbilities = remember(card.id, card.oracleText) { cardActivatedAbilityLines(card) }
-    val cardHeight = tileWidth / 0.72f
-    Box(Modifier.width(if (card.tapped) cardHeight else tileWidth).height(cardHeight), contentAlignment = Alignment.Center) {
-        CardFace(card, Modifier.width(tileWidth), onClick = onTap, onLongClick = onPreview, animateTapped = true)
-        card.chosenCreatureType?.takeIf { it.isNotBlank() }?.let { chosenType ->
-            Text(
-                "TYPE Â· $chosenType",
-                color = SoftWhite,
-                fontSize = 8.sp,
-                fontWeight = FontWeight.Black,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 3.dp, vertical = 5.dp)
-                    .clip(RoundedCornerShape(5.dp)).background(Color(0xDD101615)).padding(horizontal = 5.dp, vertical = 3.dp)
-            )
-        }
-        if (interactive) Box(Modifier.align(Alignment.TopEnd).padding(3.dp).then(tutorialAnchor)) {
-            IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(34.dp).clip(CircleShape).background(Color(0xCC101615))) {
-                Icon(Icons.Filled.MoreVert, "${card.name} actions", tint = Color.White)
-            }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                DropdownMenuItem(text = { Text(if (card.tapped) "Untap" else "Tap") }, onClick = { menuOpen = false; onAction("TAP") })
-                DropdownMenuItem(text = { Text("Add counter") }, onClick = { menuOpen = false; onAction("COUNTER") })
-                DropdownMenuItem(text = { Text("Create token") }, onClick = { menuOpen = false; onAction("TOKEN") })
-                DropdownMenuItem(text = { Text("Move to graveyard") }, onClick = { menuOpen = false; onAction("GRAVEYARD") })
-                DropdownMenuItem(text = { Text("Exile") }, onClick = { menuOpen = false; onAction("EXILE") })
-                if (!card.isFaceDown && activatedAbilities.isNotEmpty()) {
-                    HorizontalDivider(color = Muted.copy(alpha = 0.3f))
-                    Text(if (card.type.contains("planeswalker", ignoreCase = true)) "LOYALTY ABILITIES" else "ACTIVATED ABILITIES", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 12.dp, vertical = 5.dp))
-                    activatedAbilities.forEach { ability ->
-                        DropdownMenuItem(
-                            text = { Text(ability, maxLines = 3, overflow = TextOverflow.Ellipsis, fontSize = 10.sp) },
-                            onClick = { menuOpen = false; onAction("ABILITY:$ability") }
-                        )
-                    }
-                }
-                if (canSetCommander && !card.isFaceDown) DropdownMenuItem(text = { Text("Set as commander") }, onClick = { menuOpen = false; onAction("SET COMMANDER") })
-                if (isCommander) DropdownMenuItem(text = { Text("Move commander to command zone") }, onClick = { menuOpen = false; onAction("COMMAND ZONE") })
-                if (card.isFaceDown) DropdownMenuItem(text = { Text("Turn face up") }, onClick = { menuOpen = false; onAction("FACE UP") })
-                DropdownMenuItem(text = { Text("Inspect card") }, onClick = { menuOpen = false; onAction("INSPECT") })
-            }
-        }
-    }
-}
-
-private fun cardActivatedAbilityLines(card: GameCard): List<String> {
-    return card.oracleText.orEmpty().lineSequence()
-        .map { it.trim() }
-        // Avoid java.util.regex here: Android's ICU regex engine rejects some
-        // escaped characters in character classes (notably `\\-`), which made
-        // merely rendering a battlefield card crash on affected devices.
-        .filter { line ->
-            if (line.isBlank()) return@filter false
-            val colon = line.indexOf(':')
-            if (colon !in 1..40 || colon == line.lastIndex) return@filter false
-            val cost = line.substring(0, colon).trim()
-            val effect = line.substring(colon + 1).trim()
-            cost.isNotEmpty() && effect.isNotEmpty() && !cost.contains('.')
-        }
-        .distinct()
-        .take(8)
-        .toList()
-}
-
-@Composable
-private fun OverviewCard(card: GameCard, width: androidx.compose.ui.unit.Dp, onClick: () -> Unit, onLongClick: () -> Unit) {
-    val height = width / 0.72f
-    Box(Modifier.width(if (card.tapped) height else width).height(height), contentAlignment = Alignment.Center) {
-        CardFace(card, Modifier.width(width), onClick = onClick, onLongClick = onLongClick, animateTapped = true)
-    }
-}
-
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: () -> Unit, onLongClick: () -> Unit, showCounters: Boolean = true, animateTapped: Boolean = false) {
-    val rotation by animateFloatAsState(targetValue = if (animateTapped && card.tapped) 90f else 0f, animationSpec = tween(260), label = "card-tap")
-    Box(
-        modifier.aspectRatio(0.72f).graphicsLayer(rotationZ = rotation).clip(RoundedCornerShape(8.dp)).background(card.color)
-            .border(if (card.tapped) 2.dp else 1.dp, if (card.tapped) Mint else Color.White.copy(alpha = 0.28f), RoundedCornerShape(8.dp))
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
-    ) {
-        if (card.isFaceDown) {
-            Box(Modifier.fillMaxSize().background(Color(0xFF12221E)), contentAlignment = Alignment.Center) {
-                Text("FACE\nDOWN", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
-            }
-        } else if (!card.imageUrl.isNullOrBlank()) CardArt(card.imageUrl, Modifier.fillMaxSize())
-        else Column(Modifier.fillMaxSize().background(card.color).padding(6.dp), verticalArrangement = Arrangement.SpaceBetween) {
-            Text(card.name, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 4, overflow = TextOverflow.Ellipsis)
-            Text(card.type, color = Color.White.copy(alpha = 0.8f), fontSize = 8.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
-        }
-        if (card.isToken && !card.isFaceDown) Text("TOKEN", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.TopStart).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xDD15221D)).padding(horizontal = 5.dp, vertical = 3.dp))
-        val visibleCounters = card.counters.entries.filter { it.value > 0 }
-        val counterText = visibleCounters.take(2).joinToString("  ") { "${it.key} ${it.value}" } + if (visibleCounters.size > 2) "  +${visibleCounters.size - 2}" else ""
-        if (showCounters && counterText.isNotBlank()) Text(counterText, color = Ink, fontSize = 7.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(CounterGold).padding(horizontal = 4.dp, vertical = 4.dp))
-    }
-}
-
-@Composable
-private fun CardArt(url: String, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Fit) {
-    var bitmap by remember(url) { mutableStateOf<Bitmap?>(CardBitmapCache.get(url)) }
-    LaunchedEffect(url) { if (bitmap == null) bitmap = try { downloadCardBitmap(url) } catch (_: Exception) { null } }
-    if (bitmap != null) Image(bitmap!!.asImageBitmap(), contentDescription = "Magic card art", modifier = modifier, contentScale = contentScale)
-    else Box(modifier.background(Color(0xFF263B35)), contentAlignment = Alignment.Center) { Text("âœ¦", color = Mint, fontSize = 16.sp) }
-}
-
-@Composable
-private fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeight: androidx.compose.ui.unit.Dp, highlightedCardId: Int?, handRevealed: Boolean, canAdvance: Boolean, canControl: Boolean, commanderCanCast: Boolean, actionOrder: List<String>, stackCount: Int, tutorialAnchor: (String) -> Modifier, onToggleReveal: (Boolean) -> Unit, onClose: () -> Unit, onDraw: () -> Unit, onCombat: () -> Unit, onNextStep: () -> Unit, onPassTurn: () -> Unit, onStack: () -> Unit, onCastCommander: () -> Unit, onMoreAction: (String) -> Unit, onSelect: (GameCard) -> Unit, onDragDrop: (GameCard, Offset) -> Unit) {
-    val handScrollState = rememberScrollState()
-    var moreOpen by remember { mutableStateOf(false) }
-    val density = LocalDensity.current
-    val cardHeight = (availableHeight - 190.dp).coerceIn(if (isLandscape) 180.dp else 220.dp, if (isLandscape) 300.dp else 410.dp)
-    val cardWidth = cardHeight * 0.72f
-    val cardStepPx = with(density) { cardWidth.plus(8.dp).roundToPx() }
-    LaunchedEffect(highlightedCardId, cards) {
-        val drawnIndex = cards.indexOfFirst { it.id == highlightedCardId }
-        if (drawnIndex >= 0) handScrollState.animateScrollTo((drawnIndex * cardStepPx).coerceAtMost(handScrollState.maxValue))
-    }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 8.dp)) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("YOUR HAND  Â·  ${cards.size} CARDS", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f))
-            IconButton(onClick = onClose, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close hand", tint = SoftWhite) }
-        }
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            actionOrder.forEach { action ->
-                when (action) {
-                    "DRAW" -> if (canControl) HeaderButton("DRAW", onDraw)
-                    "REVEAL" -> HeaderButton(if (handRevealed) "HIDE HAND" else "REVEAL HAND", { onToggleReveal(!handRevealed) })
-                    "STACK" -> HeaderButton("STACK Â· $stackCount", onStack, modifier = tutorialAnchor("stack-hand-button"))
-                    "CAST_COMMANDER" -> if (commanderCanCast) HeaderButton("CAST COMMANDER", onCastCommander, modifier = tutorialAnchor("commander-cast"))
-                    "COMBAT" -> if (canAdvance) HeaderButton("COMBAT", onCombat, modifier = tutorialAnchor("combat-action"))
-                    "NEXT_STEP" -> if (canAdvance) HeaderButton("NEXT STEP", onNextStep, modifier = tutorialAnchor("next-step"))
-                    "PASS_TURN" -> if (canAdvance) HeaderButton("PASS TURN", onPassTurn, modifier = tutorialAnchor("pass-turn"))
-                    "MORE" -> HeaderButton("MORE  â‹®", { moreOpen = true }, modifier = tutorialAnchor("more-actions"))
-                }
-            }
-            if (!canControl && actionOrder.none { it == "REVEAL" || it == "STACK" || it == "MORE" }) Text("WAITING", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
-            DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
-                if (canControl) {
-                    DropdownMenuItem(text = { Text("Add token") }, modifier = tutorialAnchor("token-action"), onClick = { moreOpen = false; onMoreAction("TOKEN") })
-                    DropdownMenuItem(text = { Text("Reveal top card") }, onClick = { moreOpen = false; onMoreAction("REVEAL") })
-                    DropdownMenuItem(text = { Text("Shuffle libraryâ€¦") }, onClick = { moreOpen = false; onMoreAction("SHUFFLE") })
-                    DropdownMenuItem(text = { Text("Player trackers and commander damage") }, onClick = { moreOpen = false; onMoreAction("TRACKERS") })
-                    DropdownMenuItem(text = { Text("Search / browse library") }, onClick = { moreOpen = false; onMoreAction("SEARCH") })
-                    DropdownMenuItem(text = { Text("Concede gameâ€¦", color = Color(0xFFE9978B)) }, onClick = { moreOpen = false; onMoreAction("CONCEDE") })
-                    DropdownMenuItem(text = { Text("View graveyard") }, onClick = { moreOpen = false; onMoreAction("GRAVEYARD") })
-                    DropdownMenuItem(text = { Text("View exile") }, onClick = { moreOpen = false; onMoreAction("EXILE") })
-                    DropdownMenuItem(text = { Text("View revealed zone") }, onClick = { moreOpen = false; onMoreAction("REVEALED") })
-                    HorizontalDivider(color = Muted.copy(alpha = 0.3f))
-                }
-                DropdownMenuItem(text = { Text("Open game log") }, onClick = { moreOpen = false; onMoreAction("LOG") })
-                DropdownMenuItem(text = { Text("Open text chat") }, onClick = { moreOpen = false; onMoreAction("CHAT") })
-            }
-        }
-        if (cards.isEmpty()) Text("Your hand is empty", color = Muted, modifier = Modifier.padding(12.dp))
-        else Row(Modifier.fillMaxWidth().height(cardHeight + 6.dp).horizontalScroll(handScrollState), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            cards.forEach { card ->
-                var coordinates by remember(card.id) { mutableStateOf<LayoutCoordinates?>(null) }
-                CardFace(
-                    card,
-                    Modifier.width(cardWidth).height(cardHeight)
-                        .onGloballyPositioned { coordinates = it }
-                        .pointerInput(card.id) {
-                            var dragStart = Offset.Zero
-                            var dragDelta = Offset.Zero
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { dragStart = it; dragDelta = Offset.Zero },
-                                onDrag = { change, amount -> change.consume(); dragDelta += amount },
-                                onDragEnd = {
-                                    val coords = coordinates
-                                    if (coords != null) onDragDrop(card, coords.localToRoot(dragStart + dragDelta))
-                                }
-                            )
-                        }
-                        .then(if (cards.firstOrNull()?.id == card.id) tutorialAnchor("hand-card") else Modifier)
-                        .then(if (card.id == highlightedCardId) Modifier.border(3.dp, Mint, RoundedCornerShape(8.dp)) else Modifier),
-                    onClick = { onSelect(card) }, onLongClick = { onSelect(card) }, showCounters = false
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun HandCardActionsDialog(card: GameCard, hasCommander: Boolean, isCommanderCard: Boolean, tutorialStep: TutorialStop?, tutorialIndex: Int, tutorialTotal: Int, tutorialBounds: Map<String, Rect>, tutorialAnchor: (String) -> Modifier, onTutorialBack: () -> Unit, onTutorialNext: () -> Unit, onTutorialExit: () -> Unit, onDismiss: () -> Unit, onAction: (String) -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
-        Surface(shape = RoundedCornerShape(14.dp), color = Panel, modifier = Modifier.widthIn(max = 310.dp).fillMaxWidth()) {
-            // Let the dialog wrap its title and actions. fillMaxSize() here made
-            // a tiny card menu claim the Dialog's full available height.
-            Box {
-            Column(Modifier.padding(10.dp).then(tutorialAnchor("hand-actions"))) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(card.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("Choose an action", color = Muted, fontSize = 10.sp)
-                    }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(42.dp)) { Icon(Icons.Filled.Close, "Close actions", tint = Muted) }
-                }
-                val actions = listOf("PLAY", "PLAY FACE DOWN", "REVEAL", "EXILE", "DISCARD", "INSPECT") + if (isCommanderCard) listOf("COMMAND ZONE") else if (hasCommander) emptyList() else listOf("SET COMMANDER")
-                actions.chunked(2).forEach { pair ->
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        pair.forEach { action ->
-                            TextButton(onClick = { onAction(action) }, modifier = Modifier.weight(1f).heightIn(min = 46.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
-                                Text(action, color = if (action == "DISCARD" || action == "EXILE") Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold, fontSize = 9.sp, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                            }
-                        }
-                        if (pair.size == 1) Spacer(Modifier.weight(1f))
-                    }
-                }
-            }
-            tutorialStep?.let { step -> GuidedTutorialOverlay(step, tutorialIndex, tutorialTotal, tutorialBounds[step.target], onTutorialBack, onTutorialNext, onTutorialExit) }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DeckEditorDialog(
-    player: TablePlayer,
-    highlightedCardIds: Set<Int>,
-    onRename: (GameCard, String) -> Unit,
-    onRemove: (GameCard) -> Unit,
-    onAdd: (ScryfallCard) -> Unit,
-    onReplace: (GameCard, ScryfallCard) -> Unit,
-    onDismiss: () -> Unit
-) {
-    var query by remember { mutableStateOf("") }
-    var results by remember { mutableStateOf<List<ScryfallCard>>(emptyList()) }
-    var searching by remember { mutableStateOf(false) }
-    var menuCard by remember { mutableStateOf<GameCard?>(null) }
-    var renameCard by remember { mutableStateOf<GameCard?>(null) }
-    var renameValue by remember { mutableStateOf("") }
-    var replacementTarget by remember { mutableStateOf<GameCard?>(null) }
-    var autoFixingCardId by remember { mutableStateOf<Int?>(null) }
-    var autoFixStatus by remember { mutableStateOf("") }
-    val scope = rememberCoroutineScope()
-    fun autoFix(target: GameCard, copiesToFix: List<GameCard>) {
-        autoFixingCardId = target.id
-        autoFixStatus = "Looking up ${target.name}â€¦"
-        scope.launch {
-            val search = runCatching { Scryfall.searchCards(target.name) }
-            val exact = search.getOrNull()?.firstOrNull {
-                it.name.equals(target.name, ignoreCase = true) && !it.imageUrl.isNullOrBlank()
-            }
-            val fuzzy = if (exact == null) runCatching { Scryfall.fuzzyNamedCard(target.name) }.getOrNull() else null
-            val candidate = exact ?: fuzzy?.takeIf {
-                it.imageUrl?.isNotBlank() == true && cardNameSimilarity(target.name, it.name) >= 0.78
-            }
-            if (candidate != null) {
-                val flaggedCopies = copiesToFix.filter { it.importIssue != null || it.id in highlightedCardIds }
-                flaggedCopies.forEach { onReplace(it, candidate) }
-                autoFixStatus = if (candidate.name.equals(target.name, ignoreCase = true)) {
-                    "Fixed ${flaggedCopies.size} ${target.name} ${if (flaggedCopies.size == 1) "card" else "cards"}."
-                } else {
-                    "Fixed ${flaggedCopies.size} flagged card(s) as ${candidate.name} (closest clear match)."
-                }
-            } else {
-                replacementTarget = target
-                query = target.name
-                results = search.getOrNull().orEmpty()
-                autoFixStatus = if (search.isFailure) "Card search failed. Check your connection and try again." else "No safe automatic match. Choose the right card from the search results."
+YªçŠx-®éÜj×¢ëiºÚ+Š§j[h‘éÜ¢éí×¯tÛÔèµ©hºÚn¶X§zÍPš[N“Ü[Š[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹‘^\š[Y[[›Ý[™][Û\NŽ˜Û\ÜÊB‚œXÚØYÙHÛÛK˜\˜Ø[˜]X›B‚š[\Ü[™›ÚY™Ü˜\XÜËš]X\š[\Ü[™›ÚY™Ü˜\XÜË™˜]ØX›KÛÛÜ‘˜]ØX›Bš[\Ü[™›ÚY›ÜË[™Bš[\Ü[™›ÚY˜\XÝ]š]Bš[\Ü[™›ÚY“X[šY™\Ýš[\Ü[™›ÚY˜\“›ÝYšXØ][Û‚š[\Ü[™›ÚY˜\“›ÝYšXØ][ÛÚ[›™[š[\Ü[™›ÚY˜\“›ÝYšXØ][Û“X[˜YÙ\‚š[\Ü[™›ÚY˜\”[™[™Ò[[š[\Ü[™›ÚY˜ÛÛ[ÛÛ^š[\Ü[™›ÚY˜ÛÛ[’[[š[\Ü[™›ÚY˜ÛÛ[œK”XÚØYÙSX[˜YÙ\‚š[\Ü[™›ÚY›ÜËZ[š[\Ü[™›ÚY][“ÙÂš[\Ü[™›ÚYÙXšÚ]•ÙX•šY]Âš[\Ü[™›ÚYÙXšÚ]•ÙX•šY]ÐÛY[š[\Ü[™›ÚY˜XÝ]š]KÛÛ\Û™[XÝ]š]Bš[\Ü[™›ÚY˜XÝ]š]K˜ÛÛ\ÜÙKœÙ]ÛÛ[š[\Ü[™›ÚY˜XÝ]š]K˜ÛÛ\ÜÙKœ™[Y[X™\“][˜Ú\‘›ÜXÝ]š]T™\Ý[š[\Ü[™›ÚY˜XÝ]š]Kœ™\Ý[˜ÛÛ˜XÝXÝ]š]T™\Ý[ÛÛ˜XÝÂš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹‘^\š[Y[[›Ý[™][Û\Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹›Ü™\”Ý›ÚÙBš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹Ø[˜\Âš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹’[XYÙBš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹˜˜XÚÙÜ›Ý[™š[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹˜›Ü™\‚š[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹˜ÛÛXš[™YÛXÚØX›Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹˜ÛXÚØX›Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹šÜš^›Û[ØÜ›Ûš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹™Ù\Ý\™\Ë™]XÝ˜YÑÙ\Ý\™\Âš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹™Ù\Ý\™\Ë™]XÝ˜YÑÙ\Ý\™\ÐY\“Û™Ô™\ÜÂš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹™Ù\Ý\™\Ë™]XÝ\Ù\Ý\™\Âš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹™Ù\Ý\™\Ë™]XÝ™\XØ[˜YÑÙ\Ý\™\Âš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹›^[Ý]Š‚š[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹›^žK“^žPÛÛ[[‚š[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹›^žK“^žR][TØÛÜBš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹›^žKœ™[Y[X™\“^žS\ÝÝ]Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹›^žK™ÜšY‘ÜšYÙ[Âš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹›^žK™ÜšY“^žU™\XØ[ÜšYš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹›^žK™ÜšYœ™[Y[X™\“^žQÜšYÝ]Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹›^žKš][\Âš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹œYÙ\‹’Üš^›Û[YÙ\‚š[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹œYÙ\‹œ™[Y[X™\”YÙ\”Ý]Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹œ™[Y[X™\”ØÜ›ÛÝ]Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹œÚ\KÚ\˜ÛTÚ\Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹œÚ\K”›Ý[™YÛÜ›™\”Ú\Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹™\XØ[ØÜ›Ûš[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹^œÙ[XÝ[Û‹”Ù[XÝ[ÛÛÛZ[™\‚š[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹^’[›[™U^ÛÛ[š[\Ü[™›ÚY˜ÛÛ\ÜÙK™›Ý[™][Û‹^˜\[™[›[™PÛÛ[š[\Ü[™›ÚY˜ÛÛ\ÜÙK˜[š[X][Û‹˜ÛÜ™K˜[š[X]Q›Ø]\ÔÝ]Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK˜[š[X][Û‹˜ÛÜ™KÙY[‚š[\Ü[™›ÚY˜ÛÛ\ÜÙK˜[š[X][Û‹[š[X]Yš\ÚXš[]Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK˜[š[X][Û‹˜[š[X]PÛÛ[Ú^™Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK˜[š[X][Û‹™˜YR[‚š[\Ü[™›ÚY˜ÛÛ\ÜÙK˜[š[X][Û‹™˜YSÝ]š[\Ü[™›ÚY˜ÛÛ\ÜÙK˜[š[X][Û‹œÛYR[’Üš^›Û[Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK˜[š[X][Û‹œÛYSÝ]Üš^›Û[Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK˜[š[X][Û‹œÛYR[•™\XØ[Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK˜[š[X][Û‹œÛYSÝ]™\XØ[Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK›X]\šX[šXÛÛœË’XÛÛœÂš[\Ü[™›ÚY˜ÛÛ\ÜÙK›X]\šX[šXÛÛœË™š[YYš[\Ü[™›ÚY˜ÛÛ\ÜÙK›X]\šX[šXÛÛœË™š[YÛÜÙBš[\Ü[™›ÚY˜ÛÛ\ÜÙK›X]\šX[šXÛÛœË™š[Y”™[[Ý™Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK›X]\šX[šXÛÛœË™š[Y“[Ü™U™\š[\Ü[™›ÚY˜ÛÛ\ÜÙK›X]\šX[šXÛÛœË™š[YÚ]š[\Ü[™›ÚY˜ÛÛ\ÜÙK›X]\šX[šXÛÛœË™š[Y‘^[™[Ü™Bš[\Ü[™›ÚY˜ÛÛ\ÜÙK›X]\šX[šXÛÛœË™š[Y‘^[™\ÜÂš[\Ü[™›ÚY˜ÛÛ\ÜÙK›X]\šX[ËŠ‚š[\Ü[™›ÚY˜ÛÛ\ÜÙKœ[[YKŠ‚š[\Ü[™›ÚY˜ÛÛ\ÜÙKœ[[YKœÛ˜\ÚÝ›ÝÂš[\Ü[™›ÚY˜ÛÛ\ÜÙKœ[[YKœØ]™XX›Kœ™[Y[X™\”Ø]™XX›Bš[\Ü[™›ÚY˜ÛÛ\ÜÙKZK[YÛ›Y[š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK“[ÙYšY\‚š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK™˜]Ë˜Û\š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK™˜]Ë˜›\‚š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK™Ù[ÛY]žK”™XÝš[\Ü[™›ÚY˜ÛÛ\ÜÙKZK™Ù[ÛY]žKÛÜ›™\”˜Y]\Âš[\Ü[™›ÚY˜ÛÛ\ÜÙKZK™Ù[ÛY]žK“Ù™œÙ]š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK™Ù[ÛY]žK”Ú^™Bš[\Ü[™›ÚY˜ÛÛ\ÜÙKZK™Ü˜\XÜË›[™[ÙBš[\Ü[™›ÚY˜ÛÛ\ÜÙKZK™Ü˜\XÜËÛÛÜ‚š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK™Ü˜\XÜË”]š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK™Ü˜\XÜËÐ\™Ø‚š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK™Ü˜\XÜËÛÛ\ÜÚ][™ÔÝ˜]YÞBš[\Ü[™›ÚY˜ÛÛ\ÜÙKZK™Ü˜\XÜË™Ü˜\XÜÓ^Y\‚š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK™Ü˜\XÜË™˜]ÜØÛÜK”Ý›ÚÙBš[\Ü[™›ÚY˜ÛÛ\ÜÙKZKš[œ]œÚ[\‹œÚ[\’[œ]š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK™Ü˜\XÜË˜\Ò[XYÙPš]X\š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK›^[Ý]ÛÛ[ØØ[Bš[\Ü[™›ÚY˜ÛÛ\ÜÙKZK›^[Ý]˜›Ý[™Ò[”›ÛÝš[\Ü[™›ÚY˜ÛÛ\ÜÙKZK›^[Ý]›Û‘ÛØ˜[TÜÚ][Û™Yš[\Ü[™›ÚY˜ÛÛ\ÜÙKZK›^[Ý]“^[Ý]ÛÛÜ™[˜]\Âš[\Ü[™›ÚY˜ÛÛ\ÜÙKZKž’[™^š[\Ü[™›ÚY˜ÛÛ\ÜÙKZKšY]Ú[\›Ü[™›ÚYšY]Âš[\Ü[™›ÚY˜ÛÛ\ÜÙKZKœ]›Ü›K“ØØ[ÛÛ™šYÝ\˜][Û‚š[\Ü[™›ÚY˜ÛÛ\ÜÙKZKœ]›Ü›K“ØØ[ÛÛ^š[\Ü[™›ÚY˜ÛÛ\ÜÙKZKœ]›Ü›K“ØØ[[œÚ]Bš[\Ü[™›ÚY˜ÛÛ\ÜÙKZKœ]›Ü›K“ØØ[šY]Âš[\Ü[™›ÚY˜ÛÛ\ÜÙKZK^™›Û‘›ÛÙZYÚš[\Ü[™›ÚY˜ÛÛ\ÜÙKZK^”XÙZÛ\‚š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK^”XÙZÛ\•™\XØ[[YÛ‚š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK^˜Z[[››Ý]YÝš[™Âš[\Ü[™›ÚY˜ÛÛ\ÜÙKZK^œÝ[K•^Ý™\™›ÝÂš[\Ü[™›ÚY˜ÛÛ\ÜÙKZK^š[œ]”\ÜÝÛÜ™š\ÝX[˜[œÙ›Ü›X][Û‚š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK[š]™š[\Ü[™›ÚY˜ÛÛ\ÜÙKZK[š]œÜš[\Ü˜]˜K][“ØØ[Bš[\Ü[™›ÚY˜ÛÛ\ÜÙKZKÚ[™ÝË‘X[ÙÂš[\Ü[™›ÚY˜ÛÛ\ÜÙKZKÚ[™ÝË‘X[ÙÔ›Ü\Y\Âš[\Ü[™›ÚY˜ÛÛ\ÜÙKZKÚ[™ÝË‘X[ÙÕÚ[™ÝÔ›ÝšY\‚š[\Ü[™›ÚY˜ÛÛ\ÜÙKZKÚ[™ÝË”Ü\š[\Ü[™›ÚY˜ÛÛ\ÜÙKZKÚ[™ÝË”Ü\›Ü\Y\Âš[\ÜÛÝ[ž˜ÛÜ›Ý][™\Ë‘\Ü]Ú\œÂš[\ÜÛÝ[‹˜ÛÜ›Ý][™\Ë˜Ø[˜Ù[][Û‹Ø[˜Ù[][Û‘^Ù\[Û‚š[\ÜÛÝ[ž˜ÛÜ›Ý][™\Ë™[^Bš[\ÜÛÝ[ž˜ÛÜ›Ý][™\Ë™›ÝË˜ÛÛXÝš[\ÜÛÝ[ž˜ÛÜ›Ý][™\Ë™›ÝË™\Ý[˜Ý[[Ú[™ÙYš[\ÜÛÝ[ž˜ÛÜ›Ý][™\Ë’›Ø‚š[\ÜÛÝ[ž˜ÛÜ›Ý][™\Ë›][˜Úš[\ÜÛÝ[ž˜ÛÜ›Ý][™\ËÚ][Y[Ý]Ü“[š[\ÜÛÝ[ž˜ÛÜ›Ý][™\ËÚ]ÛÛ^š[\ÜÜ™ËšœÛÛ‹’”ÓÓ\œ˜^Bš[\ÜÜ™ËšœÛÛ‹’”ÓÓ“Øš™XÝ‚œš]˜]H]HÛ\ÜÈX›PÛÛÜœÊ˜[˜XÚÙÜ›Ý[™ˆÛÛÜ‹˜[[™[ˆÛÛÜ‹˜[˜Z\ÙYˆÛÛÜ‹˜[XØÙ[ˆÛÛÜ‹˜[^ˆÛÛÜ‹˜[]]YˆÛÛÜ‹˜[ÛÝ[\ŽˆÛÛÜŠBœš]˜]H˜[\šÕX›PÛÛÜœÈHX›PÛÛÜœÊÛÛÜŠ‘ŒLMŒMJKÛÛÜŠ‘ŒNLŒŒŒ
+KÛÛÜŠ‘ŒŒÌÌ‘ŠKÛÛÜŠ‘ŽQLÐŒ
+KÛÛÜŠ‘‘PQŒQQ
+KÛÛÜŠ‘MŒPPŠKÛÛÜŠ‘‘‘‘MŠJBœš]˜]H˜[YÚX›PÛÛÜœÈHX›PÛÛÜœÊÛÛÜŠ‘‘Œ‘QŒJKÛÛÜŠ‘‘‘‘‘‘‘ŠKÛÛÜŠ‘‘MP‘MŠKÛÛÜŠ‘ŒNM‘MJKÛÛÜŠ‘ŒMÌŒÌQ
+KÛÛÜŠ‘QMÍ
+KÛÛÜŠ‘ŽL
+JBœš]˜]H˜[ØØ[X›PÛÛÜœÈHÝ]XÐÛÛ\ÜÚ][Û“ØØ[ÙˆÈ\šÕX›PÛÛÜœÈBœš]˜]H˜\ˆ\[‘›Ü™YÜ›Ý[™žH]]X›TÝ]SÙŠYJBœš]˜]HÛÛœÝ˜[ÐSQWÐST•ÐÒS“‘SH˜\˜Ø[˜WÙØ[YWØ[\È‚œš]˜]HÛÛœÝ˜[QUSÐÓÕQÔ“ÓÓWÑS‘ÒS•HšÎ‹ËØ\˜Ø[˜K]X›K\›ÛÛ\Ë˜\˜Ø[˜[]ËÛÜšÙ\œË™]ˆ‚œš]˜]HÛÛœÝ˜[QÐPÖWÑVSTWÐÓÕQÔ“ÓÓWÑS‘ÒS•HšÎ‹ËØ\˜Ø[˜K]X›K\›ÛÛ\Ë™^[\KÛÜšÙ\œË™]ˆ‚‚œš]˜]H[ˆ\ÓYØXÞQ^[\PÛÝY[™Ú[
+[™Ú[ˆÝš[™ÊNˆ›ÛÛX[ˆBˆ[™Ú[š[J
+Kš[Q[™
+	ËÉÊK™\]X[ÊQÐPÖWÑVSTWÐÓÕQÔ“ÓÓWÑS‘ÒS•YÛ›Ü™PØ\ÙHHYJB‚œš]˜]H[ˆÜÝØ[YP[\
+ÛÛ^ˆÛÛ^]NˆÝš[™Ë^ˆÝš[™ÊHÂˆYˆ
+Z[•‘T”ÒSÓ‹”Ñ×ÒS•HÌÈ	‰ˆÛÛ^˜ÚXÚÔÙ[”\›Z\ÜÚ[ÛŠX[šY™\Ýœ\›Z\ÜÚ[Û‹”ÔÕÓ“ÕQ’PÐUSÓ”ÊHOHXÚØYÙSX[˜YÙ\‹”T“RTÔÒSÓ—ÑÔS•Q
+H™]\›‚ˆ˜[X[˜YÙ\ˆHÛÛ^™Ù]Þ\Ý[TÙ\šXÙJÛÛ^““ÕQ’PÐUSÓ—ÔÑT•’PÑJH\È›ÝYšXØ][Û“X[˜YÙ\‚ˆYˆ
+Z[•‘T”ÒSÓ‹”Ñ×ÒS•HZ[•‘T”ÒSÓ—ÐÓÑTË“ÊHÂˆX[˜YÙ\‹˜Ü™X]S›ÝYšXØ][ÛÚ[›™[
+›ÝYšXØ][ÛÚ[›™[
+ÐSQWÐST•ÐÒS“‘S‘Ø[YHXÝ]š]H‹›ÝYšXØ][Û“X[˜YÙ\‹’STÔ•SÑWÑQUS
+K˜\HÂˆ\ØÜš\[ÛˆH•\›ˆ[™^H\]\ÈÚ[H\˜Ø[˜HX›H\È[ˆH˜XÚÙÜ›Ý[™ˆ‚ˆJBˆBˆ˜[Ü[\H[™[™Ò[[™Ù]XÝ]š]JˆÛÛ^ˆ[[
+ÛÛ^XZ[XÝ]š]NŽ˜Û\ÜËš˜]˜JK˜\HÈ›YÜÈH[[‘“Q×ÐPÕU’UWÔÒS‘ÓWÕÔÜˆ[[‘“Q×ÐPÕU’UWÐÓPT—ÕÔKˆ[™[™Ò[[‘“Q×ÕTUWÐÕT”‘S•Üˆ[™[™Ò[[‘“Q×ÒSSUUP“Bˆ
+Bˆ˜[›ÝYšXØ][ÛˆH›ÝYšXØ][Û‹Z[\ŠÛÛ^ÐSQWÐST•ÐÒS“‘S
+BˆœÙ]ÛX[XÛÛŠ[™›ÚY”‹™˜]ØX›KšX×ÙX[Ù×Ú[™›ÊBˆœÙ]ÛÛ[]J]JBˆœÙ]ÛÛ[^
+^ZÙJN
+JBˆœÙ]Ø]YÛÜžJ›ÝYšXØ][Û‹ÐUQÓÔ–WÑU‘S•
+BˆœÙ]]]ÐØ[˜Ù[
+YJBˆœÙ]ÛÛ[[[
+Ü[\
+Bˆ˜Z[
+
+BˆX[˜YÙ\‹››ÝYžJ
+Þ\Ý[K˜Ý\œ™[[YSZ[\Ê
+H	H[“PVÕSQJKÒ[
+
+K›ÝYšXØ][ÛŠBŸBœš]˜]H˜[[šÎˆÛÛÜˆÛÛ\ÜØX›HÙ]
+
+HHØØ[X›PÛÛÜœË˜Ý\œ™[˜˜XÚÙÜ›Ý[™œš]˜]H˜[[™[ˆÛÛÜˆÛÛ\ÜØX›HÙ]
+
+HHØØ[X›PÛÛÜœË˜Ý\œ™[œ[™[œš]˜]H˜[[™[YÚˆÛÛÜˆÛÛ\ÜØX›HÙ]
+
+HHØØ[X›PÛÛÜœË˜Ý\œ™[œ˜Z\ÙYœš]˜]H˜[Z[ˆÛÛÜˆÛÛ\ÜØX›HÙ]
+
+HHØØ[X›PÛÛÜœË˜Ý\œ™[˜XØÙ[œš]˜]H˜[ÛÙÚ]NˆÛÛÜˆÛÛ\ÜØX›HÙ]
+
+HHØØ[X›PÛÛÜœË˜Ý\œ™[^œš]˜]H˜[]]YˆÛÛÜˆÛÛ\ÜØX›HÙ]
+
+HHØØ[X›PÛÛÜœË˜Ý\œ™[›]]Yœš]˜]H˜[ÛÝ[\‘ÛÛˆÛÛÜˆÛÛ\ÜØX›HÙ]
+
+HHØØ[X›PÛÛÜœË˜Ý\œ™[˜ÛÝ[\‚‚œš]˜]H]HÛ\ÜÈ]ÜšX[ÝÜ
+ˆ˜[]NˆÝš[™Ëˆ˜[^[˜][ÛŽˆÝš[™Ëˆ˜[\™Ù]ˆÝš[™Ëˆ˜[šY]ÎˆÝš[™Ëˆ˜[^XÝ]PXÝ[ÛŽˆ›ÛÛX[ˆHYBŠBœš]˜]H˜[]ÜšX[ÝÜÈH\ÝÙŠˆ]ÜšX[ÝÜ
+•ÑSÓÓQHÈTÐSHP“HH‹•Ù[ÛÛYHÈ\˜Ø[˜HX›HHX\ÙH›ÛÝÈ\ÈœšYYˆ]ÜšX[ÈÚÝÈ[ÝH]™\ž][™È\˜Ø[˜H\ÈÈÙ™™\ˆH‹ˆ‹’ÓQH‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”VHPQÒPÈÑÑUTˆ‹\˜Ø[˜HX›H]È[ÝH^HXYÚXÎˆHØ]\š[™ÈÚ]\È›Ý\ˆ[ÜK[ž]Ú\™H[ˆHÛÜ›H‹ˆ‹’ÓQH‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+Ô‘PUH“ÓÓH‹Ü™X]HH™]È›ÛÛKˆ[ÝHÚÛÜÙHHÛÛ›™XÝ[Ûˆ\K[š]H^Y\œËØYXÚÜË[™Ý\HØ[YHœ›ÛHHØ˜žKˆ‹šÛYKXÜ™X]H‹’ÓQHŠK‚ˆ]ÜšX[ÝÜ
+Ô‘PUH“ÓÓH‹ÚÛÜÙH\ÈÈÜÝH›ÛÛKˆ‹›Ø˜žKXÜ™X]H‹“Ð–HŠKˆ]ÜšX[ÝÜ
+’“ÒSˆ“ÓÓH‹ÚÛÜÙH\ÈÈ[\ˆH›ÛÛKˆ‹›Ø˜žKZ›Ú[ˆ‹“Ð–HŠKˆ]ÜšX[ÝÜ
+“ÐÐSÒKQ’H‹”^HÚ]]šXÙ\ÈÛˆ[Ý\ˆÚKQšKˆ‹›Ø˜žK[ØØ[‹“Ð–HŠKˆ]ÜšX[ÝÜ
+’S•T“‘U‹”^HÚ][ÜHÛˆY™™\™[™]ÛÜšÜÈ\Ú[™ÈHÙXÝ\™H›ÛÛHÙ\šXÙKˆ‹›Ø˜žKZ[\›™]‹“Ð–HŠKˆ]ÜšX[ÝÜ
+”“ÓÓHÑT•’PÑHQ‘TÔÈ‹•H\˜Ø[˜H›ÛÛHY™\ÜÈ\È[™XYHš[Y[‹ˆ[ÝHÈ›Ý™YYÈ\ÜˆÚ[™ÙH]ˆÛÛ[YH\Ý\ÈÝ\ˆÛ›HY]]Yˆ[ÝH[ˆ[Ý\ˆÝÛˆ›ÛÛHÙ\™\ˆ[™Û›ÝÈ]ÈY™\ÜËˆ‹ˆ‹“Ð–H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+Ô‘PUHÔˆ“ÒSˆ‹’›Ú[ˆØ[YH™YYÈH›ÛÛHÛÙH[™\ÜÝÛÜ™ˆ\™^ÈÛÛ[YHÚ]Ý]ÛÛ›™XÝ[™Ëˆ‹›Ø˜žK\ÝX›Z]‹“Ð–H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+ÐSÑS“ÒSˆ‹”ÝÜHÛÛ›™XÝ[Ûˆ][\ˆ‹›Ø˜žKXØ[˜Ù[‹“Ð–H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”“ÓÓHÓÑH‹”Ú\™H\ÈÛÙH[™\ÜÝÛÜ™ÛÈœšY[™ÈØ[ˆ›Ú[‹ˆ\ÙHÚ\™H›ÛÛHÈÙ[™H[š]H[ˆÛ™HY\ÜØYÙKˆ‹›Ø˜žKXÛÜH‹“Ð–H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”ÒT‘H“ÓÓH‹”Ù[™H›ÛÛHÛÙK\ÜÝÛÜ™[™ÛÛ›™XÝ[ÛˆY™\ÜÈÚ][Ý\ˆÛ™IÜÈÚ\™HY[Kˆ‹›Ø˜žK\Ú\™H‹“Ð–H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+ÓÔHQ‘TÔÈ‹ÛÜHHÜÝY™\ÜÈ›ÜˆØØ[^Y\œËˆ‹›Ø˜žKXÛÜKZ\‹“Ð–H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+’STÔ•PÒÈ‹“ØYHXÚÈ›Üˆ\ÈÙX]ˆ‹›Ø˜žKZ[\Ü‹“Ð–HŠKˆ]ÜšX[ÝÜ
+”‘PQHT‹•[HÜÝ[ÝH\™H™XYKˆ‹›Ø˜žK\™XYH‹“Ð–H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+QRHÔÓ‘S•‹YHÛÛ\]\ˆ^Y\‹ˆ‹›Ø˜žKXZH‹“Ð–H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”S‘ÓRV‘HÔ‘Tˆ‹ÚÛÜÙHÚÈZÙ\ÈHš\œÝ\›‹ˆ‹›Ø˜žK[Ü™\ˆ‹“Ð–H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+‘VÔ•PQÓ“ÔÕPÈÑÈ‹”Ø]™HÛÛ›™XÝ[Ûˆ]Z[È›Üˆ›ÝX›\ÚÛÝ[™Ëˆ‹›Ø˜žKYXYÛ›ÜÝXÜÈ‹“Ð–H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”ÕT•ÐSQH‹™YÚ[ˆÛ˜ÙH]™\žH^Y\ˆ\È™XYKˆ‹›Ø˜žK\Ý\‹“Ð–H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+ÓÔÑH“ÓÓH‹“X]™HÜˆÛÜÙH\È›ÛÛKˆ‹›Ø˜žK[X]™H‹“Ð–H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+ÓÔÑHÐ–H‹”™]\›ˆÈHÛYHØÜ™Y[‹ˆ‹›Ø˜žKXÛÜÙH‹“Ð–HŠK‚ˆ]ÜšX[ÝÜ
+’“ÒSˆ“ÓÓH‹’›Ú[ˆHœšY[™	ÜÈ›ÛÛKˆ]Ü[œÈ\ÈØ[YHØ˜žHØÜ™Y[ˆÚ]›Ú[ˆ›ÛÛH[™XYHÙ[XÝYˆ‹šÛYKZ›Ú[ˆ‹’ÓQHŠKˆ]ÜšX[ÝÜ
+’“ÒSˆTÈÑSPÕQ‹•\È\ÈHØ[YHØ˜žH\ÈÜ™X]H›ÛÛKˆH›Ú[ˆ›ÛÛHÚÚXÙH\ÈÙ[XÝY›Üˆ[ÝKÛÈ[\ˆHÜÝ	ÜÈ›ÛÛH]Z[Ëˆ‹›Ø˜žKZ›Ú[ˆ‹“Ð–H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”‘UT“ˆÓQH‹ÛÜÙHHØ˜žHÈÛÛ[YHHÝZYKˆ‹›Ø˜žKXÛÜÙH‹“Ð–HŠKˆ]ÜšX[ÝÜ
+ÓÓ•S•QHÈP“H‹“Ü[ˆHØ[YHX›HÛˆ\È]šXÙKˆHX›HšY]ÈÚÝÜÈ]™\ž[Û™NÈH^Y\ˆšY]ÈÚ]™\È[ÝH[Ü™HÛÛ›ÛËˆ‹šÛYKXÛÛ[YH‹’ÓQHŠK‚ˆ]ÜšX[ÝÜ
+”ÑTÔÒSÓˆSQTˆ‹•\H[Y\ˆÈÜ[ˆ[Y\ˆÛÛ›ÛËˆ‹[Y\ˆ‹•P“HŠKˆ]ÜšX[ÝÜ
+ÒU‹“Ü[ˆY\ÜØYÙ\È›Üˆ[Ý\ˆ›ÛÛKˆ‹˜Ú]X]Ûˆ‹•P“HŠKˆ]ÜšX[ÝÜ
+TQS•H‹“Ü[ˆXÚÜËØ[YHÛÛË›ÛÛHÛÛ›ÛË[™Ü[ÛœËˆ‹›XZ[‹[Y[H‹•P“HŠKˆ]ÜšX[ÝÜ
+•P“H’QUÈ‹”ÙYH]™\žH^Y\ˆ]Û˜ÙKˆ‹X›K]Xˆ‹•P“HŠKˆ]ÜšX[ÝÜ
+”VQTˆ’QUÈ‹“Ü[ˆ\È^Y\¸ &\È›Ø\™ˆ‹œ^Y\‹]Xˆ‹•P“HŠKˆ]ÜšX[ÝÜ
+”VQTˆ“ÐT‘‹•\H^Y\ˆ[™[È[œÜXÝZ\ˆ›Ø\™ˆ‹œ^Y\‹XØ\™‹•P“HŠKˆ]ÜšX[ÝÜ
+“‘VÕT‹“[Ý™HÈH™^\ÙKˆ‹X›K[™^‹•P“H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”TÔÈT“ˆ‹‘š[š\Ú[Ý\ˆ\›ˆ[™\ÜÈ^Kˆ‹X›K\\ÜÈ‹•P“H‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+’STÔ•PÒÈ‹“ØYHXÚÈ›ÜˆHÙ[XÝY^Y\‹ˆ‹X›KZ[\Ü‹•P“HŠK‚ˆ]ÜšX[ÝÜ
+”VQTˆÕUTÈ‹”ÙYHÚÜÙH\›ˆ]\È[™HÝ\œ™[\ÙKˆ‹œ^Y\‹\Ý]\È‹”VQTˆŠKˆ]ÜšX[ÝÜ
+”ÑTÔÒSÓˆSQTˆ‹•\H[Y\ˆÈÜ[ˆ[Y\ˆÛÛ›ÛËˆ‹[Y\ˆ‹”VQTˆŠKˆ]ÜšX[ÝÜ
+ÒU‹“Ü[ˆ›ÛÛHY\ÜØYÙ\Ëˆ‹˜Ú]X]Ûˆ‹”VQTˆŠKˆ]ÜšX[ÝÜ
+TQS•H‹“Ü[ˆXÚÜËØ[YHÛÛË›ÛÛHÛÛ›ÛË[™Ü[ÛœËˆ‹›XZ[‹[Y[H‹”VQTˆŠKˆ]ÜšX[ÝÜ
+“ÕÑTˆQ‘H‹”ÝX˜XÝÛ™HY™Kˆ‹›Y™KYÝÛˆ‹”VQTˆ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”RTÑHQ‘H‹YÛ™HY™Kˆ‹›Y™K]\‹”VQTˆ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+“PSHÓÓ‹•\HPSHÝ]\ÈÈ˜XÚÈÜˆÜ[™X[˜Kˆ‹›X[˜K\Ý]\È‹”VQTˆŠKˆ]ÜšX[ÝÜ
+ÐTÕÓÓSPS‘Tˆ‹Ø\Ý[Ý\ˆÛÛ[X[™\ˆœ›ÛHHÛÛ[X[™›Û™Kˆ‹˜ÛÛ[X[™\‹XØ\Ý‹”VQTˆ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+“‘VÕT‹“[Ý™HÈH™^\ÙKˆ‹›™^\Ý\‹”VQTˆ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”TÔÈT“ˆ‹‘š[š\Ú[Ý\ˆ\›ˆ[™\ÜÈ^Kˆ‹œ\ÜË]\›ˆ‹”VQTˆ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+“P”T–H‹”ÙX\˜ÚÜˆœ›ÝÜÙH\ÈXœ˜\žKˆ‹ž›Û™K[Xœ˜\žH‹”VQTˆŠKˆ]ÜšX[ÝÜ
+’S‘‹“Ü[ˆ\È^Y\¸ &\È[™ˆ‹š[™X]Ûˆ‹”VQTˆŠKˆ]ÜšX[ÝÜ
+’S‘“Ó‘H‹“Ü[ˆH[™œ›ÛH\È›Û™H]Û‹ˆ‹ž›Û™KZ[™‹”VQTˆŠKˆ]ÜšX[ÝÜ
+‘ÔU‘VPT‘‹•šY]ÈØ\™È[ˆHÜ˜]™^X\™ˆ‹ž›Û™KYÜ˜]™^X\™‹”VQTˆŠKˆ]ÜšX[ÝÜ
+‘VSH‹•šY]È^[YØ\™Ëˆ‹ž›Û™KY^[H‹”VQTˆŠKˆ]ÜšX[ÝÜ
+”‘U‘PSQ‹•šY]ÈØ\™È™]™X[YÈHX›Kˆ‹ž›Û™K\™]™X[Y‹”VQTˆŠKˆ]ÜšX[ÝÜ
+‘UÈ‹‘˜]ÈÛ™HØ\™ˆ‹™˜]ËXXÝ[Ûˆ‹”VQTˆ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+ÓÓPU‹”Ù]]XÚÙ\œË›ØÚÙ\œË[™[XYÙKˆ‹˜ÛÛX˜]XXÝ[Ûˆ‹”VQTˆ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+“SÔ‘H‹“Ü[ˆ[Ü™H^Y\ˆ[™Ø[YHÛÛËˆ‹›[Ü™KXXÝ[ÛœÈ‹”VQTˆŠKˆ]ÜšX[ÝÜ
+QÒÑSˆ‹“Ü[ˆSÔ‘K[ˆÚÛÜÙHYÚÙ[‹ˆ‹ÚÙ[‹XXÝ[Ûˆ‹”VQTˆ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”ÕPÒÈS‘’SÔ’UH‹“Ü[ˆÜ[È[™Xš[]Y\ÈØZ][™ÈÈ™\ÛÛ™Kˆ‹œÝXÚË[Ü[ˆ‹”VQTˆŠKˆ]ÜšX[ÝÜ
+PÒÈÈP“H‹”™]\›ˆÈH[X›Kˆ‹œ^Y\‹X˜XÚË]X›H‹”VQTˆŠKˆ]ÜšX[ÝÜ
+•TÔˆS”ÔPÕHÐT‘‹•\È\Üˆ[\ÈÛ™Ë\™\ÜÈ›Üˆ]Z[Ëˆ‹˜˜]YšY[‹”VQTˆ‹^XÝ]PXÝ[ÛˆH˜[ÙJK‚ˆ]ÜšX[ÝÜ
+ÐT‘URSÈ‹•\HØ\™ÈÙYH]ÈXÝ[ÛœÎÈÛ™Ë\™\ÜÈ›Üˆ[^ˆ‹š[™XØ\™‹’S‘ŠKˆ]ÜšX[ÝÜ
+”VHÐT‘PÕSÓ”È‹ÚÛÜÙHÚ]ÈÈÚ]\ÈØ\™ˆ‹š[™XXÝ[ÛœÈ‹’S‘‹^XÝ]PXÝ[ÛˆH˜[ÙJK‚ˆ]ÜšX[ÝÜ
+•SQH‹”ÝÚ]Ú™]ÙY[ˆYÚ[™\šËˆ‹›Ü[ÛœË][YH‹“ÔSÓ”È‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”‘QPÑHÕÒTHS’SPUSÓˆ‹•\ÙHÚÜ\ˆØÜ™Y[ˆ˜[œÚ][ÛœËˆ‹›Ü[ÛœË[[Ý[Ûˆ‹“ÔSÓ”È‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+ÐT‘ÒV‘H‹ÚÛÜÙHÝÈ\™ÙHØ\™È\X\‹ˆ‹›Ü[ÛœËXØ\™\Ú^™H‹“ÔSÓ”È‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”‘UT“ˆÈP“H‹”ÚÝÈHX›HY\ˆ\ÜÚ[™È[Ý\ˆ\›‹ˆ‹›Ü[ÛœË\™]\›‹]X›H‹“ÔSÓ”È‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+“ÔSˆS‘Q•TˆUÈ‹”ÚÝÈ[Ý\ˆ[™Y\ˆ˜]Ú[™Ëˆ‹›Ü[ÛœË[Ü[‹Z[™‹“ÔSÓ”È‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+‘UÈUUÓPUPÐSH‹‘˜]ÈÚ[ˆH˜]ÈÝ\™YÚ[œËˆ‹›Ü[ÛœËX]]ËY˜]È‹“ÔSÓ”È‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+•S•TUUÓPUPÐSH‹•[\[Ý\ˆ\›X[™[È]\›ˆÝ\ˆ‹›Ü[ÛœËX]]Ë][\‹“ÔSÓ”È‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+•T“ˆSQTˆTÔVH‹”ÚÝÈÜˆYHH\›ˆ[Y\‹ˆ‹›Ü[ÛœË][Y\ˆ‹“ÔSÓ”È‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+PÒÑÔ“ÕS‘ST•È‹‘Ù]H›ÝYšXØ][ÛˆÚ[ˆHØ[YHÚ[™Ù\Ëˆ‹›Ü[ÛœËX[\È‹“ÔSÓ”È‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+ÓPTˆSUH‹”™\Ù]Ø[YHÙ][™ÜÎÈ[Ý\ˆXÚÜÈ[™ÝZYH›ÙÜ™\ÜÈÝ^Kˆ‹˜ÛX\‹Y]H‹“ÔSÓ”È‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+‘U‘SÔTˆÔSÓ”È‹“Ü[ˆ\ÝÛÛËˆ‹›Ü[ÛœËY]™[Ü\ˆ‹“ÔSÓ”È‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+ÓÔÑHÔSÓ”È‹”™]\›ˆÈHX›Kˆ‹›Ü[ÛœËXÛÜÙH‹“ÔSÓ”ÈŠK‚ˆ]ÜšX[ÝÜ
+ÐTÕ”“ÓHS‘‹“Ü[ˆ[Ý\ˆ[™ÈÚÛÜÙHHÜ[ˆ‹œÝXÚËXØ\Ý‹”ÕPÒÈŠKˆ]ÜšX[ÝÜ
+”UÓˆÕPÒÈ‹YHX[X[Xš[]HÜˆY™™XÝˆ‹œÝXÚËXY‹”ÕPÒÈ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”TÔÈ’SÔ’UH‹“]H™^^Y\ˆ™\ÜÛ™ˆHRH\ÜÙ\È]]ÛX]XØ[HÚ[ˆ]\È›È™\ÜÛœÙKˆ‹œÝXÚË\\ÜÈ‹”ÕPÒÈ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”‘TÓÓ‘HÔ‹”™\ÛÛ™HHÜ][HY\ˆ]™\ž[Û™H\ÜÙ\ËˆH™]Ù\Ý][H™\ÛÛ™\Èš\œÝˆ‹œÝXÚË\™\ÛÛ™H‹”ÕPÒÈ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”ÕPÒÈUSH‹•\[ˆ][HÈ[œÜXÝ]ˆYˆHRH\È›È™\ÜÛœÙK]\ÜÙ\ÈÛÈHÝXÚÈØ[ˆ™\ÛÛ™Kˆ‹œÝXÚËZ][H‹”ÕPÒÈŠKˆ]ÜšX[ÝÜ
+ÓÔÑHÕPÒÈ‹ÛÜÙHHÝXÚÈšY]Ëˆ‹œÝXÚËXÛÜÙH‹”ÕPÒÈŠK‚ˆ]ÜšX[ÝÜ
+”ÑS‘QTÔÐQÑH‹”Ù[™HY\ÜØYÙHÈHX›Kˆ‹˜Ú]\Ù[™‹ÒU‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+ÒUÓÔÑH‹ÛÜÙHHÚ][™[ˆ‹˜Ú]XÛÜÙH‹ÒUŠK‚ˆ]ÜšX[ÝÜ
+ÓÔÑHÐSQHÑÈ‹”™]\›ˆÈHX›Kˆ‹›ÙËXÛÜÙH‹‘ÐSQWÓÑÈŠK‚ˆ]ÜšX[ÝÜ
+‘PÒÔÈQS•H‹“Ü[ˆXÚÈ[\ÜY][™Ë[™Ø]™YXÚÜËˆ‹›Y[KYXÚÜÈ‹“QS•WÓPRSˆŠKˆ]ÜšX[ÝÜ
+‘ÐSQHÓÓÈQS•H‹“Ü[ˆ˜XÚÚ[™ÈÛÛËHÝXÚËÙË[™[\Ëˆ‹›Y[K]ÛÛÈ‹“QS•WÓPRSˆŠKˆ]ÜšX[ÝÜ
+”“ÓÓHS‘ÐSQHQS•H‹“Ü[ˆ›ÛÛKØ[YK[™™\Ù]ÛÛ›ÛËˆ‹›Y[KYØ[YH‹“QS•WÓPRSˆŠKˆ]ÜšX[ÝÜ
+“ÔSÓ”ÈQS•H‹“Ü[ˆ™Y™\™[˜Ù\È[™ÛX\ˆ[]Kˆ‹›Y[K[Ü[ÛœÈ‹“QS•WÓPRSˆŠKˆ]ÜšX[ÝÜ
+’STÔ•PÒÈQS•H‹ÚÛÜÙHÜˆ\ÝHHXÚÈ\Ýˆ‹›Y[KZ[\Ü‹“QS•WÑPÒÔÈŠKˆ]ÜšX[ÝÜ
+‘QUPÒÈQS•H‹Ú[™ÙHHÙ[XÝYXÚËˆ‹›Y[KYY]‹“QS•WÑPÒÔÈŠKˆ]ÜšX[ÝÜ
+”ÐU‘QPÒÔÈQS•H‹“ØYÜˆ™[[Ý™HHØ]™YXÚËˆ‹›Y[K\Ø]™Y‹“QS•WÑPÒÔÈŠKˆ]ÜšX[ÝÜ
+QRH‹YHÛÛ\]\ˆÙX]ÈHØØ[Ø[YKˆ‹›Y[KXYXZH‹“QS•WÕÓÓÈ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+QÒÑSˆ‹“Ü[ˆHÚÙ[ˆXÚÙ\‹ˆ‹›Y[KXY]ÚÙ[ˆ‹“QS•WÕÓÓÈ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+“PSHÓÓ‹•˜XÚÈÛÛÜ™YX[˜H›Üˆ\È^Y\‹ˆ‹›Y[K[X[˜H‹“QS•WÕÓÓÈ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”ÑPTÒP”T–H‹”ÙX\˜ÚÜˆœ›ÝÜÙHØ\™È[ˆHXœ˜\žKˆ‹›Y[K\ÙX\˜Ú‹“QS•WÕÓÓÈ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”ÕPÒÈQS•H‹“Ü[ˆÜ[È[™Xš[]Y\È]ØZ][™È™\ÜÛœÙ\Ëˆ‹›Y[K\ÝXÚÈ‹“QS•WÕÓÓÈŠKˆ]ÜšX[ÝÜ
+‘ÐSQHÑÈQS•H‹”™]šY]ÈH™XÛÜ™YØ[YHXÝ[ÛœËˆ‹›Y[K[ÙÈ‹“QS•WÕÓÓÈŠKˆ]ÜšX[ÝÜ
+”•STÈQS•H‹”ÙX\˜ÚHXYÚXÈ[\È™Y™\™[˜ÙKˆ‹›Y[K\[\È‹“QS•WÕÓÓÈŠKˆ]ÜšX[ÝÜ
+‘VÔ•PQÓ“ÔÕPÔÈ‹”Ø]™HHÛÛ›™XÝ[ÛˆÙÈ›Üˆ›ÝX›\ÚÛÝ[™Ëˆ‹›Y[KY^Ü‹“QS•WÕÓÓÈ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”“ÓÓHÓQHQS•H‹”™]\›ˆÈHÛYHØÜ™Y[‹ˆ‹›Y[KZÛYH‹“QS•WÑÐSQHŠKˆ]ÜšX[ÝÜ
+”ÕT•ÐSQHQS•H‹™YÚ[ˆH™]ÈØØ[Ø[YKˆ‹›Y[K\Ý\YØ[YH‹“QS•WÑÐSQH‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+‘ÐSQHÐ–HQS•H‹“Ü[ˆ›ÛÛH[™^Y\ˆÛÛ›ÛËˆ‹›Y[K[Ø˜žH‹“QS•WÑÐSQHŠKˆ]ÜšX[ÝÜ
+‘S‘ÐSQHQS•H‹\ÚÈ[^Y\œÈÈYÜ™YHÈ[™HØ[YKˆ‹›Y[KY[™‹“QS•WÑÐSQH‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+“PU‘HÐSQHQS•H‹“Ü[ˆHØ˜žHÈX]™HÜˆ[™Ù™ˆH›ÛÛKˆ‹›Y[K[X]™H‹“QS•WÑÐSQHŠKˆ]ÜšX[ÝÜ
+”‘TÑUÐSQHQS•H‹”Ý\Hœ™\ÚØ[YHÚ]\ÙHXÚÜËˆ‹›Y[K\™\Ù]‹“QS•WÑÐSQH‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+ÓPTˆÐSQHUHQS•H‹“Ü[ˆHÛÛ™š\›X][Ûˆ™Y›Ü™HÛX\š[™È]Kˆ‹›Y[KXÛX\ˆ‹“QS•WÑÐSQH‹^XÝ]PXÝ[ÛˆH˜[ÙJK‚ˆ]ÜšX[ÝÜ
+ÒÓÔÑH’SH‹”XÚÈHXÚÈ\Ýš[Kˆ‹™XÚËXÚÛÜÙKYš[H‹‘PÒ×ÒSTÔ•‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+”S‘ÓHPÒÈ‹“ØY[ˆ^[\HXÚÈ\Ýˆ‹™XÚË\˜[™ÛH‹‘PÒ×ÒSTÔ•‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+“ÐQÐU‘QPÒÈ‹“Ü[ˆ[Ý\ˆØ]™YXÚÈ\Ýˆ‹™XÚË[ØY\Ø]™Y‹‘PÒ×ÒSTÔ•ŠKˆ]ÜšX[ÝÜ
+’STÔ•PÒÈ‹”™\XÙH\È^Y\¸ &\ÈXÚËˆ‹™XÚËZ[\Ü‹‘PÒ×ÒSTÔ•‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+ÐSÑSSTÔ•‹ÛÜÙHÚ]Ý]™\XÚ[™È\ÈXÚËˆ‹™XÚËXØ[˜Ù[‹‘PÒ×ÒSTÔ•‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+“ÐQHÐU‘QPÒÈ‹”]\ÈXÚÈ[ÈH[\Ü›Þˆ‹œØ]™Y[ØY‹”ÐU‘QÑPÒÔÈ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+‘SUHHÐU‘QPÒÈ‹”™[[Ý™H\ÈØ]™YXÚÈœ›ÛHH]šXÙKˆ‹œØ]™YY[]H‹”ÐU‘QÑPÒÔÈ‹^XÝ]PXÝ[ÛˆH˜[ÙJKˆ]ÜšX[ÝÜ
+ÓÔÑHÐU‘QPÒÔÈ‹”™]\›ˆÈXÚÈ[\Üˆ‹œØ]™YXÛÜÙH‹”ÐU‘QÑPÒÔÈŠBŠB‚™]HÛ\ÜÈØ[YPØ\™
+ˆ˜[Yˆ[ˆ˜[˜[YNˆÝš[™Ëˆ˜[\NˆÝš[™Ëˆ˜[ÛÛÜŽˆÛÛÜ‹ˆ˜[\Yˆ›ÛÛX[ˆH˜[ÙKˆ˜[[XYÙU\›ˆÝš[™ÏÈH[ˆ˜[\ÕÚÙ[Žˆ›ÛÛX[ˆH˜[ÙKˆ˜[ÛÝ[\œÎˆX\Ýš[™Ë[ˆH[\SX\
+
+Kˆ˜[\Ñ˜XÙQÝÛŽˆ›ÛÛX[ˆH˜[ÙKˆ˜[Ü˜XÛU^ˆÝš[™ÏÈH[ˆ˜[X[˜U˜[YNˆÝX›OÈH[ˆ˜[[\Ü\ÜÝYNˆÝš[™ÏÈH[ˆ˜[\Ü›Ü\›ˆÝš[™ÏÈH[ˆ˜[X[˜PÛÜÝˆÝš[™ÏÈH[ˆ˜[ÝÙ\ŽˆÝš[™ÏÈH[ˆ˜[ÝYÚ™\ÜÎˆÝš[™ÏÈH[ˆ˜[Ù^]ÛÜ™Îˆ\ÝÝš[™ÏˆH[\S\Ý
+
+Kˆ˜[ÚÜÙ[Ü™X]\™U\NˆÝš[™ÏÈH[ŠB‚œš]˜]H]HÛ\ÜÈ[™[žT›Û\
+˜[^Y\’[™^ˆ[˜[Ø\™ˆØ[YPØ\™˜[\ÔÚØÚÓ[™ˆ›ÛÛX[‹˜[ÛÛ™][Û•^ˆÝš[™ÊB‚œš]˜]H[ˆÚØÚÓ[™ÚÚXÙT™\]Z\™Y
+Ø\™ˆØ[YPØ\™
+Nˆ›ÛÛX[ˆÂˆ˜[^HØ\™›Ü˜XÛU^›Ü‘[\J
+K›ÝÙ\˜Ø\ÙJ
+Bˆ™]\›ˆØ\™\K˜ÛÛZ[œÊ›[™‹YÛ›Ü™PØ\ÙHHYJH	‰‚ˆ
+œ^HˆY™Hˆ[ˆ^œ^HˆY™Hˆ[ˆØ\™›˜[YK›ÝÙ\˜Ø\ÙJ
+JH	‰‚ˆ
+™[\œÈ\Yˆ[ˆ^™[\œÈH˜]YšY[\Yˆ[ˆ^
+BŸB‚œš]˜]H[ˆ[™[žPÛÛ™][ÛŠØ\™ˆØ[YPØ\™
+NˆÝš[™ÏÈÂˆYˆ
+XØ\™\K˜ÛÛZ[œÊ›[™‹YÛ›Ü™PØ\ÙHHYJJH™]\›ˆ[ˆ˜[^HØ\™›Ü˜XÛU^›Ü‘[\J
+Bˆ˜[™[]˜[H^›[™\Ê
+K™š\œÝÜ“[È[™HO‚ˆ˜[ÝÙ\ˆH[™K›ÝÙ\˜Ø\ÙJ
+Bˆ
+™[\œÈ\Yˆ[ˆÝÙ\ˆ™[\œÈH˜]YšY[\Yˆ[ˆÝÙ\ŠH	‰‚ˆ
+[›\ÜÈˆ[ˆÝÙ\ˆšYˆˆ[ˆÝÙ\ˆœ^Hˆ[ˆÝÙ\ŠBˆBˆ™]\›ˆ™[]˜[Ëš[J
+OËZÙRYŠÝš[™ÎŽš\Ó›Ý›[šÊBŸB‚œš]˜]H[ˆ[™[Ø^\Ñ[\œÕ\Y
+Ø\™ˆØ[YPØ\™
+Nˆ›ÛÛX[ˆÂˆ˜[^HØ\™›Ü˜XÛU^›Ü‘[\J
+K›ÝÙ\˜Ø\ÙJ
+Bˆ™]\›ˆØ\™\K˜ÛÛZ[œÊ›[™‹YÛ›Ü™PØ\ÙHHYJH	‰‚ˆ
+™[\œÈ\Yˆ[ˆ^™[\œÈH˜]YšY[\Yˆ[ˆ^
+H	‰‚ˆ[™[žPÛÛ™][ÛŠØ\™
+HOH[ŸB‚œš]˜]H]HÛ\ÜÈX[˜PÚÚXÙT›Û\
+ˆ˜[^Y\’[™^ˆ[ˆ˜[Ø\™˜[YNˆÝš[™Ëˆ˜[Ü[ÛœÎˆ\ÝX[˜T›ÙXÝ[Û“Ü[Û‚ŠB‚œš]˜]H]HÛ\ÜÈÜ™X]\™U\PÚÚXÙT›Û\
+˜[^Y\’[™^ˆ[˜[Ø\™Yˆ[˜[Ø\™˜[YNˆÝš[™ÊB‚š[\›˜[[ˆ™YYÐÜ™X]\™U\PÚÚXÙJØ\™ˆØ[YPØ\™
+Nˆ›ÛÛX[ˆBˆXØ\™š\Ñ˜XÙQÝÛˆ	‰ˆ™YÙ^
+—˜\È\È[\œÊÎˆH˜]YšY[
+OËÚÛÜÙHHÜ™X]\™H\Wˆ‹™YÙ^Ü[Û‹’QÓ“Ô‘WÐÐTÑJBˆ˜ÛÛZ[œÓX]Ú[ŠØ\™›Ü˜XÛU^›Ü‘[\J
+JB‚œš]˜]H]HÛ\ÜÈZSX[˜T[Š˜[[™YÎˆÙ][‹˜[™[XZ[š[™ÔÛÛˆX\Ýš[™Ë[ŠB‚œš]˜]H[ˆ[ZSX[˜J^Y\ŽˆX›T^Y\‹Ø\™ˆØ[YPØ\™
+NˆZSX[˜T[ÈÂˆ˜[ÛÜÝHØ\™›X[˜PÛÜÝÎˆ™]\›ˆYˆ
+Ø\™›X[˜U˜[YHOHŒ
+HZSX[˜T[Š[\TÙ]
+
+K^Y\‹›X[˜TÛÛ
+H[ÙH[ˆ˜[Þ[X›ÛÈHÚ[\SX[˜TÞ[X›ÛÊÛÜÝ
+HÎˆ™]\›ˆ[ˆ˜[™\]Z\™YHÞ[X›ÛË™š[\ˆÈ][ˆÙ]ÙŠ•È‹•H‹ˆ‹”ˆ‹‘È‹ÈŠHK™Ü›Ý\[™ÐžHÈ]K™XXÚÛÝ[
+
+Bˆ˜[Ù[™\šXÈHÞ[X›ÛË›X\›Ý[È]Ò[Ü“[
+
+HKœÝ[J
+Bˆ˜[]˜Z[X›HH^Y\‹˜˜]YšY[™š[\ˆÈ]\K˜ÛÛZ[œÊ›[™‹YJH	‰ˆZ]\YKÓ]]X›S\Ý
+
+Bˆ˜[ÛÛH^Y\‹›X[˜TÛÛÓ]]X›SX\
+
+Bˆ˜[\ÙY[™YÈH[šÙYÙ]Ù[Š
+Bˆ[ˆYÜ[ÛŠ[™ˆØ[YPØ\™Ü[ÛŽˆX[˜T›ÙXÝ[Û“Ü[ÛŠHÂˆÜ[Û‹œÛÛ™›Ü‘XXÚÈ
+ÛÛÜ‹ÛÝ[
+HOˆÛÛØÛÛÜ—HH
+
+ÛÛØÛÛÜ—HÎˆ
+H
+ÈÛÝ[
+K˜ÛÙ\˜ÙP][ÜÝ
+NJHBˆ]˜Z[X›Kœ™[[Ý™P[È]šYOH[™šYBˆ\ÙY[™YÈ
+ÏH[™šYˆBˆ›Üˆ
+ÛÛÜˆ[ˆ\ÝÙŠ•È‹•H‹ˆ‹”ˆ‹‘È‹ÈŠJHÂˆÚ[H
+
+ÛÛØÛÛÜ—HÎˆ
+H
+™\]Z\™YØÛÛÜ—HÎˆ
+JHÂˆ˜[ÚÚXÙHH]˜Z[X›K˜\ÔÙ\]Y[˜ÙJ
+K™›]X\È[™O‚ˆX[˜T›ÙXÝ[Û“Ü[ÛœÊ[™
+K˜\ÔÙ\]Y[˜ÙJ
+K™š[\ˆÈ
+]œÛÛØÛÛÜ—HÎˆ
+HˆK›X\È[™È]BˆK›X^žSÜ“[È
+ËÜ[ÛŠHOˆ
+Ü[Û‹œÛÛØÛÛÜ—HÎˆ
+H
+ˆLH
+Ü[Û‹œÛÛ˜[Y\ËœÝ[J
+HH
+Ü[Û‹œÛÛØÛÛÜ—HÎˆ
+JHHÎˆ™]\›ˆ[ˆYÜ[ÛŠÚÚXÙK™š\œÝÚÚXÙKœÙXÛÛ™
+BˆBˆBˆ˜[Ý[™\]Z\™YH™\]Z\™Y˜[Y\ËœÝ[J
+H
+ÈÙ[™\šXÂˆÚ[H
+ÛÛ˜[Y\ËœÝ[J
+HÝ[™\]Z\™Y
+HÂˆ˜[ÚÚXÙHH]˜Z[X›K˜\ÔÙ\]Y[˜ÙJ
+K™›]X\È[™OˆX[˜T›ÙXÝ[Û“Ü[ÛœÊ[™
+K˜\ÔÙ\]Y[˜ÙJ
+K›X\È[™È]HBˆ›X^žSÜ“[È
+ËÜ[ÛŠHOˆÜ[Û‹œÛÛ˜[Y\ËœÝ[J
+HHÎˆ™]\›ˆ[ˆYÜ[ÛŠÚÚXÙK™š\œÝÚÚXÙKœÙXÛÛ™
+BˆBˆ˜[™[XZ[š[™ÈH^TÚ[\SX[˜PÛÜÝ
+ÛÛÛÜÝ
+HÎˆ™]\›ˆ[ˆ™]\›ˆZSX[˜T[Š\ÙY[™YË™[XZ[š[™ÊBŸB‚œš]˜]H[ˆZPØ\™š[Üš]JØ\™ˆØ[YPØ\™
+NˆÝX›HÂˆ˜[^HØ\™›Ü˜XÛU^›Ü‘[\J
+K›ÝÙ\˜Ø\ÙJ
+Bˆ˜[\HHØ\™\K›ÝÙ\˜Ø\ÙJ
+Bˆ˜\ˆØÛÜ™HH
+Ø\™›X[˜U˜[YHÎˆŒ
+K˜ÛÙ\˜ÙP][ÜÝ
+Œ
+H
+ˆŒBˆYˆ
+˜Ü™X]\™Hˆ[ˆ\JHØÛÜ™H
+ÏH‹ŒÂˆYˆ
+˜\Y˜XÝˆ[ˆ\H™[˜Ú[Y[ˆ[ˆ\Hœ[™\ÝØ[Ù\ˆˆ[ˆ\H˜˜]Hˆ[ˆ\JHØÛÜ™H
+ÏHKŒBˆYˆ
+™˜]Èˆ[ˆ^	‰ˆ˜Ø\™ˆ[ˆ^
+HØÛÜ™H
+ÏHKŽˆYˆ
+œÙX\˜Ú[Ý\ˆXœ˜\žHˆ[ˆ^	‰ˆ
+›[™ˆ[ˆ^›X[˜Hˆ[ˆ^
+JHØÛÜ™H
+ÏHK‚ˆYˆ
+\ÝÙŠ™\Ý›ÞH\™Ù]‹™^[H\™Ù]‹˜ÛÝ[\ˆ\™Ù]ŠK˜[žHÈ][ˆ^JHØÛÜ™H
+ÏHKˆYˆ
+Ú[™]™\ˆˆ[ˆ^˜]H™YÚ[›š[™Èˆ[ˆ^
+HØÛÜ™H
+ÏH‚ˆYˆ
+š[œÝ[ˆ[ˆ\HœÛÜ˜Ù\žHˆ[ˆ\JHØÛÜ™HOHBˆ™]\›ˆØÛÜ™BŸB‚œš]˜]H[ˆX[˜T›ÙXÝ[Û“Ü[ÛœÊØ\™ˆØ[YPØ\™
+Nˆ\ÝX[˜T›ÙXÝ[Û“Ü[ÛˆÂˆ™]\›ˆX[˜T›ÙXÝ[Û”ÛÛÊØ\™›˜[YKØ\™\KØ\™›Ü˜XÛU^
+K›X\
+Ž“X[˜T›ÙXÝ[Û“Ü[ÛŠBŸB‚™]HÛ\ÜÈX›T^Y\Šˆ˜[˜[YNˆÝš[™Ëˆ˜[YˆÝš[™ÈH˜]˜K][•URQœ˜[™ÛUURQ
+
+KÔÝš[™Ê
+Kˆ˜[\ÓÛ›[™Nˆ›ÛÛX[ˆH˜[ÙKˆ˜[ÛÛ[X[™\“˜[YNˆÝš[™ÏÈH[ˆ˜[ÛÛ[X[™\Ø\™ˆØ[YPØ\™ÈH[ˆ˜[\ÐÛÛ\]\Žˆ›ÛÛX[ˆH˜[ÙKˆ˜[XÚÓØYYˆ›ÛÛX[ˆH˜[ÙKˆ˜[][YØ[œÕZÙ[Žˆ[Hˆ˜[Ü[š[™Ò[™Ù\ˆ›ÛÛX[ˆH˜[ÙKˆ˜[Y™Nˆ[Hˆ˜[X[˜TÛÛˆX\Ýš[™Ë[ˆH[\SX\
+
+Kˆ˜[Xœ˜\žNˆ\ÝØ[YPØ\™ˆH[\S\Ý
+
+Kˆ˜[[™ˆ\ÝØ[YPØ\™ˆH[\S\Ý
+
+Kˆ˜[˜]YšY[ˆ\ÝØ[YPØ\™ˆH[\S\Ý
+
+Kˆ˜[Ü˜]™^X\™ˆ\ÝØ[YPØ\™ˆH[\S\Ý
+
+Kˆ˜[^[Nˆ\ÝØ[YPØ\™ˆH[\S\Ý
+
+Kˆ˜[™]™X[Yˆ\ÝØ[YPØ\™ˆH[\S\Ý
+
+Kˆ˜[[™™]™X[YÐ[ˆ›ÛÛX[ˆH˜[ÙKˆ˜[^Y\ÛÝ[\œÎˆX\Ýš[™Ë[ˆH[\SX\
+
+Kˆ˜[ÛÛ[X[™\‘[XYÙT™XÙZ]™YˆX\Ýš[™Ë[ˆH[\SX\
+
+Kˆ˜[ÛÛ[X[™\Ø\ÝÛÝ[ˆ[Hˆ˜[\Ñ[[Z[˜]Yˆ›ÛÛX[ˆH˜[ÙKˆ˜[[[Z[˜][Û”™X\ÛÛŽˆÝš[™ÏÈH[ŠB‚™]HÛ\ÜÈÝXÚÐXÝ[ÛŠˆ˜[YˆÝš[™ÈH˜]˜K][•URQœ˜[™ÛUURQ
+
+KÔÝš[™Ê
+Kˆ˜[]NˆÝš[™Ëˆ˜[ÛÛ›Û\’YˆÝš[™Ëˆ˜[Ú[™ˆÝš[™ÈH”ÔS‹ˆ˜[Ø\™ˆØ[YPØ\™ÈH[ˆ˜[\™Ù]^ˆÝš[™ÈHØ\™Ë›Ü˜XÛU^›Ü‘[\J
+Kˆ˜[\™Ù]ÛÝ[ˆ\™Ù]ÛÝ[˜[™ÙOÈH\œÙU\™Ù]ÛÝ[˜[™ÙJ\™Ù]^
+Kˆ˜[\™Ù]Îˆ\ÝÝXÚÕ\™Ù]ˆH[\S\Ý
+
+Kˆ˜[\™Ù]ÐÛÛ™š\›YYˆ›ÛÛX[ˆH\™Ù]ÛÝ[OH[ŠB‚œš]˜]H]HÛ\ÜÈØ]™YXÚÊ˜[˜[YNˆÝš[™Ë˜[^ˆÝš[™ÊB‚˜Û\ÜÈXZ[XÝ]š]HˆÛÛ\Û™[XÝ]š]J
+HÂˆÝ™\œšYH[ˆÛÜ™X]JØ]™Y[œÝ[˜ÙTÝ]Nˆ[™OÊHÂˆÝ\\‹›ÛÜ™X]JØ]™Y[œÝ[˜ÙTÝ]JBˆ˜[™]š[Ý\Ò[™\ˆH™XY™Ù]Y˜][[˜Ø]YÚ^Ù\[Û’[™\Š
+Bˆ™XYœÙ]Y˜][[˜Ø]YÚ^Ù\[Û’[™\ˆÈ™XY\œ›ÜˆO‚ˆ[Ø]Ú[™ÈÂˆÙ]Ú\™Y™Y™\™[˜Ù\Ê˜\˜Ø[˜WØÜ˜\Ú‹ÛÛ^“SÑWÔ’UUJK™Y]
+
+Bˆœ]Ýš[™Ê›\ÝØÜ˜\Ú‹ÙË™Ù]ÝXÚÕ˜XÙTÝš[™Ê\œ›ÜŠKZÙJÌ
+JBˆœ]Ýš[™Ê›\ÝØÜ˜\ÚØÛÛ^‹Ù]Ú\™Y™Y™\™[˜Ù\Ê˜\˜Ø[˜WÛÜ[ÛœÈ‹ÛÛ^“SÑWÔ’UUJK™Ù]Ýš[™Ê›\ÝÙXYÛ›ÜÝX×ØÛÛ^‹“›È™XÙ[XÝ[ÛˆÛÛ^Ø\È™XÛÜ™YˆŠJBˆœ]Ýš[™Ê›\ÝØÜ˜\ÚØ]‹˜]˜K^”Ú[\Q]Q›Ü›X]
+ž^^^KSSKY›[NœÜË”ÔÔÈ‹˜]˜K][“ØØ[K•TÊK™›Ü›X]
+˜]˜K][‘]J
+JJBˆ˜ÛÛ[Z]
+
+BˆBˆ™]š[Ý\Ò[™\Ë[˜Ø]YÚ^Ù\[ÛŠ™XY\œ›ÜŠBˆBˆÙ]ÛÛ[ÈX›TØÜ™Y[Š
+HBˆB‚ˆÝ™\œšYH[ˆÛ”™\Ý[YJ
+HÈÝ\\‹›Û”™\Ý[YJ
+NÈ\[‘›Ü™YÜ›Ý[™HYHBˆÝ™\œšYH[ˆÛ”]\ÙJ
+HÈ\[‘›Ü™YÜ›Ý[™H˜[ÙNÈÝ\\‹›Û”]\ÙJ
+HBŸB‚ÛÛ\ÜØX›B™[ˆX›TØÜ™Y[Š
+HÂˆ˜[ÛÛ^HØØ[ÛÛ^˜Ý\œ™[ˆ˜[Ü[Û”™YœÈH™[Y[X™\ˆÈÛÛ^™Ù]Ú\™Y™Y™\™[˜Ù\Ê˜\˜Ø[˜WÛÜ[ÛœÈ‹ÛÛ^“SÑWÔ’UUJHBˆ˜\ˆ\šÓ[ÙHžH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠÜ[Û”™YœË™Ù]›ÛÛX[Š™\š×Û[ÙH‹YJJHBˆ˜[ÛÛÜœÈHYˆ
+\šÓ[ÙJH\šÕX›PÛÛÜœÈ[ÙHYÚX›PÛÛÜœÂˆ˜[ØÚ[YHHYˆ
+\šÓ[ÙJH\šÐÛÛÜ”ØÚ[YJš[X\žHHÛÛÜœË˜XØÙ[˜XÚÙÜ›Ý[™HÛÛÜœË˜˜XÚÙÜ›Ý[™Ý\™˜XÙHHÛÛÜœËœ[™[
+Bˆ[ÙHYÚÛÛÜ”ØÚ[YJš[X\žHHÛÛÜœË˜XØÙ[˜XÚÙÜ›Ý[™HÛÛÜœË˜˜XÚÙÜ›Ý[™Ý\™˜XÙHHÛÛÜœËœ[™[
+BˆÛÛ\ÜÚ][Û“ØØ[›ÝšY\ŠØØ[X›PÛÛÜœÈ›ÝšY\ÈÛÛÜœÊHÂˆX]\šX[[YJÛÛÜ”ØÚ[YHHØÚ[YJHÈX›TØÜ™Y[ÛÛ[
+\šÓ[ÙKÛ•ÙÙÛU[YHHÂˆ\šÓ[ÙHHY\šÓ[ÙBˆÜ[Û”™YœË™Y]
+
+Kœ]›ÛÛX[Š™\š×Û[ÙH‹\šÓ[ÙJK˜\J
+BˆJHBˆBŸB‚Ü[Š^\š[Y[[X]\šX[Ð\NŽ˜Û\ÜÊBÛÛ\ÜØX›Bœš]˜]H[ˆX›TØÜ™Y[ÛÛ[
+\šÓ[ÙNˆ›ÛÛX[‹Û•ÙÙÛU[YNˆ
+
+HOˆ[š]
+HÂˆ˜[ÛÛ^HØØ[ÛÛ^˜Ý\œ™[ˆ˜[ØÛÜHH™[Y[X™\ÛÜ›Ý][™TØÛÜJ
+Bˆ˜[]]ÛX]XÐXÝ[Û”Û˜XÚØ˜\ˆH™[Y[X™\ˆÈÛ˜XÚØ˜\’ÜÝÝ]J
+HBˆ˜[Ü[Û”™YœÈH™[Y[X™\ˆÈÛÛ^™Ù]Ú\™Y™Y™\™[˜Ù\Ê˜\˜Ø[˜WÛÜ[ÛœÈ‹ÛÛ^“SÑWÔ’UUJHBˆ˜[]ÜšX[™YœÈH™[Y[X™\ˆÈÛÛ^™Ù]Ú\™Y™Y™\™[˜Ù\Ê˜\˜Ø[˜WÝ]ÜšX[‹ÛÛ^“SÑWÔ’UUJHBˆ˜\ˆ˜XÚÙÜ›Ý[™[\Ñ[˜X›YžH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠÜ[Û”™YœË™Ù]›ÛÛX[Š˜˜XÚÙÜ›Ý[™Ø[\È‹˜[ÙJJHBˆ˜\ˆ]]Ô™]\›•X›PY\”\ÜÈžH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠÜ[Û”™YœË™Ù]›ÛÛX[Š˜]]×Ü™]\›—ÝX›H‹YJJHBˆ˜\ˆ]]Ñ˜]ÓÛ‘˜]ÔÝ\žH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠÜ[Û”™YœË™Ù]›ÛÛX[Š˜]]×Ù˜]×ÜÝ\‹YJJHBˆ˜\ˆ]]Õ[\Û•[\Ý\žH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠÜ[Û”™YœË™Ù]›ÛÛX[Š˜]]×Ý[\ÜÝ\‹YJJHBˆ˜\ˆÜ[’[™Y\‘˜]ÈžH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠÜ[Û”™YœË™Ù]›ÛÛX[Š›Ü[—Ú[™ØY\—Ù˜]È‹YJJHBˆ˜\ˆ™YXÙYÝÚ\S[Ý[ÛˆžH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠÜ[Û”™YœË™Ù]›ÛÛX[Šœ™YXÙYÜÝÚ\WÛ[Ý[Ûˆ‹˜[ÙJJHBˆ˜[ÛÛ™šYÝ\˜][ÛˆHØØ[ÛÛ™šYÝ\˜][Û‹˜Ý\œ™[ˆ˜[\Ó[™ØØ\HHÛÛ™šYÝ\˜][Û‹›ÜšY[][ÛˆOH[™›ÚY˜ÛÛ[œ™\ËÛÛ™šYÝ\˜][Û‹“Ô’QS•USÓ—ÓS‘ÐÐTBˆ˜[^[Ý]ÜšY[][Û”ÝY™š^HYˆ
+\Ó[™ØØ\JH›[™ØØ\Hˆ[ÙHœÜ˜Z]‚ˆ˜\ˆØ\™Ú^™TØØ[HžH™[Y[X™\”Ø]™XX›J^[Ý]ÜšY[][Û”ÝY™š^
+HÈ]]X›Q›Ø]Ý]SÙŠÜ[Û”™YœË™Ù]›Ø]
+›^[Ý]ØØ\™ÜÚ^™WÉ^[Ý]ÜšY[][Û”ÝY™š^‹Ü[Û”™YœË™Ù]›Ø]
+˜Ø\™ÜÚ^™WÜØØ[H‹YŠJK˜ÛÙ\˜ÙR[ŠÍY‹KŠJHBˆ˜\ˆ›Ø\™ÜXÚ[™ÔØØ[HžH™[Y[X™\”Ø]™XX›J^[Ý]ÜšY[][Û”ÝY™š^
+HÈ]]X›Q›Ø]Ý]SÙŠÜ[Û”™YœË™Ù]›Ø]
+›^[Ý]Ø›Ø\™ÜÜXÚ[™×É^[Ý]ÜšY[][Û”ÝY™š^‹YŠK˜ÛÙ\˜ÙR[ŠY‹™ŠJHBˆ˜\ˆ›ÛÝ\]Û”ØØ[HžH™[Y[X™\”Ø]™XX›J^[Ý]ÜšY[][Û”ÝY™š^
+HÈ]]X›Q›Ø]Ý]SÙŠÜ[Û”™YœË™Ù]›Ø]
+›^[Ý]Ù›ÛÝ\—Ø]Û—ÜØØ[WÉ^[Ý]ÜšY[][Û”ÝY™š^‹YŠK˜ÛÙ\˜ÙR[ŠÎ‹KŒÙŠJHBˆ˜\ˆ[™ÚY]ZYÚœ˜XÝ[ÛˆžH™[Y[X™\”Ø]™XX›J^[Ý]ÜšY[][Û”ÝY™š^
+HÂˆ]]X›Q›Ø]Ý]SÙŠÜ[Û”™YœË™Ù]›Ø]
+›^[Ý]Ú[™ÜÚY]ÚZYÚÉ^[Ý]ÜšY[][Û”ÝY™š^‹Ü[Û”™YœË™Ù]›Ø]
+š[™ÜÚY]ÚZYÚÙœ˜XÝ[Ûˆ‹L™ŠJK˜ÛÙ\˜ÙR[ŠŒÎ‹ŽMYŠJBˆBˆ˜\ˆ^Y\”ÙXÝ[Û“Ü™\”˜]ÈžH™[Y[X™\”Ø]™XX›J^[Ý]ÜšY[][Û”ÝY™š^
+HÂˆ˜[Ù^HH›^[Ý]Ü^Y\—ÜÙXÝ[Ûœ×É^[Ý]ÜšY[][Û”ÝY™š^‚ˆ˜[ZYÜ˜][Û’Ù^HH›^[Ý]ÛX[˜WÜÙXÝ[Û—ÛZYÜ˜]YÉ^[Ý]ÜšY[][Û”ÝY™š^‚ˆ˜[Y˜][ÙXÝ[ÛœÈH”ÕUTßPS_ÓÓSPS‘TŸÕT“Ó‘Tß‘U‘PSQUQ’QS‚ˆ˜[Ø]™YHÜ[Û”™YœË™Ù]Ýš[™ÊÙ^K[
+Bˆ˜[Ü™\ˆHÚ[ˆÂˆØ]™YOH[OˆY˜][ÙXÝ[ÛœÂˆÜ[Û”™YœË™Ù]›ÛÛX[ŠZYÜ˜][Û’Ù^K˜[ÙJHOˆØ]™Yˆ“PSHˆ[ˆØ]™YœÜ]
+	ß	ÊHOˆØ]™Yˆ[ÙHOˆØ]™YœÜ]
+	ß	ÊKÓ]]X›S\Ý
+
+K˜\HÂˆY
+
+[™^ÙŠ”ÕUTÈŠH
+ÈJK˜ÛÙ\˜ÙP]X\Ý
+
+K“PSHŠBˆKš›Ú[•ÔÝš[™ÊŸŠBˆBˆÜ[Û”™YœË™Y]
+
+Kœ]›ÛÛX[ŠZYÜ˜][Û’Ù^KYJKœ]Ýš[™ÊÙ^KÜ™\ŠK˜\J
+Bˆ]]X›TÝ]SÙŠÜ™\ŠBˆBˆ˜\ˆ[™XÝ[Û“Ü™\”˜]ÈžH™[Y[X™\”Ø]™XX›J^[Ý]ÜšY[][Û”ÝY™š^
+HÈ]]X›TÝ]SÙŠÜ[Û”™YœË™Ù]Ýš[™Ê›^[Ý]Ú[™ØXÝ[Ûœ×É^[Ý]ÜšY[][Û”ÝY™š^‹‘Uß‘U‘PSÕPÒßÐTÕÐÓÓSPS‘TŸÓÓPU‘VÔÕTTÔ×ÕT“ŸSÔ‘HŠHÎˆ‘Uß‘U‘PSÕPÒßÐTÕÐÓÓSPS‘TŸÓÓPU‘VÔÕTTÔ×ÕT“ŸSÔ‘HŠHBˆ˜[[œÚ]HHØØ[[œÚ]K˜Ý\œ™[ˆ˜[ØÜ™Y[•ÚYHÛÛ™šYÝ\˜][Û‹œØÜ™Y[•ÚYˆ˜\ˆ™^YžH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠŒ
+HBˆ˜\ˆ^Y\œÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠØYØ]™Y^Y\œÊÛÛ^
+HÎˆØ[\T^Y\œÊ
+JHBˆ˜\ˆÙ[XÝY^Y\ˆžH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠ
+HBˆ˜\ˆÚÝÓÝ™\šY]ÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠYJHBˆ˜\ˆÚÝÒ[™žH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ[\ÜÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ[\Ü^žH™[Y[X™\ˆÈ]]X›TÝ]SÙŠˆŠHBˆ˜\ˆ[\ÜØ]™UÓXœ˜\žHžH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ[\ÜØ]™S˜[YHžH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠˆŠHBˆ˜\ˆØ]™YXÚÜÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠØYØ]™YXÚÜÊÛÛ^
+JHBˆ˜\ˆØ]™YXÚÜÓÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆØØ[XÚÔÞ[˜ÐÛÛ™š\›YYžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜[XYÛ›ÜÝXÑ]™[ÈH™[Y[X™\ˆÂˆ]]X›TÝ]S\ÝÙÝš[™ÏŠ
+K˜\HÂˆY[
+Ü[Û”™YœË™Ù]Ýš[™Ê™XYÛ›ÜÝX×Ù]™[È‹ˆŠK›Ü‘[\J
+K›[™TÙ\]Y[˜ÙJ
+K™š[\ŠÝš[™ÎŽš\Ó›Ý›[šÊKÓ\Ý
+
+KZÙS\Ý
+L
+JBˆBˆBˆ˜\ˆXYÛ›ÜÝXÑ]™[Ù\]Y[˜ÙHžH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠXYÛ›ÜÝXÑ]™[ËœÚ^™JHBˆ˜\ˆ\ÝXYÛ›ÜÝXÖ›Û™TÚYÛ˜]\™HžH™[Y[X™\ˆÈ]]X›TÝ]SÙÝš[™ÏÏŠ[
+HBˆ˜\ˆ\ÝXYÛ›ÜÝXÖ›Û™TÛ˜\ÚÝžH™[Y[X™\ˆÈ]]X›TÝ]SÙ\ÝX›T^Y\ÏŠ[
+HBˆ˜\ˆ[˜›Ý[™Û˜\ÚÝÙ\]Y[˜ÙHžH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠ
+HBˆ˜\ˆ[\Ü[™ÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ˜[™ÛQXÚÓØY[™ÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ[\Ü\œ›ÜˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙÝš[™ÏÏŠ[
+HBˆ˜\ˆ[\Ü™]šY]ÓÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ[\Ü™]šY]ÓY\ÜØYÙHžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠˆŠHBˆ˜\ˆ[\Ü™]šY]ÐØ\™YÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ[\TÙ][Š
+JHBˆ˜\ˆ[\ÜÝ™\™›ÝÐØ\™YÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ[\TÙ][Š
+JHBˆ˜\ˆ[\Ü]]Ñš^[”›ÙÜ™\ÜÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ[™[™ÐZT^Y\’[™^žH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠLJHBˆ˜\ˆÛX\[ÛÛ™š\›SÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆYÚYÚY[™Ø\™YžH™[Y[X™\ˆÈ]]X›TÝ]SÙ[ÏŠ[
+HBˆ˜\ˆÚÙ[”XÚÙ\“Ü[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆÚÙ[•\™Ù]žH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠ
+HBˆ˜\ˆÛÝ[\•\™Ù]žH™[Y[X™\ˆÈ]]X›TÝ]SÙZ\[[ÏŠ[
+HBˆ˜\ˆ™]šY]ÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙØ\™™]šY]ÏÏŠ[
+HBˆ˜\ˆ[\ÓÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ˜]YšY[›Ý[™ÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙ™XÝÏŠ[
+HBˆ˜\ˆ[™ÚY]›Ý[™ÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙ™XÝÏŠ[
+HBˆ˜\ˆ›Û™QX[ÙÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙZ\[Ýš[™ÏÏŠ[
+HBˆ˜\ˆY\ÜØYÙHžH™[Y[X™\ˆÈ]]X›TÝ]SÙÝš[™ÏÏŠ[
+HBˆ˜\ˆØ\™XÝ[Û•\™Ù]žH™[Y[X™\ˆÈ]]X›TÝ]SÙZ\[[ÏŠ[
+HBˆ˜\ˆ[™XÝ[ÛØ\™žH™[Y[X™\ˆÈ]]X›TÝ]SÙØ[YPØ\™ÏŠ[
+HBˆ˜\ˆXÝ]™T^Y\ˆžH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠ
+HBˆ˜[šY]ÔYÙ\”Ý]HH™[Y[X™\”YÙ\”Ý]JYÙPÛÝ[HÈ^Y\œËœÚ^™H
+ÈHJBˆ][˜ÚYY™™XÝ
+ÚÝÓÝ™\šY]ËÙ[XÝY^Y\‹^Y\œËœÚ^™K™YXÙYÝÚ\S[Ý[ÛŠHÂˆ˜[\™Ù]YÙHHYˆ
+ÚÝÓÝ™\šY]ÊH[ÙH
+Ù[XÝY^Y\ˆ
+ÈJK˜ÛÙ\˜ÙR[Š^Y\œËœÚ^™JBˆYˆ
+šY]ÔYÙ\”Ý]K˜Ý\œ™[YÙHOH\™Ù]YÙJHÂˆYˆ
+™YXÙYÝÚ\S[Ý[ÛŠHšY]ÔYÙ\”Ý]KœØÜ›ÛÔYÙJ\™Ù]YÙJBˆ[ÙHšY]ÔYÙ\”Ý]K˜[š[X]TØÜ›ÛÔYÙJ\™Ù]YÙJBˆBˆBˆ][˜ÚYY™™XÝ
+šY]ÔYÙ\”Ý]K^Y\œËœÚ^™JHÂˆÛ˜\ÚÝ›ÝÈÈšY]ÔYÙ\”Ý]KœÙ]YYÙHBˆ™\Ý[˜Ý[[Ú[™ÙY
+
+Bˆ˜ÛÛXÝÈYÙHO‚ˆÚÝÓÝ™\šY]ÈHYÙHOHˆYˆ
+YÙH[ˆK‹œ^Y\œËœÚ^™JHÙ[XÝY^Y\ˆHYÙHHBˆYˆ
+YÙHOH
+HÚÝÒ[™H˜[ÙBˆBˆBˆ˜\ˆØ[YU\›“Ü™\ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ[\S\Ý[Š
+JHBˆ˜\ˆ\›“[X™\ˆžH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠJHBˆ˜[\ÙTÝ\ÈH™[Y[X™\ˆÈ\ÝÙŠ•S•T‹•TÑQT‹‘UÈ‹”‘PÓÓPUPRSˆ‹‘QÒSˆÓÓPU‹UPÒÑT”È‹“ÐÒÑT”È‹‘SPQÑH‹‘S‘ÓÓPU‹”ÔÕÓÓPUPRSˆ‹‘S‘ÕT‹ÓPS•TŠHBˆ˜\ˆ\ÙR[™^žH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠ
+HBˆ˜\ˆ[\ÙYØ[YTÙXÛÛ™ÈžH™[Y[X™\ˆÈ]]X›SÛ™ÔÝ]SÙŠ
+HBˆ˜\ˆ[\ÙY\›”ÙXÛÛ™ÈžH™[Y[X™\ˆÈ]]X›SÛ™ÔÝ]SÙŠ
+HBˆ˜\ˆØ[YSÙÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ\ÝÙŠ‘Ø[YHÙ\ÜÚ[ÛˆÝ\YŠJHBˆ˜\ˆÙÓÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆÚ]Ü[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆÜY[Q^[™YžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆÜY[TÙXÝ[ÛˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙÝš[™ÏÏŠ[
+HBˆ˜\ˆ™\Ù]ÛÛ™š\›SÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆÚ]˜YžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠˆŠHBˆ˜\ˆÚ]Y\ÜØYÙ\ÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ[\S\ÝÚ]Y\ÜØYÙOŠ
+JHBˆ˜\ˆ[œ™XYÚ]ÛÝ[žH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠ
+HBˆ˜\ˆšYÙÙ\”›Û\ÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ[\S\ÝšYÙÙ\”›Û\Š
+JHBˆ˜\ˆÝXÚÐXÝ[ÛœÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ[\S\ÝÝXÚÐXÝ[ÛŠ
+JHBˆ˜\ˆ\™Ù]Ù[XÝ[Û”ÝXÚÒ][RYžH™[Y[X™\ˆÈ]]X›TÝ]SÙÝš[™ÏÏŠ[
+HBˆ˜\ˆš[Üš]T^Y\ˆžH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠ
+HBˆ˜\ˆš[Üš]T\ÜÙYžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ[\TÙ]Ýš[™ÏŠ
+JHBˆ˜\ˆÝXÚÓÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ[™[™ÔÝXÚÓÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆÝXÚÐÞXÛPXÝ]™HžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ˜XÚÙ\”^Y\ˆžH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠLJHBˆ˜\ˆÛÛ˜ÙYT^Y\ˆžH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠLJHBˆ˜\ˆÚY™›PÛÛ™š\›T^Y\ˆžH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠLJHBˆ˜\ˆ^[Y[Ø\™žH™[Y[X™\ˆÈ]]X›TÝ]SÙZ\[Ø[YPØ\™ÏŠ[
+HBˆ˜\ˆ[™[žT›Û\žH™[Y[X™\ˆÈ]]X›TÝ]SÙ[™[žT›Û\ÏŠ[
+HBˆ˜\ˆXœ˜\žTÙX\˜Ú^Y\ˆžH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠLJHBˆ˜\ˆX[˜TÛÛÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆX[˜U\™Ù]žH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠ
+HBˆ˜\ˆX[˜PÚÚXÙT›Û\žH™[Y[X™\ˆÈ]]X›TÝ]SÙX[˜PÚÚXÙT›Û\ÏŠ[
+HBˆ˜\ˆÜ™X]\™U\PÚÚXÙT›Û\žH™[Y[X™\ˆÈ]]X›TÝ]SÙÜ™X]\™U\PÚÚXÙT›Û\ÏŠ[
+HBˆ˜\ˆ[Y\“Y[SÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆÜ[ÛœÓÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ^[Ý]X“Ü[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆÚ[™Ù[ÙÓÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ]™[Ü\“Ü[ÛœÓÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ]ÜšX[Ü[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ]ÜšX[[™^žH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠ
+HBˆ˜[]ÜšX[\™[[™XÙ\ÈH™[Y[X™\ˆÈ]]X›TÝ]S\ÝÙ[Š
+HBˆ˜[]ÜšX[›Ý[™ÈH™[Y[X™\ˆÈ]]X›TÝ]SX\ÙÝš[™Ë™XÝŠ
+HBˆ˜[™]š[Ý\ÛTÙY[•]ÜšX[ØÜ™Y[œÈH™[Y[X™\ˆÂˆ˜[Ý\œ™[H]ÜšX[™YœË™Ù]Ýš[™ÔÙ]
+™š\œÝÝš\Ú]ÙÝZY\×ÝŒˆ‹[
+Bˆ˜[YØXÞHHÜ[Û”™YœË™Ù]Ýš[™ÔÙ]
+™š\œÝÝš\Ú]ÙÝZY\×ÝŒˆ‹[
+Bˆ˜[ÙY[ˆHÝ\œ™[ÎˆYØXÞBˆYˆ
+Ý\œ™[OH[	‰ˆYØXÞHOH[
+HÂˆ]ÜšX[™YœË™Y]
+
+Kœ]Ýš[™ÔÙ]
+™š\œÝÝš\Ú]ÙÝZY\×ÝŒˆ‹YØXÞKÔÙ]
+
+JK˜\J
+BˆÜ[Û”™YœË™Y]
+
+Kœ™[[Ý™J™š\œÝÝš\Ú]ÙÝZY\×ÝŒˆŠK˜\J
+BˆBˆÙY[‹›Ü‘[\J
+KÔÙ]
+
+BˆBˆ˜\ˆ]ÜšX[ÙY[”ØÜ™Y[œÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ™]š[Ý\ÛTÙY[•]ÜšX[ØÜ™Y[œÊHBˆ˜\ˆØ˜žSÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆÛYSÜ[ˆžH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠYJHBˆ˜\ˆØ˜žPÜ™X]YžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆØ˜žR›Ú[“[ÙHžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆØ˜žT™XYT^Y\œÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ[\TÙ][Š
+JHBˆ˜\ˆ[™[™Ô™XYTÝ]HžH™[Y[X™\ˆÈ]]X›TÝ]SÙ›ÛÛX[ÏŠ[
+HBˆ˜\ˆØ˜žU\›“Ü™\ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙ\Ý[ÏŠ[
+HBˆ˜\ˆØ˜žT›ÛÛPÛÙHžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠˆŠHBˆ˜\ˆØ˜žT\ÜÝÛÜ™žH™[Y[X™\ˆÈ]]X›TÝ]SÙŠˆŠHBˆ˜\ˆØ˜žR›Ú[ÛÙHžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠˆŠHBˆ˜\ˆØ˜žR›Ú[”\ÜÝÛÜ™žH™[Y[X™\ˆÈ]]X›TÝ]SÙŠˆŠHBˆ˜\ˆØ˜žRÜÝ[œ]žH™[Y[X™\ˆÈ]]X›TÝ]SÙŠˆŠHBˆ˜\ˆØ˜žR[\›™][ÙHžH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆØ˜žPÛÝY[™Ú[žH™[Y[X™\”Ø]™XX›HÂˆ˜[Ø]™Y[™Ú[HÜ[Û”™YœË™Ù]Ýš[™Ê˜ÛÝYÜ›ÛÛWÙ[™Ú[‹[
+OËš[J
+Bˆ]]X›TÝ]SÙŠØ]™Y[™Ú[ËZÙRYˆÈ]š\Ó›Ý›[šÊ
+H	‰ˆZ\ÓYØXÞQ^[\PÛÝY[™Ú[
+]
+HHÎˆQUSÐÓÕQÔ“ÓÓWÑS‘ÒS•
+BˆBˆ][˜ÚYY™™XÝ
+Ø˜žSÜ[‹Ø˜žR[\›™][ÙJHÂˆYˆ
+Ø˜žSÜ[ˆ	‰ˆØ˜žR[\›™][ÙH	‰ˆ
+Ø˜žPÛÝY[™Ú[š\Ð›[šÊ
+H\ÓYØXÞQ^[\PÛÝY[™Ú[
+Ø˜žPÛÝY[™Ú[
+JJHÂˆØ˜žPÛÝY[™Ú[HQUSÐÓÕQÔ“ÓÓWÑS‘ÒS•ˆÜ[Û”™YœË™Y]
+
+Kœ]Ýš[™Ê˜ÛÝYÜ›ÛÛWÙ[™Ú[‹QUSÐÓÕQÔ“ÓÓWÑS‘ÒS•
+K˜\J
+BˆBˆBˆ˜\ˆØ˜žT^Y\“˜[YHžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ”VQTˆŠHBˆ˜\ˆØ˜žRÜÝY™\ÜÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠˆŠHBˆ˜\ˆØ˜žS›ÝXÙHžH™[Y[X™\ˆÈ]]X›TÝ]SÙÝš[™ÏÏŠ[
+HBˆ˜\ˆÛ›[™TÝ]\ÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ“Ù™›[™HŠHBˆ˜\ˆ›ÛÛPÛÛ›™XÝYžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆÛÛ›™XÝ[Û“ÜÝžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆÛÛ›™XÝ[Û“ÜÝ™X\ÛÛˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙÝš[™ÏÏŠ[
+HBˆ˜\ˆ™XÛÛ›™XÝ[™ÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ™XÛÛ›™XÝ›ØˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙ›ØÏŠ[
+HBˆ˜\ˆØØ[ÙX]žH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠ
+HBˆ˜\ˆ›ÛÛRÜÝžH™[Y[X™\ˆÈ]]X›TÝ]SÙ[”›ÛÛRÜÝÏŠ[
+HBˆ˜\ˆ›ÛÛPÛY[žH™[Y[X™\ˆÈ]]X›TÝ]SÙ[”›ÛÛPÛY[ÏŠ[
+HBˆ˜\ˆÛÝY›ÛÛPÛY[žH™[Y[X™\ˆÈ]]X›TÝ]SÙÛÝY›ÛÛPÛY[ÏŠ[
+HBˆ˜\ˆØØ[^Y\œÐ˜XÚÝ\žH™[Y[X™\ˆÈ]]X›TÝ]SÙ\ÝX›T^Y\ÏŠ[
+HBˆ˜\ˆ\Ý™[[ÝTÛ˜\ÚÝžH™[Y[X™\ˆÈ]]X›TÝ]SÙÝš[™ÏÏŠ[
+HBˆ˜\ˆØ[YTÝ\YÛ›[™HžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆÛ›[™TÝ]T™XYHžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ[™›ÜÜØ[žHžH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠLJHBˆ˜\ˆ[™›Ý\ÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ[\SX\[›ÛÛX[Š
+JHBˆ˜\ˆØ[YQ[™YÛ›[™HžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆØØ[Ø[YTÝ\YžH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜[›ÝYšXØ][Û”\›Z\ÜÚ[Û“][˜Ú\ˆH™[Y[X™\“][˜Ú\‘›ÜXÝ]š]T™\Ý[
+XÝ]š]T™\Ý[ÛÛ˜XÝË”™\]Y\Ý\›Z\ÜÚ[ÛŠ
+JHÈÜ˜[YO‚ˆ˜XÚÙÜ›Ý[™[\Ñ[˜X›YHÜ˜[YˆÛÛ^™Ù]Ú\™Y™Y™\™[˜Ù\Ê˜\˜Ø[˜WÛÜ[ÛœÈ‹ÛÛ^“SÑWÔ’UUJK™Y]
+
+Kœ]›ÛÛX[Š˜˜XÚÙÜ›Ý[™Ø[\È‹Ü˜[Y
+K˜\J
+BˆYˆ
+YÜ˜[Y
+HY\ÜØYÙHH[™›ÚY›ÝYšXØ][Ûˆ\›Z\ÜÚ[Ûˆ\È™YYY›Üˆ˜XÚÙÜ›Ý[™Ø[YH[\Ëˆ‚ˆBˆ[ˆÙ]˜XÚÙÜ›Ý[™[\Ê[˜X›Yˆ›ÛÛX[ŠHÂˆYˆ
+[˜X›Y	‰ˆZ[•‘T”ÒSÓ‹”Ñ×ÒS•HÌÈ	‰ˆÛÛ^˜ÚXÚÔÙ[”\›Z\ÜÚ[ÛŠX[šY™\Ýœ\›Z\ÜÚ[Û‹”ÔÕÓ“ÕQ’PÐUSÓ”ÊHOHXÚØYÙSX[˜YÙ\‹”T“RTÔÒSÓ—ÑÔS•Q
+HÂˆ›ÝYšXØ][Û”\›Z\ÜÚ[Û“][˜Ú\‹›][˜Ú
+X[šY™\Ýœ\›Z\ÜÚ[Û‹”ÔÕÓ“ÕQ’PÐUSÓ”ÊBˆH[ÙHÂˆ˜XÚÙÜ›Ý[™[\Ñ[˜X›YH[˜X›YˆÛÛ^™Ù]Ú\™Y™Y™\™[˜Ù\Ê˜\˜Ø[˜WÛÜ[ÛœÈ‹ÛÛ^“SÑWÔ’UUJK™Y]
+
+Kœ]›ÛÛX[Š˜˜XÚÙÜ›Ý[™Ø[\È‹[˜X›Y
+K˜\J
+BˆBˆB‚ˆ[ˆ™XÛÜ™XYÛ›ÜÝXÊ]™[ˆÝš[™ÊHÂˆ˜[ØY™Q]™[H]™[ˆœ™\XÙJ™YÙ^
+ŠÎ—ÌKßWŠ^ÌßWÌKßHŠK\ˆŠBˆœ™\XÙJ™YÙ^
+ŠÚJJ\ÜÝÛÜ™Ê–ÎWWÊŠWÊÈŠK‰O™YXÝYˆŠBˆœ™\XÙJ™YÙ^
+ŠÚJJ
+Îœ›ÛÛ_›Ú[ŠWÊ˜ÛÙWÊ–ÎWWÊŠVØK^ŒNKWJÈŠK‰O™YXÝYˆŠBˆ˜[[Y\Ý[\H˜]˜K^”Ú[\Q]Q›Ü›X]
+ž^^^KSSKY›[NœÜË”ÔÔÈ‹˜]˜K][“ØØ[K•TÊK™›Ü›X]
+˜]˜K][‘]J
+JBˆXYÛ›ÜÝXÑ]™[Ù\]Y[˜ÙH
+ÏHBˆXYÛ›ÜÝXÑ]™[Ë˜Y
+ˆÉÙXYÛ›ÜÝXÑ]™[Ù\]Y[˜ÙKÔÝš[™Ê
+KœYÝ\
+K	Ì	Ê_H	[Y\Ý[\	ØY™Q]™[ŠBˆÚ[H
+XYÛ›ÜÝXÑ]™[ËœÚ^™HˆL
+HXYÛ›ÜÝXÑ]™[Ëœ™[[Ý™P]
+
+Bˆ˜[ÛÛ^[™HH‰[Y\Ý[\0­È	ØY™Q]™[0­È	ÚYˆ
+\[‘›Ü™YÜ›Ý[™
+H™›Ü™YÜ›Ý[™ˆ[ÙH˜˜XÚÙÜ›Ý[™ŸH0­È	ÚYˆ
+›ÛÛRÜÝOH[›ÛÛPÛY[OH[ÛÝY›ÛÛPÛY[OH[
+H›Û›[™Hˆ[ÙH›Ù™›[™HŸH0­È	ÚYˆ
+ÚÝÓÝ™\šY]ÊHX›Hˆ[ÙHœ^Y\ˆšY]ÈŸH0­È	ÊÙ[XÝY^Y\ˆ
+ÈJK˜ÛÙ\˜ÙP]X\Ý
+J_H0­È\›ˆ	\›“[X™\ˆ	Ü\ÙTÝ\Ë™Ù]Ü“[
+\ÙR[™^
+K›Ü‘[\J
+_H‚ˆÜ[Û”™YœË™Y]
+
+Kœ]Ýš[™Ê™XYÛ›ÜÝX×Ù]™[È‹XYÛ›ÜÝXÑ]™[Ëš›Ú[•ÔÝš[™Ê—ˆŠJBˆœ]Ýš[™Ê›\ÝÙXYÛ›ÜÝX×ØÛÛ^‹ÛÛ^[™JK˜\J
+BˆB‚ˆ[ˆ›Û™PÛÝ[Ê^Y\ŽˆX›T^Y\ŠNˆÝš[™ÈH\ÝÙŠˆ›Xœ˜\žOIÜ^Y\‹›Xœ˜\žKœÚ^™_H‹š[™IÜ^Y\‹š[™œÚ^™_H‹˜˜]YšY[IÜ^Y\‹˜˜]YšY[œÚ^™_H‹ˆ™Ü˜]™^X\™IÜ^Y\‹™Ü˜]™^X\™œÚ^™_H‹™^[OIÜ^Y\‹™^[KœÚ^™_H‹œ™]™X[YIÜ^Y\‹œ™]™X[YœÚ^™_H‚ˆ
+Kš›Ú[•ÔÝš[™Ê‹ŠB‚ˆ[ˆ›Û™RY[]TÚYÛ˜]\™JÙX]Îˆ\ÝX›T^Y\ŠNˆÝš[™ÈHÙX]Ëš›Ú[•ÔÝš[™ÊŸŠHÈ^Y\ˆO‚ˆ\ÝÙŠ^Y\‹›Xœ˜\žK^Y\‹š[™^Y\‹˜˜]YšY[^Y\‹™Ü˜]™^X\™^Y\‹™^[K^Y\‹œ™]™X[Y
+Bˆš›Ú[•ÔÝš[™Ê‹ÈŠHÈ›Û™HOˆ›Û™K›X\È]šYKœÛÜY
+
+Kš›Ú[•ÔÝš[™Ê‹ŠHBˆB‚ˆ[ˆ›Û™PØ\™Ê^Y\ŽˆX›T^Y\ŠNˆ\ÝZ\Ýš[™ËØ[YPØ\™ˆHZ[\ÝÂˆ^Y\‹›Xœ˜\žK™›Ü‘XXÚÈY
+›Xœ˜\žHˆÈ]
+HBˆ^Y\‹š[™™›Ü‘XXÚÈY
+š[™ˆÈ]
+HBˆ^Y\‹˜˜]YšY[™›Ü‘XXÚÈY
+˜˜]YšY[ˆÈ]
+HBˆ^Y\‹™Ü˜]™^X\™™›Ü‘XXÚÈY
+™Ü˜]™^X\™ˆÈ]
+HBˆ^Y\‹™^[K™›Ü‘XXÚÈY
+™^[HˆÈ]
+HBˆ^Y\‹œ™]™X[Y™›Ü‘XXÚÈY
+œ™]™X[YˆÈ]
+HBˆB‚ˆ[ˆ›Û™R\ÔX›XÊ›Û™NˆÝš[™ÊNˆ›ÛÛX[ˆH›Û™H[ˆÙ]ÙŠ˜˜]YšY[‹™Ü˜]™^X\™‹™^[H‹œ™]™X[YŠB‚ˆ[ˆÙÖ›Û™TÛ˜\ÚÝÚ[™ÙJÙX]Îˆ\ÝX›T^Y\‹ÛÝ\˜ÙNˆÝš[™ÊHÂˆ˜[ÚYÛ˜]\™HH›Û™RY[]TÚYÛ˜]\™JÙX]ÊBˆYˆ
+ÚYÛ˜]\™HOH\ÝXYÛ›ÜÝXÖ›Û™TÚYÛ˜]\™JH™]\›‚ˆ˜[™]š[Ý\ÈH\ÝXYÛ›ÜÝXÖ›Û™TÚYÛ˜]\™Bˆ˜[™]š[Ý\ÔÛ˜\ÚÝH\ÝXYÛ›ÜÝXÖ›Û™TÛ˜\ÚÝˆ\ÝXYÛ›ÜÝXÖ›Û™TÚYÛ˜]\™HHÚYÛ˜]\™Bˆ\ÝXYÛ›ÜÝXÖ›Û™TÛ˜\ÚÝHÙX]ÂˆYˆ
+™]š[Ý\ÈOH[
+HÂˆ™XÛÜ™XYÛ›ÜÝXÊ–›Û™H˜\Ù[[™HØ\\™Y
+	ÛÝ\˜ÙJNˆ	ÜÙX]Ë›X\[™^YÈKOˆ”	ÚH
+È_H	Þ›Û™PÛÝ[Ê
+_HˆKš›Ú[•ÔÝš[™ÊŽÈŠ_HŠBˆ™]\›‚ˆBˆ™]š[Ý\ÔÛ˜\ÚÝË›]ÈÛÙX]ÈO‚ˆÙX]Ë™›Ü‘XXÚ[™^YÈ[™^^Y\ˆO‚ˆ˜[Û^Y\ˆHÛÙX]Ë™Ù]Ü“[
+[™^
+HÎˆ™]\››Ü‘XXÚ[™^Yˆ˜[ÛØ\™ÈH›Û™PØ\™ÊÛ^Y\ŠK™Ü›Ý\žHÈ]œÙXÛÛ™šYBˆ˜[™]ÐØ\™ÈH›Û™PØ\™Ê^Y\ŠK™Ü›Ý\žHÈ]œÙXÛÛ™šYBˆ
+ÛØ\™ËšÙ^\È
+È™]ÐØ\™ËšÙ^\ÊK™›Ü‘XXÚÈYO‚ˆ˜[™Y›Ü™HHÛØ\™ÖÚYOËœÚ[™ÛSÜ“[
+
+HÎˆ™]\››Ü‘XXÚˆ˜[Y\ˆH™]ÐØ\™ÖÚYOËœÚ[™ÛSÜ“[
+
+HÎˆ™]\››Ü‘XXÚˆYˆ
+™Y›Ü™K™š\œÝOHY\‹™š\œÝ
+™Y›Ü™KœÙXÛÛ™š\Ñ˜XÙQÝÛˆY\‹œÙXÛÛ™š\Ñ˜XÙQÝÛŠJH™]\››Ü‘XXÚˆ˜[Y[]Uš\ÚX›HH[™^OHØØ[ÙX]›Û™R\ÔX›XÊ™Y›Ü™K™š\œÝ
+H›Û™R\ÔX›XÊY\‹™š\œÝ
+Hˆ
+™Y›Ü™K™š\œÝOHš[™ˆ	‰ˆÛ^Y\‹š[™™]™X[YÐ[
+H
+Y\‹™š\œÝOHš[™ˆ	‰ˆ^Y\‹š[™™]™X[YÐ[
+BˆYˆ
+Y[]Uš\ÚX›JHÂˆ™XÛÜ™XYÛ›ÜÝXÊØ\™[Ý™H
+	ÛÝ\˜ÙJNˆ	Ú[™^
+È_H	ØY\‹œÙXÛÛ™›˜[Y_HÉY	Ø™Y›Ü™K™š\œÝH8¡¤ˆ	ØY\‹™š\œÝHŠBˆBˆBˆBˆBˆ˜[š[Ü”ÙX]ÚYÛ˜]\™\ÈH™]š[Ý\ËœÜ]
+	ß	ÊBˆ˜[Ú[™ÙYHÙX]Ë›X\[™^Y›Ý[È[™^^Y\ˆO‚ˆ˜[Ý\œ™[ÙX]H\ÝÙŠ^Y\‹›Xœ˜\žK^Y\‹š[™^Y\‹˜˜]YšY[^Y\‹™Ü˜]™^X\™^Y\‹™^[K^Y\‹œ™]™X[Y
+Bˆš›Ú[•ÔÝš[™Ê‹ÈŠHÈ›Û™HOˆ›Û™K›X\È]šYKœÛÜY
+
+Kš›Ú[•ÔÝš[™Ê‹ŠHBˆYˆ
+š[Ü”ÙX]ÚYÛ˜]\™\Ë™Ù]Ü“[
+[™^
+HOHÝ\œ™[ÙX]
+H[[ÙHÂˆ˜[[YÈH\ÝÙŠ^Y\‹›Xœ˜\žK^Y\‹š[™^Y\‹˜˜]YšY[^Y\‹™Ü˜]™^X\™^Y\‹™^[K^Y\‹œ™]™X[Y
+K™›][Š
+K›X\È]šYBˆ˜[™\X]Y[œÝ[˜ÙPÛÝ[H[YË™Ü›Ý\[™ÐžHÈ]K™XXÚÛÝ[
+
+K˜ÛÝ[È]˜[YHˆHBˆ”	Ú[™^
+È_H	Þ›Û™PÛÝ[Ê^Y\Š_K™\X]Y[œÝ[˜ÙHQÏI™\X]Y[œÝ[˜ÙPÛÝ[‚ˆBˆBˆYˆ
+Ú[™ÙYš\Ó›Ý[\J
+JH™XÛÜ™XYÛ›ÜÝXÊ–›Û™HÝ]HÚ[™ÙY
+	ÛÝ\˜ÙJNˆ	ØÚ[™ÙYš›Ú[•ÔÝš[™ÊŽÈŠ_HŠBˆB‚ˆ[ˆX]™SÛ›[™T›ÛÛJ
+HÂˆ˜[ÝÛ”^Y\ˆH^Y\œË™Ù]Ü“[
+ØØ[ÙX]
+OË˜ÛÜJ\ÓÛ›[™HH˜[ÙJBˆ›ÛÛPÛY[Ë˜ÛÜÙJ
+NÈ›ÛÛPÛY[H[ˆÛÝY›ÛÛPÛY[Ë›X]™J
+NÈÛÝY›ÛÛPÛY[H[ˆ›ÛÛRÜÝË˜ÛÜÙJ
+NÈ›ÛÛRÜÝH[ˆ˜[˜XÚÝ\HØØ[^Y\œÐ˜XÚÝ\ˆ˜[™\ÝÜ™YÝÛˆHÚ[ˆÂˆÝÛ”^Y\ˆOH[Oˆ˜XÚÝ\Ë™š\œÝÜ“[
+
+BˆÝÛ”^Y\‹™XÚÓØYY˜XÚÝ\Ë™š\œÝÜ“[
+
+OË™XÚÓØYYOHYHOˆÝÛ”^Y\‚ˆ[ÙHOˆ˜XÚÝ\™š\œÝ
+
+BˆBˆ^Y\œÈHYˆ
+™\ÝÜ™YÝÛˆOH[	‰ˆX˜XÚÝ\š\Ó[Ü‘[\J
+JH˜XÚÝ\›X\[™^YÈ[™^^Y\ˆOˆYˆ
+[™^OH
+H™\ÝÜ™YÝÛˆ[ÙH^Y\‹˜ÛÜJ\ÓÛ›[™HH˜[ÙJHBˆ[ÙHYˆ
+™\ÝÜ™YÝÛˆOH[
+H\ÝÙŠ™\ÝÜ™YÝÛŠH[ÙH˜XÚÝ\›Ü‘[\J
+BˆØØ[^Y\œÐ˜XÚÝ\H[ˆ›ÛÛPÛÛ›™XÝYH˜[ÙNÈØ˜žPÜ™X]YH˜[ÙNÈÛ›[™TÝ]\ÈH“Ù™›[™HŽÈØØ[ÙX]HˆÛ›[™TÝ]T™XYHH˜[ÙNÈØ[YTÝ\YÛ›[™HH˜[ÙNÈ[™[™Ô™XYTÝ]HH[ˆÙ[XÝY^Y\ˆHˆØ˜žSÜ[ˆH˜[ÙNÈÛYSÜ[ˆHYNÈÚÝÓÝ™\šY]ÈHYBˆB‚ˆ[ˆXYÛ›ÜÝXÔ™\Ü
+
+NˆÝš[™ÈHZ[Ýš[™ÈÂˆ\[™[™J\˜Ø[˜HX›HXYÛ›ÜÝXÈ™\ÜŠBˆ\[™[™J\™\œÚ[ÛŽˆ	ÐZ[ÛÛ™šYË•‘T”ÒSÓ—ÓSQ_H
+Z[	ÐZ[ÛÛ™šYË•‘T”ÒSÓ—ÐÓÑ_JHŠBˆ\[™[™J[™›ÚYTNˆ	Ø[™›ÚY›ÜËZ[•‘T”ÒSÓ‹”Ñ×ÒS•HŠBˆ\[™[™J‘]šXÙNˆ	ÐZ[“PS•QPÕT‘TŸH	ÐZ[“SÑSHŠBˆ\[™[™J”›ÛNˆ	ÚYˆ
+Ø˜žPÜ™X]Y
+HšÜÝˆ[ÙHYˆ
+›ÛÛPÛY[OH[ÛÝY›ÛÛPÛY[OH[
+H˜ÛY[ˆ[ÙH›Ù™›[™HŸHŠBˆ\[™[™JÛÛ›™XÝ[ÛŽˆ	Û›[™TÝ]\ÈŠBˆ\[™[™J”Þ[˜È™]š\Ú[ÛŽˆ›Ý›ÝšYYžHHÝ\œ™[›ÛÛH›ÝØÛÛÈØØ[[˜›Ý[™Û˜\ÚÝÛÝ[\I[˜›Ý[™Û˜\ÚÝÙ\]Y[˜ÙHŠBˆ\[™[™J“ØØ[ÙX]ˆ	ÛØØ[ÙX]
+È_NÈÙX]È™\Ù[ˆ	Ü^Y\œËœÚ^™_HŠBˆ\[™[™J\Ý]Nˆ	ÚYˆ
+\[‘›Ü™YÜ›Ý[™
+H™›Ü™YÜ›Ý[™ˆ[ÙH˜˜XÚÙÜ›Ý[™ŸNÈšY]ÏIÚYˆ
+ÚÝÓÝ™\šY]ÊHX›Hˆ[ÙHœ^Y\ˆŸNÈÙ[XÝYÙX]IÜÙ[XÝY^Y\ˆ
+È_NÈXÝ]™TÙX]IØXÝ]™T^Y\ˆ
+È_NÈ\ÙOIÜ\ÙTÝ\Ë™Ù]Ü“[
+\ÙR[™^
+K›Ü‘[\J
+_HŠBˆ\[™[™J‘Ø[YHÝ\Yˆ	ÙØ[YTÝ\YÛ›[™HØØ[Ø[YTÝ\YHŠBˆ\[™[™J“Ø˜žH™XY[™\ÜÎˆ	ÛØ˜žT™XYT^Y\œËœÛÜY
+
+Kš›Ú[•ÔÝš[™ÈÈ
+]
+ÈJKÔÝš[™Ê
+HKšY›[šÈÈ››Û™Hˆ_HŠBˆ\[™[™J‘XÚÈÝ]\Îˆ	Ü^Y\œË›X\[™^YÈ[™^^Y\ˆOˆ”	Ú[™^
+È_OIÚYˆ
+^Y\‹™XÚÓØYY
+H›ØYYˆ[ÙH›Z\ÜÚ[™ÈŸHˆKš›Ú[•ÔÝš[™Ê
+_HŠBˆÛÛ^™Ù]Ú\™Y™Y™\™[˜Ù\Ê˜\˜Ø[˜WØÜ˜\Ú‹ÛÛ^“SÑWÔ’UUJK™Ù]Ýš[™Ê›\ÝØÜ˜\Ú‹[
+OË›]ÈÜ˜\ÚO‚ˆ\[™[™J
+Bˆ˜[Ü˜\Ú™YœÈHÛÛ^™Ù]Ú\™Y™Y™\™[˜Ù\Ê˜\˜Ø[˜WØÜ˜\Ú‹ÛÛ^“SÑWÔ’UUJBˆ\[™[™JÜ˜\Ú[YNˆ	ØÜ˜\Ú™YœË™Ù]Ýš[™Ê›\ÝØÜ˜\ÚØ]‹[šÛ›ÝÛˆŠ_HŠBˆ\[™[™JXÝ[ÛˆÛÛ^ˆ	ØÜ˜\Ú™YœË™Ù]Ýš[™Ê›\ÝØÜ˜\ÚØÛÛ^‹[šÛ›ÝÛˆŠ_HŠBˆ\[™[™J“\Ý[˜Ø]YÚ\Ü˜\ÚˆŠBˆ\[™[™JÜ˜\Ú
+BˆBˆ\[™[™J
+Bˆ\[™[™J–›Û™HÝ[È[˜ÛYHÛÝ[ÈÛ›KˆÜÛ™[ÉÈY[ˆØ\™Y[]Y\È\™H^ÛYYÈÝÛ‹YXÚÈ\XØ]HÝ[[X\šY\ÈX^H[˜ÛYHØ\™˜[Y\ËˆŠBˆ\[™[™J”™XÙ[]™[ÙÈ
+\ÜÝÛÜ™ËTY™\ÜÙ\Ë[™›ÛÛHÛÙ\È™YXÝY
+NˆŠBˆXYÛ›ÜÝXÑ]™[Ë™›Ü‘XXÚÈ\[™[™J]
+HBˆB‚ˆ˜[XYÛ›ÜÝXÑ^Ü][˜Ú\ˆH™[Y[X™\“][˜Ú\‘›ÜXÝ]š]T™\Ý[
+XÝ]š]T™\Ý[ÛÛ˜XÝËÜ™X]QØÝ[Y[
+^ÜZ[ˆŠJHÈ\šHO‚ˆYˆ
+\šHOH[
+HÂˆ™XÛÜ™XYÛ›ÜÝXÊ‘XYÛ›ÜÝXÈ^ÜØ[˜Ù[YŠBˆH[ÙHÂˆ˜[™\Ý[H[Ø]Ú[™ÈÂˆÛÛ^˜ÛÛ[™\ÛÛ™\‹›Ü[“Ý]]Ý™X[J\šJOË˜Y™™\™YÜš]\Š
+OË\ÙHÈ]Üš]JXYÛ›ÜÝXÔ™\Ü
+
+JHBˆÎˆ\œ›ÜŠÛÝ[›ÝÜ[ˆHÙ[XÝYš[KˆŠBˆBˆYˆ
+™\Ý[š\ÔÝXØÙ\ÜÊHÂˆ™XÛÜ™XYÛ›ÜÝXÊ‘XYÛ›ÜÝXÈ™\Ü^ÜYŠBˆY\ÜØYÙHH‘XYÛ›ÜÝXÈÙÈ^ÜYˆ‚ˆØ˜žS›ÝXÙHH‘XYÛ›ÜÝXÈÙÈ^ÜYˆ‚ˆH[ÙHÂˆ™XÛÜ™XYÛ›ÜÝXÊ‘XYÛ›ÜÝXÈ^Ü˜Z[YŠBˆY\ÜØYÙHHÛÝ[›ÝÜš]HHXYÛ›ÜÝXÈÙËˆ‚ˆØ˜žS›ÝXÙHHÛÝ[›ÝÜš]HHXYÛ›ÜÝXÈÙËˆ‚ˆBˆBˆBˆ[ˆ^ÜXYÛ›ÜÝXÓÙÊ
+HÂˆ™XÛÜ™XYÛ›ÜÝXÊ‘XYÛ›ÜÝXÈ^Ü™\]Y\ÝYŠBˆ˜[š[[˜[YHH\˜Ø[˜UX›KYXYÛ›ÜÝXÜËIÚ˜]˜K^”Ú[\Q]Q›Ü›X]
+ž^^^SSYR[\ÜÈ‹˜]˜K][“ØØ[K•TÊK™›Ü›X]
+˜]˜K][‘]J
+J_K‚ˆXYÛ›ÜÝXÑ^Ü][˜Ú\‹›][˜Ú
+š[[˜[YJBˆBˆ˜\ˆ[™[™Ô^Y\”™[[Ý˜[žH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠLJHBˆ˜\ˆXÚÑY]Ü“Ü[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆÛÛX˜]X[ÙÓÜ[ˆžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆ\›•[Y\”[›š[™ÈžH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆØ[YU[Y\”[›š[™ÈžH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆZT›Ý][™T[›š[™ÈžH™[Y[X™\ˆÈ]]X›TÝ]SÙŠ˜[ÙJHBˆ˜\ˆØ[YQÙ[™\˜][ÛˆžH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠ
+HBˆ˜\ˆ\›•[Y\•š\ÚX›HžH™[Y[X™\”Ø]™XX›HÈ]]X›TÝ]SÙŠYJHBˆ˜\ˆ\ÝÝÚ\Q\Ý[˜ÙHžH™[Y[X™\ˆÈ]]X›Q›Ø]Ý]SÙŠŠHBˆ˜[Û›[™S[ÙHH›ÛÛRÜÝOH[›ÛÛPÛY[OH[ÛÝY›ÛÛPÛY[OH[ÛÛ›™XÝ[Û“ÜÝˆ˜[Ø[YR[”›ÙÜ™\ÜÈHYˆ
+Û›[™S[ÙJHØ[YTÝ\YÛ›[™H	‰ˆ›ÛÛPÛÛ›™XÝY	‰ˆYØ[YQ[™YÛ›[™H[ÙHØØ[Ø[YTÝ\Yˆ˜[Ø[ÛÛ›ÛÙ[XÝY^Y\ˆH
+[Û›[™S[ÙHÙ[XÝY^Y\ˆOHØØ[ÙX]
+H	‰ˆYØ[YQ[™YÛ›[™H	‰ˆ^Y\œË™Ù]Ü“[
+Ù[XÝY^Y\ŠOËš\Ñ[[Z[˜]YOHYB‚ˆ][˜ÚYY™™XÝ
+›ÛÛRÜÝ›ÛÛPÛY[ÛÝY›ÛÛPÛY[
+HÂˆYˆ
+›ÛÛRÜÝOH[›ÛÛPÛY[OH[ÛÝY›ÛÛPÛY[OH[
+H[ÛÛ›™XÝ[Û”Ù\šXÙKœÝ\
+ÛÛ^
+Bˆ[ÙH[ÛÛ›™XÝ[Û”Ù\šXÙKœÝÜ
+ÛÛ^
+BˆB‚ˆ][˜ÚYY™™XÝ
+[š]
+HÂˆ™XÛÜ™XYÛ›ÜÝXÊ\XØ][ÛˆÜ[™YŠBˆÚ[H
+YJHÂˆ[^JWÌ
+BˆYˆ
+›ÛÛPÛY[OH[	‰ˆÛÝY›ÛÛPÛY[OH[
+HÂˆYˆ
+Ø[YU[Y\”[›š[™ÊH[\ÙYØ[YTÙXÛÛ™ÊÊÂˆYˆ
+\›•[Y\”[›š[™ÊH[\ÙY\›”ÙXÛÛ™ÊÊÂˆBˆBˆB‚ˆ][˜ÚYY™™XÝ
+^Y\œËÛ›[™S[ÙJHÈYˆ
+[Û›[™S[ÙJHØ]™T^Y\œÊÛÛ^^Y\œÊHBˆ[ˆZ[Û›[™TÛ˜\ÚÝ
+
+NˆÝš[™ÈÂˆ˜[Ú\™YÜ™\ˆHYˆ
+Ø[YTÝ\YÛ›[™JHØ[YU\›“Ü™\ˆ[ÙHØ˜žU\›“Ü™\‹›Ü‘[\J
+Bˆ™]\›ˆÛ›[™QØ[YTÝ]J^Y\œËXÝ]™T^Y\‹\›“[X™\‹\ÙR[™^[\ÙYØ[YTÙXÛÛ™Ë[\ÙY\›”ÙXÛÛ™ËÚ\™YÜ™\‹Ø˜žT™XYT^Y\œËØ[YSÙËZÙS\Ý
+L
+KÚ]Y\ÜØYÙ\ËZÙS\Ý
+Œ
+K›X\ÈÛ›[™PÚ]Y\ÜØYÙJ]˜]]Ü‹]^][Y\Ý[\
+HKØ[YTÝ\YÛ›[™K[™›ÜÜØ[žK[™›Ý\ËØ[YQ[™YÛ›[™KÝXÚÐXÝ[ÛœËš[Üš]T^Y\‹š[Üš]T\ÜÙYšYÙÙ\”›Û\ÊKÒœÛÛŠ
+BˆBˆ[ˆX›\ÚÛ›[™TÛ˜\ÚÝ
+
+HÂˆYˆ
+
+›ÛÛRÜÝOH[›ÛÛPÛY[OH[ÛÝY›ÛÛPÛY[OH[
+H	‰ˆ›ÛÛPÛÛ›™XÝY	‰ˆÛ›[™TÝ]T™XYJHÂˆ˜[Û˜\ÚÝHZ[Û›[™TÛ˜\ÚÝ
+
+BˆYˆ
+Û˜\ÚÝOH\Ý™[[ÝTÛ˜\ÚÝ
+HÂˆ›ÛÛRÜÝËœX›\Ú
+Û˜\ÚÝ
+Bˆ›ÛÛPÛY[ËœX›\Ú
+Û˜\ÚÝ
+BˆÛÝY›ÛÛPÛY[ËœX›\Ú
+Û˜\ÚÝ
+BˆBˆBˆBˆ][˜ÚYY™™XÝ
+^Y\œËXÝ]™T^Y\‹\›“[X™\‹\ÙR[™^Ø[YU\›“Ü™\‹Ø˜žT™XYT^Y\œËØ˜žU\›“Ü™\‹Ø[YSÙËÚ]Y\ÜØYÙ\ËØ[YTÝ\YÛ›[™K[™›ÜÜØ[žK[™›Ý\ËØ[YQ[™YÛ›[™KÝXÚÐXÝ[ÛœËš[Üš]T^Y\‹š[Üš]T\ÜÙYšYÙÙ\”›Û\Ë›ÛÛRÜÝ›ÛÛPÛY[ÛÝY›ÛÛPÛY[›ÛÛPÛÛ›™XÝYÛ›[™TÝ]T™XYJHÂˆ[^JN
+BˆX›\ÚÛ›[™TÛ˜\ÚÝ
+
+BˆBˆ][˜ÚYY™™XÝ
+[\ÙYØ[YTÙXÛÛ™Ë[\ÙY\›”ÙXÛÛ™Ë›ÛÛRÜÝ›ÛÛPÛY[ÛÝY›ÛÛPÛY[›ÛÛPÛÛ›™XÝYÛ›[™TÝ]T™XYJHÂˆYˆ
+[\ÙYØ[YTÙXÛÛ™È	HSOH[\ÙY\›”ÙXÛÛ™È	HSOH
+HX›\ÚÛ›[™TÛ˜\ÚÝ
+
+BˆBˆËÈØ\\™HH[œÝ[˜Ù\È]\ÈY™™XÝÝÛœËˆ™XY[™ÈH[YØ]YÛÛ\ÜÙBˆËÈÝ]H˜[Y\È[œÚYHÛ‘\ÜÜÙHÛÝ[ÙYHH™]ÛH\ÜÚYÛ™Y›ÛÛKØÛY[[™ˆËÈÛÝ[ÛÜÙH][[YYX][HÚ[ˆHÙ^\ÈÚ[™ÙH\š[™È™XÛÛ\ÜÚ][Û‹‚ˆ˜[ÜÝÝÛ™YžQY™™XÝH›ÛÛRÜÝˆ˜[ÛY[ÝÛ™YžQY™™XÝH›ÛÛPÛY[ˆ˜[ÛÝYÛY[ÝÛ™YžQY™™XÝHÛÝY›ÛÛPÛY[ˆ\ÜÜØX›QY™™XÝ
+ÜÝÝÛ™YžQY™™XÝÛY[ÝÛ™YžQY™™XÝÛÝYÛY[ÝÛ™YžQY™™XÝ
+HÂˆÛ‘\ÜÜÙHÂˆÜÝÝÛ™YžQY™™XÝË˜ÛÜÙJ
+BˆÛY[ÝÛ™YžQY™™XÝË˜ÛÜÙJ
+BˆÛÝYÛY[ÝÛ™YžQY™™XÝË˜ÛÜÙJ
+Bˆ[ÛÛ›™XÝ[Û”Ù\šXÙKœÝÜ
+ÛÛ^
+BˆBˆBˆ][˜ÚYY™™XÝ
+^Y\œÊHÈ™^YHX^ÙŠ™^Y
+^Y\œË™›]X\È]›Xœ˜\žH
+È]š[™
+È]˜˜]YšY[
+È]™Ü˜]™^X\™
+È]™^[H
+È]œ™]™X[YK›X^Ù“Ü“[È]šYHÎˆ
+H
+ÈJHBˆ][˜ÚYY™™XÝ
+ÝXÚÐXÝ[ÛœËØØ[ÙX]Û›[™S[ÙJHÂˆ\™Ù]Ù[XÝ[Û”ÝXÚÒ][RYHÝXÚÐXÝ[ÛœË™š\œÝÜ“[ÂˆZ]\™Ù]ÐÛÛ™š\›YY	‰ˆ]\™Ù]ÛÝ[OH[	‰‚ˆ
+[Û›[™S[ÙH]˜ÛÛ›Û\’YOH^Y\œË™Ù]Ü“[
+ØØ[ÙX]
+OËšY
+BˆOËšYˆBˆ˜\ˆØœÙ\™YÚ]ÛÝ[žH™[Y[X™\ˆÈ]]X›R[Ý]SÙŠÚ]Y\ÜØYÙ\ËœÚ^™JHBˆ][˜ÚYY™™XÝ
+Ú]Y\ÜØYÙ\ËœÚ^™KÚ]Ü[ŠHÂˆYˆ
+Ú]Y\ÜØYÙ\ËœÚ^™HˆØœÙ\™YÚ]ÛÝ[	‰ˆXÚ]Ü[ŠH[œ™XYÚ]ÛÝ[
+ÏHÚ]Y\ÜØYÙ\ËœÚ^™HHØœÙ\™YÚ]ÛÝ[ˆØœÙ\™YÚ]ÛÝ[HÚ]Y\ÜØYÙ\ËœÚ^™BˆYˆ
+Ú]Ü[ŠH[œ™XYÚ]ÛÝ[HˆBˆ][˜ÚYY™™XÝ
+Ø[YTÝ\YÛ›[™JHÂˆYˆ
+Ø[YTÝ\YÛ›[™JHÈÛYSÜ[ˆH˜[ÙNÈÚÝÓÝ™\šY]ÈHYNÈÚÝÒ[™H˜[ÙNÈØ˜žSÜ[ˆH˜[ÙHBˆBˆ][˜ÚYY™™XÝ
+Ø[YQ[™YÛ›[™JHÂˆYˆ
+Ø[YQ[™YÛ›[™JHÈØ[YU[Y\”[›š[™ÈH˜[ÙNÈ\›•[Y\”[›š[™ÈH˜[ÙNÈÚÝÓÝ™\šY]ÈHYNÈÚÝÒ[™H˜[ÙHBˆBˆ][˜ÚYY™™XÝ
+[™[™ÔÝXÚÓÜ[‹šYÙÙ\”›Û\ËœÚ^™K^[Y[Ø\™X[˜TÛÛÜ[‹\™Ù]Ù[XÝ[Û”ÝXÚÒ][RYÜ™X]\™U\PÚÚXÙT›Û\
+HÂˆYˆ
+[™[™ÔÝXÚÓÜ[ˆ	‰ˆšYÙÙ\”›Û\Ëš\Ñ[\J
+H	‰ˆ^[Y[Ø\™OH[	‰ˆ[X[˜TÛÛÜ[ˆ	‰ˆ\™Ù]Ù[XÝ[Û”ÝXÚÒ][RYOH[	‰ˆÜ™X]\™U\PÚÚXÙT›Û\OH[
+HÂˆ[^JN
+BˆÝXÚÓÜ[ˆHYBˆ[™[™ÔÝXÚÓÜ[ˆH˜[ÙBˆBˆBˆ][˜ÚYY™™XÝ
+ÝXÚÐXÝ[ÛœËš\Ó›Ý[\J
+KšYÙÙ\”›Û\ËœÚ^™K^[Y[Ø\™X[˜TÛÛÜ[‹X[˜PÚÚXÙT›Û\Ü™X]\™U\PÚÚXÙT›Û\[™[™ÔÝXÚÓÜ[ŠHÂˆYˆ
+ÝXÚÐXÝ[ÛœËš\Ó›Ý[\J
+JHÂˆÝXÚÐÞXÛPXÝ]™HHYBˆ™]\›][˜ÚYY™™XÝˆBˆYˆ
+\ÝXÚÐÞXÛPXÝ]™HšYÙÙ\”›Û\Ëš\Ó›Ý[\J
+H^[Y[Ø\™OH[X[˜TÛÛÜ[ˆX[˜PÚÚXÙT›Û\OH[Ü™X]\™U\PÚÚXÙT›Û\OH[[™[™ÔÝXÚÓÜ[ŠH™]\›][˜ÚYY™™XÝˆ[^JL
+BˆYˆ
+ÝXÚÐXÝ[ÛœËš\Ñ[\J
+H	‰ˆšYÙÙ\”›Û\Ëš\Ñ[\J
+H	‰ˆ^[Y[Ø\™OH[	‰ˆ[X[˜TÛÛÜ[ˆ	‰ˆX[˜PÚÚXÙT›Û\OH[	‰ˆÜ™X]\™U\PÚÚXÙT›Û\OH[	‰ˆ\[™[™ÔÝXÚÓÜ[ŠHÂˆÝXÚÓÜ[ˆH˜[ÙBˆÝXÚÐÞXÛPXÝ]™HH˜[ÙBˆBˆB‚ˆ˜[XÝ]š]HHÛÛ^\ÏÈXÝ]š]BˆÚYQY™™XÝÂˆ˜[Þ\Ý[P˜\ˆHYˆ
+\šÓ[ÙJH[™›ÚY™Ü˜\XÜËÛÛÜ‹œ™ØŠM‹Œ‹ŒJH[ÙH[™›ÚY™Ü˜\XÜËÛÛÜ‹œ™ØŠ‹KJBˆXÝ]š]OËÚ[™ÝÏËœÝ]\Ð˜\ÛÛÜˆHÞ\Ý[P˜\‚ˆXÝ]š]OËÚ[™ÝÏË›˜]šYØ][Û˜\ÛÛÜˆHÞ\Ý[P˜\‚ˆB‚ˆ[ˆ\]T^Y\Š[™^ˆ[˜[œÙ›Ü›Nˆ
+X›T^Y\ŠHOˆX›T^Y\ŠHÂˆ^Y\œÈH^Y\œË›X\[™^YÈKOˆYˆ
+HOH[™^
+H˜[œÙ›Ü›J
+H[ÙHBˆÙÖ›Û™TÛ˜\ÚÝÚ[™ÙJ^Y\œË›ØØ[^Y\ˆ\]HŠBˆBˆ[ˆZÙSÜ[š[™Ó][YØ[Š[™^ˆ[
+HÂˆ˜[^Y\ˆH^Y\œË™Ù]Ü“[
+[™^
+HÎˆ™]\›‚ˆYˆ
+[™^OHØØ[ÙX][Û›[™S[ÙHØ[YTÝ\YÛ›[™H\^Y\‹™XÚÓØYY^Y\‹›Ü[š[™Ò[™Ù\[™^[ˆØ˜žT™XYT^Y\œÈ^Y\‹›][YØ[œÕZÙ[ˆH
+H™]\›‚ˆ˜[ÚY™›YH
+^Y\‹š[™
+È^Y\‹›Xœ˜\žJKœÚY™›Y
+
+Bˆ\]T^Y\Š[™^
+HÈ]˜ÛÜJˆ[™HÚY™›YZÙJÊKˆXœ˜\žHHÚY™›Y™›Ü
+ÊKˆ][YØ[œÕZÙ[ˆH^Y\‹›][YØ[œÕZÙ[ˆ
+ÈKˆÜ[š[™Ò[™Ù\H˜[ÙBˆ
+HBˆX›\ÚÛ›[™TÛ˜\ÚÝ
+
+BˆØ˜žS›ÝXÙHHYˆ
+^Y\‹›][YØ[œÕZÙ[ˆOH
+H”ÚY™›Y[Ý\ˆ[™[È[Ý\ˆXœ˜\žH[™X[H™]ÈÛ™Kˆ\È][\^Y\ˆ][YØ[ˆ\Èœ™YKˆˆ[ÙH”ÚY™›Y[Ý\ˆ[™[È[Ý\ˆXœ˜\žH[™X[H™]ÈÛ™Kˆ‚ˆ™XÛÜ™XYÛ›ÜÝXÊ“Ü[š[™È[™][YØ[ŽˆÙX]	Ú[™^
+È_KÝ[IÜ^Y\‹›][YØ[œÕZÙ[ˆ
+È_HŠBˆBˆ[ˆÙY\Ü[š[™Ò[™
+[™^ˆ[›ÝÛRYÎˆ\Ý[ŠHÂˆ˜[^Y\ˆH^Y\œË™Ù]Ü“[
+[™^
+HÎˆ™]\›‚ˆYˆ
+[™^OHØØ[ÙX][Û›[™S[ÙHØ[YTÝ\YÛ›[™H\^Y\‹™XÚÓØYY^Y\‹›Ü[š[™Ò[™Ù\[™^[ˆØ˜žT™XYT^Y\œÊH™]\›‚ˆ˜[™\]Z\™Y›ÝÛPÛÝ[H
+^Y\‹›][YØ[œÕZÙ[ˆHJK˜ÛÙ\˜ÙP]X\Ý
+
+Bˆ˜[Ù[XÝYYÈH›ÝÛRYË™\Ý[˜Ý
+
+BˆYˆ
+Ù[XÝYYËœÚ^™HOH™\]Z\™Y›ÝÛPÛÝ[Ù[XÝYYË˜[žHÈYOˆ^Y\‹š[™››Û™HÈ]šYOHYHJH™]\›‚ˆ˜[›ÝÛPØ\™ÈH^Y\‹š[™™š[\ˆÈ]šY[ˆÙ[XÝYYÈBˆ\]T^Y\Š[™^
+HÈÝ\œ™[OˆÝ\œ™[˜ÛÜJˆ[™HÝ\œ™[š[™™š[\“›ÝÈ]šY[ˆÙ[XÝYYÈKˆXœ˜\žHHÝ\œ™[›Xœ˜\žH
+È›ÝÛPØ\™ËˆÜ[š[™Ò[™Ù\HYBˆ
+HBˆX›\ÚÛ›[™TÛ˜\ÚÝ
+
+BˆØ˜žS›ÝXÙHHYˆ
+™\]Z\™Y›ÝÛPÛÝ[OH
+H“Ü[š[™È[™Ù\ˆ[ÝHØ[ˆ›ÝÈ™XYH\ˆˆ[ÙH“Ü[š[™È[™Ù\È	™\]Z\™Y›ÝÛPÛÝ[Ø\™
+ÊH]ÛˆH›ÝÛHÙˆ[Ý\ˆXœ˜\žKˆ‚ˆ™XÛÜ™XYÛ›ÜÝXÊ“Ü[š[™È[™Ù\ˆÙX]	Ú[™^
+È_K][YØ[œÏIÜ^Y\‹›][YØ[œÕZÙ[ŸKØ\™È›ÝÛYYI™\]Z\™Y›ÝÛPÛÝ[ŠBˆBˆ[ˆ˜XÚÙYX[˜J[™^ˆ[
+Nˆ[H^Y\œË™Ù]Ü“[
+[™^
+OË›X[˜TÛÛË˜[Y\ÏËœÝ[J
+HÎˆˆ[ˆÚ[™ÙSX[˜J[™^ˆ[ÛÛÜŽˆÝš[™Ë[Nˆ[
+HÂˆYˆ
+[™^Z[ˆ^Y\œËš[™XÙ\ÈÛÛÜˆZ[ˆ\ÝÙŠ•È‹•H‹ˆ‹”ˆ‹‘È‹ÈŠJH™]\›‚ˆ\]T^Y\Š[™^
+HÈ^Y\ˆO‚ˆ˜[[[Ý[H
+
+^Y\‹›X[˜TÛÛØÛÛÜ—HÎˆ
+H
+È[JK˜ÛÙ\˜ÙR[ŠNJBˆ^Y\‹˜ÛÜJX[˜TÛÛH^Y\‹›X[˜TÛÛÓ]]X›SX\
+
+K˜\HÂˆYˆ
+[[Ý[OH
+H™[[Ý™JÛÛÜŠH[ÙH]
+ÛÛÜ‹[[Ý[
+BˆJBˆBˆBˆ[ˆÛX\“X[˜J[™^ˆ[
+HÂˆYˆ
+^Y\œË™Ù]Ü“[
+[™^
+OË›X[˜TÛÛËš\Ó›Ý[\J
+HOHYJH\]T^Y\Š[™^
+HÈ]˜ÛÜJX[˜TÛÛH[\SX\
+
+JHBˆBˆ[ˆÜ[™Ù[™\šXÓX[˜J[™^ˆ[[[Ý[ˆ[
+Nˆ›ÛÛX[ˆÂˆYˆ
+[™^Z[ˆ^Y\œËš[™XÙ\ÊH™]\›ˆ˜[ÙBˆ˜[™^HÜ[™Ù[™\šXÓX[˜J^Y\œÖÚ[™^K›X[˜TÛÛ[[Ý[
+HÎˆ™]\›ˆ˜[ÙBˆ\]T^Y\Š[™^
+HÈ]˜ÛÜJX[˜TÛÛH™^
+HBˆ™]\›ˆYBˆBˆ[ˆ\]PØ\™
+^Y\’[™^ˆ[Ø\™Yˆ[˜[œÙ›Ü›Nˆ
+Ø[YPØ\™
+HOˆØ[YPØ\™
+HÂˆ\]T^Y\Š^Y\’[™^
+HÈOˆ˜ÛÜJ˜]YšY[H˜˜]YšY[›X\ÈYˆ
+]šYOHØ\™Y
+H˜[œÙ›Ü›J]
+H[ÙH]JHBˆBˆ[ˆY]XÚÐØ\™
+^Y\’[™^ˆ[Ø\™Yˆ[™]Ó˜[YNˆÝš[™ÏË™[[Ý™Nˆ›ÛÛX[ˆH˜[ÙJHÂˆ\]T^Y\Š^Y\’[™^
+HÈO‚ˆ[ˆÚ[™ÙJØ\™Îˆ\ÝØ[YPØ\™ŠHHØ\™Ë›X\›Ý[ÈØ\™O‚ˆYˆ
+Ø\™šYOHØ\™Y
+HØ\™[ÙHYˆ
+™[[Ý™JH[[ÙHØ\™˜ÛÜJ˜[YHH™]Ó˜[YOËš[J
+OËZÙRYˆÈ]š\Ó›Ý[\J
+HHÎˆØ\™›˜[YJBˆBˆ˜[ÛÛ[X[™\ˆH˜ÛÛ[X[™\Ø\™Ë›]ÈØ\™O‚ˆYˆ
+Ø\™šYOHØ\™Y
+HØ\™[ÙHYˆ
+™[[Ý™JH[[ÙHØ\™˜ÛÜJ˜[YHH™]Ó˜[YOËš[J
+OËZÙRYˆÈ]š\Ó›Ý[\J
+HHÎˆØ\™›˜[YJBˆBˆ˜ÛÜJˆXœ˜\žHHÚ[™ÙJ›Xœ˜\žJKˆ[™HÚ[™ÙJš[™
+Kˆ˜]YšY[HÚ[™ÙJ˜˜]YšY[
+KˆÜ˜]™^X\™HÚ[™ÙJ™Ü˜]™^X\™
+Kˆ^[HHÚ[™ÙJ™^[JKˆ™]™X[YHÚ[™ÙJœ™]™X[Y
+KˆÛÛ[X[™\Ø\™HÛÛ[X[™\‹ˆÛÛ[X[™\“˜[YHHÛÛ[X[™\Ë›˜[YBˆ
+BˆBˆBˆ[ˆ™^\›”^Y\ŠÝ\œ™[[™^ˆ[
+Nˆ[Âˆ™]\›ˆ™^\›’[™^
+Ý\œ™[[™^Ø[YU\›“Ü™\‹^Y\œËœÚ^™K^Y\œËš[™XÙ\Ë™š[\“›ÝÈ^Y\œÖÚ]Kš\Ñ[[Z[˜]YKÔÙ]
+
+JBˆBˆ[ˆ[Ý™T^Y\Ø\™
+[™^ˆ[\™XÝ[ÛŽˆ[
+HÂˆ˜[\™Ù]H
+[™^
+È\™XÝ[ÛŠK˜ÛÙ\˜ÙR[Š^Y\œË›\Ý[™^
+BˆYˆ
+\™Ù]OH[™^
+H™]\›‚ˆ˜[™[Ü™\™YH^Y\œËÓ]]X›S\Ý
+
+K˜[ÛÈÈ\ÝO‚ˆ˜[][HH\ÝÚ[™^NÈ\ÝÚ[™^HH\ÝÝ\™Ù]NÈ\ÝÝ\™Ù]HH][BˆBˆ^Y\œÈH™[Ü™\™Yˆ[ˆ™[X\
+˜[YNˆ[
+HHÚ[ˆ
+˜[YJHÈ[™^Oˆ\™Ù]È\™Ù]Oˆ[™^È[ÙHOˆ˜[YHBˆÙ[XÝY^Y\ˆH™[X\
+Ù[XÝY^Y\ŠBˆXÝ]™T^Y\ˆH™[X\
+XÝ]™T^Y\ŠBˆš[Üš]T^Y\ˆH™[X\
+š[Üš]T^Y\ŠBˆØ[YU\›“Ü™\ˆHØ[YU\›“Ü™\‹›X\
+Žœ™[X\
+BˆØ˜žU\›“Ü™\ˆHØ˜žU\›“Ü™\Ë›X\
+Žœ™[X\
+BˆØ˜žT™XYT^Y\œÈHØ˜žT™XYT^Y\œË›X\
+Žœ™[X\
+KÔÙ]
+
+BˆBˆ[ˆ™[[Ý™SØ˜žT^Y\Š[™^ˆ[
+HÂˆYˆ
+[Ø˜žPÜ™X]YØ˜žR›Ú[“[ÙH[™^H[™^Z[ˆ^Y\œËš[™XÙ\ÊH™]\›‚ˆ›ÛÛRÜÝËœ™[[Ý™TÙX]
+[™^
+Bˆ˜[™[[Ý™Y˜[YHH^Y\œÖÚ[™^K›˜[YBˆ^Y\œÈH^Y\œË™š[\’[™^YÈ^Y\’[™^ÈOˆ^Y\’[™^OH[™^Bˆ[ˆ™[X\
+^Y\’[™^ˆ[
+Nˆ[HÚ[ˆÂˆ^Y\’[™^OH[™^Oˆˆ^Y\’[™^ˆ[™^Oˆ^Y\’[™^HBˆ[ÙHOˆ^Y\’[™^ˆBˆÙ[XÝY^Y\ˆH™[X\
+Ù[XÝY^Y\ŠK˜ÛÙ\˜ÙR[Š^Y\œËš[™XÙ\ÊBˆXÝ]™T^Y\ˆH™[X\
+XÝ]™T^Y\ŠK˜ÛÙ\˜ÙR[Š^Y\œËš[™XÙ\ÊBˆš[Üš]T^Y\ˆH™[X\
+š[Üš]T^Y\ŠK˜ÛÙ\˜ÙR[Š^Y\œËš[™XÙ\ÊBˆØ[YU\›“Ü™\ˆHØ[YU\›“Ü™\‹™š[\ˆÈ]OH[™^K›X\ÈYˆ
+]ˆ[™^
+H]HH[ÙH]BˆØ˜žT™XYT^Y\œÈHØ˜žT™XYT^Y\œË™š[\ˆÈ]OH[™^K›X\ÈYˆ
+]ˆ[™^
+H]HH[ÙH]KÔÙ]
+
+BˆØ˜žU\›“Ü™\ˆHØ˜žU\›“Ü™\Ë™š[\ˆÈ]OH[™^OË›X\ÈYˆ
+]ˆ[™^
+H]HH[ÙH]BˆYˆ
+[™[™ÐZT^Y\’[™^OH[™^
+H[™[™ÐZT^Y\’[™^HLH[ÙHYˆ
+[™[™ÐZT^Y\’[™^ˆ[™^
+H[™[™ÐZT^Y\’[™^KBˆYˆ
+[™›ÜÜØ[žHOH[™^
+HÈ[™›ÜÜØ[žHHLNÈ[™›Ý\ÈH[\SX\
+
+HBˆ[ÙHYˆ
+[™›ÜÜØ[žHˆ[™^
+H[™›ÜÜØ[žKKBˆ[™›Ý\ÈH[™›Ý\Ë™š[\’Ù^\ÈÈ]OH[™^K›X\Ù^\ÈÈ
+ÙX]ÊHOˆYˆ
+ÙX]ˆ[™^
+HÙX]HH[ÙHÙX]BˆšYÙÙ\”›Û\ÈHšYÙÙ\”›Û\Ë™š[\ˆÈ]˜ÛÛ›Û\’[™^OH[™^	‰ˆ]™]™[^Y\’[™^OH[™^K›X\Âˆ]˜ÛÜJÛÛ›Û\’[™^H™[X\
+]˜ÛÛ›Û\’[™^
+K]™[^Y\’[™^H™[X\
+]™]™[^Y\’[™^
+JBˆBˆØ[YQÙ[™\˜][ÛŠÊÂˆØ˜žS›ÝXÙHH‰™[[Ý™Y˜[YHØ\È™[[Ý™Yœ›ÛHHØ˜žKˆ‚ˆBˆ[ˆÙÐXÝ[ÛŠ^Y\’[™^ˆ[XÝ[ÛŽˆÝš[™ÊHÂˆ˜[^Y\“˜[YHH^Y\œË™Ù]Ü“[
+^Y\’[™^
+OË›˜[YHÎˆ•P“H‚ˆ˜[\ÙHH\ÙTÝ\Ë™Ù]Ü“[
+\ÙR[™^
+OË›]Èˆ0­È	]ˆK›Ü‘[\J
+BˆØ[YSÙÈH
+Ø[YSÙÈ
+È•\›ˆ	\›“[X™\‰\ÙH0­È	^Y\“˜[YH	XÝ[ÛˆŠKZÙS\Ý
+L
+BˆYˆ
+˜XÚÙÜ›Ý[™[\Ñ[˜X›Y	‰ˆX\[‘›Ü™YÜ›Ý[™	‰ˆÛ›[™S[ÙH	‰ˆ^Y\’[™^OHØØ[ÙX]	‰ˆXXÝ[Û‹œÝ\ÕÚ]
+œÙ[HÚ]ŠJHÂˆÜÝØ[YP[\
+ÛÛ^‘Ø[YHXÝ]š]H‹‰^Y\“˜[YH	XÝ[ÛˆŠBˆBˆBˆ[ˆ[››Ý[˜ÙP]]ÛX]XÐXÝ[ÛŠ^Y\’[™^ˆ[XÝ[ÛŽˆÝš[™Ë[™XYSÙÙÙYˆ›ÛÛX[ˆH˜[ÙJHÂˆ˜[^Y\“˜[YHH^Y\œË™Ù]Ü“[
+^Y\’[™^
+OË›˜[YHÎˆ”^Y\ˆ‚ˆYˆ
+X[™XYSÙÙÙY
+HÙÐXÝ[ÛŠ^Y\’[™^‰XÝ[Ûˆ]]ÛX]XØ[HŠBˆØÛÜK›][˜ÚÈ]]ÛX]XÐXÝ[Û”Û˜XÚØ˜\‹œÚÝÔÛ˜XÚØ˜\Š‰^Y\“˜[YH0­È	XÝ[ÛˆŠHBˆBˆ[ˆ\\›X[™[
+^Y\’[™^ˆ[Ø\™ˆØ[YPØ\™
+HÂˆYˆ
+Ø\™\Y
+HÂˆ\]PØ\™
+^Y\’[™^Ø\™šY
+HÈ]˜ÛÜJ\YH˜[ÙJHBˆÙÐXÝ[ÛŠ^Y\’[™^[\Y	ØØ\™›˜[Y_HŠBˆ™]\›‚ˆBˆ\]PØ\™
+^Y\’[™^Ø\™šY
+HÈ]˜ÛÜJ\YHYJHBˆÙÐXÝ[ÛŠ^Y\’[™^\Y	ØØ\™›˜[Y_HŠBˆ˜[Ü[ÛœÈHX[˜T›ÙXÝ[Û“Ü[ÛœÊØ\™
+BˆYˆ
+Ü[ÛœËœÚ^™HOHJHÂˆ˜[Û›SÜ[ÛˆHÜ[ÛœËœÚ[™ÛJ
+Bˆ\]T^Y\Š^Y\’[™^
+HÈ^Y\ˆO‚ˆ^Y\‹˜ÛÜJX[˜TÛÛH^Y\‹›X[˜TÛÛÓ]]X›SX\
+
+K˜\HÂˆÛ›SÜ[Û‹œÛÛ™›Ü‘XXÚÈ
+ÛÛÜ‹ÛÝ[
+HOˆ]
+ÛÛÜ‹
+
+Ù]
+ÛÛÜŠHÎˆ
+H
+ÈÛÝ[
+K˜ÛÙ\˜ÙP][ÜÝ
+NJJHBˆJBˆBˆÙÐXÝ[ÛŠ^Y\’[™^˜YY	ÛÛ›SÜ[Û‹›X™[HX[˜HŠBˆH[ÙHYˆ
+Ü[ÛœËœÚ^™HˆJHÂˆX[˜PÚÚXÙT›Û\HX[˜PÚÚXÙT›Û\
+^Y\’[™^Ø\™›˜[YKÜ[ÛœÊBˆBˆBˆ[ˆ\SÛ›[™TÛ˜\ÚÝ
+ÛÝ\˜ÙNˆÝš[™ÊHÂˆ˜[Ý]HH\œÙSÛ›[™QØ[YTÝ]JÛÝ\˜ÙJHÎˆ™]\›‚ˆ[˜›Ý[™Û˜\ÚÝÙ\]Y[˜ÙH
+ÏHBˆ˜[š\œÝÛ˜\ÚÝ›ÜÛÛ›™XÝ[ÛˆH[Û›[™TÝ]T™XYBˆ˜[Ø\ÑØ[YTÝ\YHØ[YTÝ\YÛ›[™Bˆ˜[ÛXÝ]™T^Y\ˆHXÝ]™T^Y\‚ˆ˜[Ûš[Üš]T^Y\ˆHš[Üš]T^Y\‚ˆ˜[ÛÝXÚÒYÈHÝXÚÐXÝ[ÛœË›X\È]šYKÔÙ]
+
+Bˆ˜[ÛØ[YSÙÈHØ[YSÙÂˆ˜[™]š[Ý\Ô™XYHHØ˜žT™XYT^Y\œÂˆ˜[™]š[Ý\Ô^Y\œÈH^Y\œÂˆ\Ý™[[ÝTÛ˜\ÚÝHÝ]KÒœÛÛŠ
+Bˆ˜[™XÙZ]™Y^Y\œÈHÝ]Kœ^Y\œË›X\[™^YÈ[™^^Y\ˆO‚ˆYˆ
+›ÛÛPÛÛ›™XÝY	‰ˆ[™^OHØØ[ÙX]
+H^Y\‹˜ÛÜJ\ÓÛ›[™HHYJH[ÙH^Y\‚ˆKÓ]]X›S\Ý
+
+BˆÚ[H
+™XÙZ]™Y^Y\œËœÚ^™HHØØ[ÙX]	‰ˆ™XÙZ]™Y^Y\œËœÚ^™H
+H™XÙZ]™Y^Y\œÈ
+ÏHX›T^Y\Š˜[YHHYˆ
+™XÙZ]™Y^Y\œËœÚ^™HOHØØ[ÙX]
+HØ˜žT^Y\“˜[YH[ÙH”VQTˆ	Ü™XÙZ]™Y^Y\œËœÚ^™H
+È_HŠBˆËÈ\È]šXÙHÝÛœÈ]È\ÜÚYÛ™YÙX]ˆÙY\]ÈÝ\œ™[^Y\ˆ]HÚ[BˆËÈÛÛ›™XÝYÛÈ[ˆÛ\ˆÙ\™\ˆÛ˜\ÚÝØ[››Ý[™ÈHØØ[Ø\™[Ý™BˆËÈ]\ÈÝ[ØZ][™È›Üˆ]ÈÝ]›Ý[™Û˜\ÚÝÈ™HX›\ÚY‚ˆËÈHš\œÝÛ˜\ÚÝY\ˆÛÛ›™XÝ[™È™[XZ[œÈ]]Üš]]]™HÛÈBˆËÈ™XÛÛ›™XÝØ[ˆ™\ÝÜ™HH›ÛÛIÜÈØ]™YÝ]K‚ˆYˆ
+Yš\œÝÛ˜\ÚÝ›ÜÛÛ›™XÝ[ÛŠHÂˆ™]š[Ý\Ô^Y\œË™Ù]Ü“[
+ØØ[ÙX]
+OË›]ÈØØ[^Y\ˆO‚ˆYˆ
+ØØ[ÙX][ˆ™XÙZ]™Y^Y\œËš[™XÙ\ÊHÂˆ™XÙZ]™Y^Y\œÖÛØØ[ÙX]HHØØ[^Y\‹˜ÛÜJ\ÓÛ›[™HHYJBˆBˆBˆBˆ^Y\œÈH™XÙZ]™Y^Y\œÂˆÙÖ›Û™TÛ˜\ÚÝÚ[™ÙJ^Y\œË›Û›[™HÛ˜\ÚÝÉ[˜›Ý[™Û˜\ÚÝÙ\]Y[˜ÙHŠBˆ™XÙZ]™Y^Y\œË™›Ü‘XXÚ[™^YÈ[™^^Y\ˆO‚ˆ˜[ÛØYYH™]š[Ý\Ô^Y\œË™Ù]Ü“[
+[™^
+OË™XÚÓØYYˆYˆ
+ÛØYYOH[	‰ˆÛØYYOH^Y\‹™XÚÓØYY
+H™XÛÜ™XYÛ›ÜÝXÊ“Ø˜žHXÚÈÝ]\È\]YˆÙX]	Ú[™^
+È_KØYYIÜ^Y\‹™XÚÓØYYHŠBˆ˜[ÛÛ›[™HH™]š[Ý\Ô^Y\œË™Ù]Ü“[
+[™^
+OËš\ÓÛ›[™BˆYˆ
+Yš\œÝÛ˜\ÚÝ›ÜÛÛ›™XÝ[Ûˆ	‰ˆ[™^OHØØ[ÙX]	‰ˆÛÛ›[™HOH[	‰ˆÛÛ›[™HOH^Y\‹š\ÓÛ›[™JHÂˆ˜[]™[HYˆ
+^Y\‹š\ÓÛ›[™JH‰Ü^Y\‹›˜[Y_H™XÛÛ›™XÝYˆ[ÙH‰Ü^Y\‹›˜[Y_HÜÝÛÛ›™XÝ[Ûˆ‚ˆ™XÛÜ™XYÛ›ÜÝXÊ”^Y\ˆÛÛ›™XÝ[ÛˆÚ[™ÙYˆÙX]	Ú[™^
+È_H	ÚYˆ
+^Y\‹š\ÓÛ›[™JH›Û›[™Hˆ[ÙH›Ù™›[™HŸHŠBˆYˆ
+Ø˜žSÜ[ŠHØ˜žS›ÝXÙHH‰]™[ˆ‚ˆYˆ
+Y\ÜØYÙHOH[
+HY\ÜØYÙHH‰]™[ˆ‚ˆYˆ
+˜XÚÙÜ›Ý[™[\Ñ[˜X›Y	‰ˆX\[‘›Ü™YÜ›Ý[™
+HÂˆÜÝØ[YP[\
+ÛÛ^Yˆ
+^Y\‹š\ÓÛ›[™JH”^Y\ˆ™XÛÛ›™XÝYˆ[ÙH”^Y\ˆ\ØÛÛ›™XÝY‹]™[
+BˆBˆBˆBˆYˆ
+ØØ[ÙX][ˆ^Y\œËš[™XÙ\ÊH^Y\œÈH^Y\œË›X\[™^YÈ[™^^Y\ˆOˆYˆ
+[™^OHØØ[ÙX]
+H^Y\‹˜ÛÜJ\ÓÛ›[™HHYJH[ÙH^Y\ˆBˆXÝ]™T^Y\ˆHÝ]K˜XÝ]™T^Y\‹˜ÛÙ\˜ÙR[Š^Y\œËš[™XÙ\ÊBˆ\›“[X™\ˆHÝ]K\›“[X™\‚ˆ\ÙR[™^HÝ]Kœ\ÙR[™^˜ÛÙ\˜ÙP][ÜÝ
+\ÙTÝ\Ë›\Ý[™^
+Bˆ[\ÙYØ[YTÙXÛÛ™ÈHÝ]K™[\ÙYØ[YTÙXÛÛ™Âˆ[\ÙY\›”ÙXÛÛ™ÈHÝ]K™[\ÙY\›”ÙXÛÛ™ÂˆØ[YU\›“Ü™\ˆHÝ]K\›“Ü™\‚ˆØ˜žU\›“Ü™\ˆHÝ]K\›“Ü™\‹ZÙRYˆÈ]š\Ó›Ý[\J
+H	‰ˆ\Ý]K™Ø[YTÝ\YBˆØ˜žT™XYT^Y\œÈHÝ]Kœ™XYT^Y\œÂˆ
+
+™]š[Ý\Ô™XYH[š[ÛˆÝ]Kœ™XYT^Y\œÊHH
+™]š[Ý\Ô™XYH[\œÙXÝÝ]Kœ™XYT^Y\œÊJKœÛÜY
+
+K™›Ü‘XXÚÈÙX]O‚ˆ™XÛÜ™XYÛ›ÜÝXÊ“Ø˜žH™XY[™\ÜÈ\]YˆÙX]	ÜÙX]
+È_K™XYOIÜÙX][ˆÝ]Kœ™XYT^Y\œßHŠBˆBˆYˆ
+Ø˜žSÜ[ˆ	‰ˆ™]š[Ý\Ô™XYHOHÝ]Kœ™XYT^Y\œÊHÂˆ˜[™XØ[YT™XYHH
+Ý]Kœ™XYT^Y\œÈH™]š[Ý\Ô™XYJK™š\œÝÜ“[
+
+Bˆ˜[™XØ[YS›Ý™XYHH
+™]š[Ý\Ô™XYHHÝ]Kœ™XYT^Y\œÊK™š\œÝÜ“[
+
+Bˆ˜[Ú[™ÙYÙX]H™XØ[YT™XYHÎˆ™XØ[YS›Ý™XYBˆYˆ
+Ú[™ÙYÙX]OH[
+HÂˆ˜[˜[YHHÝ]Kœ^Y\œË™Ù]Ü“[
+Ú[™ÙYÙX]
+OË›˜[YHÎˆH^Y\ˆ‚ˆØ˜žS›ÝXÙHHYˆ
+™XØ[YT™XYHOH[
+H‰˜[YH\È™XYHÈÝ\ˆˆ[ÙH‰˜[YH\È›ÈÛ™Ù\ˆ™XYKˆ‚ˆBˆBˆØ[YSÙÈHÝ]K™Ø[YSÙÂˆYˆ
+˜XÚÙÜ›Ý[™[\Ñ[˜X›Y	‰ˆX\[‘›Ü™YÜ›Ý[™	‰ˆØ\ÑØ[YTÝ\Y	‰ˆÝ]K™Ø[YTÝ\Y
+HÂˆYˆ
+Ý]K˜XÝ]™T^Y\ˆOHØØ[ÙX]	‰ˆÛXÝ]™T^Y\ˆOHØØ[ÙX]
+HÜÝØ[YP[\
+ÛÛ^–[Ý\ˆ\›ˆ‹’]\È[Ý\ˆ\›ˆ[ˆ\˜Ø[˜HX›KˆŠBˆ˜[õ×Ý6öÚ$z{-®éÜj×results."
             }
             autoFixingCardId = null
         }
