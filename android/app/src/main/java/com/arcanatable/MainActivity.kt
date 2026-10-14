@@ -37,6 +37,7 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
@@ -93,6 +94,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -504,7 +506,6 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val layoutOrientationSuffix = if (isLandscape) "landscape" else "portrait"
     var cardSizeScale by rememberSaveable(layoutOrientationSuffix) { mutableFloatStateOf(optionPrefs.getFloat("layout_card_size_$layoutOrientationSuffix", optionPrefs.getFloat("card_size_scale", 1f)).coerceIn(0.82f, 1.18f)) }
-    var battlefieldHeightScale by rememberSaveable(layoutOrientationSuffix) { mutableFloatStateOf(optionPrefs.getFloat("layout_battlefield_height_$layoutOrientationSuffix", 1f).coerceIn(0.75f, 1.5f)) }
     var boardSpacingScale by rememberSaveable(layoutOrientationSuffix) { mutableFloatStateOf(optionPrefs.getFloat("layout_board_spacing_$layoutOrientationSuffix", 1f).coerceIn(0.5f, 2f)) }
     var footerButtonScale by rememberSaveable(layoutOrientationSuffix) { mutableFloatStateOf(optionPrefs.getFloat("layout_footer_button_scale_$layoutOrientationSuffix", 1f).coerceIn(0.9f, 1.3f)) }
     var handSheetHeightFraction by rememberSaveable(layoutOrientationSuffix) {
@@ -1569,7 +1570,6 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         openHandAfterDraw = true
         reducedSwipeMotion = false
         cardSizeScale = 1f
-        battlefieldHeightScale = 1f
         boardSpacingScale = 1f
         handSheetHeightFraction = 0.52f
         footerButtonScale = 1f
@@ -2365,7 +2365,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         Modifier.fillMaxSize().background(Ink)
             .then(if (tutorialOpen) Modifier.blur(4.dp) else Modifier)
             .windowInsetsPadding(WindowInsets.safeDrawing)
-            .padding(horizontal = 10.dp, vertical = 8.dp)
+            .padding(start = 10.dp, top = 8.dp, end = 10.dp)
     ) {
         Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
             Column {
@@ -2501,7 +2501,6 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         Modifier.fillMaxWidth().then(if (index == selectedPlayer) tutorialAnchor("player-card") else Modifier),
                         tutorialAnchor = ::tutorialAnchor,
                         compact = compactOverview,
-                        cardSizeScale = cardSizeScale,
                         isActivePlayer = index == activePlayer,
                         turnNumber = turnNumber,
                         phaseName = if (index == activePlayer) phaseSteps[phaseIndex] else "WAITING",
@@ -2521,7 +2520,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             val boardCanControl = gameInProgress && (!onlineMode || boardIndex == localSeat) && !gameEndedOnline && !players[boardIndex].isEliminated
             PlayerBoard(
                 player = players[boardIndex].copy(name = if (onlineMode && boardIndex == localSeat) "YOU" else players[boardIndex].name), playerIndex = boardIndex, isLandscape = isLandscape, cardSizeScale = cardSizeScale,
-                battlefieldHeightScale = battlefieldHeightScale, boardSpacingScale = boardSpacingScale,
+                boardSpacingScale = boardSpacingScale,
                 playerSectionOrder = playerSectionOrderRaw.split('|').filter(String::isNotBlank),
                 gameInProgress = gameInProgress,
                 tutorialAnchor = ::tutorialAnchor,
@@ -2613,22 +2612,24 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             }
         } else {
             val canPassTurnFromBoard = gameInProgress && !gameEndedOnline && selectedPlayer == activePlayer && !players[selectedPlayer].isComputer && !players[selectedPlayer].isEliminated && (!onlineMode || localSeat == activePlayer)
+            val footerControlHeight = (54.dp * footerButtonScale).coerceIn(50.dp, 76.dp)
+            val handControlHeight = (62.dp * footerButtonScale).coerceIn(56.dp, 82.dp)
             Spacer(Modifier.weight(1f))
             Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.Bottom) {
                 HeaderButton(
                     "PASS TURN", onClick = { guidedAction("pass-turn") { passTurn() } }, enabled = canPassTurnFromBoard,
-                    modifier = Modifier.weight(1f).height((54.dp * footerButtonScale).coerceIn(48.dp, 76.dp)).then(tutorialAnchor("pass-turn"))
+                    modifier = Modifier.weight(1f).height(footerControlHeight).then(tutorialAnchor("pass-turn"))
                 )
                 Box(Modifier.weight(1.18f).then(tutorialAnchor("hand-button"))) {
                     HandPeekBar(
                         players[selectedPlayer].hand.size,
-                        modifier = Modifier.fillMaxWidth().height((62.dp * footerButtonScale).coerceIn(48.dp, 82.dp)),
+                        modifier = Modifier.fillMaxWidth().height(handControlHeight),
                         onClick = { guidedAction("hand-button") { if (canControlSelectedPlayer) showHand = true } }
                     )
                 }
                 HeaderButton(
                     "BACK TO TABLE", onClick = { guidedAction("player-back-table") { showOverview = true; showHand = false } },
-                    modifier = Modifier.weight(1f).height((54.dp * footerButtonScale).coerceIn(48.dp, 76.dp)).then(tutorialAnchor("player-back-table"))
+                    modifier = Modifier.weight(1f).height(footerControlHeight).then(tutorialAnchor("player-back-table"))
                 )
             }
         }
@@ -2656,6 +2657,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 78 · DRAGGABLE UI EDITOR AND PLAYER LAYOUT", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Long-press and drag player-screen elements or hand-tray buttons in the editor's sample layout. The active item lifts and tracks your finger while neighboring items animate into place.\n• Player-screen footer controls stay aligned to the bottom, with a larger hand button. The battlefield automatically fills available space and scrolls when its cards exceed that space.\n• Removed the Large View toggle from the table view.", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 77 · DRAG-AND-DROP UI EDITOR", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Adjust UI now lets you drag to reorder player-screen sections, remove and restore sections such as the health/activity bar and commander strip, and add, remove, and reorder hand-tray buttons. Layouts are saved separately for portrait and landscape.", color = SoftWhite, fontSize = 11.sp)
 
@@ -3796,28 +3800,25 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     if (layoutLabOpen) LayoutLabPage(
         orientationName = if (isLandscape) "LANDSCAPE" else "PORTRAIT",
         cardSizeScale = cardSizeScale,
-        battlefieldHeightScale = battlefieldHeightScale,
         boardSpacingScale = boardSpacingScale,
         handSheetHeightFraction = handSheetHeightFraction,
         footerButtonScale = footerButtonScale,
         playerSectionOrder = playerSectionOrderRaw.split('|').filter(String::isNotBlank),
         handActionOrder = handActionOrderRaw.split('|').filter(String::isNotBlank),
         onCardSizeScale = { value -> cardSizeScale = value.coerceIn(0.82f, 1.18f); optionPrefs.edit().putFloat("card_size_scale", cardSizeScale).putFloat("layout_card_size_$layoutOrientationSuffix", cardSizeScale).apply() },
-        onBattlefieldHeightScale = { value -> battlefieldHeightScale = value.coerceIn(0.75f, 1.5f); optionPrefs.edit().putFloat("layout_battlefield_height_$layoutOrientationSuffix", battlefieldHeightScale).apply() },
         onBoardSpacingScale = { value -> boardSpacingScale = value.coerceIn(0.5f, 2f); optionPrefs.edit().putFloat("layout_board_spacing_$layoutOrientationSuffix", boardSpacingScale).apply() },
         onHandSheetHeightFraction = { value -> handSheetHeightFraction = value.coerceIn(0.38f, 0.95f); optionPrefs.edit().putFloat("hand_sheet_height_fraction", handSheetHeightFraction).putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction).apply() },
         onFooterButtonScale = { value -> footerButtonScale = value.coerceIn(0.9f, 1.3f); optionPrefs.edit().putFloat("layout_footer_button_scale_$layoutOrientationSuffix", footerButtonScale).apply() },
         onPlayerSectionOrder = { order -> playerSectionOrderRaw = order.joinToString("|"); optionPrefs.edit().putString("layout_player_sections_$layoutOrientationSuffix", playerSectionOrderRaw).apply() },
         onHandActionOrder = { order -> handActionOrderRaw = order.joinToString("|"); optionPrefs.edit().putString("layout_hand_actions_$layoutOrientationSuffix", handActionOrderRaw).apply() },
         onReset = {
-            cardSizeScale = 1f; battlefieldHeightScale = 1f; boardSpacingScale = 1f
+            cardSizeScale = 1f; boardSpacingScale = 1f
             handSheetHeightFraction = 0.52f; footerButtonScale = 1f
             playerSectionOrderRaw = "STATUS|COMMANDER|STEP|ZONES|REVEALED|BATTLEFIELD"
             handActionOrderRaw = "DRAW|REVEAL|STACK|CAST_COMMANDER|COMBAT|NEXT_STEP|PASS_TURN|MORE"
             optionPrefs.edit()
                 .putFloat("card_size_scale", cardSizeScale)
                 .putFloat("layout_card_size_$layoutOrientationSuffix", cardSizeScale)
-                .putFloat("layout_battlefield_height_$layoutOrientationSuffix", battlefieldHeightScale)
                 .putFloat("layout_board_spacing_$layoutOrientationSuffix", boardSpacingScale)
                 .putFloat("hand_sheet_height_fraction", handSheetHeightFraction)
                 .putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction)
@@ -4490,7 +4491,7 @@ private fun ManaSymbolText(text: String, color: Color, fontSize: androidx.compos
 @Composable
 private fun HandPeekBar(cardCount: Int, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(
-        modifier.fillMaxWidth().heightIn(min = 60.dp).clip(RoundedCornerShape(10.dp)).background(PanelLight)
+        modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(10.dp)).background(PanelLight)
             .combinedClickable(onClick = onClick).padding(horizontal = 11.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
@@ -5002,14 +5003,12 @@ private fun OptionsPage(
 private fun LayoutLabPage(
     orientationName: String,
     cardSizeScale: Float,
-    battlefieldHeightScale: Float,
     boardSpacingScale: Float,
     handSheetHeightFraction: Float,
     footerButtonScale: Float,
     playerSectionOrder: List<String>,
     handActionOrder: List<String>,
     onCardSizeScale: (Float) -> Unit,
-    onBattlefieldHeightScale: (Float) -> Unit,
     onBoardSpacingScale: (Float) -> Unit,
     onHandSheetHeightFraction: (Float) -> Unit,
     onFooterButtonScale: (Float) -> Unit,
@@ -5029,9 +5028,8 @@ private fun LayoutLabPage(
         val updated = items.toMutableList().apply { add(destination, removeAt(index)) }
         save(updated)
     }
-    fun setPreset(card: Float, battlefield: Float, spacing: Float, hand: Float, footer: Float) {
+    fun setPreset(card: Float, spacing: Float, hand: Float, footer: Float) {
         onCardSizeScale(card)
-        onBattlefieldHeightScale(battlefield)
         onBoardSpacingScale(spacing)
         onHandSheetHeightFraction(hand)
         onFooterButtonScale(footer)
@@ -5065,22 +5063,29 @@ private fun LayoutLabPage(
                     previewScreen = previewScreen,
                     selectedElement = selectedElement,
                     cardSizeScale = cardSizeScale,
-                    battlefieldHeightScale = battlefieldHeightScale,
                     boardSpacingScale = boardSpacingScale,
                     handSheetHeightFraction = handSheetHeightFraction,
                     footerButtonScale = footerButtonScale,
                     playerSectionOrder = playerSectionOrder,
                     handActionOrder = handActionOrder,
-                    onSelectElement = { selectedElement = it }
+                    onSelectElement = { selectedElement = it },
+                    onMovePlayerElement = { id, direction ->
+                        val index = playerSectionOrder.indexOf(id)
+                        if (index >= 0) moveItem(playerSectionOrder, index, direction, onPlayerSectionOrder)
+                    },
+                    onMoveHandAction = { id, direction ->
+                        val index = handActionOrder.indexOf(id)
+                        if (index >= 0) moveItem(handActionOrder, index, direction, onHandActionOrder)
+                    }
                 )
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                     listOf("COMFORTABLE", "LARGER CARDS", "COMPACT").forEach { preset ->
                         TextButton(
                             onClick = {
                                 when (preset) {
-                                    "LARGER CARDS" -> setPreset(1.16f, 1.35f, 1.05f, 0.64f, 1f)
-                                    "COMPACT" -> setPreset(0.88f, 0.9f, 0.72f, 0.46f, 0.92f)
-                                    else -> setPreset(1f, 1.15f, 1.2f, 0.58f, 1.05f)
+                                    "LARGER CARDS" -> setPreset(1.16f, 1.05f, 0.64f, 1f)
+                                    "COMPACT" -> setPreset(0.88f, 0.72f, 0.46f, 0.92f)
+                                    else -> setPreset(1f, 1.2f, 0.58f, 1.05f)
                                 }
                             },
                             modifier = Modifier.weight(1f).heightIn(min = 42.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight),
@@ -5095,7 +5100,6 @@ private fun LayoutLabPage(
                     when (selectedElement) {
                         "BATTLEFIELD" -> {
                             LayoutTuningSlider("Card size", cardSizeScale, 0.82f..1.18f, { "${(it * 100).toInt()}%" }, onCardSizeScale)
-                            LayoutTuningSlider("Battlefield viewing area", battlefieldHeightScale, 0.75f..1.5f, { "${(it * 100).toInt()}%" }, onBattlefieldHeightScale)
                         }
                         "STATUS", "COMMANDER" -> Text("This element can be removed below and restored from ADD ELEMENT.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp))
                         "SPACING" -> LayoutTuningSlider("Space between sections", boardSpacingScale, 0.5f..2f, { "${(it * 100).toInt()}%" }, onBoardSpacingScale)
@@ -5105,7 +5109,7 @@ private fun LayoutLabPage(
                         }
                         "FOOTER" -> LayoutTuningSlider("Footer button size", footerButtonScale, 0.9f..1.3f, { "${(it * 100).toInt()}%" }, onFooterButtonScale)
                     }
-                    Text("Tap a section in the preview to tune it. Card proportions and minimum touch sizes are preserved.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp, bottom = 8.dp))
+                    Text("Tap an element to tune it. Long-press and drag elements in the sample layout; nearby items animate aside as you move.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp, bottom = 8.dp))
                     if (previewScreen == "PLAYER") {
                         Text("PLAYER SCREEN ELEMENTS · HOLD AND DRAG TO REORDER", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 3.dp))
                         playerSectionOrder.forEachIndexed { index, id ->
@@ -5214,25 +5218,30 @@ private fun LayoutLabPreview(
     previewScreen: String,
     selectedElement: String,
     cardSizeScale: Float,
-    battlefieldHeightScale: Float,
     boardSpacingScale: Float,
     handSheetHeightFraction: Float,
     footerButtonScale: Float,
     playerSectionOrder: List<String>,
     handActionOrder: List<String>,
-    onSelectElement: (String) -> Unit
+    onSelectElement: (String) -> Unit,
+    onMovePlayerElement: (String, Int) -> Unit,
+    onMoveHandAction: (String, Int) -> Unit
 ) {
     val sectionGap = (4.dp * boardSpacingScale).coerceIn(2.dp, 10.dp)
     val previewHeight = if (previewScreen == "HAND") (160.dp + 150.dp * handSheetHeightFraction).coerceIn(205.dp, 285.dp) else 226.dp
-    Column(
-        Modifier.fillMaxWidth().height(previewHeight).clip(RoundedCornerShape(13.dp)).background(Color(0xFF101917)).padding(8.dp),
-        verticalArrangement = Arrangement.spacedBy(sectionGap)
-    ) {
+    Box(Modifier.fillMaxWidth().height(previewHeight).clip(RoundedCornerShape(13.dp)).background(Color(0xFF101917))) {
         if (previewScreen == "PLAYER") {
-            playerSectionOrder.forEach { section ->
-                when (section) {
+            LazyColumn(
+                Modifier.fillMaxSize().padding(8.dp),
+                verticalArrangement = Arrangement.spacedBy(sectionGap)
+            ) {
+                items(playerSectionOrder, key = { "section-$it" }) { section ->
+                    LayoutPreviewDraggable(
+                        elementId = "section-$section",
+                        onMove = { direction -> onMovePlayerElement(section, direction) }
+                    ) { dragModifier -> when (section) {
                     "STATUS" -> Row(
-                        Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)
+                        dragModifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)
                             .border(if (selectedElement == "STATUS") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp))
                             .clickable { onSelectElement("STATUS") }.padding(horizontal = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -5241,20 +5250,20 @@ private fun LayoutLabPreview(
                         Text("40  +", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Black)
                     }
                     "COMMANDER" -> Row(
-                        Modifier.fillMaxWidth().height(28.dp).clip(RoundedCornerShape(7.dp)).background(PanelLight)
+                        dragModifier.fillMaxWidth().height(28.dp).clip(RoundedCornerShape(7.dp)).background(PanelLight)
                             .border(if (selectedElement == "COMMANDER") 2.dp else 0.dp, Mint, RoundedCornerShape(7.dp))
                             .clickable { onSelectElement("COMMANDER") }.padding(horizontal = 7.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) { Text("COMMAND ZONE · COMMANDER", color = CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
-                    "STEP" -> Row(Modifier.fillMaxWidth().height(24.dp).clickable { onSelectElement("SPACING") }, verticalAlignment = Alignment.CenterVertically) {
+                    "STEP" -> Row(dragModifier.fillMaxWidth().height(24.dp).clickable { onSelectElement("SPACING") }, verticalAlignment = Alignment.CenterVertically) {
                         Text("NEXT STEP  ›", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterVertically).padding(start = 5.dp))
                     }
-                    "ZONES" -> Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    "ZONES" -> Row(dragModifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         listOf("LIBRARY", "HAND", "GRAVEYARD").forEach { label -> Text(label, color = SoftWhite, fontSize = 6.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(PanelLight).padding(horizontal = 5.dp, vertical = 4.dp)) }
                     }
-                    "REVEALED" -> Text("PUBLIC REVEALS", color = CounterGold, fontSize = 7.sp, modifier = Modifier.clickable { onSelectElement("SPACING") }.padding(start = 4.dp))
+                    "REVEALED" -> Text("PUBLIC REVEALS", color = CounterGold, fontSize = 7.sp, modifier = dragModifier.clickable { onSelectElement("SPACING") }.padding(start = 4.dp))
                     "BATTLEFIELD" -> Column(
-                        Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(8.dp)).background(PanelLight)
+                        dragModifier.fillMaxWidth().height(92.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)
                             .border(if (selectedElement == "BATTLEFIELD") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp))
                             .clickable { onSelectElement("BATTLEFIELD") }.padding(6.dp),
                         verticalArrangement = Arrangement.spacedBy(3.dp)
@@ -5262,7 +5271,7 @@ private fun LayoutLabPreview(
                         Text("BATTLEFIELD · grouped by type", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                         Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
                             val tileWidth = (38.dp * cardSizeScale).coerceIn(31.dp, 46.dp)
-                            val tileHeight = (tileWidth / 0.72f).coerceAtMost((82.dp * battlefieldHeightScale).coerceIn(62.dp, 116.dp))
+                            val tileHeight = tileWidth / 0.72f
                             listOf("CREATURE", "ARTIFACT", "LAND").forEachIndexed { index, label ->
                                 Column(Modifier.width(tileWidth).height(tileHeight).clip(RoundedCornerShape(5.dp)).background(listOf(Color(0xFF66513D), Color(0xFF364C52), Color(0xFF4A644C))[index]).padding(3.dp), verticalArrangement = Arrangement.SpaceBetween) {
                                     Text(label, color = SoftWhite, fontSize = 5.sp, maxLines = 1)
@@ -5273,31 +5282,42 @@ private fun LayoutLabPreview(
                         }
                     }
                 }
-            }
-            Row(
-                Modifier.fillMaxWidth().height((34.dp * footerButtonScale).coerceIn(31.dp, 46.dp)).clip(RoundedCornerShape(8.dp)).background(PanelLight)
-                    .border(if (selectedElement == "FOOTER") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp)).clickable { onSelectElement("FOOTER") },
-                horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically
-            ) {
-                listOf("PASS TURN", "HAND", "BACK TO TABLE").forEach { label ->
-                    Box(Modifier.weight(1f).fillMaxHeight().padding(3.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xFF293934)), contentAlignment = Alignment.Center) {
-                        Text(label, color = Mint, fontSize = 6.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
+                }
+                item(key = "preview-footer") {
+                    Row(
+                        Modifier.fillMaxWidth().height((34.dp * footerButtonScale).coerceIn(31.dp, 46.dp)).clip(RoundedCornerShape(8.dp)).background(PanelLight)
+                            .border(if (selectedElement == "FOOTER") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp)).clickable { onSelectElement("FOOTER") },
+                        horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        listOf("PASS TURN", "HAND", "BACK TO TABLE").forEach { label ->
+                            Box(Modifier.weight(1f).fillMaxHeight().padding(3.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xFF293934)), contentAlignment = Alignment.Center) {
+                                Text(label, color = Mint, fontSize = 6.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                            }
+                        }
                     }
                 }
             }
         } else {
+            Column(Modifier.fillMaxSize().padding(8.dp), verticalArrangement = Arrangement.spacedBy(sectionGap)) {
             Row(Modifier.fillMaxWidth().height(30.dp).clickable { onSelectElement("HAND") }, verticalAlignment = Alignment.CenterVertically) {
                 Text("YOUR HAND · 5 CARDS", color = SoftWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 Text("×", color = SoftWhite, fontSize = 18.sp)
             }
-            Row(
+            androidx.compose.foundation.lazy.LazyRow(
                 Modifier.fillMaxWidth().height(30.dp).clip(RoundedCornerShape(7.dp)).background(PanelLight)
                     .border(if (selectedElement == "HAND") 2.dp else 0.dp, Mint, RoundedCornerShape(7.dp)).clickable { onSelectElement("HAND") }
-                    .horizontalScroll(rememberScrollState()),
+                    ,
                 horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically
             ) {
-                handActionOrder.forEach { id ->
-                    Text(layoutHandActionTitle(id).uppercase(), color = Mint, fontSize = 6.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 5.dp), maxLines = 1)
+                items(handActionOrder, key = { "hand-action-$it" }) { id ->
+                    LayoutPreviewDraggable(
+                        elementId = "hand-action-$id",
+                        horizontal = true,
+                        onMove = { direction -> onMoveHandAction(id, direction) }
+                    ) { dragModifier ->
+                        Text(layoutHandActionTitle(id).uppercase(), color = Mint, fontSize = 6.sp, fontWeight = FontWeight.Bold, modifier = dragModifier.padding(horizontal = 5.dp), maxLines = 1)
+                    }
                 }
             }
             Row(
@@ -5312,8 +5332,57 @@ private fun LayoutLabPreview(
                     }
                 }
             }
+            }
         }
     }
+}
+
+@Composable
+private fun LazyItemScope.LayoutPreviewDraggable(
+    elementId: String,
+    horizontal: Boolean = false,
+    onMove: (Int) -> Unit,
+    content: @Composable (Modifier) -> Unit
+) {
+    val density = LocalDensity.current
+    val dragThreshold = with(density) { 30.dp.toPx() }
+    val moveCurrent by rememberUpdatedState(onMove)
+    var dragging by remember(elementId) { mutableStateOf(false) }
+    var dragOffset by remember(elementId) { mutableFloatStateOf(0f) }
+    val dragModifier = Modifier
+        .animateItem()
+        .graphicsLayer {
+            if (horizontal) translationX = dragOffset else translationY = dragOffset
+            scaleX = if (dragging) 1.035f else 1f
+            scaleY = if (dragging) 1.035f else 1f
+            shadowElevation = if (dragging) 12.dp.toPx() else 0f
+        }
+        .zIndex(if (dragging) 1f else 0f)
+        .pointerInput(elementId, horizontal, dragThreshold) {
+            var accumulated = 0f
+            detectDragGesturesAfterLongPress(
+                onDragStart = { accumulated = 0f; dragOffset = 0f; dragging = true },
+                onDragEnd = { dragOffset = 0f; dragging = false },
+                onDragCancel = { dragOffset = 0f; dragging = false },
+                onDrag = { change, amount ->
+                    change.consume()
+                    val delta = if (horizontal) amount.x else amount.y
+                    accumulated += delta
+                    dragOffset += delta
+                    while (accumulated >= dragThreshold) {
+                        moveCurrent(1)
+                        accumulated -= dragThreshold
+                        dragOffset -= dragThreshold
+                    }
+                    while (accumulated <= -dragThreshold) {
+                        moveCurrent(-1)
+                        accumulated += dragThreshold
+                        dragOffset += dragThreshold
+                    }
+                }
+            )
+        }
+    content(dragModifier)
 }
 
 @Composable
@@ -5515,16 +5584,9 @@ private fun GuidedTutorialOverlay(step: TutorialStop, index: Int, total: Int, ta
 }
 
 @Composable
-private fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier = Modifier, compact: Boolean = false, cardSizeScale: Float = 1f, isActivePlayer: Boolean = false, turnNumber: Int, phaseName: String, turnTime: Long?, showTurnTimer: Boolean, tutorialAnchor: (String) -> Modifier, onToggleTimer: () -> Unit, onMoveUp: () -> Unit, onMoveDown: () -> Unit, onOpen: () -> Unit, onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit) {
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp
-    val largeCardWidth = when {
-        screenWidthDp >= 1300 -> (154 * cardSizeScale).dp
-        screenWidthDp >= 800 -> (138 * cardSizeScale).dp
-        else -> (122 * cardSizeScale).dp
-    }
+private fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier = Modifier, compact: Boolean = false, isActivePlayer: Boolean = false, turnNumber: Int, phaseName: String, turnTime: Long?, showTurnTimer: Boolean, tutorialAnchor: (String) -> Modifier, onToggleTimer: () -> Unit, onMoveUp: () -> Unit, onMoveDown: () -> Unit, onOpen: () -> Unit, onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit) {
     var expanded by remember(player.id) { mutableStateOf(isActivePlayer) }
     LaunchedEffect(player.id, isActivePlayer) { expanded = isActivePlayer }
-    var largeCards by remember { mutableStateOf(false) }
     val paymentCards = player.battlefield.filter { card ->
         if (card.isFaceDown) return@filter false
         val name = card.name.lowercase()
@@ -5584,10 +5646,6 @@ private fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier =
         ).joinToString("  ·  ")
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Text("BOARD · ${player.battlefield.size} permanents", color = Muted, fontSize = if (compact) 8.sp else 9.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.7.sp)
-            Spacer(Modifier.weight(1f))
-            if (expanded && !compact) TextButton(onClick = { largeCards = !largeCards }, modifier = Modifier.heightIn(min = 44.dp)) {
-                Text(if (largeCards) "COMPACT" else "LARGE VIEW", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-            }
         }
         if (typeCounts.isNotEmpty()) Text(typeCounts.entries.joinToString("  ·  ") { "${it.key} ${it.value}" }, color = Muted, fontSize = if (compact) 7.sp else 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (zoneSummary.isNotBlank()) Text(zoneSummary, color = Muted, fontSize = if (compact) 7.sp else 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -5601,18 +5659,7 @@ private fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier =
                 "PUBLICLY REVEALED" to player.revealed
             ).filter { it.second.isNotEmpty() }
             if (cardGroups.isEmpty()) Text("No public cards to show", color = Muted, fontSize = 10.sp)
-            else if (largeCards && !compact) {
-                Column(Modifier.fillMaxWidth().heightIn(max = 430.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                    cardGroups.forEach { (title, cards) ->
-                        Text(title, color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
-                        cards.forEach { card -> OverviewCard(card, largeCardWidth, onClick = onOpen, onLongClick = { onPublicPreview(card) }) }
-                    }
-                    if (player.handRevealedToAll && player.hand.isNotEmpty()) {
-                        Text("HAND REVEALED TO EVERYONE", color = CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                        player.hand.forEach { card -> OverviewCard(card, largeCardWidth, onClick = { onPublicPreview(card) }, onLongClick = { onPublicPreview(card) }) }
-                    }
-                }
-            } else {
+            else {
                 Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     cardGroups.forEach { (title, cards) ->
                         Text(title, color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
@@ -5658,7 +5705,7 @@ private fun ZoneChip(name: String, count: Int, enabled: Boolean = true, onClick:
 
 @Composable
 private fun PlayerBoard(
-    player: TablePlayer, playerIndex: Int, isLandscape: Boolean, cardSizeScale: Float = 1f, battlefieldHeightScale: Float = 1f, boardSpacingScale: Float = 1f, gameInProgress: Boolean, isActivePlayer: Boolean, canControl: Boolean, turnNumber: Int, phaseName: String, modifier: Modifier,
+    player: TablePlayer, playerIndex: Int, isLandscape: Boolean, cardSizeScale: Float = 1f, boardSpacingScale: Float = 1f, gameInProgress: Boolean, isActivePlayer: Boolean, canControl: Boolean, turnNumber: Int, phaseName: String, modifier: Modifier,
     playerSectionOrder: List<String>,
     tutorialAnchor: (String) -> Modifier, stackCount: Int, commanderUnavailable: Boolean,
     onLife: (Int) -> Unit, onDraw: () -> Unit, onShowHand: () -> Unit, onShowHandFromZone: () -> Unit, onToken: () -> Unit, onManageMana: () -> Unit,
@@ -5668,7 +5715,6 @@ private fun PlayerBoard(
     onTrackers: () -> Unit, onStack: () -> Unit, onOpenMore: () -> Unit, onSearchLibrary: () -> Unit, onCastCommander: () -> Unit, onConcede: () -> Unit
 ) {
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp
     val battlefieldCardWidth = when {
         screenWidthDp >= 1000 -> (142 * cardSizeScale).dp
         screenWidthDp >= 700 -> (128 * cardSizeScale).dp
@@ -5677,11 +5723,7 @@ private fun PlayerBoard(
     }
     var moreOpen by remember { mutableStateOf(false) }
     var shuffleConfirm by remember { mutableStateOf(false) }
-    val battlefieldHeightLimit = (screenHeightDp * 0.72f).dp
-    val battlefieldBaseHeight = (screenHeightDp * if (isLandscape) 0.56f else 0.40f).dp
-    val battlefieldMaxHeight = (battlefieldBaseHeight * battlefieldHeightScale)
-        .coerceIn((battlefieldBaseHeight * 0.75f).coerceAtMost(battlefieldHeightLimit), battlefieldHeightLimit)
-    val sectionContent: Map<String, @Composable () -> Unit> = mapOf(
+    val sectionContent: Map<String, @Composable ColumnScope.() -> Unit> = mapOf(
             "STATUS" to {
         Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(RoundedCornerShape(12.dp)).background(Panel).border(if (isActivePlayer) 2.dp else 0.dp, if (isActivePlayer) Mint else Panel, RoundedCornerShape(12.dp)).padding(horizontal = 9.dp).then(tutorialAnchor("player-status")), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -5764,12 +5806,12 @@ private fun PlayerBoard(
             "BATTLEFIELD" to {
         Text("BATTLEFIELD  ·  grouped by type  ·  tap to tap/untap  ·  long-press to inspect", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp, modifier = Modifier.padding(start = 3.dp))
         if (player.battlefield.isEmpty()) {
-            Box(Modifier.fillMaxWidth().height(68.dp).clip(RoundedCornerShape(12.dp)).background(Panel), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)).background(Panel), contentAlignment = Alignment.Center) {
                 Text("Your battlefield is empty", color = Muted, fontSize = 12.sp)
             }
         } else {
             LazyColumn(
-                modifier = Modifier.fillMaxWidth().heightIn(max = battlefieldMaxHeight).clip(RoundedCornerShape(12.dp)).background(Panel).padding(5.dp).then(tutorialAnchor("battlefield")),
+                modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)).background(Panel).padding(5.dp).then(tutorialAnchor("battlefield")),
                 verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(3.dp)
             ) {
                 battlefieldGroups(player.battlefield).forEach { (type, cards) ->
@@ -5797,7 +5839,7 @@ private fun PlayerBoard(
     val defaultSectionOrder = listOf("STATUS", "COMMANDER", "STEP", "ZONES", "REVEALED", "BATTLEFIELD")
     val normalizedSectionOrder = playerSectionOrder.filter { it in defaultSectionOrder }.distinct()
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp * boardSpacingScale)) {
-        normalizedSectionOrder.forEach { section -> sectionContent[section]?.invoke() }
+        normalizedSectionOrder.forEach { section -> sectionContent[section]?.invoke(this) }
     }
 }
 

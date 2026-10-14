@@ -2,7 +2,7 @@
 
 ## Canonical project
 
-This branch is the separate Arcana Table **Targeting Experimental Build 74** (`0.15.55-targeting`, version code `74`) source tree. It branches from stable Build 72 source and includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Keep this work on `experimental/targeting` until the targeting flow is accepted.
+This branch is the separate Arcana Table **Targeting Experimental Build 78** (`0.15.59-targeting`, version code `78`) source tree. It branches from stable Build 72 source and includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Keep this work on `experimental/targeting` until the targeting flow is accepted.
 
 Build 73 adds a target picker for targeted spells, Auras, activated abilities, and recognized targeted triggers. It records chosen targets on stack items and syncs them in room snapshots. The picker presents visible objects from battlefield, stack, graveyard, exile, revealed zones, and eligible hands, plus a manual-entry field. It estimates target count from card text, but does not certify Magic target legality; users must check the card text and game state. Hidden library cards are not listed.
 
@@ -15,7 +15,14 @@ Build 73 adds a target picker for targeted spells, Auras, activated abilities, a
 - Prompts for a creature type after a matching permanent resolves, shows the chosen type on the permanent, and synchronizes that choice with online game state.
 - Adds a small game-log card preview button when a logged card is still present in a public zone.
 
-The Build 74 source is staged on `experimental/targeting`; test/build status is recorded after the GitHub Actions run.
+## Changes in Build 78
+
+- The UI editor's sample layout supports long-press drag reordering for player sections and hand-tray buttons. The moving element lifts and follows the gesture while the surrounding items animate into their new positions.
+- The player footer stays aligned to the bottom edge, with a taller hand control than the two side buttons.
+- The battlefield takes up the available player-screen height and resizes automatically; excess cards remain scrollable.
+- Removed the obsolete Large View toggle from the table view.
+
+Build 78 source is on `experimental/targeting`. `testDebugUnitTest` passed (34 tests, 0 failures), and `assembleDebug` completed successfully. The installable APK is `app/build/outputs/apk/debug/app-debug.apk`, package `com.arcanatable.targeting`, version `0.15.59-targeting`, version code `78`; APK signature verification passed with APK Signature Scheme v2. SHA-256: `74f69e2fa5f335d8efc0fa28e2bd38c661d0a88831ffd642a7412e81671ce4fa`.
 
 The separate `ArcanaTable-build52-source/` folder is stale and should not be used as the project source. Its Gradle metadata still labels it Build 52 and its code is materially different.
 
@@ -110,7 +117,7 @@ These fixes are retained in the Build 62 source and APK.
 
 ## Build status
 
-Targeting Experimental Build 74 (`0.15.55-targeting`, version code `74`) is the current source on `experimental/targeting`. Its debug package ID is `com.arcanatable.targeting`. Stable Build 72 remains on `main`.
+Targeting Experimental Build 78 (`0.15.59-targeting`, version code `78`) is the current source on `experimental/targeting`. Its debug package ID is `com.arcanatable.targeting`. Stable Build 72 remains on `main`; the Worker was not deployed for this build.
 
 Build 62 gives every tutorial step a `NEXT` button, explains that the Join Game action needs a room code and password, and lets the tutorial continue without connecting.
 

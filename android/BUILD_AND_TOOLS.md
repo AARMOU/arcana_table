@@ -1,6 +1,6 @@
 # Arcana Table build and Worker tools
 
-This workspace keeps the app source, Cloudflare Worker, lockfiles, and build scripts together. Targeting Experimental Build 74 is on `experimental/targeting` and uses the separate debug application ID `com.arcanatable.targeting`. Stable Build 72 remains on `main`. APKs are kept outside the GitHub source repository and project-page deployment.
+This workspace keeps the app source, Cloudflare Worker, lockfiles, and build scripts together. Targeting Experimental Build 78 is on `experimental/targeting` and uses the separate debug application ID `com.arcanatable.targeting`. Stable Build 72 remains on `main`. APKs are produced by the branch's GitHub Actions workflow as downloadable build artifacts; they are not included in the source tree or project-page deployment.
 
 The responsive GitHub Pages landing page is in `docs/`. Its Actions workflow stages the APK from `artifacts/` into the deployed site's `downloads/` path. See `docs/README.md` for publishing setup.
 
