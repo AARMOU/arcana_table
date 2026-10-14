@@ -220,8 +220,23 @@ class GameRulesTest {
     }
 
     @Test
-    fun wrapsFinalPhaseToNextPlayerAndTurn() {
-        assertEquals(TurnProgression(0, 0, 5, true), advanceTurnProgression(10, 10, 1, 4, listOf(1, 0), 2))
+    fun wrapsFinalPhaseToNextPlayerWithoutAdvancingRoundUntilOrderCompletes() {
+        assertEquals(TurnProgression(0, 0, 4, true), advanceTurnProgression(10, 10, 1, 4, listOf(1, 0), 2))
+    }
+
+    @Test
+    fun turnCounterChangesAfterEveryEligiblePlayerHasTakenATurn() {
+        val order = listOf(2, 0, 1)
+        val eligible = setOf(0, 1, 2)
+        assertEquals(TurnProgression(0, 0, 8, true), advanceTurnProgression(10, 10, 2, 8, order, 3, eligible))
+        assertEquals(TurnProgression(0, 1, 8, true), advanceTurnProgression(10, 10, 0, 8, order, 3, eligible))
+        assertEquals(TurnProgression(0, 2, 9, true), advanceTurnProgression(10, 10, 1, 8, order, 3, eligible))
+    }
+
+    @Test
+    fun eliminatedSeatsDoNotDelayRoundCounter() {
+        assertEquals(true, isLastEligibleTurnInRound(2, listOf(0, 1, 2, 3), 4, setOf(0, 1, 2)))
+        assertEquals(false, isLastEligibleTurnInRound(1, listOf(0, 1, 2, 3), 4, setOf(0, 1, 2)))
     }
 
     @Test

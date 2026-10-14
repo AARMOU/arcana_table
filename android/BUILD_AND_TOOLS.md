@@ -1,6 +1,6 @@
 # Arcana Table build and Worker tools
 
-This workspace keeps the app source, Cloudflare Worker, lockfiles, and build scripts together. Targeting Experimental Build 79 is on `experimental/targeting` and uses the separate debug application ID `com.arcanatable.targeting`. Stable Build 72 remains on `main`. APKs are produced by the branch's GitHub Actions workflow as downloadable build artifacts; they are not included in the source tree or project-page deployment.
+This workspace keeps the app source, Cloudflare Worker, lockfiles, and build scripts together. Targeting Experimental Build 81 is on `experimental/targeting` and uses the separate debug application ID `com.arcanatable.targeting`. Stable Build 72 remains on `main`. APKs are produced by the branch's GitHub Actions workflow as downloadable build artifacts; they are not included in the source tree or project-page deployment.
 
 The responsive GitHub Pages landing page is in `docs/`. Its Actions workflow stages the APK from `artifacts/` into the deployed site's `downloads/` path. See `docs/README.md` for publishing setup.
 
@@ -32,4 +32,4 @@ Login and deployment require the owner's Cloudflare credentials. No credentials 
 
 ## Current environment
 
-Targeting Experimental Build 79 (`0.15.60-targeting`, version code `79`) has passed `testDebugUnitTest` and `assembleDebug` in this workspace. The Android SDK is not bundled in the source archive. Wrangler and TypeScript dependencies are recorded in the Worker lockfile; the Worker was not redeployed for this build.
+Targeting Experimental Build 81 (`0.15.62-targeting`, version code `81`) has passed `testDebugUnitTest` and `assembleDebug` in this workspace. The Android SDK is not bundled in the source archive. Wrangler and TypeScript dependencies are recorded in the Worker lockfile; the Worker was not redeployed for this build.

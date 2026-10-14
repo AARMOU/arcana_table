@@ -2,7 +2,16 @@
 
 ## Canonical project
 
-This branch is the separate Arcana Table **Targeting Experimental Build 79** (`0.15.60-targeting`, version code `79`) source tree. It branches from stable Build 72 source and includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Keep this work on `experimental/targeting` until the targeting flow is accepted.
+This branch is the separate Arcana Table **Targeting Experimental Build 81** (`0.15.62-targeting`, version code `81`) source tree. It branches from stable Build 72 source and includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Keep this work on `experimental/targeting` until the targeting flow is accepted.
+
+## Changes in Build 81
+
+- Replaces the library/zone strip with a configurable Quick Actions bar. Adjust UI can add, remove, and reorder zone shortcuts and actions such as Draw, Stack, Token, Combat, and Cast Commander; empty zones remain visible with a count of 0.
+- Fixes the missing live Mana Pool section, enlarges mana pips throughout the app, and makes card three-dot menus visually smaller while keeping a 40 dp tap target.
+- Advances the TURN counter once every eligible player has completed a turn; the display remains labeled TURN.
+- Carries forward Build 80’s player battlefield height fix.
+
+Build 81 `testDebugUnitTest` passed (36 tests, 0 failures), and `assembleDebug` completed successfully. The APK is `app/build/outputs/apk/debug/app-debug.apk`, package `com.arcanatable.targeting`, version `0.15.62-targeting`, version code `81`, app label `Arcana Table Targeting 0.15.62 · Build 81`; APK signature verification passed with APK Signature Scheme v2. SHA-256: `4ff4d1b4f83a152bac3c8c9922fd1b261681f758540e311307cf4101a22055d1`.
 
 Build 73 adds a target picker for targeted spells, Auras, activated abilities, and recognized targeted triggers. It records chosen targets on stack items and syncs them in room snapshots. The picker presents visible objects from battlefield, stack, graveyard, exile, revealed zones, and eligible hands, plus a manual-entry field. It estimates target count from card text, but does not certify Magic target legality; users must check the card text and game state. Hidden library cards are not listed.
 
@@ -129,7 +138,7 @@ These fixes are retained in the Build 62 source and APK.
 
 ## Build status
 
-Targeting Experimental Build 79 (`0.15.60-targeting`, version code `79`) is the current source prepared for `experimental/targeting`. Its debug package ID is `com.arcanatable.targeting`. Stable Build 72 remains on `main`; the Worker was not deployed for this build.
+Targeting Experimental Build 81 (`0.15.62-targeting`, version code `81`) is the current source on `experimental/targeting`. Its debug package ID is `com.arcanatable.targeting`. Stable Build 72 remains on `main`; the Worker was not deployed for this build.
 
 Build 62 gives every tutorial step a `NEXT` button, explains that the Join Game action needs a room code and password, and lets the tutorial continue without connecting.
 

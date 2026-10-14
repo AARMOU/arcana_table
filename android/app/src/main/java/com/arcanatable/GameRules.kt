@@ -443,6 +443,14 @@ internal fun nextTurnIndex(currentIndex: Int, turnOrder: List<Int>, playerCount:
     return eligibleOrder[if (orderIndex < 0) 0 else (orderIndex + 1) % eligibleOrder.size]
 }
 
+internal fun isLastEligibleTurnInRound(currentIndex: Int, turnOrder: List<Int>, playerCount: Int, eligiblePlayers: Set<Int>): Boolean {
+    if (playerCount <= 0) return true
+    val validOrder = turnOrder.takeIf { it.size == playerCount && it.toSet() == (0 until playerCount).toSet() }
+        ?: (0 until playerCount).toList()
+    val turnIndex = validOrder.indexOf(currentIndex)
+    return turnIndex < 0 || validOrder.drop(turnIndex + 1).none { it in eligiblePlayers }
+}
+
 internal data class TurnProgression(
     val phaseIndex: Int,
     val activePlayer: Int,
@@ -460,5 +468,11 @@ internal fun advanceTurnProgression(
     eligiblePlayers: Set<Int> = (0 until playerCount).toSet()
 ): TurnProgression {
     if (phaseIndex < lastPhaseIndex) return TurnProgression(phaseIndex + 1, activePlayer, turnNumber, false)
-    return TurnProgression(0, nextTurnIndex(activePlayer, turnOrder, playerCount, eligiblePlayers), turnNumber + 1, true)
+    val completedRound = isLastEligibleTurnInRound(activePlayer, turnOrder, playerCount, eligiblePlayers)
+    return TurnProgression(
+        0,
+        nextTurnIndex(activePlayer, turnOrder, playerCount, eligiblePlayers),
+        turnNumber + if (completedRound) 1 else 0,
+        true
+    )
 }
