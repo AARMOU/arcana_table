@@ -1076,6 +1076,18 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             if (roomConnected && index == localSeat) player.copy(isOnline = true) else player
         }.toMutableList()
         while (receivedPlayers.size <= localSeat && receivedPlayers.size < 4) receivedPlayers += TablePlayer(name = if (receivedPlayers.size == localSeat) lobbyPlayerName else "PLAYER ${receivedPlayers.size + 1}")
+        // This device owns its assigned seat. Keep its current player data while
+        // connected so an older server snapshot cannot undo a local card move
+        // that is still waiting for its outbound snapshot to be published.
+        // The first snapshot after connecting remains authoritative so a
+        // reconnect can restore the room's saved state.
+        if (!firstSnapshotForConnection) {
+            previousPlayers.getOrNull(localSeat)?.let { localPlayer ->
+                if (localSeat in receivedPlayers.indices) {
+                    receivedPlayers[localSeat] = localPlayer.copy(isOnline = true)
+                }
+            }
+        }
         players = receivedPlayers
         logZoneSnapshotChange(players, "online snapshot #$inboundSnapshotSequence")
         receivedPlayers.forEachIndexed { index, player ->
