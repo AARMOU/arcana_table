@@ -2,7 +2,9 @@
 
 ## Canonical project
 
-This is the complete Arcana Table **Build 72 source tree** (`0.15.53`, version code `72`). It contains the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. Build 72 adds commander artwork player tabs, automatic active-player expansion, and automatic scrolling to the active player in the full-table view.
+This branch is the separate Arcana Table **Targeting Experimental Build 73** (`0.15.54-targeting`, version code `73`) source tree. It branches from stable Build 72 source and includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Keep this work on `experimental/targeting` until the targeting flow is accepted.
+
+Build 73 adds a target picker for targeted spells, Auras, activated abilities, and recognized targeted triggers. It records chosen targets on stack items and syncs them in room snapshots. The picker presents visible objects from battlefield, stack, graveyard, exile, revealed zones, and eligible hands, plus a manual-entry field. It estimates target count from card text, but does not certify Magic target legality; users must check the card text and game state. Hidden library cards are not listed.
 
 The separate `ArcanaTable-build52-source/` folder is stale and should not be used as the project source. Its Gradle metadata still labels it Build 52 and its code is materially different.
 
@@ -97,7 +99,7 @@ These fixes are retained in the Build 62 source and APK.
 
 ## Build status
 
-Build 72 (`0.15.53`, version code `72`) is the current local source. Build 69 (`0.15.50`, version code `69`) is the latest compiled debug APK. Build 72 has not been compiled.
+Targeting Experimental Build 73 (`0.15.54-targeting`, version code `73`) is the current source on `experimental/targeting`. Its debug package ID is `com.arcanatable.targeting`. Stable Build 72 remains on `main`.
 
 Build 62 gives every tutorial step a `NEXT` button, explains that the Join Game action needs a room code and password, and lets the tutorial continue without connecting.
 

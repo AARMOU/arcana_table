@@ -1,8 +1,14 @@
-# Arcana Table 0.15.53 — Build 72 source update
+# Arcana Table Targeting 0.15.54 — Experimental Build 73
 
-Arcana Table is a native Android Magic tabletop prototype. Build 72 adds player view tabs with cropped commander artwork, automatically expands and scrolls to the active player's card on the full table, and reorganizes the player footer into full-width PASS TURN, HAND, and BACK TO TABLE buttons with a larger centered HAND button. Mana-pool access is in the player status header; ADD TOKEN is in MORE, the footer library count is removed, and the command-zone strip is condensed without removing its controls or status. Build 71 makes table-chat message text selectable and adds a PASTE control for clipboard text in the draft. Build 70's fix for duplicate permanents on ability resolution, Build 69's trigger prompts and Activity Log updates, and Build 68's card-face mulligan screen with tap-to-enlarge previews are included.
+Arcana Table is a native Android Magic tabletop prototype. Experimental Build 73 adds target selection for targeted spells, Auras, activated abilities, and recognized targeted triggers. The picker offers players, battlefield permanents, spells and abilities on the stack, cards in visible zones, and manual entry for other targets. Chosen targets remain attached to the stack item and sync to connected players. This experiment lives on the `experimental/targeting` branch and installs as a separate app so it cannot replace the stable Arcana Table install.
+
+Target legality still depends on the card's full wording, game state, and rules interactions. The picker estimates how many targets to select, but players must verify restrictions such as controller, color, type, shroud, hexproof, and protection. Hidden library cards are not listed; use manual target entry only when the card text makes an unlisted target legal and known to the choosing player.
 
 ## Included
+
+- Choose targets while a spell or ability is on the stack; the selector includes visible players and game objects and allows a manual target entry
+- Show chosen targets on the stack and in the game log, and synchronize them in internet/LAN rooms
+- Keep priority passing and resolution unavailable until the responsible player confirms target choices
 
 - Landscape and portrait layouts with taskbar/system-bar safe spacing
 - Adaptive room home and player layouts for narrow phones, wide phones, tablets, and foldable screen changes; keeps game state through orientation and screen-size changes
@@ -77,7 +83,7 @@ Arcana Table is a native Android Magic tabletop prototype. Build 72 adds player 
 
 ## Build status
 
-The source is labeled version 0.15.53, build 72. No Build 72 APK has been compiled. The optional full visual guide starts with the welcome message and follows the app screens with dimmed/blurred backgrounds, highlighted controls, and straight red arrows with solid arrowheads. It is available from the home screen and app menu and never launches automatically.
+The source is labeled version 0.15.54-targeting, build 73. This experimental branch builds a separate debug app package `com.arcanatable.targeting`. The optional full visual guide remains available from the home screen and app menu and never launches automatically.
 
 Build 66 adds a resizable hand panel, automatic stack-window closing after all resolutions, tighter player-view spacing, and stronger import/movement/sync diagnostics. It also includes the Build 65 import review, supported automatic life/draw/token effects with manual-resolution notices, quick Stack access, and earlier tutorial, card movement, privacy, and navigation updates.
 

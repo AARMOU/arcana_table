@@ -423,7 +423,17 @@ data class TablePlayer(
     val eliminationReason: String? = null
 )
 
-data class StackAction(val id: String = java.util.UUID.randomUUID().toString(), val title: String, val controllerId: String, val kind: String = "SPELL", val card: GameCard? = null)
+data class StackAction(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val title: String,
+    val controllerId: String,
+    val kind: String = "SPELL",
+    val card: GameCard? = null,
+    val targetText: String = card?.oracleText.orEmpty(),
+    val targetCount: TargetCountRange? = parseTargetCountRange(targetText),
+    val targets: List<StackTarget> = emptyList(),
+    val targetsConfirmed: Boolean = targetCount == null
+)
 
 private data class SavedDeck(val name: String, val text: String)
 
@@ -564,6 +574,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var unreadChatCount by remember { mutableIntStateOf(0) }
     var triggerPrompts by remember { mutableStateOf(emptyList<TriggerPrompt>()) }
     var stackActions by remember { mutableStateOf(emptyList<StackAction>()) }
+    var targetSelectionStackItemId by remember { mutableStateOf<String?>(null) }
     var priorityPlayer by remember { mutableIntStateOf(0) }
     var priorityPassed by remember { mutableStateOf(emptySet<String>()) }
     var stackOpen by remember { mutableStateOf(false) }
@@ -867,6 +878,12 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         }
     }
     LaunchedEffect(players) { nextId = maxOf(nextId, (players.flatMap { it.library + it.hand + it.battlefield + it.graveyard + it.exile + it.revealed }.maxOfOrNull { it.id } ?: 0) + 1) }
+    LaunchedEffect(stackActions, localSeat, onlineMode) {
+        targetSelectionStackItemId = stackActions.firstOrNull {
+            !it.targetsConfirmed && it.targetCount != null &&
+                (!onlineMode || it.controllerId == players.getOrNull(localSeat)?.id)
+        }?.id
+    }
     var observedChatCount by remember { mutableIntStateOf(chatMessages.size) }
     LaunchedEffect(chatMessages.size, chatOpen) {
         if (chatMessages.size > observedChatCount && !chatOpen) unreadChatCount += chatMessages.size - observedChatCount
@@ -879,8 +896,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     LaunchedEffect(gameEndedOnline) {
         if (gameEndedOnline) { gameTimerRunning = false; turnTimerRunning = false; showOverview = true; showHand = false }
     }
-    LaunchedEffect(pendingStackOpen, triggerPrompts.size, paymentCard, manaPoolOpen) {
-        if (pendingStackOpen && triggerPrompts.isEmpty() && paymentCard == null && !manaPoolOpen) {
+    LaunchedEffect(pendingStackOpen, triggerPrompts.size, paymentCard, manaPoolOpen, targetSelectionStackItemId) {
+        if (pendingStackOpen && triggerPrompts.isEmpty() && paymentCard == null && !manaPoolOpen && targetSelectionStackItemId == null) {
             delay(180)
             stackOpen = true
             pendingStackOpen = false
@@ -1140,6 +1157,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         endVotes = state.endVotes
         gameEndedOnline = state.gameEnded
         stackActions = state.stackActions
+        targetSelectionStackItemId = state.stackActions.firstOrNull { !it.targetsConfirmed && it.targetCount != null && it.controllerId == players.getOrNull(localSeat)?.id }?.id
         triggerPrompts = state.triggerPrompts
         priorityPlayer = state.priorityPlayer.coerceIn(players.indices)
         priorityPassed = state.priorityPassed
@@ -1389,8 +1407,22 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         effectText = targetEffect?.effectText ?: ability.effectText,
                         targetRule = targetEffect?.targetRule ?: parseTargetPlayerRule(ability.effectText)
                     )
-                    triggerPrompts = triggerPrompts + prompt
-                    logAction(controllerIndex, "triggered ${card.name} · ${ability.conditionText}")
+                    if (parseTargetCountRange(ability.effectText) != null) {
+                        val triggerStackItem = StackAction(
+                            title = "${card.name}: ${ability.effectText}",
+                            controllerId = player.id,
+                            kind = "TRIGGER",
+                            card = card,
+                            targetText = ability.effectText
+                        )
+                        stackActions = stackActions + triggerStackItem
+                        priorityPassed = emptySet()
+                        pendingStackOpen = true
+                        logAction(controllerIndex, "triggered ${card.name} · ${ability.conditionText}; choose its target")
+                    } else {
+                        triggerPrompts = triggerPrompts + prompt
+                        logAction(controllerIndex, "triggered ${card.name} · ${ability.conditionText}")
+                    }
                 }
             }
         }
@@ -1650,7 +1682,22 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             commanderCastCount = if (commander) p.commanderCastCount + 1 else p.commanderCastCount
         ) }
         val title = if (card.isFaceDown) "Face-down spell" else card.name
-        stackActions = stackActions + StackAction(title = title, controllerId = current.id, kind = if (commander) "COMMANDER" else "SPELL", card = card)
+        val typeText = card.type.lowercase()
+        val isAura = Regex("\\baura\\b").containsMatchIn(typeText)
+        val canTargetWhenCast = !card.isFaceDown && ("instant" in typeText || "sorcery" in typeText || isAura)
+        val targetText = if (canTargetWhenCast) card.oracleText.orEmpty() else ""
+        val targetCount = if (!canTargetWhenCast) null else if (isAura) TargetCountRange(1, 1) else parseTargetCountRange(targetText)
+        val stackItem = StackAction(
+            title = title,
+            controllerId = current.id,
+            kind = if (commander) "COMMANDER" else "SPELL",
+            card = card,
+            targetText = targetText,
+            targetCount = targetCount,
+            targetsConfirmed = targetCount == null
+        )
+        stackActions = stackActions + stackItem
+        if (stackItem.targetCount != null) targetSelectionStackItemId = stackItem.id
         priorityPlayer = index
         priorityPassed = emptySet()
         val castDescription = if (commander) "cast ${card.name} from the command zone" else if (card.isFaceDown) "cast a face-down spell" else "cast ${card.name}"
@@ -1736,9 +1783,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
 
     fun applyAutomaticResolutionEffects(playerIndex: Int, card: GameCard) {
         if (playerIndex !in players.indices || card.isFaceDown) return
-        val targeted = parseTargetedAutomaticEffect(card.oracleText)
-        if (targeted != null) {
-            val notice = "${card.name} resolved; choose its target and resolve the effect manually."
+        if (parseTargetCountRange(card.oracleText) != null) {
+            val notice = "${card.name} resolved; resolve its targeted effect manually."
             logAction(playerIndex, notice)
             scope.launch { automaticActionSnackbar.showSnackbar("${players[playerIndex].name} · $notice") }
             return
@@ -1747,6 +1793,10 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     }
 
     fun resolveTopOfStack() {
+        if (stackActions.lastOrNull()?.targetsConfirmed == false) {
+            message = "Choose targets for the top stack item first."
+            return
+        }
         val eligibleIds = players.filterNot { it.isEliminated }.map { it.id }.toSet()
         if (eligibleIds.isNotEmpty() && !eligibleIds.all { it in priorityPassed }) {
             message = "Each remaining player must pass priority before the top item can resolve."
@@ -1755,6 +1805,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         val item = stackActions.lastOrNull() ?: return
         stackActions = stackActions.dropLast(1)
         val owner = players.indexOfFirst { it.id == item.controllerId }
+        val selectedTargets = item.targets.takeIf { it.isNotEmpty() }?.joinToString { it.label }?.let { " · targets: $it" }.orEmpty()
         if (owner >= 0 && item.card != null && stackResolutionMovesCardToZone(item.kind)) {
             val card = item.card
             val isPermanent = listOf("creature", "artifact", "enchantment", "planeswalker", "battle", "land").any { card.type.contains(it, true) }
@@ -1762,12 +1813,12 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 if (isPermanent) p.copy(battlefield = p.battlefield + card)
                 else p.copy(graveyard = p.graveyard + card)
             }
-            logAction(owner, "resolved ${item.title}")
+            logAction(owner, "resolved ${item.title}$selectedTargets")
             if (isPermanent && card.type.contains("creature", ignoreCase = true)) applyCreatureEntryLifeEffects(owner, card)
             if (!isPermanent && item.kind == "SPELL") applyAutomaticResolutionEffects(owner, card)
         } else if (owner >= 0 && item.card != null) {
-            logAction(owner, "resolved ${item.title}; source permanent stays on the battlefield")
-        } else logAction(activePlayer, "resolved ${item.title}")
+            logAction(owner, "resolved ${item.title}$selectedTargets; source permanent stays on the battlefield")
+        } else logAction(activePlayer, "resolved ${item.title}$selectedTargets")
         priorityPlayer = activePlayer
         priorityPassed = emptySet()
     }
@@ -2479,10 +2530,12 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         else -> if (action.startsWith("ABILITY:")) {
                             val abilityText = action.removePrefix("ABILITY:")
                             val kind = if (card.type.contains("planeswalker", ignoreCase = true)) "LOYALTY ABILITY" else "ACTIVATED ABILITY"
-                            stackActions = stackActions + StackAction(title = "${card.name}: $abilityText", controllerId = players[boardIndex].id, kind = kind, card = card)
+                            val stackItem = StackAction(title = "${card.name}: $abilityText", controllerId = players[boardIndex].id, kind = kind, card = card, targetText = abilityText)
+                            stackActions = stackActions + stackItem
+                            if (stackItem.targetCount != null) targetSelectionStackItemId = stackItem.id
                             priorityPassed = emptySet()
                             priorityPlayer = boardIndex
-                            stackOpen = true
+                            stackOpen = stackItem.targetCount == null
                             logAction(boardIndex, "activated an ability of ${card.name}; resolve its effect manually")
                         }
                     }
@@ -2573,6 +2626,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 73 · TARGETING EXPERIMENT", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Targeted spells, Auras, activated abilities, and recognized targeted triggers pause for target selection. The picker lists visible players, permanents, stack items, and cards in visible zones; add a legal target by name if it is not listed. Chosen targets appear on the stack and in the game log, and sync to the room. The picker estimates target count, but players still verify card-specific restrictions. This experimental app installs separately from the stable release.", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 72 · PLAYER TABS AND ACTIVE BOARD", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Player view tabs use cropped commander artwork with the player name at the bottom. On the full table, the active player's board opens automatically and the view scrolls to it; the previous active board closes when the turn changes. The player footer has PASS TURN, a larger centered HAND button, and BACK TO TABLE. Mana access is now in the player status header. ADD TOKEN is in MORE; the footer no longer shows the library count. The command-zone strip is more compact while preserving commander casting, cast count, tax, and status.", color = SoftWhite, fontSize = 11.sp)
 
@@ -3778,8 +3834,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
 
     if (stackOpen) StackPriorityDialog(
         players = players, stack = stackActions, priorityPlayer = priorityPlayer, passedCount = priorityPassed.size,
-        eligibleCount = players.count { !it.isEliminated }, canResolve = stackActions.isNotEmpty() && players.filterNot { it.isEliminated }.all { it.id in priorityPassed },
-        canAct = !gameEndedOnline && players.getOrNull(priorityPlayer)?.isEliminated == false && (if (onlineMode) priorityPlayer == localSeat else priorityPlayer == selectedPlayer),
+        eligibleCount = players.count { !it.isEliminated }, canResolve = stackActions.isNotEmpty() && stackActions.none { !it.targetsConfirmed } && players.filterNot { it.isEliminated }.all { it.id in priorityPassed },
+        canAct = !gameEndedOnline && stackActions.none { !it.targetsConfirmed } && players.getOrNull(priorityPlayer)?.isEliminated == false && (if (onlineMode) priorityPlayer == localSeat else priorityPlayer == selectedPlayer),
         tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "STACK" }, tutorialIndex = tutorialIndex,
         tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
         onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
@@ -3804,6 +3860,24 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         onResolve = { guidedAction("stack-resolve") { resolveTopOfStack() } },
         onDismiss = { guidedAction("stack-close") { stackOpen = false } }
     )
+
+    val targetSelectionItem = stackActions.firstOrNull { it.id == targetSelectionStackItemId }
+    targetSelectionItem?.let { item ->
+        val controllerIndex = players.indexOfFirst { it.id == item.controllerId }.coerceAtLeast(0)
+        TargetSelectionDialog(
+            stackItem = item,
+            candidates = buildTargetCandidates(players, stackActions, item.id, players.getOrNull(controllerIndex)?.id.orEmpty()),
+            onConfirm = { selectedTargets ->
+                stackActions = stackActions.map { current -> if (current.id == item.id) current.copy(targets = selectedTargets, targetsConfirmed = true) else current }
+                logAction(controllerIndex, "chose ${selectedTargets.size} target${if (selectedTargets.size == 1) "" else "s"} for ${item.title}")
+                targetSelectionStackItemId = null
+                if (stackActions.none { !it.targetsConfirmed && it.targetCount != null }) {
+                    stackOpen = true
+                    pendingStackOpen = false
+                }
+            }
+        )
+    }
 
     if (trackerPlayer in players.indices) PlayerTrackerDialog(
         player = players[trackerPlayer], players = players, playerIndex = trackerPlayer,
@@ -5591,6 +5665,92 @@ private fun PlayerTrackerDialog(player: TablePlayer, players: List<TablePlayer>,
 }
 
 @Composable
+private fun TargetSelectionDialog(stackItem: StackAction, candidates: List<StackTarget>, onConfirm: (List<StackTarget>) -> Unit) {
+    val range = stackItem.targetCount ?: TargetCountRange(1, 1)
+    var selectedTargets by remember(stackItem.id, stackItem.targets) { mutableStateOf(stackItem.targets) }
+    var customTargetText by remember(stackItem.id) { mutableStateOf("") }
+    val maxHeight = LocalConfiguration.current.screenHeightDp.dp * 0.86f
+    val allowed = selectedTargets.size in range.minimum..range.maximum
+    val targetLimit = if (range.maximum >= 99) Int.MAX_VALUE else range.maximum
+    Dialog(
+        onDismissRequest = {},
+        properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false, dismissOnClickOutside = false)
+    ) {
+        Surface(Modifier.fillMaxWidth(0.94f).heightIn(max = maxHeight), shape = RoundedCornerShape(18.dp), color = Panel) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("CHOOSE TARGETS", color = Mint, fontWeight = FontWeight.Black, fontSize = 15.sp)
+                Text(stackItem.title, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(
+                    when {
+                        range.minimum == range.maximum -> "Select ${range.minimum} target${if (range.minimum == 1) "" else "s"}."
+                        range.maximum >= 99 -> "Select any number of targets (${range.minimum} or more)."
+                        else -> "Select ${range.minimum} to ${range.maximum} targets."
+                    },
+                    color = Muted,
+                    fontSize = 11.sp
+                )
+                Text("Check the card text and select only legal targets. The app does not fully parse card-specific restrictions.", color = CounterGold, fontSize = 10.sp, lineHeight = 14.sp)
+                LazyColumn(
+                    Modifier.fillMaxWidth().heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.43f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (candidates.isEmpty()) item(key = "no-candidates") {
+                        Text("No visible game objects are available. Add a target by name below if the card text allows it.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(8.dp))
+                    }
+                    items(candidates, key = { it.key }) { candidate ->
+                        val isSelected = selectedTargets.any { it.key == candidate.key }
+                        Surface(
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                selectedTargets = if (isSelected) selectedTargets.filterNot { it.key == candidate.key }
+                                else if (selectedTargets.size < targetLimit) selectedTargets + candidate else selectedTargets
+                            },
+                            shape = RoundedCornerShape(8.dp),
+                            color = if (isSelected) Mint.copy(alpha = 0.15f) else PanelLight
+                        ) {
+                            Row(Modifier.padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Checkbox(checked = isSelected, onCheckedChange = { checked ->
+                                    selectedTargets = if (checked && selectedTargets.size < targetLimit) selectedTargets + candidate else selectedTargets.filterNot { it.key == candidate.key }
+                                })
+                                Column(Modifier.weight(1f)) {
+                                    Text(candidate.label, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                                    Text(candidate.category, color = Muted, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                }
+                            }
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = customTargetText,
+                    onValueChange = { customTargetText = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Other legal target") },
+                    placeholder = { Text("For example: a counter on a permanent") }
+                )
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(
+                        onClick = {
+                            val label = customTargetText.trim()
+                            if (label.isNotEmpty() && selectedTargets.size < targetLimit) {
+                                selectedTargets = selectedTargets + StackTarget("manual:${java.util.UUID.randomUUID()}", label, "MANUAL TARGET")
+                                customTargetText = ""
+                            }
+                        },
+                        enabled = customTargetText.isNotBlank() && selectedTargets.size < targetLimit
+                    ) { Text("ADD TARGET", color = Mint, fontSize = 10.sp) }
+                    Text("${selectedTargets.size} selected", color = Muted, fontSize = 10.sp)
+                }
+                Button(
+                    onClick = { onConfirm(selectedTargets) },
+                    enabled = allowed,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Color(0xFF09251D))
+                ) { Text("CONFIRM TARGETS", fontWeight = FontWeight.Black) }
+            }
+        }
+    }
+}
+
 private fun StackPriorityDialog(players: List<TablePlayer>, stack: List<StackAction>, priorityPlayer: Int, passedCount: Int, eligibleCount: Int, canResolve: Boolean, canAct: Boolean, tutorialStep: TutorialStop?, tutorialIndex: Int, tutorialTotal: Int, tutorialBounds: Map<String, Rect>, tutorialAnchor: (String) -> Modifier, onTutorialBack: () -> Unit, onTutorialNext: () -> Unit, onTutorialExit: () -> Unit, onPreviewCard: (StackAction, GameCard) -> Unit, onStackItemTap: () -> Unit, onCastFromHand: () -> Unit, onAddTrigger: (String) -> Unit, onPassPriority: () -> Unit, onResolve: () -> Unit, onDismiss: () -> Unit) {
     var triggerName by remember { mutableStateOf("") }
     var manualAbilityOpen by remember { mutableStateOf(false) }
@@ -5637,6 +5797,8 @@ private fun StackPriorityDialog(players: List<TablePlayer>, stack: List<StackAct
                                     val visibleTitle = if (cardIsFaceDown) "Face-down spell" else item.title
                                     Text("${if (index == stack.lastIndex) "TOP · " else ""}$visibleTitle", color = if (index == stack.lastIndex) Mint else SoftWhite, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                                     Text("$owner · ${item.kind}", color = Muted, fontSize = 9.sp)
+                                    if (item.targets.isNotEmpty()) Text("TARGETS · ${item.targets.joinToString { it.label }}", color = Mint, fontSize = 9.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                    else if (item.targetCount != null && !item.targetsConfirmed) Text("WAITING FOR TARGETS", color = CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                     if (card != null && !cardIsFaceDown) {
                                         val facts = listOfNotNull(card.manaCost?.takeIf { it.isNotBlank() }, card.type.takeIf { it.isNotBlank() })
                                         if (facts.isNotEmpty()) Text(facts.joinToString(" · "), color = CounterGold, fontSize = 9.sp, maxLines = 2)
