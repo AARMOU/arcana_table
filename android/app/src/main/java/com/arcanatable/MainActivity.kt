@@ -5751,6 +5751,7 @@ private fun TargetSelectionDialog(stackItem: StackAction, candidates: List<Stack
     }
 }
 
+@Composable
 private fun StackPriorityDialog(players: List<TablePlayer>, stack: List<StackAction>, priorityPlayer: Int, passedCount: Int, eligibleCount: Int, canResolve: Boolean, canAct: Boolean, tutorialStep: TutorialStop?, tutorialIndex: Int, tutorialTotal: Int, tutorialBounds: Map<String, Rect>, tutorialAnchor: (String) -> Modifier, onTutorialBack: () -> Unit, onTutorialNext: () -> Unit, onTutorialExit: () -> Unit, onPreviewCard: (StackAction, GameCard) -> Unit, onStackItemTap: () -> Unit, onCastFromHand: () -> Unit, onAddTrigger: (String) -> Unit, onPassPriority: () -> Unit, onResolve: () -> Unit, onDismiss: () -> Unit) {
     var triggerName by remember { mutableStateOf("") }
     var manualAbilityOpen by remember { mutableStateOf(false) }
