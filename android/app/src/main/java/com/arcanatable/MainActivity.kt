@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -46,6 +47,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedVisibility
@@ -212,6 +214,7 @@ private val tutorialStops = listOf(
     TutorialStop("APP MENU", "Open decks, game tools, room controls, and options.", "main-menu", "PLAYER"),
     TutorialStop("LOWER LIFE", "Subtract one life.", "life-down", "PLAYER", executeAction = false),
     TutorialStop("RAISE LIFE", "Add one life.", "life-up", "PLAYER", executeAction = false),
+    TutorialStop("MANA POOL", "Tap the MANA status to track or spend mana.", "mana-status", "PLAYER"),
     TutorialStop("CAST COMMANDER", "Cast your commander from the command zone.", "commander-cast", "PLAYER", executeAction = false),
     TutorialStop("NEXT STEP", "Move to the next phase.", "next-step", "PLAYER", executeAction = false),
     TutorialStop("PASS TURN", "Finish your turn and pass play.", "pass-turn", "PLAYER", executeAction = false),
@@ -222,9 +225,9 @@ private val tutorialStops = listOf(
     TutorialStop("EXILE", "View exiled cards.", "zone-exile", "PLAYER"),
     TutorialStop("REVEALED", "View cards revealed to the table.", "zone-revealed", "PLAYER"),
     TutorialStop("DRAW", "Draw one card.", "draw-action", "PLAYER", executeAction = false),
-    TutorialStop("ADD TOKEN", "Add a token to the battlefield.", "token-action", "PLAYER", executeAction = false),
     TutorialStop("COMBAT", "Set attackers, blockers, and damage.", "combat-action", "PLAYER", executeAction = false),
     TutorialStop("MORE", "Open more player and game tools.", "more-actions", "PLAYER"),
+    TutorialStop("ADD TOKEN", "Open MORE, then choose Add token.", "token-action", "PLAYER", executeAction = false),
     TutorialStop("STACK AND PRIORITY", "Open spells and abilities waiting to resolve.", "stack-open", "PLAYER"),
     TutorialStop("BACK TO TABLE", "Return to the full table.", "player-back-table", "PLAYER"),
     TutorialStop("TAP OR INSPECT A CARD", "Tap to tap or untap; long-press for details.", "battlefield", "PLAYER", executeAction = false),
@@ -2344,7 +2347,12 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 Box(Modifier.then(tutorialAnchor("table-tab"))) { ViewChip("TABLE", selected = showOverview, onClick = { guidedAction("table-tab") { showOverview = true; showHand = false } }) }
                 players.forEachIndexed { index, player ->
                     Box(Modifier.then(tutorialAnchor("player-tab"))) {
-                        ViewChip((if (onlineMode && index == localSeat) "YOU" else player.name).uppercase(), selected = !showOverview && selectedPlayer == index, onClick = { guidedAction("player-tab") { selectedPlayer = index; showOverview = false; showHand = false } })
+                        PlayerViewTab(
+                            name = if (onlineMode && index == localSeat) "YOU" else player.name,
+                            commander = player.commanderCard,
+                            selected = !showOverview && selectedPlayer == index,
+                            onClick = { guidedAction("player-tab") { selectedPlayer = index; showOverview = false; showHand = false } }
+                        )
                     }
                 }
             }
@@ -2381,8 +2389,16 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 screenWidthDp >= 700 -> 2
                 else -> 1
             }
+            val overviewGridState = rememberLazyGridState()
+            LaunchedEffect(activePlayer, players.size) {
+                if (activePlayer in players.indices) {
+                    if (reducedSwipeMotion) overviewGridState.scrollToItem(activePlayer)
+                    else overviewGridState.animateScrollToItem(activePlayer)
+                }
+            }
             LazyVerticalGrid(
                 columns = GridCells.Fixed(overviewColumns.coerceAtLeast(1)),
+                state = overviewGridState,
                 modifier = Modifier.fillMaxWidth().weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -2429,7 +2445,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 onShowHand = { guidedAction("hand-button") { if (boardCanControl) showHand = true } },
                 onShowHandFromZone = { guidedAction("zone-hand") { if (boardCanControl) showHand = true } },
                 onToken = { guidedAction("token-action") { if (boardCanControl) { tokenTarget = boardIndex; tokenPickerOpen = true } } },
-                onManageMana = { if (boardCanControl) { manaTarget = boardIndex; manaPoolOpen = true } },
+                onManageMana = { guidedAction("mana-status") { if (boardCanControl) { manaTarget = boardIndex; manaPoolOpen = true } } },
                 onZone = { zone -> guidedAction("zone-${zone.lowercase()}") { zoneDialog = boardIndex to zone } },
                 onPreview = { preview = CardPreview(boardIndex, it, fromHand = false, canManipulate = boardCanControl) },
                 onPublicPreview = { preview = CardPreview(boardIndex, it, fromHand = false, canManipulate = false) },
@@ -2460,7 +2476,6 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     }
                 },
                 onNextStep = { guidedAction("next-step") { if (boardCanControl && boardIndex == activePlayer) advanceStep() } }, onOpenLog = { logOpen = true }, onOpenChat = { chatOpen = true },
-                onPassTurn = { guidedAction("pass-turn") { if (boardCanControl && boardIndex == activePlayer) passTurn() } },
                 onCombat = { guidedAction("combat-action") { if (boardCanControl && boardIndex == activePlayer) combatDialogOpen = true } },
                 onTrackers = { if (boardCanControl) trackerPlayer = boardIndex },
                 onSearchLibrary = { guidedAction("zone-library") { if (boardCanControl) librarySearchPlayer = boardIndex } },
@@ -2488,23 +2503,38 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         }
         }
 
-        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(if (showOverview) "Tap a player to inspect their board" else "${players[selectedPlayer].library.size} in library", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
-            if (showOverview && gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) HeaderButton("NEXT · ${phaseSteps[phaseIndex]}", onClick = { guidedAction("table-next") { advanceStep() } }, modifier = tutorialAnchor("table-next"))
-            if (showOverview && gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) {
-                Spacer(Modifier.width(5.dp))
-                HeaderButton("PASS TURN", onClick = { guidedAction("table-pass") { passTurn() } }, modifier = tutorialAnchor("table-pass"))
+        if (showOverview) {
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("Tap a player to inspect their board", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
+                if (gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) HeaderButton("NEXT · ${phaseSteps[phaseIndex]}", onClick = { guidedAction("table-next") { advanceStep() } }, modifier = tutorialAnchor("table-next"))
+                if (gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) {
+                    Spacer(Modifier.width(5.dp))
+                    HeaderButton("PASS TURN", onClick = { guidedAction("table-pass") { passTurn() } }, modifier = tutorialAnchor("table-pass"))
+                } else if (gameInProgress) Text(if (players[activePlayer].deckLoaded) "COMPUTER TURN" else "AI NEEDS DECK", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
+                else Text("START GAME TO PLAY", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
+                if (!players[selectedPlayer].deckLoaded && !gameEndedOnline && (!onlineMode || selectedPlayer == localSeat)) {
+                    Spacer(Modifier.width(6.dp))
+                    HeaderButton("IMPORT DECK", onClick = { guidedAction("table-import") { if (onlineMode) selectedPlayer = localSeat; importError = null; importOpen = true } }, modifier = tutorialAnchor("table-import"))
+                }
             }
-            else if (showOverview && gameInProgress) Text(if (players[activePlayer].deckLoaded) "COMPUTER TURN" else "AI NEEDS DECK", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
-            else if (showOverview) Text("START GAME TO PLAY", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
-            if (!players[selectedPlayer].deckLoaded && !gameEndedOnline && (!onlineMode || selectedPlayer == localSeat)) {
-                Spacer(Modifier.width(6.dp))
-                HeaderButton("IMPORT DECK", onClick = { guidedAction("table-import") { if (onlineMode) selectedPlayer = localSeat; importError = null; importOpen = true } }, modifier = tutorialAnchor("table-import"))
-            }
-            if (!showOverview) {
-                Box(Modifier.then(tutorialAnchor("hand-button"))) { HandPeekBar(players[selectedPlayer].hand.size, onClick = { guidedAction("hand-button") { if (canControlSelectedPlayer) showHand = true } }) }
-                Spacer(Modifier.width(7.dp))
-                HeaderButton("BACK TO TABLE", onClick = { guidedAction("player-back-table") { showOverview = true; showHand = false } }, modifier = tutorialAnchor("player-back-table"))
+        } else {
+            val canPassTurnFromBoard = gameInProgress && !gameEndedOnline && selectedPlayer == activePlayer && !players[selectedPlayer].isComputer && !players[selectedPlayer].isEliminated && (!onlineMode || localSeat == activePlayer)
+            Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+                HeaderButton(
+                    "PASS TURN", onClick = { guidedAction("pass-turn") { passTurn() } }, enabled = canPassTurnFromBoard,
+                    modifier = Modifier.weight(1f).height(54.dp).then(tutorialAnchor("pass-turn"))
+                )
+                Box(Modifier.weight(1.18f).then(tutorialAnchor("hand-button"))) {
+                    HandPeekBar(
+                        players[selectedPlayer].hand.size,
+                        modifier = Modifier.fillMaxWidth().height(62.dp),
+                        onClick = { guidedAction("hand-button") { if (canControlSelectedPlayer) showHand = true } }
+                    )
+                }
+                HeaderButton(
+                    "BACK TO TABLE", onClick = { guidedAction("player-back-table") { showOverview = true; showHand = false } },
+                    modifier = Modifier.weight(1f).height(54.dp).then(tutorialAnchor("player-back-table"))
+                )
             }
         }
     }
@@ -2531,6 +2561,12 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 72 · PLAYER TABS AND ACTIVE BOARD", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Player view tabs use cropped commander artwork with the player name at the bottom. On the full table, the active player's board opens automatically and the view scrolls to it; the previous active board closes when the turn changes. The player footer has PASS TURN, a larger centered HAND button, and BACK TO TABLE. Mana access is now in the player status header. ADD TOKEN is in MORE; the footer no longer shows the library count. The command-zone strip is more compact while preserving commander casting, cast count, tax, and status.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 71 · CHAT COPY AND PASTE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Chat messages support text selection by long-pressing, with Android's copy action. Added a PASTE control to append clipboard text to the draft; the message field also keeps Android's normal text paste menu.", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 70 · DUPLICATE PERMANENT FIX", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Resolving an activated or loyalty ability now leaves its source permanent in its current zone. Only resolving a spell moves that spell card to the battlefield or graveyard.", color = SoftWhite, fontSize = 11.sp)
 
@@ -4123,12 +4159,12 @@ private fun HeaderButton(label: String, onClick: () -> Unit, enabled: Boolean = 
 }
 
 @Composable
-private fun HandPeekBar(cardCount: Int, onClick: () -> Unit) {
+private fun HandPeekBar(cardCount: Int, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Row(
-        Modifier.heightIn(min = 50.dp).clip(RoundedCornerShape(10.dp)).background(PanelLight)
+        modifier.fillMaxWidth().heightIn(min = 60.dp).clip(RoundedCornerShape(10.dp)).background(PanelLight)
             .combinedClickable(onClick = onClick).padding(horizontal = 11.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(7.dp)
+        horizontalArrangement = Arrangement.Center
     ) {
         Text("HAND  $cardCount", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black)
         if (cardCount > 0) {
@@ -4145,6 +4181,32 @@ private fun HandPeekBar(cardCount: Int, onClick: () -> Unit) {
 @Composable
 private fun ViewChip(label: String, selected: Boolean, onClick: () -> Unit) {
     Text(label, color = if (selected) Ink else SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.heightIn(min = 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(if (selected) Mint else PanelLight).combinedClickable(onClick = onClick).padding(horizontal = 15.dp, vertical = 12.dp))
+}
+
+@Composable
+private fun PlayerViewTab(name: String, commander: GameCard?, selected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(9.dp)
+    val artUrl = commander?.artCropUrl ?: commander?.imageUrl
+    Box(
+        Modifier.width(96.dp).height(50.dp).clip(shape)
+            .background(PanelLight)
+            .border(if (selected) 2.dp else 1.dp, if (selected) Mint else Color(0xFF33423D), shape)
+            .combinedClickable(onClick = onClick)
+    ) {
+        if (!artUrl.isNullOrBlank()) {
+            CardArt(artUrl, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        } else {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("NO COMMANDER", color = Muted, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+        Text(
+            name.uppercase(), color = SoftWhite, fontSize = 8.sp, fontWeight = FontWeight.Black,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .background(Color(0xD9000000)).padding(horizontal = 5.dp, vertical = 4.dp)
+        )
+    }
 }
 
 @Composable
@@ -4792,7 +4854,8 @@ private fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier =
         screenWidthDp >= 800 -> (138 * cardSizeScale).dp
         else -> (122 * cardSizeScale).dp
     }
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by remember(player.id) { mutableStateOf(isActivePlayer) }
+    LaunchedEffect(player.id, isActivePlayer) { expanded = isActivePlayer }
     var largeCards by remember { mutableStateOf(false) }
     val paymentCards = player.battlefield.filter { card ->
         if (card.isFaceDown) return@filter false
@@ -4932,7 +4995,7 @@ private fun PlayerBoard(
     onLife: (Int) -> Unit, onDraw: () -> Unit, onShowHand: () -> Unit, onShowHandFromZone: () -> Unit, onToken: () -> Unit, onManageMana: () -> Unit,
     onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit, onTapCard: (Int) -> Unit,
     onCardAction: (GameCard, String) -> Unit, onReveal: () -> Unit, onShuffle: () -> Unit,
-    onNextStep: () -> Unit, onPassTurn: () -> Unit, onOpenLog: () -> Unit, onOpenChat: () -> Unit, onCombat: () -> Unit,
+    onNextStep: () -> Unit, onOpenLog: () -> Unit, onOpenChat: () -> Unit, onCombat: () -> Unit,
     onTrackers: () -> Unit, onStack: () -> Unit, onOpenMore: () -> Unit, onSearchLibrary: () -> Unit, onCastCommander: () -> Unit, onConcede: () -> Unit
 ) {
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
@@ -4952,20 +5015,34 @@ private fun PlayerBoard(
                 Text("${if (player.isEliminated) "✕ " else if (player.isOnline) "● " else ""}${player.name}${if (player.isEliminated) " · ELIMINATED" else if (player.isOnline) " · ONLINE" else ""}${if (player.isComputer) " · AI" else ""}${if (isActivePlayer && !player.isEliminated) " · ACTIVE" else ""}", color = if (player.isEliminated) Muted else if (isActivePlayer || player.isOnline) Mint else SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 Text("TURN $turnNumber · ${phaseName} · P${playerIndex + 1} · ${player.hand.size} IN HAND · ${player.library.size} IN LIBRARY", color = Muted, fontSize = 8.sp, letterSpacing = 0.4.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
+            Box(Modifier.padding(end = 3.dp).then(tutorialAnchor("mana-status"))) {
+                Column(
+                    Modifier.widthIn(min = 48.dp).heightIn(min = 40.dp).clip(RoundedCornerShape(8.dp))
+                        .background(if (canControl) PanelLight else Panel)
+                        .combinedClickable(enabled = canControl, onClick = onManageMana)
+                        .padding(horizontal = 6.dp, vertical = 3.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
+                ) {
+                    Text("MANA", color = if (canControl) Muted else Muted.copy(alpha = 0.7f), fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                    Text("${player.manaPool.values.sum()}", color = if (canControl) Mint else Muted, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                }
+            }
             IconButton(onClick = { onLife(-1) }, enabled = canControl, modifier = Modifier.size(44.dp).then(tutorialAnchor("life-down"))) { Icon(Icons.Filled.Remove, "Decrease life", tint = if (canControl) SoftWhite else Muted) }
             Text("${player.life}", color = Mint, fontSize = 25.sp, fontWeight = FontWeight.Black, modifier = Modifier.widthIn(min = 36.dp))
             IconButton(onClick = { onLife(1) }, enabled = canControl, modifier = Modifier.size(44.dp).then(tutorialAnchor("life-up"))) { Icon(Icons.Filled.Add, "Increase life", tint = if (canControl) Mint else Muted) }
         }
         val commander = player.commanderCard
         if (commander != null || player.commanderDamageReceived.isNotEmpty() || player.playerCounters.isNotEmpty()) {
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Panel).padding(horizontal = 7.dp, vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(Panel).padding(horizontal = 5.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (commander != null) {
-                    CardFace(commander, Modifier.width(38.dp), onClick = { if (!commanderUnavailable && canControl) onCastCommander() }, onLongClick = { if (!commanderUnavailable && canControl) onCastCommander() }, showCounters = false)
-                    Column(Modifier.weight(1f).padding(start = 7.dp)) {
-                        Text("${if (commanderUnavailable) "COMMANDER IN PLAY / STACK" else "COMMAND ZONE"} · ${commander.name}", color = CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("Cast ${player.commanderCastCount} · commander tax +{${player.commanderCastCount * 2}}", color = Muted, fontSize = 8.sp)
+                    CardFace(commander, Modifier.width(30.dp), onClick = { if (!commanderUnavailable && canControl) onCastCommander() }, onLongClick = { if (!commanderUnavailable && canControl) onCastCommander() }, showCounters = false)
+                    Column(Modifier.weight(1f).padding(start = 6.dp)) {
+                        Text("${if (commanderUnavailable) "IN PLAY / STACK" else "COMMAND ZONE"} · ${commander.name}", color = CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        val trackerSummary = player.playerCounters.entries.joinToString(" · ") { "${it.key} ${it.value}" }
+                        Text("Cast ${player.commanderCastCount} · tax +{${player.commanderCastCount * 2}}${if (trackerSummary.isNotBlank()) " · $trackerSummary" else ""}", color = Muted, fontSize = 7.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    TextButton(onClick = onCastCommander, enabled = canControl && !commanderUnavailable && !player.isEliminated, modifier = Modifier.heightIn(min = 36.dp).then(tutorialAnchor("commander-cast"))) { Text("CAST", color = if (canControl && !commanderUnavailable && !player.isEliminated) Mint else Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = onCastCommander, enabled = canControl && !commanderUnavailable && !player.isEliminated, modifier = Modifier.heightIn(min = 32.dp).then(tutorialAnchor("commander-cast")), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) { Text("CAST", color = if (canControl && !commanderUnavailable && !player.isEliminated) Mint else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
                 } else Text("PLAYER TRACKERS · ${player.playerCounters.entries.joinToString { "${it.key} ${it.value}" }.ifBlank { "none" }}", color = Muted, fontSize = 9.sp, modifier = Modifier.weight(1f))
                 val incomingDamage = player.commanderDamageReceived.entries.sumOf { it.value }
                 if (incomingDamage > 0) Text("CMD DMG $incomingDamage", color = if (player.commanderDamageReceived.values.any { it >= 21 }) Color(0xFFE9978B) else CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold)
@@ -4979,7 +5056,6 @@ private fun PlayerBoard(
                     TextButton(onClick = onNextStep, enabled = isActivePlayer && canControl, modifier = Modifier.heightIn(min = 38.dp).then(tutorialAnchor("next-step"))) {
                         Text(if (!canControl) "OTHER PLAYER · READ ONLY" else if (isActivePlayer) "NEXT STEP  ›" else "WAITING FOR TURN", color = if (isActivePlayer && canControl) Mint else Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                     }
-                    if (isActivePlayer) HeaderButton("PASS TURN", onClick = onPassTurn, enabled = canControl, modifier = tutorialAnchor("pass-turn"))
                 }
             }
         }
@@ -5030,13 +5106,12 @@ private fun PlayerBoard(
         }
         if (gameInProgress) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             if (canControl) {
-                ActionPill("MANA ${player.manaPool.values.sum()}", onManageMana)
                 Box(Modifier.then(tutorialAnchor("draw-action"))) { ActionPill("DRAW", onDraw) }
-                Box(Modifier.then(tutorialAnchor("token-action"))) { ActionPill("ADD TOKEN", onToken) }
                 Box(Modifier.then(tutorialAnchor("combat-action"))) { ActionPill("COMBAT", onCombat) }
                 Box(Modifier.then(tutorialAnchor("more-actions"))) {
                     ActionPill("MORE  ⋮") { onOpenMore(); moreOpen = true }
                     DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                        DropdownMenuItem(text = { Text("Add token") }, modifier = tutorialAnchor("token-action"), onClick = { moreOpen = false; onToken() })
                         DropdownMenuItem(text = { Text("Reveal top card") }, onClick = { moreOpen = false; onReveal() })
                         DropdownMenuItem(text = { Text("Shuffle library…") }, onClick = { moreOpen = false; shuffleConfirm = true })
                         DropdownMenuItem(text = { Text("Open game log") }, onClick = { moreOpen = false; onOpenLog() })
@@ -6080,6 +6155,7 @@ private fun LocalChatPanel(
     onTutorialBack: () -> Unit, onTutorialNext: () -> Unit, onTutorialExit: () -> Unit,
     onDraft: (String) -> Unit, onDismiss: () -> Unit, onSend: () -> Unit
 ) {
+    val context = LocalContext.current
     Surface(modifier, shape = RoundedCornerShape(topStart = 18.dp, bottomStart = 18.dp), color = Panel) {
         Box(Modifier.fillMaxSize()) {
             Column(Modifier.padding(14.dp)) {
@@ -6093,12 +6169,17 @@ private fun LocalChatPanel(
                         val item = messages[index]
                         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).padding(9.dp)) {
                             Text("${item.author} · ${item.timestamp}", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold)
-                            Text(item.text, color = SoftWhite, fontSize = 12.sp)
+                            SelectionContainer { Text(item.text, color = SoftWhite, fontSize = 12.sp) }
                         }
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedTextField(value = draft, onValueChange = onDraft, modifier = Modifier.weight(1f), singleLine = true, label = { Text("Message") })
+                    TextButton(onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+                        val pastedText = clipboard?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
+                        if (!pastedText.isNullOrEmpty()) onDraft(draft + pastedText)
+                    }, modifier = Modifier.heightIn(min = 48.dp)) { Text("PASTE", color = Mint, fontSize = 9.sp) }
                     TextButton(onClick = onSend, enabled = draft.isNotBlank(), modifier = Modifier.heightIn(min = 48.dp).then(tutorialAnchor("chat-send"))) { Text("SEND", color = Mint) }
                 }
             }

@@ -1,6 +1,6 @@
-# Arcana Table 0.15.51 — Build 70 source update
+# Arcana Table 0.15.53 — Build 72 source update
 
-Arcana Table is a native Android Magic tabletop prototype. Build 70 fixes battlefield activated-ability resolution so resolving an ability does not add its source permanent to the battlefield again. Only spell and commander stack items move their card to a new zone. Build 69's trigger prompts and Activity Log updates, plus Build 68's card-face mulligan screen with tap-to-enlarge previews, are included.
+Arcana Table is a native Android Magic tabletop prototype. Build 72 adds player view tabs with cropped commander artwork, automatically expands and scrolls to the active player's card on the full table, and reorganizes the player footer into full-width PASS TURN, HAND, and BACK TO TABLE buttons with a larger centered HAND button. Mana-pool access is in the player status header; ADD TOKEN is in MORE, the footer library count is removed, and the command-zone strip is condensed without removing its controls or status. Build 71 makes table-chat message text selectable and adds a PASTE control for clipboard text in the draft. Build 70's fix for duplicate permanents on ability resolution, Build 69's trigger prompts and Activity Log updates, and Build 68's card-face mulligan screen with tap-to-enlarge previews are included.
 
 ## Included
 
@@ -77,7 +77,7 @@ Arcana Table is a native Android Magic tabletop prototype. Build 70 fixes battle
 
 ## Build status
 
-The source is labeled version 0.15.51, build 70. No Build 70 APK has been compiled yet. The optional full visual guide starts with the welcome message and follows the app screens with dimmed/blurred backgrounds, highlighted controls, and straight red arrows with solid arrowheads. It is available from the home screen and app menu and never launches automatically.
+The source is labeled version 0.15.53, build 72. No Build 72 APK has been compiled. The optional full visual guide starts with the welcome message and follows the app screens with dimmed/blurred backgrounds, highlighted controls, and straight red arrows with solid arrowheads. It is available from the home screen and app menu and never launches automatically.
 
 Build 66 adds a resizable hand panel, automatic stack-window closing after all resolutions, tighter player-view spacing, and stronger import/movement/sync diagnostics. It also includes the Build 65 import review, supported automatic life/draw/token effects with manual-resolution notices, quick Stack access, and earlier tutorial, card movement, privacy, and navigation updates.
 

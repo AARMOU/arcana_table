@@ -2,9 +2,23 @@
 
 ## Canonical project
 
-This is the complete Arcana Table **Build 70 source tree** (`0.15.51`, version code `70`). It contains the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. Build 70 fixes duplicate permanent instances when resolving activated abilities, with a regression test.
+This is the complete Arcana Table **Build 72 source tree** (`0.15.53`, version code `72`). It contains the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. Build 72 adds commander artwork player tabs, automatic active-player expansion, and automatic scrolling to the active player in the full-table view.
 
 The separate `ArcanaTable-build52-source/` folder is stale and should not be used as the project source. Its Gradle metadata still labels it Build 52 and its code is materially different.
+
+## Changes in Build 71
+
+- Chat messages support long-press text selection and Android's copy action.
+- Added a PASTE button that appends clipboard text to the message draft. The message field also keeps Android's normal paste context menu.
+
+## Changes in Build 72
+
+- Player view tabs show cropped commander artwork with the player name overlaid at the bottom.
+- On the full table, the active player's board expands automatically; the prior active player's board collapses when the turn changes.
+- The full-table grid scrolls to the active player's card when the active player changes.
+- The player footer has full-width PASS TURN, HAND, and BACK TO TABLE buttons; HAND is centered and larger. ADD TOKEN is in MORE, and the footer no longer shows the library count.
+- Mana-pool access is a compact MANA chip in the player status header instead of a bottom action button.
+- The command-zone strip uses a smaller commander thumbnail and condensed status text while retaining commander casting, cast count, tax, and commander status.
 
 ## Changes in Build 70
 
@@ -83,7 +97,7 @@ These fixes are retained in the Build 62 source and APK.
 
 ## Build status
 
-Build 70 (`0.15.51`, version code `70`) is the current source. Build 69 (`0.15.50`, version code `69`) is the latest compiled debug APK. Build 70 has not been compiled.
+Build 72 (`0.15.53`, version code `72`) is the current local source. Build 69 (`0.15.50`, version code `69`) is the latest compiled debug APK. Build 72 has not been compiled.
 
 Build 62 gives every tutorial step a `NEXT` button, explains that the Join Game action needs a room code and password, and lets the tutorial continue without connecting.
 
