@@ -500,13 +500,17 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var autoUntapOnUntapStep by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("auto_untap_step", true)) }
     var openHandAfterDraw by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("open_hand_after_draw", true)) }
     var reducedSwipeMotion by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("reduced_swipe_motion", false)) }
-    var cardSizeScale by rememberSaveable { mutableFloatStateOf(optionPrefs.getFloat("card_size_scale", 1f).coerceIn(0.82f, 1.18f)) }
-    var handSheetHeightFraction by rememberSaveable {
-        mutableFloatStateOf(optionPrefs.getFloat("hand_sheet_height_fraction", 0.52f).coerceIn(0.38f, 0.95f))
-    }
     val configuration = LocalConfiguration.current
-    val density = LocalDensity.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val layoutOrientationSuffix = if (isLandscape) "landscape" else "portrait"
+    var cardSizeScale by rememberSaveable(layoutOrientationSuffix) { mutableFloatStateOf(optionPrefs.getFloat("layout_card_size_$layoutOrientationSuffix", optionPrefs.getFloat("card_size_scale", 1f)).coerceIn(0.82f, 1.18f)) }
+    var battlefieldHeightScale by rememberSaveable(layoutOrientationSuffix) { mutableFloatStateOf(optionPrefs.getFloat("layout_battlefield_height_$layoutOrientationSuffix", 1f).coerceIn(0.75f, 1.5f)) }
+    var boardSpacingScale by rememberSaveable(layoutOrientationSuffix) { mutableFloatStateOf(optionPrefs.getFloat("layout_board_spacing_$layoutOrientationSuffix", 1f).coerceIn(0.5f, 2f)) }
+    var footerButtonScale by rememberSaveable(layoutOrientationSuffix) { mutableFloatStateOf(optionPrefs.getFloat("layout_footer_button_scale_$layoutOrientationSuffix", 1f).coerceIn(0.9f, 1.3f)) }
+    var handSheetHeightFraction by rememberSaveable(layoutOrientationSuffix) {
+        mutableFloatStateOf(optionPrefs.getFloat("layout_hand_sheet_height_$layoutOrientationSuffix", optionPrefs.getFloat("hand_sheet_height_fraction", 0.52f)).coerceIn(0.38f, 0.95f))
+    }
+    val density = LocalDensity.current
     val screenWidthDp = configuration.screenWidthDp
     var nextId by remember { mutableIntStateOf(20) }
     var players by remember { mutableStateOf(loadSavedPlayers(context) ?: samplePlayers()) }
@@ -604,6 +608,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var creatureTypeChoicePrompt by remember { mutableStateOf<CreatureTypeChoicePrompt?>(null) }
     var timerMenuOpen by remember { mutableStateOf(false) }
     var optionsOpen by remember { mutableStateOf(false) }
+    var layoutLabOpen by remember { mutableStateOf(false) }
     var changelogOpen by remember { mutableStateOf(false) }
     var developerOptionsOpen by remember { mutableStateOf(false) }
     var tutorialOpen by remember { mutableStateOf(false) }
@@ -1562,6 +1567,11 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         openHandAfterDraw = true
         reducedSwipeMotion = false
         cardSizeScale = 1f
+        battlefieldHeightScale = 1f
+        boardSpacingScale = 1f
+        handSheetHeightFraction = 0.52f
+        footerButtonScale = 1f
+        layoutLabOpen = false
         lobbyInternetMode = false
         lobbyCloudEndpoint = DEFAULT_CLOUD_ROOM_ENDPOINT
         players = listOf(TablePlayer("YOU"))
@@ -2389,6 +2399,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         DropdownMenuItem(text = { Text("Game tools") }, modifier = tutorialAnchor("menu-tools"), onClick = { guidedAction("menu-tools") { topMenuSection = "tools" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("Room & game") }, modifier = tutorialAnchor("menu-game"), onClick = { guidedAction("menu-game") { topMenuSection = "game" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("What's new") }, onClick = { topMenuExpanded = false; changelogOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                        DropdownMenuItem(text = { Text("Adjust UI") }, onClick = { topMenuExpanded = false; topMenuSection = null; layoutLabOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("Options") }, modifier = tutorialAnchor("menu-options"), onClick = { guidedAction("menu-options") { topMenuExpanded = false; optionsOpen = true } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                     } else {
                         DropdownMenuItem(text = { Text("‹  MAIN MENU") }, modifier = tutorialAnchor("menu-back"), onClick = { guidedAction("menu-back") { topMenuSection = null } })
@@ -2508,6 +2519,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             val boardCanControl = gameInProgress && (!onlineMode || boardIndex == localSeat) && !gameEndedOnline && !players[boardIndex].isEliminated
             PlayerBoard(
                 player = players[boardIndex].copy(name = if (onlineMode && boardIndex == localSeat) "YOU" else players[boardIndex].name), playerIndex = boardIndex, isLandscape = isLandscape, cardSizeScale = cardSizeScale,
+                battlefieldHeightScale = battlefieldHeightScale, boardSpacingScale = boardSpacingScale,
                 gameInProgress = gameInProgress,
                 tutorialAnchor = ::tutorialAnchor,
                 stackCount = stackActions.size,
@@ -2599,21 +2611,21 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         } else {
             val canPassTurnFromBoard = gameInProgress && !gameEndedOnline && selectedPlayer == activePlayer && !players[selectedPlayer].isComputer && !players[selectedPlayer].isEliminated && (!onlineMode || localSeat == activePlayer)
             Spacer(Modifier.weight(1f))
-            Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.Bottom) {
                 HeaderButton(
                     "PASS TURN", onClick = { guidedAction("pass-turn") { passTurn() } }, enabled = canPassTurnFromBoard,
-                    modifier = Modifier.weight(1f).height(54.dp).then(tutorialAnchor("pass-turn"))
+                    modifier = Modifier.weight(1f).height((54.dp * footerButtonScale).coerceIn(48.dp, 76.dp)).then(tutorialAnchor("pass-turn"))
                 )
                 Box(Modifier.weight(1.18f).then(tutorialAnchor("hand-button"))) {
                     HandPeekBar(
                         players[selectedPlayer].hand.size,
-                        modifier = Modifier.fillMaxWidth().height(62.dp),
+                        modifier = Modifier.fillMaxWidth().height((62.dp * footerButtonScale).coerceIn(48.dp, 82.dp)),
                         onClick = { guidedAction("hand-button") { if (canControlSelectedPlayer) showHand = true } }
                     )
                 }
                 HeaderButton(
                     "BACK TO TABLE", onClick = { guidedAction("player-back-table") { showOverview = true; showHand = false } },
-                    modifier = Modifier.weight(1f).height(54.dp).then(tutorialAnchor("player-back-table"))
+                    modifier = Modifier.weight(1f).height((54.dp * footerButtonScale).coerceIn(48.dp, 76.dp)).then(tutorialAnchor("player-back-table"))
                 )
             }
         }
@@ -2641,6 +2653,12 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 76 · PLAYER LAYOUT AND HAND ACTIONS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Player-screen footer buttons now align on the bottom edge. Opening-hand cards are larger, and the hand tray includes Cast Commander when it can be cast. Pass Priority is the primary stack action; Resolve Top remains available as a smaller action after everyone passes.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 75 · MANA PIPS AND UI ADJUSTMENT", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Mana-choice buttons show colored mana pips. Open the app menu and tap Adjust UI to go straight to the layout controls.", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 74 · HAND TRAY AND PLAYER CONTROLS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Opening-hand cards are larger, and hand-tray cards grow or shrink with the drawer. The tray now holds Draw, Combat, Stack, turn flow, and secondary game commands; the Stack shortcut is off the view selector. The player footer stays at the bottom, and the old drag-to-play hint is gone.\n• Mana symbols use colored pips. Permanents that say to choose a creature type prompt for one as they enter and display the choice. Public card mentions in the game log can open a card preview.", color = SoftWhite, fontSize = 11.sp)
 
@@ -2732,7 +2750,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                                         handSheetHeightFraction = (handSheetHeightFraction - amount / screenHeightPx).coerceIn(0.38f, 0.95f)
                                     },
                                     onDragEnd = {
-                                        optionPrefs.edit().putFloat("hand_sheet_height_fraction", handSheetHeightFraction).apply()
+                                        optionPrefs.edit().putFloat("hand_sheet_height_fraction", handSheetHeightFraction).putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction).apply()
                                         if (dragDistance > dismissDistancePx && handSheetHeightFraction <= 0.40f) showHand = false
                                         dragDistance = 0f
                                     }
@@ -2752,6 +2770,10 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         handRevealed = players[selectedPlayer].handRevealedToAll,
                         canAdvance = canControlSelectedPlayer && selectedPlayer == activePlayer && !players[activePlayer].isComputer,
                         canControl = canControlSelectedPlayer,
+                        commanderCanCast = players[selectedPlayer].commanderCard?.let { commander ->
+                            val owner = players[selectedPlayer]
+                            canControlSelectedPlayer && !owner.isEliminated && !owner.library.any { it.id == commander.id } && !owner.hand.any { it.id == commander.id } && !owner.battlefield.any { it.id == commander.id } && !owner.graveyard.any { it.id == commander.id } && !owner.exile.any { it.id == commander.id } && !owner.revealed.any { it.id == commander.id } && stackActions.none { it.card?.id == commander.id }
+                        } == true,
                         onToggleReveal = { revealed ->
                             updatePlayer(selectedPlayer) { it.copy(handRevealedToAll = revealed) }
                             logAction(selectedPlayer, if (revealed) "revealed their hand to everyone" else "hid their hand")
@@ -2761,6 +2783,11 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         onNextStep = { advanceStep() },
                         onPassTurn = { passTurn() },
                         onStack = { guidedAction("stack-open") { stackOpen = true } },
+                        onCastCommander = {
+                            val commander = players.getOrNull(selectedPlayer)?.commanderCard
+                            if (commander == null) message = "Set a commander from your deck or battlefield first."
+                            else paymentCard = selectedPlayer to commander
+                        },
                         onCombat = { guidedAction("combat-action") { if (canControlSelectedPlayer && selectedPlayer == activePlayer) combatDialogOpen = true } },
                         onMoreAction = { action ->
                             if (action in setOf("LOG", "CHAT") || canControlSelectedPlayer) when (action) {
@@ -3745,6 +3772,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         autoReturnTableAfterPass = autoReturnTableAfterPass, autoDrawOnDrawStep = autoDrawOnDrawStep,
         autoUntapOnUntapStep = autoUntapOnUntapStep, openHandAfterDraw = openHandAfterDraw,
         reducedSwipeMotion = reducedSwipeMotion, cardSizeScale = cardSizeScale,
+        onOpenLayoutLab = { guidedAction("options-layout-lab") { optionsOpen = false; layoutLabOpen = true } },
         onToggleTheme = { guidedAction("options-theme") { onToggleTheme() } },
         onToggleTimerVisibility = { guidedAction("options-timer") { turnTimerVisible = !turnTimerVisible } },
         onToggleBackgroundAlerts = { enabled -> guidedAction("options-alerts") { setBackgroundAlerts(enabled) } },
@@ -3753,10 +3781,36 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         onAutoUntap = { value -> guidedAction("options-auto-untap") { autoUntapOnUntapStep = value; optionPrefs.edit().putBoolean("auto_untap_step", value).apply() } },
         onOpenHandAfterDraw = { value -> guidedAction("options-open-hand") { openHandAfterDraw = value; optionPrefs.edit().putBoolean("open_hand_after_draw", value).apply() } },
         onReducedMotion = { value -> guidedAction("options-motion") { reducedSwipeMotion = value; optionPrefs.edit().putBoolean("reduced_swipe_motion", value).apply() } },
-        onCardSizeScale = { value -> guidedAction("options-card-size") { cardSizeScale = value; optionPrefs.edit().putFloat("card_size_scale", value).apply() } },
+        onCardSizeScale = { value -> guidedAction("options-card-size") { cardSizeScale = value; optionPrefs.edit().putFloat("card_size_scale", value).putFloat("layout_card_size_$layoutOrientationSuffix", value).apply() } },
         onOpenDeveloperOptions = { guidedAction("options-developer") { optionsOpen = false; developerOptionsOpen = true } },
         onClearAllData = { guidedAction("clear-data") { optionsOpen = false; clearAllConfirmOpen = true } },
         onDismiss = { guidedAction("options-close") { optionsOpen = false } }
+    )
+    if (layoutLabOpen) LayoutLabPage(
+        orientationName = if (isLandscape) "LANDSCAPE" else "PORTRAIT",
+        cardSizeScale = cardSizeScale,
+        battlefieldHeightScale = battlefieldHeightScale,
+        boardSpacingScale = boardSpacingScale,
+        handSheetHeightFraction = handSheetHeightFraction,
+        footerButtonScale = footerButtonScale,
+        onCardSizeScale = { value -> cardSizeScale = value.coerceIn(0.82f, 1.18f); optionPrefs.edit().putFloat("card_size_scale", cardSizeScale).putFloat("layout_card_size_$layoutOrientationSuffix", cardSizeScale).apply() },
+        onBattlefieldHeightScale = { value -> battlefieldHeightScale = value.coerceIn(0.75f, 1.5f); optionPrefs.edit().putFloat("layout_battlefield_height_$layoutOrientationSuffix", battlefieldHeightScale).apply() },
+        onBoardSpacingScale = { value -> boardSpacingScale = value.coerceIn(0.5f, 2f); optionPrefs.edit().putFloat("layout_board_spacing_$layoutOrientationSuffix", boardSpacingScale).apply() },
+        onHandSheetHeightFraction = { value -> handSheetHeightFraction = value.coerceIn(0.38f, 0.95f); optionPrefs.edit().putFloat("hand_sheet_height_fraction", handSheetHeightFraction).putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction).apply() },
+        onFooterButtonScale = { value -> footerButtonScale = value.coerceIn(0.9f, 1.3f); optionPrefs.edit().putFloat("layout_footer_button_scale_$layoutOrientationSuffix", footerButtonScale).apply() },
+        onReset = {
+            cardSizeScale = 1f; battlefieldHeightScale = 1f; boardSpacingScale = 1f
+            handSheetHeightFraction = 0.52f; footerButtonScale = 1f
+            optionPrefs.edit()
+                .putFloat("card_size_scale", cardSizeScale)
+                .putFloat("layout_card_size_$layoutOrientationSuffix", cardSizeScale)
+                .putFloat("layout_battlefield_height_$layoutOrientationSuffix", battlefieldHeightScale)
+                .putFloat("layout_board_spacing_$layoutOrientationSuffix", boardSpacingScale)
+                .putFloat("hand_sheet_height_fraction", handSheetHeightFraction)
+                .putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction)
+                .putFloat("layout_footer_button_scale_$layoutOrientationSuffix", footerButtonScale).apply()
+        },
+        onDismiss = { layoutLabOpen = false; optionsOpen = true }
     )
     if (developerOptionsOpen) DeveloperOptionsPage(
         players = players,
@@ -3967,7 +4021,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
     )
 
-    if (tutorialOpen && !lobbyOpen && !optionsOpen && !developerOptionsOpen && !stackOpen && !chatOpen && !logOpen && !importOpen && !savedDecksOpen && !deckEditorOpen && handActionCard == null) {
+    if (tutorialOpen && !lobbyOpen && !optionsOpen && !layoutLabOpen && !developerOptionsOpen && !stackOpen && !chatOpen && !logOpen && !importOpen && !savedDecksOpen && !deckEditorOpen && handActionCard == null) {
         val step = tutorialStops.getOrNull(tutorialIndex)
         if (step != null && step.view == currentTutorialView()) {
             GuidedTutorialOverlay(
@@ -4018,7 +4072,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                             logAction(prompt.playerIndex, "added ${option.label} mana")
                             manaChoicePrompt = null
                         }, modifier = Modifier.heightIn(min = 44.dp)) {
-                            Text(option.label, color = Mint, fontWeight = FontWeight.Bold)
+                            ManaSymbolText(option.label, color = Mint, fontSize = 14.sp)
                         }
                     }
                 }
@@ -4812,7 +4866,7 @@ private fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKee
     var previewCard by remember(player.id) { mutableStateOf<GameCard?>(null) }
     val bottomCount = (player.mulligansTaken - 1).coerceAtLeast(0)
     val canMulliganAgain = player.mulligansTaken < 8
-    val openingCardWidth = (LocalConfiguration.current.screenWidthDp * 0.30f).dp.coerceIn(116.dp, 156.dp)
+    val openingCardWidth = (LocalConfiguration.current.screenWidthDp * 0.36f).dp.coerceIn(132.dp, 190.dp)
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth(0.94f).heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.88f), shape = RoundedCornerShape(16.dp), color = Panel) {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(18.dp)) {
@@ -4872,7 +4926,7 @@ private fun OptionsPage(
     onTutorialBack: () -> Unit, onTutorialNext: () -> Unit, onTutorialExit: () -> Unit,
     darkMode: Boolean, timerRunning: Boolean, timerVisible: Boolean, backgroundAlertsEnabled: Boolean,
     autoReturnTableAfterPass: Boolean, autoDrawOnDrawStep: Boolean, autoUntapOnUntapStep: Boolean, openHandAfterDraw: Boolean,
-    reducedSwipeMotion: Boolean, cardSizeScale: Float,
+    reducedSwipeMotion: Boolean, cardSizeScale: Float, onOpenLayoutLab: () -> Unit,
     onToggleTheme: () -> Unit, onToggleTimerVisibility: () -> Unit, onToggleBackgroundAlerts: (Boolean) -> Unit,
     onAutoReturnTable: (Boolean) -> Unit, onAutoDraw: (Boolean) -> Unit, onAutoUntap: (Boolean) -> Unit,
     onOpenHandAfterDraw: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, onCardSizeScale: (Float) -> Unit,
@@ -4894,6 +4948,9 @@ private fun OptionsPage(
                     listOf(0.82f to "SMALL", 1f to "STANDARD", 1.18f to "LARGE").forEach { (scale, label) ->
                         TextButton(onClick = { onCardSizeScale(scale) }, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) { Text(if (kotlin.math.abs(cardSizeScale - scale) < 0.03f) "✓ $label" else label, color = if (kotlin.math.abs(cardSizeScale - scale) < 0.03f) Mint else SoftWhite, fontSize = 9.sp) }
                     }
+                }
+                TextButton(onClick = onOpenLayoutLab, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
+                    Text("ADJUST UI LAYOUT  ›", color = Mint, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
                 }
                 Text("NAVIGATION", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
                 SettingsToggle("Return to Table after passing", "Show the full table when your turn passes.", autoReturnTableAfterPass, onAutoReturnTable, tutorialAnchor("options-return-table"))
@@ -4922,6 +4979,218 @@ private fun OptionsPage(
             tutorialStep?.let { step -> GuidedTutorialOverlay(step, tutorialIndex, tutorialTotal, tutorialBounds[step.target], onTutorialBack, onTutorialNext, onTutorialExit) }
             }
         }
+    }
+}
+
+@Composable
+private fun LayoutLabPage(
+    orientationName: String,
+    cardSizeScale: Float,
+    battlefieldHeightScale: Float,
+    boardSpacingScale: Float,
+    handSheetHeightFraction: Float,
+    footerButtonScale: Float,
+    onCardSizeScale: (Float) -> Unit,
+    onBattlefieldHeightScale: (Float) -> Unit,
+    onBoardSpacingScale: (Float) -> Unit,
+    onHandSheetHeightFraction: (Float) -> Unit,
+    onFooterButtonScale: (Float) -> Unit,
+    onReset: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    var previewScreen by remember { mutableStateOf("PLAYER") }
+    var selectedElement by remember { mutableStateOf("BATTLEFIELD") }
+    fun setPreset(card: Float, battlefield: Float, spacing: Float, hand: Float, footer: Float) {
+        onCardSizeScale(card)
+        onBattlefieldHeightScale(battlefield)
+        onBoardSpacingScale(spacing)
+        onHandSheetHeightFraction(hand)
+        onFooterButtonScale(footer)
+    }
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.94f),
+            shape = RoundedCornerShape(18.dp),
+            color = Panel
+        ) {
+            Column(Modifier.fillMaxSize().padding(14.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("ADJUST UI · $orientationName", color = SoftWhite, fontSize = 17.sp, fontWeight = FontWeight.Black)
+                        Text("$orientationName layout · saves automatically", color = Muted, fontSize = 10.sp)
+                    }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) {
+                        Icon(Icons.Filled.Close, "Close layout lab", tint = Muted)
+                    }
+                }
+                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    listOf("PLAYER", "HAND").forEach { screen ->
+                        val selected = previewScreen == screen
+                        TextButton(
+                            onClick = { previewScreen = screen; selectedElement = if (screen == "HAND") "HAND" else "BATTLEFIELD" },
+                            modifier = Modifier.weight(1f).clip(RoundedCornerShape(9.dp)).background(if (selected) PanelLight else Color.Transparent)
+                        ) { Text(screen, color = if (selected) Mint else Muted, fontWeight = FontWeight.Bold) }
+                    }
+                }
+                LayoutLabPreview(
+                    previewScreen = previewScreen,
+                    selectedElement = selectedElement,
+                    cardSizeScale = cardSizeScale,
+                    battlefieldHeightScale = battlefieldHeightScale,
+                    boardSpacingScale = boardSpacingScale,
+                    handSheetHeightFraction = handSheetHeightFraction,
+                    footerButtonScale = footerButtonScale,
+                    onSelectElement = { selectedElement = it }
+                )
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                    listOf("COMFORTABLE", "LARGER CARDS", "COMPACT").forEach { preset ->
+                        TextButton(
+                            onClick = {
+                                when (preset) {
+                                    "LARGER CARDS" -> setPreset(1.16f, 1.35f, 1.05f, 0.64f, 1f)
+                                    "COMPACT" -> setPreset(0.88f, 0.9f, 0.72f, 0.46f, 0.92f)
+                                    else -> setPreset(1f, 1.15f, 1.2f, 0.58f, 1.05f)
+                                }
+                            },
+                            modifier = Modifier.weight(1f).heightIn(min = 42.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 3.dp)
+                        ) {
+                            Text(preset, color = SoftWhite, fontSize = 8.sp, fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center, lineHeight = 10.sp)
+                        }
+                    }
+                }
+                Text("ADJUST · $selectedElement", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 3.dp))
+                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                    when (selectedElement) {
+                        "BATTLEFIELD" -> {
+                            LayoutTuningSlider("Card size", cardSizeScale, 0.82f..1.18f, { "${(it * 100).toInt()}%" }, onCardSizeScale)
+                            LayoutTuningSlider("Battlefield viewing area", battlefieldHeightScale, 0.75f..1.5f, { "${(it * 100).toInt()}%" }, onBattlefieldHeightScale)
+                        }
+                        "SPACING" -> LayoutTuningSlider("Space between sections", boardSpacingScale, 0.5f..2f, { "${(it * 100).toInt()}%" }, onBoardSpacingScale)
+                        "HAND" -> {
+                            LayoutTuningSlider("Hand tray height", handSheetHeightFraction, 0.38f..0.95f, { "${(it * 100).toInt()}%" }, onHandSheetHeightFraction)
+                            LayoutTuningSlider("Hand card size", cardSizeScale, 0.82f..1.18f, { "${(it * 100).toInt()}%" }, onCardSizeScale)
+                        }
+                        "FOOTER" -> LayoutTuningSlider("Footer button size", footerButtonScale, 0.9f..1.3f, { "${(it * 100).toInt()}%" }, onFooterButtonScale)
+                    }
+                    Text("Tap a section in the preview to tune it. Card proportions and minimum touch sizes are preserved.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp, bottom = 8.dp))
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onReset, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        Text("RESET TO DEFAULT", color = Color(0xFFE5B2A7), fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+                    Button(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = PanelLight)) {
+                        Text("DONE", color = Mint, fontWeight = FontWeight.Black)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LayoutLabPreview(
+    previewScreen: String,
+    selectedElement: String,
+    cardSizeScale: Float,
+    battlefieldHeightScale: Float,
+    boardSpacingScale: Float,
+    handSheetHeightFraction: Float,
+    footerButtonScale: Float,
+    onSelectElement: (String) -> Unit
+) {
+    val sectionGap = (4.dp * boardSpacingScale).coerceIn(2.dp, 10.dp)
+    val previewHeight = if (previewScreen == "HAND") (160.dp + 150.dp * handSheetHeightFraction).coerceIn(205.dp, 285.dp) else 226.dp
+    Column(
+        Modifier.fillMaxWidth().height(previewHeight).clip(RoundedCornerShape(13.dp)).background(Color(0xFF101917)).padding(8.dp),
+        verticalArrangement = Arrangement.spacedBy(sectionGap)
+    ) {
+        if (previewScreen == "PLAYER") {
+            Row(
+                Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight).border(if (selectedElement == "SPACING") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp)).clickable { onSelectElement("SPACING") }.padding(horizontal = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("● YOU · ONLINE · ACTIVE", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text("40  +", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Black)
+            }
+            Row(
+                Modifier.fillMaxWidth().height(28.dp).clip(RoundedCornerShape(7.dp)).background(PanelLight).clickable { onSelectElement("SPACING") }.padding(horizontal = 7.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) { Text("COMMAND ZONE · COMMANDER", color = CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+            Column(
+                Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(8.dp)).background(PanelLight)
+                    .border(if (selectedElement == "BATTLEFIELD") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp))
+                    .clickable { onSelectElement("BATTLEFIELD") }.padding(6.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp)
+            ) {
+                Text("BATTLEFIELD · grouped by type", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val tileWidth = (38.dp * cardSizeScale).coerceIn(31.dp, 46.dp)
+                    val tileHeight = (tileWidth / 0.72f).coerceAtMost((82.dp * battlefieldHeightScale).coerceIn(62.dp, 116.dp))
+                    listOf("CREATURE", "ARTIFACT", "LAND").forEachIndexed { index, label ->
+                        Column(Modifier.width(tileWidth).height(tileHeight).clip(RoundedCornerShape(5.dp)).background(listOf(Color(0xFF66513D), Color(0xFF364C52), Color(0xFF4A644C))[index]).padding(3.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                            Text(label, color = SoftWhite, fontSize = 5.sp, maxLines = 1)
+                            Box(Modifier.fillMaxWidth().height((tileHeight * 0.5f).coerceAtLeast(18.dp)).clip(RoundedCornerShape(3.dp)).background(Color.White.copy(alpha = 0.14f)))
+                            Text("CARD NAME", color = SoftWhite, fontSize = 5.sp, maxLines = 1)
+                        }
+                    }
+                }
+            }
+            Row(
+                Modifier.fillMaxWidth().height((34.dp * footerButtonScale).coerceIn(31.dp, 46.dp))
+                    .clip(RoundedCornerShape(8.dp)).background(PanelLight)
+                    .border(if (selectedElement == "FOOTER") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp))
+                    .clickable { onSelectElement("FOOTER") },
+                horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically
+            ) {
+                listOf("PASS TURN", "HAND", "BACK TO TABLE").forEach { label ->
+                    Box(Modifier.weight(1f).fillMaxHeight().padding(3.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xFF293934)), contentAlignment = Alignment.Center) {
+                        Text(label, color = Mint, fontSize = 6.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                    }
+                }
+            }
+        } else {
+            Row(Modifier.fillMaxWidth().height(30.dp).clickable { onSelectElement("HAND") }, verticalAlignment = Alignment.CenterVertically) {
+                Text("YOUR HAND · 5 CARDS", color = SoftWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                Text("×", color = SoftWhite, fontSize = 18.sp)
+            }
+            Row(
+                Modifier.fillMaxWidth().height(30.dp).clip(RoundedCornerShape(7.dp)).background(PanelLight)
+                    .border(if (selectedElement == "HAND") 2.dp else 0.dp, Mint, RoundedCornerShape(7.dp))
+                    .clickable { onSelectElement("HAND") },
+                horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically
+            ) { listOf("DRAW", "STACK", "NEXT STEP", "MORE").forEach { Text(it, color = Mint, fontSize = 6.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center) } }
+            Row(
+                Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(8.dp)).background(PanelLight)
+                    .border(if (selectedElement == "HAND") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp))
+                    .clickable { onSelectElement("HAND") }.padding(5.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                val cardWidth = (44.dp * cardSizeScale).coerceIn(36.dp, 52.dp)
+                repeat(3) { index ->
+                    Box(Modifier.width(cardWidth).fillMaxHeight().clip(RoundedCornerShape(5.dp)).background(listOf(Color(0xFF7A513F), Color(0xFF3D6674), Color(0xFF665A3D))[index]), contentAlignment = Alignment.BottomCenter) {
+                        Text("SAMPLE CARD", color = SoftWhite, fontSize = 5.sp, modifier = Modifier.padding(bottom = 5.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LayoutTuningSlider(
+    label: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    valueLabel: (Float) -> String,
+    onValueChange: (Float) -> Unit
+) {
+    Column(Modifier.fillMaxWidth().padding(top = 5.dp, bottom = 1.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(label, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text(valueLabel(value), color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+        }
+        Slider(value = value, onValueChange = onValueChange, valueRange = valueRange)
     }
 }
 
@@ -5250,7 +5519,7 @@ private fun ZoneChip(name: String, count: Int, enabled: Boolean = true, onClick:
 
 @Composable
 private fun PlayerBoard(
-    player: TablePlayer, playerIndex: Int, isLandscape: Boolean, cardSizeScale: Float = 1f, gameInProgress: Boolean, isActivePlayer: Boolean, canControl: Boolean, turnNumber: Int, phaseName: String, modifier: Modifier,
+    player: TablePlayer, playerIndex: Int, isLandscape: Boolean, cardSizeScale: Float = 1f, battlefieldHeightScale: Float = 1f, boardSpacingScale: Float = 1f, gameInProgress: Boolean, isActivePlayer: Boolean, canControl: Boolean, turnNumber: Int, phaseName: String, modifier: Modifier,
     tutorialAnchor: (String) -> Modifier, stackCount: Int, commanderUnavailable: Boolean,
     onLife: (Int) -> Unit, onDraw: () -> Unit, onShowHand: () -> Unit, onShowHandFromZone: () -> Unit, onToken: () -> Unit, onManageMana: () -> Unit,
     onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit, onTapCard: (Int) -> Unit,
@@ -5268,8 +5537,11 @@ private fun PlayerBoard(
     }
     var moreOpen by remember { mutableStateOf(false) }
     var shuffleConfirm by remember { mutableStateOf(false) }
-    val battlefieldMaxHeight = (screenHeightDp * if (isLandscape) 0.56f else 0.40f).dp
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    val battlefieldHeightLimit = (screenHeightDp * 0.72f).dp
+    val battlefieldBaseHeight = (screenHeightDp * if (isLandscape) 0.56f else 0.40f).dp
+    val battlefieldMaxHeight = (battlefieldBaseHeight * battlefieldHeightScale)
+        .coerceIn((battlefieldBaseHeight * 0.75f).coerceAtMost(battlefieldHeightLimit), battlefieldHeightLimit)
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp * boardSpacingScale)) {
         Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(RoundedCornerShape(12.dp)).background(Panel).border(if (isActivePlayer) 2.dp else 0.dp, if (isActivePlayer) Mint else Panel, RoundedCornerShape(12.dp)).padding(horizontal = 9.dp).then(tutorialAnchor("player-status")), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("${if (player.isEliminated) "✕ " else if (player.isOnline) "● " else ""}${player.name}${if (player.isEliminated) " · ELIMINATED" else if (player.isOnline) " · ONLINE" else ""}${if (player.isComputer) " · AI" else ""}${if (isActivePlayer && !player.isEliminated) " · ACTIVE" else ""}", color = if (player.isEliminated) Muted else if (isActivePlayer || player.isOnline) Mint else SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
@@ -5497,7 +5769,7 @@ private fun CardArt(url: String, modifier: Modifier = Modifier, contentScale: Co
 }
 
 @Composable
-private fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeight: androidx.compose.ui.unit.Dp, highlightedCardId: Int?, handRevealed: Boolean, canAdvance: Boolean, canControl: Boolean, stackCount: Int, tutorialAnchor: (String) -> Modifier, onToggleReveal: (Boolean) -> Unit, onClose: () -> Unit, onDraw: () -> Unit, onCombat: () -> Unit, onNextStep: () -> Unit, onPassTurn: () -> Unit, onStack: () -> Unit, onMoreAction: (String) -> Unit, onSelect: (GameCard) -> Unit, onDragDrop: (GameCard, Offset) -> Unit) {
+private fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeight: androidx.compose.ui.unit.Dp, highlightedCardId: Int?, handRevealed: Boolean, canAdvance: Boolean, canControl: Boolean, commanderCanCast: Boolean, stackCount: Int, tutorialAnchor: (String) -> Modifier, onToggleReveal: (Boolean) -> Unit, onClose: () -> Unit, onDraw: () -> Unit, onCombat: () -> Unit, onNextStep: () -> Unit, onPassTurn: () -> Unit, onStack: () -> Unit, onCastCommander: () -> Unit, onMoreAction: (String) -> Unit, onSelect: (GameCard) -> Unit, onDragDrop: (GameCard, Offset) -> Unit) {
     val handScrollState = rememberScrollState()
     var moreOpen by remember { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -5517,6 +5789,7 @@ private fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeig
             if (canControl) HeaderButton("DRAW", onDraw)
             HeaderButton(if (handRevealed) "HIDE HAND" else "REVEAL HAND", { onToggleReveal(!handRevealed) })
             HeaderButton("STACK · $stackCount", onStack, modifier = tutorialAnchor("stack-hand-button"))
+            if (commanderCanCast) HeaderButton("CAST COMMANDER", onCastCommander, modifier = tutorialAnchor("commander-cast"))
             if (canAdvance) {
                 HeaderButton("COMBAT", onCombat, modifier = tutorialAnchor("combat-action"))
                 HeaderButton("NEXT STEP", onNextStep, modifier = tutorialAnchor("next-step"))
@@ -6032,10 +6305,17 @@ private fun StackPriorityDialog(players: List<TablePlayer>, stack: List<StackAct
                         modifier = Modifier.heightIn(min = 44.dp)
                     ) { Text("ADD", color = if (canAct && triggerName.isNotBlank()) Mint else Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = onPassPriority, enabled = canAct || tutorialStep?.target == "stack-pass", modifier = Modifier.weight(1f).heightIn(min = 48.dp).then(tutorialAnchor("stack-pass"))) { Text("PASS PRIORITY", color = if (canAct || tutorialStep?.target == "stack-pass") Mint else Muted, fontSize = 10.sp) }
-                    Button(onClick = onResolve, enabled = canResolve || tutorialStep?.target == "stack-resolve", modifier = Modifier.weight(1f).heightIn(min = 48.dp).then(tutorialAnchor("stack-resolve")), colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Color(0xFF09251D))) { Text("RESOLVE TOP", fontSize = 10.sp, fontWeight = FontWeight.Bold) }
-                }
+                Button(
+                    onClick = onPassPriority,
+                    enabled = canAct || tutorialStep?.target == "stack-pass",
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).then(tutorialAnchor("stack-pass")),
+                    colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Color(0xFF09251D))
+                ) { Text("PASS PRIORITY", fontSize = 14.sp, fontWeight = FontWeight.Black) }
+                TextButton(
+                    onClick = onResolve,
+                    enabled = canResolve || tutorialStep?.target == "stack-resolve",
+                    modifier = Modifier.align(Alignment.End).heightIn(min = 40.dp).then(tutorialAnchor("stack-resolve"))
+                ) { Text("RESOLVE TOP", color = if (canResolve) Mint else Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
             }
             tutorialStep?.let { step ->
                 GuidedTutorialOverlay(step, tutorialIndex, tutorialTotal, tutorialBounds[step.target], onTutorialBack, onTutorialNext, onTutorialExit)
