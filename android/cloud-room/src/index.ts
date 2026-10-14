@@ -238,15 +238,24 @@ export class GameRoom extends DurableObject<Env> {
       }
     }
     const next: RoomState = { ...current, players };
-    if (seat === 0 || seat === Number(current.activePlayer ?? -1)) {
+    const activeSeat = Number(current.activePlayer ?? 0);
+    const prioritySeat = Number(current.priorityPlayer ?? activeSeat);
+    if (seat === 0 || seat === activeSeat) {
       const allowed = seat === 0
-        ? ["activePlayer", "turnNumber", "phaseIndex", "elapsedGameSeconds", "elapsedTurnSeconds", "turnOrder", "readyPlayers", "gameLog", "chat", "gameStarted", "endProposalBy", "endVotes", "gameEnded", "stackActions", "priorityPlayer", "priorityPassed"]
-        : ["activePlayer", "turnNumber", "phaseIndex", "elapsedGameSeconds", "elapsedTurnSeconds", "gameLog", "chat", "endProposalBy", "endVotes", "stackActions", "priorityPlayer", "priorityPassed"];
+        ? ["activePlayer", "turnNumber", "phaseIndex", "elapsedGameSeconds", "elapsedTurnSeconds", "turnOrder", "readyPlayers", "gameLog", "chat", "gameStarted", "endProposalBy", "endVotes", "gameEnded"]
+        : ["activePlayer", "turnNumber", "phaseIndex", "elapsedGameSeconds", "elapsedTurnSeconds", "gameLog", "chat", "endProposalBy", "endVotes"];
       for (const key of allowed) {
         if (key in incoming) next[key] = incoming[key];
       }
     } else {
-      for (const key of ["gameLog", "chat", "stackActions", "endProposalBy", "endVotes"]) if (key in incoming) next[key] = incoming[key];
+      for (const key of ["gameLog", "chat", "endProposalBy", "endVotes"]) if (key in incoming) next[key] = incoming[key];
+    }
+    // Stack actions and priority belong to whoever currently has priority, not
+    // necessarily the active player. The host (seat 0) may still administer them.
+    if (seat === 0 || seat === prioritySeat) {
+      for (const key of ["stackActions", "priorityPlayer", "priorityPassed"]) {
+        if (key in incoming) next[key] = incoming[key];
+      }
     }
     if (seat === 0) {
       for (let index = 1; index < incoming.players.length && index < MAX_PLAYERS; index++) {
