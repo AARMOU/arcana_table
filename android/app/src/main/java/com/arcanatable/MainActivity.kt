@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 116543)
-Total output lines: 6548
-
 @file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 
 package com.arcanatable
@@ -3090,7 +3087,985 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     lobbyNotice = "Reconnected to the room."
                     recordDiagnostic("Reconnected to the game room")
                     return@launch
-  …16543 tokens truncated…ht = FontWeight.Black, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
+                }
+                client.close()
+                if (roomClient === client) roomClient = null
+                if (attempt < 3) delay(900L * (attempt + 1))
+            }
+            reconnecting = false
+            if (!recovered) {
+                connectionLost = true
+                onlineStatus = "Disconnected"
+                connectionLostReason = "Couldn't reconnect after four attempts. Check that the host is still in the room and both phones are on the same Wi-Fi, then try again."
+                lobbyNotice = connectionLostReason
+                recordDiagnostic("Automatic reconnect failed after four attempts")
+            }
+        }
+    }
+
+    fun cancelRoomJoin() {
+        if (onlineStatus != "Connecting") return
+        roomClient?.close()
+        roomClient = null
+        cloudRoomClient?.close()
+        cloudRoomClient = null
+        roomConnected = false
+        onlineStateReady = false
+        onlineStatus = "Offline"
+        lobbyNotice = "Join canceled. You can change the details and try again."
+    }
+
+    if (lobbyOpen) LobbyDialog(
+        tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "LOBBY" },
+        tutorialIndex = tutorialIndex, tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
+        onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
+        onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
+        players = players,
+        roomCreated = lobbyCreated || roomConnected,
+        isHost = lobbyCreated,
+        gameStarted = gameStartedOnline,
+        gameEnded = gameEndedOnline,
+        joining = lobbyJoinMode,
+        roomCode = lobbyRoomCode,
+        password = lobbyPassword,
+        joinCode = lobbyJoinCode,
+        joinPassword = lobbyJoinPassword,
+        hostInput = lobbyHostInput,
+        internetMode = lobbyInternetMode,
+        cloudEndpoint = lobbyCloudEndpoint,
+        playerName = lobbyPlayerName,
+        hostAddress = lobbyHostAddress,
+        localSeat = localSeat,
+        onlineStatus = onlineStatus,
+        readyPlayers = lobbyReadyPlayers,
+        pendingReady = pendingReadyState,
+        deckSyncConfirmed = localDeckSyncConfirmed,
+        onTakeMulligan = { takeOpeningMulligan(localSeat) },
+        onKeepOpeningHand = { bottomIds -> keepOpeningHand(localSeat, bottomIds) },
+        turnOrder = lobbyTurnOrder,
+        notice = lobbyNotice,
+        onRemovePlayer = ::removeLobbyPlayer,
+        onExportDiagnostics = { guidedAction("lobby-diagnostics") { exportDiagnosticLog() } },
+        onTutorialTarget = { key -> guidedAction(key) {} },
+        onDismiss = { guidedAction("lobby-close") { cancelRoomJoin(); lobbyOpen = false } },
+        onCancelJoin = { guidedAction("lobby-cancel") { cancelRoomJoin() } },
+        onSelectJoin = { guidedAction("lobby-join") { lobbyJoinMode = true; lobbyNotice = null } },
+        onSelectCreate = { guidedAction("lobby-create") { lobbyJoinMode = false; lobbyNotice = null } },
+        onSelectNetwork = { internet -> guidedAction(if (internet) "lobby-internet" else "lobby-local") {
+            lobbyInternetMode = internet
+            if (internet && (lobbyCloudEndpoint.isBlank() || isLegacyExampleCloudEndpoint(lobbyCloudEndpoint))) {
+                lobbyCloudEndpoint = DEFAULT_CLOUD_ROOM_ENDPOINT
+                optionPrefs.edit().putString("cloud_room_endpoint", DEFAULT_CLOUD_ROOM_ENDPOINT).apply()
+            }
+            lobbyNotice = null
+        } },
+        onCloudEndpoint = { lobbyCloudEndpoint = it.trim(); optionPrefs.edit().putString("cloud_room_endpoint", lobbyCloudEndpoint).apply() },
+        onPassword = { lobbyPassword = it },
+        onJoinCode = { lobbyJoinCode = it.uppercase().filter(Char::isLetterOrDigit).take(8) },
+        onJoinPassword = { lobbyJoinPassword = it },
+        onHostInput = { lobbyHostInput = it.trim() },
+        onPlayerName = { lobbyPlayerName = it.take(24) },
+        onCreate = { guidedAction("lobby-submit") { if (lobbyInternetMode) startInternetRoom() else {
+            recordDiagnostic("Lobby creation requested")
+            lobbyRoomCode = (1..6).map { "ABCDEFGHJKLMNPQRSTUVWXYZ23456789".random() }.joinToString("")
+            roomClient?.close(); roomClient = null
+            roomHost?.close()
+            localPlayersBackup = players
+            players = listOf(players.first().copy(name = lobbyPlayerName.trim().ifBlank { "PLAYER" }, isOnline = true))
+            selectedPlayer = 0
+            activePlayer = 0
+            localSeat = 0
+            lobbyCreated = true
+            roomConnected = false
+            gameStartedOnline = false
+            endProposalBy = -1
+            endVotes = emptyMap()
+            gameEndedOnline = false
+            onlineStateReady = false
+            lobbyReadyPlayers = emptySet()
+            pendingReadyState = null
+            lobbyTurnOrder = null
+            lobbyHostAddress = ""
+            onlineStatus = "Starting room host"
+            val host = LanRoomHost(
+                roomCode = lobbyRoomCode,
+                password = lobbyPassword,
+                onStarted = { address -> scope.launch(Dispatchers.Main) {
+                    lobbyHostAddress = address
+                    onlineStatus = if (address.isBlank()) "Room is open · local IP not found" else "Room is open"
+                    roomConnected = true
+                    onlineStateReady = true
+                    recordDiagnostic(if (address.isBlank()) "Lobby host started without a detected local IP" else "Lobby host started with a detected local IP")
+                    if (address.isBlank()) lobbyNotice = "The room server is open, but this phone's Wi-Fi IP could not be detected. Check Wi-Fi or hotspot settings before inviting players."
+                } },
+                onSnapshot = { snapshot -> scope.launch(Dispatchers.Main) { applyOnlineSnapshot(snapshot) } },
+                onPeerJoined = { seat, name -> scope.launch(Dispatchers.Main) {
+                    if (players.size <= seat) players = players + TablePlayer(name = name, isOnline = true)
+                    else players = players.mapIndexed { index, player -> if (index == seat) player.copy(name = name, isOnline = true) else player }
+                    recordDiagnostic("Remote player joined: seat ${seat + 1}")
+                    lobbyNotice = "$name joined the room."
+                    if (backgroundAlertsEnabled && !appInForeground) postGameAlert(context, "Player connected", "$name joined the game room.")
+                } },
+                onPeerLeft = { seat -> scope.launch(Dispatchers.Main) {
+                    if (seat in players.indices && seat > 0) {
+                        val departed = players[seat].name
+                        roomHost?.reserveSeat(seat)
+                        players = players.mapIndexed { index, player -> if (index == seat) player.copy(isOnline = false) else player }
+                        lobbyReadyPlayers = lobbyReadyPlayers - seat
+                        recordDiagnostic("Remote player disconnected; reserved seat ${seat + 1} for reconnect")
+                        lobbyNotice = "$departed lost connection. Their seat is reserved; they can try to reconnect."
+                        if (message == null) message = "$departed lost connection. Their seat is reserved while they reconnect."
+                        if (backgroundAlertsEnabled && !appInForeground) postGameAlert(context, "Player disconnected", "$departed lost connection. Their seat is reserved for reconnect.")
+                    }
+                } },
+                onEvent = { event -> scope.launch(Dispatchers.Main) { recordDiagnostic(event) } },
+                onError = { error -> scope.launch(Dispatchers.Main) {
+                    recordDiagnostic("Room host error: $error")
+                    lobbyHostAddress = ""
+                    roomConnected = false
+                    onlineStateReady = false
+                    onlineStatus = "Host failed to start"
+                    lobbyNotice = "Couldn't start the room host: $error. Close this lobby and try creating it again."
+                    roomHost?.close()
+                    roomHost = null
+                    lobbyCreated = false
+                } },
+                onHostMigrationFinished = { scope.launch(Dispatchers.Main) {
+                    recordDiagnostic("Previous host left after successful handoff")
+                    leaveOnlineRoom()
+                } }
+            )
+            roomHost = host
+            host.start()
+            scope.launch {
+                delay(10_000)
+                if (roomHost === host && onlineStatus == "Starting room host") {
+                    recordDiagnostic("Lobby host startup timed out")
+                    host.close()
+                    roomHost = null
+                    lobbyCreated = false
+                    roomConnected = false
+                    onlineStateReady = false
+                    lobbyHostAddress = ""
+                    onlineStatus = "Host startup timed out"
+                    lobbyNotice = "The room didn't start. Check that no other Arcana Table room is open, then try again."
+                }
+            }
+        } } },
+        onJoin = { guidedAction("lobby-submit") { if (lobbyInternetMode) {
+            if (lobbyCloudEndpoint.isBlank()) {
+                lobbyNotice = "Enter your deployed Cloudflare Worker URL first."
+            } else {
+                lobbyCloudEndpoint = lobbyCloudEndpoint.trim().removeSuffix("/")
+                optionPrefs.edit().putString("cloud_room_endpoint", lobbyCloudEndpoint).apply()
+                roomHost?.close(); roomHost = null
+                roomClient?.close(); roomClient = null
+                cloudRoomClient?.close()
+                localPlayersBackup = players
+                roomConnected = false
+                onlineStateReady = false
+                localDeckSyncConfirmed = false
+                pendingReadyState = null
+                lobbyCreated = false
+                lobbyRoomCode = lobbyJoinCode
+                lobbyPassword = lobbyJoinPassword
+                recordDiagnostic("Internet lobby join requested")
+                lobbyNotice = "Connecting securely to the internet room…"
+                onlineStatus = "Connecting"
+                val client = makeCloudRoomClient(lobbyJoinCode, lobbyJoinPassword, creating = false)
+                cloudRoomClient = client
+                client.connect(lobbyCloudEndpoint, lobbyJoinCode, lobbyJoinPassword, lobbyPlayerName, create = false)
+                scope.launch {
+                    delay(15_000)
+                    if (cloudRoomClient === client && !roomConnected) {
+                        client.close()
+                        cloudRoomClient = null
+                        onlineStatus = "Connection timed out"
+                        lobbyNotice = "The room service did not answer in time. Check the Worker URL and internet connection, then try again."
+                    }
+                }
+            }
+        } else {
+            roomHost?.close(); roomHost = null
+            cloudRoomClient?.close(); cloudRoomClient = null
+            roomClient?.close()
+            localPlayersBackup = players
+            roomConnected = false
+            onlineStateReady = false
+            localDeckSyncConfirmed = false
+            pendingReadyState = null
+            recordDiagnostic("Lobby join requested")
+            lobbyNotice = "Connecting to $lobbyHostInput…"
+            onlineStatus = "Connecting"
+            val client = makeRoomClient(lobbyHostInput, lobbyJoinCode, lobbyJoinPassword)
+            roomClient = client
+            client.connect(lobbyHostInput, lobbyJoinCode, lobbyJoinPassword, lobbyPlayerName)
+        } } },
+        onToggleReady = { index -> guidedAction("lobby-ready") {
+            val isHostAi = lobbyCreated && index in players.indices && players[index].isComputer
+            if (index != localSeat && !isHostAi) lobbyNotice = "Each player marks their own seat ready on their device."
+            else if (!players[index].deckLoaded) lobbyNotice = "${players[index].name} needs an imported deck before becoming ready."
+            else if (!players[index].openingHandKept && !players[index].isComputer) lobbyNotice = "Choose Keep Hand or Mulligan before marking ready."
+            else {
+                val isBecomingReady = index !in lobbyReadyPlayers
+                if ((roomClient != null || cloudRoomClient != null) && index == localSeat) {
+                    pendingReadyState = isBecomingReady
+                    recordDiagnostic("Ready status sent: seat ${localSeat + 1}, ready=$isBecomingReady")
+                    val sent = roomClient?.publishReady(isBecomingReady) ?: cloudRoomClient?.publishReady(isBecomingReady) ?: false
+                    if (!sent) {
+                        pendingReadyState = null
+                        lobbyNotice = "Your ready status could not be sent. Check the connection and retry."
+                        recordDiagnostic("Ready status send failed: seat ${localSeat + 1}")
+                    } else lobbyNotice = if (isBecomingReady) "Sending ready status to the host…" else "Sending your not-ready status to the host…"
+                    scope.launch {
+                        delay(5_000)
+                        if (pendingReadyState == isBecomingReady) {
+                            pendingReadyState = null
+                            lobbyNotice = "The host has not confirmed that readiness change. Reopen the lobby or try again."
+                            recordDiagnostic("Ready confirmation timed out: seat ${localSeat + 1}, requested=$isBecomingReady")
+                        }
+                    }
+                } else {
+                    lobbyReadyPlayers = if (isBecomingReady) lobbyReadyPlayers + index else lobbyReadyPlayers - index
+                    recordDiagnostic("Ready status changed locally: seat ${index + 1}, ready=$isBecomingReady")
+                    lobbyNotice = if (isBecomingReady) "${players[index].name} is ready to start." else "${players[index].name} is not ready yet."
+                }
+            }
+        } },
+        onImportDeck = { index -> guidedAction("lobby-import") {
+            selectedPlayer = index
+            lobbyOpen = false
+            importError = null
+            importOpen = true
+        } },
+        onAddAi = { guidedAction("lobby-ai") {
+            lobbyOpen = false
+            addAiOpponent()
+        } },
+        onRandomizeTurnOrder = { guidedAction("lobby-order") {
+            val randomized = players.indices.shuffled()
+            lobbyTurnOrder = randomized
+            lobbyNotice = "${players[randomized.first()].name} will take the first turn."
+        } },
+        onStartGame = { guidedAction("lobby-start") {
+            val order = lobbyTurnOrder ?: players.indices.toList()
+            recordDiagnostic("Host started game with ${players.size} occupied seat(s)")
+            resetGame(startImmediately = true, order = order, preserveOpeningHands = true)
+            endProposalBy = -1
+            endVotes = emptyMap()
+            logAction(activePlayer, "started the game and goes first")
+        } },
+        onLeave = { guidedAction("lobby-leave") {
+            if (cloudRoomClient != null) {
+                lobbyNotice = "Leaving the room. The internet room stays available for the other players."
+                recordDiagnostic("Player left the internet room")
+                leaveOnlineRoom()
+            } else if (lobbyCreated && gameStartedOnline && !gameEndedOnline) {
+                val successorSeat = roomHost?.beginHostTransfer()
+                if (successorSeat == null) {
+                    lobbyNotice = "The room needs another connected player before you can hand off hosting. The game is still running here."
+                    recordDiagnostic("Host leave blocked because no successor could accept the room")
+                } else {
+                    lobbyNotice = "Handing the room to ${players.getOrNull(successorSeat)?.name ?: "the next player"}… Keep this screen open until the transfer finishes."
+                    onlineStatus = "Transferring host"
+                    recordDiagnostic("Host initiated transfer to seat ${successorSeat + 1}")
+                }
+            } else {
+                leaveOnlineRoom()
+            }
+        } },
+    )
+
+    handActionCard?.let { card -> HandCardActionsDialog(
+        card, hasCommander = players.getOrNull(selectedPlayer)?.let { it.commanderCard != null || !it.commanderName.isNullOrBlank() } == true,
+        isCommanderCard = players.getOrNull(selectedPlayer)?.commanderCard?.id == card.id,
+        tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.target == "hand-actions" },
+        tutorialIndex = tutorialIndex, tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
+        onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
+        onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
+        onDismiss = { handActionCard = null }, onAction = { action -> guidedAction("hand-actions") { performHandAction(card, action) } }
+    ) }
+
+    if (connectionLostReason != null || reconnecting) AlertDialog(
+        onDismissRequest = { if (!reconnecting) connectionLostReason = null },
+        title = { Text(if (reconnecting) "Reconnecting…" else "Connection interrupted") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (reconnecting) CircularProgressIndicator(color = Mint, strokeWidth = 2.dp)
+                Text(connectionLostReason ?: "Arcana Table is trying to restore your room connection.", color = Muted)
+                if (reconnecting) Text("The host keeps your seat reserved while you reconnect.", color = Mint, fontSize = 11.sp)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { reconnectToRoom() }, enabled = !reconnecting) {
+                Text(if (reconnecting) "TRYING…" else "AUTO RECONNECT", color = if (reconnecting) Muted else Mint)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = {
+                reconnectJob?.cancel()
+                reconnectJob = null
+                reconnecting = false
+                roomClient?.close()
+                roomClient = null
+                if (connectionLost) {
+                    roomConnected = false
+                    onlineStatus = "Disconnected"
+                }
+                connectionLostReason = null
+            }) { Text(if (reconnecting) "CANCEL" else "LATER", color = Muted) }
+        },
+        containerColor = Panel,
+        titleContentColor = SoftWhite,
+        textContentColor = Muted
+    )
+
+    if (importOpen) {
+        Dialog(onDismissRequest = { if (!importing) cancelDeckImport() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            val maxImportDialogHeight = LocalConfiguration.current.screenHeightDp.dp * 0.86f
+            Surface(Modifier.fillMaxWidth(0.96f).heightIn(max = maxImportDialogHeight), shape = RoundedCornerShape(18.dp), color = Panel) {
+                Box(Modifier.fillMaxWidth().heightIn(max = maxImportDialogHeight)) {
+                    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("${if (players[selectedPlayer].deckLoaded) "Replace deck for" else "Import deck for"} ${players[selectedPlayer].name}", color = SoftWhite, fontSize = 19.sp, modifier = Modifier.weight(1f))
+                            IconButton(onClick = { guidedAction("deck-cancel") { if (!importing) cancelDeckImport() } }, modifier = Modifier.size(44.dp).then(tutorialAnchor("deck-cancel"))) { Icon(Icons.Filled.Close, "Cancel deck import", tint = Muted) }
+                        }
+                        Text("Paste a deck list or choose a .txt/.csv file. Import replaces this player's deck.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                        TextButton(onClick = { guidedAction("deck-load-saved") { savedDecksOpen = true } }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp).then(tutorialAnchor("deck-load-saved"))) { Text("SAVED DECKS · ${savedDecks.size}", color = Mint) }
+                        Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                            OutlinedButton(onClick = { guidedAction("deck-choose-file") { filePicker.launch(arrayOf("text/*", "application/*")) } }, enabled = !importing && !randomDeckLoading, modifier = Modifier.weight(1f).heightIn(min = 48.dp).then(tutorialAnchor("deck-choose-file"))) { Text("CHOOSE FILE", fontSize = 9.sp) }
+                            OutlinedButton(
+                                onClick = { guidedAction("deck-random") {
+                                    randomDeckLoading = true
+                                    importError = null
+                                    scope.launch {
+                                        try {
+                                            importText = fetchRandomCommanderDecklist()
+                                            message = "Random Commander deck loaded. Review it, then tap Import."
+                                        } catch (error: Exception) {
+                                            importError = error.message ?: "Could not fetch a random deck. Check your connection and try again."
+                                        } finally { randomDeckLoading = false }
+                                    }
+                                } },
+                                enabled = !importing && !randomDeckLoading,
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp).then(tutorialAnchor("deck-random"))
+                            ) { Text(if (randomDeckLoading) "FETCHING…" else "RANDOM DECK", fontSize = 9.sp, color = Mint) }
+                        }
+                        OutlinedTextField(
+                            value = importText,
+                            onValueChange = { importText = it; importError = null },
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp, max = 260.dp).padding(top = 6.dp),
+                            placeholder = { Text("1 Sol Ring\n36 Island\n...") },
+                            minLines = 5,
+                            maxLines = 10,
+                            enabled = !importing && !randomDeckLoading
+                        )
+                        if (importText.isNotBlank()) {
+                            val importedCardCount = remember(importText) { parseDeckList(importText).sumOf { it.count } }
+                            Text("${importedCardCount} cards in list · scroll inside the box to review", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
+                        }
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = importSaveToLibrary, onCheckedChange = { importSaveToLibrary = it }, enabled = !importing)
+                            Text("Save this imported deck for later", color = SoftWhite, fontSize = 11.sp)
+                        }
+                        if (importSaveToLibrary) OutlinedTextField(importSaveName, { importSaveName = it }, modifier = Modifier.fillMaxWidth(), singleLine = true, label = { Text("Saved deck name (optional)") }, enabled = !importing)
+                        importError?.let { Text(it, color = Color(0xFFFF9C91), fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp)) }
+                        if (importing) Text("Checking every card name against the card catalog…", color = Mint, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                            TextButton(onClick = { guidedAction("deck-cancel") { if (!importing) cancelDeckImport() } }, modifier = Modifier.heightIn(min = 48.dp).then(tutorialAnchor("deck-cancel"))) { Text("CANCEL", color = Muted) }
+                            Button(onClick = { guidedAction("deck-import") { importDeck(importText) } }, enabled = !importing && !randomDeckLoading, modifier = Modifier.heightIn(min = 48.dp).then(tutorialAnchor("deck-import"))) { Text(if (importing || randomDeckLoading) "LOADING" else "IMPORT") }
+                        }
+                    }
+                    tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "DECK_IMPORT" }?.let { step ->
+                        GuidedTutorialOverlay(step, tutorialIndex, tutorialStops.size, tutorialBounds[step.target], { goBackTutorial() }, { advanceTutorial() }, { markTutorialSeen(step.view); tutorialOpen = false })
+                    }
+                }
+            }
+        }
+    }
+
+    if (savedDecksOpen) SavedDecksDialog(
+        decks = savedDecks,
+        tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "SAVED_DECKS" },
+        tutorialIndex = tutorialIndex, tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
+        onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
+        onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
+        onLoad = { deck -> guidedAction("saved-load") {
+            if (onlineMode) selectedPlayer = localSeat
+            importText = deck.text
+            importError = null
+            importOpen = true
+            savedDecksOpen = false
+        } },
+        onDelete = { deck -> guidedAction("saved-delete") {
+            savedDecks = savedDecks.filterNot { it.name == deck.name && it.text == deck.text }
+            saveSavedDecks(context, savedDecks)
+        } },
+        onDismiss = { guidedAction("saved-close") { savedDecksOpen = false } }
+    )
+
+    if (importReviewOpen) {
+        val reviewPlayerIndex = selectedPlayer
+        val reviewPlayer = players.getOrNull(reviewPlayerIndex)
+        val cardsNeedingReview = reviewPlayer?.let { player ->
+            (player.library + player.hand + listOfNotNull(player.commanderCard))
+                .filter { it.id in importReviewCardIds && it.importIssue != null }
+                .distinctBy { it.id }
+        }.orEmpty()
+        AlertDialog(
+            onDismissRequest = { if (!importAutoFixInProgress) importReviewOpen = false },
+            title = { Text("Review imported cards") },
+            text = { Text(importReviewMessage, color = Muted, fontSize = 12.sp) },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    Row {
+                        if (cardsNeedingReview.isNotEmpty()) TextButton(
+                            enabled = !importAutoFixInProgress,
+                            onClick = {
+                                val groupedCards = cardsNeedingReview.groupBy { it.name }
+                                importAutoFixInProgress = true
+                                importReviewMessage = "Checking ${groupedCards.size} card ${if (groupedCards.size == 1) "name" else "names"} for close matches…"
+                                scope.launch {
+                                    val fixedIds = mutableSetOf<Int>()
+                                    val matchedNames = mutableListOf<Pair<String, String>>()
+                                    val unresolvedNames = mutableListOf<String>()
+                                    var lookupFailures = 0
+                                    for ((name, copies) in groupedCards) {
+                                        val lookup = runCatching { Scryfall.fuzzyNamedCard(name) }
+                                        val candidate = lookup.getOrNull()?.takeIf {
+                                            cardNameSimilarity(name, it.name) >= 0.78
+                                        }
+                                        if (candidate == null) {
+                                            unresolvedNames += name
+                                            if (lookup.isFailure) lookupFailures++
+                                            continue
+                                        }
+                                        val ids = copies.mapTo(mutableSetOf()) { it.id }
+                                        updatePlayer(reviewPlayerIndex) { player ->
+                                            fun fix(card: GameCard) = if (card.id in ids) card.copy(
+                                                name = candidate.name,
+                                                type = candidate.type,
+                                                imageUrl = candidate.imageUrl,
+                                                oracleText = candidate.oracleText,
+                                                manaValue = candidate.manaValue,
+                                                importIssue = null,
+                                                artCropUrl = candidate.artCropUrl,
+                                                manaCost = candidate.manaCost,
+                                                power = candidate.power,
+                                                toughness = candidate.toughness,
+                                                keywords = candidate.keywords
+                                            ) else card
+                                            val commander = player.commanderCard?.let(::fix)
+                                            val commanderWasFixed = player.commanderCard?.id?.let(ids::contains) == true
+                                            player.copy(
+                                                library = player.library.map(::fix),
+                                                hand = player.hand.map(::fix),
+                                                commanderCard = commander,
+                                                commanderName = if (commanderWasFixed) commander?.name else player.commanderName
+                                            )
+                                        }
+                                        fixedIds += ids
+                                        matchedNames += name to candidate.name
+                                    }
+                                    importReviewCardIds = importReviewCardIds - fixedIds
+                                    val allReviewCardsFixed = unresolvedNames.isEmpty() && lookupFailures == 0
+                                    if (allReviewCardsFixed && importOverflowCardIds.isEmpty()) {
+                                        importReviewCardIds = emptySet()
+                                        importReviewOpen = false
+                                        message = "Auto Fix succeeded. All cards needing review were matched."
+                                    } else {
+                                        importReviewMessage = buildString {
+                                            if (matchedNames.isNotEmpty()) {
+                                                append("Auto Fix matched ${matchedNames.size} card ${if (matchedNames.size == 1) "name" else "names"} and updated ${fixedIds.size} flagged ${if (fixedIds.size == 1) "card" else "cards"}.")
+                                            } else if (lookupFailures == 0) {
+                                                append("Auto Fix couldn’t identify the cards.")
+                                            }
+                                            if (unresolvedNames.isNotEmpty()) {
+                                                append("\n\nYou’ll need to resolve these manually: ")
+                                                append(unresolvedNames.take(5).joinToString(", "))
+                                                if (unresolvedNames.size > 5) append(" and ${unresolvedNames.size - 5} more")
+                                                append(".")
+                                            }
+                                            if (lookupFailures > 0) append("\n\nCouldn’t check $lookupFailures ${if (lookupFailures == 1) "name" else "names"}. Check your connection and try Auto Fix again.")
+                                            if (importOverflowCardIds.isNotEmpty()) append("\n\n${importOverflowCardIds.size} over-limit ${if (importOverflowCardIds.size == 1) "card remains" else "cards remain"}.")
+                                            if (unresolvedNames.isNotEmpty() || lookupFailures > 0) append("\n\nOpen Editor to resolve the remaining cards manually.")
+                                        }
+                                    }
+                                    importAutoFixInProgress = false
+                                }
+                            }
+                        ) { Text(if (importAutoFixInProgress) "FIXING…" else "AUTO FIX", color = Mint) }
+                        if (importOverflowCardIds.isNotEmpty()) TextButton(
+                            enabled = !importAutoFixInProgress,
+                            onClick = {
+                                val overflow = importOverflowCardIds
+                                updatePlayer(reviewPlayerIndex) { p -> p.copy(hand = p.hand.filterNot { it.id in overflow }, library = p.library.filterNot { it.id in overflow }) }
+                                importReviewCardIds = importReviewCardIds - overflow
+                                importOverflowCardIds = emptySet()
+                                importReviewMessage = "Removed ${overflow.size} card(s) over the deck limit."
+                            }
+                        ) { Text("TRIM EXCESS", color = Mint) }
+                    }
+                    if (cardsNeedingReview.isNotEmpty()) TextButton(onClick = { if (!importAutoFixInProgress) { importReviewOpen = false; deckEditorOpen = true } }, enabled = !importAutoFixInProgress) {
+                        Text("OPEN EDITOR", color = Mint)
+                    }
+                }
+            },
+            dismissButton = { TextButton(onClick = { if (!importAutoFixInProgress) importReviewOpen = false }, enabled = !importAutoFixInProgress) { Text("LATER") } },
+            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
+        )
+    }
+
+    if (tokenPickerOpen) TokenPickerDialog(
+        onDismiss = { tokenPickerOpen = false },
+        onAdd = { token ->
+            val created = makeCard(token.name, token.type, token.imageUrl, token = true)
+            updatePlayer(tokenTarget) { it.copy(battlefield = it.battlefield + created) }
+            logAction(tokenTarget, "created a ${token.name} token")
+            applyCreatureEntryLifeEffects(tokenTarget, created)
+            tokenPickerOpen = false
+        }
+    )
+
+    counterTarget?.let { (playerIndex, cardId) ->
+        val card = players[playerIndex].battlefield.firstOrNull { it.id == cardId }
+        if (card != null) CounterPickerDialog(card, onDismiss = { counterTarget = null }, onAdd = { counter ->
+            updateCard(playerIndex, cardId) { current -> current.copy(counters = current.counters + (counter to ((current.counters[counter] ?: 0) + 1))) }
+            logAction(playerIndex, "put a $counter counter on ${card.name}")
+            counterTarget = null
+        })
+    }
+
+    preview?.let { item ->
+        CardPreviewPopup(item = item, onDismiss = { preview = null })
+    }
+
+    zoneDialog?.let { (index, zone) ->
+        val cards = when (zone) {
+            "Graveyard" -> players[index].graveyard
+            "Exile" -> players[index].exile
+            else -> players[index].revealed
+        }
+        CardZoneDialog(
+            zone, players[index].name, cards, onDismiss = { zoneDialog = null },
+            onPreview = { preview = CardPreview(index, it, fromHand = false, canManipulate = false) },
+            canMoveCards = zone in listOf("Graveyard", "Exile") && (!onlineMode || index == localSeat && !gameEndedOnline),
+            onMoveCard = { card, destination ->
+                val canControlZone = !onlineMode || index == localSeat && !gameEndedOnline
+                if (canControlZone && destination == "Command Zone" && card.id == players[index].commanderCard?.id) {
+                    updatePlayer(index) { p -> p.copy(graveyard = p.graveyard.filterNot { it.id == card.id }, exile = p.exile.filterNot { it.id == card.id }, revealed = p.revealed.filterNot { it.id == card.id }, commanderCard = card, commanderName = card.name) }
+                    logAction(index, "moved ${card.name} to the command zone")
+                } else if (canControlZone) {
+                    updatePlayer(index) { p ->
+                        val sourceCards = when (zone) {
+                            "Graveyard" -> p.graveyard
+                            "Exile" -> p.exile
+                            else -> p.revealed
+                        }
+                        if (sourceCards.none { it.id == card.id }) p else {
+                            val withoutCard = when (zone) {
+                                "Graveyard" -> p.copy(graveyard = p.graveyard.filterNot { it.id == card.id })
+                                "Exile" -> p.copy(exile = p.exile.filterNot { it.id == card.id })
+                                else -> p.copy(revealed = p.revealed.filterNot { it.id == card.id })
+                            }
+                            when (destination) {
+                                "Hand" -> withoutCard.copy(hand = withoutCard.hand + card)
+                                "Battlefield" -> withoutCard.copy(battlefield = withoutCard.battlefield + card.copy(tapped = false))
+                                "Library (top)" -> withoutCard.copy(library = listOf(card) + withoutCard.library)
+                                "Library (bottom)" -> withoutCard.copy(library = withoutCard.library + card)
+                                "Graveyard" -> withoutCard.copy(graveyard = withoutCard.graveyard + card)
+                                "Exile" -> withoutCard.copy(exile = withoutCard.exile + card)
+                                "Revealed" -> withoutCard.copy(revealed = withoutCard.revealed + card)
+                                else -> p
+                            }
+                        }
+                    }
+                    val destinationLabel = if (destination == "Library (top)") "the top of the library" else if (destination == "Library (bottom)") "the bottom of the library" else destination.lowercase()
+                    logAction(index, "moved ${card.name} from ${zone.lowercase()} to $destinationLabel")
+                    if (destination == "Battlefield" && needsCreatureTypeChoice(card)) creatureTypeChoicePrompt = CreatureTypeChoicePrompt(index, card.id, card.name)
+                    if (destination == "Battlefield") applyCreatureEntryLifeEffects(index, card)
+                }
+            },
+            commanderId = players[index].commanderCard?.id,
+            canMoveCommander = !onlineMode || index == localSeat && !gameEndedOnline
+        )
+    }
+
+    if (message != null) AlertDialog(onDismissRequest = { message = null }, title = { Text("Arcana Table") }, text = { Text(message!!) }, confirmButton = { TextButton(onClick = { message = null }) { Text("OK") } }, containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted)
+
+    if (logOpen) GameLogDialog(
+        entries = gameLog,
+        previewableCards = players.flatMapIndexed { index, player ->
+            (player.battlefield + player.graveyard + player.exile + player.revealed.filterNot { it.isFaceDown } + listOfNotNull(player.commanderCard))
+                .filterNot { it.isFaceDown }.map { index to it }
+        },
+        onPreviewCard = { owner, card -> preview = CardPreview(owner, card, fromHand = false, canManipulate = false) },
+        tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "GAME_LOG" },
+        tutorialIndex = tutorialIndex, tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
+        onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
+        onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
+        onDismiss = { guidedAction("log-close") { logOpen = false } }
+    )
+    if (rulesOpen) RulesLookupDialog(onDismiss = { rulesOpen = false })
+    AnimatedVisibility(
+        visible = chatOpen,
+        modifier = Modifier.fillMaxSize(),
+        enter = slideInHorizontally(initialOffsetX = { it }) + fadeIn(),
+        exit = slideOutHorizontally(targetOffsetX = { it }) + fadeOut()
+    ) {
+        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.28f)).clickable { chatOpen = false }, contentAlignment = Alignment.CenterEnd) {
+            LocalChatPanel(
+                players = players, activePlayer = if (onlineMode) localSeat else activePlayer, messages = chatMessages, draft = chatDraft,
+                modifier = Modifier.fillMaxHeight().fillMaxWidth(0.88f).clickable(enabled = false) {},
+                tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "CHAT" },
+                tutorialIndex = tutorialIndex, tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
+                onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
+                onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
+                onDraft = { chatDraft = it }, onDismiss = { guidedAction("chat-close") { chatOpen = false } }, onSend = { guidedAction("chat-send") {
+            val text = chatDraft.trim()
+            if (text.isNotEmpty()) {
+                val speaker = if (onlineMode) localSeat else activePlayer
+                chatMessages = chatMessages + ChatMessage(players[speaker.coerceIn(players.indices)].name, text, formatClock(elapsedGameSeconds))
+                logAction(speaker, "sent a chat message")
+                chatDraft = ""
+            }
+                } }
+            )
+        }
+    }
+
+    if (optionsOpen) OptionsPage(
+        tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "OPTIONS" },
+        tutorialIndex = tutorialIndex, tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
+        onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
+        onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
+        darkMode = darkMode, timerRunning = turnTimerRunning, timerVisible = turnTimerVisible,
+        backgroundAlertsEnabled = backgroundAlertsEnabled,
+        autoReturnTableAfterPass = autoReturnTableAfterPass, autoDrawOnDrawStep = autoDrawOnDrawStep,
+        autoUntapOnUntapStep = autoUntapOnUntapStep, openHandAfterDraw = openHandAfterDraw,
+        reducedSwipeMotion = reducedSwipeMotion, cardSizeScale = cardSizeScale,
+        onToggleTheme = { guidedAction("options-theme") { onToggleTheme() } },
+        onToggleTimerVisibility = { guidedAction("options-timer") { turnTimerVisible = !turnTimerVisible } },
+        onToggleBackgroundAlerts = { enabled -> guidedAction("options-alerts") { setBackgroundAlerts(enabled) } },
+        onAutoReturnTable = { value -> guidedAction("options-return-table") { autoReturnTableAfterPass = value; optionPrefs.edit().putBoolean("auto_return_table", value).apply() } },
+        onAutoDraw = { value -> guidedAction("options-auto-draw") { autoDrawOnDrawStep = value; optionPrefs.edit().putBoolean("auto_draw_step", value).apply() } },
+        onAutoUntap = { value -> guidedAction("options-auto-untap") { autoUntapOnUntapStep = value; optionPrefs.edit().putBoolean("auto_untap_step", value).apply() } },
+        onOpenHandAfterDraw = { value -> guidedAction("options-open-hand") { openHandAfterDraw = value; optionPrefs.edit().putBoolean("open_hand_after_draw", value).apply() } },
+        onReducedMotion = { value -> guidedAction("options-motion") { reducedSwipeMotion = value; optionPrefs.edit().putBoolean("reduced_swipe_motion", value).apply() } },
+        onCardSizeScale = { value -> guidedAction("options-card-size") { cardSizeScale = value; optionPrefs.edit().putFloat("card_size_scale", value).apply() } },
+        onOpenDeveloperOptions = { guidedAction("options-developer") { optionsOpen = false; developerOptionsOpen = true } },
+        onClearAllData = { guidedAction("clear-data") { optionsOpen = false; clearAllConfirmOpen = true } },
+        onDismiss = { guidedAction("options-close") { optionsOpen = false } }
+    )
+    if (developerOptionsOpen) DeveloperOptionsPage(
+        players = players,
+        selectedPlayer = selectedPlayer,
+        onSelectPlayer = { index -> selectedPlayer = index; showOverview = false; developerOptionsOpen = false },
+        onLoadRandomDecks = { makeRandomDecks(); developerOptionsOpen = false },
+        onRandomizeMidgame = { randomizeMidgame(); developerOptionsOpen = false },
+        onOpenWalkthrough = { startTutorial() },
+        onDismiss = { developerOptionsOpen = false }
+    )
+
+    if (resetConfirmOpen) AlertDialog(
+        onDismissRequest = { resetConfirmOpen = false },
+        title = { Text("Reset this game?") },
+        text = { Text("This will shuffle each player's non-token cards into a new library, deal a new opening hand, reset life and timers, and clear the current board and game log. Player names, decks, and commanders will stay.") },
+        confirmButton = { TextButton(onClick = { resetGame() }) { Text("RESET GAME", color = Color(0xFFE9978B)) } },
+        dismissButton = { TextButton(onClick = { resetConfirmOpen = false }) { Text("CANCEL") } }
+    )
+
+    if (onlineMode && endProposalBy >= 0 && localSeat !in endVotes && !gameEndedOnline) {
+        val proposer = players.getOrNull(endProposalBy)?.name ?: "A player"
+        AlertDialog(
+            onDismissRequest = { submitEndVote(false) },
+            title = { Text("End this game?") },
+            text = { Text("$proposer proposes ending the game. Everyone must agree. If you decline, the game continues.") },
+            confirmButton = { TextButton(onClick = { submitEndVote(true) }) { Text("AGREE TO END", color = Mint) } },
+            dismissButton = { TextButton(onClick = { submitEndVote(false) }) { Text("KEEP PLAYING", color = SoftWhite) } },
+            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
+        )
+    }
+    if (onlineMode && gameEndedOnline) AlertDialog(
+        onDismissRequest = {},
+        title = { Text("Game ended by unanimous vote") },
+        text = { Text("Every player agreed to end the game. The table is now read-only.") },
+        confirmButton = { TextButton(onClick = { homeOpen = true; showOverview = true; lobbyOpen = true }) { Text("ROOM LOBBY", color = Mint) } },
+        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
+    )
+
+    if (clearAllConfirmOpen) AlertDialog(
+        onDismissRequest = { clearAllConfirmOpen = false },
+        title = { Text("Clear all app data?") },
+        text = { Text("This clears the current game, room, chat, logs, and game settings. The Internet room URL resets to your default. Saved decks and tutorial progress are kept.") },
+        confirmButton = { TextButton(onClick = { clearAllData() }) { Text("CLEAR EVERYTHING", color = Color(0xFFE9978B)) } },
+        dismissButton = { TextButton(onClick = { clearAllConfirmOpen = false }) { Text("CANCEL") } },
+        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
+    )
+
+    if (manaPoolOpen) ManaPoolDialog(
+        player = players.getOrNull(manaTarget) ?: players.first(),
+        onChange = { color, delta -> changeMana(manaTarget, color, delta) },
+        onClear = { clearMana(manaTarget) },
+        onDismiss = { manaPoolOpen = false }
+    )
+
+    landEntryPrompt?.let { prompt ->
+        val life = players.getOrNull(prompt.playerIndex)?.life ?: 0
+        fun placeLand(enterTapped: Boolean, payTwoLife: Boolean = false) {
+            val playerIndex = prompt.playerIndex
+            if (playerIndex in players.indices) {
+                updatePlayer(playerIndex) { player ->
+                    player.copy(
+                        life = if (payTwoLife) player.life - 2 else player.life,
+                        hand = player.hand.filterNot { it.id == prompt.card.id },
+                        battlefield = player.battlefield + prompt.card.copy(tapped = enterTapped)
+                    )
+                }
+                logAction(playerIndex, "played ${prompt.card.name}${if (payTwoLife) " and paid 2 life" else if (enterTapped) " tapped" else " untapped"}")
+                if (needsCreatureTypeChoice(prompt.card)) creatureTypeChoicePrompt = CreatureTypeChoicePrompt(playerIndex, prompt.card.id, prompt.card.name)
+            }
+            landEntryPrompt = null
+        }
+        AlertDialog(
+            onDismissRequest = { landEntryPrompt = null },
+            title = { Text(if (prompt.isShockLand) "Pay 2 life for ${prompt.card.name}?" else "How should ${prompt.card.name} enter?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (prompt.conditionText.isNotBlank()) Text(prompt.conditionText, color = Muted)
+                    if (prompt.isShockLand) Text("Pay 2 life to have it enter untapped, or let it enter tapped.", color = SoftWhite)
+                    else Text("Choose the entry state. Check the condition above; Arcana will track the tapped state you choose.", color = SoftWhite)
+                }
+            },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    if (prompt.isShockLand) TextButton(onClick = { placeLand(enterTapped = false, payTwoLife = true) }, enabled = life >= 2) {
+                        Text("PAY 2 LIFE · ENTER UNTAPPED", color = if (life >= 2) Mint else Muted)
+                    } else TextButton(onClick = { placeLand(enterTapped = false) }) {
+                        Text("ENTER UNTAPPED", color = Mint)
+                    }
+                    TextButton(onClick = { placeLand(enterTapped = true) }) { Text("ENTER TAPPED", color = Mint) }
+                }
+            },
+            dismissButton = { TextButton(onClick = { landEntryPrompt = null }) { Text("CANCEL", color = Muted) } },
+            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
+        )
+    }
+
+    paymentCard?.let { (owner, card) ->
+        val commanderCast = players.getOrNull(owner)?.commanderCard?.id == card.id
+        val tax = if (commanderCast) (players.getOrNull(owner)?.commanderCastCount ?: 0) * 2 else 0
+        val payable = paySimpleManaCost(players.getOrNull(owner)?.manaPool.orEmpty(), card.manaCost, tax)
+        val costKnown = card.manaCost != null
+        AlertDialog(
+            onDismissRequest = { paymentCard = null; handActionCard = null },
+            title = { Text(if (commanderCast) "Cast commander?" else "Cast ${if (card.isFaceDown) "face down" else card.name}?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("Mana cost:")
+                    if (card.manaCost.isNullOrBlank()) Text("unknown") else ManaCostPips(card.manaCost.orEmpty())
+                    if (tax > 0) Text("+ $tax commander tax")
+                }
+                    Text("Tracked pool: ${players.getOrNull(owner)?.manaPool?.entries?.joinToString { (color, amount) -> "${color} $amount" }?.ifBlank { "empty" } ?: "empty"}", color = Muted)
+                    if (!costKnown) Text("No parsed mana cost is available. Use manual payment after checking the card.", color = CounterGold)
+                    else if (!supportsSimpleManaCost(card.manaCost)) Text("This cost uses hybrid, phyrexian, X, or other special symbols. Review and pay it manually.", color = CounterGold)
+                    else if (payable == null) Text("The tracked pool does not have the required colored and generic mana.", color = CounterGold)
+                }
+            },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = { castFromPayment(owner, card, commanderCast) }, enabled = payable != null && costKnown) { Text("PAY FROM MANA POOL", color = if (payable != null && costKnown) Mint else Muted) }
+                    TextButton(onClick = { castFromPayment(owner, card, commanderCast, manualPayment = true) }) { Text("I PAID MANUALLY", color = CounterGold) }
+                }
+            },
+            dismissButton = { TextButton(onClick = { paymentCard = null; handActionCard = null }) { Text("CANCEL") } },
+            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = SoftWhite
+        )
+    }
+
+    if (stackOpen) StackPriorityDialog(
+        players = players, stack = stackActions, priorityPlayer = priorityPlayer, passedCount = priorityPassed.size,
+        eligibleCount = players.count { !it.isEliminated }, canResolve = stackActions.isNotEmpty() && stackActions.none { !it.targetsConfirmed } && players.filterNot { it.isEliminated }.all { it.id in priorityPassed },
+        canAct = !gameEndedOnline && stackActions.none { !it.targetsConfirmed } && players.getOrNull(priorityPlayer)?.isEliminated == false && (if (onlineMode) priorityPlayer == localSeat else priorityPlayer == selectedPlayer),
+        tutorialStep = tutorialStops.getOrNull(tutorialIndex)?.takeIf { tutorialOpen && it.view == "STACK" }, tutorialIndex = tutorialIndex,
+        tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
+        onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
+        onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
+        onPreviewCard = { action, card ->
+            val ownerIndex = players.indexOfFirst { it.id == action.controllerId }.coerceAtLeast(0)
+            preview = CardPreview(ownerIndex, card, fromHand = false, canManipulate = false)
+        },
+        onStackItemTap = { guidedAction("stack-item") {} },
+        onCastFromHand = { guidedAction("stack-cast") {
+            selectedPlayer = if (onlineMode) localSeat else priorityPlayer
+            showOverview = false
+            showHand = true
+            stackOpen = false
+        } },
+        onAddTrigger = { title -> guidedAction("stack-add") { stackActions = stackActions + StackAction(title = title, controllerId = players.getOrNull(priorityPlayer)?.id.orEmpty(), kind = "TRIGGER"); priorityPassed = emptySet() } },
+        onPassPriority = { guidedAction("stack-pass") {
+            val currentId = players.getOrNull(priorityPlayer)?.id
+            if (currentId != null) priorityPassed = priorityPassed + currentId
+            priorityPlayer = nextTurnIndex(priorityPlayer, gameTurnOrder, players.size, players.indices.filterNot { players[it].isEliminated }.toSet())
+        } },
+        onResolve = { guidedAction("stack-resolve") { resolveTopOfStack() } },
+        onDismiss = { guidedAction("stack-close") { stackOpen = false } }
+    )
+
+    val targetSelectionItem = stackActions.firstOrNull { it.id == targetSelectionStackItemId }
+    targetSelectionItem?.let { item ->
+        val controllerIndex = players.indexOfFirst { it.id == item.controllerId }.coerceAtLeast(0)
+        TargetSelectionDialog(
+            stackItem = item,
+            candidates = buildTargetCandidates(players, stackActions, item.id, players.getOrNull(controllerIndex)?.id.orEmpty()),
+            onConfirm = { selectedTargets ->
+                stackActions = stackActions.map { current -> if (current.id == item.id) current.copy(targets = selectedTargets, targetsConfirmed = true) else current }
+                logAction(controllerIndex, "chose ${selectedTargets.size} target${if (selectedTargets.size == 1) "" else "s"} for ${item.title}")
+                targetSelectionStackItemId = null
+                if (stackActions.none { !it.targetsConfirmed && it.targetCount != null }) {
+                    stackOpen = true
+                    pendingStackOpen = false
+                }
+            }
+        )
+    }
+
+    if (trackerPlayer in players.indices) PlayerTrackerDialog(
+        player = players[trackerPlayer], players = players, playerIndex = trackerPlayer,
+        onUpdate = { updated ->
+            val target = trackerPlayer
+            updatePlayer(target) { updated }
+            if (!players[target].isEliminated && (updated.playerCounters["Poison"] ?: 0) >= 10) eliminatePlayer(target, "10 poison counters")
+        },
+        onDismiss = { trackerPlayer = -1 }
+    )
+
+    if (concedePlayer in players.indices) AlertDialog(
+        onDismissRequest = { concedePlayer = -1 },
+        title = { Text("Concede and leave the game?") },
+        text = { Text("${players[concedePlayer].name} will be marked eliminated and cannot take further game actions. This does not close the room for other players.") },
+        confirmButton = { TextButton(onClick = { concede(concedePlayer); concedePlayer = -1 }) { Text("CONCEDE", color = Color(0xFFE9978B)) } },
+        dismissButton = { TextButton(onClick = { concedePlayer = -1 }) { Text("CANCEL") } },
+        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
+    )
+
+    if (shuffleConfirmPlayer in players.indices) AlertDialog(
+        onDismissRequest = { shuffleConfirmPlayer = -1 },
+        title = { Text("Shuffle library?") },
+        text = { Text("This will randomize ${players[shuffleConfirmPlayer].name}’s library order.") },
+        confirmButton = {
+            TextButton(onClick = {
+                val target = shuffleConfirmPlayer
+                shuffleConfirmPlayer = -1
+                updatePlayer(target) { it.copy(library = it.library.shuffled()) }
+                logAction(target, "shuffled their library")
+            }) { Text("SHUFFLE") }
+        },
+        dismissButton = { TextButton(onClick = { shuffleConfirmPlayer = -1 }) { Text("CANCEL") } },
+        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
+    )
+
+    if (tutorialOpen && !lobbyOpen && !optionsOpen && !developerOptionsOpen && !stackOpen && !chatOpen && !logOpen && !importOpen && !savedDecksOpen && !deckEditorOpen && handActionCard == null) {
+        val step = tutorialStops.getOrNull(tutorialIndex)
+        if (step != null && step.view == currentTutorialView()) {
+            GuidedTutorialOverlay(
+                step = step, index = tutorialIndex, total = tutorialStops.size,
+                targetBounds = tutorialBounds[step.target],
+                onBack = { goBackTutorial() },
+                onNext = { advanceTutorial() },
+                onExit = { markTutorialSeen(step.view); tutorialOpen = false }
+            )
+        }
+    }
+
+    if (librarySearchPlayer in players.indices) {
+        val owner = librarySearchPlayer
+        LibrarySearchDialog(
+            player = players[owner],
+            onPreview = { preview = CardPreview(owner, it, fromHand = false, canManipulate = false) },
+            onTakeToHand = { card -> updatePlayer(owner) { p -> p.copy(library = p.library.filterNot { it.id == card.id }, hand = p.hand + card) }; logAction(owner, "found ${card.name} and put it into hand") },
+            onPutBattlefield = { card ->
+                updatePlayer(owner) { p -> p.copy(library = p.library.filterNot { it.id == card.id }, battlefield = p.battlefield + card) }
+                logAction(owner, "found ${card.name} and put it onto the battlefield")
+                if (needsCreatureTypeChoice(card)) creatureTypeChoicePrompt = CreatureTypeChoicePrompt(owner, card.id, card.name)
+                applyCreatureEntryLifeEffects(owner, card)
+            },
+            onPutGraveyard = { card -> updatePlayer(owner) { p -> p.copy(library = p.library.filterNot { it.id == card.id }, graveyard = p.graveyard + card) }; logAction(owner, "found ${card.name} and put it into the graveyard") },
+            onPutExile = { card -> updatePlayer(owner) { p -> p.copy(library = p.library.filterNot { it.id == card.id }, exile = p.exile + card) }; logAction(owner, "found ${card.name} and exiled it") },
+            onMoveToTop = { card -> updatePlayer(owner) { p -> p.copy(library = listOf(card) + p.library.filterNot { it.id == card.id }) }; logAction(owner, "put ${card.name} on top of the library") },
+            onMoveToBottom = { card -> updatePlayer(owner) { p -> p.copy(library = p.library.filterNot { it.id == card.id } + card) }; logAction(owner, "put ${card.name} on the bottom of the library") },
+            onShuffle = { updatePlayer(owner) { it.copy(library = it.library.shuffled()) }; logAction(owner, "shuffled their library") },
+            onDismiss = { librarySearchPlayer = -1 }
+        )
+    }
+
+    manaChoicePrompt?.let { prompt ->
+        AlertDialog(
+            onDismissRequest = { manaChoicePrompt = null },
+            title = { Text("Choose mana · ${prompt.cardName}") },
+            text = { Text("Which mana did this permanent produce?") },
+            confirmButton = {
+                Column(horizontalAlignment = Alignment.End) {
+                    prompt.options.forEach { option ->
+                        TextButton(onClick = {
+                            updatePlayer(prompt.playerIndex) { player ->
+                                player.copy(manaPool = player.manaPool.toMutableMap().apply {
+                                    option.pool.forEach { (color, count) -> put(color, ((get(color) ?: 0) + count).coerceAtMost(99)) }
+                                })
+                            }
+                            logAction(prompt.playerIndex, "added ${option.label} mana")
+                            manaChoicePrompt = null
+                        }, modifier = Modifier.heightIn(min = 44.dp)) {
+                            Text(option.label, color = Mint, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            },
+            dismissButton = { TextButton(onClick = { manaChoicePrompt = null }) { Text("CANCEL", color = Muted) } },
+            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
+        )
+    }
+
+    val visibleTriggerPrompt = if (onlineMode) triggerPrompts.firstOrNull {
+        it.controllerIndex == localSeat || (roomHost != null && players.getOrNull(it.controllerIndex)?.isComputer == true)
+    } else triggerPrompts.firstOrNull()
+    creatureTypeChoicePrompt?.let { prompt ->
+        CreatureTypeChoiceDialog(
+            cardName = prompt.cardName,
+            onConfirm = { chosenType ->
+                updatePlayer(prompt.playerIndex) { player ->
+                    player.copy(battlefield = player.battlefield.map { card ->
+                        if (card.id == prompt.cardId) card.copy(chosenCreatureType = chosenType) else card
+                    })
+                }
+                logAction(prompt.playerIndex, "chose $chosenType for ${prompt.cardName}")
+                creatureTypeChoicePrompt = null
+            }
+        )
+    }
+
+    if (!manaPoolOpen && manaChoicePrompt == null && creatureTypeChoicePrompt == null) visibleTriggerPrompt?.let { prompt ->
+        val payment = when (prompt.kind) { "RHYSTIC" -> 1; "TITHE" -> 2; else -> 0 }
+        val canPay = payment == 0 || trackedMana(prompt.eventPlayerIndex) >= payment
+        val targetCandidates = players.indices.filter { target ->
+            !players[target].isEliminated && (prompt.targetRule != "OPPONENT" || target != prompt.controllerIndex)
+        }
+        var selectedTriggerTarget by remember(prompt.cardName, prompt.controllerIndex, prompt.eventPlayerIndex, prompt.kind, prompt.effectText) { mutableIntStateOf(-1) }
+        val promptText = when (prompt.kind) {
+            "RHYSTIC" -> "${players[prompt.eventPlayerIndex].name} cast a spell. Pay {1} for ${prompt.cardName}, or let ${players[prompt.controllerIndex].name} draw a card?"
+            "TITHE" -> "${players[prompt.eventPlayerIndex].name} drew a card. Pay {2} for ${prompt.cardName}, or create a Treasure for ${players[prompt.controllerIndex].name}?"
+            "AUTO_EFFECT" -> "${prompt.cardName} triggered: ${prompt.triggerText}. The app can apply this effect: ${prompt.effectText}"
+            "TARGET_EFFECT" -> "${prompt.cardName} triggered: ${prompt.triggerText}. Choose a target for: ${prompt.effectText}"
+            else -> "${prompt.cardName} triggered: ${prompt.triggerText}. Choose any modes, targets, and other decisions on the card, resolve it manually, then confirm. Effect: ${prompt.effectText}"
+        }
+        AlertDialog(
+            onDismissRequest = { if (prompt.kind == "RHYSTIC" || prompt.kind == "TITHE") resolveTrigger(prompt, paid = false) },
+            title = { Text(if (prompt.kind == "RHYSTIC" || prompt.kind == "TITHE") "Triggered choice · ${prompt.cardName}" else "Triggered ability · ${prompt.cardName}") },
+            text = { Column {
+                Text(promptText, color = SoftWhite)
+                if (prompt.targetRule != null) {
+                    Text("TARGET", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 10.dp, bottom = 4.dp))
                     targetCandidates.forEach { target ->
                         TextButton(onClick = { selectedTriggerTarget = target }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp)) {
                             Text("${if (selectedTriggerTarget == target) "✓ " else ""}${players[target].name}", color = if (selectedTriggerTarget == target) Mint else SoftWhite, fontWeight = FontWeight.Bold)
