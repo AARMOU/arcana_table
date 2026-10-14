@@ -1,6 +1,6 @@
-# Arcana Table Targeting 0.15.54 — Experimental Build 73
+# Arcana Table Targeting 0.15.55 — Experimental Build 74
 
-Arcana Table is a native Android Magic tabletop prototype. Experimental Build 73 adds target selection for targeted spells, Auras, activated abilities, and recognized targeted triggers. The picker offers players, battlefield permanents, spells and abilities on the stack, cards in visible zones, and manual entry for other targets. Chosen targets remain attached to the stack item and sync to connected players. This experiment lives on the `experimental/targeting` branch and installs as a separate app so it cannot replace the stable Arcana Table install.
+Arcana Table is a native Android Magic tabletop prototype. Experimental Build 74 carries forward Build 73 target selection and improves the player hand workflow: larger opening-hand cards, hand-tray controls and card sizing that adapt to the drawer, a bottom-aligned player footer, mana-symbol pips, creature-type choice prompts, and card previews from matching game-log entries. The targeting experiment lives on the `experimental/targeting` branch and installs as a separate app so it cannot replace the stable Arcana Table install.
 
 Target legality still depends on the card's full wording, game state, and rules interactions. The picker estimates how many targets to select, but players must verify restrictions such as controller, color, type, shroud, hexproof, and protection. Hidden library cards are not listed; use manual target entry only when the card text makes an unlisted target legal and known to the choosing player.
 
@@ -38,7 +38,7 @@ Target legality still depends on the card's full wording, game state, and rules 
 - Long-press a card to inspect only the card, without covering the rest of the table
 - Manual life total changes, draw, reveal top card, shuffle, and tap/untap
 - Move permanents to the graveyard or exile
-- Draw opens the hand; Reveal Top and confirmed Shuffle are in the board menu
+- Draw, Combat, Stack, turn flow, and additional game commands are available from the hand tray; Shuffle still asks for confirmation
 - A game action log, elapsed session/turn timers, and a room-synchronized text chat panel
 - Table view shows each player's status, life, hand/library counts, commander art, current phase, turn timer, and public-zone counts; expanded cards show battlefield and public cards, with compact or large views and seat controls
 - Swipe between table and player views with a more pronounced animated transition; Next Step remains available from the table view
@@ -83,7 +83,7 @@ Target legality still depends on the card's full wording, game state, and rules 
 
 ## Build status
 
-The source is labeled version 0.15.54-targeting, build 73. This experimental branch builds a separate debug app package `com.arcanatable.targeting`. The optional full visual guide remains available from the home screen and app menu and never launches automatically.
+The source is labeled version 0.15.55-targeting, build 74. This experimental branch builds a separate debug app package `com.arcanatable.targeting`. The optional full visual guide remains available from the home screen and app menu and never launches automatically.
 
 Build 66 adds a resizable hand panel, automatic stack-window closing after all resolutions, tighter player-view spacing, and stronger import/movement/sync diagnostics. It also includes the Build 65 import review, supported automatic life/draw/token effects with manual-resolution notices, quick Stack access, and earlier tutorial, card movement, privacy, and navigation updates.
 

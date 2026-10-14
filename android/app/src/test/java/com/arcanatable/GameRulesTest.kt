@@ -2,9 +2,20 @@ package com.arcanatable
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GameRulesTest {
+    @Test
+    fun detectsAsEntersCreatureTypeChoicesButIgnoresFaceDownCards() {
+        val choosingPermanent = GameCard(1, "Type Picker", "Artifact", androidx.compose.ui.graphics.Color.Black, oracleText = "As this enters, choose a creature type.")
+        assertTrue(needsCreatureTypeChoice(choosingPermanent))
+        assertTrue(needsCreatureTypeChoice(choosingPermanent.copy(oracleText = "As this enters the battlefield, choose a creature type.")))
+        assertFalse(needsCreatureTypeChoice(choosingPermanent.copy(isFaceDown = true)))
+        assertFalse(needsCreatureTypeChoice(choosingPermanent.copy(oracleText = "Choose a creature type.")))
+    }
+
     @Test
     fun onlySpellResolutionMovesItsCardOutOfTheStack() {
         assertEquals(true, stackResolutionMovesCardToZone("SPELL"))

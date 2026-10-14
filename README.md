@@ -19,7 +19,7 @@ Visit the [Arcana Table project page](https://aarmou.github.io/arcana_table/).
 
 ## Source code
 
-The Android app and internet room service source are in [android/](android/). The stable source is Build 72. The separate `experimental/targeting` branch contains Targeting Experimental Build 73 and uses a different Android package ID so it can be installed beside the stable app. Installable APKs should be published separately as GitHub Releases.
+The Android app and internet room service source are in [android/](android/). The stable source is Build 72. The separate `experimental/targeting` branch contains Targeting Experimental Build 74 and uses a different Android package ID so it can be installed beside the stable app. Installable APKs should be published separately as GitHub Releases.
 
 Open the android folder in Android Studio to build the app. See [android/README.md](android/README.md) for features, requirements, and build notes. The internet room service is in [android/cloud-room/](android/cloud-room/).
 

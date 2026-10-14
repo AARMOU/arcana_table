@@ -196,6 +196,7 @@ private fun GameCard.toJson() = JSONObject().apply {
     put("manaCost", manaCost ?: JSONObject.NULL)
     put("power", power ?: JSONObject.NULL); put("toughness", toughness ?: JSONObject.NULL)
     put("keywords", JSONArray().apply { keywords.forEach { put(it) } })
+    put("chosenCreatureType", chosenCreatureType ?: JSONObject.NULL)
 }
 
 private fun JSONObject.toGameCard(): GameCard {
@@ -212,7 +213,8 @@ private fun JSONObject.toGameCard(): GameCard {
         manaValue = if (isNull("manaValue")) null else optDouble("manaValue"), importIssue = optString("importIssue").nullableString(),
         artCropUrl = optString("artCropUrl").nullableString(), manaCost = if (has("manaCost") && !isNull("manaCost")) optString("manaCost") else null,
         power = optString("power").nullableString(), toughness = optString("toughness").nullableString(),
-        keywords = optJSONArray("keywords")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty()
+        keywords = optJSONArray("keywords")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty(),
+        chosenCreatureType = optString("chosenCreatureType").nullableString()
     )
 }
 

@@ -2,9 +2,20 @@
 
 ## Canonical project
 
-This branch is the separate Arcana Table **Targeting Experimental Build 73** (`0.15.54-targeting`, version code `73`) source tree. It branches from stable Build 72 source and includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Keep this work on `experimental/targeting` until the targeting flow is accepted.
+This branch is the separate Arcana Table **Targeting Experimental Build 74** (`0.15.55-targeting`, version code `74`) source tree. It branches from stable Build 72 source and includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Keep this work on `experimental/targeting` until the targeting flow is accepted.
 
 Build 73 adds a target picker for targeted spells, Auras, activated abilities, and recognized targeted triggers. It records chosen targets on stack items and syncs them in room snapshots. The picker presents visible objects from battlefield, stack, graveyard, exile, revealed zones, and eligible hands, plus a manual-entry field. It estimates target count from card text, but does not certify Magic target legality; users must check the card text and game state. Hidden library cards are not listed.
+
+## Changes in Build 74
+
+- Enlarges opening-hand card faces and scales hand-tray cards as the drawer height changes.
+- Moves Draw, Combat, Stack, turn flow, and secondary game commands into the hand tray; keeps the view selector focused on player/table navigation.
+- Pins the player-screen footer to the bottom and removes the outdated drag-to-play hint.
+- Displays colored mana symbols as colored pips in mana controls and cost displays.
+- Prompts for a creature type after a matching permanent resolves, shows the chosen type on the permanent, and synchronizes that choice with online game state.
+- Adds a small game-log card preview button when a logged card is still present in a public zone.
+
+The Build 74 source is staged on `experimental/targeting`; test/build status is recorded after the GitHub Actions run.
 
 The separate `ArcanaTable-build52-source/` folder is stale and should not be used as the project source. Its Gradle metadata still labels it Build 52 and its code is materially different.
 
@@ -94,12 +105,12 @@ These fixes are retained in the Build 62 source and APK.
 
 - The import review now reports unmatched or unverifiable cards, closes after Auto Fix matches every flagged card, and offers the editor when manual correction is still needed.
 - Supported fixed life, draw, and token effects from resolving spells are applied automatically, along with simple creature-entry life triggers. Each automatic action is announced and logged; unsupported effects prompt the player to resolve them manually.
-- A persistent Stack button beside the view tabs shows the stack count and highlights while items are waiting. The hand tray also has a Stack shortcut.
+- A persistent Stack button in the hand tray shows the stack count; the view tabs are reserved for table/player navigation.
 - The What's New dialog now contains confirmed release notes for Builds 60–64 and the Build 65 changes, in a scrollable panel.
 
 ## Build status
 
-Targeting Experimental Build 73 (`0.15.54-targeting`, version code `73`) is the current source on `experimental/targeting`. Its debug package ID is `com.arcanatable.targeting`. Stable Build 72 remains on `main`.
+Targeting Experimental Build 74 (`0.15.55-targeting`, version code `74`) is the current source on `experimental/targeting`. Its debug package ID is `com.arcanatable.targeting`. Stable Build 72 remains on `main`.
 
 Build 62 gives every tutorial step a `NEXT` button, explains that the Join Game action needs a room code and password, and lets the tutorial continue without connecting.
 
