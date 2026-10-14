@@ -54,4 +54,3 @@ dependencies {
     testImplementation("org.json:json:20240303")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
-a9e4829d9821905001e793d4a05151fa39afe127
