@@ -49,5 +49,9 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("junit:junit:4.13.2")
+    // JVM unit tests exercise online snapshot JSON. Android's org.json stubs
+    // throw "Method ... not mocked" outside an emulator, so use the JVM port.
+    testImplementation("org.json:json:20240303")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
+a9e4829d9821905001e793d4a05151fa39afe127
