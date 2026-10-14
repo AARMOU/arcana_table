@@ -510,6 +510,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var handSheetHeightFraction by rememberSaveable(layoutOrientationSuffix) {
         mutableFloatStateOf(optionPrefs.getFloat("layout_hand_sheet_height_$layoutOrientationSuffix", optionPrefs.getFloat("hand_sheet_height_fraction", 0.52f)).coerceIn(0.38f, 0.95f))
     }
+    var playerSectionOrderRaw by rememberSaveable(layoutOrientationSuffix) { mutableStateOf(optionPrefs.getString("layout_player_sections_$layoutOrientationSuffix", "STATUS|COMMANDER|STEP|ZONES|REVEALED|BATTLEFIELD") ?: "STATUS|COMMANDER|STEP|ZONES|REVEALED|BATTLEFIELD") }
+    var handActionOrderRaw by rememberSaveable(layoutOrientationSuffix) { mutableStateOf(optionPrefs.getString("layout_hand_actions_$layoutOrientationSuffix", "DRAW|REVEAL|STACK|CAST_COMMANDER|COMBAT|NEXT_STEP|PASS_TURN|MORE") ?: "DRAW|REVEAL|STACK|CAST_COMMANDER|COMBAT|NEXT_STEP|PASS_TURN|MORE") }
     val density = LocalDensity.current
     val screenWidthDp = configuration.screenWidthDp
     var nextId by remember { mutableIntStateOf(20) }
@@ -2520,6 +2522,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             PlayerBoard(
                 player = players[boardIndex].copy(name = if (onlineMode && boardIndex == localSeat) "YOU" else players[boardIndex].name), playerIndex = boardIndex, isLandscape = isLandscape, cardSizeScale = cardSizeScale,
                 battlefieldHeightScale = battlefieldHeightScale, boardSpacingScale = boardSpacingScale,
+                playerSectionOrder = playerSectionOrderRaw.split('|').filter(String::isNotBlank),
                 gameInProgress = gameInProgress,
                 tutorialAnchor = ::tutorialAnchor,
                 stackCount = stackActions.size,
@@ -2653,6 +2656,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 77 · DRAG-AND-DROP UI EDITOR", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Adjust UI now lets you drag to reorder player-screen sections, remove and restore sections such as the health/activity bar and commander strip, and add, remove, and reorder hand-tray buttons. Layouts are saved separately for portrait and landscape.", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 76 · PLAYER LAYOUT AND HAND ACTIONS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Player-screen footer buttons now align on the bottom edge. Opening-hand cards are larger, and the hand tray includes Cast Commander when it can be cast. Pass Priority is the primary stack action; Resolve Top remains available as a smaller action after everyone passes.", color = SoftWhite, fontSize = 11.sp)
 
@@ -2767,6 +2773,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         stackCount = stackActions.size,
                         tutorialAnchor = ::tutorialAnchor,
                         highlightedCardId = highlightedHandCardId,
+                        actionOrder = handActionOrderRaw.split('|').filter(String::isNotBlank),
                         handRevealed = players[selectedPlayer].handRevealedToAll,
                         canAdvance = canControlSelectedPlayer && selectedPlayer == activePlayer && !players[activePlayer].isComputer,
                         canControl = canControlSelectedPlayer,
@@ -3793,14 +3800,20 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         boardSpacingScale = boardSpacingScale,
         handSheetHeightFraction = handSheetHeightFraction,
         footerButtonScale = footerButtonScale,
+        playerSectionOrder = playerSectionOrderRaw.split('|').filter(String::isNotBlank),
+        handActionOrder = handActionOrderRaw.split('|').filter(String::isNotBlank),
         onCardSizeScale = { value -> cardSizeScale = value.coerceIn(0.82f, 1.18f); optionPrefs.edit().putFloat("card_size_scale", cardSizeScale).putFloat("layout_card_size_$layoutOrientationSuffix", cardSizeScale).apply() },
         onBattlefieldHeightScale = { value -> battlefieldHeightScale = value.coerceIn(0.75f, 1.5f); optionPrefs.edit().putFloat("layout_battlefield_height_$layoutOrientationSuffix", battlefieldHeightScale).apply() },
         onBoardSpacingScale = { value -> boardSpacingScale = value.coerceIn(0.5f, 2f); optionPrefs.edit().putFloat("layout_board_spacing_$layoutOrientationSuffix", boardSpacingScale).apply() },
         onHandSheetHeightFraction = { value -> handSheetHeightFraction = value.coerceIn(0.38f, 0.95f); optionPrefs.edit().putFloat("hand_sheet_height_fraction", handSheetHeightFraction).putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction).apply() },
         onFooterButtonScale = { value -> footerButtonScale = value.coerceIn(0.9f, 1.3f); optionPrefs.edit().putFloat("layout_footer_button_scale_$layoutOrientationSuffix", footerButtonScale).apply() },
+        onPlayerSectionOrder = { order -> playerSectionOrderRaw = order.joinToString("|"); optionPrefs.edit().putString("layout_player_sections_$layoutOrientationSuffix", playerSectionOrderRaw).apply() },
+        onHandActionOrder = { order -> handActionOrderRaw = order.joinToString("|"); optionPrefs.edit().putString("layout_hand_actions_$layoutOrientationSuffix", handActionOrderRaw).apply() },
         onReset = {
             cardSizeScale = 1f; battlefieldHeightScale = 1f; boardSpacingScale = 1f
             handSheetHeightFraction = 0.52f; footerButtonScale = 1f
+            playerSectionOrderRaw = "STATUS|COMMANDER|STEP|ZONES|REVEALED|BATTLEFIELD"
+            handActionOrderRaw = "DRAW|REVEAL|STACK|CAST_COMMANDER|COMBAT|NEXT_STEP|PASS_TURN|MORE"
             optionPrefs.edit()
                 .putFloat("card_size_scale", cardSizeScale)
                 .putFloat("layout_card_size_$layoutOrientationSuffix", cardSizeScale)
@@ -3808,7 +3821,10 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 .putFloat("layout_board_spacing_$layoutOrientationSuffix", boardSpacingScale)
                 .putFloat("hand_sheet_height_fraction", handSheetHeightFraction)
                 .putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction)
-                .putFloat("layout_footer_button_scale_$layoutOrientationSuffix", footerButtonScale).apply()
+                .putFloat("layout_footer_button_scale_$layoutOrientationSuffix", footerButtonScale)
+                .putString("layout_player_sections_$layoutOrientationSuffix", playerSectionOrderRaw)
+                .putString("layout_hand_actions_$layoutOrientationSuffix", handActionOrderRaw)
+                .apply()
         },
         onDismiss = { layoutLabOpen = false; optionsOpen = true }
     )
@@ -4990,16 +5006,29 @@ private fun LayoutLabPage(
     boardSpacingScale: Float,
     handSheetHeightFraction: Float,
     footerButtonScale: Float,
+    playerSectionOrder: List<String>,
+    handActionOrder: List<String>,
     onCardSizeScale: (Float) -> Unit,
     onBattlefieldHeightScale: (Float) -> Unit,
     onBoardSpacingScale: (Float) -> Unit,
     onHandSheetHeightFraction: (Float) -> Unit,
     onFooterButtonScale: (Float) -> Unit,
+    onPlayerSectionOrder: (List<String>) -> Unit,
+    onHandActionOrder: (List<String>) -> Unit,
     onReset: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var previewScreen by remember { mutableStateOf("PLAYER") }
     var selectedElement by remember { mutableStateOf("BATTLEFIELD") }
+    var addElementMenuOpen by remember { mutableStateOf(false) }
+    val playerSectionCatalog = listOf("STATUS", "COMMANDER", "STEP", "ZONES", "REVEALED", "BATTLEFIELD")
+    val handActionCatalog = listOf("DRAW", "REVEAL", "STACK", "CAST_COMMANDER", "COMBAT", "NEXT_STEP", "PASS_TURN", "MORE")
+    fun moveItem(items: List<String>, index: Int, direction: Int, save: (List<String>) -> Unit) {
+        val destination = (index + direction).coerceIn(0, items.lastIndex)
+        if (destination == index) return
+        val updated = items.toMutableList().apply { add(destination, removeAt(index)) }
+        save(updated)
+    }
     fun setPreset(card: Float, battlefield: Float, spacing: Float, hand: Float, footer: Float) {
         onCardSizeScale(card)
         onBattlefieldHeightScale(battlefield)
@@ -5040,6 +5069,8 @@ private fun LayoutLabPage(
                     boardSpacingScale = boardSpacingScale,
                     handSheetHeightFraction = handSheetHeightFraction,
                     footerButtonScale = footerButtonScale,
+                    playerSectionOrder = playerSectionOrder,
+                    handActionOrder = handActionOrder,
                     onSelectElement = { selectedElement = it }
                 )
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -5066,6 +5097,7 @@ private fun LayoutLabPage(
                             LayoutTuningSlider("Card size", cardSizeScale, 0.82f..1.18f, { "${(it * 100).toInt()}%" }, onCardSizeScale)
                             LayoutTuningSlider("Battlefield viewing area", battlefieldHeightScale, 0.75f..1.5f, { "${(it * 100).toInt()}%" }, onBattlefieldHeightScale)
                         }
+                        "STATUS", "COMMANDER" -> Text("This element can be removed below and restored from ADD ELEMENT.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp))
                         "SPACING" -> LayoutTuningSlider("Space between sections", boardSpacingScale, 0.5f..2f, { "${(it * 100).toInt()}%" }, onBoardSpacingScale)
                         "HAND" -> {
                             LayoutTuningSlider("Hand tray height", handSheetHeightFraction, 0.38f..0.95f, { "${(it * 100).toInt()}%" }, onHandSheetHeightFraction)
@@ -5074,6 +5106,43 @@ private fun LayoutLabPage(
                         "FOOTER" -> LayoutTuningSlider("Footer button size", footerButtonScale, 0.9f..1.3f, { "${(it * 100).toInt()}%" }, onFooterButtonScale)
                     }
                     Text("Tap a section in the preview to tune it. Card proportions and minimum touch sizes are preserved.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp, bottom = 8.dp))
+                    if (previewScreen == "PLAYER") {
+                        Text("PLAYER SCREEN ELEMENTS · HOLD AND DRAG TO REORDER", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 3.dp))
+                        playerSectionOrder.forEachIndexed { index, id ->
+                            LayoutOrderRow(
+                                title = layoutSectionTitle(id),
+                                subtitle = if (id == "STATUS") "Health, mana and activity" else if (id == "COMMANDER") "Commander card and cast control" else "Drag handle · long press to move",
+                                onMove = { direction -> moveItem(playerSectionOrder, index, direction, onPlayerSectionOrder) },
+                                onRemove = { onPlayerSectionOrder(playerSectionOrder - id) }
+                            )
+                        }
+                        Box {
+                            TextButton(onClick = { addElementMenuOpen = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp)) { Text("ADD ELEMENT  +", color = Mint, fontWeight = FontWeight.Bold) }
+                            DropdownMenu(expanded = addElementMenuOpen, onDismissRequest = { addElementMenuOpen = false }) {
+                                playerSectionCatalog.filterNot { it in playerSectionOrder }.forEach { id ->
+                                    DropdownMenuItem(text = { Text("Add ${layoutSectionTitle(id)}") }, onClick = { addElementMenuOpen = false; onPlayerSectionOrder(playerSectionOrder + id) })
+                                }
+                            }
+                        }
+                    } else {
+                        Text("HAND TRAY BUTTONS · HOLD AND DRAG TO REORDER", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp, bottom = 3.dp))
+                        handActionOrder.forEachIndexed { index, id ->
+                            LayoutOrderRow(
+                                title = layoutHandActionTitle(id),
+                                subtitle = "Shown when the action is available",
+                                onMove = { direction -> moveItem(handActionOrder, index, direction, onHandActionOrder) },
+                                onRemove = { onHandActionOrder(handActionOrder - id) }
+                            )
+                        }
+                        Box {
+                            TextButton(onClick = { addElementMenuOpen = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp)) { Text("ADD BUTTON  +", color = Mint, fontWeight = FontWeight.Bold) }
+                            DropdownMenu(expanded = addElementMenuOpen, onDismissRequest = { addElementMenuOpen = false }) {
+                                handActionCatalog.filterNot { it in handActionOrder }.forEach { id ->
+                                    DropdownMenuItem(text = { Text("Add ${layoutHandActionTitle(id)}") }, onClick = { addElementMenuOpen = false; onHandActionOrder(handActionOrder + id) })
+                                }
+                            }
+                        }
+                    }
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     TextButton(onClick = onReset, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
@@ -5088,6 +5157,58 @@ private fun LayoutLabPage(
     }
 }
 
+private fun layoutSectionTitle(id: String): String = when (id) {
+    "STATUS" -> "Health and activity bar"
+    "COMMANDER" -> "Commander strip"
+    "STEP" -> "Next step"
+    "ZONES" -> "Library and zone buttons"
+    "REVEALED" -> "Public reveals"
+    "BATTLEFIELD" -> "Battlefield"
+    else -> id
+}
+
+private fun layoutHandActionTitle(id: String): String = when (id) {
+    "DRAW" -> "Draw"
+    "REVEAL" -> "Reveal hand"
+    "STACK" -> "Stack"
+    "CAST_COMMANDER" -> "Cast Commander"
+    "COMBAT" -> "Combat"
+    "NEXT_STEP" -> "Next step"
+    "PASS_TURN" -> "Pass turn"
+    "MORE" -> "More actions"
+    else -> id
+}
+
+@Composable
+private fun LayoutOrderRow(title: String, subtitle: String, onMove: (Int) -> Unit, onRemove: () -> Unit) {
+    val density = LocalDensity.current
+    val dragThreshold = with(density) { 34.dp.toPx() }
+    val currentMove by rememberUpdatedState(onMove)
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 52.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)
+            .pointerInput(title, dragThreshold) {
+                var accumulatedDrag = 0f
+                detectDragGesturesAfterLongPress(
+                    onDragStart = { accumulatedDrag = 0f },
+                    onDrag = { change, amount ->
+                        change.consume()
+                        accumulatedDrag += amount.y
+                        if (accumulatedDrag >= dragThreshold) { currentMove(1); accumulatedDrag -= dragThreshold }
+                        else if (accumulatedDrag <= -dragThreshold) { currentMove(-1); accumulatedDrag += dragThreshold }
+                    }
+                )
+            },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text("⠿", color = Mint, fontSize = 19.sp, modifier = Modifier.padding(start = 10.dp, end = 9.dp))
+        Column(Modifier.weight(1f).padding(vertical = 5.dp)) {
+            Text(title, color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+            Text(subtitle, color = Muted, fontSize = 8.sp)
+        }
+        IconButton(onClick = onRemove, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Remove $title", tint = Color(0xFFE9978B)) }
+    }
+}
+
 @Composable
 private fun LayoutLabPreview(
     previewScreen: String,
@@ -5097,6 +5218,8 @@ private fun LayoutLabPreview(
     boardSpacingScale: Float,
     handSheetHeightFraction: Float,
     footerButtonScale: Float,
+    playerSectionOrder: List<String>,
+    handActionOrder: List<String>,
     onSelectElement: (String) -> Unit
 ) {
     val sectionGap = (4.dp * boardSpacingScale).coerceIn(2.dp, 10.dp)
@@ -5106,41 +5229,54 @@ private fun LayoutLabPreview(
         verticalArrangement = Arrangement.spacedBy(sectionGap)
     ) {
         if (previewScreen == "PLAYER") {
-            Row(
-                Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight).border(if (selectedElement == "SPACING") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp)).clickable { onSelectElement("SPACING") }.padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("● YOU · ONLINE · ACTIVE", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text("40  +", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Black)
-            }
-            Row(
-                Modifier.fillMaxWidth().height(28.dp).clip(RoundedCornerShape(7.dp)).background(PanelLight).clickable { onSelectElement("SPACING") }.padding(horizontal = 7.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) { Text("COMMAND ZONE · COMMANDER", color = CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
-            Column(
-                Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(8.dp)).background(PanelLight)
-                    .border(if (selectedElement == "BATTLEFIELD") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp))
-                    .clickable { onSelectElement("BATTLEFIELD") }.padding(6.dp),
-                verticalArrangement = Arrangement.spacedBy(3.dp)
-            ) {
-                Text("BATTLEFIELD · grouped by type", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
-                    val tileWidth = (38.dp * cardSizeScale).coerceIn(31.dp, 46.dp)
-                    val tileHeight = (tileWidth / 0.72f).coerceAtMost((82.dp * battlefieldHeightScale).coerceIn(62.dp, 116.dp))
-                    listOf("CREATURE", "ARTIFACT", "LAND").forEachIndexed { index, label ->
-                        Column(Modifier.width(tileWidth).height(tileHeight).clip(RoundedCornerShape(5.dp)).background(listOf(Color(0xFF66513D), Color(0xFF364C52), Color(0xFF4A644C))[index]).padding(3.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                            Text(label, color = SoftWhite, fontSize = 5.sp, maxLines = 1)
-                            Box(Modifier.fillMaxWidth().height((tileHeight * 0.5f).coerceAtLeast(18.dp)).clip(RoundedCornerShape(3.dp)).background(Color.White.copy(alpha = 0.14f)))
-                            Text("CARD NAME", color = SoftWhite, fontSize = 5.sp, maxLines = 1)
+            playerSectionOrder.forEach { section ->
+                when (section) {
+                    "STATUS" -> Row(
+                        Modifier.fillMaxWidth().height(34.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)
+                            .border(if (selectedElement == "STATUS") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp))
+                            .clickable { onSelectElement("STATUS") }.padding(horizontal = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("● YOU · ONLINE · ACTIVE", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                        Text("40  +", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Black)
+                    }
+                    "COMMANDER" -> Row(
+                        Modifier.fillMaxWidth().height(28.dp).clip(RoundedCornerShape(7.dp)).background(PanelLight)
+                            .border(if (selectedElement == "COMMANDER") 2.dp else 0.dp, Mint, RoundedCornerShape(7.dp))
+                            .clickable { onSelectElement("COMMANDER") }.padding(horizontal = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) { Text("COMMAND ZONE · COMMANDER", color = CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+                    "STEP" -> Row(Modifier.fillMaxWidth().height(24.dp).clickable { onSelectElement("SPACING") }, verticalAlignment = Alignment.CenterVertically) {
+                        Text("NEXT STEP  ›", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterVertically).padding(start = 5.dp))
+                    }
+                    "ZONES" -> Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        listOf("LIBRARY", "HAND", "GRAVEYARD").forEach { label -> Text(label, color = SoftWhite, fontSize = 6.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(PanelLight).padding(horizontal = 5.dp, vertical = 4.dp)) }
+                    }
+                    "REVEALED" -> Text("PUBLIC REVEALS", color = CounterGold, fontSize = 7.sp, modifier = Modifier.clickable { onSelectElement("SPACING") }.padding(start = 4.dp))
+                    "BATTLEFIELD" -> Column(
+                        Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(8.dp)).background(PanelLight)
+                            .border(if (selectedElement == "BATTLEFIELD") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp))
+                            .clickable { onSelectElement("BATTLEFIELD") }.padding(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp)
+                    ) {
+                        Text("BATTLEFIELD · grouped by type", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                        Row(Modifier.fillMaxWidth().weight(1f), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                            val tileWidth = (38.dp * cardSizeScale).coerceIn(31.dp, 46.dp)
+                            val tileHeight = (tileWidth / 0.72f).coerceAtMost((82.dp * battlefieldHeightScale).coerceIn(62.dp, 116.dp))
+                            listOf("CREATURE", "ARTIFACT", "LAND").forEachIndexed { index, label ->
+                                Column(Modifier.width(tileWidth).height(tileHeight).clip(RoundedCornerShape(5.dp)).background(listOf(Color(0xFF66513D), Color(0xFF364C52), Color(0xFF4A644C))[index]).padding(3.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                                    Text(label, color = SoftWhite, fontSize = 5.sp, maxLines = 1)
+                                    Box(Modifier.fillMaxWidth().height((tileHeight * 0.5f).coerceAtLeast(18.dp)).clip(RoundedCornerShape(3.dp)).background(Color.White.copy(alpha = 0.14f)))
+                                    Text("CARD NAME", color = SoftWhite, fontSize = 5.sp, maxLines = 1)
+                                }
+                            }
                         }
                     }
                 }
             }
             Row(
-                Modifier.fillMaxWidth().height((34.dp * footerButtonScale).coerceIn(31.dp, 46.dp))
-                    .clip(RoundedCornerShape(8.dp)).background(PanelLight)
-                    .border(if (selectedElement == "FOOTER") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp))
-                    .clickable { onSelectElement("FOOTER") },
+                Modifier.fillMaxWidth().height((34.dp * footerButtonScale).coerceIn(31.dp, 46.dp)).clip(RoundedCornerShape(8.dp)).background(PanelLight)
+                    .border(if (selectedElement == "FOOTER") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp)).clickable { onSelectElement("FOOTER") },
                 horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically
             ) {
                 listOf("PASS TURN", "HAND", "BACK TO TABLE").forEach { label ->
@@ -5156,14 +5292,17 @@ private fun LayoutLabPreview(
             }
             Row(
                 Modifier.fillMaxWidth().height(30.dp).clip(RoundedCornerShape(7.dp)).background(PanelLight)
-                    .border(if (selectedElement == "HAND") 2.dp else 0.dp, Mint, RoundedCornerShape(7.dp))
-                    .clickable { onSelectElement("HAND") },
+                    .border(if (selectedElement == "HAND") 2.dp else 0.dp, Mint, RoundedCornerShape(7.dp)).clickable { onSelectElement("HAND") }
+                    .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically
-            ) { listOf("DRAW", "STACK", "NEXT STEP", "MORE").forEach { Text(it, color = Mint, fontSize = 6.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center) } }
+            ) {
+                handActionOrder.forEach { id ->
+                    Text(layoutHandActionTitle(id).uppercase(), color = Mint, fontSize = 6.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 5.dp), maxLines = 1)
+                }
+            }
             Row(
                 Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(8.dp)).background(PanelLight)
-                    .border(if (selectedElement == "HAND") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp))
-                    .clickable { onSelectElement("HAND") }.padding(5.dp),
+                    .border(if (selectedElement == "HAND") 2.dp else 0.dp, Mint, RoundedCornerShape(8.dp)).clickable { onSelectElement("HAND") }.padding(5.dp),
                 horizontalArrangement = Arrangement.spacedBy(5.dp)
             ) {
                 val cardWidth = (44.dp * cardSizeScale).coerceIn(36.dp, 52.dp)
@@ -5520,6 +5659,7 @@ private fun ZoneChip(name: String, count: Int, enabled: Boolean = true, onClick:
 @Composable
 private fun PlayerBoard(
     player: TablePlayer, playerIndex: Int, isLandscape: Boolean, cardSizeScale: Float = 1f, battlefieldHeightScale: Float = 1f, boardSpacingScale: Float = 1f, gameInProgress: Boolean, isActivePlayer: Boolean, canControl: Boolean, turnNumber: Int, phaseName: String, modifier: Modifier,
+    playerSectionOrder: List<String>,
     tutorialAnchor: (String) -> Modifier, stackCount: Int, commanderUnavailable: Boolean,
     onLife: (Int) -> Unit, onDraw: () -> Unit, onShowHand: () -> Unit, onShowHandFromZone: () -> Unit, onToken: () -> Unit, onManageMana: () -> Unit,
     onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit, onTapCard: (Int) -> Unit,
@@ -5541,7 +5681,8 @@ private fun PlayerBoard(
     val battlefieldBaseHeight = (screenHeightDp * if (isLandscape) 0.56f else 0.40f).dp
     val battlefieldMaxHeight = (battlefieldBaseHeight * battlefieldHeightScale)
         .coerceIn((battlefieldBaseHeight * 0.75f).coerceAtMost(battlefieldHeightLimit), battlefieldHeightLimit)
-    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp * boardSpacingScale)) {
+    val sectionContent: Map<String, @Composable () -> Unit> = mapOf(
+            "STATUS" to {
         Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(RoundedCornerShape(12.dp)).background(Panel).border(if (isActivePlayer) 2.dp else 0.dp, if (isActivePlayer) Mint else Panel, RoundedCornerShape(12.dp)).padding(horizontal = 9.dp).then(tutorialAnchor("player-status")), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("${if (player.isEliminated) "✕ " else if (player.isOnline) "● " else ""}${player.name}${if (player.isEliminated) " · ELIMINATED" else if (player.isOnline) " · ONLINE" else ""}${if (player.isComputer) " · AI" else ""}${if (isActivePlayer && !player.isEliminated) " · ACTIVE" else ""}", color = if (player.isEliminated) Muted else if (isActivePlayer || player.isOnline) Mint else SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
@@ -5564,6 +5705,9 @@ private fun PlayerBoard(
             Text("${player.life}", color = Mint, fontSize = 25.sp, fontWeight = FontWeight.Black, modifier = Modifier.widthIn(min = 36.dp))
             IconButton(onClick = { onLife(1) }, enabled = canControl, modifier = Modifier.size(44.dp).then(tutorialAnchor("life-up"))) { Icon(Icons.Filled.Add, "Increase life", tint = if (canControl) Mint else Muted) }
         }
+
+            },
+            "COMMANDER" to {
         val commander = player.commanderCard
         if (commander != null || player.commanderDamageReceived.isNotEmpty() || player.playerCounters.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(Panel).padding(horizontal = 5.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -5580,6 +5724,9 @@ private fun PlayerBoard(
                 if (incomingDamage > 0) Text("CMD DMG $incomingDamage", color = if (player.commanderDamageReceived.values.any { it >= 21 }) Color(0xFFE9978B) else CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold)
             }
         }
+
+            },
+            "STEP" to {
         if (gameInProgress) {
             Row(Modifier.fillMaxWidth().then(tutorialAnchor("next-step")), verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.weight(1f))
@@ -5591,6 +5738,9 @@ private fun PlayerBoard(
                 }
             }
         }
+
+            },
+            "ZONES" to {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).then(tutorialAnchor("zones")), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Box(Modifier.then(tutorialAnchor("zone-library"))) { ZoneChip("LIBRARY", player.library.size, enabled = canControl, onClick = onSearchLibrary) }
             Box(Modifier.then(tutorialAnchor("zone-hand"))) { ZoneChip("HAND", player.hand.size, enabled = canControl, onClick = onShowHandFromZone) }
@@ -5598,6 +5748,9 @@ private fun PlayerBoard(
             if (player.exile.isNotEmpty()) Box(Modifier.then(tutorialAnchor("zone-exile"))) { ZoneChip("EXILE", player.exile.size) { onZone("Exile") } }
             if (player.revealed.isNotEmpty()) Box(Modifier.then(tutorialAnchor("zone-revealed"))) { ZoneChip("REVEALED", player.revealed.size) { onZone("Revealed") } }
         }
+
+            },
+            "REVEALED" to {
         if (player.revealed.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(Panel).padding(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("PUBLIC REVEALS", color = CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(end = 7.dp))
@@ -5606,6 +5759,9 @@ private fun PlayerBoard(
                 }
             }
         }
+
+            },
+            "BATTLEFIELD" to {
         Text("BATTLEFIELD  ·  grouped by type  ·  tap to tap/untap  ·  long-press to inspect", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp, modifier = Modifier.padding(start = 3.dp))
         if (player.battlefield.isEmpty()) {
             Box(Modifier.fillMaxWidth().height(68.dp).clip(RoundedCornerShape(12.dp)).background(Panel), contentAlignment = Alignment.Center) {
@@ -5636,6 +5792,12 @@ private fun PlayerBoard(
                 }
             }
         }
+            }
+    )
+    val defaultSectionOrder = listOf("STATUS", "COMMANDER", "STEP", "ZONES", "REVEALED", "BATTLEFIELD")
+    val normalizedSectionOrder = playerSectionOrder.filter { it in defaultSectionOrder }.distinct()
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp * boardSpacingScale)) {
+        normalizedSectionOrder.forEach { section -> sectionContent[section]?.invoke() }
     }
 }
 
@@ -5769,7 +5931,7 @@ private fun CardArt(url: String, modifier: Modifier = Modifier, contentScale: Co
 }
 
 @Composable
-private fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeight: androidx.compose.ui.unit.Dp, highlightedCardId: Int?, handRevealed: Boolean, canAdvance: Boolean, canControl: Boolean, commanderCanCast: Boolean, stackCount: Int, tutorialAnchor: (String) -> Modifier, onToggleReveal: (Boolean) -> Unit, onClose: () -> Unit, onDraw: () -> Unit, onCombat: () -> Unit, onNextStep: () -> Unit, onPassTurn: () -> Unit, onStack: () -> Unit, onCastCommander: () -> Unit, onMoreAction: (String) -> Unit, onSelect: (GameCard) -> Unit, onDragDrop: (GameCard, Offset) -> Unit) {
+private fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeight: androidx.compose.ui.unit.Dp, highlightedCardId: Int?, handRevealed: Boolean, canAdvance: Boolean, canControl: Boolean, commanderCanCast: Boolean, actionOrder: List<String>, stackCount: Int, tutorialAnchor: (String) -> Modifier, onToggleReveal: (Boolean) -> Unit, onClose: () -> Unit, onDraw: () -> Unit, onCombat: () -> Unit, onNextStep: () -> Unit, onPassTurn: () -> Unit, onStack: () -> Unit, onCastCommander: () -> Unit, onMoreAction: (String) -> Unit, onSelect: (GameCard) -> Unit, onDragDrop: (GameCard, Offset) -> Unit) {
     val handScrollState = rememberScrollState()
     var moreOpen by remember { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -5786,16 +5948,19 @@ private fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeig
             IconButton(onClick = onClose, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close hand", tint = SoftWhite) }
         }
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (canControl) HeaderButton("DRAW", onDraw)
-            HeaderButton(if (handRevealed) "HIDE HAND" else "REVEAL HAND", { onToggleReveal(!handRevealed) })
-            HeaderButton("STACK · $stackCount", onStack, modifier = tutorialAnchor("stack-hand-button"))
-            if (commanderCanCast) HeaderButton("CAST COMMANDER", onCastCommander, modifier = tutorialAnchor("commander-cast"))
-            if (canAdvance) {
-                HeaderButton("COMBAT", onCombat, modifier = tutorialAnchor("combat-action"))
-                HeaderButton("NEXT STEP", onNextStep, modifier = tutorialAnchor("next-step"))
-                HeaderButton("PASS TURN", onPassTurn, modifier = tutorialAnchor("pass-turn"))
-            } else if (!canControl) Text("WAITING", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
-            HeaderButton("MORE  ⋮", { moreOpen = true }, modifier = tutorialAnchor("more-actions"))
+            actionOrder.forEach { action ->
+                when (action) {
+                    "DRAW" -> if (canControl) HeaderButton("DRAW", onDraw)
+                    "REVEAL" -> HeaderButton(if (handRevealed) "HIDE HAND" else "REVEAL HAND", { onToggleReveal(!handRevealed) })
+                    "STACK" -> HeaderButton("STACK · $stackCount", onStack, modifier = tutorialAnchor("stack-hand-button"))
+                    "CAST_COMMANDER" -> if (commanderCanCast) HeaderButton("CAST COMMANDER", onCastCommander, modifier = tutorialAnchor("commander-cast"))
+                    "COMBAT" -> if (canAdvance) HeaderButton("COMBAT", onCombat, modifier = tutorialAnchor("combat-action"))
+                    "NEXT_STEP" -> if (canAdvance) HeaderButton("NEXT STEP", onNextStep, modifier = tutorialAnchor("next-step"))
+                    "PASS_TURN" -> if (canAdvance) HeaderButton("PASS TURN", onPassTurn, modifier = tutorialAnchor("pass-turn"))
+                    "MORE" -> HeaderButton("MORE  ⋮", { moreOpen = true }, modifier = tutorialAnchor("more-actions"))
+                }
+            }
+            if (!canControl && actionOrder.none { it == "REVEAL" || it == "STACK" || it == "MORE" }) Text("WAITING", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
             DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
                 if (canControl) {
                     DropdownMenuItem(text = { Text("Add token") }, modifier = tutorialAnchor("token-action"), onClick = { moreOpen = false; onMoreAction("TOKEN") })
