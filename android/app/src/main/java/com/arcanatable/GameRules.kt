@@ -608,7 +608,7 @@ internal fun explainAssistanceEventMismatch(
     val subject = ability.subjectFilter?.lowercase()
         ?.replace(Regex("^(?:a|an|another|one or more)\\s+"), "")
         .orEmpty()
-    if (subject.startsWith("this ") && event.subjectCardId != null && event.subjectCardId != event.sourceCardId) return false
+    if (subject.startsWith("this ") && event.subjectCardId != null && event.subjectCardId != event.sourceCardId) return "subject is not this source card"
     val subjectType = event.subjectType?.lowercase().orEmpty()
     if (subject.isNotBlank() && subjectType.isNotBlank()) {
         val typeMatches = when {
