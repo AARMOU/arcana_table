@@ -312,6 +312,24 @@ class GameRulesTest {
     }
 
     @Test
+    fun creatureAndLandTriggersSeeBothTypesOfAMultiTypeEtb() {
+        val typeLine = "Land Creature — Forest Dryad"
+        val creatureEntry = parseRecognizedTriggeredAbilities(
+            "Whenever another creature enters the battlefield under your control, draw a card."
+        ).single()
+        val landfall = parseRecognizedTriggeredAbilities(
+            "Whenever a land enters the battlefield under your control, draw a card."
+        ).single()
+        val landPrimaryEvent = AssistanceEvent("LAND_ETB", actorIndex = 0, subjectType = typeLine, sourceCardId = 1, subjectCardId = 2)
+        val creaturePrimaryEvent = landPrimaryEvent.copy(kind = "CREATURE_ETB")
+
+        assertTrue(matchesAssistanceEvent(creatureEntry, landPrimaryEvent, 0))
+        assertTrue(matchesAssistanceEvent(landfall, creaturePrimaryEvent, 0))
+        assertFalse(matchesAssistanceEvent(creatureEntry, landPrimaryEvent.copy(subjectType = "Basic Land — Forest"), 0))
+        assertFalse(matchesAssistanceEvent(landfall, creaturePrimaryEvent.copy(subjectType = "Creature — Elf"), 0))
+    }
+
+    @Test
     fun sacrificeAndDeathEventsRespectActorObjectAndAnotherSource() {
         val sacrificeTrigger = parseRecognizedTriggeredAbilities("Whenever you sacrifice a creature, draw a card.").single()
         assertTrue(matchesAssistanceEvent(sacrificeTrigger, AssistanceEvent("SACRIFICE", actorIndex = 0, subjectType = "Creature — Elf"), 0))

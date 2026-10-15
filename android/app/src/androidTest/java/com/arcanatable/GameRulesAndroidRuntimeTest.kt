@@ -1,6 +1,7 @@
 package com.arcanatable
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import androidx.compose.ui.graphics.Color
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Test
@@ -20,5 +21,32 @@ class GameRulesAndroidRuntimeTest {
         )
         assertFalse(soldier.requiresManualReview)
         assertEquals(listOf("Flying", "Vigilance", "Ward"), soldier.tokens.single().keywords)
+    }
+
+    @Test
+    fun gildedGooseEtbMatchesAndItsFoodEffectParsesOnAndroid() {
+        val goose = GameCard(
+            id = 79,
+            name = "Gilded Goose",
+            type = "Creature — Bird",
+            color = Color.Black,
+            oracleText = "When Gilded Goose enters the battlefield, create a Food token."
+        )
+        val check = GameEventRulesEngine.evaluate(
+            GameEvent(
+                kind = GameEventKind.CREATURE_ETB,
+                actorIndex = 0,
+                subject = goose,
+                fromZone = "stack",
+                toZone = "battlefield"
+            ),
+            listOf(TriggerSource(goose, controllerIndex = 0, controllerId = "player-0"))
+        ).single()
+
+        assertEquals(TriggerCheckStatus.MATCHED, check.status)
+        val effects = parseAutomaticResolutionEffects(check.ability?.effectText)
+        assertFalse(effects.requiresManualReview)
+        assertEquals("Food", effects.tokens.single().name)
+        assertEquals("Artifact Token — Food", effects.tokens.single().type)
     }
 }

@@ -2848,6 +2848,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 87 · MULTI-TYPE ETB TRIGGERS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Creature-entry and landfall triggers now both see a land creature entering, based on its full type line. Added Android-runtime coverage for Gilded Goose creating a Food token on entry.", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 81 · QUICK ACTIONS AND TURN COUNTER", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• The player-screen zone strip is now a configurable Quick Actions bar. Add, remove, and reorder zone shortcuts and actions in Adjust UI; empty zones stay visible with a count of 0. The Mana Pool element now appears on the live player board when enabled.\n• Mana pips are larger across card costs and text, and card three-dot menus have smaller visible buttons with an accessible tap area.\n• The TURN counter advances after every eligible player has completed a turn. It remains labeled TURN.", color = SoftWhite, fontSize = 11.sp)
 

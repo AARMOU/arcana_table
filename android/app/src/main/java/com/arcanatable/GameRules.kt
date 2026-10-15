@@ -662,10 +662,18 @@ internal fun explainAssistanceEventMismatch(
     event: AssistanceEvent,
     controllerIndex: Int
 ): String? {
+    val subjectTypeLine = event.subjectType.orEmpty()
+    val isCreatureSubject = Regex("(?i)\\bcreature\\b").containsMatchIn(subjectTypeLine)
+    val isLandSubject = Regex("(?i)\\bland\\b").containsMatchIn(subjectTypeLine)
     val eventMatches = when (ability.event) {
         "PERMANENT_ETB" -> event.kind in setOf("PERMANENT_ETB", "CREATURE_ETB", "LAND_ETB")
-        "CREATURE_ETB" -> event.kind == "CREATURE_ETB"
-        "LAND_ETB" -> event.kind == "LAND_ETB"
+        // The UI currently emits one primary ETB kind. A land creature is
+        // emitted as LAND_ETB, for example, but still causes creature-entry
+        // triggers. Use the complete subject type line to recover that fact.
+        "CREATURE_ETB" -> event.kind == "CREATURE_ETB" ||
+            (event.kind == "LAND_ETB" && isCreatureSubject)
+        "LAND_ETB" -> event.kind == "LAND_ETB" ||
+            (event.kind == "CREATURE_ETB" && isLandSubject)
         "PHASE" -> event.kind == "PHASE" && (ability.phaseFilter == null || ability.phaseFilter == event.phase)
         else -> ability.event == event.kind
     }

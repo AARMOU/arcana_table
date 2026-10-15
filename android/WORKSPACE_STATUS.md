@@ -2,7 +2,13 @@
 
 ## Canonical project
 
-This branch is the separate Arcana Table **Game Assistance Overhaul Build 86** (`0.15.67-targeting`, version code `86`) source tree on `experimental/assistance-overhaul`. It includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Stable Build 72 and the Worker are unchanged.
+This branch is the separate Arcana Table **Game Assistance Overhaul Build 87** (`0.15.68-targeting`, version code `87`) source tree on `experimental/assistance-overhaul`. It includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Stable Build 72 and the Worker are unchanged.
+
+## Changes in Build 87
+
+- ETB trigger matching now checks the entering permanent's full type line, so a land creature's entry can trigger both creature-entry and landfall abilities even though the UI records only one primary event type.
+- Added unit regressions for multi-type ETB matching and an Android-runtime test that parses and matches Gilded Goose's Food-token ETB.
+- Build 87 CI includes the full parser test suite, APK assembly, and Android emulator parser tests. Verification and APK checksum will be recorded after CI completes.
 
 ## Changes in Build 86
 
@@ -10,7 +16,7 @@ This branch is the separate Arcana Table **Game Assistance Overhaul Build 86** (
 - Parser exceptions now leave an effect for manual resolution, and a trigger-text parsing failure is recorded as unsupported instead of escaping the rules pass.
 - Added regression tests for Food-token ETBs, keyword-bearing tokens, malformed text fallback, and an Android-runtime smoke test. The experimental CI workflow now runs that smoke test on an emulator before uploading the APK.
 
-Build 86 verification and APK checksum will be recorded after CI completes.
+Build 86 `testDebugUnitTest` and `assembleDebug` passed; connected Android tests passed (15 tests, 0 failures). APK SHA-256: `20f7a3c0e2e10cc1e305f37f8568edee0405d9adf45d00d9a0c11506aea6700c`.
 
 ## Changes in Build 85
 
