@@ -5,7 +5,9 @@ internal data class AutomaticTokenSpec(
     val name: String,
     val type: String,
     val power: String? = null,
-    val toughness: String? = null
+    val toughness: String? = null,
+    val colors: List<String> = emptyList(),
+    val keywords: List<String> = emptyList()
 )
 
 internal data class AutomaticResolutionEffects(
@@ -17,6 +19,10 @@ internal data class AutomaticResolutionEffects(
 ) {
     val isEmpty: Boolean get() = lifeGain == 0 && lifeLoss == 0 && cardsDrawn == 0 && tokens.isEmpty()
 }
+
+/** Validates known prerequisites before an automatic effect mutates any state. */
+internal fun canApplyAutomaticEffects(librarySize: Int, effects: AutomaticResolutionEffects): Boolean =
+    !effects.requiresManualReview && effects.cardsDrawn <= librarySize.coerceAtLeast(0)
 
 internal data class CreatureEntryLifeEffect(
     val amount: Int,
@@ -30,7 +36,24 @@ internal data class RecognizedTriggeredAbility(
     val conditionText: String,
     val effectText: String,
     val anotherOnly: Boolean = false,
-    val controllerFilter: String? = null
+    val controllerFilter: String? = null,
+    /** The object that must cause the event, when Oracle wording names one. */
+    val subjectFilter: String? = null,
+    /** Turn structure trigger such as UPKEEP, BEGINNING_COMBAT, or END_STEP. */
+    val phaseFilter: String? = null
+)
+
+/** A normalized action observed by the table. Unknown actions remain manual. */
+internal data class AssistanceEvent(
+    val kind: String,
+    val actorIndex: Int? = null,
+    val subjectType: String? = null,
+    val subjectName: String? = null,
+    val phase: String? = null,
+    val targetIndex: Int? = null,
+    val amount: Int? = null,
+    val sourceCardId: Int? = null,
+    val subjectCardId: Int? = null
 )
 
 internal data class TargetedAutomaticEffect(
@@ -67,6 +90,58 @@ data class StackTarget(
     val category: String,
     val ownerId: String? = null
 )
+
+/** Target classes parsed from ordinary Oracle target phrases; restrictions remain player-verified. */
+internal data class TargetCategoryHints(val categories: Set<String>, val description: String)
+
+internal fun parseTargetCategoryHints(text: String?): TargetCategoryHints? {
+    val oracle = text.orEmpty()
+    if (!Regex("(?i)\\btarget\\b|\\bany target\\b").containsMatchIn(oracle)) return null
+    val categories = linkedSetOf<String>()
+    if (Regex("(?i)\\bany target\\b").containsMatchIn(oracle)) {
+        categories += setOf("PLAYER", "CREATURE", "PLANESWALKER", "BATTLE")
+    }
+    val normalizedGroups = Regex(
+        "(?i)\\btarget\\s+(?:[a-z-]+\\s+){0,3}(player|opponent|creature|artifact|enchantment|land|planeswalker|battle|permanent|spell|ability|card)\\b"
+    ).findAll(oracle).map { it.groupValues[1].uppercase() }.toList()
+    // Include alternatives in phrases such as "target creature or planeswalker".
+    val alternatives = Regex("(?i)\\btarget\\b[^.]*").findAll(oracle).flatMap { match ->
+        Regex("(?i)\\b(player|opponent|creature|artifact|enchantment|land|planeswalker|battle|permanent|spell|ability|card)\\b")
+            .findAll(match.value.substringAfter(Regex("(?i)\\btarget\\b").find(match.value)?.value.orEmpty()))
+            .map { it.groupValues[1].uppercase() }
+    }.toList()
+    (normalizedGroups + alternatives).forEach { target ->
+        when (target) {
+            "PLAYER", "OPPONENT" -> categories += "PLAYER"
+            "PERMANENT" -> categories += setOf("CREATURE", "ARTIFACT", "ENCHANTMENT", "LAND", "PLANESWALKER", "BATTLE")
+            "SPELL" -> categories += "STACK · SPELL"
+            "ABILITY" -> categories += "STACK · ABILITY"
+            "CARD" -> {
+                val nearby = oracle.lowercase().substringAfter("target card").substringBefore(".").substringBefore(" to ")
+                if ("graveyard" in nearby) categories += "GRAVEYARD"
+                if ("exile" in nearby) categories += "EXILE"
+                if ("hand" in nearby) categories += "HAND"
+                if ("library" in nearby) categories += "LIBRARY"
+            }
+            else -> categories += target
+        }
+    }
+    if (categories.isEmpty()) return null
+    return TargetCategoryHints(categories, categories.joinToString(" or ") { it.lowercase().replaceFirstChar { first -> first.uppercase() } })
+}
+
+internal fun targetCandidateLikelyMatches(candidate: StackTarget, hints: TargetCategoryHints): Boolean {
+    val category = candidate.category.uppercase()
+    return hints.categories.any { target ->
+        when (target) {
+            "PLAYER" -> category == "PLAYER"
+            "STACK · SPELL" -> category.startsWith("STACK · SPELL")
+            "STACK · ABILITY" -> category.startsWith("STACK · ABILITY")
+            "GRAVEYARD", "EXILE", "HAND", "LIBRARY" -> category.startsWith(target)
+            else -> category.startsWith("BATTLEFIELD") && category.contains(target)
+        }
+    }
+}
 
 /** Builds the visible game objects that can be reviewed as possible targets. */
 internal fun buildTargetCandidates(
@@ -139,7 +214,7 @@ internal fun parseAutomaticResolutionEffects(oracleText: String?): AutomaticReso
     val gainPattern = Regex("(?i)^(?:you\\s+)?gain\\s+$amountPattern\\s+life$")
     val lossPattern = Regex("(?i)^(?:you\\s+)?lose\\s+$amountPattern\\s+life$")
     val drawPattern = Regex("(?i)^(?:you\\s+)?draw\\s+$amountPattern\\s+cards?$")
-    val tokenPattern = Regex("(?i)^create\\s+$amountPattern\\s+([^.;]+?)\\s+tokens?$")
+    val tokenPattern = Regex("(?i)^create\\s+$amountPattern\\s+(.+?)\\s+tokens?(?:\\s+with\\s+(.+))?$")
     var lifeGain = 0
     var lifeLoss = 0
     var cardsDrawn = 0
@@ -171,10 +246,26 @@ internal fun parseAutomaticResolutionEffects(oracleText: String?): AutomaticReso
             val hasCreature = description.contains("creature", ignoreCase = true)
             val isArtifact = description.contains("artifact", ignoreCase = true) ||
                 description.substringBefore(" ").lowercase() in setOf("treasure", "food", "clue", "blood", "map", "powerstone", "incubator")
+            val statLike = Regex("^(?:\\d+|\\*|x)/(?:\\d+|\\*|x)\\s+", RegexOption.IGNORE_CASE).containsMatchIn(description)
+            val suffix = token.groupValues[3]
+            val supportedKeywords = listOf("Flying", "First strike", "Double strike", "Deathtouch", "Defender", "Haste", "Hexproof", "Indestructible", "Lifelink", "Menace", "Reach", "Trample", "Vigilance", "Ward")
+            val unexplainedSuffix = supportedKeywords.fold(suffix.lowercase()) { remaining, keyword ->
+                remaining.replace(Regex("(?<![a-z])${Regex.escape(keyword.lowercase())}(?![a-z])(?:\\s+\\{[^}]+})?"), " ")
+            }.replace(Regex("\\b(and|or|with)\\b|[{},.;]"), " ").trim()
+            if ((!hasCreature && !isArtifact) || (statLike && stats == null) ||
+                Regex("(?i)\\b(tapped|attacking|blocking|counter|counters|copy|copies|enchanted|equipped)\\b").containsMatchIn(description) ||
+                unexplainedSuffix.isNotBlank()) return AutomaticResolutionEffects(requiresManualReview = true)
+            val colorWords = mapOf("white" to "W", "blue" to "U", "black" to "B", "red" to "R", "green" to "G")
+            val colors = description.split(Regex("[^A-Za-z]+"))
+                .mapNotNull { colorWords[it.lowercase()] }
+                .distinct()
+            val keywordNames = listOf("Flying", "First strike", "Double strike", "Deathtouch", "Defender", "Haste", "Hexproof", "Indestructible", "Lifelink", "Menace", "Reach", "Trample", "Vigilance", "Ward")
+            val fullText = "$description $suffix"
+            val keywords = keywordNames.filter { Regex("(?i)(?<![A-Za-z])${Regex.escape(it)}(?![A-Za-z])").containsMatchIn(fullText) }
             val name = description
                 .replace(Regex("^\\d+/\\d+\\s+"), "")
                 .split(Regex("\\s+"))
-                .filterNot { it.lowercase() in setOf("white", "blue", "black", "red", "green", "colorless", "and", "creature", "artifact", "enchantment", "land") }
+                .filterNot { it.lowercase() in setOf("white", "blue", "black", "red", "green", "colorless", "and", "creature", "artifact", "enchantment", "land", "token", "tokens") }
                 .joinToString(" ")
                 .trim()
                 .ifBlank { if (isArtifact) "Artifact" else "Creature" }
@@ -183,7 +274,7 @@ internal fun parseAutomaticResolutionEffects(oracleText: String?): AutomaticReso
                 isArtifact -> "Artifact Token — $name"
                 else -> "Token"
             }
-            tokens += AutomaticTokenSpec(count, name, type, stats?.groupValues?.get(1), stats?.groupValues?.get(2))
+            tokens += AutomaticTokenSpec(count, name, type, stats?.groupValues?.get(1), stats?.groupValues?.get(2), colors, keywords)
             continue
         }
         return AutomaticResolutionEffects(requiresManualReview = true)
@@ -191,7 +282,11 @@ internal fun parseAutomaticResolutionEffects(oracleText: String?): AutomaticReso
     return AutomaticResolutionEffects(lifeGain, lifeLoss, cardsDrawn, tokens)
 }
 
-/** Recognizes trigger clauses for events that the table currently reports: casts, draws, and creature entry. */
+/**
+ * Reads the common rules-text shapes used by triggered abilities. This is a
+ * deliberately conservative recognizer: it labels the event and leaves effect
+ * choices and rules legality to the assistance flow instead of simulating text.
+ */
 internal fun parseRecognizedTriggeredAbilities(oracleText: String?): List<RecognizedTriggeredAbility> {
     val sentences = oracleText.orEmpty().lineSequence()
         .flatMap { line -> line.split(Regex("(?<=\\.)\\s+" )).asSequence() }
@@ -200,41 +295,282 @@ internal fun parseRecognizedTriggeredAbilities(oracleText: String?): List<Recogn
     return sentences.mapNotNull { sentence ->
         val comma = sentence.indexOf(',')
         if (comma < 0) return@mapNotNull null
-        val condition = sentence.substringBefore(',').trim()
+        val rawCondition = sentence.substringBefore(',').trim()
+        // Oracle often prefixes a trigger with a named ability label, e.g.
+        // "Landfall — Whenever a land ...". Parse the actual event clause.
+        val condition = rawCondition.substringAfter("—", rawCondition).trim()
         val effect = sentence.substring(comma + 1).trim()
         if (effect.isBlank()) return@mapNotNull null
 
-        val cast = Regex("(?i)^whenever\\s+(you|a player|an opponent)\\s+casts?\\s+.+\\bspell$").matchEntire(condition)
-        if (cast != null) return@mapNotNull RecognizedTriggeredAbility(
-            event = "CAST",
-            actorFilter = when (cast.groupValues[1].lowercase()) { "you" -> "YOU"; "an opponent" -> "OPPONENT"; else -> "ANY" },
-            conditionText = condition,
-            effectText = effect
-        )
+        fun actor(raw: String): String = when (raw.lowercase()) {
+            "you", "your" -> "YOU"
+            "an opponent", "opponent's", "an opponent's", "each opponent's" -> "OPPONENT"
+            "a player", "each player", "a player's", "each player's" -> "ANY"
+            else -> "ANY"
+        }
 
-        val draw = Regex("(?i)^whenever\\s+(you|a player|an opponent)\\s+draws?\\s+(?:a|one)\\s+card$").matchEntire(condition)
-        if (draw != null) return@mapNotNull RecognizedTriggeredAbility(
-            event = "DRAW",
-            actorFilter = when (draw.groupValues[1].lowercase()) { "you" -> "YOU"; "an opponent" -> "OPPONENT"; else -> "ANY" },
-            conditionText = condition,
-            effectText = effect
-        )
+        val cast = Regex("(?i)^(whenever|when)\\s+(you|a player|an opponent)\\s+casts?\\s+(.+)$").matchEntire(condition)
+        if (cast != null && (cast.groupValues[3].contains("spell", true) || cast.groupValues[3].contains("cast", true))) {
+            return@mapNotNull RecognizedTriggeredAbility("CAST", actor(cast.groupValues[2]), condition, effect,
+                subjectFilter = cast.groupValues[3].takeIf { it.isNotBlank() })
+        }
 
-        val creatureEntry = Regex("(?i)^whenever\\s+(another\\s+)?creature\\s+enters(?:\\s+the battlefield)?(?:\\s+(under your control|under an opponent's control))?$").matchEntire(condition)
-        if (creatureEntry != null) return@mapNotNull RecognizedTriggeredAbility(
-            event = "CREATURE_ETB",
-            actorFilter = when (creatureEntry.groupValues[2].lowercase()) {
+        val draw = Regex("(?i)^(whenever|when)\\s+(you|a player|an opponent)\\s+draws?\\s+(.+)$").matchEntire(condition)
+        if (draw != null && Regex("(?i)(a|one|another|second|third|fourth|first)\\s+card|cards").containsMatchIn(draw.groupValues[3])) {
+            return@mapNotNull RecognizedTriggeredAbility("DRAW", actor(draw.groupValues[2]), condition, effect,
+                subjectFilter = draw.groupValues[3])
+        }
+
+        val enters = Regex("(?i)^(whenever|when)\\s+(?:(another|a|an)\\s+)?(creature|artifact|enchantment|permanent|land|planeswalker|battle|token)\\s+enters(?:\\s+the battlefield)?(?:\\s+(under your control|under an opponent's control))?$")
+            .matchEntire(condition)
+        if (enters != null) {
+            val objectType = enters.groupValues[3].uppercase()
+            val event = when (objectType) {
+                "CREATURE" -> "CREATURE_ETB"
+                "LAND" -> "LAND_ETB"
+                else -> "PERMANENT_ETB"
+            }
+            val controller = enters.groupValues[4].takeIf { it.isNotBlank() }?.lowercase()
+            return@mapNotNull RecognizedTriggeredAbility(event, when (controller) {
                 "under your control" -> "YOU"
                 "under an opponent's control" -> "OPPONENT"
                 else -> "ANY"
-            },
-            conditionText = condition,
-            effectText = effect,
-            anotherOnly = creatureEntry.groupValues[1].isNotBlank(),
-            controllerFilter = creatureEntry.groupValues[2].takeIf { it.isNotBlank() }?.lowercase()
+            }, condition, effect, anotherOnly = enters.groupValues[2].equals("another", true),
+                controllerFilter = controller, subjectFilter = objectType)
+        }
+        val thisEnters = Regex("(?i)^(whenever|when)\\s+this\\s+(creature|artifact|enchantment|permanent|land|planeswalker|battle)\\s+enters(?:\\s+the battlefield)?$")
+            .matchEntire(condition)
+        if (thisEnters != null) {
+            val objectType = thisEnters.groupValues[2].uppercase()
+            val event = when (objectType) {
+                "CREATURE" -> "CREATURE_ETB"
+                "LAND" -> "LAND_ETB"
+                else -> "PERMANENT_ETB"
+            }
+            return@mapNotNull RecognizedTriggeredAbility(event, "YOU", condition, effect, subjectFilter = "this $objectType")
+        }
+
+        val dies = Regex("(?i)^(whenever|when)\\s+(?:(another|a|an)\\s+)?(creature|artifact|permanent|token|planeswalker)(?:\\s+(you control|an opponent controls))?\\s+dies$").matchEntire(condition)
+        if (dies != null) {
+            val controller = dies.groupValues[4].takeIf { it.isNotBlank() }?.lowercase()
+            return@mapNotNull RecognizedTriggeredAbility("DIES", when (controller) {
+                "you control" -> "YOU"
+                "an opponent controls" -> "OPPONENT"
+                else -> "ANY"
+            }, condition, effect, anotherOnly = dies.groupValues[2].equals("another", true), controllerFilter = controller,
+                subjectFilter = dies.groupValues[3].uppercase())
+        }
+        val thisDies = Regex("(?i)^(whenever|when)\\s+this\\s+(creature|artifact|permanent|token|planeswalker)\\s+dies$").matchEntire(condition)
+        if (thisDies != null) return@mapNotNull RecognizedTriggeredAbility(
+            "DIES", "YOU", condition, effect, subjectFilter = "this ${thisDies.groupValues[2]}"
         )
+
+        val leaves = Regex("(?i)^(whenever|when)\\s+(?:(another|a|an)\\s+)?(creature|artifact|permanent|land|token|planeswalker|enchantment)(?:\\s+(you control|an opponent controls))?\\s+leaves the battlefield$").matchEntire(condition)
+        if (leaves != null) {
+            val controller = leaves.groupValues[4].takeIf { it.isNotBlank() }?.lowercase()
+            return@mapNotNull RecognizedTriggeredAbility("LEAVES_BATTLEFIELD", when (controller) {
+                "you control" -> "YOU"
+                "an opponent controls" -> "OPPONENT"
+                else -> "ANY"
+            }, condition, effect, anotherOnly = leaves.groupValues[2].equals("another", true), controllerFilter = controller,
+                subjectFilter = leaves.groupValues[3].uppercase())
+        }
+        val thisLeaves = Regex("(?i)^(whenever|when)\\s+this\\s+(creature|artifact|permanent|land|token|planeswalker|enchantment)\\s+leaves the battlefield$").matchEntire(condition)
+        if (thisLeaves != null) return@mapNotNull RecognizedTriggeredAbility(
+            "LEAVES_BATTLEFIELD", "YOU", condition, effect, subjectFilter = "this ${thisLeaves.groupValues[2]}"
+        )
+
+        val attacks = Regex("(?i)^(whenever|when)\\s+(.+?)\\s+attacks?(?:\\s+alone)?(?:\\s+you)?$").matchEntire(condition)
+        if (attacks != null) {
+            val subject = attacks.groupValues[2]
+            val actorFilter = when {
+                subject.equals("you", true) || subject.contains("you control", true) -> "YOU"
+                subject.contains("opponent", true) -> "OPPONENT"
+                else -> "ANY"
+            }
+            return@mapNotNull RecognizedTriggeredAbility("ATTACKS", actorFilter, condition, effect,
+                anotherOnly = subject.contains("another", true), subjectFilter = subject)
+        }
+
+        val blocks = Regex("(?i)^(whenever|when)\\s+(.+?)\\s+blocks?(?:\\s+(.+))?$").matchEntire(condition)
+        if (blocks != null) {
+            val subject = blocks.groupValues[2]
+            val actorFilter = when {
+                subject.equals("you", true) || subject.contains("you control", true) -> "YOU"
+                subject.contains("opponent", true) -> "OPPONENT"
+                else -> "ANY"
+            }
+            return@mapNotNull RecognizedTriggeredAbility("BLOCKS", actorFilter, condition, effect,
+                anotherOnly = subject.contains("another", true), subjectFilter = subject)
+        }
+
+        val damage = Regex("(?i)^(whenever|when)\\s+(.+?)\\s+(deals?|is dealt)\\s+(combat )?damage(?:\\s+to\\s+(.+))?$").matchEntire(condition)
+        if (damage != null) {
+            val subject = damage.groupValues[2]
+            val actorFilter = when {
+                subject.contains("you control", true) -> "YOU"
+                subject.contains("opponent controls", true) || subject.contains("opponent's", true) -> "OPPONENT"
+                else -> "ANY"
+            }
+            return@mapNotNull RecognizedTriggeredAbility(if (damage.groupValues[4].isBlank()) "DAMAGE" else "COMBAT_DAMAGE", actorFilter, condition, effect,
+                subjectFilter = subject)
+        }
+
+        val phase = Regex("(?i)^at the beginning of (your|each player's|an opponent's|each opponent's) (upkeep|draw step|(?:precombat |postcombat |first )?main phase|combat(?: phase)?(?: on your turn)?|end combat|end step|cleanup)$")
+            .matchEntire(condition)
+        if (phase != null) {
+            val owner = actor(phase.groupValues[1])
+            val phaseName = when (phase.groupValues[2].lowercase()) {
+                "upkeep" -> "UPKEEP"
+                "draw step" -> "DRAW"
+                "precombat main phase", "first main phase" -> "PRECOMBAT_MAIN"
+                "postcombat main phase" -> "POSTCOMBAT_MAIN"
+                "main phase" -> "PRECOMBAT_MAIN"
+                "combat", "combat phase", "combat on your turn", "combat phase on your turn" -> "BEGIN_COMBAT"
+                "end combat" -> "END_COMBAT"
+                "end step" -> "END_STEP"
+                else -> "CLEANUP"
+            }
+            return@mapNotNull RecognizedTriggeredAbility("PHASE", owner, condition, effect, phaseFilter = phaseName)
+        }
+        if (Regex("(?i)^at the beginning of (your|each player's|an opponent's|each opponent's) turn$").matches(condition)) {
+            val who = condition.substringAfter("beginning of ").substringBefore(" turn")
+            return@mapNotNull RecognizedTriggeredAbility("PHASE", actor(who), condition, effect, phaseFilter = "BEGIN_TURN")
+        }
+
+        val life = Regex("(?i)^(whenever|when)\\s+(you|a player|an opponent)\\s+(gains?|loses?)\\s+life$").matchEntire(condition)
+        if (life != null) return@mapNotNull RecognizedTriggeredAbility(if (life.groupValues[3].startsWith("gain", true)) "LIFE_GAIN" else "LIFE_LOSS", actor(life.groupValues[2]), condition, effect)
+
+        val landfall = Regex("(?i)^landfall$").matchEntire(condition)
+        if (landfall != null) return@mapNotNull RecognizedTriggeredAbility("LAND_ETB", "YOU", condition, effect, subjectFilter = "LAND")
+
+        val genericTap = Regex("(?i)^(whenever|when)\\s+(this|a|an|another|one or more)\\s+(creature|permanent|artifact|land)(?:\\s+(you control|an opponent controls))?\\s+becomes? (tapped|untapped)$").matchEntire(condition)
+        if (genericTap != null) return@mapNotNull RecognizedTriggeredAbility(if (genericTap.groupValues[5].equals("tapped", true)) "BECOMES_TAPPED" else "BECOMES_UNTAPPED", when (genericTap.groupValues[4].lowercase()) {
+            "you control" -> "YOU"
+            "an opponent controls" -> "OPPONENT"
+            else -> "ANY"
+        }, condition, effect,
+            anotherOnly = genericTap.groupValues[2].equals("another", true), controllerFilter = genericTap.groupValues[4].takeIf { it.isNotBlank() }?.lowercase(),
+            subjectFilter = if (genericTap.groupValues[2].equals("this", true)) "this ${genericTap.groupValues[3]}" else genericTap.groupValues[3].uppercase())
+
+        val sacrifice = Regex("(?i)^(whenever|when)\\s+(you|a player|an opponent)\\s+sacrifices?\\s+(.+)$").matchEntire(condition)
+        if (sacrifice != null) return@mapNotNull RecognizedTriggeredAbility("SACRIFICE", actor(sacrifice.groupValues[2]), condition, effect,
+            subjectFilter = sacrifice.groupValues[3])
+
+        val counters = Regex("(?i)^(whenever|when)\\s+(one or more|a|another)\\s+(.+?)\\s+counters?\\s+(?:are|is)\\s+put on\\s+(.+)$").matchEntire(condition)
+        if (counters != null) return@mapNotNull RecognizedTriggeredAbility("COUNTER_ADDED", "ANY", condition, effect,
+            anotherOnly = counters.groupValues[2].equals("another", true), subjectFilter = counters.groupValues[4])
+
+        val discards = Regex("(?i)^(whenever|when)\\s+(you|a player|an opponent)\\s+discards?\\s+(.+)$").matchEntire(condition)
+        if (discards != null) return@mapNotNull RecognizedTriggeredAbility("DISCARD", actor(discards.groupValues[2]), condition, effect,
+            subjectFilter = discards.groupValues[3])
         null
     }.toList()
+}
+
+/** Checks a recognized trigger against the table event without inventing legality. */
+internal fun matchesAssistanceEvent(
+    ability: RecognizedTriggeredAbility,
+    event: AssistanceEvent,
+    controllerIndex: Int
+): Boolean {
+    val eventMatches = when (ability.event) {
+        "PERMANENT_ETB" -> event.kind in setOf("PERMANENT_ETB", "CREATURE_ETB", "LAND_ETB")
+        "CREATURE_ETB" -> event.kind == "CREATURE_ETB"
+        "LAND_ETB" -> event.kind == "LAND_ETB"
+        "PHASE" -> event.kind == "PHASE" && (ability.phaseFilter == null || ability.phaseFilter == event.phase)
+        else -> ability.event == event.kind
+    }
+    if (!eventMatches) return false
+    val actorMatches = when (ability.actorFilter) {
+        "YOU" -> controllerIndex == event.actorIndex
+        "OPPONENT" -> event.actorIndex != null && controllerIndex != event.actorIndex
+        else -> true
+    }
+    if (!actorMatches) return false
+    if (ability.event == "ATTACKS" && ability.conditionText.contains("attacks you", true) && controllerIndex != event.targetIndex) return false
+    if (ability.event in setOf("DAMAGE", "COMBAT_DAMAGE")) {
+        val condition = ability.conditionText
+        if (condition.contains("damage to you", true) && controllerIndex != event.targetIndex) return false
+        if (condition.contains("damage to an opponent", true) && controllerIndex == event.targetIndex) return false
+    }
+    if (ability.controllerFilter == "under your control" && controllerIndex != event.actorIndex) return false
+    if (ability.controllerFilter == "under an opponent's control" && controllerIndex == event.actorIndex) return false
+    if (ability.anotherOnly && event.sourceCardId != null && event.sourceCardId == event.subjectCardId) return false
+    val subject = ability.subjectFilter?.lowercase()
+        ?.replace(Regex("^(?:a|an|another|one or more)\\s+"), "")
+        .orEmpty()
+    if (subject.startsWith("this ") && event.subjectCardId != null && event.subjectCardId != event.sourceCardId) return false
+    val subjectType = event.subjectType?.lowercase().orEmpty()
+    if (subject.isNotBlank() && subjectType.isNotBlank()) {
+        val typeMatches = when {
+            "permanent" in subject -> true
+            "creature" in subject -> "creature" in subjectType
+            "land" in subject -> "land" in subjectType
+            "artifact" in subject -> "artifact" in subjectType
+            "enchantment" in subject -> "enchantment" in subjectType
+            "planeswalker" in subject -> "planeswalker" in subjectType
+            "battle" in subject -> "battle" in subjectType
+            "noncreature" in subject -> "creature" !in subjectType
+            "spell" in subject -> "spell" in categoryForAssistanceEvent(event.kind)
+            "token" in subject -> event.subjectName?.contains("token", true) == true
+            else -> true
+        }
+        if (!typeMatches) return false
+    }
+    return true
+}
+
+private fun categoryForAssistanceEvent(eventKind: String): String = when {
+    eventKind.contains("SPELL") || eventKind == "CAST" -> "spell"
+    else -> eventKind.lowercase()
+}
+
+/**
+ * A lightweight explanation used for logs and diagnostics. A value below 1.0
+ * means one or more clauses need player handling; it is not a rules-accuracy
+ * claim and must never be treated as permission to apply a partial effect.
+ */
+internal data class AssistanceAssessment(
+    val recognizedClauses: Int,
+    val manualClauses: Int,
+    val triggerClauses: Int,
+    val unsupportedClauses: List<String>
+) {
+    val recognizedRatio: Double get() = if (recognizedClauses + manualClauses == 0) 1.0
+        else recognizedClauses.toDouble() / (recognizedClauses + manualClauses)
+    val hasPlayerHandledClauses: Boolean get() = manualClauses > 0
+}
+
+/** Classifies the text coverage before resolving; unknown text is always manual. */
+internal fun assessOracleText(oracleText: String?): AssistanceAssessment {
+    val text = oracleText.orEmpty().trim()
+    if (text.isBlank()) return AssistanceAssessment(0, 0, 0, emptyList())
+    val clauses = text.lineSequence()
+        .flatMap { line -> line.split(Regex("(?<=\\.)\\s+|\\n+|(?<=:)\\s+(?=[A-Z])")).asSequence() }
+        .map { it.trim().trimEnd('.', ' ') }
+        .filter { it.isNotBlank() && !it.startsWith("//") }
+        .toList()
+    val recognized = mutableListOf<String>()
+    val unsupported = mutableListOf<String>()
+    clauses.forEach { clause ->
+        val lowered = clause.lowercase()
+        val simple = Regex("(?i)^(?:you\\s+)?(?:gain|lose)\\s+(?:\\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten)\\s+life$").matches(clause) ||
+            Regex("(?i)^(?:you\\s+)?draw\\s+(?:\\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten)\\s+cards?$").matches(clause) ||
+            Regex("(?i)^create\\s+(?:\\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten)\\s+.+\\s+tokens?$" ).matches(clause)
+        val trigger = parseRecognizedTriggeredAbilities(clause).isNotEmpty() ||
+            Regex("(?i)^(?:whenever|when|at the beginning of)\\b").containsMatchIn(clause)
+        val keyword = Regex("(?i)^(?:flying|first strike|double strike|deathtouch|defender|haste|hexproof|indestructible|lifelink|menace|reach|trample|vigilance|ward)(?:\\s+.+)?$").matches(clause)
+        when {
+            simple || trigger || keyword -> recognized += clause
+            // Static abilities are surfaced as understood text rather than executed.
+            lowered.startsWith("as this enters") || lowered.startsWith("you may") || lowered.startsWith("you can't") ||
+                lowered.startsWith("you cannot") || lowered.startsWith("players can't") || lowered.startsWith("spells can't") -> recognized += clause
+            else -> unsupported += clause
+        }
+    }
+    val triggerCount = clauses.count { Regex("(?i)^(?:whenever|when|at the beginning of)\\b").containsMatchIn(it) }
+    return AssistanceAssessment(recognized.size, unsupported.size, triggerCount, unsupported)
 }
 
 /** Extracts simple effects aimed at one player so the UI can ask who the target is before applying them. */
@@ -441,6 +777,33 @@ internal fun nextTurnIndex(currentIndex: Int, turnOrder: List<Int>, playerCount:
     if (eligibleOrder.isEmpty()) return currentIndex.coerceIn(0, playerCount - 1)
     val orderIndex = eligibleOrder.indexOf(currentIndex)
     return eligibleOrder[if (orderIndex < 0) 0 else (orderIndex + 1) % eligibleOrder.size]
+}
+
+internal data class StackPriorityAdvance(
+    val nextPlayer: Int,
+    val passedPlayers: Set<String>,
+    val returnedToOrigin: Boolean
+)
+
+/** Advances one pass around the table and ends the response cycle when priority returns to the stack actor. */
+internal fun advanceStackPriority(
+    currentPlayer: Int,
+    originPlayer: Int,
+    passedPlayers: Set<String>,
+    playerIds: List<String>,
+    turnOrder: List<Int>,
+    eligiblePlayers: Set<Int>
+): StackPriorityAdvance {
+    if (playerIds.isEmpty()) return StackPriorityAdvance(0, passedPlayers, false)
+    val current = currentPlayer.coerceIn(playerIds.indices)
+    val validEligible = eligiblePlayers.filter { it in playerIds.indices }.toSet()
+    val next = nextTurnIndex(current, turnOrder, playerIds.size, validEligible)
+    val id = playerIds[current]
+    val passed = if (id.isBlank()) passedPlayers else passedPlayers + id
+    val origin = originPlayer.takeIf { it in validEligible }
+    val responders = validEligible.filter { it != origin }.map { playerIds[it] }
+    val returned = origin != null && next == origin && responders.all { it in passed }
+    return StackPriorityAdvance(next, passed, returned)
 }
 
 internal fun isLastEligibleTurnInRound(currentIndex: Int, turnOrder: List<Int>, playerCount: Int, eligiblePlayers: Set<Int>): Boolean {

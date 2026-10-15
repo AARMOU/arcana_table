@@ -39,7 +39,8 @@ data class ScryfallCard(
     val manaCost: String? = null,
     val power: String? = null,
     val toughness: String? = null,
-    val keywords: List<String> = emptyList()
+    val keywords: List<String> = emptyList(),
+    val colors: List<String> = emptyList()
 )
 
 private val deckSectionHeadings = setOf("creatures", "instants", "sorceries", "artifacts", "enchantments", "lands", "planeswalkers", "battles", "other", "others", "tokens", "noncreatures")
@@ -197,7 +198,8 @@ object Scryfall {
                         card.optString("mana_cost").takeIf { it.isNotBlank() },
                         card.optString("power").takeIf { it.isNotBlank() } ?: firstFace?.optString("power")?.takeIf { it.isNotBlank() },
                         card.optString("toughness").takeIf { it.isNotBlank() } ?: firstFace?.optString("toughness")?.takeIf { it.isNotBlank() },
-                        card.optJSONArray("keywords")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty()
+                        card.optJSONArray("keywords")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty(),
+                        card.optJSONArray("colors")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty()
                     )
                     byName[name.normalized()] = found
                     val set = card.optString("set").lowercase(Locale.ROOT)
@@ -247,7 +249,8 @@ object Scryfall {
                     card.optDouble("cmc").takeIf { card.has("cmc") }, artCropUrl, card.optString("mana_cost").takeIf { it.isNotBlank() },
                     card.optString("power").takeIf { it.isNotBlank() } ?: firstFace?.optString("power")?.takeIf { it.isNotBlank() },
                     card.optString("toughness").takeIf { it.isNotBlank() } ?: firstFace?.optString("toughness")?.takeIf { it.isNotBlank() },
-                    card.optJSONArray("keywords")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty()
+                    card.optJSONArray("keywords")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty(),
+                    card.optJSONArray("colors")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty()
                 )
             }
         } finally { connection.disconnect() }
@@ -277,7 +280,8 @@ object Scryfall {
                 card.optString("mana_cost").takeIf { it.isNotBlank() },
                 card.optString("power").takeIf { it.isNotBlank() } ?: firstFace?.optString("power")?.takeIf { it.isNotBlank() },
                 card.optString("toughness").takeIf { it.isNotBlank() } ?: firstFace?.optString("toughness")?.takeIf { it.isNotBlank() },
-                card.optJSONArray("keywords")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty()
+                card.optJSONArray("keywords")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty(),
+                card.optJSONArray("colors")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty()
             )
         } finally { connection.disconnect() }
     }
@@ -306,7 +310,8 @@ object Scryfall {
                     card.optString("oracle_text").takeIf { it.isNotBlank() },
                     power = card.optString("power").takeIf { it.isNotBlank() } ?: firstFace?.optString("power")?.takeIf { it.isNotBlank() },
                     toughness = card.optString("toughness").takeIf { it.isNotBlank() } ?: firstFace?.optString("toughness")?.takeIf { it.isNotBlank() },
-                    keywords = card.optJSONArray("keywords")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty()
+                    keywords = card.optJSONArray("keywords")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty(),
+                    colors = card.optJSONArray("colors")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty()
                 )
             }
         } finally {

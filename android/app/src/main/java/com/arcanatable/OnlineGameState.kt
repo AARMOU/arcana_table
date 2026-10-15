@@ -23,7 +23,8 @@ data class OnlineGameState(
     val stackActions: List<StackAction> = emptyList(),
     val priorityPlayer: Int = 0,
     val priorityPassed: Set<String> = emptySet(),
-    val triggerPrompts: List<TriggerPrompt> = emptyList()
+    val triggerPrompts: List<TriggerPrompt> = emptyList(),
+    val stackPriorityOriginId: String? = null
 )
 
 data class OnlineChatMessage(val author: String, val text: String, val timestamp: String)
@@ -63,6 +64,7 @@ fun OnlineGameState.toJson(): String = JSONObject().apply {
     } })
     put("priorityPlayer", priorityPlayer)
     put("priorityPassed", JSONArray().apply { priorityPassed.forEach { put(it) } })
+    put("stackPriorityOriginId", stackPriorityOriginId ?: JSONObject.NULL)
     put("triggerPrompts", JSONArray().apply { triggerPrompts.forEach { prompt ->
         put(JSONObject()
             .put("id", prompt.id)
@@ -109,6 +111,7 @@ fun parseOnlineGameState(source: String): OnlineGameState? = runCatching {
         } } }.orEmpty(),
         priorityPlayer = json.optInt("priorityPlayer").coerceIn(players.indices),
         priorityPassed = json.optJSONArray("priorityPassed")?.let { array -> (0 until array.length()).map { array.optString(it) }.toSet() }.orEmpty(),
+        stackPriorityOriginId = json.optString("stackPriorityOriginId").takeUnless { it.isBlank() || it == "null" },
         triggerPrompts = json.optJSONArray("triggerPrompts")?.let { array ->
             (0 until array.length()).mapNotNull { index ->
                 val item = array.optJSONObject(index) ?: return@mapNotNull null
@@ -196,6 +199,7 @@ private fun GameCard.toJson() = JSONObject().apply {
     put("manaCost", manaCost ?: JSONObject.NULL)
     put("power", power ?: JSONObject.NULL); put("toughness", toughness ?: JSONObject.NULL)
     put("keywords", JSONArray().apply { keywords.forEach { put(it) } })
+    put("colors", JSONArray().apply { colors.forEach { put(it) } })
     put("chosenCreatureType", chosenCreatureType ?: JSONObject.NULL)
 }
 
@@ -214,7 +218,8 @@ private fun JSONObject.toGameCard(): GameCard {
         artCropUrl = optString("artCropUrl").nullableString(), manaCost = if (has("manaCost") && !isNull("manaCost")) optString("manaCost") else null,
         power = optString("power").nullableString(), toughness = optString("toughness").nullableString(),
         keywords = optJSONArray("keywords")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty(),
-        chosenCreatureType = optString("chosenCreatureType").nullableString()
+        chosenCreatureType = optString("chosenCreatureType").nullableString(),
+        colors = optJSONArray("colors")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty()
     )
 }
 

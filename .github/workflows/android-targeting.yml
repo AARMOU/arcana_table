@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - experimental/targeting
+      - experimental/assistance-overhaul
   workflow_dispatch:
 
 permissions:
@@ -37,7 +38,7 @@ jobs:
       - name: Upload experimental APK
         uses: actions/upload-artifact@v4
         with:
-          name: ArcanaTable-Targeting-Build81
+          name: ArcanaTable-Assistance-Overhaul-Build82
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 30
