@@ -37,7 +37,8 @@ data class TriggerPrompt(
     val kind: String,
     val triggerText: String = "",
     val effectText: String = "",
-    val targetRule: String? = null
+    val targetRule: String? = null,
+    val eventId: String? = null
 )
 
 fun OnlineGameState.toJson(): String = JSONObject().apply {
@@ -74,7 +75,8 @@ fun OnlineGameState.toJson(): String = JSONObject().apply {
             .put("kind", prompt.kind)
             .put("triggerText", prompt.triggerText)
             .put("effectText", prompt.effectText)
-            .put("targetRule", prompt.targetRule ?: JSONObject.NULL))
+            .put("targetRule", prompt.targetRule ?: JSONObject.NULL)
+            .put("eventId", prompt.eventId ?: JSONObject.NULL))
     } })
 }.toString()
 
@@ -126,7 +128,8 @@ fun parseOnlineGameState(source: String): OnlineGameState? = runCatching {
                     kind = item.optString("kind", "MANUAL"),
                     triggerText = item.optString("triggerText"),
                     effectText = item.optString("effectText"),
-                    targetRule = item.optString("targetRule").takeUnless { it.isBlank() || it == "null" }
+                    targetRule = item.optString("targetRule").takeUnless { it.isBlank() || it == "null" },
+                    eventId = item.optString("eventId").takeUnless { it.isBlank() || it == "null" }
                 )
             }
         }.orEmpty()

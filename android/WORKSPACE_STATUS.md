@@ -2,7 +2,17 @@
 
 ## Canonical project
 
-This branch is the separate Arcana Table **Game Assistance Overhaul Build 84** (`0.15.65-targeting`, version code `84`) source tree on `experimental/assistance-overhaul`. It includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Stable Build 72 and the Worker are unchanged.
+This branch is the separate Arcana Table **Game Assistance Overhaul Build 85** (`0.15.66-targeting`, version code `85`) source tree on `experimental/assistance-overhaul`. It includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Stable Build 72 and the Worker are unchanged.
+
+## Changes in Build 85
+
+- Added a normalized game-event model carrying event ID, kind, acting player, subject card, zone movement, cause, phase, target, and amount.
+- Moved trigger candidate evaluation into a pure rules-engine pass shared by existing cast, draw, ETB, death, combat, phase, life, and other event producers.
+- Added explicit matched, rejected, and unsupported decisions with reasons; diagnostics now link the event to source-card checks and trigger prompts through queue, display, and resolution.
+- Trigger prompts retain their originating event ID across online game-state snapshots.
+- Added regression tests for event normalization, positive and negative trigger matches, unsupported trigger text, and known Rhystic Study handling.
+
+This is an event-processing foundation for the currently supported rules patterns. It is not a complete Magic rules engine; unsupported or ambiguous card behavior remains manual. Build 85 verification and APK checksum will be recorded after the build completes.
 
 ## Changes in Build 84
 

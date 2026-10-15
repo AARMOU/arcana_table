@@ -1,6 +1,6 @@
 # Arcana Table build and Worker tools
 
-This workspace keeps the app source, Cloudflare Worker, lockfiles, and build scripts together. Targeting Experimental Build 81 is on `experimental/targeting`; Game Assistance Overhaul Build 84 is on `experimental/assistance-overhaul`. Both use the separate debug application ID `com.arcanatable.targeting`. Stable Build 72 remains on `main`. APKs are produced by GitHub Actions as downloadable build artifacts; they are not included in the source tree or project-page deployment.
+This workspace keeps the app source, Cloudflare Worker, lockfiles, and build scripts together. Targeting Experimental Build 81 is on `experimental/targeting`; Game Assistance Overhaul Build 85 is on `experimental/assistance-overhaul`. Both use the separate debug application ID `com.arcanatable.targeting`. Stable Build 72 remains on `main`. APKs are produced by GitHub Actions as downloadable build artifacts; they are not included in the source tree or project-page deployment.
 
 The responsive GitHub Pages landing page is in `docs/`. Its Actions workflow stages the APK from `artifacts/` into the deployed site's `downloads/` path. See `docs/README.md` for publishing setup.
 

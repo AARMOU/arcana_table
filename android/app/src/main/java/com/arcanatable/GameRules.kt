@@ -56,6 +56,86 @@ internal data class AssistanceEvent(
     val subjectCardId: Int? = null
 )
 
+/** A normalized game action emitted by a UI/network action before rule checks run. */
+internal enum class GameEventKind(val legacyName: String) {
+    CAST("CAST"), DRAW("DRAW"), PERMANENT_ETB("PERMANENT_ETB"), CREATURE_ETB("CREATURE_ETB"), LAND_ETB("LAND_ETB"),
+    DIES("DIES"), LEAVES_BATTLEFIELD("LEAVES_BATTLEFIELD"), SACRIFICE("SACRIFICE"), PHASE("PHASE"),
+    ATTACKS("ATTACKS"), BLOCKS("BLOCKS"), DAMAGE("DAMAGE"), COMBAT_DAMAGE("COMBAT_DAMAGE"),
+    LIFE_GAIN("LIFE_GAIN"), LIFE_LOSS("LIFE_LOSS"), BECOMES_TAPPED("BECOMES_TAPPED"),
+    BECOMES_UNTAPPED("BECOMES_UNTAPPED"), DISCARD("DISCARD"), COUNTER_ADDED("COUNTER_ADDED"), UNKNOWN("UNKNOWN");
+
+    companion object {
+        fun fromLegacy(name: String): GameEventKind = entries.firstOrNull { it.legacyName.equals(name, true) } ?: UNKNOWN
+    }
+}
+
+internal data class GameEvent(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val kind: GameEventKind,
+    val actorIndex: Int,
+    val subject: GameCard? = null,
+    val fromZone: String? = null,
+    val toZone: String? = null,
+    val cause: String? = null,
+    val phase: String? = null,
+    val targetIndex: Int? = null,
+    val amount: Int? = null
+) {
+    fun asAssistanceEvent(sourceCardId: Int? = null): AssistanceEvent = AssistanceEvent(
+        kind = kind.legacyName,
+        actorIndex = actorIndex,
+        subjectType = subject?.type,
+        subjectName = subject?.let { if (it.isToken) "${it.name} token" else it.name },
+        phase = phase,
+        targetIndex = targetIndex,
+        amount = amount ?: subject?.power?.toIntOrNull(),
+        sourceCardId = sourceCardId,
+        subjectCardId = subject?.id
+    )
+}
+
+internal data class TriggerSource(val card: GameCard, val controllerIndex: Int, val controllerId: String)
+
+internal enum class TriggerCheckStatus { MATCHED, REJECTED, UNSUPPORTED }
+
+internal data class TriggerCheck(
+    val source: TriggerSource,
+    val ability: RecognizedTriggeredAbility?,
+    val status: TriggerCheckStatus,
+    val reason: String,
+    val knownKind: String? = null
+)
+
+/** Pure event-to-trigger pass. It never mutates game state or invents a rules result. */
+internal object GameEventRulesEngine {
+    fun evaluate(event: GameEvent, sources: List<TriggerSource>): List<TriggerCheck> = buildList {
+        sources.filterNot { it.card.isFaceDown }.forEach { source ->
+            val card = source.card
+            val knownKind = when {
+                event.kind == GameEventKind.CAST && source.controllerIndex != event.actorIndex && card.name.equals("Rhystic Study", true) -> "RHYSTIC"
+                event.kind == GameEventKind.DRAW && source.controllerIndex != event.actorIndex && card.name.equals("Smothering Tithe", true) -> "TITHE"
+                else -> null
+            }
+            if (knownKind != null) {
+                add(TriggerCheck(source, null, TriggerCheckStatus.MATCHED, "supported card-specific trigger", knownKind))
+                return@forEach
+            }
+            val abilities = parseRecognizedTriggeredAbilities(card.oracleText, card.name, card.type)
+            if (abilities.isEmpty()) {
+                if (Regex("(?i)\\b(whenever|when|at the beginning)\\b").containsMatchIn(card.oracleText.orEmpty())) {
+                    add(TriggerCheck(source, null, TriggerCheckStatus.UNSUPPORTED, "trigger-like text was not parsed"))
+                }
+                return@forEach
+            }
+            abilities.forEach { ability ->
+                val reason = explainAssistanceEventMismatch(ability, event.asAssistanceEvent(card.id), source.controllerIndex)
+                add(TriggerCheck(source, ability, if (reason == null) TriggerCheckStatus.MATCHED else TriggerCheckStatus.REJECTED,
+                    reason ?: "event and trigger conditions matched"))
+            }
+        }
+    }
+}
+
 internal data class TargetedAutomaticEffect(
     val targetRule: String,
     val effectText: String
@@ -494,7 +574,14 @@ internal fun matchesAssistanceEvent(
     ability: RecognizedTriggeredAbility,
     event: AssistanceEvent,
     controllerIndex: Int
-): Boolean {
+): Boolean = explainAssistanceEventMismatch(ability, event, controllerIndex) == null
+
+/** Returns a concrete rejection reason for diagnostics, or null when conditions match. */
+internal fun explainAssistanceEventMismatch(
+    ability: RecognizedTriggeredAbility,
+    event: AssistanceEvent,
+    controllerIndex: Int
+): String? {
     val eventMatches = when (ability.event) {
         "PERMANENT_ETB" -> event.kind in setOf("PERMANENT_ETB", "CREATURE_ETB", "LAND_ETB")
         "CREATURE_ETB" -> event.kind == "CREATURE_ETB"
@@ -502,22 +589,22 @@ internal fun matchesAssistanceEvent(
         "PHASE" -> event.kind == "PHASE" && (ability.phaseFilter == null || ability.phaseFilter == event.phase)
         else -> ability.event == event.kind
     }
-    if (!eventMatches) return false
+    if (!eventMatches) return "event kind ${event.kind} does not match ${ability.event}${ability.phaseFilter?.let { "/$it" }.orEmpty()}"
     val actorMatches = when (ability.actorFilter) {
         "YOU" -> controllerIndex == event.actorIndex
         "OPPONENT" -> event.actorIndex != null && controllerIndex != event.actorIndex
         else -> true
     }
-    if (!actorMatches) return false
-    if (ability.event == "ATTACKS" && ability.conditionText.contains("attacks you", true) && controllerIndex != event.targetIndex) return false
+    if (!actorMatches) return "actor does not satisfy ${ability.actorFilter} controller condition"
+    if (ability.event == "ATTACKS" && ability.conditionText.contains("attacks you", true) && controllerIndex != event.targetIndex) return "attacked player is not this trigger's controller"
     if (ability.event in setOf("DAMAGE", "COMBAT_DAMAGE")) {
         val condition = ability.conditionText
-        if (condition.contains("damage to you", true) && controllerIndex != event.targetIndex) return false
-        if (condition.contains("damage to an opponent", true) && controllerIndex == event.targetIndex) return false
+        if (condition.contains("damage to you", true) && controllerIndex != event.targetIndex) return "damaged player is not this trigger's controller"
+        if (condition.contains("damage to an opponent", true) && controllerIndex == event.targetIndex) return "damage was not dealt to an opponent of this trigger's controller"
     }
-    if (ability.controllerFilter?.contains("you control", true) == true && controllerIndex != event.actorIndex) return false
-    if (ability.controllerFilter?.contains("opponent", true) == true && controllerIndex == event.actorIndex) return false
-    if (ability.anotherOnly && event.sourceCardId != null && event.sourceCardId == event.subjectCardId) return false
+    if (ability.controllerFilter?.contains("you control", true) == true && controllerIndex != event.actorIndex) return "event object was not controlled by this trigger's controller"
+    if (ability.controllerFilter?.contains("opponent", true) == true && controllerIndex == event.actorIndex) return "event object was not controlled by an opponent"
+    if (ability.anotherOnly && event.sourceCardId != null && event.sourceCardId == event.subjectCardId) return "trigger requires another object; the source caused this event"
     val subject = ability.subjectFilter?.lowercase()
         ?.replace(Regex("^(?:a|an|another|one or more)\\s+"), "")
         .orEmpty()
@@ -537,12 +624,12 @@ internal fun matchesAssistanceEvent(
             "token" in subject -> event.subjectName?.contains("token", true) == true
             else -> true
         }
-        if (!typeMatches) return false
+        if (!typeMatches) return "subject type does not satisfy '${ability.subjectFilter}'"
     }
-    if (subject.contains("nontoken", true) && event.subjectName?.contains("token", true) == true) return false
+    if (subject.contains("nontoken", true) && event.subjectName?.contains("token", true) == true) return "subject must be nontoken"
     val powerLimit = Regex("(?i)\\bwith power (\\d+) or less\\b").find(subject)?.groupValues?.get(1)?.toIntOrNull()
-    if (powerLimit != null && (event.amount == null || event.amount > powerLimit)) return false
-    return true
+    if (powerLimit != null && (event.amount == null || event.amount > powerLimit)) return "subject power does not satisfy limit $powerLimit"
+    return null
 }
 
 private fun categoryForAssistanceEvent(eventKind: String): String = when {

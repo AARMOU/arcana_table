@@ -1106,87 +1106,96 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         if (!alreadyLogged) logAction(playerIndex, "$action automatically")
         scope.launch { automaticActionSnackbar.showSnackbar("$playerName · $action") }
     }
-    fun queueKnownTriggers(event: String, eventPlayerIndex: Int, enteringCard: GameCard? = null, phase: String? = null, targetIndex: Int? = null) {
+    fun queueKnownTriggers(event: String, eventPlayerIndex: Int, enteringCard: GameCard? = null, phase: String? = null, targetIndex: Int? = null, cause: String? = null) {
         if (eventPlayerIndex !in players.indices) return
-        val observedEvent = AssistanceEvent(
-            kind = event,
+        val gameEvent = GameEvent(
+            kind = GameEventKind.fromLegacy(event),
             actorIndex = eventPlayerIndex,
-            subjectType = enteringCard?.type,
-            subjectName = enteringCard?.let { if (it.isToken) "${it.name} token" else it.name },
-            subjectCardId = enteringCard?.id,
-            amount = enteringCard?.power?.toIntOrNull(),
+            subject = enteringCard,
+            fromZone = when (GameEventKind.fromLegacy(event)) {
+                GameEventKind.CAST -> "hand"
+                GameEventKind.DRAW -> "library"
+                GameEventKind.CREATURE_ETB, GameEventKind.LAND_ETB, GameEventKind.PERMANENT_ETB -> "unknown"
+                else -> null
+            },
+            toZone = when (GameEventKind.fromLegacy(event)) {
+                GameEventKind.CREATURE_ETB, GameEventKind.LAND_ETB, GameEventKind.PERMANENT_ETB -> "battlefield"
+                GameEventKind.DIES -> "graveyard"
+                GameEventKind.LEAVES_BATTLEFIELD, GameEventKind.SACRIFICE -> "left battlefield"
+                GameEventKind.CAST -> "stack"
+                GameEventKind.DRAW -> "hand"
+                else -> null
+            },
+            cause = cause ?: "${event.lowercase().replace('_', ' ')} action",
             phase = phase,
-            targetIndex = targetIndex
+            targetIndex = targetIndex,
+            amount = enteringCard?.power?.toIntOrNull()
         )
-        players.forEachIndexed { controllerIndex, player ->
-            if (player.isEliminated) return@forEachIndexed
-            val sources = (player.battlefield.filterNot { it.isFaceDown } +
-                if (controllerIndex == eventPlayerIndex && event in setOf("DIES", "LEAVES_BATTLEFIELD", "SACRIFICE")) {
-                    listOfNotNull(enteringCard?.takeUnless { it.isFaceDown })
-                } else emptyList()).distinctBy { it.id }
-            sources.forEach { card ->
-                val knownKind = when {
-                    event == "CAST" && controllerIndex != eventPlayerIndex && card.name.equals("Rhystic Study", ignoreCase = true) -> "RHYSTIC"
-                    event == "DRAW" && controllerIndex != eventPlayerIndex && card.name.equals("Smothering Tithe", ignoreCase = true) -> "TITHE"
-                    else -> null
-                }
-                if (knownKind != null) {
-                    val prompt = TriggerPrompt(
-                        cardName = card.name,
-                        controllerIndex = controllerIndex,
-                        eventPlayerIndex = eventPlayerIndex,
-                        kind = knownKind,
-                        triggerText = if (knownKind == "RHYSTIC") "Whenever an opponent casts a spell" else "Whenever an opponent draws a card",
-                        effectText = if (knownKind == "RHYSTIC") "Draw a card unless that player pays {1}." else "Create a Treasure token unless that player pays {2}."
-                    )
-                    triggerPrompts = triggerPrompts + prompt
-                    logAction(controllerIndex, "triggered ${card.name} · ${prompt.triggerText}")
-                    return@forEach
-                }
-                parseRecognizedTriggeredAbilities(card.oracleText, card.name, card.type).filter { ability ->
-                    matchesAssistanceEvent(ability, observedEvent.copy(sourceCardId = card.id), controllerIndex)
-                }.forEach abilityLoop@{ ability ->
+        val sources = players.flatMapIndexed { controllerIndex, player ->
+            if (player.isEliminated) emptyList() else {
+                (player.battlefield.filterNot { it.isFaceDown } +
+                    if (controllerIndex == eventPlayerIndex && gameEvent.kind in setOf(GameEventKind.DIES, GameEventKind.LEAVES_BATTLEFIELD, GameEventKind.SACRIFICE)) {
+                        listOfNotNull(enteringCard?.takeUnless { it.isFaceDown })
+                    } else emptyList()).distinctBy { it.id }.map { TriggerSource(it, controllerIndex, player.id) }
+            }
+        }
+        val checks = GameEventRulesEngine.evaluate(gameEvent, sources)
+        val matches = checks.filter { it.status == TriggerCheckStatus.MATCHED }
+        val diagnosticSubject = enteringCard?.let { " subject=${it.name}#${it.id}" }.orEmpty()
+        recordDiagnostic("Rules event ${gameEvent.id}: ${gameEvent.kind} actor=P${eventPlayerIndex + 1}$diagnosticSubject zones=${gameEvent.fromZone ?: "?"}→${gameEvent.toZone ?: "?"} cause=${gameEvent.cause}; sources=${sources.size}, checks=${checks.size}, matched=${matches.size}, unsupported=${checks.count { it.status == TriggerCheckStatus.UNSUPPORTED }}")
+        checks.filter { (it.ability != null && !it.reason.startsWith("event kind ")) || it.status == TriggerCheckStatus.UNSUPPORTED }.forEach { check ->
+            val abilityText = check.ability?.conditionText ?: "unparsed trigger text"
+            recordDiagnostic("Rules check event=${gameEvent.id} source=${check.source.card.name}#${check.source.card.id} controller=P${check.source.controllerIndex + 1} status=${check.status} reason=${check.reason} ability=$abilityText")
+        }
+        matches.forEach { check ->
+            val card = check.source.card
+            val controllerIndex = check.source.controllerIndex
+            val ability = check.ability
+            val knownKind = check.knownKind
+            if (ability == null && knownKind == null) return@forEach
+            val conditionText = ability?.conditionText ?: if (knownKind == "RHYSTIC") "Whenever an opponent casts a spell" else "Whenever an opponent draws a card"
+            val effectText = ability?.effectText ?: if (knownKind == "RHYSTIC") "Draw a card unless that player pays {1}." else "Create a Treasure token unless that player pays {2}."
+            val oldLifeTrigger = event == "CREATURE_ETB" && parseCreatureEntryLifeEffects(card.oracleText).isNotEmpty()
+            val simpleEffects = parseAutomaticResolutionEffects(effectText)
+            if (knownKind == null && oldLifeTrigger && !simpleEffects.requiresManualReview && simpleEffects.lifeGain > 0 &&
+                simpleEffects.lifeLoss == 0 && simpleEffects.cardsDrawn == 0 && simpleEffects.tokens.isEmpty()) return@forEach
 
-                    val oldLifeTrigger = event == "CREATURE_ETB" && parseCreatureEntryLifeEffects(card.oracleText).isNotEmpty()
-                    val simpleEffects = parseAutomaticResolutionEffects(ability.effectText)
-                    if (oldLifeTrigger && !simpleEffects.requiresManualReview && simpleEffects.lifeGain > 0 &&
-                        simpleEffects.lifeLoss == 0 && simpleEffects.cardsDrawn == 0 && simpleEffects.tokens.isEmpty()) return@abilityLoop
-
-                    val targetEffect = parseTargetedAutomaticEffect(ability.effectText)
-                    val triggerKind = when {
-                        targetEffect != null -> "TARGET_EFFECT"
-                        simpleEffects.requiresManualReview -> "MANUAL"
-                        !simpleEffects.isEmpty -> "AUTO_EFFECT"
-                        else -> "MANUAL"
-                    }
-                    val prompt = TriggerPrompt(
-                        cardName = card.name,
-                        controllerIndex = controllerIndex,
-                        eventPlayerIndex = eventPlayerIndex,
-                        kind = triggerKind,
-                        triggerText = ability.conditionText,
-                        effectText = targetEffect?.effectText ?: ability.effectText,
-                        targetRule = targetEffect?.targetRule ?: parseTargetPlayerRule(ability.effectText)
-                    )
-                    if (parseTargetCountRange(ability.effectText) != null) {
-                        val triggerStackItem = StackAction(
-                            title = "${card.name}: ${ability.effectText}",
-                            controllerId = player.id,
-                            kind = "TRIGGER",
-                            card = card,
-                            targetText = ability.effectText
-                        )
-                        stackActions = stackActions + triggerStackItem
-                        priorityPassed = emptySet()
-                        priorityPlayer = controllerIndex
-                        stackPriorityOriginId = players.getOrNull(controllerIndex)?.id
-                        pendingStackOpen = true
-                        logAction(controllerIndex, "triggered ${card.name} · ${ability.conditionText}; choose its target")
-                    } else {
-                        triggerPrompts = triggerPrompts + prompt
-                        logAction(controllerIndex, "triggered ${card.name} · ${ability.conditionText}")
-                    }
-                }
+            val targetEffect = if (knownKind == null) parseTargetedAutomaticEffect(effectText) else null
+            val triggerKind = knownKind ?: when {
+                targetEffect != null -> "TARGET_EFFECT"
+                simpleEffects.requiresManualReview -> "MANUAL"
+                !simpleEffects.isEmpty -> "AUTO_EFFECT"
+                else -> "MANUAL"
+            }
+            val prompt = TriggerPrompt(
+                cardName = card.name,
+                controllerIndex = controllerIndex,
+                eventPlayerIndex = eventPlayerIndex,
+                kind = triggerKind,
+                triggerText = conditionText,
+                effectText = targetEffect?.effectText ?: effectText,
+                targetRule = targetEffect?.targetRule ?: parseTargetPlayerRule(effectText),
+                eventId = gameEvent.id
+            )
+            if (knownKind == null && parseTargetCountRange(effectText) != null) {
+                val triggerStackItem = StackAction(
+                    title = "${card.name}: $effectText",
+                    controllerId = check.source.controllerId,
+                    kind = "TRIGGER",
+                    card = card,
+                    targetText = effectText
+                )
+                stackActions = stackActions + triggerStackItem
+                priorityPassed = emptySet()
+                priorityPlayer = controllerIndex
+                stackPriorityOriginId = players.getOrNull(controllerIndex)?.id
+                pendingStackOpen = true
+                logAction(controllerIndex, "triggered ${card.name} · $conditionText; choose its target")
+                recordDiagnostic("Rules trigger queued event=${gameEvent.id} source=${card.name}#${card.id} destination=stack target-selection")
+            } else {
+                triggerPrompts = triggerPrompts + prompt
+                logAction(controllerIndex, "triggered ${card.name} · $conditionText")
+                recordDiagnostic("Rules trigger queued event=${gameEvent.id} source=${card.name}#${card.id} prompt=${prompt.kind} promptId=${prompt.id}")
             }
         }
     }
@@ -2019,6 +2028,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     }
 
     fun resolveTrigger(prompt: TriggerPrompt, paid: Boolean, targetIndex: Int? = null, manual: Boolean = false) {
+        recordDiagnostic("Rules prompt resolved event=${prompt.eventId ?: "unknown"} prompt=${prompt.id} source=${prompt.cardName} choice=${if (manual) "manual" else if (paid) "paid" else "accepted"}${targetIndex?.let { " target=P${it + 1}" }.orEmpty()}")
         val payment = when (prompt.kind) { "RHYSTIC" -> 1; "TITHE" -> 2; else -> 0 }
         if (paid && payment > 0 && !spendGenericMana(prompt.eventPlayerIndex, payment)) return
         if (manual) {
@@ -4308,6 +4318,11 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     val visibleTriggerPrompt = if (onlineMode) triggerPrompts.firstOrNull {
         it.controllerIndex == localSeat || (roomHost != null && players.getOrNull(it.controllerIndex)?.isComputer == true)
     } else triggerPrompts.firstOrNull()
+    LaunchedEffect(visibleTriggerPrompt?.id) {
+        visibleTriggerPrompt?.let { prompt ->
+            recordDiagnostic("Rules prompt displayed event=${prompt.eventId ?: "unknown"} prompt=${prompt.id} source=${prompt.cardName} kind=${prompt.kind}")
+        }
+    }
     creatureTypeChoicePrompt?.let { prompt ->
         CreatureTypeChoiceDialog(
             cardName = prompt.cardName,

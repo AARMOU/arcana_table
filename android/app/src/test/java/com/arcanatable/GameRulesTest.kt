@@ -8,6 +8,66 @@ import org.junit.Test
 
 class GameRulesTest {
     @Test
+    fun gameEventCarriesNormalizedObjectAndActionContext() {
+        val entering = GameCard(31, "Solemn Simulacrum", "Artifact Creature — Golem", androidx.compose.ui.graphics.Color.Black, power = "2", isToken = false)
+        val event = GameEvent(
+            id = "evt-1", kind = GameEventKind.CREATURE_ETB, actorIndex = 1, subject = entering,
+            fromZone = "stack", toZone = "battlefield", cause = "spell resolved", phase = "MAIN"
+        )
+        val normalized = event.asAssistanceEvent(sourceCardId = 22)
+        assertEquals("CREATURE_ETB", normalized.kind)
+        assertEquals("Solemn Simulacrum", normalized.subjectName)
+        assertEquals("Artifact Creature — Golem", normalized.subjectType)
+        assertEquals(2, normalized.amount)
+        assertEquals(22, normalized.sourceCardId)
+        assertEquals(31, normalized.subjectCardId)
+        assertEquals(GameEventKind.UNKNOWN, GameEventKind.fromLegacy("NOT_A_GAME_EVENT"))
+    }
+
+    @Test
+    fun eventEngineReturnsMatchedAndRejectedTriggerReasons() {
+        val color = androidx.compose.ui.graphics.Color.Black
+        val warden = GameCard(10, "Soul Warden", "Creature — Human Cleric", color,
+            oracleText = "Whenever another creature enters the battlefield, you gain 1 life.")
+        val listener = TriggerSource(warden, controllerIndex = 0, controllerId = "p1")
+        val entered = GameCard(31, "Solemn Simulacrum", "Artifact Creature — Golem", color)
+        val etb = GameEvent(id = "evt-etb", kind = GameEventKind.CREATURE_ETB, actorIndex = 1, subject = entered)
+        val matched = GameEventRulesEngine.evaluate(etb, listOf(listener)).single()
+        assertEquals(TriggerCheckStatus.MATCHED, matched.status)
+        assertEquals("event and trigger conditions matched", matched.reason)
+
+        val selfEntry = etb.copy(actorIndex = 0, subject = warden)
+        val rejected = GameEventRulesEngine.evaluate(selfEntry, listOf(listener)).single()
+        assertEquals(TriggerCheckStatus.REJECTED, rejected.status)
+        assertTrue(rejected.reason.contains("another object"))
+    }
+
+    @Test
+    fun eventEngineFlagsTriggerTextThatWasNotParsed() {
+        val color = androidx.compose.ui.graphics.Color.Black
+        val card = GameCard(44, "Unparsed Trigger", "Creature", color,
+            oracleText = "Whenever the moon is full, something complicated happens.")
+        val check = GameEventRulesEngine.evaluate(
+            GameEvent(kind = GameEventKind.DRAW, actorIndex = 0),
+            listOf(TriggerSource(card, 0, "p1"))
+        ).single()
+        assertEquals(TriggerCheckStatus.UNSUPPORTED, check.status)
+        assertEquals("trigger-like text was not parsed", check.reason)
+    }
+
+    @Test
+    fun knownCardTriggersUseTheSameEventEvaluationPass() {
+        val color = androidx.compose.ui.graphics.Color.Black
+        val rhystic = GameCard(9, "Rhystic Study", "Enchantment", color)
+        val check = GameEventRulesEngine.evaluate(
+            GameEvent(kind = GameEventKind.CAST, actorIndex = 1, subject = GameCard(80, "Sol Ring", "Artifact", color)),
+            listOf(TriggerSource(rhystic, 0, "p1"))
+        ).single()
+        assertEquals(TriggerCheckStatus.MATCHED, check.status)
+        assertEquals("RHYSTIC", check.knownKind)
+    }
+
+    @Test
     fun detectsAsEntersCreatureTypeChoicesButIgnoresFaceDownCards() {
         val choosingPermanent = GameCard(1, "Type Picker", "Artifact", androidx.compose.ui.graphics.Color.Black, oracleText = "As this enters, choose a creature type.")
         assertTrue(needsCreatureTypeChoice(choosingPermanent))
@@ -308,7 +368,8 @@ class GameRulesTest {
             kind = "TARGET_EFFECT",
             triggerText = "Whenever you cast a spell",
             effectText = "lose 2 life",
-            targetRule = "OPPONENT"
+            targetRule = "OPPONENT",
+            eventId = "event-123"
         )
         val state = OnlineGameState(
             players = listOf(TablePlayer("YOU"), TablePlayer("PLAYER 2")),
