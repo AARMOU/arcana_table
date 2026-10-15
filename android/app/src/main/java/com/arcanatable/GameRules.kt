@@ -798,9 +798,11 @@ internal fun advanceStackPriority(
     val current = currentPlayer.coerceIn(playerIds.indices)
     val validEligible = eligiblePlayers.filter { it in playerIds.indices }.toSet()
     val next = nextTurnIndex(current, turnOrder, playerIds.size, validEligible)
-    val id = playerIds[current]
-    val passed = if (id.isBlank()) passedPlayers else passedPlayers + id
     val origin = originPlayer.takeIf { it in validEligible }
+    val id = playerIds[current]
+    // The spell/ability's controller starts with priority; only responses from
+    // the other eligible players are needed before the table round completes.
+    val passed = if (id.isBlank() || current == origin) passedPlayers else passedPlayers + id
     val responders = validEligible.filter { it != origin }.map { playerIds[it] }
     val returned = origin != null && next == origin && responders.all { it in passed }
     return StackPriorityAdvance(next, passed, returned)

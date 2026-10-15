@@ -379,7 +379,10 @@ class GameRulesTest {
         val response = advanceStackPriority(1, 1, emptySet(), ids, listOf(0, 1, 2), eligible)
         assertEquals(2, response.nextPlayer)
         assertFalse(response.returnedToOrigin)
-        val returned = advanceStackPriority(2, 1, response.passedPlayers, ids, listOf(0, 1, 2), eligible)
+        val nextResponder = advanceStackPriority(2, 1, response.passedPlayers, ids, listOf(0, 1, 2), eligible)
+        assertEquals(0, nextResponder.nextPlayer)
+        assertFalse(nextResponder.returnedToOrigin)
+        val returned = advanceStackPriority(0, 1, nextResponder.passedPlayers, ids, listOf(0, 1, 2), eligible)
         assertEquals(1, returned.nextPlayer)
         assertTrue(returned.returnedToOrigin)
     }
