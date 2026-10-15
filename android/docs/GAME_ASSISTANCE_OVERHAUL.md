@@ -18,12 +18,12 @@ game state was understood.
 ## Current implementation gaps
 
 The current resolver handles only a small set of fixed, unconditional effects:
-gain life, lose life, draw cards, and create simple tokens. The trigger scanner
-primarily sees casts, draws, and creature entry. It has two named-card branches
-for Rhystic Study and Smothering Tithe. Many other abilities are logged as
-manual work, but do not consistently present the full card text as an in-game
-assistance prompt. Event detection is also uneven because card changes are
-performed directly by many UI callbacks.
+gain life, lose life, draw cards, and create simple tokens. Trigger recognition
+now covers common casts, draws, entries, deaths, sacrifices, attacks, blocks,
+damage, life changes, turn steps, taps, counters, and discards. Two named-card
+branches remain for Rhystic Study and Smothering Tithe. The recognizer still
+misses compound or highly qualified patterns, and event detection is uneven
+because card changes are performed directly by many UI callbacks.
 
 Target picking currently estimates a target count from the word “target” and
 shows broad object candidates. It does not evaluate full target legality,
@@ -130,6 +130,21 @@ queued into a visible manual-resolution prompt with their card text.
 This slice is a foundation, not the 90% completion claim. Event paths such as
 sacrifice costs, replacement effects, stack-aware trigger ordering, effects
 that change other permanents or zones, and comprehensive target legality still
-need dedicated implementation and regression coverage. The new priority cycle
-has focused unit coverage, but the Android test task still needs to run on a
-machine where Gradle can resolve the Android Gradle Plugin.
+need dedicated implementation and regression coverage. The priority cycle has
+focused unit coverage and passed the Build 82 Android CI test run.
+
+## Offline recognition benchmark
+
+`app/src/test/resources/assistance-oracle-benchmark.json` stores small,
+representative Oracle-text excerpts retrieved from Scryfall's Card Collection
+API. `AssistanceBenchmarkTest` reports separate coverage for trigger-event
+classification, target-category hints, and automatic fixed-effect parsing, and
+lists expected manual fallbacks. The current fixture includes one deliberate
+trigger miss (Tectonic Giant's compound attack-or-target condition) so growth in
+coverage is visible. Target hints are not legality checks: for example,
+`target nonland permanent` still includes lands in the candidate category set.
+
+This corpus is a regression benchmark, not a statistically representative
+estimate of all game actions. Its percentages must not be described as proof of
+the 90% product goal. Expand it with labeled action sequences and player
+feedback before making that claim.

@@ -321,49 +321,50 @@ internal fun parseRecognizedTriggeredAbilities(oracleText: String?): List<Recogn
                 subjectFilter = draw.groupValues[3])
         }
 
-        val enters = Regex("(?i)^(whenever|when)\\s+(?:(another|a|an)\\s+)?(creature|artifact|enchantment|permanent|land|planeswalker|battle|token)\\s+enters(?:\\s+the battlefield)?(?:\\s+(under your control|under an opponent's control))?$")
+        val enters = Regex("(?i)^(whenever|when)\\s+(.+?)\\s+enters(?:\\s+the battlefield)?(?:\\s+(under your control|under an opponent's control))?$")
             .matchEntire(condition)
-        if (enters != null) {
-            val objectType = enters.groupValues[3].uppercase()
+        val enteringSubject = enters?.groupValues?.get(2).orEmpty()
+        val enteringType = Regex("(?i)\\b(creature|artifact|enchantment|permanent|land|planeswalker|battle|token)\\b")
+            .find(enteringSubject)?.groupValues?.get(1)?.uppercase()
+        if (enters != null && enteringType != null) {
+            val objectType = enteringType
             val event = when (objectType) {
                 "CREATURE" -> "CREATURE_ETB"
                 "LAND" -> "LAND_ETB"
                 else -> "PERMANENT_ETB"
             }
-            val controller = enters.groupValues[4].takeIf { it.isNotBlank() }?.lowercase()
+            val controller = when {
+                enters.groupValues[3].isNotBlank() -> enters.groupValues[3].lowercase()
+                enteringSubject.contains("you control", true) -> "you control"
+                enteringSubject.contains("an opponent controls", true) -> "an opponent controls"
+                else -> null
+            }
             return@mapNotNull RecognizedTriggeredAbility(event, when (controller) {
-                "under your control" -> "YOU"
-                "under an opponent's control" -> "OPPONENT"
+                "under your control", "you control" -> "YOU"
+                "under an opponent's control", "an opponent controls" -> "OPPONENT"
                 else -> "ANY"
-            }, condition, effect, anotherOnly = enters.groupValues[2].equals("another", true),
-                controllerFilter = controller, subjectFilter = objectType)
-        }
-        val thisEnters = Regex("(?i)^(whenever|when)\\s+this\\s+(creature|artifact|enchantment|permanent|land|planeswalker|battle)\\s+enters(?:\\s+the battlefield)?$")
-            .matchEntire(condition)
-        if (thisEnters != null) {
-            val objectType = thisEnters.groupValues[2].uppercase()
-            val event = when (objectType) {
-                "CREATURE" -> "CREATURE_ETB"
-                "LAND" -> "LAND_ETB"
-                else -> "PERMANENT_ETB"
-            }
-            return@mapNotNull RecognizedTriggeredAbility(event, "YOU", condition, effect, subjectFilter = "this $objectType")
+            }, condition, effect, anotherOnly = enteringSubject.trimStart().startsWith("another ", true) && !enteringSubject.contains("this ", true),
+                controllerFilter = controller, subjectFilter = enteringSubject)
         }
 
-        val dies = Regex("(?i)^(whenever|when)\\s+(?:(another|a|an)\\s+)?(creature|artifact|permanent|token|planeswalker)(?:\\s+(you control|an opponent controls))?\\s+dies$").matchEntire(condition)
-        if (dies != null) {
-            val controller = dies.groupValues[4].takeIf { it.isNotBlank() }?.lowercase()
+        val dies = Regex("(?i)^(whenever|when)\\s+(.+?)\\s+dies$").matchEntire(condition)
+        val dyingSubject = dies?.groupValues?.get(2).orEmpty()
+        val dyingType = Regex("(?i)\\b(creature|artifact|permanent|token|planeswalker)\\b")
+            .find(dyingSubject)?.groupValues?.get(1)
+        if (dies != null && dyingType != null) {
+            val controller = when {
+                dyingSubject.contains("you control", true) -> "you control"
+                dyingSubject.contains("an opponent controls", true) -> "an opponent controls"
+                else -> null
+            }
             return@mapNotNull RecognizedTriggeredAbility("DIES", when (controller) {
                 "you control" -> "YOU"
                 "an opponent controls" -> "OPPONENT"
                 else -> "ANY"
-            }, condition, effect, anotherOnly = dies.groupValues[2].equals("another", true), controllerFilter = controller,
-                subjectFilter = dies.groupValues[3].uppercase())
+            }, condition, effect,
+                anotherOnly = dyingSubject.trimStart().startsWith("another ", true) && !dyingSubject.contains("this ", true),
+                controllerFilter = controller, subjectFilter = dyingSubject)
         }
-        val thisDies = Regex("(?i)^(whenever|when)\\s+this\\s+(creature|artifact|permanent|token|planeswalker)\\s+dies$").matchEntire(condition)
-        if (thisDies != null) return@mapNotNull RecognizedTriggeredAbility(
-            "DIES", "YOU", condition, effect, subjectFilter = "this ${thisDies.groupValues[2]}"
-        )
 
         val leaves = Regex("(?i)^(whenever|when)\\s+(?:(another|a|an)\\s+)?(creature|artifact|permanent|land|token|planeswalker|enchantment)(?:\\s+(you control|an opponent controls))?\\s+leaves the battlefield$").matchEntire(condition)
         if (leaves != null) {
@@ -494,8 +495,8 @@ internal fun matchesAssistanceEvent(
         if (condition.contains("damage to you", true) && controllerIndex != event.targetIndex) return false
         if (condition.contains("damage to an opponent", true) && controllerIndex == event.targetIndex) return false
     }
-    if (ability.controllerFilter == "under your control" && controllerIndex != event.actorIndex) return false
-    if (ability.controllerFilter == "under an opponent's control" && controllerIndex == event.actorIndex) return false
+    if (ability.controllerFilter?.contains("you control", true) == true && controllerIndex != event.actorIndex) return false
+    if (ability.controllerFilter?.contains("opponent", true) == true && controllerIndex == event.actorIndex) return false
     if (ability.anotherOnly && event.sourceCardId != null && event.sourceCardId == event.subjectCardId) return false
     val subject = ability.subjectFilter?.lowercase()
         ?.replace(Regex("^(?:a|an|another|one or more)\\s+"), "")
@@ -518,6 +519,9 @@ internal fun matchesAssistanceEvent(
         }
         if (!typeMatches) return false
     }
+    if (subject.contains("nontoken", true) && event.subjectName?.contains("token", true) == true) return false
+    val powerLimit = Regex("(?i)\\bwith power (\\d+) or less\\b").find(subject)?.groupValues?.get(1)?.toIntOrNull()
+    if (powerLimit != null && (event.amount == null || event.amount > powerLimit)) return false
     return true
 }
 

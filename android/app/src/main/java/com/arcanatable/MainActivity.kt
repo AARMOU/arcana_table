@@ -1114,6 +1114,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             subjectType = enteringCard?.type,
             subjectName = enteringCard?.let { if (it.isToken) "${it.name} token" else it.name },
             subjectCardId = enteringCard?.id,
+            amount = enteringCard?.power?.toIntOrNull(),
             phase = phase,
             targetIndex = targetIndex
         )

@@ -17,16 +17,16 @@ android {
         applicationId = "com.arcanatable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 82
-        versionName = "0.15.63-targeting"
-        manifestPlaceholders["appLabel"] = "Arcana Table Targeting · Build 82"
+        versionCode = 83
+        versionName = "0.15.64-targeting"
+        manifestPlaceholders["appLabel"] = "Arcana Table Targeting · Build 83"
     }
 
     buildTypes {
         debug {
             // Keep the installable test build separate from earlier debug APKs.
             applicationIdSuffix = ".targeting"
-            manifestPlaceholders["appLabel"] = "Arcana Table Targeting 0.15.63 · Build 82"
+            manifestPlaceholders["appLabel"] = "Arcana Table Targeting 0.15.64 · Build 83"
         }
     }
 
@@ -53,4 +53,10 @@ dependencies {
     // throw "Method ... not mocked" outside an emulator, so use the JVM port.
     testImplementation("org.json:json:20240303")
     debugImplementation("androidx.compose.ui:ui-tooling")
+}
+
+tasks.withType<Test>().configureEach {
+    testLogging {
+        showStandardStreams = true
+    }
 }
