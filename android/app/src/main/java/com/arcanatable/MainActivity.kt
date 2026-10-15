@@ -1143,7 +1143,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     logAction(controllerIndex, "triggered ${card.name} · ${prompt.triggerText}")
                     return@forEach
                 }
-                parseRecognizedTriggeredAbilities(card.oracleText).filter { ability ->
+                parseRecognizedTriggeredAbilities(card.oracleText, card.name, card.type).filter { ability ->
                     matchesAssistanceEvent(ability, observedEvent.copy(sourceCardId = card.id), controllerIndex)
                 }.forEach abilityLoop@{ ability ->
 

@@ -287,7 +287,11 @@ internal fun parseAutomaticResolutionEffects(oracleText: String?): AutomaticReso
  * deliberately conservative recognizer: it labels the event and leaves effect
  * choices and rules legality to the assistance flow instead of simulating text.
  */
-internal fun parseRecognizedTriggeredAbilities(oracleText: String?): List<RecognizedTriggeredAbility> {
+internal fun parseRecognizedTriggeredAbilities(
+    oracleText: String?,
+    sourceCardName: String? = null,
+    sourceCardType: String? = null
+): List<RecognizedTriggeredAbility> {
     val sentences = oracleText.orEmpty().lineSequence()
         .flatMap { line -> line.split(Regex("(?<=\\.)\\s+" )).asSequence() }
         .map { it.trim().trimEnd('.') }
@@ -324,8 +328,23 @@ internal fun parseRecognizedTriggeredAbilities(oracleText: String?): List<Recogn
         val enters = Regex("(?i)^(whenever|when)\\s+(.+?)\\s+enters(?:\\s+the battlefield)?(?:\\s+(under your control|under an opponent's control))?$")
             .matchEntire(condition)
         val enteringSubject = enters?.groupValues?.get(2).orEmpty()
-        val enteringType = Regex("(?i)\\b(creature|artifact|enchantment|permanent|land|planeswalker|battle|token)\\b")
+        val explicitEnteringType = Regex("(?i)\\b(creature|artifact|enchantment|permanent|land|planeswalker|battle|token)\\b")
             .find(enteringSubject)?.groupValues?.get(1)?.uppercase()
+        val sourceNames = sourceCardName.orEmpty().split(" // ").map { it.trim() }.filter { it.isNotBlank() }
+        val refersToSource = enteringSubject.equals("this", ignoreCase = true) ||
+            Regex("(?i)^this\\s+[a-z-]+$").matches(enteringSubject) ||
+            sourceNames.any { enteringSubject.equals(it, ignoreCase = true) }
+        val sourceType = sourceCardType.orEmpty()
+        val sourceEnteringType = when {
+            Regex("(?i)\\bland\\b").containsMatchIn(sourceType) -> "LAND"
+            Regex("(?i)\\bcreature\\b").containsMatchIn(sourceType) -> "CREATURE"
+            Regex("(?i)\\b(artifact|enchantment|planeswalker|battle)\\b").containsMatchIn(sourceType) -> "PERMANENT"
+            else -> null
+        }
+        // For self-references, the current card's complete type line is
+        // authoritative. This also handles multi-type permanents such as
+        // Land Creatures, where the event producer reports a land entry.
+        val enteringType = if (refersToSource) sourceEnteringType ?: explicitEnteringType else explicitEnteringType
         if (enters != null && enteringType != null) {
             val objectType = enteringType
             val event = when (objectType) {
@@ -344,7 +363,8 @@ internal fun parseRecognizedTriggeredAbilities(oracleText: String?): List<Recogn
                 "under an opponent's control", "an opponent controls" -> "OPPONENT"
                 else -> "ANY"
             }, condition, effect, anotherOnly = enteringSubject.trimStart().startsWith("another ", true) && !enteringSubject.contains("this ", true),
-                controllerFilter = controller, subjectFilter = enteringSubject)
+                controllerFilter = controller,
+                subjectFilter = if (refersToSource && sourceEnteringType != null) "this ${sourceEnteringType.lowercase()}" else enteringSubject)
         }
 
         val dies = Regex("(?i)^(whenever|when)\\s+(.+?)\\s+dies$").matchEntire(condition)

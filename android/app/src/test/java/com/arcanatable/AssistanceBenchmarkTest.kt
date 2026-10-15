@@ -17,6 +17,46 @@ class AssistanceBenchmarkTest {
     }
 
     @Test
+    fun recognizesSelfReferencingEtbsAcrossOneThousandRealCards() {
+        val resource = requireNotNull(javaClass.getResourceAsStream("/etb-card-benchmark.json")) {
+            "Missing 1,000-card ETB benchmark resource"
+        }
+        val data = JSONObject(resource.bufferedReader().use { it.readText() })
+        val rows = data.getJSONArray("cards").objects()
+        assertEquals("Benchmark must retain the agreed 1,000-card size", 1_000, rows.size)
+        assertEquals("Benchmark should use distinct Oracle IDs", 1_000, rows.map { it.getString("oracleId") }.toSet().size)
+        val misses = mutableListOf<String>()
+        val recognizedByEvent = mutableMapOf<String, Int>()
+        rows.forEachIndexed { index, row ->
+            val cardName = row.getString("card")
+            val typeLine = row.getString("typeLine")
+            val expectedEvent = row.getString("event")
+            val triggerText = "${row.getString("condition")}, draw a card."
+            val actual = parseRecognizedTriggeredAbilities(triggerText, cardName, typeLine).singleOrNull()
+            val ability = actual
+            if (ability == null || ability.event != expectedEvent) {
+                misses += "$cardName: expected $expectedEvent, got ${ability?.event ?: "manual"}"
+                return@forEachIndexed
+            }
+            val event = AssistanceEvent(
+                kind = expectedEvent,
+                actorIndex = 0,
+                subjectType = typeLine,
+                subjectName = cardName,
+                sourceCardId = index,
+                subjectCardId = index
+            )
+            if (!matchesAssistanceEvent(ability, event, 0)) {
+                misses += "$cardName: parsed trigger did not match its own entry event"
+                return@forEachIndexed
+            }
+            recognizedByEvent[expectedEvent] = (recognizedByEvent[expectedEvent] ?: 0) + 1
+        }
+        assertTrue("Self-referencing ETB misses: ${misses.take(20).joinToString("; ")}", misses.isEmpty())
+        println("ASSISTANCE_BENCHMARK|bucket=self_etb|recognized=${rows.size - misses.size}|total=${rows.size}|by_event=${recognizedByEvent.entries.joinToString(",") { "${it.key}:${it.value}" }}")
+    }
+
+    @Test
     fun reportsOracleTriggerEventCoverage() {
         val rows = corpus.getJSONArray("triggers").objects()
         val misses = mutableListOf<String>()

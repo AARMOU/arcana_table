@@ -160,6 +160,34 @@ class GameRulesTest {
     }
 
     @Test
+    fun recognizesSelfReferencingEtbsUsingTheCardsNameAndType() {
+        val creature = parseRecognizedTriggeredAbilities(
+            "When Aang enters, draw a card.", "Aang", "Legendary Creature — Human Avatar"
+        ).single()
+        assertEquals("CREATURE_ETB", creature.event)
+        assertTrue(matchesAssistanceEvent(
+            creature,
+            AssistanceEvent("CREATURE_ETB", actorIndex = 0, subjectType = "Legendary Creature — Human Avatar", sourceCardId = 7, subjectCardId = 7),
+            0
+        ))
+        assertFalse(matchesAssistanceEvent(
+            creature,
+            AssistanceEvent("CREATURE_ETB", actorIndex = 0, subjectType = "Creature", sourceCardId = 7, subjectCardId = 8),
+            0
+        ))
+
+        val artifact = parseRecognizedTriggeredAbilities(
+            "When The Great Henge enters the battlefield, draw a card.", "The Great Henge", "Legendary Artifact"
+        ).single()
+        assertEquals("PERMANENT_ETB", artifact.event)
+
+        val self = parseRecognizedTriggeredAbilities(
+            "When this card enters, draw a card.", "Arcane Signet", "Artifact"
+        ).single()
+        assertEquals("PERMANENT_ETB", self.event)
+    }
+
+    @Test
     fun recognizesCommonTriggerFamiliesAcrossTurnAndZoneEvents() {
         val triggers = parseRecognizedTriggeredAbilities(
             "Whenever a land enters the battlefield under your control, create a Treasure token.\n" +

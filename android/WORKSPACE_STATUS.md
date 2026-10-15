@@ -2,7 +2,15 @@
 
 ## Canonical project
 
-This branch is the separate Arcana Table **Targeting Experimental Build 81** (`0.15.62-targeting`, version code `81`) source tree. It branches from stable Build 72 source and includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Keep this work on `experimental/targeting` until the targeting flow is accepted.
+This branch is the separate Arcana Table **Game Assistance Overhaul Build 84** (`0.15.65-targeting`, version code `84`) source tree on `experimental/assistance-overhaul`. It includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Stable Build 72 and the Worker are unchanged.
+
+## Changes in Build 84
+
+- Uses a card's name and type line to recognize self-referencing ETB text such as “When this creature enters,” “When this artifact enters,” and named self-ETB conditions. The derived event is matched to creature, land, or other permanent entry.
+- Adds regression coverage for creature, artifact, and named self-ETB cases.
+- Adds an offline benchmark fixture of 1,000 distinct Oracle IDs across creature, land, and other permanent ETB conditions.
+
+Build 84 `clean testDebugUnitTest assembleDebug` passed (55 tests, 0 failures). The benchmark recognized 1,000/1,000 self-referencing ETB conditions across 625 creature, 250 other permanent, and 125 land cases. The benchmark verifies condition parsing and event matching; it does not validate complete card-effect resolution or every gameplay prompt. The APK at `app/build/outputs/apk/debug/app-debug.apk` reports package `com.arcanatable.targeting`, version `0.15.65-targeting`, version code `84`, and label `Arcana Table Targeting 0.15.65 · Build 84`. APK Signature Scheme v2 verification passed. SHA-256: `d8603ba3580ac685a2902322930fc48dead612b9f87374f31ad868b093cf4cf6`.
 
 ## Changes in Build 81
 

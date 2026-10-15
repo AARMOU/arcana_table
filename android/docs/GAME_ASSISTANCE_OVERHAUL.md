@@ -135,16 +135,24 @@ focused unit coverage and passed the Build 82 Android CI test run.
 
 ## Offline recognition benchmark
 
-`app/src/test/resources/assistance-oracle-benchmark.json` stores small,
+`app/src/test/resources/assistance-oracle-benchmark.json` stores small
 representative Oracle-text excerpts retrieved from Scryfall's Card Collection
-API. `AssistanceBenchmarkTest` reports separate coverage for trigger-event
-classification, target-category hints, and automatic fixed-effect parsing, and
-lists expected manual fallbacks. The current fixture includes one deliberate
-trigger miss (Tectonic Giant's compound attack-or-target condition) so growth in
-coverage is visible. Target hints are not legality checks: for example,
-`target nonland permanent` still includes lands in the candidate category set.
+API. `app/src/test/resources/etb-card-benchmark.json` adds 1,000 distinct cards
+sampled from Scryfall's Oracle Cards bulk file, stratified across creatures,
+other permanents, and lands. It tests actual self-referencing entry conditions
+with each card's name and type line, including wording such as “When CARDNAME
+enters.” The parser now receives that source-card context so those triggers can
+be matched to the entry event. `android/tools/generate_etb_card_benchmark.py`
+regenerates the fixture from Scryfall's compressed JSONL bulk file.
 
-This corpus is a regression benchmark, not a statistically representative
-estimate of all game actions. Its percentages must not be described as proof of
-the 90% product goal. Expand it with labeled action sequences and player
-feedback before making that claim.
+`AssistanceBenchmarkTest` reports trigger-event, target-category-hint, fixed-
+effect, and 1,000-card self-ETB results. The small fixture retains one known
+unsupported trigger (Tectonic Giant's compound attack-or-target condition).
+Target hints are not legality checks: for example, `target nonland permanent`
+still includes lands in the candidate category set.
+
+These corpora are regression benchmarks, not statistically representative
+estimates of all game actions. The 1,000-card sample is ETB-focused and its
+percentage must not be described as proof of the 90% product goal. Expand the
+benchmark with labeled action sequences and player feedback before making that
+claim.
