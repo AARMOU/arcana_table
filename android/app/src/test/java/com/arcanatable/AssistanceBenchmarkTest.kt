@@ -59,7 +59,7 @@ class AssistanceBenchmarkTest {
                 }
             }
         }
-        println("ASSISTANCE_BENCHMARK|bucket=trigger_events|recognized=$recognized|total=${rows.length()}|misses=${misses.joinToString("; ").ifBlank { "none" }}")
+        println("ASSISTANCE_BENCHMARK|bucket=trigger_events|recognized=$recognized|total=${rows.size}|misses=${misses.joinToString("; ").ifBlank { "none" }}")
     }
 
     @Test
@@ -75,7 +75,7 @@ class AssistanceBenchmarkTest {
             assertEquals("$card target-category hint", expected, actual)
             if (expected.isEmpty()) misses += card else matched++
         }
-        println("ASSISTANCE_BENCHMARK|bucket=target_hints|matched=$matched|total=${rows.length()}|no_target_hint=${misses.joinToString(", ").ifBlank { "none" }}|legality=not_evaluated")
+        println("ASSISTANCE_BENCHMARK|bucket=target_hints|matched=$matched|total=${rows.size}|no_target_hint=${misses.joinToString(", ").ifBlank { "none" }}|legality=not_evaluated")
     }
 
     @Test
@@ -98,7 +98,7 @@ class AssistanceBenchmarkTest {
             }
             if (row.getBoolean("automatic") && !actualAutomatic) automaticMisses += card
         }
-        println("ASSISTANCE_BENCHMARK|bucket=fixed_effects|automatic=$automatic|total=${rows.length()}|manual_fallback=$correctlyManual|unsafe_or_unexpected=${(automaticMisses + manualFailures).joinToString(", ").ifBlank { "none" }}")
+        println("ASSISTANCE_BENCHMARK|bucket=fixed_effects|automatic=$automatic|total=${rows.size}|manual_fallback=$correctlyManual|unsafe_or_unexpected=${(automaticMisses + manualFailures).joinToString(", ").ifBlank { "none" }}")
     }
 
     private fun JSONArray.objects(): List<JSONObject> = List(length()) { getJSONObject(it) }
