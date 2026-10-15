@@ -2,7 +2,15 @@
 
 ## Canonical project
 
-This branch is the separate Arcana Table **Game Assistance Overhaul Build 85** (`0.15.66-targeting`, version code `85`) source tree on `experimental/assistance-overhaul`. It includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Stable Build 72 and the Worker are unchanged.
+This branch is the separate Arcana Table **Game Assistance Overhaul Build 86** (`0.15.67-targeting`, version code `86`) source tree on `experimental/assistance-overhaul`. It includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Stable Build 72 and the Worker are unchanged.
+
+## Changes in Build 86
+
+- Replaced dynamic, platform-sensitive keyword regexes with literal phrase matching. This fixes the Android ICU regex crash that occurred while a matched Gilded Goose ETB was being queued.
+- Parser exceptions now leave an effect for manual resolution, and a trigger-text parsing failure is recorded as unsupported instead of escaping the rules pass.
+- Added regression tests for Food-token ETBs, keyword-bearing tokens, malformed text fallback, and an Android-runtime smoke test. The experimental CI workflow now runs that smoke test on an emulator before uploading the APK.
+
+Build 86 verification and APK checksum will be recorded after CI completes.
 
 ## Changes in Build 85
 
@@ -12,7 +20,7 @@ This branch is the separate Arcana Table **Game Assistance Overhaul Build 85** (
 - Trigger prompts retain their originating event ID across online game-state snapshots.
 - Added regression tests for event normalization, positive and negative trigger matches, unsupported trigger text, and known Rhystic Study handling.
 
-This is an event-processing foundation for the currently supported rules patterns. It is not a complete Magic rules engine; unsupported or ambiguous card behavior remains manual. Build 85 verification and APK checksum will be recorded after the build completes.
+This is an event-processing foundation for the currently supported rules patterns. It is not a complete Magic rules engine; unsupported or ambiguous card behavior remains manual. Build 85's unit tests and APK assembly passed in GitHub Actions; artifact was uploaded from run 38682591551.
 
 ## Changes in Build 84
 

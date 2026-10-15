@@ -171,6 +171,28 @@ class GameRulesTest {
     }
 
     @Test
+    fun parsesFoodTokenEtbWithoutRuntimeDependentKeywordRegex() {
+        val food = parseAutomaticResolutionEffects("Create a Food token.")
+        assertFalse(food.requiresManualReview)
+        assertEquals("Food", food.tokens.single().name)
+        assertEquals("Artifact Token — Food", food.tokens.single().type)
+
+        val keywordToken = parseAutomaticResolutionEffects(
+            "Create a 1/1 white Soldier creature token with flying, vigilance, and ward {2}."
+        )
+        assertFalse(keywordToken.requiresManualReview)
+        assertEquals(listOf("Flying", "Vigilance", "Ward"), keywordToken.tokens.single().keywords)
+    }
+
+    @Test
+    fun parserRuntimeFailureFallsBackToManualReview() {
+        // Unexpected Oracle text must never take down the game if a platform
+        // parser behaves differently from the local JVM test runtime.
+        val result = parseAutomaticResolutionEffects("Create a Food token with {unclosed symbol")
+        assertTrue(result.requiresManualReview)
+    }
+
+    @Test
     fun automaticDrawEffectsRequireEnoughCardsBeforeAnyMutation() {
         val draws = parseAutomaticResolutionEffects("Gain 2 life. Draw two cards.")
         assertTrue(canApplyAutomaticEffects(2, draws))

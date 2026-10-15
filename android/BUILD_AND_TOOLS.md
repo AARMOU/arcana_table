@@ -1,6 +1,6 @@
 # Arcana Table build and Worker tools
 
-This workspace keeps the app source, Cloudflare Worker, lockfiles, and build scripts together. Targeting Experimental Build 81 is on `experimental/targeting`; Game Assistance Overhaul Build 85 is on `experimental/assistance-overhaul`. Both use the separate debug application ID `com.arcanatable.targeting`. Stable Build 72 remains on `main`. APKs are produced by GitHub Actions as downloadable build artifacts; they are not included in the source tree or project-page deployment.
+This workspace keeps the app source, Cloudflare Worker, lockfiles, and build scripts together. Targeting Experimental Build 81 is on `experimental/targeting`; Game Assistance Overhaul Build 86 is on `experimental/assistance-overhaul`. Both use the separate debug application ID `com.arcanatable.targeting`. Stable Build 72 remains on `main`. APKs are produced by GitHub Actions as downloadable build artifacts; they are not included in the source tree or project-page deployment.
 
 The responsive GitHub Pages landing page is in `docs/`. Its Actions workflow stages the APK from `artifacts/` into the deployed site's `downloads/` path. See `docs/README.md` for publishing setup.
 
@@ -32,4 +32,4 @@ Login and deployment require the owner's Cloudflare credentials. No credentials 
 
 ## Current environment
 
-Targeting Experimental Build 81 (`0.15.62-targeting`, version code `81`) passed `testDebugUnitTest` and `assembleDebug` in its prior workspace. The Game Assistance Overhaul is Build 84 (`0.15.65-targeting`, version code `84`) on `experimental/assistance-overhaul`. Its unit suite includes an offline Oracle-text benchmark for 1,000 self-referencing ETB conditions, plus trigger-event, target-hint, and fixed-effect checks. Wrangler and TypeScript dependencies are recorded in the Worker lockfile; the Worker is not part of this build.
+Targeting Experimental Build 81 (`0.15.62-targeting`, version code `81`) passed `testDebugUnitTest` and `assembleDebug` in its prior workspace. The Game Assistance Overhaul is Build 86 (`0.15.67-targeting`, version code `86`) on `experimental/assistance-overhaul`. Its checks include an offline Oracle-text benchmark for 1,000 self-referencing ETB conditions, trigger-event, target-hint, and fixed-effect unit tests, plus an Android-emulator parser smoke test. Wrangler and TypeScript dependencies are recorded in the Worker lockfile; the Worker is not part of this build.

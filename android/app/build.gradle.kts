@@ -17,16 +17,17 @@ android {
         applicationId = "com.arcanatable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 85
-        versionName = "0.15.66-targeting"
-        manifestPlaceholders["appLabel"] = "Arcana Table Targeting · Build 85"
+        versionCode = 86
+        versionName = "0.15.67-targeting"
+        manifestPlaceholders["appLabel"] = "Arcana Table Targeting · Build 86"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         debug {
             // Keep the installable test build separate from earlier debug APKs.
             applicationIdSuffix = ".targeting"
-            manifestPlaceholders["appLabel"] = "Arcana Table Targeting 0.15.66 · Build 85"
+            manifestPlaceholders["appLabel"] = "Arcana Table Targeting 0.15.67 · Build 86"
         }
     }
 
@@ -52,6 +53,8 @@ dependencies {
     // JVM unit tests exercise online snapshot JSON. Android's org.json stubs
     // throw "Method ... not mocked" outside an emulator, so use the JVM port.
     testImplementation("org.json:json:20240303")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
 

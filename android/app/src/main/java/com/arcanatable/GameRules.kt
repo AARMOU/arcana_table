@@ -120,7 +120,12 @@ internal object GameEventRulesEngine {
                 add(TriggerCheck(source, null, TriggerCheckStatus.MATCHED, "supported card-specific trigger", knownKind))
                 return@forEach
             }
-            val abilities = parseRecognizedTriggeredAbilities(card.oracleText, card.name, card.type)
+            val abilities = try {
+                parseRecognizedTriggeredAbilities(card.oracleText, card.name, card.type)
+            } catch (_: Exception) {
+                add(TriggerCheck(source, null, TriggerCheckStatus.UNSUPPORTED, "trigger text parser failed safely"))
+                return@forEach
+            }
             if (abilities.isEmpty()) {
                 if (Regex("(?i)\\b(whenever|when|at the beginning)\\b").containsMatchIn(card.oracleText.orEmpty())) {
                     add(TriggerCheck(source, null, TriggerCheckStatus.UNSUPPORTED, "trigger-like text was not parsed"))
@@ -282,12 +287,84 @@ private val automaticNumberWords = mapOf(
 private fun parseAutomaticCount(raw: String): Int? =
     raw.toIntOrNull() ?: automaticNumberWords[raw.lowercase()]
 
+/** Matches Oracle keywords as phrases without compiling text-dependent regex patterns. */
+private fun containsWholePhrase(text: String, phrase: String): Boolean {
+    if (phrase.isBlank()) return false
+    val source = text.lowercase()
+    val target = phrase.lowercase()
+    var fromIndex = 0
+    while (fromIndex <= source.length - target.length) {
+        val index = source.indexOf(target, fromIndex)
+        if (index < 0) return false
+        val end = index + target.length
+        val leftIsWord = index > 0 && source[index - 1].isLetter()
+        val rightIsWord = end < source.length && source[end].isLetter()
+        if (!leftIsWord && !rightIsWord) return true
+        fromIndex = index + 1
+    }
+    return false
+}
+
+private fun removeWholePhrase(text: String, phrase: String): String {
+    if (phrase.isBlank() || text.isEmpty()) return text
+    val source = text.lowercase()
+    val target = phrase.lowercase()
+    val remove = BooleanArray(text.length)
+    var fromIndex = 0
+    while (fromIndex <= source.length - target.length) {
+        val index = source.indexOf(target, fromIndex)
+        if (index < 0) break
+        val end = index + target.length
+        val leftIsWord = index > 0 && source[index - 1].isLetter()
+        val rightIsWord = end < source.length && source[end].isLetter()
+        if (!leftIsWord && !rightIsWord) {
+            for (position in index until end) remove[position] = true
+            // Oracle keyword reminder costs, for example "Ward {2}", are
+            // optional in token text and should not make a known token manual.
+            var costStart = end
+            while (costStart < text.length && text[costStart].isWhitespace()) costStart++
+            if (costStart < text.length && text[costStart] == '{') {
+                val costEnd = text.indexOf('}', costStart + 1)
+                if (costEnd >= 0) for (position in end until costEnd + 1) remove[position] = true
+            }
+            fromIndex = end
+        } else {
+            fromIndex = index + 1
+        }
+    }
+    return buildString(text.length) {
+        text.forEachIndexed { index, char -> append(if (remove[index]) ' ' else char) }
+    }
+}
+
+private fun removeBraceSymbols(text: String): String {
+    val result = StringBuilder(text.length)
+    var insideSymbol = false
+    text.forEach { char ->
+        when {
+            char == '{' && !insideSymbol -> insideSymbol = true
+            char == '}' && insideSymbol -> insideSymbol = false
+            !insideSymbol -> result.append(char)
+        }
+    }
+    // Preserve malformed symbols as unexplained text so the effect remains manual.
+    return if (insideSymbol) text else result.toString()
+}
+
 /**
  * Extracts only unconditional, fixed-size effects from a resolving spell.
  * Anything involving targets, choices, conditions, costs, or variable amounts
  * stays manual so the app does not guess at a rules decision.
  */
-internal fun parseAutomaticResolutionEffects(oracleText: String?): AutomaticResolutionEffects {
+internal fun parseAutomaticResolutionEffects(oracleText: String?): AutomaticResolutionEffects = try {
+    parseAutomaticResolutionEffectsUnsafe(oracleText)
+} catch (_: Exception) {
+    // Recognition is assistive. A parser/runtime mismatch must leave the
+    // effect for the player instead of crashing the active game.
+    AutomaticResolutionEffects(requiresManualReview = true)
+}
+
+private fun parseAutomaticResolutionEffectsUnsafe(oracleText: String?): AutomaticResolutionEffects {
     val text = oracleText?.trim().orEmpty()
     if (text.isBlank()) return AutomaticResolutionEffects()
     val amountPattern = "(\\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten)"
@@ -329,9 +406,12 @@ internal fun parseAutomaticResolutionEffects(oracleText: String?): AutomaticReso
             val statLike = Regex("^(?:\\d+|\\*|x)/(?:\\d+|\\*|x)\\s+", RegexOption.IGNORE_CASE).containsMatchIn(description)
             val suffix = token.groupValues[3]
             val supportedKeywords = listOf("Flying", "First strike", "Double strike", "Deathtouch", "Defender", "Haste", "Hexproof", "Indestructible", "Lifelink", "Menace", "Reach", "Trample", "Vigilance", "Ward")
-            val unexplainedSuffix = supportedKeywords.fold(suffix.lowercase()) { remaining, keyword ->
-                remaining.replace(Regex("(?<![a-z])${Regex.escape(keyword.lowercase())}(?![a-z])(?:\\s+\\{[^}]+})?"), " ")
-            }.replace(Regex("\\b(and|or|with)\\b|[{},.;]"), " ").trim()
+            val unexplainedSuffix = supportedKeywords.fold(removeBraceSymbols(suffix)) { remaining, keyword ->
+                removeWholePhrase(remaining, keyword)
+            }.filter { it.isLetterOrDigit() || it.isWhitespace() }
+                .split(Regex("\\s+"))
+                .filterNot { it.equals("and", true) || it.equals("or", true) || it.equals("with", true) }
+                .joinToString(" ")
             if ((!hasCreature && !isArtifact) || (statLike && stats == null) ||
                 Regex("(?i)\\b(tapped|attacking|blocking|counter|counters|copy|copies|enchanted|equipped)\\b").containsMatchIn(description) ||
                 unexplainedSuffix.isNotBlank()) return AutomaticResolutionEffects(requiresManualReview = true)
@@ -341,7 +421,7 @@ internal fun parseAutomaticResolutionEffects(oracleText: String?): AutomaticReso
                 .distinct()
             val keywordNames = listOf("Flying", "First strike", "Double strike", "Deathtouch", "Defender", "Haste", "Hexproof", "Indestructible", "Lifelink", "Menace", "Reach", "Trample", "Vigilance", "Ward")
             val fullText = "$description $suffix"
-            val keywords = keywordNames.filter { Regex("(?i)(?<![A-Za-z])${Regex.escape(it)}(?![A-Za-z])").containsMatchIn(fullText) }
+            val keywords = keywordNames.filter { containsWholePhrase(fullText, it) }
             val name = description
                 .replace(Regex("^\\d+/\\d+\\s+"), "")
                 .split(Regex("\\s+"))
@@ -798,7 +878,7 @@ internal data class CombatCreature(
     val oracleText: String = ""
 ) {
     fun hasKeyword(keyword: String): Boolean = keywords.any { it.equals(keyword, ignoreCase = true) } ||
-        Regex("(?<![A-Za-z])${Regex.escape(keyword)}(?![A-Za-z])", RegexOption.IGNORE_CASE).containsMatchIn(oracleText)
+        containsWholePhrase(oracleText, keyword)
 }
 
 /** A cautious single- or double-block recommendation; it never invents stats for `*` creatures. */
