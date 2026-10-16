@@ -2534,7 +2534,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             if (submitted.isEmpty()) { argentumLastError = "Your imported deck has no cards to submit."; argentumDeckValidationRunning = false; return@launch }
             try {
                 val api = ArgentumDeckApi()
-                var commanderForGame = commander
+                var commanderForGame: String = requireNotNull(commander)
                 var replacementCommander = false
                 var validation = withContext(Dispatchers.IO) { api.validate(submitted, commanderForGame, "COMMANDER") }
                 val unsupported = linkedSetOf<String>()
