@@ -11,7 +11,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 import java.net.URLEncoder
-import kotlin.random.Random
 
 data class DeckEntry(val name: String, val count: Int, val setCode: String? = null, val collectorNumber: String? = null, val commander: Boolean = false)
 data class RepeatedDeckEntry(val name: String, val quantity: Int)
@@ -340,67 +339,4 @@ suspend fun downloadCardBitmap(url: String): Bitmap? = withContext(Dispatchers.I
     } finally {
         connection.disconnect()
     }
-}
-
-/** Fetches a random popular public Commander list from Archidekt and converts it
- * to the text format accepted by the existing deck importer. */
-suspend fun fetchRandomCommanderDecklist(): String = withContext(Dispatchers.IO) {
-    fun getJson(url: String): JSONObject {
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 12_000
-            readTimeout = 18_000
-            setRequestProperty("Accept", "application/json")
-            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) ArcanaTable/0.15")
-        }
-        return try {
-            val code = connection.responseCode
-            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-            val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (code !in 200..299) error("Deck source returned HTTP $code")
-            JSONObject(body)
-        } finally {
-            connection.disconnect()
-        }
-    }
-
-    val page = Random.nextInt(1, 6)
-    val search = getJson("https://archidekt.com/api/decks/v3/?deckFormat=3&orderBy=-viewCount&pageSize=100&page=$page")
-    val results = search.optJSONArray("results") ?: JSONArray()
-    val candidates = (0 until results.length()).mapNotNull { results.optJSONObject(it) }
-        .filter { it.optLong("id", 0L) > 0L }.shuffled()
-    if (candidates.isEmpty()) error("No public Commander decks were returned. Try again later.")
-
-    var lastFailure: Exception? = null
-    for (candidate in candidates.take(8)) {
-        try {
-            val deck = getJson("https://archidekt.com/api/decks/${candidate.optLong("id")}/")
-            val cards = deck.optJSONArray("cards") ?: continue
-            val commanders = mutableListOf<String>()
-            val mainboard = mutableListOf<String>()
-            for (index in 0 until cards.length()) {
-                val row = cards.optJSONObject(index) ?: continue
-                val card = row.optJSONObject("card") ?: continue
-                val name = (card.optJSONObject("oracleCard") ?: card).optString("name").trim()
-                if (name.isBlank()) continue
-                val categories = row.optJSONArray("categories")
-                val categoryNames = (0 until (categories?.length() ?: 0))
-                    .mapNotNull { categories?.optString(it)?.lowercase(Locale.ROOT) }
-                if (categoryNames.any { it.contains("sideboard") || it.contains("maybeboard") }) continue
-                val line = "${row.optInt("quantity", 1).coerceAtLeast(1)} $name"
-                if (categoryNames.any { it.contains("commander") }) commanders += line else mainboard += line
-            }
-            if (commanders.isNotEmpty() && mainboard.isNotEmpty()) {
-                return@withContext buildString {
-                    appendLine("[Commander]")
-                    commanders.forEach(::appendLine)
-                    appendLine("[Mainboard]")
-                    mainboard.forEach(::appendLine)
-                }
-            }
-        } catch (exception: Exception) {
-            lastFailure = exception
-        }
-    }
-    throw IllegalStateException("Could not load a complete public Commander deck. Try again later.", lastFailure)
 }

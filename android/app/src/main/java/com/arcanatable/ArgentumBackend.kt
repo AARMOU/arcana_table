@@ -23,6 +23,23 @@ const val ARGENTUM_GAME_SOCKET = "wss://magic.wingedsheep.com/game"
 
 data class ArgentumDeckIssue(val code: String, val message: String, val cardName: String?)
 
+data class ArgentumExampleDeck(
+    val id: String,
+    val name: String,
+    val description: String,
+    val note: String?,
+    val commander: String,
+    val cards: Map<String, Int>,
+) {
+    /** Format understood by Arcana's existing importer, with the commander in its own zone. */
+    fun asImportText(): String = buildString {
+        appendLine("[Commander]")
+        appendLine("1 $commander")
+        appendLine("[Mainboard]")
+        cards.toSortedMap().forEach { (name, count) -> if (count > 0) appendLine("$count $name") }
+    }
+}
+
 data class ArgentumDeckValidation(
     val valid: Boolean,
     val totalCards: Int,
@@ -232,6 +249,49 @@ class ArgentumDeckApi(
         .callTimeout(25, TimeUnit.SECONDS)
         .build()
 ) {
+    /**
+     * Fetch Argentum's own Commander examples and retain only the lists the live Argentum
+     * validator accepts. The examples endpoint includes the commander in `cards`; validation
+     * expects it separately in the command zone, so remove exactly one copy before checking.
+     */
+    fun commanderExamples(): List<ArgentumExampleDeck> {
+        val request = Request.Builder().url("${origin.trimEnd('/')}/api/decks/examples").get()
+            .header("Accept", "application/json").build()
+        val examples = http.newCall(request).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IllegalStateException("Could not load Argentum's premade decks (HTTP ${response.code}).")
+            JSONArray(text)
+        }
+        return (0 until examples.length()).mapNotNull { examples.optJSONObject(it) }
+            .mapNotNull { item ->
+                val commander = item.optString("commander").takeIf(String::isNotBlank) ?: return@mapNotNull null
+                if (!item.optString("format").equals("COMMANDER", ignoreCase = true)) return@mapNotNull null
+                val sourceCards = item.optJSONObject("cards") ?: return@mapNotNull null
+                val cards = buildMap {
+                    sourceCards.keys().forEach { name ->
+                        val count = sourceCards.optInt(name, 0)
+                        if (count > 0) put(name, count)
+                    }
+                }
+                val total = cards.values.sum()
+                if (total != 100 || (cards[commander] ?: 0) < 1) return@mapNotNull null
+                val library = cards.toMutableMap().apply {
+                    val remaining = (get(commander) ?: 0) - 1
+                    if (remaining > 0) put(commander, remaining) else remove(commander)
+                }
+                val validation = validate(library, commander, "COMMANDER")
+                if (!validation.valid) return@mapNotNull null
+                ArgentumExampleDeck(
+                    id = item.optString("id"),
+                    name = item.optString("name").ifBlank { commander },
+                    description = item.optString("description"),
+                    note = item.optString("note").takeIf(String::isNotBlank),
+                    commander = commander,
+                    cards = library,
+                )
+            }
+    }
+
     /** Argentum's own implemented basic lands, restricted to the commander's color identity. */
     fun supportedBasicLands(commander: String): List<String> {
         val request = Request.Builder().url("${origin.trimEnd('/')}/api/cards").get()
