@@ -3086,7 +3086,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     Column(Modifier.fillMaxWidth().padding(top = 18.dp).clip(RoundedCornerShape(18.dp)).background(Panel).padding(18.dp)) {
                         Text("ARGENTUM ROOM CODE", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                         SelectionContainer {
-                            Text(lobbyId, color = Gold, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                            Text(lobbyId, color = CounterGold, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
                         }
                         if (lobbyState.optBoolean("vsAi", argentumVsAiLobby).not()) {
                             OutlinedButton(
