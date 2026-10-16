@@ -36,6 +36,11 @@ android {
     }
 }
 
+kotlin {
+    // Match compileOptions so the build works on JDK 17 and JDK 21 hosts alike.
+    compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2025.12.00")
     implementation(composeBom)
