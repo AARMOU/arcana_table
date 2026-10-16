@@ -726,11 +726,15 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var argentumTargetAction by remember { mutableStateOf<JSONObject?>(null) }
     var argentumTargetChoices by remember { mutableStateOf<List<String>>(emptyList()) }
     var argentumSelectedTarget by remember { mutableStateOf<String?>(null) }
+    val argentumPrefs = remember { context.getSharedPreferences("argentum_session", Context.MODE_PRIVATE) }
+    val argentumOrigin = remember { ArgentumEndpoints.origin(argentumPrefs) }
+    val argentumQueue = remember { kotlinx.coroutines.channels.Channel<JSONObject>(kotlinx.coroutines.channels.Channel.UNLIMITED) }
     val argentumSocket = remember(context) {
         ArgentumGameSocket(
-            preferences = context.getSharedPreferences("argentum_session", Context.MODE_PRIVATE),
+            preferences = argentumPrefs,
+            url = ArgentumEndpoints.socketUrl(argentumOrigin),
             onStatus = { status -> argentumStatus = status; if (status != ArgentumConnectionStatus.CONNECTED) argentumAwaitingUpdate = false },
-            onMessage = { argentumInbound = it },
+            onMessage = { argentumQueue.trySend(it) },
             onError = { argentumLastError = it; message = it; argentumAwaitingUpdate = false },
             // Reconnect on its own only while the player is looking at the app.
             canAutoReconnect = { appInForeground }
@@ -1068,8 +1072,10 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         if (argentumEnabled) recordDiagnostic("Argentum connection status: ${argentumStatus.name.lowercase()}")
     }
 
-    LaunchedEffect(argentumInbound) {
-        val incoming = argentumInbound ?: return@LaunchedEffect
+    // Every server message is handled once, in order. (A single state variable conflated bursts:
+    // e.g. gameStarted + mulliganDecision arriving in one frame lost the first message.)
+    fun handleArgentumMessage(incoming: JSONObject) {
+        argentumInbound = incoming
         if (argentumEndPreviousRequested && incoming.optString("type") in setOf("connected", "reconnected")) {
             argentumEndPreviousRequested = false
             if (incoming.optString("context") == "game") argentumSocket.concede()
@@ -1077,10 +1083,10 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             // Outside this effect: a new inbound message would cancel it before the close ran.
             scope.launch { delay(600); argentumSocket.close() }
             message = if (incoming.optString("context") == "game") "The previous Argentum game was conceded." else "The previous Argentum game had already ended."
-            return@LaunchedEffect
+            return
         }
         // Outside an Argentum session, never let pushed game messages take over the table.
-        if (!argentumEnabled && incoming.optString("type") !in setOf("connected", "reconnected", "error", "sessionReplaced")) return@LaunchedEffect
+        if (!argentumEnabled && incoming.optString("type") !in setOf("connected", "reconnected", "error", "sessionReplaced")) return
         when (incoming.optString("type")) {
             "connected", "reconnected" -> {
                 argentumPlayerId = incoming.optString("playerId").takeUnless { it.isBlank() || it == "null" }
@@ -1227,8 +1233,28 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             }
         }
     }
+    LaunchedEffect(argentumQueue) {
+        for (incoming in argentumQueue) {
+            runCatching { handleArgentumMessage(incoming) }.onFailure { error ->
+                recordDiagnostic("Could not apply Argentum ${incoming.optString("type")} message: ${error.javaClass.simpleName}", DiagnosticCategory.ERROR)
+                argentumAwaitingUpdate = false
+                argentumSocket.requestResync()
+            }
+        }
+    }
+    LaunchedEffect(argentumLastError) {
+        // Socket-level problems (unreadable messages, failed connects) reach the searchable log too.
+        argentumLastError?.let { recordDiagnostic("Argentum problem: $it", DiagnosticCategory.ERROR) }
+    }
     DisposableEffect(argentumSocket) {
         onDispose { argentumSocket.close() }
+    }
+    LaunchedEffect(Unit) {
+        // After a relaunch or recreation, surface the Resume / End choice instead of a stale table.
+        if (argentumResumeAvailable && !argentumEnabled) {
+            homeOpen = true
+            recordDiagnostic("Previous Argentum game may still be active; offering Resume (no automatic reconnect)", DiagnosticCategory.CONNECTION)
+        }
     }
     LaunchedEffect(argentumAwaitingUpdate) {
         if (argentumAwaitingUpdate) {
@@ -2688,7 +2714,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             )
             if (submitted.isEmpty()) { argentumLastError = "Your imported deck has no cards to submit."; argentumDeckValidationRunning = false; return@launch }
             try {
-                val api = ArgentumDeckApi()
+                val api = ArgentumDeckApi(argentumOrigin)
                 var commanderForGame: String = requireNotNull(commander)
                 var replacementCommander = false
                 var validation = withContext(Dispatchers.IO) { api.validate(submitted, commanderForGame, "COMMANDER") }
@@ -2823,8 +2849,13 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     recordDiagnostic("Argentum Commander ${if (joinLobbyCode != null) "room join" else if (vsAi) "practice lobby" else "room"} requested with ${validation.totalCards} supported cards")
                 }
             } catch (error: Exception) {
-                argentumLastError = error.message ?: "Could not validate this deck with Argentum."
-                recordDiagnostic("Argentum deck validation failed: ${argentumLastError}")
+                argentumLastError = when (error) {
+                    is java.net.SocketTimeoutException -> "Argentum took too long to answer. Check your connection and try again."
+                    is java.net.UnknownHostException, is java.net.ConnectException, is javax.net.ssl.SSLException, is java.io.IOException ->
+                        "Couldn't reach the Argentum server. Check your internet connection and try again. Your deck hasn't been changed."
+                    else -> error.message ?: "Could not validate this deck with Argentum."
+                }
+                recordDiagnostic("Argentum deck validation failed (${error.javaClass.simpleName}): ${error.message.orEmpty()}", DiagnosticCategory.ERROR)
             } finally {
                 argentumDeckValidationRunning = false
             }
@@ -2993,7 +3024,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     DropdownMenuItem(text = { Text(if (turnTimerVisible) "Hide turn timer display" else "Show turn timer display") }, onClick = { turnTimerVisible = !turnTimerVisible; timerMenuOpen = false })
                 }
             }
-            Box(Modifier.then(tutorialAnchor("chat-button"))) {
+            // Argentum does not relay Arcana chat, so the chat entry point is hidden during Argentum games.
+            if (!argentumEnabled) Box(Modifier.then(tutorialAnchor("chat-button"))) {
                 IconButton(onClick = { guidedAction("chat-button") { chatOpen = true; unreadChatCount = 0 } }, modifier = Modifier.size(44.dp)) {
                     Icon(Icons.Filled.Chat, "Open chat${if (unreadChatCount > 0) ", $unreadChatCount unread" else ""}", tint = if (unreadChatCount > 0) CounterGold else SoftWhite)
                 }
@@ -3159,8 +3191,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 modifier = Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { battlefieldBounds = it.boundsInRoot() },
                 onLife = { delta -> guidedAction(if (delta > 0) "life-up" else "life-down") { if (boardCanControl) { val nextLife = (players[boardIndex].life + delta).coerceAtLeast(0); updatePlayer(boardIndex) { it.copy(life = nextLife) }; logAction(boardIndex, if (delta > 0) "gained life" else "lost life"); if (nextLife == 0) eliminatePlayer(boardIndex, "Life total reached 0") } } },
                 onDraw = { guidedAction("draw-action") { if (boardCanControl) { drawCard(boardIndex); showHand = true } } },
-                onShowHand = { guidedAction("hand-button") { if (boardCanControl) showHand = true } },
-                onShowHandFromZone = { guidedAction("zone-hand") { if (boardCanControl) showHand = true } },
+                onShowHand = { guidedAction("hand-button") { if (boardCanControl || (argentumEnabled && boardIndex == localSeat)) showHand = true } },
+                onShowHandFromZone = { guidedAction("zone-hand") { if (boardCanControl || (argentumEnabled && boardIndex == localSeat)) showHand = true } },
+                engineControlled = argentumEnabled && boardIndex == localSeat,
                 onToken = { guidedAction("token-action") { if (boardCanControl) { tokenTarget = boardIndex; tokenPickerOpen = true } } },
                 onManageMana = { guidedAction("mana-status") { if (boardCanControl) { manaTarget = boardIndex; manaPoolOpen = true } } },
                 onZone = { zone -> guidedAction("zone-${zone.lowercase()}") { zoneDialog = boardIndex to zone } },
@@ -3232,7 +3265,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 Text("Tap a player to inspect their board", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
                 if (argentumEnabled) {
                     if (argentumPrimaryLabel != null) HeaderButton(argentumPrimaryLabel, onClick = { guidedAction("table-pass") { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, modifier = tutorialAnchor("table-pass"))
-                    else Text(when { gameEndedOnline -> "GAME OVER"; argentumSnapshot == null -> "WAITING FOR ARGENTUM"; else -> "OPPONENT HAS PRIORITY" }, color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
+                    else Text(when { gameEndedOnline -> "GAME OVER"; argentumSnapshot == null -> "WAITING FOR ARGENTUM"; argentumPendingDecision != null -> "YOUR CHOICE IS NEEDED"; argentumAwaitingUpdate -> "WAITING FOR ARGENTUM"; else -> "OPPONENT HAS PRIORITY" }, color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
                 } else {
                 if (gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) HeaderButton("NEXT · ${phaseSteps[phaseIndex]}", onClick = { guidedAction("table-next") { if (argentumEnabled) sendArgentumPriority() else advanceStep() } }, enabled = !argentumAwaitingUpdate, modifier = tutorialAnchor("table-next"))
                 if (gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) {
@@ -3260,7 +3293,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 Box(Modifier.weight(1.18f).then(tutorialAnchor("hand-button"))) {
                     HandPeekBar(
                         players[selectedPlayer].hand.size,
-                        modifier = Modifier.fillMaxWidth().height(handControlHeight),
+                        modifier = Modifier.fillMaxWidth().height(handControlHeight).testTag("hand-peek"),
                         onClick = { guidedAction("hand-button") { if (canControlSelectedPlayer) showHand = true } }
                     )
                 }
@@ -3888,6 +3921,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 87 · ARGENTUM INTEGRATION", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Attack and block declarations come from Argentum; the main button names what it will do (Pass priority, Declare attackers, Declare blockers).\n• More Argentum choices open in Arcana dialogs: modes, library search, ordering, mana auto-pay, damage assignment and distribution. Anything else shows a Needs handling notice with Cancel, Refresh or View table instead of blocking the app.\n• Unsupported deck cards open a review: play without them for this game, play the full deck in the Arcana sandbox, or edit the deck. Your saved deck is never changed.\n• No automatic resume: after a relaunch, choose Resume game or End that game. A connection lost in the background waits for Resume.\n• Engine status strip, searchable diagnostic log with redacted export, and a hand drawer that rearranges cards as you resize it (Adjust UI → Hand).", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 86 · ARGENTUM PREMADE DECKS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Removed random external deck fetching. The importer now offers Argentum's own premade Commander lists and only shows lists that pass the live Argentum Commander validator.", color = SoftWhite, fontSize = 11.sp)
 
@@ -3986,9 +4022,12 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 enter = slideInVertically { it } + fadeIn(),
                 exit = slideOutVertically { it } + fadeOut()
             ) {
+                // Never shorter than the tray chrome (~172dp) plus one readable card row (~110dp),
+                // which matters on short landscape screens.
+                val effectiveHandFraction = handSheetHeightFraction.coerceAtLeast((282f / configuration.screenHeightDp.coerceAtLeast(1)).coerceIn(0.38f, 0.95f))
                 Column(
                     Modifier.fillMaxWidth()
-                        .fillMaxHeight(handSheetHeightFraction)
+                        .fillMaxHeight(effectiveHandFraction)
                         .verticalScroll(rememberScrollState())
                         .clip(RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp))
                         .background(Panel)
@@ -4022,7 +4061,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     Text("DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
                     HandSheet(
                         cards = players[selectedPlayer].hand, isLandscape = isLandscape,
-                        availableHeight = LocalConfiguration.current.screenHeightDp.dp * handSheetHeightFraction,
+                        availableHeight = LocalConfiguration.current.screenHeightDp.dp * effectiveHandFraction,
                         stackCount = visibleStackCount,
                         tutorialAnchor = ::tutorialAnchor,
                         highlightedCardId = highlightedHandCardId,
@@ -4741,7 +4780,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                                     importError = null
                                     scope.launch {
                                         try {
-                                            val decks = withContext(Dispatchers.IO) { ArgentumDeckApi().commanderExamples() }
+                                            val decks = withContext(Dispatchers.IO) { ArgentumDeckApi(argentumOrigin).commanderExamples() }
                                             argentumDeckOptions = decks
                                             if (decks.isEmpty()) importError = "Argentum did not return any Commander examples that pass its current deck validator."
                                             else argentumDeckPickerOpen = true
@@ -7217,7 +7256,9 @@ private fun PlayerBoard(
     onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit, onTapCard: (Int) -> Unit,
     onCardAction: (GameCard, String) -> Unit, onReveal: () -> Unit, onShuffle: () -> Unit,
     onNextStep: () -> Unit, onOpenLog: () -> Unit, onOpenChat: () -> Unit, onCombat: () -> Unit,
-    onTrackers: () -> Unit, onStack: () -> Unit, onOpenMore: () -> Unit, onSearchLibrary: () -> Unit, onCastCommander: () -> Unit, onConcede: () -> Unit
+    onTrackers: () -> Unit, onStack: () -> Unit, onOpenMore: () -> Unit, onSearchLibrary: () -> Unit, onCastCommander: () -> Unit, onConcede: () -> Unit,
+    /** Own seat in an Argentum game: the engine owns rules, so manual-only tools are hidden. */
+    engineControlled: Boolean = false
 ) {
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val battlefieldListState = rememberLazyListState()
@@ -7242,9 +7283,9 @@ private fun PlayerBoard(
                 Text("${if (player.isEliminated) "✕ " else if (player.isOnline) "● " else ""}${player.name}${if (player.isEliminated) " · ELIMINATED" else if (player.isOnline) " · ONLINE" else ""}${if (player.isComputer) " · AI" else ""}${if (isActivePlayer && !player.isEliminated) " · ACTIVE" else ""}", color = if (player.isEliminated) Muted else if (isActivePlayer || player.isOnline) Mint else SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 Text("TURN $turnNumber · ${phaseName} · P${playerIndex + 1} · ${player.hand.size} IN HAND · ${player.library.size} IN LIBRARY", color = Muted, fontSize = 8.sp, letterSpacing = 0.4.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            IconButton(onClick = { onLife(-1) }, enabled = canControl, modifier = Modifier.size(44.dp).then(tutorialAnchor("life-down"))) { Icon(Icons.Filled.Remove, "Decrease life", tint = if (canControl) SoftWhite else Muted) }
+            if (canControl) IconButton(onClick = { onLife(-1) }, modifier = Modifier.size(44.dp).then(tutorialAnchor("life-down"))) { Icon(Icons.Filled.Remove, "Decrease life", tint = SoftWhite) }
             Text("${player.life}", color = Mint, fontSize = 25.sp, fontWeight = FontWeight.Black, modifier = Modifier.widthIn(min = 36.dp))
-            IconButton(onClick = { onLife(1) }, enabled = canControl, modifier = Modifier.size(44.dp).then(tutorialAnchor("life-up"))) { Icon(Icons.Filled.Add, "Increase life", tint = if (canControl) Mint else Muted) }
+            if (canControl) IconButton(onClick = { onLife(1) }, modifier = Modifier.size(44.dp).then(tutorialAnchor("life-up"))) { Icon(Icons.Filled.Add, "Increase life", tint = Mint) }
         }
 
             },
@@ -7267,13 +7308,13 @@ private fun PlayerBoard(
         if (commander != null || player.commanderDamageReceived.isNotEmpty() || player.playerCounters.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(Panel).padding(horizontal = 5.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (commander != null) {
-                    CardFace(commander, Modifier.width(30.dp), onClick = { if (!commanderUnavailable && canControl) onCastCommander() }, onLongClick = { if (!commanderUnavailable && canControl) onCastCommander() }, showCounters = false)
+                    CardFace(commander, Modifier.width(30.dp), onClick = { if (!commanderUnavailable && (canControl || engineControlled)) onCastCommander() }, onLongClick = { if (!commanderUnavailable && (canControl || engineControlled)) onCastCommander() }, showCounters = false)
                     Column(Modifier.weight(1f).padding(start = 6.dp)) {
                         Text("${if (commanderUnavailable) "IN PLAY / STACK" else "COMMAND ZONE"} · ${commander.name}", color = CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         val trackerSummary = player.playerCounters.entries.joinToString(" · ") { "${it.key} ${it.value}" }
                         Text("Cast ${player.commanderCastCount} · tax +{${player.commanderCastCount * 2}}${if (trackerSummary.isNotBlank()) " · $trackerSummary" else ""}", color = Muted, fontSize = 7.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    TextButton(onClick = onCastCommander, enabled = canControl && !commanderUnavailable && !player.isEliminated, modifier = Modifier.heightIn(min = 32.dp).then(tutorialAnchor("commander-cast")), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) { Text("CAST", color = if (canControl && !commanderUnavailable && !player.isEliminated) Mint else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = onCastCommander, enabled = (canControl || engineControlled) && !commanderUnavailable && !player.isEliminated, modifier = Modifier.heightIn(min = 32.dp).then(tutorialAnchor("commander-cast")), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) { Text("CAST", color = if (canControl && !commanderUnavailable && !player.isEliminated) Mint else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
                 } else Text("PLAYER TRACKERS · ${player.playerCounters.entries.joinToString { "${it.key} ${it.value}" }.ifBlank { "none" }}", color = Muted, fontSize = 9.sp, modifier = Modifier.weight(1f))
                 val incomingDamage = player.commanderDamageReceived.entries.sumOf { it.value }
                 if (incomingDamage > 0) Text("CMD DMG $incomingDamage", color = if (player.commanderDamageReceived.values.any { it >= 21 }) Color(0xFFE9978B) else CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold)
@@ -7285,7 +7326,8 @@ private fun PlayerBoard(
         if (gameInProgress) {
             Row(Modifier.fillMaxWidth().then(tutorialAnchor("next-step")), verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.weight(1f))
-                if (player.isComputer || player.isEliminated) Text(if (player.isEliminated) "ELIMINATED · ${player.eliminationReason ?: "OUT"}" else if (player.deckLoaded) "AI TURN IN PROGRESS" else "IMPORT A DECK FOR THE AI", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(10.dp))
+                if (engineControlled && !player.isEliminated) Text("ARGENTUM RUNS THE RULES · USE ${if (isActivePlayer) "PASS PRIORITY / ACTIONS" else "ACTIONS WHEN OFFERED"}", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                else if (player.isComputer || player.isEliminated) Text(if (player.isEliminated) "ELIMINATED · ${player.eliminationReason ?: "OUT"}" else if (player.deckLoaded) "AI TURN IN PROGRESS" else "IMPORT A DECK FOR THE AI", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(10.dp))
                 else {
                     TextButton(onClick = onNextStep, enabled = isActivePlayer && canControl, modifier = Modifier.heightIn(min = 38.dp).then(tutorialAnchor("next-step"))) {
                         Text(if (!canControl) "OTHER PLAYER · READ ONLY" else if (isActivePlayer) "NEXT STEP  ›" else "WAITING FOR TURN", color = if (isActivePlayer && canControl) Mint else Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
@@ -7297,7 +7339,9 @@ private fun PlayerBoard(
             },
             "ZONES" to {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).then(tutorialAnchor("zones")), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            quickActionOrder.distinct().forEach { action ->
+            // Manual-only shortcuts would be silent no-ops in an engine-run game, so they are not shown.
+            val engineHidden = setOf("LIBRARY", "MANA", "DRAW", "REVEAL", "TOKEN", "SHUFFLE", "NEXT_STEP", "CHAT")
+            quickActionOrder.distinct().filterNot { engineControlled && it in engineHidden }.forEach { action ->
                 val zoneCount = when (action) {
                     "LIBRARY" -> player.library.size
                     "HAND" -> player.hand.size
@@ -7503,7 +7547,7 @@ private fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: () 
             Box(Modifier.fillMaxSize().background(Color(0xFF12221E)), contentAlignment = Alignment.Center) {
                 Text("FACE\nDOWN", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
             }
-        } else if (!card.imageUrl.isNullOrBlank()) CardArt(card.imageUrl, Modifier.fillMaxSize())
+        } else if (!card.imageUrl.isNullOrBlank()) CardArt(card.imageUrl, Modifier.fillMaxSize(), fallbackName = card.name, fallbackType = card.type)
         else Column(Modifier.fillMaxSize().background(card.color).padding(6.dp), verticalArrangement = Arrangement.SpaceBetween) {
             Text(card.name, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 4, overflow = TextOverflow.Ellipsis)
             Text(card.type, color = Color.White.copy(alpha = 0.8f), fontSize = 8.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
@@ -7516,10 +7560,16 @@ private fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: () 
 }
 
 @Composable
-private fun CardArt(url: String, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Fit) {
+private fun CardArt(url: String, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Fit, fallbackName: String? = null, fallbackType: String? = null) {
     var bitmap by remember(url) { mutableStateOf<Bitmap?>(CardBitmapCache.get(url)) }
     LaunchedEffect(url) { if (bitmap == null) bitmap = try { downloadCardBitmap(url) } catch (_: Exception) { null } }
     if (bitmap != null) Image(bitmap!!.asImageBitmap(), contentDescription = "Magic card art", modifier = modifier, contentScale = contentScale)
+    // While art loads (or if it cannot load), keep the card identifiable.
+    else if (fallbackName != null) Column(modifier.background(Color(0xFF263B35)).padding(6.dp), verticalArrangement = Arrangement.SpaceBetween) {
+        Text(fallbackName, color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 4, overflow = TextOverflow.Ellipsis)
+        Text("✦", color = Mint, fontSize = 14.sp, modifier = Modifier.align(Alignment.CenterHorizontally))
+        Text(fallbackType.orEmpty(), color = Muted, fontSize = 8.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
+    }
     else Box(modifier.background(Color(0xFF263B35)), contentAlignment = Alignment.Center) { Text("✦", color = Mint, fontSize = 16.sp) }
 }
 

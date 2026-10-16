@@ -21,6 +21,23 @@ import kotlin.math.min
 const val ARGENTUM_SERVER_ORIGIN = "https://magic.wingedsheep.com"
 const val ARGENTUM_GAME_SOCKET = "wss://magic.wingedsheep.com/game"
 
+/**
+ * Resolves which Argentum server Arcana talks to. Default is the public server; a self-hosted
+ * Argentum (see its README, `just server`) can be set in the "argentum_session" preferences under
+ * [PREF_ORIGIN]. The origin is never written to logs (DiagnosticRedactor strips addresses).
+ */
+object ArgentumEndpoints {
+    const val PREF_ORIGIN = "server_origin"
+
+    fun origin(preferences: SharedPreferences): String =
+        preferences.getString(PREF_ORIGIN, null)?.trim()?.trimEnd('/')
+            ?.takeIf { it.startsWith("https://") || it.startsWith("http://") }
+            ?: ARGENTUM_SERVER_ORIGIN
+
+    fun socketUrl(origin: String): String =
+        origin.replaceFirst(Regex("^https://"), "wss://").replaceFirst(Regex("^http://"), "ws://") + "/game"
+}
+
 /** Build the 99-card Commander library payload; Argentum receives the commander separately. */
 fun argentumCommanderLibraryDeck(cardNames: Iterable<String>, commander: String): MutableMap<String, Int> {
     val deck = cardNames.asSequence()

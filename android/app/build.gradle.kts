@@ -17,22 +17,37 @@ android {
         applicationId = "com.arcanatable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 86
-        versionName = "0.15.67-argentum-commander-count"
-        manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build 86"
+        versionCode = 87
+        versionName = "0.15.68-argentum-integration"
+        manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build 87"
     }
 
     buildTypes {
         debug {
-            // Keep the installable test build separate from earlier debug APKs.
-            applicationIdSuffix = ".targeting"
-            manifestPlaceholders["appLabel"] = "Arcana Table · Argentum 0.15.67 · Build 86"
+            // Separate package so this build installs beside the experimental/targeting test build.
+            applicationIdSuffix = ".argentum"
+            manifestPlaceholders["appLabel"] = "Arcana · Argentum B87"
         }
     }
 
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    testOptions {
+        unitTests {
+            // Robolectric UI tests render real resources and Compose screens on the JVM.
+            isIncludeAndroidResources = true
+            all { test ->
+                test.maxHeapSize = "3g"
+                // Opt-in live test against Argentum's server: ./gradlew testDebugUnitTest -Pargentum.live=true
+                test.systemProperty("argentum.live", (project.findProperty("argentum.live") ?: "false").toString())
+                // Robolectric fetches android-all jars itself; use the Maven Central mirror Gradle already uses.
+                test.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
+                test.systemProperty("arcana.screenshots", layout.buildDirectory.dir("screenshots").get().asFile.absolutePath)
+            }
+        }
     }
 }
 
@@ -54,6 +69,11 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     testImplementation("junit:junit:4.13.2")
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     // JVM unit tests exercise online snapshot JSON. Android's org.json stubs
     // throw "Method ... not mocked" outside an emulator, so use the JVM port.
     testImplementation("org.json:json:20240303")

@@ -1,5 +1,12 @@
 # Arcana Table workspace status
 
+## Build 87 · Arcana × Argentum integration (branch `experimental/arcana-argentum-integration`)
+
+Branched from `experimental/targeting` at `c97da64` (Build 86); `main`, `experimental/targeting` and the other branches are untouched. Debug application ID `com.arcanatable.argentum`. See `README.md` (What's new, how to play) and `docs/ARGENTUM_INTEGRATION.md` (design, protocol, adapter files).
+
+Verification on this build: 79 JVM/Robolectric tests pass, including live games through the Arcana UI against `magic.wingedsheep.com`. `assembleDebug` and `lintDebug` succeed with 0 lint errors. Not verified: installation on a physical device or emulator (no hardware acceleration was available) and card art loading (Scryfall image hosts were blocked in the build environment).
+
+
 ## Canonical project
 
 This branch is the separate Arcana Table **Targeting Experimental Build 81** (`0.15.62-targeting`, version code `81`) source tree. It branches from stable Build 72 source and includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Keep this work on `experimental/targeting` until the targeting flow is accepted.
