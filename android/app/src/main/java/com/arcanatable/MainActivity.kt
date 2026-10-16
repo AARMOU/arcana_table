@@ -2529,10 +2529,12 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         scope.launch {
             argentumDeckValidationRunning = true
             argentumLastError = null
-            val submitted = (seat.library + seat.hand)
-                .filterNot { it.isToken || it.name == "Hidden card" }
-                .groupingBy { it.name.trim() }.eachCount().toMutableMap()
-            submitted[commander] = (submitted[commander] ?: 0) + 1
+            val submitted = argentumCommanderLibraryDeck(
+                (seat.library + seat.hand)
+                    .filterNot { it.isToken || it.name == "Hidden card" }
+                    .map { it.name },
+                commander
+            )
             if (submitted.isEmpty()) { argentumLastError = "Your imported deck has no cards to submit."; argentumDeckValidationRunning = false; return@launch }
             try {
                 val api = ArgentumDeckApi()
@@ -2557,12 +2559,18 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         var replacement: Pair<String, Pair<Map<String, Int>, List<String>>>? = null
                         for ((candidate, basics) in candidates) {
                             val candidateDeck = submitted.toMutableMap()
-                            // A candidate already in the library is promoted to commander; a
-                            // replacement basic fills the resulting gap in the 100-card list.
-                            candidateDeck[candidate] = (candidateDeck[candidate] ?: 0).coerceAtLeast(1)
+                            // The replacement commander moves from the 99-card library into
+                            // the command zone, so remove one copy before filling the library.
+                            val candidateCount = candidateDeck.entries.firstOrNull {
+                                it.key.equals(candidate, ignoreCase = true)
+                            }
+                            if (candidateCount != null) {
+                                if (candidateCount.value <= 1) candidateDeck.remove(candidateCount.key)
+                                else candidateDeck[candidateCount.key] = candidateCount.value - 1
+                            }
                             if (basics.isEmpty()) continue
                             val candidateBasics = mutableListOf<String>()
-                            val missing = (100 - candidateDeck.values.sum()).coerceAtLeast(0)
+                            val missing = (99 - candidateDeck.values.sum()).coerceAtLeast(0)
                             repeat(missing) { offset ->
                                 val basic = basics[offset % basics.size]
                                 candidateDeck[basic] = (candidateDeck[basic] ?: 0) + 1
@@ -2593,7 +2601,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     validation = withContext(Dispatchers.IO) { api.validate(submitted, commanderForGame, "COMMANDER") }
                 }
                 if (unsupported.isNotEmpty() && !validation.valid) {
-                    val missing = (100 - submitted.values.sum()).coerceAtLeast(0)
+                    val missing = (99 - submitted.values.sum()).coerceAtLeast(0)
                     if (missing > 0) {
                         val basics = withContext(Dispatchers.IO) { api.supportedBasicLands(commanderForGame) }
                         if (basics.isEmpty()) {
@@ -2622,13 +2630,26 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         makeCard(name, type)
                     }
                     players = players.mapIndexed { index, player ->
-                        if (index != localSeat) player else player.copy(
-                            library = player.library.filterNot { card -> unsupported.any { it.equals(card.name, true) } } + addedCards,
-                            hand = player.hand.filterNot { card -> unsupported.any { it.equals(card.name, true) } },
-                            commanderName = commanderForGame,
-                            commanderCard = if (replacementCommander) (player.library + player.hand).firstOrNull { it.name.equals(commanderForGame, true) }
-                                ?: makeCard(commanderForGame, "Legendary Creature") else player.commanderCard
-                        )
+                        if (index != localSeat) player else {
+                            val keptLibrary = player.library.filterNot { card -> unsupported.any { it.equals(card.name, true) } }.toMutableList()
+                            val keptHand = player.hand.filterNot { card -> unsupported.any { it.equals(card.name, true) } }.toMutableList()
+                            val promotedCommander = if (replacementCommander) {
+                                val libraryIndex = keptLibrary.indexOfFirst { it.name.equals(commanderForGame, true) }
+                                if (libraryIndex >= 0) keptLibrary.removeAt(libraryIndex)
+                                else {
+                                    val handIndex = keptHand.indexOfFirst { it.name.equals(commanderForGame, true) }
+                                    if (handIndex >= 0) keptHand.removeAt(handIndex)
+                                }
+                                (player.library + player.hand).firstOrNull { it.name.equals(commanderForGame, true) }
+                                    ?: makeCard(commanderForGame, "Legendary Creature")
+                            } else player.commanderCard
+                            player.copy(
+                                library = keptLibrary + addedCards,
+                                hand = keptHand,
+                                commanderName = commanderForGame,
+                                commanderCard = promotedCommander
+                            )
+                        }
                     }
                     message = "Argentum removed ${unsupported.size} unsupported card name(s)${if (replacementCommander) " and selected $commanderForGame as a supported commander" else ""}, then filled the deck with ${replacementBasics.size} supported basic lands."
                 }
@@ -3550,7 +3571,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("BUILD 85 · ARGENTUM PREMADE DECKS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("BUILD 86 · ARGENTUM PREMADE DECKS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Removed random external deck fetching. The importer now offers Argentum's own premade Commander lists and only shows lists that pass the live Argentum Commander validator.", color = SoftWhite, fontSize = 11.sp)
 
                 Text("BUILD 84 · ARGENTUM COMPATIBLE-DECK FILTERING", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)

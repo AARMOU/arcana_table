@@ -9,6 +9,23 @@ import org.junit.Test
 
 class ArgentumBackendTest {
     @Test
+    fun commanderIsRemovedFromLibraryPayloadAndSentSeparately() {
+        val importedNames = listOf(" Avatar Aang ") + (1..99).map { "Card $it" }
+
+        val library = argentumCommanderLibraryDeck(importedNames, "Avatar Aang")
+
+        assertEquals(99, library.values.sum())
+        assertFalse(library.keys.any { it.equals("Avatar Aang", ignoreCase = true) })
+    }
+
+    @Test
+    fun commanderRemovalDoesNotDropAnAdditionalCopy() {
+        val library = argentumCommanderLibraryDeck(listOf("Avatar Aang", "Avatar Aang", "Plains"), "Avatar Aang")
+
+        assertEquals(mapOf("Avatar Aang" to 1, "Plains" to 1), library)
+    }
+
+    @Test
     fun validationSeparatesUnknownCardsFromOtherFormatErrors() {
         val result = ArgentumDeckValidation.parse(
             """{"valid":false,"totalCards":98,"errors":[

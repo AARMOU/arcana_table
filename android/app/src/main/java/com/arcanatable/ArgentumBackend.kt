@@ -21,6 +21,22 @@ import kotlin.math.min
 const val ARGENTUM_SERVER_ORIGIN = "https://magic.wingedsheep.com"
 const val ARGENTUM_GAME_SOCKET = "wss://magic.wingedsheep.com/game"
 
+/** Build the 99-card Commander library payload; Argentum receives the commander separately. */
+fun argentumCommanderLibraryDeck(cardNames: Iterable<String>, commander: String): MutableMap<String, Int> {
+    val deck = cardNames.asSequence()
+        .map(String::trim)
+        .filter(String::isNotEmpty)
+        .groupingBy { it }
+        .eachCount()
+        .toMutableMap()
+    val commanderEntry = deck.entries.firstOrNull { it.key.equals(commander.trim(), ignoreCase = true) }
+    if (commanderEntry != null) {
+        if (commanderEntry.value <= 1) deck.remove(commanderEntry.key)
+        else deck[commanderEntry.key] = commanderEntry.value - 1
+    }
+    return deck
+}
+
 data class ArgentumDeckIssue(val code: String, val message: String, val cardName: String?)
 
 data class ArgentumExampleDeck(

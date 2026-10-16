@@ -17,16 +17,16 @@ android {
         applicationId = "com.arcanatable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 85
-        versionName = "0.15.66-argentum-decks"
-        manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build 85"
+        versionCode = 86
+        versionName = "0.15.67-argentum-commander-count"
+        manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build 86"
     }
 
     buildTypes {
         debug {
             // Keep the installable test build separate from earlier debug APKs.
             applicationIdSuffix = ".targeting"
-            manifestPlaceholders["appLabel"] = "Arcana Table · Argentum 0.15.66 · Build 85"
+            manifestPlaceholders["appLabel"] = "Arcana Table · Argentum 0.15.67 · Build 86"
         }
     }
 
