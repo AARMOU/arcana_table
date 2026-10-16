@@ -2534,7 +2534,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             if (submitted.isEmpty()) { argentumLastError = "Your imported deck has no cards to submit."; argentumDeckValidationRunning = false; return@launch }
             try {
                 val api = ArgentumDeckApi()
-                var validation = withContext(Dispatchers.IO) { api.validate(submitted, commander, "COMMANDER") }
+                var commanderForGame = commander
+                var replacementCommander = false
+                var validation = withContext(Dispatchers.IO) { api.validate(submitted, commanderForGame, "COMMANDER") }
                 val unsupported = linkedSetOf<String>()
                 val replacementBasics = mutableListOf<String>()
                 var checks = 0
@@ -2542,19 +2544,56 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     val newlyUnsupported = validation.unsupportedCards
                     unsupported += newlyUnsupported
                     val commanderUnsupported = newlyUnsupported.any { it.equals(commander, ignoreCase = true) }
-                    if (commanderUnsupported) {
-                        argentumLastError = "Argentum does not support your commander: $commander. Choose a supported commander to continue."
-                        return@launch
-                    }
                     val priorSize = submitted.size
                     submitted.keys.filter { name -> newlyUnsupported.any { it.equals(name, ignoreCase = true) } }.forEach(submitted::remove)
+                    if (commanderUnsupported) {
+                        val candidates = withContext(Dispatchers.IO) {
+                            api.compatibleCommanderOptions((seat.library + seat.hand)
+                                .filterNot { it.isToken || it.name == "Hidden card" || newlyUnsupported.any { name -> name.equals(it.name, true) } }
+                                .map { it.name })
+                        }
+                        var replacement: Pair<String, Pair<Map<String, Int>, List<String>>>? = null
+                        for ((candidate, basics) in candidates) {
+                            val candidateDeck = submitted.toMutableMap()
+                            // A candidate already in the library is promoted to commander; a
+                            // replacement basic fills the resulting gap in the 100-card list.
+                            candidateDeck[candidate] = (candidateDeck[candidate] ?: 0).coerceAtLeast(1)
+                            if (basics.isEmpty()) continue
+                            val candidateBasics = mutableListOf<String>()
+                            val missing = (100 - candidateDeck.values.sum()).coerceAtLeast(0)
+                            repeat(missing) { offset ->
+                                val basic = basics[offset % basics.size]
+                                candidateDeck[basic] = (candidateDeck[basic] ?: 0) + 1
+                                candidateBasics += basic
+                            }
+                            val candidateValidation = withContext(Dispatchers.IO) {
+                                api.validate(candidateDeck, candidate, "COMMANDER")
+                            }
+                            if (candidateValidation.valid) {
+                                replacement = candidate to (candidateDeck to candidateBasics)
+                                validation = candidateValidation
+                                break
+                            }
+                        }
+                        if (replacement == null) {
+                            argentumLastError = "Argentum does not support commander $commander, and this deck has no compatible commander. Choose a supported commander and try again."
+                            return@launch
+                        }
+                        val selectedReplacement = replacement
+                        commanderForGame = selectedReplacement.first
+                        submitted.clear()
+                        submitted.putAll(selectedReplacement.second.first)
+                        replacementBasics += selectedReplacement.second.second
+                        replacementCommander = true
+                        break
+                    }
                     if (submitted.size == priorSize) break
-                    validation = withContext(Dispatchers.IO) { api.validate(submitted, commander, "COMMANDER") }
+                    validation = withContext(Dispatchers.IO) { api.validate(submitted, commanderForGame, "COMMANDER") }
                 }
                 if (unsupported.isNotEmpty() && !validation.valid) {
                     val missing = (100 - submitted.values.sum()).coerceAtLeast(0)
                     if (missing > 0) {
-                        val basics = withContext(Dispatchers.IO) { api.supportedBasicLands(commander) }
+                        val basics = withContext(Dispatchers.IO) { api.supportedBasicLands(commanderForGame) }
                         if (basics.isEmpty()) {
                             argentumLastError = "Argentum rejected ${unsupported.joinToString()}; no supported basic lands were found to complete the deck."
                             return@launch
@@ -2564,7 +2603,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                             submitted[basic] = (submitted[basic] ?: 0) + 1
                             replacementBasics += basic
                         }
-                        validation = withContext(Dispatchers.IO) { api.validate(submitted, commander, "COMMANDER") }
+                        validation = withContext(Dispatchers.IO) { api.validate(submitted, commanderForGame, "COMMANDER") }
                     }
                 }
                 if (unsupported.isNotEmpty()) {
@@ -2583,13 +2622,16 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     players = players.mapIndexed { index, player ->
                         if (index != localSeat) player else player.copy(
                             library = player.library.filterNot { card -> unsupported.any { it.equals(card.name, true) } } + addedCards,
-                            hand = player.hand.filterNot { card -> unsupported.any { it.equals(card.name, true) } }
+                            hand = player.hand.filterNot { card -> unsupported.any { it.equals(card.name, true) } },
+                            commanderName = commanderForGame,
+                            commanderCard = if (replacementCommander) (player.library + player.hand).firstOrNull { it.name.equals(commanderForGame, true) }
+                                ?: makeCard(commanderForGame, "Legendary Creature") else player.commanderCard
                         )
                     }
-                    message = "Argentum removed ${unsupported.size} unsupported card name(s) and filled the deck with ${replacementBasics.size} supported basic lands."
+                    message = "Argentum removed ${unsupported.size} unsupported card name(s)${if (replacementCommander) " and selected $commanderForGame as a supported commander" else ""}, then filled the deck with ${replacementBasics.size} supported basic lands."
                 }
                 argentumDeckForLobby = submitted
-                argentumCommanderForLobby = commander
+                argentumCommanderForLobby = commanderForGame
                 argentumVsAiLobby = vsAi
                 argentumLobbySubmitted = false
                 argentumLocalPlayersBackup = players.toList()
@@ -3506,7 +3548,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("BUILD 83 · ARGENTUM ROOM FLOW", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("BUILD 84 · ARGENTUM COMPATIBLE-DECK FILTERING", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Practice, create-room, and join-room actions now use Argentum Commander lobbies. The host can copy the server room code, joining validates the imported deck with Argentum first, and the Argentum stack panel displays server state and submits server-provided Pass Priority actions.", color = SoftWhite, fontSize = 11.sp)
 
                 Text("BUILD 82 · ARGENTUM NATIVE TABLE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)

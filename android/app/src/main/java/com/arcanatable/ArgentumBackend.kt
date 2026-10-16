@@ -257,6 +257,35 @@ class ArgentumDeckApi(
         }
     }
 
+    /** Resolve commander-eligible candidates and their legal basic replacements in one catalog read. */
+    fun compatibleCommanderOptions(candidates: Collection<String>): Map<String, List<String>> {
+        if (candidates.isEmpty()) return emptyMap()
+        val wanted = candidates.map(String::trim).filter(String::isNotEmpty).distinct()
+        val request = Request.Builder().url("${origin.trimEnd('/')}/api/cards").get()
+            .header("Accept", "application/json").build()
+        http.newCall(request).execute().use { response ->
+            val text = response.body?.string().orEmpty()
+            if (!response.isSuccessful) throw IllegalStateException("Could not load Argentum's supported card catalog (HTTP ${response.code}).")
+            val catalog = JSONArray(text)
+            val cards = (0 until catalog.length()).mapNotNull(catalog::optJSONObject)
+            val byName = cards.associateBy { it.optString("name").lowercase() }
+            val basicNameByColor = mapOf(
+                "WHITE" to "Plains", "BLUE" to "Island", "BLACK" to "Swamp",
+                "RED" to "Mountain", "GREEN" to "Forest", "COLORLESS" to "Wastes"
+            )
+            val basics = cards.filter { it.optBoolean("basicLand") }
+            return wanted.mapNotNull { candidate ->
+                val card = byName[candidate.lowercase()]?.takeIf { it.optBoolean("canBeCommander") } ?: return@mapNotNull null
+                val identity = card.optJSONArray("colorIdentity")?.let { colors ->
+                    (0 until colors.length()).map { colors.optString(it).uppercase() }.toSet()
+                }.orEmpty()
+                val allowed = identity.mapNotNull(basicNameByColor::get).toSet().ifEmpty { setOf("Wastes") }
+                card.optString("name") to basics.filter { it.optString("name") in allowed }
+                    .map { it.optString("name") }.distinct().sorted()
+            }.toMap()
+        }
+    }
+
     fun validate(deckList: Map<String, Int>, commander: String? = null, format: String? = null): ArgentumDeckValidation {
         require(deckList.isNotEmpty()) { "Choose a deck before checking Argentum compatibility." }
         val body = JSONObject().apply {
