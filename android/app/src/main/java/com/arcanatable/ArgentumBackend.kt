@@ -389,7 +389,12 @@ class ArgentumDeckApi(
     }
 }
 
-enum class ArgentumConnectionStatus { DISCONNECTED, CONNECTING, CONNECTED, REPLACED }
+/**
+ * PAUSED means the connection dropped while Arcana could not auto-reconnect (app in background,
+ * or relaunched). Argentum resumes a game as soon as a client reconnects with its token, so the
+ * socket stays down until the player explicitly chooses Resume ([ArgentumGameSocket.retryNow]).
+ */
+enum class ArgentumConnectionStatus { DISCONNECTED, CONNECTING, CONNECTED, PAUSED, REPLACED }
 
 /**
  * Native OkHttp implementation of Argentum's `/game` protocol. The client only forwards server
@@ -402,6 +407,8 @@ class ArgentumGameSocket(
     private val onMessage: (JSONObject) -> Unit,
     private val onError: (String) -> Unit,
     private val url: String = ARGENTUM_GAME_SOCKET,
+    /** Consulted when the socket drops; false pauses instead of reconnecting (see PAUSED). */
+    private val canAutoReconnect: () -> Boolean = { true },
     private val http: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(0, TimeUnit.MILLISECONDS)
@@ -424,8 +431,10 @@ class ArgentumGameSocket(
         openSocket()
     }
 
+    /** Player-initiated reconnect; also the only way out of PAUSED. */
     fun retryNow() {
-        if (!enabled.get() || status == ArgentumConnectionStatus.REPLACED) return
+        if (status == ArgentumConnectionStatus.REPLACED) return
+        enabled.set(true)
         manualRetry?.let(main::removeCallbacks)
         retryCount = 0
         socket?.cancel()
@@ -494,6 +503,7 @@ class ArgentumGameSocket(
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
+                if (socket !== webSocket) return
                 val message = runCatching { JSONObject(text) }.getOrElse {
                     report("Argentum sent a message Arcana could not read.")
                     return
@@ -518,12 +528,15 @@ class ArgentumGameSocket(
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-                if (socket === webSocket) socket = null
+                // Ignore late callbacks from a socket that retryNow() already replaced.
+                if (socket !== webSocket) return
+                socket = null
                 if (enabled.get()) scheduleReconnect()
             }
 
             override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                if (socket === webSocket) socket = null
+                if (socket !== webSocket) return
+                socket = null
                 if (enabled.get()) {
                     setStatus(ArgentumConnectionStatus.DISCONNECTED)
                     report(response?.let { "Argentum connection failed (HTTP ${it.code})." }
@@ -536,12 +549,17 @@ class ArgentumGameSocket(
 
     private fun scheduleReconnect() {
         if (!enabled.get() || status == ArgentumConnectionStatus.REPLACED || manualRetry != null) return
+        if (!canAutoReconnect()) {
+            setStatus(ArgentumConnectionStatus.PAUSED)
+            return
+        }
         val delayMs = min(1_000L shl retryCount.coerceAtMost(5), 30_000L)
         retryCount++
         setStatus(ArgentumConnectionStatus.DISCONNECTED)
         manualRetry = Runnable {
             manualRetry = null
-            openSocket()
+            // The app may have gone to the background while waiting; re-check before resuming.
+            if (canAutoReconnect()) openSocket() else setStatus(ArgentumConnectionStatus.PAUSED)
         }.also { main.postDelayed(it, delayMs) }
     }
 
