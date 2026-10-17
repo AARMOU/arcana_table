@@ -411,7 +411,25 @@ class LocalArgentumHost(
             return enricher.enrich(enumerator.enumerate(state, play.playerId), state, play.playerId)
         }
         if (state.pendingDecision != null || state.priorityPlayerId != humanId) return emptyList()
-        return enricher.enrich(enumerator.enumerate(state, humanId), state, humanId)
+        return enricher.enrich(enumerator.enumerate(state, humanId), state, humanId).map { trueMaxX(state, it) }
+    }
+
+    /**
+     * Argentum's "up to X" can be one or two higher than auto-pay (with Treasures) can really pay.
+     * For untargeted X spells, step down from its number to the first X that actually works, so the
+     * X picker's default never fails.
+     */
+    private fun trueMaxX(state: GameState, info: LegalActionInfo): LegalActionInfo {
+        val cast = info.action as? CastSpell ?: return info
+        val max = info.maxAffordableX ?: return info
+        if (!info.hasXCost || info.requiresTargets || max <= info.minX) return info
+        for (x in max downTo maxOf(info.minX, max - 3)) {
+            val attempt = cast.copy(xValue = x)
+            if (processor.process(state, attempt).result.error == null) return if (x == max) info else info.copy(maxAffordableX = x)
+            val paid = payWithSacrificeSources(state, attempt) ?: continue
+            if (processor.process(paid.first, attempt).result.error == null) return if (x == max) info else info.copy(maxAffordableX = x)
+        }
+        return info
     }
 
     private fun finishIfOver(events: List<GameEvent>) {
