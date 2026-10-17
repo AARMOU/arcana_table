@@ -402,6 +402,7 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var argentumAutoYes by remember { mutableStateOf(emptyMap<String, Int>()) }
     var playPopup by remember { mutableStateOf<PlayedCard?>(null) }
     var playFeed by remember { mutableStateOf(emptyList<PlayedCard>()) }
+    var playFeedOpen by remember { mutableStateOf(runCatching { context.getSharedPreferences("arcana-table-ui", Context.MODE_PRIVATE).getBoolean("playFeedOpen", true) }.getOrDefault(true)) }
     var playBanner by remember { mutableStateOf<PlayedCard?>(null) }
     var aiRecap by remember { mutableStateOf(-1 to TurnRecap()) }
     var recapText by remember { mutableStateOf<String?>(null) }
@@ -417,6 +418,7 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     /** Turn number when "Pass to my turn" was switched on; null when it is off. */
     var passToMyTurnFrom by remember { mutableStateOf<Int?>(null) }
     var followActivePlayer by remember { mutableStateOf(optionPrefs.getBoolean("follow_active_player", true)) }
+    var quietOpponentTurns by remember { mutableStateOf(optionPrefs.getBoolean("quiet_opponent_turns", false)) }
     var argentumPingResult by remember { mutableStateOf<String?>(null) }
     var engineTrialResult by remember { mutableStateOf<String?>(null) }
     var lastOpponentViewed by remember { mutableIntStateOf(-1) }
@@ -2443,7 +2445,7 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 val (setup, registry) = prepared
                 recordDiagnostic("Offline game prepared in ${System.currentTimeMillis() - started} ms: ${setup.you.commander ?: "Portal"} vs ${setup.aiDeckName}", DiagnosticCategory.ENGINE)
                 setup.notes.forEach { recordDiagnostic("Offline: $it", DiagnosticCategory.ENGINE) }
-                argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, setup.you, setup.ai, emit = emit) }
+                argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, setup.you, setup.ai, emit = emit).also { it.quietOpponentTurns = quietOpponentTurns } }
                 argentumOffline = true
                 argentumDeckForLobby = null
                 argentumCommanderForLobby = null
@@ -3133,7 +3135,8 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             Box(Modifier.fillMaxSize()) {
         if (argentumEnabled && !homeOpen) TurnBanner(turnBanner)
         if (argentumEnabled && !homeOpen) PlayFeedOverlay(playPopup, playFeed, playBanner, recapText,
-            onDismissPopup = { playPopup = null }, onPreview = { playPopup = it })
+            onDismissPopup = { playPopup = null }, onPreview = { playPopup = it },
+            feedOpen = playFeedOpen, onToggleFeed = { playFeedOpen = !playFeedOpen; runCatching { context.getSharedPreferences("arcana-table-ui", Context.MODE_PRIVATE).edit().putBoolean("playFeedOpen", playFeedOpen).apply() } })
         if (homeOpen) {
             val deckChoices = remember(savedDecks, premadeDecks) {
                 savedDecks.map { DeckChoice(it.name, it.name, it.commander ?: parseDeckList(it.text).firstOrNull { e -> e.commander }?.name, builtIn = false) } +
@@ -4914,6 +4917,8 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             }
         },
         onFollowActivePlayer = { value -> run { followActivePlayer = value; optionPrefs.edit().putBoolean("follow_active_player", value).apply() } },
+        quietOpponentTurns = quietOpponentTurns,
+        onQuietOpponentTurns = { value -> quietOpponentTurns = value; optionPrefs.edit().putBoolean("quiet_opponent_turns", value).apply(); if (argentumOffline) argentumSocket.send("setQuietOpponentTurns", JSONObject().put("enabled", value)) },
         reducedSwipeMotion = reducedSwipeMotion, cardSizeScale = cardSizeScale,
         onOpenLayoutLab = { run { optionsOpen = false; layoutLabOpen = true } },
         onToggleTheme = { run { onToggleTheme() } },

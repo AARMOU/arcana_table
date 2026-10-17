@@ -710,6 +710,7 @@ internal fun OptionsPage(
     reducedSwipeMotion: Boolean, cardSizeScale: Float, onOpenLayoutLab: () -> Unit,
     onToggleTheme: () -> Unit, onToggleTimerVisibility: () -> Unit, onToggleBackgroundAlerts: (Boolean) -> Unit,
     onFollowActivePlayer: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, onCardSizeScale: (Float) -> Unit,
+    quietOpponentTurns: Boolean = false, onQuietOpponentTurns: (Boolean) -> Unit = {},
     onTestConnection: () -> Unit, onReconnect: (() -> Unit)?, onViewDiagnostics: () -> Unit, onExportDiagnostics: () -> Unit,
     onWhatsNew: () -> Unit,
     engineTrialResult: String? = null, onEngineSelfTest: (() -> Unit)? = null,
@@ -748,6 +749,7 @@ internal fun OptionsPage(
                 }
                 Section("TABLE")
                 SettingsToggle("Follow whose turn it is", "When a turn starts, show that player's board. A tab you pick stays until the next turn.", followActivePlayer, onFollowActivePlayer, Modifier)
+                SettingsToggle("Don't stop for AI spells", "Offline: on an AI's turn, skip past its spells and abilities unless one targets you or your cards. You still block and answer prompts.", quietOpponentTurns, onQuietOpponentTurns, Modifier)
                 SettingsToggle("Show turn timer", "Show how long the current turn has taken.", timerVisible, { onToggleTimerVisibility() }, Modifier)
                 Section("NOTIFICATIONS")
                 Row(Modifier.fillMaxWidth().heightIn(min = 54.dp), verticalAlignment = Alignment.CenterVertically) {

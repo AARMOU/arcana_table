@@ -126,7 +126,8 @@ object PlayFeedParser {
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun BoxScope.PlayFeedOverlay(popup: PlayedCard?, feed: List<PlayedCard>, banner: PlayedCard?, recap: String?, onDismissPopup: () -> Unit, onPreview: (PlayedCard) -> Unit) {
+fun BoxScope.PlayFeedOverlay(popup: PlayedCard?, feed: List<PlayedCard>, banner: PlayedCard?, recap: String?, onDismissPopup: () -> Unit, onPreview: (PlayedCard) -> Unit,
+    feedOpen: Boolean = true, onToggleFeed: () -> Unit = {}) {
     var holding by remember { mutableStateOf(false) }
     LaunchedEffect(popup?.key, holding) { if (popup != null && !holding) { delay(1500); onDismissPopup() } }
     AnimatedVisibility(visible = popup != null, enter = fadeIn(tween(140)) + scaleIn(initialScale = 0.85f, animationSpec = tween(200)), exit = fadeOut(tween(250)),
@@ -143,7 +144,14 @@ fun BoxScope.PlayFeedOverlay(popup: PlayedCard?, feed: List<PlayedCard>, banner:
             Text(shown.detail, color = SoftWhite, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xCC101615)).padding(horizontal = 8.dp, vertical = 3.dp))
         }
     }
-    if (feed.isNotEmpty()) Column(Modifier.align(Alignment.CenterStart).padding(start = 4.dp).testTag("played-card-feed"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    // The strip can be folded into a small tab at the screen edge, and opened again from there.
+    if (feed.isNotEmpty() && !feedOpen) Text("›  ${feed.size.coerceAtMost(5)}", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Black,
+        modifier = Modifier.align(Alignment.CenterStart).clip(RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp)).background(Color(0xE6101615))
+            .border(1.dp, Color(0x66FFFFFF), RoundedCornerShape(topEnd = 10.dp, bottomEnd = 10.dp))
+            .combinedClickable(onClick = onToggleFeed).padding(horizontal = 8.dp, vertical = 14.dp).testTag("played-card-feed-tab"))
+    if (feed.isNotEmpty() && feedOpen) Column(Modifier.align(Alignment.CenterStart).padding(start = 4.dp).testTag("played-card-feed"), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("‹ hide", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier.width(44.dp).clip(RoundedCornerShape(5.dp)).background(Color(0xCC101615)).combinedClickable(onClick = onToggleFeed).padding(vertical = 6.dp).testTag("played-card-feed-hide"))
         feed.takeLast(5).reversed().forEach { item ->
             Box(Modifier.width(44.dp).aspectRatio(0.716f).clip(RoundedCornerShape(5.dp)).border(1.5.dp, TurnColors.forSeat(item.byYou), RoundedCornerShape(5.dp)).background(Color(0xFF1C2523))
                 .combinedClickable(onClick = { onPreview(item) }, onLongClick = { onPreview(item) })) {

@@ -115,6 +115,12 @@ class LocalArgentumHost(
     private data class ShockOffer(val land: EntityId, val name: String, val life: Int)
     private val shockOffers = ArrayDeque<ShockOffer>()
 
+    /**
+     * "Don't stop for AI spells": on an opponent's turn, pass over their spells and abilities unless
+     * one targets you or something you control. Blocks and prompts still stop.
+     */
+    var quietOpponentTurns: Boolean = false
+
     fun receive(message: JSONObject) = worker.execute {
         runCatching { handle(message) }.onFailure { error ->
             emit(JSONObject().put("type", "error").put("code", "LOCAL_ENGINE").put("message", "Offline engine problem: ${error.javaClass.simpleName}: ${error.message?.take(200)}"))
@@ -171,6 +177,7 @@ class LocalArgentumHost(
                 finishIfOver(result.events)
             }
             "requestUndo" -> undo()
+            "setQuietOpponentTurns" -> quietOpponentTurns = message.optBoolean("enabled")
             "ping" -> emit(JSONObject().put("type", "pong"))
             else -> Unit // lobby, deck and preference messages need no answer offline
         }
@@ -398,7 +405,9 @@ class LocalArgentumHost(
             }
             // Human priority: pass automatically where Argentum's server would.
             val legal = withoutManaLike(legalActions(current))
-            if (!autoPass.shouldAutoPass(current, priority, legal)) break
+            val quietPass = quietOpponentTurns && !current.isActiveTurnFor(priority) && current.stack.isNotEmpty() &&
+                legal.none { it.actionType == "DeclareBlockers" } && !stackTargetsYou(current)
+            if (!quietPass && !autoPass.shouldAutoPass(current, priority, legal)) break
             if (!apply(safePass(current, priority), events)) break
         }
     }
@@ -424,6 +433,18 @@ class LocalArgentumHost(
         events += result.events
         queueShockOffers(result.events)
         return true
+    }
+
+    private fun stackTargetsYou(state: GameState): Boolean = state.stack.any { item ->
+        state.getEntity(item)?.get<com.wingedsheep.engine.state.components.stack.TargetsComponent>()?.targets.orEmpty().any { t ->
+            when (t) {
+                is com.wingedsheep.engine.state.components.stack.ChosenTarget.Player -> t.playerId == humanId
+                is com.wingedsheep.engine.state.components.stack.ChosenTarget.Permanent ->
+                    state.getEntity(t.entityId)?.get<com.wingedsheep.engine.state.components.identity.ControllerComponent>()?.playerId == humanId
+                is com.wingedsheep.engine.state.components.stack.ChosenTarget.Card -> t.ownerId == humanId
+                else -> false
+            }
+        }
     }
 
     private fun shockId(offer: ShockOffer) = "arcana-shock-${offer.land.value}"
