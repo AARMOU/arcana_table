@@ -346,6 +346,8 @@ data class ArgentumTargetSlot(
     val valid: List<String>,
     val byPrefix: Map<String, List<String>>,
     val exclusiveGroups: List<List<String>>,
+    /** For a cost choice (index < 0): the AdditionalCostPayment field the picks go into. */
+    val costField: String? = null,
 )
 
 /**
@@ -366,7 +368,7 @@ data class ArgentumActionPlan(
 
     /** Legal choices for a slot given earlier picks (server prefix table first, else the plain list). */
     fun legalFor(slot: ArgentumTargetSlot, picks: Map<Int, List<String>>): List<String> {
-        val earlier = slots.filter { it.index < slot.index }.flatMap { picks[it.index].orEmpty() }
+        val earlier = slots.filter { it.index in 0 until slot.index }.flatMap { picks[it.index].orEmpty() }
         val key = earlier.joinToString(",")
         val base = slot.byPrefix[key] ?: slot.valid
         val taken = picks[slot.index].orEmpty()
@@ -374,7 +376,7 @@ data class ArgentumActionPlan(
         return base.filter { id -> id in taken || slot.exclusiveGroups.none { group -> id in group && group.any { it in taken } } }
     }
 
-    fun chosenTargets(picks: Map<Int, List<String>>): List<String> = slots.flatMap { picks[it.index].orEmpty() }
+    fun chosenTargets(picks: Map<Int, List<String>>): List<String> = slots.filter { it.costField == null }.flatMap { picks[it.index].orEmpty() }
 
     fun problem(picks: Map<Int, List<String>>, distribution: Map<String, Int>, color: String?): String? {
         for (slot in slots) {
@@ -395,11 +397,20 @@ data class ArgentumActionPlan(
     /** The server's action with the player's choices filled in. [ref] turns a target id into ChosenTarget JSON. */
     fun build(picks: Map<Int, List<String>>, x: Int?, distribution: Map<String, Int>, color: String?, ref: (String) -> JSONObject?): JSONObject {
         val action = JSONObject(info.optJSONObject("action")?.toString() ?: "{}")
-        if (slots.isNotEmpty()) {
+        val targetSlots = slots.filter { it.costField == null }
+        if (targetSlots.isNotEmpty()) {
             val targets = JSONArray()
-            slots.forEach { slot -> picks[slot.index].orEmpty().forEach { id -> ref(id)?.let(targets::put) } }
+            targetSlots.forEach { slot -> picks[slot.index].orEmpty().forEach { id -> ref(id)?.let(targets::put) } }
             action.put("targets", targets)
-            if (slots.size > 1) action.put("targetGroupCounts", JSONArray(slots.map { picks[it.index].orEmpty().size }))
+            if (targetSlots.size > 1) action.put("targetGroupCounts", JSONArray(targetSlots.map { picks[it.index].orEmpty().size }))
+        }
+        // Costs like "Return an Elf you control" or "Sacrifice a creature": the chosen permanents.
+        val costSlots = slots.filter { it.costField != null }
+        if (costSlots.isNotEmpty()) {
+            val key = if (action.optString("type") == "CastSpell") "additionalCostPayment" else "costPayment"
+            val payment = action.optJSONObject(key) ?: JSONObject()
+            costSlots.forEach { slot -> payment.put(slot.costField!!, JSONArray(picks[slot.index].orEmpty())) }
+            action.put(key, payment)
         }
         if (x != null && xRange != null) action.put("xValue", x)
         if (distributeTotal != null) action.put("damageDistribution", JSONObject().apply { chosenTargets(picks).forEach { put(it, distribution[it] ?: 0) } })
@@ -429,11 +440,29 @@ data class ArgentumActionPlan(
             } else emptyList()
             return ArgentumActionPlan(
                 info = info,
-                slots = slots,
+                slots = costSlots(info) + slots,
                 xRange = ArgentumActions.xRange(info),
                 distributeTotal = if (info.optBoolean("requiresDamageDistribution")) info.optInt("totalDamageToDistribute").takeIf { it > 0 } else null,
                 distributeMin = info.optInt("minDamagePerTarget", 1),
                 manaColors = if (info.optBoolean("requiresManaColorChoice")) info.optJSONArray("availableManaColors").ids().ifEmpty { listOf("WHITE", "BLUE", "BLACK", "RED", "GREEN") } else emptyList(),
+            )
+        }
+
+        /** Choices an additional cost needs (permanents to sacrifice, return, tap; cards to discard or exile). */
+        fun costSlots(info: JSONObject): List<ArgentumTargetSlot> {
+            val cost = info.optJSONObject("additionalCostInfo") ?: return emptyList()
+            val label = cost.optString("description").takeIf { it.isNotBlank() && it != "null" }
+            fun slot(index: Int, what: String, validKey: String, min: Int, max: Int, field: String): ArgentumTargetSlot? {
+                val valid = cost.optJSONArray(validKey).ids()
+                if (valid.isEmpty() || max <= 0) return null
+                return ArgentumTargetSlot(index, "Cost: ${label ?: what}", min.coerceAtMost(valid.size), max.coerceAtMost(valid.size), valid, emptyMap(), emptyList(), costField = field)
+            }
+            return listOfNotNull(
+                slot(-5, "sacrifice", "validSacrificeTargets", cost.optInt("sacrificeCount", 1), cost.optInt("sacrificeCount", 1), "sacrificedPermanents"),
+                slot(-4, "return to hand", "validBounceTargets", cost.optInt("bounceCount"), cost.optInt("bounceCount"), "bouncedPermanents"),
+                slot(-3, "discard", "validDiscardTargets", cost.optInt("discardCount"), cost.optInt("discardCount"), "discardedCards"),
+                slot(-2, "exile", "validExileTargets", cost.optInt("exileMinCount"), cost.optInt("exileMaxCount"), "exiledCards"),
+                slot(-1, "tap", "validTapTargets", cost.optInt("tapCount"), cost.optInt("tapCount"), "tappedPermanents"),
             )
         }
 

@@ -495,7 +495,7 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     }
 
     fun argentumName(id: String): String =
-        argentumSnapshot?.targets?.get(id)?.name ?: players.firstOrNull { it.id == id }?.name ?: "Object ${id.takeLast(6)}"
+        argentumSnapshot?.targets?.get(id)?.name ?: players.firstOrNull { it.id == id }?.name ?: argentumPiece(id).name
 
     /** Opens Argentum's attack/block declaration when the server offers one. */
     fun openArgentumCombat(): Boolean {

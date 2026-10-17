@@ -286,12 +286,14 @@ class LocalArgentumHost(
             val option = enumerator.enumerate(current, humanId).firstOrNull { it.isManaAbility && (it.action as? ActivateAbility)?.sourceId in sacrificial } ?: return null
             val ability = option.action as ActivateAbility
             used += ability.sourceId
-            val colors = option.availableManaColors.orEmpty()
+            // "Any colour" sources (a Treasure) list no colours: try all five, never a blank choice
+            // (a blank one opens a colour prompt mid-payment instead of adding mana).
+            val colors = option.availableManaColors.orEmpty().ifEmpty { if (option.requiresManaColorChoice) com.wingedsheep.sdk.core.Color.entries else emptyList() }
             val tryOrder = (colors.filter { it in costColors } + colors.filterNot { it in costColors }).map { it as com.wingedsheep.sdk.core.Color? }.ifEmpty { listOf(null) }
             var fallback: Pair<GameState, List<GameEvent>>? = null
             for (color in tryOrder) {
                 val activated = processor.process(current, ability.copy(manaColorChoice = color)).result
-                if (activated.error != null) continue
+                if (activated.error != null || activated.state.pendingDecision != null) continue
                 if (fallback == null) fallback = activated.state to activated.events
                 if (processor.process(activated.state, action).result.error == null) return activated.state to (events + activated.events)
             }

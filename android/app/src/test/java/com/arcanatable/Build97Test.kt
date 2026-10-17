@@ -88,4 +88,23 @@ class Build97Test {
         assertEquals(100, rocco.cards.size)
         assertEquals(100, tails.cards.size)
     }
+
+    @Test fun bounceCostsAreChosenAndSent() {
+        val info = JSONObject().put("description", "Return an Elf permanent you control to its owner's hand: Untap target")
+            .put("requiresTargets", true).put("validTargets", JSONArray(listOf("land1")))
+            .put("additionalCostInfo", JSONObject().put("description", "Return an Elf you control").put("costType", "ReturnToHand")
+                .put("validBounceTargets", JSONArray(listOf("elf1", "elf2"))).put("bounceCount", 1))
+            .put("action", JSONObject().put("type", "ActivateAbility").put("sourceId", "elf1"))
+        val plan = ArgentumActionPlan.from(info)
+        assertTrue(plan.needsInput)
+        val cost = plan.slots.first { it.costField != null }
+        assertEquals("bouncedPermanents", cost.costField)
+        val target = plan.slots.first { it.costField == null }
+        val picks = mapOf(cost.index to listOf("elf2"), target.index to listOf("land1"))
+        assertNull(plan.problem(picks, emptyMap(), null))
+        val built = plan.build(picks, null, emptyMap(), null) { id -> JSONObject().put("type", "Permanent").put("entityId", id) }
+        assertEquals("elf2", built.getJSONObject("costPayment").getJSONArray("bouncedPermanents").getString(0))
+        assertEquals(1, built.getJSONArray("targets").length())
+        assertEquals(listOf("land1"), plan.chosenTargets(picks))
+    }
 }

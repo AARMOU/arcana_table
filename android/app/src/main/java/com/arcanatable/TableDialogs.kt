@@ -2064,7 +2064,7 @@ internal fun ChangelogDialog(onDismiss: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Text("BUILD 98 · CLEAN-UP", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• The old guided tutorial is gone (a new one is coming).\n• Behind the scenes: the app's code is split into smaller files, ready for 4-player games.", color = SoftWhite, fontSize = 13.sp)
+                Text("• The old guided tutorial is gone (a new one is coming).\n• Treasures now really pay for spells offline (they were asking for a colour behind the scenes and giving up).\n• Costs like \"Return an Elf you control\" now let you pick the card.\n• Behind the scenes: the app's code is split into smaller files, ready for 4-player games.", color = SoftWhite, fontSize = 13.sp)
 
                 Text("BUILD 97 · NEW HOME, TREASURES, FASTER COMBAT", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• New home screen: your deck up top, one PLAY button. Pick offline vs AI (and the AI's deck) or online.\n• Your decks are saved and the one you pick stays picked, even after a game ends.\n• Treasures pay for spells offline, and show \"Sacrifice for mana\" in their menu. USE 5 / USE ALL for stacks of Treasures, Clues and Foods.\n• Attack with ALL, and tap a stack (×N) to attack with every copy.\n• See what the AI plays: a big card pop-up, a side strip of recent plays, ability banners, and a recap when your turn starts.\n• X picker with −5 / +5 and type-in. \"Always yes this turn\" for repeated prompts.\n• Fewer pointless pass stops; no more passing over an open prompt.", color = SoftWhite, fontSize = 13.sp)
