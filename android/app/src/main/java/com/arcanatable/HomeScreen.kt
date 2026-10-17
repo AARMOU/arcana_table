@@ -76,8 +76,6 @@ fun ArcanaHomeScreen(
     onImport: () -> Unit,
     onSettings: () -> Unit,
     onReturnToTable: () -> Unit,
-    onGuide: () -> Unit,
-    tutorialAnchor: (String) -> Modifier = { Modifier },
 ) {
     Column(
         Modifier.fillMaxSize().background(Ink).windowInsetsPadding(WindowInsets.safeDrawing)
@@ -123,12 +121,12 @@ fun ArcanaHomeScreen(
             }
             val playButton: @Composable () -> Unit = {
                 if (argentumActive) Button(
-                    onClick = onReturnToTable, modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp).then(tutorialAnchor("home-continue")),
+                    onClick = onReturnToTable, modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
                 ) { Text("RETURN TO TABLE", fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
                 else Button(
                     onClick = onPlay, enabled = !working && !resumeAvailable,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp).testTag("home-play").then(tutorialAnchor("home-argentum")),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp).testTag("home-play"),
                     colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
                 ) { Text(if (working) (workingLabel ?: "PREPARING…") else "PLAY", fontSize = if (working) 15.sp else 22.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp) }
             }
@@ -141,7 +139,6 @@ fun ArcanaHomeScreen(
             }
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onGuide, modifier = Modifier.heightIn(min = 44.dp).then(tutorialAnchor("home-tutorial"))) { Text("Visual guide", color = Muted, fontSize = 13.sp) }
                 Spacer(Modifier.weight(1f))
                 Text("v${BuildConfig.VERSION_NAME} · Build ${BuildConfig.VERSION_CODE}", color = Muted, fontSize = 12.sp)
             }
