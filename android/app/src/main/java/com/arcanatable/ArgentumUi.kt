@@ -492,13 +492,7 @@ fun ArgentumActionComposer(plan: ArgentumActionPlan, nameOf: (String) -> String,
         text = {
             Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState())) {
                 plan.xRange?.let { range ->
-                    Text("X", color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Black)
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(enabled = x > range.first, onClick = { x-- }) { Text("−", fontSize = 20.sp) }
-                        Text("$x", color = SoftWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.widthIn(min = 40.dp))
-                        TextButton(enabled = x < range.last, onClick = { x++ }) { Text("+", fontSize = 20.sp) }
-                        Text("up to ${range.last}", color = Muted, fontSize = 10.sp)
-                    }
+                    NumberPicker(x, range, onChange = { x = it }, label = "X")
                 }
                 plan.slots.forEach { slot ->
                     val mine = picks[slot.index].orEmpty()

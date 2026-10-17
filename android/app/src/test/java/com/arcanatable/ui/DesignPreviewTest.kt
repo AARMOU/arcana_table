@@ -102,7 +102,7 @@ class DesignPreviewTest {
     private fun run(name: String) {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
+        UiTestSupport.playWithArgentum(rule)
         runCatching { UiTestSupport.awaitReal(rule, 30_000, "Argentum table") { rule.onAllNodes(hasTestTag("phase-tracker"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() || shown("Game active") } }
             .onFailure { scenario.onActivity { a -> UiTestSupport.screenshot(a, "design-$name-0-timeout") }; throw it }
         UiTestSupport.settle(rule, 1_000)
@@ -161,7 +161,7 @@ class DesignPreviewTest {
         state.put("activePlayerId", state.getJSONArray("players").getJSONObject(0).getString("playerId")).put("currentStep", "DECLARE_BLOCKERS")
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
+        UiTestSupport.playWithArgentum(rule)
         UiTestSupport.awaitReal(rule, 30_000, "declare blockers offered") { shown("DECLARE BLOCKERS") }
         UiTestSupport.settle(rule, 800)
         rule.onAllNodesWithText("DECLARE BLOCKERS")[0].performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)

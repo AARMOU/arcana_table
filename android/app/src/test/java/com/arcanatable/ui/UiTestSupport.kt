@@ -3,6 +3,9 @@ package com.arcanatable.ui
 import android.graphics.Bitmap
 import android.os.Looper
 import androidx.compose.ui.test.junit4.ComposeTestRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onNodeWithTag
+import androidx.compose.ui.test.performClick
 import org.robolectric.Shadows.shadowOf
 import java.io.File
 
@@ -11,6 +14,19 @@ object UiTestSupport {
     private val dir: File by lazy {
         File(System.getProperty("arcana.screenshots") ?: "build/screenshots").apply { mkdirs() }
     }
+
+    /** Home → PLAY → Online with Argentum → start (the Build 97 home screen). */
+    fun playWithArgentum(rule: ComposeTestRule) {
+        rule.onNodeWithTag("home-play").performClick()
+        settle(rule, 800)
+        rule.onNodeWithTag("play-online-option").performClick()
+        settle(rule, 300)
+        rule.onNodeWithTag("play-start").performClick()
+    }
+
+    /** True while the home screen's PLAY button is showing. */
+    fun homeShown(rule: ComposeTestRule): Boolean =
+        rule.onAllNodesWithTag("home-play", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
     /** The app runs an endless 1 s game-clock loop, so tests drive the Compose clock manually. */
     fun settle(rule: ComposeTestRule, ms: Long = 1_500) {

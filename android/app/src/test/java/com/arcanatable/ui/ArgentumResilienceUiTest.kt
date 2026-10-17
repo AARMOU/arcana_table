@@ -93,13 +93,13 @@ class ArgentumResilienceUiTest {
         useServer("http://127.0.0.1:9") // nothing listens on the discard port
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
+        UiTestSupport.playWithArgentum(rule)
         UiTestSupport.awaitReal(rule, 40_000, "deck-check error dialog") { shown("Argentum deck check") }
         shot(scenario, "01-unreachable")
         assertFalse("must not be stuck in a loading state", shown("CHECKING DECK WITH ARGENTUM"))
         rule.onNodeWithText("OK").performClick()
         UiTestSupport.settle(rule, 500)
-        assertTrue("player can try again", shown("PLAY WITH ARGENTUM"))
+        assertTrue("player can try again", UiTestSupport.homeShown(rule))
         assertTrue(diagnostics().contains("ERROR"))
         assertFalse("server address must not be logged", diagnostics().contains("127.0.0.1"))
         scenario.close()
@@ -115,7 +115,7 @@ class ArgentumResilienceUiTest {
         UiTestSupport.settle(rule)
 
         // Start: real app flow against the fake server.
-        rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
+        UiTestSupport.playWithArgentum(rule)
         UiTestSupport.awaitReal(rule, 30_000, "needs-handling decision panel") { shown("NEEDS HANDLING") && shown("REFRESH") }
         shot(scenario, "02-needs-handling-dialog")
         assertTrue(shown("time travel"))
@@ -200,7 +200,7 @@ class ArgentumResilienceUiTest {
         useServer(fake.origin)
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
+        UiTestSupport.playWithArgentum(rule)
         UiTestSupport.awaitReal(rule, 30_000, "primary button offers the declaration") { shown("DECLARE ATTACKERS") }
         rule.onAllNodesWithText("DECLARE ATTACKERS")[0].performSemanticsAction(SemanticsActions.OnClick)
         UiTestSupport.awaitReal(rule, 5_000, "attack board") { rule.onAllNodes(hasTestTag("combat-board"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() && shown("NO ATTACK") }
@@ -239,7 +239,7 @@ class ArgentumResilienceUiTest {
         useServer(fake.origin)
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
+        UiTestSupport.playWithArgentum(rule)
         UiTestSupport.awaitReal(rule, 30_000, "combat damage board") { shown("CONFIRM DAMAGE") }
         assertFalse("combat damage is no longer a needs-handling case", shown("NEEDS HANDLING"))
         assertTrue(shown("Stone Wall") && shown("lethal 3"))
@@ -268,7 +268,7 @@ class ArgentumResilienceUiTest {
         useServer(fake.origin)
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
+        UiTestSupport.playWithArgentum(rule)
         UiTestSupport.awaitReal(rule, 30_000, "table") { tableShown() }
         rule.onNode(hasTestTag("player-tab-you")).performClick()
         UiTestSupport.settle(rule, 800)
@@ -303,7 +303,7 @@ class ArgentumResilienceUiTest {
         useServer(fake.origin)
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
+        UiTestSupport.playWithArgentum(rule)
         UiTestSupport.awaitReal(rule, 30_000, "table") { tableShown() }
         // Open Argentum's actions from the hand drawer and pick the spell.
         rule.onNode(hasTestTag("player-tab-you")).performClick()
@@ -338,7 +338,7 @@ class ArgentumResilienceUiTest {
         assertFalse("legacy room end-of-game dialog must not appear in Argentum games", shown("unanimous vote"))
         scenario.onActivity { UiTestSupport.screenshot(it, "resilience-11-game-over") }
         rule.onNodeWithText("HOME").performClick()
-        UiTestSupport.awaitReal(rule, 5_000, "home") { shown("PLAY WITH ARGENTUM") }
+        UiTestSupport.awaitReal(rule, 5_000, "home") { UiTestSupport.homeShown(rule) }
         assertFalse("no resume offer after a finished game", shown("RESUME GAME"))
         scenario.close()
     }

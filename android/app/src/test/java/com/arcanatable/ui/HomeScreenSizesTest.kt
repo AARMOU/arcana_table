@@ -3,6 +3,7 @@ package com.arcanatable.ui
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import com.arcanatable.MainActivity
 import org.junit.Rule
 import org.junit.Test
@@ -19,7 +20,7 @@ class HomeScreenSizesTest {
 
     private fun homeShows(name: String) {
         UiTestSupport.settle(rule)
-        rule.onNodeWithText("PLAY WITH ARGENTUM").assertIsDisplayed()
+        rule.onNodeWithTag("home-play").assertIsDisplayed()
         UiTestSupport.screenshot(rule.activity, "home-$name")
     }
 

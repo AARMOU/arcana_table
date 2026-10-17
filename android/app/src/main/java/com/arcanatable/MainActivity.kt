@@ -454,7 +454,7 @@ data class StackAction(
     val targetsConfirmed: Boolean = targetCount == null
 )
 
-private data class SavedDeck(val name: String, val text: String)
+private data class SavedDeck(val name: String, val text: String, val commander: String? = null)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -557,6 +557,11 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var importSaveToLibrary by rememberSaveable { mutableStateOf(false) }
     var importSaveName by rememberSaveable { mutableStateOf("") }
     var savedDecks by remember { mutableStateOf(loadSavedDecks(context)) }
+    var activeDeckId by remember { mutableStateOf(loadActiveDeck(context)) }
+    var deckPickerOpen by remember { mutableStateOf(false) }
+    var playSheetOpen by remember { mutableStateOf(false) }
+    var offlineAiDeckId by remember { mutableStateOf<String?>(null) }
+    val premadeDecks = remember { runCatching { context.assets.open("argentum/commander-decks.json").bufferedReader().use { it.readText() } }.getOrNull()?.let { runCatching { com.arcanatable.engine.OfflineGameSetup.parsePremades(it) }.getOrNull() }.orEmpty() }
     var savedDecksOpen by remember { mutableStateOf(false) }
     var localDeckSyncConfirmed by remember { mutableStateOf(false) }
     // Structured, redacted diagnostic log (DiagnosticLog.kt). Legacy free-text entries are migrated on load.
@@ -735,6 +740,13 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var argentumLobbySubmitted by remember { mutableStateOf(false) }
     var argentumAwaitingUpdate by remember { mutableStateOf(false) }
     var argentumLocalPlayersBackup by remember { mutableStateOf<List<TablePlayer>?>(null) }
+    var argentumStackUse by remember { mutableStateOf<StackUse?>(null) }
+    var argentumAutoYes by remember { mutableStateOf(emptyMap<String, Int>()) }
+    var playPopup by remember { mutableStateOf<PlayedCard?>(null) }
+    var playFeed by remember { mutableStateOf(emptyList<PlayedCard>()) }
+    var playBanner by remember { mutableStateOf<PlayedCard?>(null) }
+    var aiRecap by remember { mutableStateOf(-1 to TurnRecap()) }
+    var recapText by remember { mutableStateOf<String?>(null) }
     var argentumMulliganPrompt by remember { mutableStateOf(false) }
     var argentumBottomCardIds by remember { mutableStateOf<List<String>?>(null) }
     var argentumBottomCardCount by remember { mutableIntStateOf(0) }
@@ -849,11 +861,18 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         } else action
         val sent = argentumSocket.submitLegalAction(outbound, epoch)
         if (sent) argentumAwaitingUpdate = true
+        argentumStackUse?.let { use -> if (sent && !use.started) argentumStackUse = use.copy(started = true, manaColor = use.manaColor ?: action.optString("manaColorChoice").takeIf { it.isNotBlank() && it != "null" }) }
         return sent
     }
 
     fun sendArgentumPriority() {
         if (argentumAwaitingUpdate) { message = "Waiting for Argentum to confirm the previous action."; return }
+        // Never pass over an open question (Argentum rejects it): bring the prompt back instead.
+        argentumPendingDecision?.takeIf { it.optString("type") != "PlayCardDecision" }?.let { decision ->
+            if (argentumDeferredDecisionId == decision.optString("id")) argentumDeferredDecisionId = null
+            message = "Answer the open prompt first."
+            return
+        }
         val snapshot = argentumSnapshot ?: return
         val pass = snapshot.legalActions.firstOrNull { it.optJSONObject("action")?.optString("type") == "PassPriority" }
         val action = pass?.optJSONObject("action")
@@ -1110,6 +1129,29 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         passToMyTurnFrom = snapshot.turnNumber
         recordDiagnostic("Pass to my turn: started on turn ${snapshot.turnNumber}", DiagnosticCategory.ACTION)
     }
+    // "Always yes for this card this turn": answer the same prompt from the same card automatically.
+    LaunchedEffect(argentumPendingDecision?.optString("id"), argentumAwaitingUpdate) {
+        val decision = argentumPendingDecision ?: return@LaunchedEffect
+        if (argentumAwaitingUpdate || decision.optString("type") != "YesNoDecision") return@LaunchedEffect
+        val turn = argentumSnapshot?.turnNumber ?: return@LaunchedEffect
+        if (argentumAutoYes[autoYesKey(decision)] != turn) return@LaunchedEffect
+        delay(250)
+        recordDiagnostic("Auto-answered yes: ${decision.optString("prompt")}", DiagnosticCategory.ACTION)
+        submitArgentumDecision(JSONObject().put("type", "YesNoResponse").put("choice", true))
+    }
+    // "Use 5 / Use all": activate the same ability on one copy after another, from each new state.
+    LaunchedEffect(argentumStackUse, argentumSnapshot, argentumAwaitingUpdate, argentumPendingDecision, argentumComposer) {
+        val use = argentumStackUse ?: return@LaunchedEffect
+        if (!use.started || argentumAwaitingUpdate || argentumComposer != null) return@LaunchedEffect
+        if (argentumPendingDecision != null && argentumPendingDecision?.optString("type") != "PlayCardDecision") { argentumStackUse = null; return@LaunchedEffect }
+        val snapshot = argentumSnapshot ?: return@LaunchedEffect
+        delay(120)
+        val action = StackUses.next(use, snapshot.legalActions) { id -> argentumPiece(id).name }
+        val epoch = snapshot.interactionEpoch
+        if (action == null || epoch == null || use.remaining <= 0) { argentumStackUse = null; return@LaunchedEffect }
+        argentumStackUse = use.copy(remaining = use.remaining - 1)
+        if (!submitArgentumAction(action, epoch)) argentumStackUse = null
+    }
     // "Pass to my turn": press Argentum's own PassPriority until your next turn or until you're needed.
     LaunchedEffect(passToMyTurnFrom, argentumSnapshot, argentumPendingDecision, argentumAwaitingUpdate, argentumStatus) {
         val start = passToMyTurnFrom ?: return@LaunchedEffect
@@ -1296,6 +1338,15 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     turnTimerRunning = true
                     val entries = incoming.optJSONArray("events")
                     if (entries != null && entries.length() > 0) {
+                        val cardsJson = state.optJSONObject("cards")
+                        val played = PlayFeedParser.parse(entries, cardsJson)
+                        played.filter { it.kind != PlayedCard.Kind.ABILITY }.takeIf { it.isNotEmpty() }?.let { playFeed = (playFeed + it).takeLast(8) }
+                        played.lastOrNull { it.kind != PlayedCard.Kind.ABILITY && !it.byYou }?.let { playPopup = it }
+                        played.lastOrNull { it.kind == PlayedCard.Kind.ABILITY }?.let { playBanner = it }
+                        if (snapshot.activePlayer != localSeat) {
+                            val base = if (aiRecap.first == snapshot.turnNumber) aiRecap.second else TurnRecap()
+                            aiRecap = snapshot.turnNumber to PlayFeedParser.recap(entries, cardsJson, argentumPlayerId, base)
+                        }
                         val eventLines = (0 until entries.length()).mapNotNull { entries.optJSONObject(it)?.optString("description")?.takeIf(String::isNotBlank) }
                         if (eventLines.isNotEmpty()) gameLog = (gameLog + eventLines).takeLast(250)
                     }
@@ -1359,6 +1410,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     }
     LaunchedEffect(argentumQueue) {
         for (incoming in argentumQueue) {
+            // A late update from a game you already left must not overwrite your table and deck.
+            if (!argentumEnabled && incoming.optString("type") in setOf("stateUpdate", "stateDeltaUpdate", "gameOver", "mulliganDecision", "chooseBottomCards")) continue
             runCatching { handleArgentumMessage(incoming) }.onFailure { error ->
                 recordDiagnostic("Could not apply Argentum ${incoming.optString("type")} message: ${error.javaClass.simpleName}", DiagnosticCategory.ERROR)
                 argentumAwaitingUpdate = false
@@ -1383,10 +1436,16 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         val seat = players.getOrNull(active) ?: return@LaunchedEffect
         val isYou = active == localSeat
         turnBanner = TurnBannerState(TurnColors.label(isYou, seat.name, seat.isComputer), isYou, turn)
+        if (isYou && aiRecap.first in 0 until turn && !aiRecap.second.isEmpty) {
+            recapText = aiRecap.second.line(players.firstOrNull { it.isComputer }?.name ?: "Opponent")
+            recordDiagnostic("Recap: ${recapText}", DiagnosticCategory.ENGINE)
+        }
         if (isYou && appInForeground) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
         delay(if (isYou) 1400 else 900)
         turnBanner = null
     }
+    LaunchedEffect(playBanner?.key) { if (playBanner != null) { delay(2200); playBanner = null } }
+    LaunchedEffect(recapText) { if (recapText != null) { delay(6500); recapText = null } }
     LaunchedEffect(argentumLastError) {
         // Socket-level problems (unreadable messages, failed connects) reach the searchable log too.
         argentumLastError?.let { recordDiagnostic("Argentum problem: $it", DiagnosticCategory.ERROR) }
@@ -2480,7 +2539,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         }
     }
 
-    fun importDeck(text: String) {
+    fun importDeck(text: String, saveAsMine: Boolean = true) {
         val entries = parseDeckList(text)
         if (entries.isEmpty()) { importError = "No card names found. Try a list such as ‘2 Sol Ring’."; return }
         importing = true
@@ -2551,9 +2610,11 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 if (lobbyCreated && !gameStartedOnline && importedTarget?.isComputer == true) {
                     lobbyReadyPlayers = lobbyReadyPlayers + selectedPlayer
                 }
-                if (importSaveToLibrary) {
+                // Your own deck always goes into your deck list and becomes the deck you play.
+                if (importSaveToLibrary || (saveAsMine && selectedPlayer == localSeat)) {
                     val savedName = importSaveName.trim().ifBlank { importedCommander?.name ?: importedTarget?.name ?: "Saved deck" }
-                    val saved = SavedDeck(savedName, importText.trim())
+                    val saved = SavedDeck(savedName, text.trim(), importedCommander?.name)
+                    if (selectedPlayer == localSeat) { activeDeckId = savedName; saveActiveDeck(context, savedName) }
                     savedDecks = listOf(saved) + savedDecks.filterNot { it.name.equals(savedName, ignoreCase = true) }
                     saveSavedDecks(context, savedDecks)
                     importSaveToLibrary = false
@@ -2839,8 +2900,17 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         argentumLastError = null
         scope.launch {
             try {
-                val names = seat?.takeIf { it.deckLoaded }?.let { (it.library + it.hand).filterNot { c -> c.isToken || c.name == "Hidden card" }.map { c -> c.name } }.orEmpty()
-                val commander = seat?.takeIf { it.deckLoaded }?.commanderName?.takeIf(String::isNotBlank)
+                // The deck you picked on the home screen (never the table, which a finished game leaves behind).
+                val active = activeDeckId
+                val premade = active?.takeIf { it.startsWith("builtin:") }?.removePrefix("builtin:")?.let { id -> premadeDecks.firstOrNull { it.id == id } }
+                val saved = active?.let { a -> savedDecks.firstOrNull { it.name == a } }
+                val (names, commander) = when {
+                    premade != null -> premade.cards to premade.commander
+                    saved != null -> parseDeckList(saved.text).let { e -> e.flatMap { x -> List(x.count) { x.name } } to (saved.commander ?: e.firstOrNull { it.commander }?.name) }
+                    else -> seat?.takeIf { it.deckLoaded }?.let { (it.library + it.hand).filterNot { c -> c.isToken || c.name == "Hidden card" }.map { c -> c.name } }.orEmpty() to
+                        seat?.takeIf { it.deckLoaded }?.commanderName?.takeIf(String::isNotBlank)
+                }
+                val aiDeckId = offlineAiDeckId
                 val started = System.currentTimeMillis()
                 val prepared = withContext(Dispatchers.IO) {
                     var result: Pair<com.arcanatable.engine.OfflineSetup, com.wingedsheep.engine.registry.CardRegistry>? = null
@@ -2849,7 +2919,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         try {
                             val library = com.arcanatable.engine.OfflineCardLibrary({ path -> runCatching { context.assets.open(path) }.getOrNull() })
                             val decks = runCatching { context.assets.open("argentum/commander-decks.json").bufferedReader().use { it.readText() } }.getOrNull()
-                            result = com.arcanatable.engine.OfflineGameSetup.build(library, lobbyPlayerName.ifBlank { "You" }, names, commander, decks)
+                            result = com.arcanatable.engine.OfflineGameSetup.build(library, lobbyPlayerName.ifBlank { "You" }, names, commander, decks, aiDeckId = aiDeckId)
                         } catch (t: Throwable) { failure = t }
                     }, "argentum-offline-setup", 256L shl 20)
                     worker.start(); worker.join()
@@ -3580,37 +3650,72 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         fun TableOverlays() {
             Box(Modifier.fillMaxSize()) {
         if (argentumEnabled && !homeOpen) TurnBanner(turnBanner)
-        if (homeOpen) RoomHomeScreen(
-        wide = screenWidthDp >= 700,
-            tutorialAnchor = ::tutorialAnchor,
-        argentumActive = argentumEnabled,
-        argentumWorking = argentumDeckValidationRunning,
-        deckLoaded = players.getOrNull(localSeat)?.deckLoaded == true,
-        deckCommander = players.getOrNull(localSeat)?.commanderName,
-        onArgentum = { guidedAction("home-argentum") { if (argentumEnabled) homeOpen = false else startArgentumPractice(vsAi = true) } },
-        onOffline = { guidedAction("home-offline") { startOfflineGame() } },
-        offlineWorking = offlineStarting,
-        resumeAvailable = argentumResumeAvailable && !argentumEnabled,
-        onResume = {
-            recordDiagnostic("Player chose to resume the previous Argentum game", DiagnosticCategory.CONNECTION)
-            argentumResumeRequested = true
-            argentumLocalPlayersBackup = players.toList()
-            argentumEnabled = true
-            homeOpen = false
-            argentumSocket.retryNow()
-        },
-        onDismissResume = {
-            // Connect only to concede the old game; its state is never shown (see inbound guard).
-            recordDiagnostic("Player chose to end the previous Argentum game", DiagnosticCategory.CONNECTION)
-            argentumEndPreviousRequested = true
-            argentumSocket.connect(lobbyPlayerName)
-        },
-        onImportDeck = { selectedPlayer = localSeat; importError = null; importOpen = true },
-        onCreateRoom = { guidedAction("home-create") { startArgentumPractice(vsAi = false) } },
-        onJoinRoom = { guidedAction("home-join") { argentumLastError = null; argentumJoinCode = ""; argentumJoinDialogOpen = true } },
-        onContinue = { guidedAction("home-continue") { homeOpen = false } },
-        onTutorial = { startTutorial() }
-    )
+        if (argentumEnabled && !homeOpen) PlayFeedOverlay(playPopup, playFeed, playBanner, recapText,
+            onDismissPopup = { playPopup = null }, onPreview = { playPopup = it })
+        if (homeOpen) {
+            val deckChoices = remember(savedDecks, premadeDecks) {
+                savedDecks.map { DeckChoice(it.name, it.name, it.commander ?: parseDeckList(it.text).firstOrNull { e -> e.commander }?.name, builtIn = false) } +
+                    premadeDecks.map { DeckChoice("builtin:${it.id}", it.name, it.commander, builtIn = true) }
+            }
+            val seat = players.getOrNull(localSeat)
+            val activeDeck = deckChoices.firstOrNull { it.id == activeDeckId }
+                ?: seat?.takeIf { it.deckLoaded }?.let { DeckChoice("table", it.commanderName ?: "Your table deck", it.commanderName, builtIn = false) }
+            val art = activeDeck?.commander?.let { name ->
+                seat?.commanderCard?.takeIf { it.name.equals(name, true) }?.let { it.artCropUrl ?: it.imageUrl }
+                    ?: "https://api.scryfall.com/cards/named?exact=${java.net.URLEncoder.encode(name, "UTF-8")}&format=image&version=art_crop"
+            }
+            ArcanaHomeScreen(
+                wide = screenWidthDp >= 700,
+                deck = activeDeck, commanderArt = art,
+                argentumActive = argentumEnabled,
+                working = argentumDeckValidationRunning || offlineStarting,
+                workingLabel = if (offlineStarting) "PREPARING OFFLINE GAME…" else "CHECKING DECK WITH ARGENTUM…",
+                resumeAvailable = argentumResumeAvailable && !argentumEnabled,
+                onResume = {
+                    recordDiagnostic("Player chose to resume the previous Argentum game", DiagnosticCategory.CONNECTION)
+                    argentumResumeRequested = true
+                    argentumLocalPlayersBackup = players.toList()
+                    argentumEnabled = true
+                    homeOpen = false
+                    argentumSocket.retryNow()
+                },
+                onDismissResume = {
+                    recordDiagnostic("Player chose to end the previous Argentum game", DiagnosticCategory.CONNECTION)
+                    argentumEndPreviousRequested = true
+                    argentumSocket.connect(lobbyPlayerName)
+                },
+                onPlay = { playSheetOpen = true },
+                onChangeDeck = { deckPickerOpen = true },
+                onImport = { selectedPlayer = localSeat; importError = null; importOpen = true },
+                onSettings = { optionsOpen = true },
+                onReturnToTable = { guidedAction("home-continue") { homeOpen = false } },
+                onGuide = { startTutorial() },
+                tutorialAnchor = ::tutorialAnchor,
+            )
+            if (playSheetOpen) PlaySheet(
+                deckName = activeDeck?.name,
+                aiDecks = premadeDecks.map { DeckChoice(it.id, it.name, it.commander, builtIn = true) },
+                aiDeckId = offlineAiDeckId,
+                onAiDeck = { offlineAiDeckId = it },
+                onOffline = { playSheetOpen = false; guidedAction("home-offline") { startOfflineGame() } },
+                onOnline = { playSheetOpen = false; guidedAction("home-argentum") { startArgentumPractice(vsAi = true) } },
+                onCreateRoom = { playSheetOpen = false; guidedAction("home-create") { startArgentumPractice(vsAi = false) } },
+                onJoinRoom = { playSheetOpen = false; guidedAction("home-join") { argentumLastError = null; argentumJoinCode = ""; argentumJoinDialogOpen = true } },
+                onDismiss = { playSheetOpen = false },
+            )
+            if (deckPickerOpen) DeckPickerSheet(deckChoices, activeDeckId,
+                onPick = { choice ->
+                    deckPickerOpen = false
+                    activeDeckId = choice.id; saveActiveDeck(context, choice.id)
+                    recordDiagnostic("Deck chosen: ${choice.name}", DiagnosticCategory.ACTION)
+                    // Also put it on your table (card art, online play). Offline games read the choice directly.
+                    val text = savedDecks.firstOrNull { it.name == choice.id }?.text
+                        ?: premadeDecks.firstOrNull { "builtin:${it.id}" == choice.id }?.let { d -> "Commander\n1 ${d.commander}\nDeck\n" + d.cards.filterNot { it == d.commander }.groupingBy { it }.eachCount().entries.joinToString("\n") { (n, c) -> "$c $n" } }
+                    if (text != null) { selectedPlayer = localSeat; importDeck(text, saveAsMine = false) }
+                },
+                onImport = { deckPickerOpen = false; selectedPlayer = localSeat; importError = null; importOpen = true },
+                onDismiss = { deckPickerOpen = false })
+        }
 
     if (argentumEnabled && argentumSnapshot == null && !homeOpen) {
         Surface(Modifier.fillMaxSize(), color = Ink) {
@@ -3742,6 +3847,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         argentumPendingDecision = null
         argentumActionChoices = emptyList(); argentumActionCard = null; argentumComposer = null
         argentumAttackPlan = null; argentumBlockPlan = null
+        playPopup = null; playFeed = emptyList(); playBanner = null; recapText = null; aiRecap = -1 to TurnRecap(); argentumStackUse = null; argentumAutoYes = emptyMap()
         argentumLocalPlayersBackup?.let { players = it; argentumLocalPlayersBackup = null }
         argentumDeckForLobby = null
         argentumCommanderForLobby = null
@@ -3830,9 +3936,15 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     if (argentumActionChoices.isNotEmpty()) ArgentumActionSheet(
         card = argentumActionCard,
         choices = ArgentumActions.visibleChoices(argentumActionChoices),
-        hidManaAbilities = argentumActionChoices.any(ArgentumActions::isManaAbility),
+        hidManaAbilities = argentumActionChoices.any { ArgentumActions.isManaAbility(it) && !ArgentumActions.isSacrificeMana(it) },
         busy = argentumAwaitingUpdate,
-        onChoose = { info -> argentumActionChoices = emptyList(); argentumActionCard = null; chooseArgentumLegalAction(info) },
+        stackCount = { info -> StackUses.count(info, argentumSnapshot?.legalActions.orEmpty()) { id -> argentumPiece(id).name } },
+        onChooseMany = { info, count ->
+            val source = info.optJSONObject("action")?.optString("sourceId").orEmpty()
+            argentumStackUse = StackUse(argentumPiece(source).name, info.optString("description"), remaining = count - 1)
+            argentumActionChoices = emptyList(); argentumActionCard = null; chooseArgentumLegalAction(info)
+        },
+        onChoose = { info -> argentumActionChoices = emptyList(); argentumActionCard = null; argentumStackUse = null; chooseArgentumLegalAction(info) },
         onDismiss = { argentumActionChoices = emptyList(); argentumActionCard = null }
     )
 
@@ -3868,10 +3980,11 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         "ChooseNumberDecision" -> {
                             val min = decision.optInt("minValue", 0)
                             val max = decision.optInt("maxValue", min)
-                            val values = if (max - min <= 12) (min..max).toList() else listOf(min, max).distinct()
-                            values.forEach { value -> TextButton(onClick = {
-                                submitArgentumDecision(JSONObject().put("type", "NumberChosenResponse").put("number", value))
-                            }, modifier = Modifier.fillMaxWidth()) { Text(value.toString(), color = Mint) } }
+                            var chosenNumber by remember(decision.optString("id")) { mutableIntStateOf(min) }
+                            NumberPicker(chosenNumber, min..maxOf(min, max), onChange = { chosenNumber = it })
+                            TextButton(onClick = {
+                                submitArgentumDecision(JSONObject().put("type", "NumberChosenResponse").put("number", chosenNumber))
+                            }, modifier = Modifier.fillMaxWidth()) { Text("CHOOSE $chosenNumber", color = Mint, fontWeight = FontWeight.Black) }
                         }
                         "ChooseColorDecision" -> {
                             val colors = decision.optJSONArray("availableColors") ?: JSONArray()
@@ -4034,7 +4147,13 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             },
             confirmButton = {
                 when (kind) {
-                    "YesNoDecision" -> TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "YesNoResponse").put("choice", true)) }) { Text(decision.optString("yesText", "YES")) }
+                    "YesNoDecision" -> Column(horizontalAlignment = Alignment.End) {
+                        TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "YesNoResponse").put("choice", true)) }) { Text(decision.optString("yesText", "YES")) }
+                        TextButton(onClick = {
+                            argentumAutoYes = argentumAutoYes + (autoYesKey(decision) to (argentumSnapshot?.turnNumber ?: 0))
+                            submitArgentumDecision(JSONObject().put("type", "YesNoResponse").put("choice", true))
+                        }) { Text("${decision.optString("yesText", "YES").uppercase()} · ALWAYS THIS TURN", fontSize = 12.sp) }
+                    }
                     "BatchYesNoDecision" -> Row {
                         TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", true).put("applyToAll", false)) }) { Text("${decision.optString("yesText", "YES")} · ONCE") }
                         TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", true).put("applyToAll", true)) }) { Text("${decision.optString("yesText", "YES")} · ALL") }
@@ -4151,7 +4270,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     argentumComposer = null
                 } else message = "Could not send that to Argentum. Refresh and try again."
             },
-            onDismiss = { argentumComposer = null })
+            onDismiss = { argentumComposer = null; argentumStackUse = null })
     }
     argentumDeckReview?.let { review ->
         ArgentumDeckReviewDialog(review,
@@ -5979,91 +6098,6 @@ private val debugCardPool = listOf(
     "Sol Ring" to "Artifact", "Arcane Signet" to "Artifact", "Command Tower" to "Land", "Island" to "Basic Land — Island", "Forest" to "Basic Land — Forest", "Plains" to "Basic Land — Plains", "Mountain" to "Basic Land — Mountain", "Swamp" to "Basic Land — Swamp",
     "Swords to Plowshares" to "Instant", "Counterspell" to "Instant", "Cultivate" to "Sorcery", "Beast Within" to "Instant", "Lightning Bolt" to "Instant", "Rhystic Study" to "Enchantment", "Smothering Tithe" to "Enchantment", "Llanowar Elves" to "Creature — Elf", "Sakura-Tribe Elder" to "Creature — Snake", "Mulldrifter" to "Creature — Elemental", "Solemn Simulacrum" to "Artifact Creature", "Swiftfoot Boots" to "Artifact", "Commander's Sphere" to "Artifact", "Murder" to "Instant", "Negate" to "Instant", "Elvish Mystic" to "Creature — Elf", "Treasure Token" to "Artifact Token — Treasure", "Goblin Token" to "Creature Token — Goblin", "Thopter Token" to "Artifact Creature Token — Thopter"
 )
-
-@Composable
-private fun RoomHomeScreen(
-    wide: Boolean,
-    tutorialAnchor: (String) -> Modifier,
-    argentumActive: Boolean,
-    argentumWorking: Boolean,
-    deckLoaded: Boolean,
-    deckCommander: String?,
-    onArgentum: () -> Unit,
-    onOffline: () -> Unit = {},
-    offlineWorking: Boolean = false,
-    resumeAvailable: Boolean,
-    onResume: () -> Unit,
-    onDismissResume: () -> Unit,
-    onImportDeck: () -> Unit,
-    onCreateRoom: () -> Unit,
-    onJoinRoom: () -> Unit,
-    onContinue: () -> Unit,
-    onTutorial: () -> Unit
-) {
-    Column(
-        Modifier.fillMaxSize().background(Ink).windowInsetsPadding(WindowInsets.safeDrawing)
-            .verticalScroll(rememberScrollState()).padding(horizontal = 22.dp, vertical = 18.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Column(Modifier.widthIn(max = if (wide) 560.dp else 460.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("ARCANA TABLE", color = SoftWhite, fontSize = 24.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp)
-            Text("VERSION ${BuildConfig.VERSION_NAME} · BUILD ${BuildConfig.VERSION_CODE}", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.6.sp, modifier = Modifier.padding(top = 4.dp))
-            Text("Play Magic together", color = Muted, fontSize = 14.sp, modifier = Modifier.padding(top = 5.dp, bottom = 22.dp))
-            if (resumeAvailable) Column(
-                Modifier.fillMaxWidth().padding(bottom = 16.dp).clip(RoundedCornerShape(16.dp)).background(Panel).padding(14.dp).testTag("resume-card")
-            ) {
-                Text("ARGENTUM GAME MAY STILL BE RUNNING", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
-                Text("Arcana closed or lost its connection during a game. It won't reconnect on its own; resume when you're ready.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onResume, modifier = Modifier.weight(1f).heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { Text("RESUME GAME", fontWeight = FontWeight.Black) }
-                    OutlinedButton(onClick = onDismissResume, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("END THAT GAME") }
-                }
-                Text("End that game concedes it on Argentum. New games are available after you choose.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
-                    onClick = onArgentum,
-                    enabled = !argentumWorking && !resumeAvailable,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp).then(tutorialAnchor("home-argentum")),
-                    colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)
-                ) { Text(when { argentumActive -> "RETURN TO ARGENTUM TABLE"; argentumWorking -> "CHECKING DECK WITH ARGENTUM…"; else -> "PLAY WITH ARGENTUM" }, fontSize = 14.sp, fontWeight = FontWeight.Black) }
-                if (!argentumActive) OutlinedButton(
-                    onClick = onOffline,
-                    enabled = !argentumWorking && !offlineWorking && !resumeAvailable,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).testTag("home-offline"),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Mint)
-                ) { Text(if (offlineWorking) "PREPARING OFFLINE GAME…" else "PLAY OFFLINE VS AI", fontSize = 13.sp, fontWeight = FontWeight.Black) }
-                OutlinedButton(
-                    onClick = onImportDeck,
-                    enabled = !argentumActive && !argentumWorking,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = SoftWhite)
-                ) { Text(if (deckLoaded) "CHANGE PLAYER DECK · ${deckCommander ?: "COMMANDER NEEDED"}" else "IMPORT PLAYER DECK", fontSize = 13.sp, fontWeight = FontWeight.Bold) }
-                if (!argentumActive) {
-                Button(
-                    onClick = onCreateRoom,
-                    enabled = !resumeAvailable,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp).then(tutorialAnchor("home-create")),
-                    colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)
-                ) { Text("CREATE ROOM", fontSize = 14.sp, fontWeight = FontWeight.Black) }
-                OutlinedButton(
-                    onClick = onJoinRoom,
-                    enabled = !resumeAvailable,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp).then(tutorialAnchor("home-join")),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = SoftWhite)
-                ) { Text("JOIN ROOM", fontSize = 14.sp, fontWeight = FontWeight.Bold) }
-                }
-            }
-            if (argentumActive) TextButton(onClick = onContinue, modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).then(tutorialAnchor("home-continue"))) {
-                Text("RETURN TO TABLE", color = Mint, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-            }
-            TextButton(onClick = onTutorial, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).then(tutorialAnchor("home-tutorial"))) {
-                Text("FULL VISUAL GUIDE", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
 
 @Composable
 private fun HeaderButton(label: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
@@ -8769,8 +8803,15 @@ private fun savePlayers(context: android.content.Context, players: List<TablePla
     runCatching { context.getSharedPreferences("arcana-table", android.content.Context.MODE_PRIVATE).edit().putString("players", data.toString()).apply() }
 }
 
+private fun saveActiveDeck(context: android.content.Context, id: String?) {
+    runCatching { context.getSharedPreferences("arcana-saved-decks", android.content.Context.MODE_PRIVATE).edit().putString("activeDeck", id).apply() }
+}
+
+private fun loadActiveDeck(context: android.content.Context): String? =
+    runCatching { context.getSharedPreferences("arcana-saved-decks", android.content.Context.MODE_PRIVATE).getString("activeDeck", null) }.getOrNull()
+
 private fun saveSavedDecks(context: android.content.Context, decks: List<SavedDeck>) {
-    val data = JSONArray().apply { decks.forEach { put(JSONObject().put("name", it.name).put("text", it.text)) } }
+    val data = JSONArray().apply { decks.forEach { put(JSONObject().put("name", it.name).put("text", it.text).put("commander", it.commander ?: JSONObject.NULL)) } }
     runCatching { context.getSharedPreferences("arcana-saved-decks", android.content.Context.MODE_PRIVATE).edit().putString("savedDecks", data.toString()).apply() }
 }
 
@@ -8788,7 +8829,7 @@ private fun loadSavedDecks(context: android.content.Context): List<SavedDeck> = 
         data.optJSONObject(index)?.let { item ->
             val name = item.optString("name").trim()
             val text = item.optString("text").trim()
-            if (name.isBlank() || text.isBlank()) null else SavedDeck(name, text)
+            if (name.isBlank() || text.isBlank()) null else SavedDeck(name, text, item.optString("commander").takeIf { it.isNotBlank() && it != "null" })
         }
     }
 }.getOrDefault(emptyList())
@@ -8978,7 +9019,7 @@ private fun LocalChatPanel(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidManaAbilities: Boolean, busy: Boolean, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit) {
+private fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidManaAbilities: Boolean, busy: Boolean, stackCount: (JSONObject) -> Int = { 1 }, onChooseMany: (JSONObject, Int) -> Unit = { _, _ -> }, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 24.dp)) {
             if (card != null) Row(verticalAlignment = Alignment.Top) {
@@ -9009,8 +9050,14 @@ private fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidM
                         .combinedClickable(enabled = !busy, onClick = { onChoose(info) })
                         .padding(horizontal = 14.dp, vertical = 12.dp)
                 ) {
-                    Text(info.optString("description", info.optJSONObject("action")?.optString("type") ?: "Action"), color = if (unsupported == null) SoftWhite else Muted, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(if (ArgentumActions.isSacrificeMana(info)) "Sacrifice for mana" else info.optString("description", info.optJSONObject("action")?.optString("type") ?: "Action"), color = if (unsupported == null) SoftWhite else Muted, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    if (ArgentumActions.isSacrificeMana(info)) Text(info.optString("description"), color = Muted, fontSize = 11.sp)
                     info.optString("manaCostString").takeIf { it.isNotBlank() && it != "null" }?.let { ManaCostPips(it) }
+                    val copies = if (unsupported == null && affordable) stackCount(info) else 1
+                    if (copies > 1) Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (copies > 5) OutlinedButton(enabled = !busy, onClick = { onChooseMany(info, 5) }, modifier = Modifier.heightIn(min = 44.dp)) { Text("USE 5", color = Mint, fontWeight = FontWeight.Black) }
+                        OutlinedButton(enabled = !busy, onClick = { onChooseMany(info, copies) }, modifier = Modifier.heightIn(min = 44.dp)) { Text("USE ALL ($copies)", color = Mint, fontWeight = FontWeight.Black) }
+                    }
                     when {
                         unsupported != null -> Text("NEEDS HANDLING · $unsupported", color = CounterGold, fontSize = 10.sp)
                         !affordable -> Text("Argentum reports you can't pay for this right now.", color = Muted, fontSize = 10.sp)
@@ -9095,6 +9142,9 @@ private fun ChangelogDialog(onDismiss: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 97 · NEW HOME, TREASURES, FASTER COMBAT", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• New home screen: your deck up top, one PLAY button. Pick offline vs AI (and the AI's deck) or online.\n• Your decks are saved and the one you pick stays picked, even after a game ends.\n• Treasures pay for spells offline, and show \"Sacrifice for mana\" in their menu. USE 5 / USE ALL for stacks of Treasures, Clues and Foods.\n• Attack with ALL, and tap a stack (×N) to attack with every copy.\n• See what the AI plays: a big card pop-up, a side strip of recent plays, ability banners, and a recap when your turn starts.\n• X picker with −5 / +5 and type-in. \"Always yes this turn\" for repeated prompts.\n• Fewer pointless pass stops; no more passing over an open prompt.", color = SoftWhite, fontSize = 13.sp)
+
                 Text("BUILD 96 · CUSTOM CARDS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Arcana's own custom cards: 30 cards Argentum doesn't have yet, so Tokens Win (Rocco) and Artificer (Tails) play offline. Only Goblin Welder and Ratchet are still swapped for basic lands. Argentum's own version of a card always wins once it has one.\n• Offline games now show the AI's turn step by step, and your combat steps too, instead of jumping to your next move.\n• Offline mulligans (London rules) and undo.\n• Whose turn it is: you're gold, the AI is blue. The phase bar, the seat tabs (YOUR TURN / AI'S TURN) and the active board's outline use that colour, a banner shows when a turn starts, and your turn gives a small buzz.\n• The pass button lights up gold when you can respond on the AI's turn, and works whichever board you're looking at.\n• Battlefield: pinch with two fingers to zoom (remembered for each screen shape), rows wrap instead of running off the side, and identical cards stack with a count.\n• The bottom buttons are lined up, with a slightly larger hand drawer, and the little card boxes in it are gone.", color = SoftWhite, fontSize = 11.sp)
 
@@ -9199,4 +9249,11 @@ private fun ChangelogDialog(onDismiss: () -> Unit) {
         confirmButton = { TextButton(onClick = { onDismiss() }) { Text("CLOSE", color = Mint) } },
         containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
     )
+}
+
+/** Same card, same question: the key "always yes this turn" remembers. */
+internal fun autoYesKey(decision: JSONObject): String {
+    val context = decision.optJSONObject("context")
+    val source = context?.optString("sourceName")?.takeIf { it.isNotBlank() && it != "null" } ?: context?.optString("sourceId").orEmpty()
+    return source + "|" + decision.optString("prompt")
 }

@@ -105,6 +105,7 @@ object OfflineGameSetup {
         commander: String?,
         aiDecksJson: String?,
         random: Random = Random.Default,
+        aiDeckId: String? = null,
     ): Pair<OfflineSetup, CardRegistry> {
         val notes = mutableListOf<String>()
         val yourCommander = commander?.let(library::canonical)
@@ -123,7 +124,8 @@ object OfflineGameSetup {
         val yourList = argentumLibraryList(deckNames, yourCommander)
         val supported = yourList.mapNotNull(library::canonical)
         val missing = yourList.filter { library.canonical(it) == null }.distinct()
-        val premade = premades.sortedByDescending { d -> d.cards.count { library.canonical(it) != null } }.let { ranked ->
+        // The deck you picked for the AI, or a random complete one.
+        val premade = premades.firstOrNull { it.id == aiDeckId } ?: premades.sortedByDescending { d -> d.cards.count { library.canonical(it) != null } }.let { ranked ->
             val complete = ranked.filter { d -> d.cards.all { library.canonical(it) != null } }
             (complete.ifEmpty { ranked.take(1) }).random(random)
         }
@@ -144,13 +146,13 @@ object OfflineGameSetup {
         return OfflineSetup(you, ai, notes, premade.name) to registry
     }
 
-    data class Premade(val name: String, val commander: String, val cards: List<String>)
+    data class Premade(val name: String, val commander: String, val cards: List<String>, val id: String = name)
 
     fun parsePremades(json: String): List<Premade> {
         val array = JSONArray(json)
         return (0 until array.length()).mapNotNull { array.optJSONObject(it) }.map { deck ->
             val cards = deck.getJSONObject("cards")
-            Premade(deck.optString("name"), deck.optString("commander"), cards.keys().asSequence().flatMap { name -> List(cards.optInt(name)) { name } }.toList())
+            Premade(deck.optString("name"), deck.optString("commander"), cards.keys().asSequence().flatMap { name -> List(cards.optInt(name)) { name } }.toList(), deck.optString("id").ifBlank { deck.optString("name") })
         }
     }
 

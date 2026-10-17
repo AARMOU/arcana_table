@@ -323,7 +323,18 @@ object ArgentumActions {
      * mana ability. Order is preserved.
      */
     fun visibleChoices(choices: List<JSONObject>): List<JSONObject> =
-        choices.filterNot { it.optBoolean("__none") || isManaAbility(it) }
+        choices.filterNot { it.optBoolean("__none") || (isManaAbility(it) && !isSacrificeMana(it)) }
+
+    /**
+     * A mana ability that sacrifices its source (a Treasure). Auto-pay never uses these, so they stay
+     * in the card menu as "Sacrifice for mana".
+     */
+    fun isSacrificeMana(info: JSONObject): Boolean =
+        isManaAbility(info) && info.optString("description").contains("Sacrifice", ignoreCase = true)
+
+    /** What the card menu calls an action: Treasures read "Sacrifice for mana". */
+    fun menuLabel(info: JSONObject): String =
+        if (isSacrificeMana(info)) "Sacrifice for mana" else info.optString("description")
 }
 
 /** One target slot of a legal action (LegalActionTargetInfo), or the single implied slot. */

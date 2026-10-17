@@ -118,6 +118,7 @@ private fun CombatBoardFrame(
     selectedId: String?, linkedIds: Set<String>,
     topEnabled: (String) -> Boolean, bottomEnabled: (String) -> Boolean,
     topBadge: (String) -> String? = { null },
+    bottomBadge: (String) -> String? = { null },
     onTop: (String) -> Unit, onBottom: (String) -> Unit,
     summary: List<String>, warning: String?,
     confirmLabel: String, confirmEnabled: Boolean, onConfirm: () -> Unit,
@@ -173,7 +174,7 @@ private fun CombatBoardFrame(
                         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             bottom.forEach { piece ->
                                 CombatTile(piece, tileWidth, selected = piece.id == selectedId, linked = piece.id in linkedIds, enabled = bottomEnabled(piece.id),
-                                    onClick = { onBottom(piece.id) }, onBounds = { bounds["b:${piece.id}"] = it })
+                                    onClick = { onBottom(piece.id) }, onBounds = { bounds["b:${piece.id}"] = it }, badge = bottomBadge(piece.id))
                             }
                             if (bottom.isEmpty()) Text("No creatures can do this right now.", color = Muted, fontSize = 12.sp)
                         }
@@ -268,45 +269,67 @@ fun ArgentumAttackBoard(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece
     val single = targets.size == 1
     val optionFor = plan.options.associateBy { it.attackerId }
     val missing = plan.missingMandatory(selection)
-    val links = selection.map { (attacker, target) -> attacker to target }
+    // Identical creatures (same name, stats and choices) share one tile: tapping it sends the whole stack.
+    val groups = attackGroups(plan, piece)
+    val groupOf = groups.flatMap { g -> g.value.map { it to g.key } }.toMap()
+    fun members(rep: String) = groups[rep] ?: listOf(rep)
+    val links = selection.map { (attacker, target) -> (groupOf[attacker] ?: attacker) to target }.distinct()
     CombatBoardFrame(
         title = "DECLARE ATTACKERS",
         hint = when {
             pending != null -> "Now tap what ${piece(pending!!).name} attacks."
-            single -> "Tap the creatures you want to attack with."
+            single -> "Tap the creatures you want to attack with. A stack (×N) attacks together."
             else -> "Tap a creature, then the player or planeswalker it attacks."
         },
         topLabel = "YOU CAN ATTACK", bottomLabel = "YOUR CREATURES",
-        top = targets.map(piece), bottom = plan.options.map { piece(it.attackerId) }, links = links,
-        selectedId = pending, linkedIds = (selection.keys + selection.values).toSet(),
+        top = targets.map(piece), bottom = groups.keys.map(piece), links = links,
+        selectedId = pending, linkedIds = (links.map { it.first } + selection.values).toSet(),
         topEnabled = { target -> pending?.let { target in optionFor[it]?.targets.orEmpty() } ?: false },
         bottomEnabled = { true },
         topBadge = { id -> selection.count { it.value == id }.takeIf { it > 0 }?.let { "×$it" } },
-        onBottom = { attacker ->
-            val option = optionFor[attacker] ?: return@CombatBoardFrame
+        bottomBadge = { rep -> members(rep).size.takeIf { it > 1 }?.let { n -> val on = members(rep).count { it in selection }; if (on in 1 until n) "$on/$n" else "×$n" } },
+        onBottom = { rep ->
+            val option = optionFor[rep] ?: return@CombatBoardFrame
+            val group = members(rep)
+            val anyOn = group.any { it in selection }
             when {
-                attacker in selection && !option.mandatory && (single || option.targets.size == 1 || pending == attacker) -> { selection = selection - attacker; pending = null }
-                single || option.targets.size == 1 -> selection = selection + (attacker to option.targets.first())
-                pending == attacker -> pending = null
-                else -> pending = attacker
+                anyOn && (single || option.targets.size == 1 || pending == rep) -> {
+                    selection = selection - group.filterNot { optionFor[it]?.mandatory == true }.toSet(); pending = null
+                }
+                single || option.targets.size == 1 -> selection = selection + group.associateWith { option.targets.first() }
+                pending == rep -> pending = null
+                else -> pending = rep
             }
         },
         onTop = { target ->
-            val attacker = pending ?: return@CombatBoardFrame
-            if (target in optionFor[attacker]?.targets.orEmpty()) selection = selection + (attacker to target)
+            val rep = pending ?: return@CombatBoardFrame
+            members(rep).forEach { a -> if (target in optionFor[a]?.targets.orEmpty()) selection = selection + (a to target) }
             pending = null
         },
-        summary = selection.map { (attacker, target) ->
-            val a = piece(attacker)
-            listOf(a.name, combatStats(a.card)).filter(String::isNotBlank).joinToString(" ") + " → " + piece(target).name
+        summary = selection.entries.groupBy { (attacker, target) -> Triple(piece(attacker).name, combatStats(piece(attacker).card), target) }.map { (key, list) ->
+            val (name, stats, target) = key
+            listOf(if (list.size > 1) "${list.size} × $name" else name, stats).filter(String::isNotBlank).joinToString(" ") + " → " + piece(target).name
         },
         warning = if (missing.isNotEmpty()) "Must attack: ${missing.joinToString { piece(it).name }}" else null,
         confirmLabel = if (selection.isEmpty()) "NO ATTACK" else "ATTACK WITH ${selection.size}",
         confirmEnabled = !busy && missing.isEmpty(),
         onConfirm = { onConfirm(plan.buildAction(selection)) },
+        extraButton = {
+            if (selection.size < plan.options.size) TextButton(onClick = {
+                val target = targets.firstOrNull()
+                selection = plan.options.associate { o -> o.attackerId to (selection[o.attackerId] ?: target?.takeIf { it in o.targets } ?: o.targets.first()) }
+                pending = null
+            }) { Text("ALL", color = Mint, fontWeight = FontWeight.Black) }
+            else TextButton(onClick = { selection = plan.options.filter { it.mandatory }.associate { it.attackerId to it.targets.first() }; pending = null }) { Text("CLEAR", color = Muted) }
+        },
         onDismiss = onDismiss,
     )
 }
+
+/** Attack options grouped into stacks of identical creatures; key = the stack's first creature. */
+fun attackGroups(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece): Map<String, List<String>> =
+    plan.options.groupBy { o -> val p = piece(o.attackerId); listOf(p.name, combatStats(p.card), o.targets.joinToString(","), o.mandatory.toString(), p.card?.counters?.toString().orEmpty()) }
+        .values.associate { list -> list.first().attackerId to list.map { it.attackerId } }
 
 /**
  * Combat damage on the board: each creature that assigns damage, with the amount it puts on each

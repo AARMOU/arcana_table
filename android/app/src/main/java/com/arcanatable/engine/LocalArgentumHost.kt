@@ -2,6 +2,9 @@ package com.arcanatable.engine
 
 import com.wingedsheep.ai.engine.AIPlayer
 import com.wingedsheep.engine.core.ActionProcessor
+import com.wingedsheep.engine.core.ActivateAbility
+import com.wingedsheep.engine.core.CastSpell
+import com.wingedsheep.engine.core.PaymentStrategy
 import com.wingedsheep.engine.core.BottomCards
 import com.wingedsheep.engine.core.Concede
 import com.wingedsheep.engine.core.DeclareAttackers
@@ -118,12 +121,20 @@ class LocalArgentumHost(
                 if (mulliganPhase) { sendError("Choose your opening hand first."); return }
                 val action = json.decodeFromString(GameAction.serializer(), message.getJSONObject("action").toString())
                 if (action.playerId != humanId) { sendError("That action belongs to another seat."); return }
-                val processed = processor.process(current, action)
+                val events = mutableListOf<GameEvent>()
+                var processed = processor.process(current, action)
+                if (processed.result.error != null && needsMana(processed.result.error!!)) {
+                    // Argentum's auto-pay never sacrifices Treasures; offline, Arcana does it for you.
+                    payWithSacrificeSources(current, action)?.let { (paid, paidEvents) ->
+                        events += paidEvents
+                        processed = processor.process(paid, action)
+                    }
+                }
                 val result = processed.result
-                if (result.error != null) { sendError(result.error!!); sendState(emptyList()); return }
+                if (result.error != null) { sendError(friendlyError(result.error!!)); sendState(emptyList()); return }
                 applyUndoPolicy(processed.undoPolicy, action, current)
                 state = result.state
-                val events = result.events.toMutableList()
+                events += result.events
                 drive(events)
                 sendState(events)
             }
@@ -249,6 +260,54 @@ class LocalArgentumHost(
         emit(JSONObject().put("type", "chooseBottomCards").put("hand", hand).put("cards", cards).put("cardsToPutOnBottom", count))
     }
 
+    // ---- Paying with Treasures ---------------------------------------------------------------
+
+    private fun needsMana(error: String) = error.contains("mana", ignoreCase = true) && (error.contains("enough", true) || error.contains("pay", true))
+
+    private fun friendlyError(error: String) =
+        if (needsMana(error)) "Not enough mana for that, even counting Treasures and other sacrifice-for-mana cards." else error
+
+    /**
+     * Sacrifices the player's Treasure-style mana sources ("{T}, Sacrifice: add one mana"), one at a
+     * time, until [action] can be paid, and returns the state with that mana floating. Each one tries
+     * every colour it can make and keeps the first that lets the action through; otherwise it adds a
+     * colour the cost asks for and moves on to the next source. Null when it still can't be paid.
+     */
+    private fun payWithSacrificeSources(start: GameState, action: GameAction): Pair<GameState, List<GameEvent>>? {
+        if (action !is CastSpell && action !is ActivateAbility) return null
+        if (action is CastSpell && action.paymentStrategy != PaymentStrategy.AutoPay) return null
+        if (action is ActivateAbility && action.paymentStrategy != PaymentStrategy.AutoPay) return null
+        val costColors = (action as? CastSpell)?.let { start.getEntity(it.cardId)?.get<CardComponent>()?.manaCost?.colors }.orEmpty()
+        var current = start
+        val events = mutableListOf<GameEvent>()
+        val used = mutableSetOf<EntityId>()
+        repeat(40) {
+            val sacrificial = services.manaSolver.findAvailableManaSources(current, humanId).filter { it.requiresSacrifice }.map { it.entityId }.toSet() - used
+            val option = enumerator.enumerate(current, humanId).firstOrNull { it.isManaAbility && (it.action as? ActivateAbility)?.sourceId in sacrificial } ?: return null
+            val ability = option.action as ActivateAbility
+            used += ability.sourceId
+            val colors = option.availableManaColors.orEmpty()
+            val tryOrder = (colors.filter { it in costColors } + colors.filterNot { it in costColors }).map { it as com.wingedsheep.sdk.core.Color? }.ifEmpty { listOf(null) }
+            var fallback: Pair<GameState, List<GameEvent>>? = null
+            for (color in tryOrder) {
+                val activated = processor.process(current, ability.copy(manaColorChoice = color)).result
+                if (activated.error != null) continue
+                if (fallback == null) fallback = activated.state to activated.events
+                if (processor.process(activated.state, action).result.error == null) return activated.state to (events + activated.events)
+            }
+            val (next, nextEvents) = fallback ?: return null
+            current = next; events += nextEvents
+        }
+        return null
+    }
+
+    /**
+     * "Add mana" abilities that aren't true mana abilities (Arcana's Food Chain, for one) shouldn't
+     * stop auto-pass on the opponent's turn: nobody wants to be asked about them at every step.
+     */
+    private fun withoutManaLike(legal: List<LegalActionInfo>): List<LegalActionInfo> =
+        legal.filterNot { it.actionType == "ActivateAbility" && !it.isManaAbility && it.description.substringAfter(':', "").trim().startsWith("Add ", ignoreCase = true) }
+
     // ---- Undo (Argentum GameSession's checkpoint policy) -------------------------------------
 
     private fun applyUndoPolicy(policy: UndoCheckpointAction, action: GameAction, before: GameState) {
@@ -316,7 +375,7 @@ class LocalArgentumHost(
                 continue
             }
             // Human priority: pass automatically where Argentum's server would.
-            val legal = legalActions(current)
+            val legal = withoutManaLike(legalActions(current))
             if (!autoPass.shouldAutoPass(current, priority, legal)) break
             if (!apply(safePass(current, priority), events)) break
         }
@@ -376,7 +435,7 @@ class LocalArgentumHost(
         val legal = if (interactive) legalActions(current) else emptyList()
         val decision: PendingDecision? = if (!interactive) null else current.pendingDecision?.takeIf { current.actorFor(it.playerId) == humanId }?.let { masker.maskFor(it, current, humanId) }
         val nextStop = if (interactive && current.priorityPlayerId == humanId && current.pendingDecision == null) {
-            autoPass.getNextStopPoint(current, humanId, autoPass.getMeaningfulActions(legal).isNotEmpty())
+            autoPass.getNextStopPoint(current, humanId, autoPass.getMeaningfulActions(withoutManaLike(legal)).isNotEmpty())
         } else null
         val message = buildJsonObject {
             put("type", "stateUpdate")
