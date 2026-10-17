@@ -1,4 +1,4 @@
-# Arcana × Argentum integration (Build 88)
+# Arcana × Argentum integration (Build 89)
 
 Arcana Table provides the mobile UI. Argentum Engine
 ([wingedsheep/argentum-engine](https://github.com/wingedsheep/argentum-engine)) is the game engine:
@@ -55,7 +55,7 @@ needed.
 |---|---|
 | `ArgentumBackend.kt` | `ArgentumGameSocket` (connection, reconnect/pause policy, token), `ArgentumDeckApi` (validation, premade decks), `ArgentumTableSnapshot` (masked state → Arcana model), `ArgentumEndpoints` (server origin) |
 | `ArgentumInteraction.kt` | Pure Kotlin: decision response builders, needs-handling classification, `ArgentumAttackPlan` / `ArgentumBlockPlan` from `DeclareAttackers` / `DeclareBlockers` legal actions, X-cost ranges |
-| `ArgentumUi.kt` | Status strip, attack/block dialogs, X picker, unsupported-deck review, diagnostic log viewer, order/amount editors |
+| `ArgentumUi.kt` | Game HUD (status, phase tracker, life chips, stack, game-log feed), action composer, attack/block dialogs, combat damage board, pile/replacement/budget/order/amount editors, unsupported-deck review, diagnostic log viewer |
 | `DiagnosticLog.kt` | Categorized, searchable, redacted log |
 | `HandLayout.kt` | Hand drawer reflow math |
 
@@ -65,8 +65,8 @@ needed.
 - **No simulation.** Arcana's own rules helpers, manual life/draw/token tools and its local combat panel are disabled or hidden on an Argentum board.
 - **Needs handling, never guessing.** If Argentum sends a decision or action Arcana cannot present, Arcana shows a *Needs handling* notice and logs it. It offers Argentum's own cancel (when the decision allows it), a refresh, or *View table*. Nothing is auto-answered.
   - Decision types with native controls: yes/no, batch yes/no, option, number, colour, card selection, targets, modes, library search, ordering (objects and library), mana sources (Argentum auto-pay or decline), combat damage assignment (`AssignDamageDecision` and the combat damage board `CombatResolutionDecision`, defined in `core/CombatResolution.kt`), distribution.
-  - Decision types that show *Needs handling*: `SplitPilesDecision`, `ChooseReplacementDecision`, `BudgetModalDecision`, and any future type.
-  - Actions that show *Needs handling* instead of being sent: multi-target spells, damage-division spells, and mana-colour choices.
+  - Also native since Build 89: `SplitPilesDecision`, `ChooseReplacementDecision`, `BudgetModalDecision`. Every decision type in Argentum's rules engine at commit `7a9663d8` has a control; only types added later show *Needs handling*.
+  - Actions: X costs, any number of target slots (with `validTargetsByPrefix`, exclusive groups and `targetGroupCounts`), divided damage (`damageDistribution`) and mana colour (`manaColorChoice`) are collected in one composer (`ArgentumActionPlan`). Card targets keep Argentum's zone spelling (`"Graveyard"`).
 - **Unsupported deck cards.** When Argentum's validator rejects cards, a review lists them and nothing changes until the player chooses one of three options:
   - Play on Argentum without those cards, for this game only, with supported basic lands filling the gap.
   - Play the full deck in Arcana's sandbox, where Argentum is not running the game.

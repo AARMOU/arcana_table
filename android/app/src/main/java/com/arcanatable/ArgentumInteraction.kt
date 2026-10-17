@@ -35,7 +35,7 @@ object ArgentumDecisions {
         "ChooseColorDecision", "SelectCardsDecision", "ChooseTargetsDecision",
         "ChooseModeDecision", "SearchLibraryDecision", "OrderObjectsDecision", "ReorderLibraryDecision",
         "SelectManaSourcesDecision", "AssignDamageDecision", "DistributeDecision",
-        "CombatResolutionDecision",
+        "CombatResolutionDecision", "SplitPilesDecision", "ChooseReplacementDecision", "BudgetModalDecision",
     )
 
     /** Handled outside the decision dialog (card-tap legal actions). */
@@ -289,15 +289,10 @@ object ArgentumActions {
     fun needsHandlingReason(info: JSONObject): String? {
         val type = info.optJSONObject("action")?.optString("type").orEmpty()
         if (type == "DeclareAttackers" || type == "DeclareBlockers") return null
-        val requirements = info.optJSONArray("targetRequirements")?.length() ?: 0
         return when {
             info.optJSONObject("action") == null -> "Argentum sent an action without a payload."
-            info.optBoolean("requiresDamageDistribution") -> "This action divides damage between targets, which Arcana cannot set up yet."
-            info.optBoolean("requiresManaColorChoice") -> "This action needs a mana colour choice that Arcana cannot present yet."
-            info.optBoolean("requiresTargets") && (requirements > 1 || info.optInt("targetCount", 1) > 1) ->
-                "This action needs several targets chosen together, which Arcana cannot present yet."
-            info.optBoolean("requiresTargets") && info.optJSONArray("validTargets").strings().isEmpty() ->
-                "Argentum did not list any targets for this action."
+            info.optBoolean("requiresTargets") && info.optJSONArray("validTargets")?.length() == 0 &&
+                (info.optJSONArray("targetRequirements")?.length() ?: 0) == 0 -> "Argentum did not list any targets for this action."
             else -> null
         }
     }
@@ -315,4 +310,168 @@ object ArgentumActions {
     /** The epoch to send with this action: its own if present, else the snapshot's. */
     fun epochFor(info: JSONObject, snapshotEpoch: String?): String? =
         info.optString("interactionEpoch").takeUnless { it.isBlank() || it == "null" } ?: snapshotEpoch
+}
+
+/** One target slot of a legal action (LegalActionTargetInfo), or the single implied slot. */
+data class ArgentumTargetSlot(
+    val index: Int,
+    val description: String,
+    val min: Int,
+    val max: Int,
+    val valid: List<String>,
+    val byPrefix: Map<String, List<String>>,
+    val exclusiveGroups: List<List<String>>,
+)
+
+/**
+ * Everything Arcana must collect before submitting a legal action: X, targets (any number of
+ * slots), divided damage and a mana colour. Built from the server's LegalActionInfo; the result
+ * is the server's own action object with only those player choices filled in.
+ */
+data class ArgentumActionPlan(
+    val info: JSONObject,
+    val slots: List<ArgentumTargetSlot>,
+    val xRange: IntRange?,
+    val distributeTotal: Int?,
+    val distributeMin: Int,
+    val manaColors: List<String>,
+) {
+    val description: String get() = info.optString("description", "Argentum action")
+    val needsInput: Boolean get() = slots.isNotEmpty() || xRange != null || distributeTotal != null || manaColors.isNotEmpty()
+
+    /** Legal choices for a slot given earlier picks (server prefix table first, else the plain list). */
+    fun legalFor(slot: ArgentumTargetSlot, picks: Map<Int, List<String>>): List<String> {
+        val earlier = slots.filter { it.index < slot.index }.flatMap { picks[it.index].orEmpty() }
+        val key = earlier.joinToString(",")
+        val base = slot.byPrefix[key] ?: slot.valid
+        val taken = picks[slot.index].orEmpty()
+        // Exclusive groups: once one member is picked, the rest of that group is unavailable.
+        return base.filter { id -> id in taken || slot.exclusiveGroups.none { group -> id in group && group.any { it in taken } } }
+    }
+
+    fun chosenTargets(picks: Map<Int, List<String>>): List<String> = slots.flatMap { picks[it.index].orEmpty() }
+
+    fun problem(picks: Map<Int, List<String>>, distribution: Map<String, Int>, color: String?): String? {
+        for (slot in slots) {
+            val count = picks[slot.index].orEmpty().size
+            if (count < slot.min) return "Choose ${if (slot.min == slot.max) slot.min else "at least ${slot.min}"} for “${slot.description}”."
+            if (count > slot.max) return "Too many choices for “${slot.description}”."
+        }
+        distributeTotal?.let { total ->
+            val targets = chosenTargets(picks)
+            if (targets.isEmpty()) return "Choose targets before dividing damage."
+            if (targets.sumOf { distribution[it] ?: 0 } != total) return "Divide exactly $total among the targets."
+            if (targets.any { (distribution[it] ?: 0) < distributeMin }) return "Each target needs at least $distributeMin."
+        }
+        if (manaColors.isNotEmpty() && color == null) return "Choose a mana colour."
+        return null
+    }
+
+    /** The server's action with the player's choices filled in. [ref] turns a target id into ChosenTarget JSON. */
+    fun build(picks: Map<Int, List<String>>, x: Int?, distribution: Map<String, Int>, color: String?, ref: (String) -> JSONObject?): JSONObject {
+        val action = JSONObject(info.optJSONObject("action")?.toString() ?: "{}")
+        if (slots.isNotEmpty()) {
+            val targets = JSONArray()
+            slots.forEach { slot -> picks[slot.index].orEmpty().forEach { id -> ref(id)?.let(targets::put) } }
+            action.put("targets", targets)
+            if (slots.size > 1) action.put("targetGroupCounts", JSONArray(slots.map { picks[it.index].orEmpty().size }))
+        }
+        if (x != null && xRange != null) action.put("xValue", x)
+        if (distributeTotal != null) action.put("damageDistribution", JSONObject().apply { chosenTargets(picks).forEach { put(it, distribution[it] ?: 0) } })
+        if (color != null && manaColors.isNotEmpty()) action.put("manaColorChoice", color)
+        return action
+    }
+
+    companion object {
+        private fun JSONArray?.ids(): List<String> = if (this == null) emptyList() else (0 until length()).map { optString(it) }.filter { it.isNotBlank() && it != "null" }
+
+        fun from(info: JSONObject): ArgentumActionPlan {
+            val requirements = info.optJSONArray("targetRequirements")
+            val slots = if (requirements != null && requirements.length() > 0) {
+                (0 until requirements.length()).mapNotNull { requirements.optJSONObject(it) }.map { r ->
+                    val prefix = r.optJSONObject("validTargetsByPrefix")
+                    ArgentumTargetSlot(
+                        index = r.optInt("index"), description = r.optString("description", "Choose target"),
+                        min = r.optInt("minTargets", 1), max = r.optInt("maxTargets", 1), valid = r.optJSONArray("validTargets").ids(),
+                        byPrefix = prefix?.keys()?.asSequence()?.associateWith { prefix.optJSONArray(it).ids() }.orEmpty(),
+                        exclusiveGroups = r.optJSONArray("exclusiveGroups")?.let { g -> (0 until g.length()).map { g.optJSONArray(it).ids() } }.orEmpty(),
+                    )
+                }.sortedBy { it.index }
+            } else if (info.optBoolean("requiresTargets")) {
+                val count = info.optInt("targetCount", 1)
+                listOf(ArgentumTargetSlot(0, info.optString("targetDescription").takeIf { it.isNotBlank() && it != "null" } ?: "Choose target",
+                    info.optInt("minTargets", count), count, info.optJSONArray("validTargets").ids(), emptyMap(), emptyList()))
+            } else emptyList()
+            return ArgentumActionPlan(
+                info = info,
+                slots = slots,
+                xRange = ArgentumActions.xRange(info),
+                distributeTotal = if (info.optBoolean("requiresDamageDistribution")) info.optInt("totalDamageToDistribute").takeIf { it > 0 } else null,
+                distributeMin = info.optInt("minDamagePerTarget", 1),
+                manaColors = if (info.optBoolean("requiresManaColorChoice")) info.optJSONArray("availableManaColors").ids().ifEmpty { listOf("WHITE", "BLUE", "BLACK", "RED", "GREEN") } else emptyList(),
+            )
+        }
+
+        /** ChosenTarget JSON (StackComponents.kt) for a target reference from the masked state. */
+        fun chosenTarget(ref: ArgentumTargetRef): JSONObject = when (ref.type) {
+            "Player" -> JSONObject().put("type", "Player").put("playerId", ref.id)
+            "Permanent" -> JSONObject().put("type", "Permanent").put("entityId", ref.id)
+            "Spell" -> JSONObject().put("type", "Spell").put("spellEntityId", ref.id)
+            else -> JSONObject().put("type", "Card").put("cardId", ref.id).put("ownerId", ref.ownerId).put("zone", ref.zone)
+        }
+    }
+}
+
+/** SplitPilesDecision helper; mirrors DecisionValidators.validateSplitPiles. */
+data class ArgentumPileSplit(val decision: JSONObject) {
+    val cards: List<String> = decision.optJSONArray("cards")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
+    val piles: Int = decision.optInt("numberOfPiles", 2)
+    val allowUnassigned: Boolean = decision.optBoolean("allowUnassigned")
+    val labels: List<String> = (0 until piles).map { i -> decision.optJSONArray("pileLabels")?.optString(i)?.takeIf { it.isNotBlank() } ?: "Pile ${i + 1}" }
+
+    /** card -> pile index (or -1 unassigned), starting from the server's suggestion. */
+    fun initial(): Map<String, Int> {
+        val suggested = decision.optJSONArray("suggestedPiles")
+        val start = mutableMapOf<String, Int>()
+        if (suggested != null) for (p in 0 until suggested.length()) suggested.optJSONArray(p)?.let { pile -> for (i in 0 until pile.length()) start[pile.optString(i)] = p }
+        cards.forEach { if (it !in start) start[it] = if (allowUnassigned) -1 else 0 }
+        return start
+    }
+
+    fun allowedPiles(card: String): List<Int> = (0 until piles).filter { p ->
+        val options = decision.optJSONObject("pileOptions")?.optJSONArray(p.toString()) ?: return@filter true
+        (0 until options.length()).any { options.optString(it) == card }
+    }
+
+    fun problem(assign: Map<String, Int>): String? {
+        if (!allowUnassigned && cards.any { (assign[it] ?: -1) < 0 }) return "Put every card in a pile."
+        if (cards.any { c -> assign[c]?.let { it >= 0 && it !in allowedPiles(c) } == true }) return "A card is in a pile it can't go in."
+        if (decision.has("requiredAssignments") && !decision.isNull("requiredAssignments")) {
+            val need = decision.optInt("requiredAssignments")
+            if (cards.count { (assign[it] ?: -1) >= 0 } != need) return "Assign exactly $need card(s)."
+        }
+        return null
+    }
+
+    fun response(assign: Map<String, Int>): JSONObject = JSONObject().put("type", "PilesSplitResponse")
+        .put("piles", JSONArray((0 until piles).map { p -> JSONArray(cards.filter { assign[it] == p }) }))
+}
+
+/** ChooseReplacementDecision helper; mirrors DecisionValidators.validateReplacement. */
+data class ArgentumReplacementChoice(val decision: JSONObject) {
+    val from: List<String> = decision.optJSONArray("fromOptions")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
+    val to: List<String> = decision.optJSONArray("toOptions")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
+    fun allowedTo(fromIndex: Int): List<Int> = decision.optJSONArray("allowedToByFrom")?.optJSONArray(fromIndex)
+        ?.let { a -> (0 until a.length()).map { a.optInt(it) } } ?: to.indices.toList()
+    fun defaultFrom(): Int = decision.optInt("defaultFromIndex", 0).coerceIn(0, (from.size - 1).coerceAtLeast(0))
+    fun response(fromIndex: Int, toIndex: Int): JSONObject = JSONObject().put("type", "ReplacementChosenResponse").put("fromIndex", fromIndex).put("toIndex", toIndex)
+}
+
+/** BudgetModalDecision helper; modes may repeat as long as the total cost fits the budget. */
+data class ArgentumBudgetModes(val decision: JSONObject) {
+    val budget: Int = decision.optInt("budget")
+    val modes: List<Pair<Int, String>> = decision.optJSONArray("modes")?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it) }.map { it.optInt("cost") to it.optString("description") } }.orEmpty()
+    fun spent(counts: Map<Int, Int>): Int = counts.entries.sumOf { (i, n) -> (modes.getOrNull(i)?.first ?: 0) * n }
+    fun response(counts: Map<Int, Int>): JSONObject = JSONObject().put("type", "BudgetModalResponse")
+        .put("selectedModeIndices", JSONArray(counts.entries.sortedBy { it.key }.flatMap { (i, n) -> List(n) { i } }))
 }

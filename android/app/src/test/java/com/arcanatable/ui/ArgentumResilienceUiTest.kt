@@ -96,9 +96,9 @@ class ArgentumResilienceUiTest {
     }
 
     @Test fun unsupportedDecisionMalformedDataBackgroundPauseAndResume() {
-        // An Argentum decision type Arcana has no control for (shape from PendingDecision.kt).
-        val split = JSONObject().put("type", "SplitPilesDecision").put("id", "split-1").put("playerId", fake.viewingPlayerId)
-            .put("prompt", "Separate these cards into two piles").put("cards", JSONArray(listOf("a", "b"))).put("numberOfPiles", 2)
+        // A decision type Arcana has no control for (a future Argentum addition).
+        val split = JSONObject().put("type", "TimeTravelDecision").put("id", "future-1").put("playerId", fake.viewingPlayerId)
+            .put("prompt", "Choose a moment in time")
         fake.stateMessage = fake.withDecision(split)
         useServer(fake.origin)
         val scenario = ActivityScenario.launch(MainActivity::class.java)
@@ -108,7 +108,7 @@ class ArgentumResilienceUiTest {
         rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
         UiTestSupport.awaitReal(rule, 30_000, "needs-handling decision panel") { shown("NEEDS HANDLING") && shown("REFRESH") }
         shot(scenario, "02-needs-handling-dialog")
-        assertTrue(shown("splitting cards into piles"))
+        assertTrue(shown("time travel"))
 
         // The player is never trapped: refresh asks Argentum again, view-table hides the panel.
         val before = fake.received.count { it.optString("type") == "requestResync" }
@@ -166,7 +166,7 @@ class ArgentumResilienceUiTest {
         UiTestSupport.settle(rule, 500)
         rule.onNode(hasTestTag("diagnostic-search")).performTextInput("needs handling")
         UiTestSupport.settle(rule, 500)
-        assertTrue(shown("SplitPilesDecision"))
+        assertTrue(shown("TimeTravelDecision"))
         shot(scenario, "06-diagnostic-search")
         val log = diagnostics()
         listOf("CONNECTION", "ENGINE", "UNSUPPORTED", "ERROR").forEach { assertTrue("log has $it entries", log.contains("\t$it\t")) }
@@ -241,6 +241,64 @@ class ArgentumResilienceUiTest {
         assertEquals("combat-1", response.getString("decisionId"))
         assertEquals(2, response.getJSONArray("edges").length())
         assertEquals(3, response.getJSONArray("edges").getJSONObject(0).getInt("amount"))
+        scenario.close()
+    }
+
+    @Test fun composerSendsDividedDamageSpellThenGameOverReturnsHome() {
+        val me = fake.viewingPlayerId
+        val state = fake.stateMessage.getJSONObject("state")
+        val opponent = state.getJSONArray("players").let { p -> (0 until p.length()).map { p.getJSONObject(it).optString("playerId") }.first { it != me } }
+        val handCard = state.getJSONArray("zones").let { z -> (0 until z.length()).map { z.getJSONObject(it) }
+            .first { it.getJSONObject("zoneId").optString("zoneType") == "Hand" && it.getJSONObject("zoneId").optString("ownerId") == me }
+            .getJSONArray("cardIds").getString(0) }
+        val oppPermanent = state.getJSONArray("zones").let { z -> (0 until z.length()).map { z.getJSONObject(it) }
+            .first { it.getJSONObject("zoneId").optString("zoneType") == "Battlefield" }.getJSONArray("cardIds").getString(0) }
+        val arc = JSONObject().put("actionType", "CastSpell").put("description", "Cast Arc Lightning").put("manaCostString", "{2}{R}")
+            .put("action", JSONObject().put("type", "CastSpell").put("playerId", me).put("cardId", handCard))
+            .put("requiresTargets", true).put("requiresDamageDistribution", true).put("totalDamageToDistribute", 3).put("minDamagePerTarget", 1)
+            .put("targetRequirements", JSONArray().put(JSONObject().put("index", 0).put("description", "Any number of targets").put("minTargets", 1).put("maxTargets", 3)
+                .put("validTargets", JSONArray(listOf(opponent, oppPermanent)))))
+        fake.stateMessage = JSONObject(fake.stateMessage.toString()).put("legalActions", JSONArray().put(arc)).put("pendingDecision", JSONObject.NULL)
+        useServer(fake.origin)
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        UiTestSupport.settle(rule)
+        rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
+        UiTestSupport.awaitReal(rule, 30_000, "table") { shown("Game active") }
+        // Open Argentum's actions from the hand drawer and pick the spell.
+        rule.onNode(hasTestTag("player-tab-you")).performClick()
+        UiTestSupport.settle(rule, 800)
+        rule.onNode(hasTestTag("hand-peek")).performClick()
+        UiTestSupport.settle(rule, 800)
+        rule.onAllNodesWithText("ACTIONS ·", substring = true)[0].performSemanticsAction(SemanticsActions.OnClick)
+        UiTestSupport.awaitReal(rule, 5_000, "action sheet") { shown("Cast Arc Lightning") }
+        UiTestSupport.settle(rule, 1_200) // let the sheet finish sliding in
+        scenario.onActivity { UiTestSupport.screenshot(it, "resilience-09-action-sheet") }
+        rule.onAllNodesWithText("Cast Arc Lightning")[0].performSemanticsAction(SemanticsActions.OnClick)
+        UiTestSupport.awaitReal(rule, 5_000, "composer") { shown("Divide 3") }
+        // Choose both targets; the composer splits 3 as 2 + 1 and enables CONFIRM.
+        val opponentName = state.getJSONArray("players").let { p -> (0 until p.length()).map { p.getJSONObject(it) }.first { it.optString("playerId") == opponent }.getString("name") }
+        val permanentName = state.getJSONObject("cards").getJSONObject(oppPermanent).getString("name")
+        val clickableRow = { text: String -> androidx.compose.ui.test.hasText(text) and androidx.compose.ui.test.hasClickAction() }
+        rule.onAllNodes(clickableRow(opponentName))[0].performSemanticsAction(SemanticsActions.OnClick)
+        UiTestSupport.settle(rule, 300)
+        rule.onAllNodes(clickableRow(permanentName))[0].performSemanticsAction(SemanticsActions.OnClick)
+        UiTestSupport.settle(rule, 500)
+        scenario.onActivity { UiTestSupport.screenshot(it, "resilience-10-composer") }
+        rule.onNodeWithText("CONFIRM").performClick()
+        UiTestSupport.awaitReal(rule, 10_000, "cast reaches server") { fake.received.any { it.optString("type") == "submitAction" } }
+        val action = fake.received.last { it.optString("type") == "submitAction" }.getJSONObject("action")
+        assertEquals("CastSpell", action.getString("type"))
+        assertEquals(2, action.getJSONArray("targets").length())
+        assertEquals(3, action.getJSONObject("damageDistribution").let { d -> d.keys().asSequence().sumOf { d.getInt(it) } })
+
+        // Game over: result screen, then HOME restores the local table.
+        fake.send(JSONObject().put("type", "gameOver").put("winnerId", me).put("reason", "LIFE_ZERO"))
+        UiTestSupport.awaitReal(rule, 10_000, "game over screen") { shown("Victory") && shown("PLAY AGAIN") }
+        assertFalse("legacy room end-of-game dialog must not appear in Argentum games", shown("unanimous vote"))
+        scenario.onActivity { UiTestSupport.screenshot(it, "resilience-11-game-over") }
+        rule.onNodeWithText("HOME").performClick()
+        UiTestSupport.awaitReal(rule, 5_000, "home") { shown("PLAY WITH ARGENTUM") }
+        assertFalse("no resume offer after a finished game", shown("RESUME GAME"))
         scenario.close()
     }
 }

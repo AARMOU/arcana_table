@@ -109,6 +109,12 @@ data class ArgentumDeckValidation(
 
 data class ArgentumTargetRef(val id: String, val name: String, val type: String, val ownerId: String? = null, val zone: String? = null)
 
+/** A spell or ability on Argentum's stack, top first. */
+data class ArgentumStackItem(val id: String, val name: String, val controllerName: String, val isYours: Boolean, val imageUrl: String?, val targetNames: List<String>)
+
+/** One line of Argentum's own game log (ClientEvent.description). */
+data class ArgentumLogLine(val description: String, val type: String, val isYours: Boolean?)
+
 /** Display projection of Argentum's masked state. It carries no rules logic. */
 data class ArgentumTableSnapshot(
     val players: List<TablePlayer>,
@@ -121,7 +127,13 @@ data class ArgentumTableSnapshot(
     val legalActions: List<JSONObject>,
     val interactionEpoch: String?,
     val serverCardIds: Map<Int, String>,
-    val targets: Map<String, ArgentumTargetRef>
+    val targets: Map<String, ArgentumTargetRef>,
+    val stack: List<ArgentumStackItem> = emptyList(),
+    val recentLog: List<ArgentumLogLine> = emptyList(),
+    val priorityPlayer: Int = -1,
+    /** Argentum's Step name, e.g. DECLARE_ATTACKERS. */
+    val stepKey: String = "",
+    val winnerName: String? = null,
 ) {
     companion object {
         fun parse(state: JSONObject, legalActions: JSONArray = JSONArray(), interactionEpoch: String? = null): ArgentumTableSnapshot {
@@ -143,7 +155,8 @@ data class ArgentumTableSnapshot(
                         "STACK" -> "Spell"
                         else -> "Card"
                     }
-                    put(id, ArgentumTargetRef(id, card.optString("name", "Card"), targetType, zoneId.optString("ownerId"), zoneType))
+                    // Keep Argentum's zone spelling ("Graveyard"): ChosenTarget.Card deserializes Zone by its serial name.
+                    put(id, ArgentumTargetRef(id, card.optString("name", "Card"), targetType, zoneId.optString("ownerId"), zoneId.optString("zoneType")))
                 }
             }
             val displayIds = linkedMapOf<String, Int>()
@@ -196,7 +209,10 @@ data class ArgentumTableSnapshot(
                             (0 until values.length()).map { values.optString(it) }.filter(String::isNotBlank)
                         }.orEmpty(),
                         chosenCreatureType = card.optString("chosenCreatureType").takeIf(String::isNotBlank),
-                        isCommander = card.optBoolean("isCommander")
+                        isCommander = card.optBoolean("isCommander"),
+                        combatRole = when { card.optBoolean("isAttacking") -> "ATTACKING"; card.optBoolean("isBlocking") -> "BLOCKING"; else -> null },
+                        damage = card.optInt("damage", 0),
+                        summoningSick = card.optBoolean("hasSummoningSickness") && typeLine.contains("Creature", ignoreCase = true)
                     )
                 }
             }
@@ -240,6 +256,30 @@ data class ArgentumTableSnapshot(
                     exile = exile, revealed = emptyList(), isEliminated = source.optBoolean("hasLost")
                 )
             }
+            val nameById = projected.associate { it.id to it.name }
+            val viewerId = state.optString("viewingPlayerId")
+            fun targetName(t: JSONObject): String? {
+                val id = t.optString("playerId").ifBlank { t.optString("entityId") }.ifBlank { t.optString("spellEntityId") }.ifBlank { t.optString("cardId") }
+                return nameById[id] ?: cards.optJSONObject(id)?.optString("name")
+            }
+            val stackIds = (0 until zones.length()).mapNotNull { zones.optJSONObject(it) }
+                .firstOrNull { it.optJSONObject("zoneId")?.optString("zoneType").equals("Stack", ignoreCase = true) }
+                ?.optJSONArray("cardIds")
+            val stack = (0 until (stackIds?.length() ?: 0)).mapNotNull { i ->
+                val id = stackIds!!.optString(i)
+                val card = cards.optJSONObject(id) ?: return@mapNotNull null
+                val controller = card.optString("controllerId")
+                val chosen = card.optJSONArray("targets")
+                ArgentumStackItem(
+                    id = id, name = card.optString("name", "Spell"), controllerName = nameById[controller] ?: "Player", isYours = controller == viewerId,
+                    imageUrl = card.optString("imageUri").takeUnless { it.isBlank() || it == "null" },
+                    targetNames = (0 until (chosen?.length() ?: 0)).mapNotNull { chosen!!.optJSONObject(it)?.let(::targetName) },
+                )
+            }.asReversed() // top of the stack first
+            val logJson = state.optJSONArray("gameLog") ?: JSONArray()
+            val recentLog = (maxOf(0, logJson.length() - 12) until logJson.length()).mapNotNull { logJson.optJSONObject(it) }
+                .mapNotNull { e -> e.optString("description").takeIf { it.isNotBlank() }?.let { ArgentumLogLine(it, e.optString("type"), if (e.has("isYours")) e.optBoolean("isYours") else null) } }
+                .asReversed()
             val activeId = state.optString("activePlayerId")
             val phase = state.optString("currentPhase", "MAIN").replace('_', ' ')
             val step = state.optString("currentStep", "MAIN").replace('_', ' ')
@@ -254,7 +294,12 @@ data class ArgentumTableSnapshot(
                 legalActions = (0 until legalActions.length()).mapNotNull { legalActions.optJSONObject(it) },
                 interactionEpoch = interactionEpoch?.takeIf(String::isNotBlank),
                 serverCardIds = displayIds.entries.associate { it.value to it.key },
-                targets = playerTargets + cardTargets
+                targets = playerTargets + cardTargets,
+                stack = stack,
+                recentLog = recentLog,
+                priorityPlayer = playerIds.indexOf(state.optString("priorityPlayerId")),
+                stepKey = state.optString("currentStep"),
+                winnerName = state.optString("winnerId").takeIf { it.isNotBlank() && it != "null" }?.let { nameById[it] ?: "Unknown" },
             )
         }
 

@@ -59,23 +59,86 @@ class ArgentumInteractionTest {
 
     // ---- Needs-handling classification ----
 
-    @Test fun unknownDecisionTypesNeedHandlingInsteadOfBlocking() {
-        for (type in listOf("SplitPilesDecision", "ChooseReplacementDecision", "BudgetModalDecision", "SomeFutureDecision")) {
-            val reason = ArgentumDecisions.needsHandlingReason(JSONObject().put("type", type))
-            assertNotNull(type, reason)
-        }
-        for (type in ArgentumDecisions.NATIVE_TYPES + ArgentumDecisions.PLAY_CARD) {
+    @Test fun onlyUnknownDecisionTypesNeedHandling() {
+        assertNotNull(ArgentumDecisions.needsHandlingReason(JSONObject().put("type", "SomeFutureDecision")))
+        // Every decision type in Argentum's rules engine today has a native control.
+        for (type in listOf("ChooseTargetsDecision", "SelectCardsDecision", "YesNoDecision", "BatchYesNoDecision", "ChooseModeDecision",
+            "ChooseColorDecision", "ChooseNumberDecision", "DistributeDecision", "OrderObjectsDecision", "SplitPilesDecision",
+            "ChooseOptionDecision", "ChooseReplacementDecision", "AssignDamageDecision", "SearchLibraryDecision", "ReorderLibraryDecision",
+            "SelectManaSourcesDecision", "BudgetModalDecision", "CombatResolutionDecision", "PlayCardDecision")) {
             assertNull(type, ArgentumDecisions.needsHandlingReason(JSONObject().put("type", type)))
         }
     }
 
-    @Test fun multiTargetActionsNeedHandling() {
-        val info = JSONObject().put("action", JSONObject().put("type", "CastSpell"))
-            .put("requiresTargets", true).put("targetCount", 2).put("validTargets", JSONArray(listOf("a", "b")))
-        assertNotNull(ArgentumActions.needsHandlingReason(info))
-        val single = JSONObject().put("action", JSONObject().put("type", "CastSpell"))
-            .put("requiresTargets", true).put("validTargets", JSONArray(listOf("a")))
-        assertNull(ArgentumActions.needsHandlingReason(single))
+    @Test fun multiTargetActionsBuildArgentumShape() {
+        val info = JSONObject().put("description", "Cast Arc Lightning")
+            .put("action", JSONObject().put("type", "CastSpell").put("cardId", "spell").put("playerId", "me"))
+            .put("requiresTargets", true).put("requiresDamageDistribution", true).put("totalDamageToDistribute", 3).put("minDamagePerTarget", 1)
+            .put("targetRequirements", JSONArray()
+                .put(JSONObject().put("index", 0).put("description", "Any target").put("minTargets", 1).put("maxTargets", 3).put("validTargets", JSONArray(listOf("opp", "bear", "elf")))))
+        val plan = ArgentumActionPlan.from(info)
+        assertTrue(plan.needsInput)
+        assertNull(ArgentumActions.needsHandlingReason(info))
+        val picks = mapOf(0 to listOf("opp", "bear"))
+        assertNotNull("must divide exactly 3", plan.problem(picks, mapOf("opp" to 1, "bear" to 1), null))
+        assertNull(plan.problem(picks, mapOf("opp" to 2, "bear" to 1), null))
+        val refs = mapOf(
+            "opp" to ArgentumTargetRef("opp", "Opponent", "Player"),
+            "bear" to ArgentumTargetRef("bear", "Bear", "Permanent", "opp", "Battlefield"))
+        val action = plan.build(picks, null, mapOf("opp" to 2, "bear" to 1), null) { refs[it]?.let(ArgentumActionPlan::chosenTarget) }
+        assertEquals("Player", action.getJSONArray("targets").getJSONObject(0).getString("type"))
+        assertEquals("bear", action.getJSONArray("targets").getJSONObject(1).getString("entityId"))
+        assertEquals(2, action.getJSONObject("damageDistribution").getInt("opp"))
+        assertFalse("single slot sends no group counts", action.has("targetGroupCounts"))
+    }
+
+    @Test fun twoSlotActionsSendGroupCountsAndRespectPrefixes() {
+        val info = JSONObject().put("action", JSONObject().put("type", "CastSpell").put("cardId", "s").put("playerId", "me")).put("requiresTargets", true)
+            .put("targetRequirements", JSONArray()
+                .put(JSONObject().put("index", 0).put("description", "Target creature you control").put("minTargets", 1).put("maxTargets", 1).put("validTargets", JSONArray(listOf("a", "b"))))
+                .put(JSONObject().put("index", 1).put("description", "Another target creature").put("minTargets", 1).put("maxTargets", 1)
+                    .put("validTargets", JSONArray(listOf("a", "b", "c"))).put("validTargetsByPrefix", JSONObject().put("a", JSONArray(listOf("b", "c"))).put("b", JSONArray(listOf("a", "c"))))))
+        val plan = ArgentumActionPlan.from(info)
+        assertEquals(listOf("b", "c"), plan.legalFor(plan.slots[1], mapOf(0 to listOf("a"))))
+        val action = plan.build(mapOf(0 to listOf("a"), 1 to listOf("c")), null, emptyMap(), null) { JSONObject().put("type", "Permanent").put("entityId", it) }
+        assertEquals(listOf(1, 1), (0 until 2).map { action.getJSONArray("targetGroupCounts").getInt(it) })
+    }
+
+    @Test fun manaColourAndXAreFilledIn() {
+        val info = JSONObject().put("action", JSONObject().put("type", "ActivateAbility").put("sourceId", "lotus"))
+            .put("requiresManaColorChoice", true).put("availableManaColors", JSONArray(listOf("RED", "GREEN")))
+        val plan = ArgentumActionPlan.from(info)
+        assertNotNull(plan.problem(emptyMap(), emptyMap(), null))
+        assertEquals("GREEN", plan.build(emptyMap(), null, emptyMap(), "GREEN") { null }.getString("manaColorChoice"))
+        val x = ArgentumActionPlan.from(JSONObject().put("action", JSONObject().put("type", "CastSpell")).put("hasXCost", true).put("maxAffordableX", 5))
+        assertEquals(5, x.build(emptyMap(), 5, emptyMap(), null) { null }.getInt("xValue"))
+    }
+
+    @Test fun cardTargetsKeepArgentumZoneSpelling() {
+        val json = ArgentumActionPlan.chosenTarget(ArgentumTargetRef("c1", "Grizzly Bears", "Card", "me", "Graveyard"))
+        assertEquals("Graveyard", json.getString("zone"))
+        assertEquals("Card", json.getString("type"))
+    }
+
+    @Test fun pileSplitReplacementAndBudgetMirrorValidators() {
+        val split = ArgentumPileSplit(JSONObject().put("type", "SplitPilesDecision").put("cards", JSONArray(listOf("a", "b", "c"))).put("numberOfPiles", 2)
+            .put("suggestedPiles", JSONArray().put(JSONArray(listOf("a"))).put(JSONArray(listOf("b")))))
+        val start = split.initial()
+        assertEquals(0, start["c"])
+        assertNull(split.problem(start))
+        val piles = split.response(start).getJSONArray("piles")
+        assertEquals(2, piles.length()); assertEquals(2, piles.getJSONArray(0).length())
+
+        val replacement = ArgentumReplacementChoice(JSONObject().put("fromOptions", JSONArray(listOf("Draw", "Damage")))
+            .put("toOptions", JSONArray(listOf("Skip", "Double"))).put("allowedToByFrom", JSONArray().put(JSONArray(listOf(0))).put(JSONArray(listOf(1)))))
+        assertEquals(listOf(1), replacement.allowedTo(1))
+        assertEquals(1, replacement.response(1, 1).getInt("toIndex"))
+
+        val budget = ArgentumBudgetModes(JSONObject().put("budget", 3).put("modes", JSONArray()
+            .put(JSONObject().put("cost", 1).put("description", "Draw")).put(JSONObject().put("cost", 2).put("description", "Hit"))))
+        val counts = mapOf(0 to 1, 1 to 1)
+        assertEquals(3, budget.spent(counts))
+        assertEquals(listOf(0, 1), budget.response(counts).getJSONArray("selectedModeIndices").let { a -> (0 until a.length()).map { a.getInt(it) } })
     }
 
     @Test fun xCostRangeAndValue() {

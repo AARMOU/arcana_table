@@ -25,6 +25,8 @@ class FakeArgentumServer {
     @Volatile var socket: WebSocket? = null
     @Volatile var stateMessage: JSONObject = fixture("state-main-phase-with-actions.json")
     @Volatile var gameRunning = false
+    /** When true, deal the recorded opening hand and wait for keepHand before the first state. */
+    @Volatile var dealOpeningHand = false
 
     val viewingPlayerId: String get() = stateMessage.getJSONObject("state").optString("viewingPlayerId")
     val origin: String get() = server.url("/").toString().trimEnd('/')
@@ -70,6 +72,10 @@ class FakeArgentumServer {
                 "setQuickGameLobbyReady" -> {
                     gameRunning = true
                     webSocket.send(JSONObject().put("type", "gameStarted").put("players", JSONArray().put(JSONObject().put("playerId", viewingPlayerId).put("isYou", true))).toString())
+                    if (dealOpeningHand) webSocket.send(fixture("mulligan-decision.json").toString()) else webSocket.send(stateMessage.toString())
+                }
+                "keepHand" -> {
+                    webSocket.send(JSONObject().put("type", "mulliganComplete").toString())
                     webSocket.send(stateMessage.toString())
                 }
                 "requestResync" -> webSocket.send(stateMessage.toString())

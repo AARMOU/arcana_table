@@ -94,10 +94,11 @@ class LiveArgentumGameTest {
         rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
         var kept = false
         UiTestSupport.awaitReal(rule, 120_000, "Argentum mulligan, then the first authoritative state on the table") {
-            if (!kept && textShown("KEEP HAND")) {
-                shot(scenario, "02-mulligan")
+            if (!kept && textShown("MULLIGAN") && textShown("KEEP ")) {
+                UiTestSupport.settle(rule, 500)
+                shot(scenario, "02-opening-hand")
                 note("Mulligan decision received from Argentum; keeping")
-                rule.onNodeWithText("KEEP HAND").performClick()
+                rule.onAllNodesWithText("KEEP ", substring = true)[0].performClick()
                 kept = true
             }
             textShown("Game active")
@@ -125,7 +126,7 @@ class LiveArgentumGameTest {
                 else -> {
                     // Open our own board, then the hand drawer, then Argentum's legal actions.
                     // The pager keeps off-screen pages composed; trigger the tab's click action directly.
-                    note("step: open own board"); rule.onAllNodesWithText("YOU")[0].performSemanticsAction(SemanticsActions.OnClick)
+                    note("step: open own board"); rule.onNode(androidx.compose.ui.test.hasTestTag("player-tab-you")).performClick()
                     UiTestSupport.settle(rule, 800)
                     note("step: open hand drawer"); rule.onNode(androidx.compose.ui.test.hasTestTag("hand-peek")).performClick()
                     UiTestSupport.settle(rule, 800)
@@ -138,8 +139,8 @@ class LiveArgentumGameTest {
                         note("Played a land via Argentum legal action")
                         playedLand = true
                     } else {
-                        rule.onNodeWithText("CANCEL").performClick()
-                        UiTestSupport.settle(rule, 300)
+                        rule.onNodeWithText("CLOSE").performClick() // close the action sheet
+                        UiTestSupport.settle(rule, 500)
                         rule.onAllNodesWithText("PASS PRIORITY")[0].performSemanticsAction(SemanticsActions.OnClick)
                         passes++
                         note("Passed priority (#$passes)")

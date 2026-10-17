@@ -1,10 +1,10 @@
-# Arcana Table × Argentum — Integration Build 88
+# Arcana Table × Argentum — Build 89
 
 This branch (`experimental/arcana-argentum-integration`) is Arcana Table's mobile table and customization UI running games on the **Argentum Engine**. Argentum owns the game state, rules, legal actions, decisions, turns and the AI opponent, and Arcana renders that state and sends the player's choices. How it fits together: [docs/ARGENTUM_INTEGRATION.md](docs/ARGENTUM_INTEGRATION.md). Build steps: [BUILD_AND_TOOLS.md](BUILD_AND_TOOLS.md).
 
 ## Play a real Argentum game
 
-1. Install `app-debug.apk`. It appears as **Arcana · Argentum B88** next to any other Arcana build.
+1. Install `app-debug.apk`. It appears as **Arcana · Argentum B89** next to any other Arcana build.
 2. Tap **IMPORT PLAYER DECK → ARGENTUM DECKS**, pick a list such as *Animated Army* (Bello), then tap **IMPORT**. Any Commander deck works; Argentum validates it.
 3. Tap **PLAY WITH ARGENTUM**. Argentum checks the deck, opens a practice table against its AI and deals. Choose **KEEP HAND** or **MULLIGAN**.
 4. Play from Arcana's table:
@@ -14,6 +14,17 @@ This branch (`experimental/arcana-argentum-integration`) is Arcana Table's mobil
    - Argentum's choices (targets, modes, discard, library search, ordering, damage assignment) open as Arcana dialogs.
 5. If anything shows **NEEDS HANDLING**, Arcana has no control for that Argentum prompt yet. Nothing was chosen for you, and the event is in **⋮ → Game tools → Diagnostic log (search)**.
 6. To leave, use **⋮ → Room & game → Leave game…**, which concedes the game on Argentum.
+
+## What's new in Build 89 — polished Argentum table
+
+- **Game HUD:** a phase tracker (Begin · Main 1 · Combat · Main 2 · End), life totals that flash red or green when they change, a ring around whoever holds priority, the live stack (top first, with targets), and the latest two lines of Argentum's own game log, so you can see what the opponent just did. Tap the log lines for the full game log.
+- **Playable glow and card sheet:** cards Argentum lets you play or activate right now glow. Tapping a card opens a sheet with large art, mana cost, type, power/toughness and rules text, plus every action Argentum allows for it. Actions you can't afford are labelled, not hidden.
+- **Board badges:** ⚔ attacking, 🛡 blocking, power/toughness with remaining toughness after damage, and a dimmed "NEW" tag for summoning-sick creatures.
+- **Every Argentum choice has a control:** spells with several targets or target groups, divided damage (split evenly to start), X, mana colour, pile splits, replacement-effect choices and mode budgets all go through Arcana dialogs, built only from Argentum's offered choices. *Needs handling* now appears only for decision types Argentum adds in the future.
+- **Opening hand:** a full-screen opening hand with real cards, play/draw and mulligan info; the bottom-of-library step uses the same grid with tap-to-select.
+- **Endings:** a Victory / Defeat / Game over screen with the reason, game length, **PLAY AGAIN**, **VIEW BOARD** and **HOME**.
+- **Your move:** a short vibration when Argentum hands you priority or a choice. With Background alerts on, you get a notification instead while Arcana is in the background.
+- **Fixes:** card targets in graveyards and other zones now use Argentum's zone names (they were rejected before). An open action sheet refreshes on every new state instead of offering stale actions. Arcana's old room "game ended" dialog no longer covers the Argentum result. Seat MOVE buttons are hidden where they can't work.
 
 ## What's new in Build 88
 

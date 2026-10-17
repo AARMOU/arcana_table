@@ -62,15 +62,21 @@ class GameScreenSizesTest {
         rule.onAllNodesWithText(text, substring = substring, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
     private fun run(name: String) {
+        fake.dealOpeningHand = true
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
         rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
+        UiTestSupport.awaitReal(rule, 30_000, "opening hand screen") { shown("Opening hand") && shown("MULLIGAN") }
+        UiTestSupport.settle(rule, 600)
+        scenario.onActivity { UiTestSupport.screenshot(it, "game-$name-0-opening-hand") }
+        assertTrue("real card names from Argentum", shown("Rampaging Baloths"))
+        rule.onAllNodesWithText("KEEP ", substring = true)[0].performClick()
         UiTestSupport.awaitReal(rule, 30_000, "Argentum table") { shown("Game active") }
         UiTestSupport.settle(rule, 800)
         scenario.onActivity { UiTestSupport.screenshot(it, "game-$name-1-table") }
 
         // Own board and hand drawer.
-        rule.onAllNodesWithText("YOU", substring = false)[0].performSemanticsAction(SemanticsActions.OnClick)
+        rule.onNode(androidx.compose.ui.test.hasTestTag("player-tab-you")).performClick()
         UiTestSupport.settle(rule, 800)
         scenario.onActivity { UiTestSupport.screenshot(it, "game-$name-2-board") }
         listOf("DRAW", "TOKEN", "SHUFFLE", "NEXT STEP  ›", "MANA POOL ·").forEach {
