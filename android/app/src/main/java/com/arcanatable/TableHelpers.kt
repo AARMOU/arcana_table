@@ -218,6 +218,8 @@ internal fun layoutQuickActionTitle(id: String): String = when (id) {
     "TOKEN" -> "Create token"
     "COMBAT" -> "Combat"
     "CAST_COMMANDER" -> "Cast Commander"
+    "PASS_TO_TURN" -> "Pass to my turn"
+    "UNDO" -> "Undo"
     "NEXT_STEP" -> "Next step"
     "SHUFFLE" -> "Shuffle library"
     "LOG" -> "Game log"

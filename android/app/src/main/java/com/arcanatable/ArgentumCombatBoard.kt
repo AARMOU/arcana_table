@@ -40,6 +40,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -126,13 +127,15 @@ private fun CombatBoardFrame(
     onDismiss: () -> Unit,
 ) {
     val config = LocalConfiguration.current
+    val combatScale = LocalContext.current.getSharedPreferences("arcana_options", android.content.Context.MODE_PRIVATE)
+        .getFloat("adjust_combat_card_scale", 1f).coerceIn(.65f, 1.35f)
     val screenWidth = config.screenWidthDp
     // Short screens (phone landscape) put the two rows side by side so both stay visible.
     val sideBySide = config.screenHeightDp < 520 && screenWidth > config.screenHeightDp
-    val tileWidth = when {
+    val tileWidth = (when {
         sideBySide -> ((config.screenHeightDp - 230) * 0.68f).coerceIn(58f, 104f).dp
         screenWidth >= 900 -> 118.dp; screenWidth >= 600 -> 108.dp; else -> 92.dp
-    }
+    }) * combatScale
     val bounds = remember { mutableStateMapOf<String, Rect>() }
     var origin by remember { mutableStateOf(Offset.Zero) }
     val lineColor = Mint

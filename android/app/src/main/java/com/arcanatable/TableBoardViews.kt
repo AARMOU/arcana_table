@@ -359,6 +359,8 @@ internal fun PlayerBoard(
     playableIds: Set<Int> = emptySet(),
     /** Any board in an Argentum game: Quick Actions show only controls that work there. */
     engineGame: Boolean = false,
+    /** Whether identical Argentum permanents are drawn as one counted stack. */
+    stackIdenticalCards: Boolean = true,
     undoAvailable: Boolean = false,
     passToMyTurnActive: Boolean = false,
     onPassToMyTurn: () -> Unit = {},
@@ -451,36 +453,38 @@ internal fun PlayerBoard(
             // In an Argentum game only controls that work are shown: Argentum owns draws, tokens,
             // mana, steps and shuffles, so those manual shortcuts would be silent no-ops.
             if (engineGame) {
-                // Commander as a chip: art + name; tap to see Argentum's actions for it (cast).
-                player.commanderCard?.let { commander ->
-                    val castable = engineControlled && !commanderUnavailable && !player.isEliminated
-                    Row(
-                        Modifier.height(40.dp).clip(RoundedCornerShape(9.dp)).background(PanelLight)
-                            .border(if (commander.id in playableIds) 2.dp else 0.dp, if (commander.id in playableIds) Mint else PanelLight, RoundedCornerShape(9.dp))
-                            .combinedClickable(onClick = { if (castable) onCastCommander() else onPublicPreview(commander) }, onLongClick = { onPublicPreview(commander) })
-                            .padding(end = 10.dp).testTag("commander-chip"),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        CardFace(commander, Modifier.width(29.dp), onClick = { if (castable) onCastCommander() else onPublicPreview(commander) }, onLongClick = { onPublicPreview(commander) }, showCounters = false)
-                        Column(Modifier.padding(start = 6.dp)) {
-                            Text(commander.name, color = CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 130.dp))
-                            Text(if (commanderUnavailable) "IN PLAY" else if (castable) "COMMAND ZONE · CAST" else "COMMAND ZONE", color = if (castable) Mint else Muted, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                // Quick Actions in the order chosen in Adjust UI (only actions that work in Argentum games).
+                quickActionOrder.distinct().forEach { action -> when (action) {
+                    "CAST_COMMANDER" -> player.commanderCard?.let { commander ->
+                        // Commander as a chip: art + name; tap to see Argentum's actions for it (cast).
+                        val castable = engineControlled && !commanderUnavailable && !player.isEliminated
+                        Row(
+                            Modifier.height(40.dp).clip(RoundedCornerShape(9.dp)).background(PanelLight)
+                                .border(if (commander.id in playableIds) 2.dp else 0.dp, if (commander.id in playableIds) Mint else PanelLight, RoundedCornerShape(9.dp))
+                                .combinedClickable(onClick = { if (castable) onCastCommander() else onPublicPreview(commander) }, onLongClick = { onPublicPreview(commander) })
+                                .padding(end = 10.dp).testTag("commander-chip"),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            CardFace(commander, Modifier.width(29.dp), onClick = { if (castable) onCastCommander() else onPublicPreview(commander) }, onLongClick = { onPublicPreview(commander) }, showCounters = false)
+                            Column(Modifier.padding(start = 6.dp)) {
+                                Text(commander.name, color = CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 130.dp))
+                                Text(if (commanderUnavailable) "IN PLAY" else if (castable) "COMMAND ZONE · CAST" else "COMMAND ZONE", color = if (castable) Mint else Muted, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
-                }
+                    "GRAVEYARD" -> ZoneChip("GRAVEYARD", player.graveyard.size, enabled = true, onClick = { onZone("Graveyard") })
+                    "EXILE" -> ZoneChip("EXILE", player.exile.size, enabled = true, onClick = { onZone("Exile") })
+                    "STACK" -> QuickActionChip(if (stackCount > 0) "STACK · $stackCount" else "STACK", enabled = true, onClick = onStack)
+                    "LOG" -> QuickActionChip("GAME LOG", enabled = true, onClick = onOpenLog)
+                    "PASS_TO_TURN" -> if (engineControlled) QuickActionChip(if (passToMyTurnActive) "STOP AUTO-PASS" else "PASS TO MY TURN", enabled = !player.isEliminated, onClick = onPassToMyTurn)
+                    "UNDO" -> if (engineControlled && undoAvailable) QuickActionChip("UNDO", enabled = true, onClick = onUndo)
+                    "HAND" -> QuickActionChip("HAND · ${player.hand.size}", enabled = true, onClick = onShowHandFromZone)
+                } }
                 if (player.manaPool.values.sum() > 0) Text(
                     "MANA " + player.manaPool.filterValues { it > 0 }.entries.joinToString(" ") { (color, n) -> "${manaLetter(color)}$n" },
                     color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Black,
                     modifier = Modifier.height(44.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(9.dp)).background(Panel).padding(horizontal = 10.dp)
                 )
-                ZoneChip("GRAVEYARD", player.graveyard.size, enabled = true, onClick = { onZone("Graveyard") })
-                ZoneChip("EXILE", player.exile.size, enabled = true, onClick = { onZone("Exile") })
-                QuickActionChip(if (stackCount > 0) "STACK · $stackCount" else "STACK", enabled = true, onClick = onStack)
-                QuickActionChip("GAME LOG", enabled = true, onClick = onOpenLog)
-                if (engineControlled) {
-                    QuickActionChip(if (passToMyTurnActive) "STOP AUTO-PASS" else "PASS TO MY TURN", enabled = !player.isEliminated, onClick = onPassToMyTurn)
-                    if (undoAvailable) QuickActionChip("UNDO", enabled = true, onClick = onUndo)
-                }
                 Text("${player.library.size} IN LIBRARY", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.height(44.dp).wrapContentHeight(Alignment.CenterVertically).padding(horizontal = 4.dp))
             } else quickActionOrder.distinct().forEach { action ->
@@ -552,7 +556,7 @@ internal fun PlayerBoard(
                     item(key = "header-$type") { Text("$type  ·  ${cards.size}", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, modifier = Modifier.padding(start = 3.dp, top = 2.dp)) }
                     item(key = "cards-$type") {
                         // Full rows wrap onto the next line; identical cards share one spot with a count.
-                        val stacks = if (engineGame) stackIdentical(cards) else cards.map { CardStack(listOf(it)) }
+                        val stacks = if (engineGame && stackIdenticalCards) stackIdentical(cards) else cards.map { CardStack(listOf(it)) }
                         WrappingCardStacks(stacks, battlefieldCardWidth * boardZoom.floatValue) { stack, width ->
                             // Tapping a stack acts on a copy Argentum offers something for, if any.
                             val card = stack.cards.firstOrNull { it.id in playableIds } ?: stack.top

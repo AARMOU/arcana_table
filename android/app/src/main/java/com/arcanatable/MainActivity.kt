@@ -184,6 +184,16 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var autoUntapOnUntapStep by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("auto_untap_step", true)) }
     var openHandAfterDraw by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("open_hand_after_draw", true)) }
     var reducedSwipeMotion by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("reduced_swipe_motion", false)) }
+    var showPlayedPopup by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("adjust_play_popup", true)) }
+    var showRecentPlays by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("adjust_recent_plays", true)) }
+    var showAbilityBanners by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("adjust_ability_banners", true)) }
+    var showAiRecap by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("adjust_ai_recap", true)) }
+    var showTurnBanner by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("adjust_turn_banner", true)) }
+    var buzzOnTurn by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("adjust_turn_buzz", true)) }
+    var stackSameCards by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("adjust_stack_cards", true)) }
+    var respondGlow by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("adjust_respond_glow", true)) }
+    var playedPopupSeconds by rememberSaveable { mutableFloatStateOf(optionPrefs.getFloat("adjust_popup_seconds", 1.5f).coerceIn(1f, 3f)) }
+    var combatCardScale by rememberSaveable { mutableFloatStateOf(optionPrefs.getFloat("adjust_combat_card_scale", 1f).coerceIn(.65f, 1.35f)) }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     val layoutOrientationSuffix = if (isLandscape) "landscape" else "portrait"
@@ -213,10 +223,10 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var handCardScale by rememberSaveable(layoutOrientationSuffix) { mutableFloatStateOf(optionPrefs.getFloat("layout_hand_card_scale_$layoutOrientationSuffix", 1f).coerceIn(0.7f, 1.4f)) }
     var showEngineStatus by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("show_engine_status", true)) }
     var handActionOrderRaw by rememberSaveable(layoutOrientationSuffix) { mutableStateOf(optionPrefs.getString("layout_hand_actions_$layoutOrientationSuffix", "DRAW|REVEAL|STACK|CAST_COMMANDER|COMBAT|NEXT_STEP|PASS_TURN|MORE") ?: "DRAW|REVEAL|STACK|CAST_COMMANDER|COMBAT|NEXT_STEP|PASS_TURN|MORE") }
-    val defaultQuickActionOrder = "LIBRARY|HAND|GRAVEYARD|EXILE|REVEALED|MANA|DRAW|STACK|TOKEN|COMBAT|CAST_COMMANDER"
+    val defaultQuickActionOrder = argentumQuickActionIds.joinToString("|")
     var quickActionOrderRaw by rememberSaveable(layoutOrientationSuffix) {
         val key = "layout_quick_actions_$layoutOrientationSuffix"
-        mutableStateOf(optionPrefs.getString(key, defaultQuickActionOrder) ?: defaultQuickActionOrder)
+        mutableStateOf(normalizeArgentumQuickActionOrder(optionPrefs.getString(key, null)).joinToString("|"))
     }
     val density = LocalDensity.current
     val screenWidthDp = configuration.screenWidthDp
@@ -1096,11 +1106,11 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         val seat = players.getOrNull(active) ?: return@LaunchedEffect
         val isYou = active == localSeat
         turnBanner = TurnBannerState(TurnColors.label(isYou, seat.name, seat.isComputer), isYou, turn)
-        if (isYou && aiRecap.first in 0 until turn && !aiRecap.second.isEmpty) {
+        if (isYou && showAiRecap && aiRecap.first in 0 until turn && !aiRecap.second.isEmpty) {
             recapText = aiRecap.second.line(players.firstOrNull { it.isComputer }?.name ?: "Opponent")
             recordDiagnostic("Recap: ${recapText}", DiagnosticCategory.ENGINE)
         }
-        if (isYou && appInForeground) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+        if (isYou && buzzOnTurn && appInForeground) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
         delay(if (isYou) 1400 else 900)
         turnBanner = null
     }
@@ -2977,6 +2987,7 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     boardSpacingScale = boardSpacingScale,
                     playerSectionOrder = playerSectionOrderRaw.split('|').filter(String::isNotBlank),
                     quickActionOrder = quickActionOrderRaw.split('|').filter(String::isNotBlank),
+                    stackIdenticalCards = stackSameCards,
                     gameInProgress = gameInProgress,
                     stackCount = visibleStackCount,
                     commanderUnavailable = players[boardIndex].commanderCard?.let { commander ->
@@ -3083,7 +3094,7 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 ) else Text("Tap a player to inspect their board", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
                 if (argentumEnabled) {
                     if (passToMyTurnFrom != null) HeaderButton("AUTO-PASSING · STOP", onClick = { run { togglePassToMyTurn() } }, modifier = Modifier)
-                    else if (argentumPrimaryLabel != null) PassButton(argentumPrimaryLabel, onClick = { run { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, canRespond = argentumCanRespond, modifier = Modifier)
+                    else if (argentumPrimaryLabel != null) PassButton(argentumPrimaryLabel, onClick = { run { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, canRespond = argentumCanRespond && respondGlow, modifier = Modifier)
                     else Text(when { gameEndedOnline -> "GAME OVER"; argentumSnapshot == null -> "WAITING FOR ARGENTUM"; argentumPendingDecision != null -> "YOUR CHOICE IS NEEDED"; argentumAwaitingUpdate -> "WAITING FOR ARGENTUM"; else -> "OPPONENT HAS PRIORITY" }, color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
                 } else {
                 if (gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) HeaderButton("NEXT · ${phaseSteps[phaseIndex]}", onClick = { run { if (argentumEnabled) sendArgentumPriority() else advanceStep() } }, enabled = !argentumAwaitingUpdate, modifier = Modifier)
@@ -3110,7 +3121,7 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     if (argentumEnabled && passToMyTurnFrom != null) "AUTO-PASSING · STOP" else if (argentumEnabled) argentumPrimaryLabel ?: "WAITING" else "PASS TURN",
                     onClick = { run { if (argentumEnabled && passToMyTurnFrom != null) togglePassToMyTurn() else if (argentumEnabled) argentumPrimary() else passTurn() } },
                     enabled = if (argentumEnabled && passToMyTurnFrom != null) true else if (argentumEnabled) argentumPrimaryLabel != null && !argentumAwaitingUpdate else canPassTurnFromBoard,
-                    canRespond = argentumCanRespond,
+                    canRespond = argentumCanRespond && respondGlow,
                     modifier = Modifier.weight(1f).height(footerControlHeight)
                 )
                 Box(Modifier.weight(1.3f)) {
@@ -3133,10 +3144,11 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         @Composable
         fun TableOverlays() {
             Box(Modifier.fillMaxSize()) {
-        if (argentumEnabled && !homeOpen) TurnBanner(turnBanner)
-        if (argentumEnabled && !homeOpen) PlayFeedOverlay(playPopup, playFeed, playBanner, recapText,
+        if (argentumEnabled && !homeOpen && showTurnBanner) TurnBanner(turnBanner)
+        if (argentumEnabled && !homeOpen) PlayFeedOverlay(if (showPlayedPopup) playPopup else null, if (showRecentPlays) playFeed else emptyList(), if (showAbilityBanners) playBanner else null, if (showAiRecap) recapText else null,
             onDismissPopup = { playPopup = null }, onPreview = { playPopup = it },
-            feedOpen = playFeedOpen, onToggleFeed = { playFeedOpen = !playFeedOpen; runCatching { context.getSharedPreferences("arcana-table-ui", Context.MODE_PRIVATE).edit().putBoolean("playFeedOpen", playFeedOpen).apply() } })
+            feedOpen = playFeedOpen, onToggleFeed = { playFeedOpen = !playFeedOpen; runCatching { context.getSharedPreferences("arcana-table-ui", Context.MODE_PRIVATE).edit().putBoolean("playFeedOpen", playFeedOpen).apply() } },
+            popupDurationSeconds = playedPopupSeconds)
         if (homeOpen) {
             val deckChoices = remember(savedDecks, premadeDecks) {
                 savedDecks.map { DeckChoice(it.name, it.name, it.commander ?: parseDeckList(it.text).firstOrNull { e -> e.commander }?.name, builtIn = false) } +
@@ -4929,49 +4941,36 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         onClearAllData = { run { optionsOpen = false; clearAllConfirmOpen = true } },
         onDismiss = { run { optionsOpen = false } }
     )
-    if (layoutLabOpen) LayoutLabPage(
+    if (layoutLabOpen) AdjustUiPage(
         orientationName = if (isLandscape) "LANDSCAPE" else "PORTRAIT",
-        cardSizeScale = cardSizeScale,
-        boardSpacingScale = boardSpacingScale,
-        handSheetHeightFraction = handSheetHeightFraction,
-        footerButtonScale = footerButtonScale,
-        playerSectionOrder = playerSectionOrderRaw.split('|').filter(String::isNotBlank),
-        quickActionOrder = quickActionOrderRaw.split('|').filter(String::isNotBlank),
-        handActionOrder = handActionOrderRaw.split('|').filter(String::isNotBlank),
-        handArrangement = handArrangement,
-        handCardScale = handCardScale,
-        showEngineStatus = showEngineStatus,
-        onHandArrangement = { value -> handArrangement = value; optionPrefs.edit().putString("layout_hand_arrangement_$layoutOrientationSuffix", value.name).apply() },
-        onHandCardScale = { value -> handCardScale = value.coerceIn(0.7f, 1.4f); optionPrefs.edit().putFloat("layout_hand_card_scale_$layoutOrientationSuffix", handCardScale).apply() },
-        onShowEngineStatus = { value -> showEngineStatus = value; optionPrefs.edit().putBoolean("show_engine_status", value).apply() },
-        onCardSizeScale = { value -> cardSizeScale = value.coerceIn(0.75f, 1.4f); optionPrefs.edit().putFloat("card_size_scale", cardSizeScale).putFloat("layout_card_size_$layoutOrientationSuffix", cardSizeScale).apply() },
-        onBoardSpacingScale = { value -> boardSpacingScale = value.coerceIn(0.5f, 2f); optionPrefs.edit().putFloat("layout_board_spacing_$layoutOrientationSuffix", boardSpacingScale).apply() },
-        onHandSheetHeightFraction = { value -> handSheetHeightFraction = value.coerceIn(0.38f, 0.95f); optionPrefs.edit().putFloat("hand_sheet_height_fraction", handSheetHeightFraction).putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction).apply() },
-        onFooterButtonScale = { value -> footerButtonScale = value.coerceIn(0.78f, 1.3f); optionPrefs.edit().putFloat("layout_footer_button_scale_$layoutOrientationSuffix", footerButtonScale).apply() },
-        onPlayerSectionOrder = { order -> playerSectionOrderRaw = order.joinToString("|"); optionPrefs.edit().putString("layout_player_sections_$layoutOrientationSuffix", playerSectionOrderRaw).apply() },
-        onQuickActionOrder = { order -> quickActionOrderRaw = order.joinToString("|"); optionPrefs.edit().putString("layout_quick_actions_$layoutOrientationSuffix", quickActionOrderRaw).apply() },
-        onHandActionOrder = { order -> handActionOrderRaw = order.joinToString("|"); optionPrefs.edit().putString("layout_hand_actions_$layoutOrientationSuffix", handActionOrderRaw).apply() },
+        cardSize = cardSizeScale, onCardSize = { value -> cardSizeScale = value.coerceIn(.75f, 1.4f); optionPrefs.edit().putFloat("card_size_scale", cardSizeScale).putFloat("layout_card_size_$layoutOrientationSuffix", cardSizeScale).apply() },
+        spacing = boardSpacingScale, onSpacing = { value -> boardSpacingScale = value.coerceIn(.5f, 2f); optionPrefs.edit().putFloat("layout_board_spacing_$layoutOrientationSuffix", boardSpacingScale).apply() },
+        handHeight = handSheetHeightFraction, onHandHeight = { value -> handSheetHeightFraction = value.coerceIn(.38f, .95f); optionPrefs.edit().putFloat("hand_sheet_height_fraction", handSheetHeightFraction).putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction).apply() },
+        footerScale = footerButtonScale, onFooterScale = { value -> footerButtonScale = value.coerceIn(.78f, 1.3f); optionPrefs.edit().putFloat("layout_footer_button_scale_$layoutOrientationSuffix", footerButtonScale).apply() },
+        handScale = handCardScale, onHandScale = { value -> handCardScale = value.coerceIn(.7f, 1.4f); optionPrefs.edit().putFloat("layout_hand_card_scale_$layoutOrientationSuffix", handCardScale).apply() },
+        arrangement = handArrangement, onArrangement = { value -> handArrangement = value; optionPrefs.edit().putString("layout_hand_arrangement_$layoutOrientationSuffix", value.name).apply() },
+        actions = quickActionOrderRaw.split('|').filter(String::isNotBlank), onActions = { order -> quickActionOrderRaw = order.joinToString("|"); optionPrefs.edit().putString("layout_quick_actions_$layoutOrientationSuffix", quickActionOrderRaw).apply() },
+        popup = showPlayedPopup, onPopup = { v -> showPlayedPopup = v; optionPrefs.edit().putBoolean("adjust_play_popup", v).apply() },
+        feed = showRecentPlays, onFeed = { v -> showRecentPlays = v; optionPrefs.edit().putBoolean("adjust_recent_plays", v).apply() },
+        banners = showAbilityBanners, onBanners = { v -> showAbilityBanners = v; optionPrefs.edit().putBoolean("adjust_ability_banners", v).apply() },
+        recap = showAiRecap, onRecap = { v -> showAiRecap = v; optionPrefs.edit().putBoolean("adjust_ai_recap", v).apply() },
+        turnBanner = showTurnBanner, onTurnBanner = { v -> showTurnBanner = v; optionPrefs.edit().putBoolean("adjust_turn_banner", v).apply() },
+        turnBuzz = buzzOnTurn, onTurnBuzz = { v -> buzzOnTurn = v; optionPrefs.edit().putBoolean("adjust_turn_buzz", v).apply() },
+        stackCards = stackSameCards, onStackCards = { v -> stackSameCards = v; optionPrefs.edit().putBoolean("adjust_stack_cards", v).apply() },
+        respondGlow = respondGlow, onRespondGlow = { v -> respondGlow = v; optionPrefs.edit().putBoolean("adjust_respond_glow", v).apply() },
+        popupSeconds = playedPopupSeconds, onPopupSeconds = { v -> playedPopupSeconds = v.coerceIn(1f, 3f); optionPrefs.edit().putFloat("adjust_popup_seconds", playedPopupSeconds).apply() },
+        combatSize = combatCardScale, onCombatSize = { v -> combatCardScale = v.coerceIn(.65f, 1.35f); optionPrefs.edit().putFloat("adjust_combat_card_scale", combatCardScale).apply() },
         onReset = {
-            cardSizeScale = 1f; boardSpacingScale = 1f
-            handSheetHeightFraction = 0.52f; footerButtonScale = 1f
-            playerSectionOrderRaw = "STATUS|MANA|COMMANDER|STEP|ZONES|REVEALED|BATTLEFIELD"
-            handActionOrderRaw = "DRAW|REVEAL|STACK|CAST_COMMANDER|COMBAT|NEXT_STEP|PASS_TURN|MORE"
+            cardSizeScale = 1f; boardSpacingScale = 1f; handSheetHeightFraction = .52f; footerButtonScale = 1f; handCardScale = 1f; handArrangement = HandArrangement.AUTO_FIT
             quickActionOrderRaw = defaultQuickActionOrder
-            handArrangement = HandArrangement.AUTO_FIT; handCardScale = 1f; showEngineStatus = true
-            optionPrefs.edit()
-                .putString("layout_hand_arrangement_$layoutOrientationSuffix", handArrangement.name)
-                .putFloat("layout_hand_card_scale_$layoutOrientationSuffix", handCardScale)
-                .putBoolean("show_engine_status", showEngineStatus)
-                .putFloat("card_size_scale", cardSizeScale)
-                .putFloat("layout_card_size_$layoutOrientationSuffix", cardSizeScale)
-                .putFloat("layout_board_spacing_$layoutOrientationSuffix", boardSpacingScale)
-                .putFloat("hand_sheet_height_fraction", handSheetHeightFraction)
-                .putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", handSheetHeightFraction)
-                .putFloat("layout_footer_button_scale_$layoutOrientationSuffix", footerButtonScale)
-                .putString("layout_player_sections_$layoutOrientationSuffix", playerSectionOrderRaw)
-                .putString("layout_hand_actions_$layoutOrientationSuffix", handActionOrderRaw)
-                .putString("layout_quick_actions_$layoutOrientationSuffix", quickActionOrderRaw)
-                .apply()
+            showPlayedPopup = true; showRecentPlays = true; showAbilityBanners = true; showAiRecap = true; showTurnBanner = true; buzzOnTurn = true; stackSameCards = true; respondGlow = true
+            playedPopupSeconds = 1.5f; combatCardScale = 1f
+            optionPrefs.edit().putFloat("card_size_scale", 1f).putFloat("layout_card_size_$layoutOrientationSuffix", 1f).putFloat("layout_board_spacing_$layoutOrientationSuffix", 1f)
+                .putFloat("hand_sheet_height_fraction", .52f).putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", .52f).putFloat("layout_hand_card_scale_$layoutOrientationSuffix", 1f)
+                .putFloat("layout_footer_button_scale_$layoutOrientationSuffix", 1f)
+                .putString("layout_hand_arrangement_$layoutOrientationSuffix", HandArrangement.AUTO_FIT.name).putString("layout_quick_actions_$layoutOrientationSuffix", defaultQuickActionOrder)
+                .putBoolean("adjust_play_popup", true).putBoolean("adjust_recent_plays", true).putBoolean("adjust_ability_banners", true).putBoolean("adjust_ai_recap", true)
+                .putBoolean("adjust_turn_banner", true).putBoolean("adjust_turn_buzz", true).putBoolean("adjust_stack_cards", true).putBoolean("adjust_respond_glow", true).putFloat("adjust_popup_seconds", 1.5f).putFloat("adjust_combat_card_scale", 1f).apply()
         },
         onDismiss = { layoutLabOpen = false; optionsOpen = true }
     )

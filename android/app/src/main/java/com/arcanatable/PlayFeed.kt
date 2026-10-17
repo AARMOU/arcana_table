@@ -127,9 +127,9 @@ object PlayFeedParser {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BoxScope.PlayFeedOverlay(popup: PlayedCard?, feed: List<PlayedCard>, banner: PlayedCard?, recap: String?, onDismissPopup: () -> Unit, onPreview: (PlayedCard) -> Unit,
-    feedOpen: Boolean = true, onToggleFeed: () -> Unit = {}) {
+    feedOpen: Boolean = true, onToggleFeed: () -> Unit = {}, popupDurationSeconds: Float = 1.5f) {
     var holding by remember { mutableStateOf(false) }
-    LaunchedEffect(popup?.key, holding) { if (popup != null && !holding) { delay(1500); onDismissPopup() } }
+    LaunchedEffect(popup?.key, holding, popupDurationSeconds) { if (popup != null && !holding) { delay((popupDurationSeconds.coerceIn(1f, 3f) * 1000).toLong()); onDismissPopup() } }
     AnimatedVisibility(visible = popup != null, enter = fadeIn(tween(140)) + scaleIn(initialScale = 0.85f, animationSpec = tween(200)), exit = fadeOut(tween(250)),
         modifier = Modifier.align(Alignment.Center).testTag("played-card-popup")) {
         val shown = popup ?: return@AnimatedVisibility

@@ -747,14 +747,14 @@ internal fun OptionsPage(
                 TextButton(onClick = onOpenLayoutLab, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
                     Text("ADJUST UI LAYOUT  ›", color = Mint, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
                 }
-                Section("TABLE")
-                SettingsToggle("Follow whose turn it is", "When a turn starts, show that player's board. A tab you pick stays until the next turn.", followActivePlayer, onFollowActivePlayer, Modifier)
-                SettingsToggle("Don't stop for AI spells", "Offline: on an AI's turn, skip past its spells and abilities unless one targets you or your cards. You still block and answer prompts.", quietOpponentTurns, onQuietOpponentTurns, Modifier)
-                SettingsToggle("Show turn timer", "Show how long the current turn has taken.", timerVisible, { onToggleTimerVisibility() }, Modifier)
+                Section("GAMEPLAY")
+                SettingsToggle("Follow the active player", "Show the player whose turn it is. Your selected tab stays until the next turn.", followActivePlayer, onFollowActivePlayer, Modifier)
+                SettingsToggle("Skip AI actions unless needed", "Offline games: pass over AI spells and abilities unless they affect you. Prompts and blocks still stop the game.", quietOpponentTurns, onQuietOpponentTurns, Modifier)
+                SettingsToggle("Show turn timer", "Show the time spent on the current turn.", timerVisible, { onToggleTimerVisibility() }, Modifier)
                 Section("NOTIFICATIONS")
                 Row(Modifier.fillMaxWidth().heightIn(min = 54.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
-                        Text("Background game alerts", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Alerts while the app is in the background", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Text("Notify you when Argentum is waiting for your move.", color = Muted, fontSize = 10.sp)
                     }
                     Switch(checked = backgroundAlertsEnabled, onCheckedChange = onToggleBackgroundAlerts)
@@ -2065,6 +2065,9 @@ internal fun ChangelogDialog(onDismiss: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 99 · ADJUST UI", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• New Adjust UI screen: choose your Quick Actions, and switch the card pop-up, recent plays, banners, recap, turn banner, buzz and card stacking on or off. Pop-up time and combat card size sliders.\n• Options regrouped. New: skip AI actions unless they affect you.\n• Recent-plays strip folds away. Fetched shock lands ask to pay life (offline). X never offers more than you can pay.", color = SoftWhite, fontSize = 13.sp)
+
                 Text("BUILD 98 · CLEAN-UP", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• The old guided tutorial is gone (a new one is coming).\n• Treasures now really pay for spells offline (they were asking for a colour behind the scenes and giving up).\n• Costs like \"Return an Elf you control\" now let you pick the card.\n• Behind the scenes: the app's code is split into smaller files, ready for 4-player games.", color = SoftWhite, fontSize = 13.sp)
 
