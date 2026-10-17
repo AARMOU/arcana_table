@@ -595,6 +595,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     val viewPagerState = rememberPagerState(pageCount = { players.size + 1 })
     // Not saveable: after a relaunch/recreation the player chooses Resume (Argentum resumes on reconnect).
     var argentumEnabled by remember { mutableStateOf(false) }
+    /** True while the current Argentum game runs on the in-app engine (no server). */
+    var argentumOffline by remember { mutableStateOf(false) }
+    var offlineStarting by remember { mutableStateOf(false) }
     val cardZoom = LocalCardZoom.current
     SideEffect { cardZoom.enabled = argentumEnabled; if (!argentumEnabled) cardZoom.dismiss() }
     LaunchedEffect(showOverview, selectedPlayer, players.size, reducedSwipeMotion) {
@@ -805,8 +808,10 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
 
     /** Persisted so a relaunch can offer (never force) a resume. */
     fun setArgentumGameActive(active: Boolean) {
-        argentumResumeAvailable = active
-        optionPrefs.edit().putBoolean("argentum_game_active", active).apply()
+        // Offline games live only in this app session; there is nothing on a server to resume.
+        val resumable = active && !argentumOffline
+        argentumResumeAvailable = resumable
+        optionPrefs.edit().putBoolean("argentum_game_active", resumable).apply()
     }
 
     /** A card or player for the combat board, from Argentum's masked state. */
@@ -2807,6 +2812,65 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
      * stops and shows a needs-handling review; substitutions happen only when the player chooses
      * [acceptSubstitutions], and only for this game (the saved deck is never edited here).
      */
+    /**
+     * Offline game: Argentum's engine and AI run inside the app (engine/LocalArgentumHost). Your
+     * imported Commander deck plays one of Argentum's premade Commander decks when the full card
+     * library ships in the app; otherwise a Portal duel. Same table, same messages, no server.
+     */
+    fun startOfflineGame() {
+        if (offlineStarting || argentumEnabled) return
+        val seat = players.getOrNull(localSeat)
+        offlineStarting = true
+        argentumLastError = null
+        scope.launch {
+            try {
+                val names = seat?.takeIf { it.deckLoaded }?.let { (it.library + it.hand).filterNot { c -> c.isToken || c.name == "Hidden card" }.map { c -> c.name } }.orEmpty()
+                val commander = seat?.takeIf { it.deckLoaded }?.commanderName?.takeIf(String::isNotBlank)
+                val started = System.currentTimeMillis()
+                val prepared = withContext(Dispatchers.IO) {
+                    var result: Pair<com.arcanatable.engine.OfflineSetup, com.wingedsheep.engine.registry.CardRegistry>? = null
+                    var failure: Throwable? = null
+                    val worker = Thread(null, {
+                        try {
+                            val library = com.arcanatable.engine.OfflineCardLibrary({ path -> runCatching { context.assets.open(path) }.getOrNull() })
+                            val decks = runCatching { context.assets.open("argentum/commander-decks.json").bufferedReader().use { it.readText() } }.getOrNull()
+                            result = com.arcanatable.engine.OfflineGameSetup.build(library, lobbyPlayerName.ifBlank { "You" }, names, commander, decks)
+                        } catch (t: Throwable) { failure = t }
+                    }, "argentum-offline-setup", 256L shl 20)
+                    worker.start(); worker.join()
+                    failure?.let { throw it }
+                    result!!
+                }
+                val (setup, registry) = prepared
+                recordDiagnostic("Offline game prepared in ${System.currentTimeMillis() - started} ms: ${setup.you.commander ?: "Portal"} vs ${setup.aiDeckName}", DiagnosticCategory.ENGINE)
+                setup.notes.forEach { recordDiagnostic("Offline: $it", DiagnosticCategory.ENGINE) }
+                argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, setup.you, setup.ai, emit) }
+                argentumOffline = true
+                argentumDeckForLobby = null
+                argentumCommanderForLobby = null
+                argentumVsAiLobby = true
+                argentumLobbySubmitted = true
+                argentumLocalPlayersBackup = players.toList()
+                argentumEnabled = true
+                homeOpen = false
+                lobbyOpen = false
+                argentumSocket.connect(lobbyPlayerName)
+                var waitCount = 0
+                while (argentumStatus != ArgentumConnectionStatus.CONNECTED && waitCount < 20) { delay(100); waitCount++ }
+                argentumSocket.createCommanderPracticeLobby(vsAi = true)
+                if (setup.notes.isNotEmpty()) message = setup.notes.joinToString("\n\n") + "\n\nOpponent: ${setup.aiDeckName}."
+            } catch (error: Throwable) {
+                argentumSocket.localHostFactory = null
+                argentumOffline = false
+                argentumLastError = "Couldn't start the offline game: ${error.javaClass.simpleName}: ${error.message?.take(200)}"
+                message = argentumLastError
+                recordDiagnostic("Offline game failed to start: ${error.javaClass.simpleName}: ${error.message}", DiagnosticCategory.ERROR)
+            } finally {
+                offlineStarting = false
+            }
+        }
+    }
+
     fun startArgentumPractice(vsAi: Boolean = true, joinLobbyCode: String? = null, acceptSubstitutions: Boolean = false) {
         if (argentumDeckValidationRunning) return
         if (joinLobbyCode != null && joinLobbyCode.isBlank()) {
@@ -3497,6 +3561,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         deckLoaded = players.getOrNull(localSeat)?.deckLoaded == true,
         deckCommander = players.getOrNull(localSeat)?.commanderName,
         onArgentum = { guidedAction("home-argentum") { if (argentumEnabled) homeOpen = false else startArgentumPractice(vsAi = true) } },
+        onOffline = { guidedAction("home-offline") { startOfflineGame() } },
+        offlineWorking = offlineStarting,
         resumeAvailable = argentumResumeAvailable && !argentumEnabled,
         onResume = {
             recordDiagnostic("Player chose to resume the previous Argentum game", DiagnosticCategory.CONNECTION)
@@ -3643,6 +3709,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         if (concede) { if (argentumSnapshot == null) argentumSocket.leaveQuickGameLobby() else if (!gameEndedOnline) argentumSocket.concede() }
         argentumSocket.close()
         argentumEnabled = false
+        argentumOffline = false
         setArgentumGameActive(false)
         argentumSnapshot = null
         argentumPendingDecision = null
@@ -3675,8 +3742,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             },
             confirmButton = { TextButton(onClick = {
                 recordDiagnostic("Player chose Play again", DiagnosticCategory.ACTION)
+                val wasOffline = argentumOffline
                 closeArgentumSession(concede = false)
-                startArgentumPractice(vsAi = true)
+                if (wasOffline) startOfflineGame() else startArgentumPractice(vsAi = true)
             }) { Text("PLAY AGAIN") } },
             dismissButton = {
                 Row {
@@ -4081,114 +4149,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         onClear = { diagnosticLog.clear(); diagnosticRevision++; optionPrefs.edit().putString("diagnostic_events", "").apply(); recordDiagnostic("Diagnostic log cleared", DiagnosticCategory.APP) },
         onDismiss = { diagnosticViewerOpen = false })
 
-    if (changelogOpen) AlertDialog(
-        onDismissRequest = { changelogOpen = false },
-        title = { Text("What's new · Build ${BuildConfig.VERSION_CODE}") },
-        text = {
-            Column(
-                Modifier.fillMaxWidth()
-                    .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.62f)
-                    .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Text("BUILD 94 · ENGINE TRIAL", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Argentum's rules engine and AI now run inside the app, with no server, as a trial. Options → Help & diagnostics → Run engine self-test plays one AI-vs-AI game with the Portal cards and reports how long it took and how much memory it used.\n• Cards ship as Argentum's own card data instead of compiled code.\n• Everything else is the same as Build 93.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 93 · MORE ROOM FOR CARDS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• A slimmer table: phases sit in one strip at the top, each player's life is on their tab, and the commander and mana are small chips. Landscape phones now show the battlefield.\n• The status box only appears for problems, a waiting confirmation or something on the stack.\n• On an unfolded Fold, an opponent's board sits beside yours.\n• Your hand opens from every table screen, including the Table tab.\n• New combat board: attackers on top, your blockers below. Tap a blocker, then the attacker; lines link them and a summary reads like \"Ramosian Captain 2/2 first strike ← 3 Rabbit Tokens (1/1)\". Attacking and combat damage use the same board.\n• Hold any card to see it large. Let go to keep it up; slide off to close.\n• Fixes: \"TYPE · null\" badges and \"null\" mana costs.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 92 · QUICKER TURNS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• The game log shows the whole game from Argentum, newest first, with turn headers and your actions marked YOU.\n• The pass button says where passing takes you, like PASS → TO COMBAT.\n• PASS TO MY TURN keeps passing for you and stops when you're attacked, an opponent casts something, or Argentum needs a choice.\n• UNDO appears when Argentum lets you take back your last action.\n• Quick Actions only show buttons that work in Argentum games: Graveyard, Exile, Stack, Game log, Cast commander, Pass to my turn.\n• The table follows whose turn it is (turn this off in Options).\n• Options: Developer Options are gone; a new Help & diagnostics section has the connection test, diagnostic log, What's new and the guided tour.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 89 · POLISHED ARGENTUM TABLE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Game HUD: phase tracker, life totals that flash on change, who has priority, the live stack, and the latest moves from Argentum's game log.\n• Cards Argentum lets you play glow; tapping a card opens a sheet with its art, rules text and every action Argentum allows right now.\n• Battlefield badges for attacking, blocking, power/toughness with damage, and summoning sickness.\n• Every Argentum choice now has a control: multi-target spells, divided damage, X, mana colour, piles, replacement choices and mode budgets.\n• Full-screen opening hand, a Victory / Defeat screen with Play again, and a buzz (or background alert) when it's your move.\n• Fixes: graveyard targets, stale actions after a new state, and an old room dialog appearing at Argentum game over.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 88 · COMBAT DAMAGE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Combat damage now opens a damage board instead of stopping at Needs handling. It starts from Argentum's own assignment, so Confirm damage applies it in one tap; adjust amounts per blocker and trample target with lethal hints, and Arcana only enables Confirm for splits Argentum accepts.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 87 · ARGENTUM INTEGRATION", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Attack and block declarations come from Argentum; the main button names what it will do (Pass priority, Declare attackers, Declare blockers).\n• More Argentum choices open in Arcana dialogs: modes, library search, ordering, mana auto-pay, damage assignment and distribution. Anything else shows a Needs handling notice with Cancel, Refresh or View table instead of blocking the app.\n• Unsupported deck cards open a review: play without them for this game, play the full deck in the Arcana sandbox, or edit the deck. Your saved deck is never changed.\n• No automatic resume: after a relaunch, choose Resume game or End that game. A connection lost in the background waits for Resume.\n• Engine status strip, searchable diagnostic log with redacted export, and a hand drawer that rearranges cards as you resize it (Adjust UI → Hand).", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 86 · ARGENTUM PREMADE DECKS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Removed random external deck fetching. The importer now offers Argentum's own premade Commander lists and only shows lists that pass the live Argentum Commander validator.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 84 · ARGENTUM COMPATIBLE-DECK FILTERING", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Practice, create-room, and join-room actions now use Argentum Commander lobbies. The host can copy the server room code, joining validates the imported deck with Argentum first, and the Argentum stack panel displays server state and submits server-provided Pass Priority actions.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 82 · ARGENTUM NATIVE TABLE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Argentum practice games now run through Arcana’s existing table and player screens. The server validates the imported Commander deck, unsupported cards are removed and replaced only with Argentum-supported basic lands, and Argentum supplies the masked game state and legal actions. The native client keeps its connection active while switching apps and reconnects after a drop. Common opening-hand, target, color, option, number, and card-selection decisions are shown in Arcana dialogs.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 81 · QUICK ACTIONS AND TURN COUNTER", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• The player-screen zone strip is now a configurable Quick Actions bar. Add, remove, and reorder zone shortcuts and actions in Adjust UI; empty zones stay visible with a count of 0. The Mana Pool element now appears on the live player board when enabled.\n• Mana pips are larger across card costs and text, and card three-dot menus have smaller visible buttons with an accessible tap area.\n• The TURN counter advances after every eligible player has completed a turn. It remains labeled TURN.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 80 · PLAYER BATTLEFIELD HEIGHT FIX", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Removed the extra weighted spacer above the player footer. The player board now receives the full available height, so the battlefield fills the space above the footer instead of leaving a large blank gap.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 79 · TABLE CARDS AND LIBRARY PRIVACY", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Deck imports automatically try close Scryfall name matches before opening review; the review menu appears only for cards or deck issues that remain unresolved, and successful corrections are reported.\n• The table overview enlarges cards to use each player panel's available width. Player battlefield windows use the full space above the footer and open at the top when switching boards.\n• General library browsing displays a randomized card list without library positions. The Adjust UI editor now selects the matching list item when you tap or drag a preview element.\n• Mana pool is a separate removable and reorderable player-screen element. Tapping the health/activity bar opens Player Status with life, commander damage, counters, and turn details; the life buttons remain quick controls.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 78 · DRAGGABLE UI EDITOR AND PLAYER LAYOUT", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Long-press and drag player-screen elements or hand-tray buttons in the editor's sample layout. The active item lifts and tracks your finger while neighboring items animate into place.\n• Player-screen footer controls stay aligned to the bottom, with a larger hand button. The battlefield automatically fills available space and scrolls when its cards exceed that space.\n• Removed the Large View toggle from the table view.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 77 · DRAG-AND-DROP UI EDITOR", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Adjust UI now lets you drag to reorder player-screen sections, remove and restore sections such as the health/activity bar and commander strip, and add, remove, and reorder hand-tray buttons. Layouts are saved separately for portrait and landscape.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 76 · PLAYER LAYOUT AND HAND ACTIONS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Player-screen footer buttons now align on the bottom edge. Opening-hand cards are larger, and the hand tray includes Cast Commander when it can be cast. Pass Priority is the primary stack action; Resolve Top remains available as a smaller action after everyone passes.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 75 · MANA PIPS AND UI ADJUSTMENT", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Mana-choice buttons show colored mana pips. Open the app menu and tap Adjust UI to go straight to the layout controls.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 74 · HAND TRAY AND PLAYER CONTROLS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Opening-hand cards are larger, and hand-tray cards grow or shrink with the drawer. The tray now holds Draw, Combat, Stack, turn flow, and secondary game commands; the Stack shortcut is off the view selector. The player footer stays at the bottom, and the old drag-to-play hint is gone.\n• Mana symbols use colored pips. Permanents that say to choose a creature type prompt for one as they enter and display the choice. Public card mentions in the game log can open a card preview.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 73 · TARGETING EXPERIMENT", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Targeted spells, Auras, activated abilities, and recognized targeted triggers pause for target selection. The picker lists visible players, permanents, stack items, and cards in visible zones; add a legal target by name if it is not listed. Chosen targets appear on the stack and in the game log, and sync to the room. The picker estimates target count, but players still verify card-specific restrictions. This experimental app installs separately from the stable release.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 72 · PLAYER TABS AND ACTIVE BOARD", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Player view tabs use cropped commander artwork with the player name at the bottom. On the full table, the active player's board opens automatically and the view scrolls to it; the previous active board closes when the turn changes. The player footer has PASS TURN, a larger centered HAND button, and BACK TO TABLE. Mana access is now in the player status header. ADD TOKEN is in MORE; the footer no longer shows the library count. The command-zone strip is more compact while preserving commander casting, cast count, tax, and status.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 71 · CHAT COPY AND PASTE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Chat messages support text selection by long-pressing, with Android's copy action. Added a PASTE control to append clipboard text to the draft; the message field also keeps Android's normal text paste menu.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 70 · DUPLICATE PERMANENT FIX", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Resolving an activated or loyalty ability now leaves its source permanent in its current zone. Only resolving a spell moves that spell card to the battlefield or graveyard.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 69 · SOURCE UPDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Added trigger detection for recognized spell-cast, draw, and creature-entry events. Triggers show their event and effect, offer target-player selection for supported player-target effects, and keep modes or unsupported effects on a manual-resolution path. Rhystic Study and Smothering Tithe keep their pay-or-resolve choices.\n• Expanded simple automatic effect handling for targeted player life, draw, and token effects after a target is chosen.\n• The Activity Log now includes turn phase, spell cost/payment detail, trigger events, automatic changes, and manual-resolution notes, with visual emphasis for payments, triggers, and effects.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 68 · SOURCE UPDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• The opening-hand screen now shows card faces. Tap any card to open a large preview; while choosing cards to bottom, use the separate button beneath each card to select it. The selection count and required bottom count remain visible.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 67 · SOURCE UPDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• Added a multiplayer opening-hand step before Ready Up. Each player can keep or mulligan; every mulligan shuffles the whole hand into the library and deals a fresh seven. The first multiplayer mulligan is free.\n• After keeping, players tap the exact number of cards to put on the bottom of their library.\n• Ready Up now requires a confirmed opening hand. LAN and Internet room state carries mulligan status, and room servers reject ready requests until both the deck and hand decision are set.\n• Starting the lobby game preserves each player's chosen hand and library order instead of dealing a new hand.\n\nThis is a source-only update; the Build 66 APK does not include these changes.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 66 · CHANGES SINCE BUILD 65", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("• The hand panel can now be resized by dragging its top handle and remembers its height.\n• The stack window closes automatically when the stack is empty and pending triggers or payment choices have finished; reopen it any time from the Stack button.\n• Player views use tighter spacing, compact zone chips, and a battlefield area sized to its cards that scrolls when crowded.\n• Diagnostic logs now capture repeated deck quantities, visible card moves, zone totals, repeated card-instance IDs, and inbound snapshot sequence numbers to help trace import and sync problems.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 65", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                Text("• Added an import check that flags unmatched or unverifiable cards. Auto Fix closes the review when every card is matched; unresolved cards can be opened in the editor for manual correction.\n• Added automatic handling for supported fixed life, draw, and token effects, plus simple creature-entry life triggers. Effects the app cannot safely parse prompt the player to resolve them manually.\n• Added a persistent Stack button beside the view tabs and another in the hand tray; the tab button highlights while the stack has items.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("EARLIER CHANGES · BUILDS 60–64", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                Text("BUILD 60", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                Text("• Rebuilt the optional visual guide with screen highlights and straight red arrows.\n• Added Share Room, the default room URL reminder, tapped-entry choices, and shock-land life prompts.\n• Added an empty-stack notice and simplified menu labels.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 61", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                Text("• Enlarged the tutorial panels and controls. The room URL step now explains that the default address is already set and can continue without opening the keyboard.\n• Improved card-action dialog layout so titles and actions fit.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 62", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                Text("• Added Next to every tutorial step, plus an import review with Auto Fix and Trim Excess.\n• Added per-card moves from Graveyard and Exile, and hid Set as Commander after one is assigned.\n• Concealed face-down card details. Made Cast from Hand the primary stack action and tucked manual ability entry behind a small control.\n• Replaced clunky view swipes with synchronized table/player paging and aligned the hand-sheet drag handle.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 63", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                Text("• Improved stack-window sizing.\n• Updated the deck editor to track cards in every zone and keep rename/remove actions available after cards move.\n• Improved AI readiness and recovery from unexpected turn errors.\n• Expanded mana-ability tracking for common mana rocks, dual-color choices, and basic lands.", color = SoftWhite, fontSize = 11.sp)
-
-                Text("BUILD 64", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
-                Text("• Fixed the Table overview layout so player panels remain visible.", color = SoftWhite, fontSize = 11.sp)
-            }
-        },
-        confirmButton = { TextButton(onClick = { changelogOpen = false }) { Text("CLOSE", color = Mint) } },
-        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
-    )
+    if (changelogOpen) ChangelogDialog(onDismiss = { changelogOpen = false })
 
     // The guide is layered over the real screen at the end of this composition.
     // Argentum games: the hand drawer always shows YOUR hand and opens from any table screen.
@@ -4370,6 +4331,12 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         }
     )
 
+            }
+        }
+        // TableOverlays is split in two so each half stays under the JVM's 64 KB method limit.
+        @Composable
+        fun TableOverlaysB() {
+            Box(Modifier.fillMaxSize()) {
     fun makeRoomClient(hostAddress: String, code: String, password: String, preferredSeat: Int? = null): LanRoomClient {
         return LanRoomClient(
             onSeatAssigned = { seat -> scope.launch(Dispatchers.Main) {
@@ -5311,6 +5278,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         backgroundAlertsEnabled = backgroundAlertsEnabled,
         followActivePlayer = followActivePlayer,
         connectionLabel = when {
+            argentumEnabled && argentumOffline -> "Offline game · Argentum running on this phone"
             argentumEnabled -> "Argentum · ${argentumStatus.name.lowercase().replaceFirstChar(Char::uppercase)}"
             else -> "Argentum · not in a game"
         },
@@ -5770,6 +5738,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             }
         }
         TableOverlays()
+        TableOverlaysB()
         SnackbarHost(
             hostState = automaticActionSnackbar,
             modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 12.dp, vertical = 4.dp),
@@ -5993,6 +5962,8 @@ private fun RoomHomeScreen(
     deckLoaded: Boolean,
     deckCommander: String?,
     onArgentum: () -> Unit,
+    onOffline: () -> Unit = {},
+    offlineWorking: Boolean = false,
     resumeAvailable: Boolean,
     onResume: () -> Unit,
     onDismissResume: () -> Unit,
@@ -6030,6 +6001,12 @@ private fun RoomHomeScreen(
                     modifier = Modifier.fillMaxWidth().heightIn(min = 58.dp).then(tutorialAnchor("home-argentum")),
                     colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)
                 ) { Text(when { argentumActive -> "RETURN TO ARGENTUM TABLE"; argentumWorking -> "CHECKING DECK WITH ARGENTUM…"; else -> "PLAY WITH ARGENTUM" }, fontSize = 14.sp, fontWeight = FontWeight.Black) }
+                if (!argentumActive) OutlinedButton(
+                    onClick = onOffline,
+                    enabled = !argentumWorking && !offlineWorking && !resumeAvailable,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 54.dp).testTag("home-offline"),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Mint)
+                ) { Text(if (offlineWorking) "PREPARING OFFLINE GAME…" else "PLAY OFFLINE VS AI", fontSize = 13.sp, fontWeight = FontWeight.Black) }
                 OutlinedButton(
                     onClick = onImportDeck,
                     enabled = !argentumActive && !argentumWorking,
@@ -9074,4 +9051,120 @@ private fun ArgentumOpeningHandScreen(
             confirmButton = { TextButton(onClick = { inspected = null }) { Text("CLOSE") } }
         )
     }
+}
+
+/** "What's new": the build history, newest first. Kept out of TableScreenContent so that method stays under the JVM size limit. */
+@Composable
+private fun ChangelogDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = { onDismiss() },
+        title = { Text("What's new · Build ${BuildConfig.VERSION_CODE}") },
+        text = {
+            Column(
+                Modifier.fillMaxWidth()
+                    .heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.62f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("BUILD 95 · PLAY OFFLINE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• New PLAY OFFLINE VS AI button on the home screen: a full game against Argentum's AI with no internet and no server.\n• All 15,942 Argentum cards are on the phone, so your imported Commander deck plays offline against one of Argentum's premade Commander decks. Cards Argentum doesn't have are left out and replaced with basic lands (your saved deck isn't changed).\n• Not yet offline: mulligans (you keep your opening hand) and undo.", color = SoftWhite, fontSize = 13.sp)
+
+                Text("BUILD 94 · ENGINE TRIAL", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Argentum's rules engine and AI now run inside the app, with no server, as a trial. Options → Help & diagnostics → Run engine self-test plays one AI-vs-AI game with the Portal cards and reports how long it took and how much memory it used.\n• Cards ship as Argentum's own card data instead of compiled code.\n• Everything else is the same as Build 93.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 93 · MORE ROOM FOR CARDS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• A slimmer table: phases sit in one strip at the top, each player's life is on their tab, and the commander and mana are small chips. Landscape phones now show the battlefield.\n• The status box only appears for problems, a waiting confirmation or something on the stack.\n• On an unfolded Fold, an opponent's board sits beside yours.\n• Your hand opens from every table screen, including the Table tab.\n• New combat board: attackers on top, your blockers below. Tap a blocker, then the attacker; lines link them and a summary reads like \"Ramosian Captain 2/2 first strike ← 3 Rabbit Tokens (1/1)\". Attacking and combat damage use the same board.\n• Hold any card to see it large. Let go to keep it up; slide off to close.\n• Fixes: \"TYPE · null\" badges and \"null\" mana costs.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 92 · QUICKER TURNS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• The game log shows the whole game from Argentum, newest first, with turn headers and your actions marked YOU.\n• The pass button says where passing takes you, like PASS → TO COMBAT.\n• PASS TO MY TURN keeps passing for you and stops when you're attacked, an opponent casts something, or Argentum needs a choice.\n• UNDO appears when Argentum lets you take back your last action.\n• Quick Actions only show buttons that work in Argentum games: Graveyard, Exile, Stack, Game log, Cast commander, Pass to my turn.\n• The table follows whose turn it is (turn this off in Options).\n• Options: Developer Options are gone; a new Help & diagnostics section has the connection test, diagnostic log, What's new and the guided tour.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 89 · POLISHED ARGENTUM TABLE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Game HUD: phase tracker, life totals that flash on change, who has priority, the live stack, and the latest moves from Argentum's game log.\n• Cards Argentum lets you play glow; tapping a card opens a sheet with its art, rules text and every action Argentum allows right now.\n• Battlefield badges for attacking, blocking, power/toughness with damage, and summoning sickness.\n• Every Argentum choice now has a control: multi-target spells, divided damage, X, mana colour, piles, replacement choices and mode budgets.\n• Full-screen opening hand, a Victory / Defeat screen with Play again, and a buzz (or background alert) when it's your move.\n• Fixes: graveyard targets, stale actions after a new state, and an old room dialog appearing at Argentum game over.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 88 · COMBAT DAMAGE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Combat damage now opens a damage board instead of stopping at Needs handling. It starts from Argentum's own assignment, so Confirm damage applies it in one tap; adjust amounts per blocker and trample target with lethal hints, and Arcana only enables Confirm for splits Argentum accepts.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 87 · ARGENTUM INTEGRATION", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Attack and block declarations come from Argentum; the main button names what it will do (Pass priority, Declare attackers, Declare blockers).\n• More Argentum choices open in Arcana dialogs: modes, library search, ordering, mana auto-pay, damage assignment and distribution. Anything else shows a Needs handling notice with Cancel, Refresh or View table instead of blocking the app.\n• Unsupported deck cards open a review: play without them for this game, play the full deck in the Arcana sandbox, or edit the deck. Your saved deck is never changed.\n• No automatic resume: after a relaunch, choose Resume game or End that game. A connection lost in the background waits for Resume.\n• Engine status strip, searchable diagnostic log with redacted export, and a hand drawer that rearranges cards as you resize it (Adjust UI → Hand).", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 86 · ARGENTUM PREMADE DECKS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Removed random external deck fetching. The importer now offers Argentum's own premade Commander lists and only shows lists that pass the live Argentum Commander validator.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 84 · ARGENTUM COMPATIBLE-DECK FILTERING", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Practice, create-room, and join-room actions now use Argentum Commander lobbies. The host can copy the server room code, joining validates the imported deck with Argentum first, and the Argentum stack panel displays server state and submits server-provided Pass Priority actions.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 82 · ARGENTUM NATIVE TABLE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Argentum practice games now run through Arcana’s existing table and player screens. The server validates the imported Commander deck, unsupported cards are removed and replaced only with Argentum-supported basic lands, and Argentum supplies the masked game state and legal actions. The native client keeps its connection active while switching apps and reconnects after a drop. Common opening-hand, target, color, option, number, and card-selection decisions are shown in Arcana dialogs.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 81 · QUICK ACTIONS AND TURN COUNTER", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• The player-screen zone strip is now a configurable Quick Actions bar. Add, remove, and reorder zone shortcuts and actions in Adjust UI; empty zones stay visible with a count of 0. The Mana Pool element now appears on the live player board when enabled.\n• Mana pips are larger across card costs and text, and card three-dot menus have smaller visible buttons with an accessible tap area.\n• The TURN counter advances after every eligible player has completed a turn. It remains labeled TURN.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 80 · PLAYER BATTLEFIELD HEIGHT FIX", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Removed the extra weighted spacer above the player footer. The player board now receives the full available height, so the battlefield fills the space above the footer instead of leaving a large blank gap.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 79 · TABLE CARDS AND LIBRARY PRIVACY", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Deck imports automatically try close Scryfall name matches before opening review; the review menu appears only for cards or deck issues that remain unresolved, and successful corrections are reported.\n• The table overview enlarges cards to use each player panel's available width. Player battlefield windows use the full space above the footer and open at the top when switching boards.\n• General library browsing displays a randomized card list without library positions. The Adjust UI editor now selects the matching list item when you tap or drag a preview element.\n• Mana pool is a separate removable and reorderable player-screen element. Tapping the health/activity bar opens Player Status with life, commander damage, counters, and turn details; the life buttons remain quick controls.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 78 · DRAGGABLE UI EDITOR AND PLAYER LAYOUT", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Long-press and drag player-screen elements or hand-tray buttons in the editor's sample layout. The active item lifts and tracks your finger while neighboring items animate into place.\n• Player-screen footer controls stay aligned to the bottom, with a larger hand button. The battlefield automatically fills available space and scrolls when its cards exceed that space.\n• Removed the Large View toggle from the table view.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 77 · DRAG-AND-DROP UI EDITOR", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Adjust UI now lets you drag to reorder player-screen sections, remove and restore sections such as the health/activity bar and commander strip, and add, remove, and reorder hand-tray buttons. Layouts are saved separately for portrait and landscape.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 76 · PLAYER LAYOUT AND HAND ACTIONS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Player-screen footer buttons now align on the bottom edge. Opening-hand cards are larger, and the hand tray includes Cast Commander when it can be cast. Pass Priority is the primary stack action; Resolve Top remains available as a smaller action after everyone passes.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 75 · MANA PIPS AND UI ADJUSTMENT", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Mana-choice buttons show colored mana pips. Open the app menu and tap Adjust UI to go straight to the layout controls.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 74 · HAND TRAY AND PLAYER CONTROLS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Opening-hand cards are larger, and hand-tray cards grow or shrink with the drawer. The tray now holds Draw, Combat, Stack, turn flow, and secondary game commands; the Stack shortcut is off the view selector. The player footer stays at the bottom, and the old drag-to-play hint is gone.\n• Mana symbols use colored pips. Permanents that say to choose a creature type prompt for one as they enter and display the choice. Public card mentions in the game log can open a card preview.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 73 · TARGETING EXPERIMENT", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Targeted spells, Auras, activated abilities, and recognized targeted triggers pause for target selection. The picker lists visible players, permanents, stack items, and cards in visible zones; add a legal target by name if it is not listed. Chosen targets appear on the stack and in the game log, and sync to the room. The picker estimates target count, but players still verify card-specific restrictions. This experimental app installs separately from the stable release.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 72 · PLAYER TABS AND ACTIVE BOARD", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Player view tabs use cropped commander artwork with the player name at the bottom. On the full table, the active player's board opens automatically and the view scrolls to it; the previous active board closes when the turn changes. The player footer has PASS TURN, a larger centered HAND button, and BACK TO TABLE. Mana access is now in the player status header. ADD TOKEN is in MORE; the footer no longer shows the library count. The command-zone strip is more compact while preserving commander casting, cast count, tax, and status.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 71 · CHAT COPY AND PASTE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Chat messages support text selection by long-pressing, with Android's copy action. Added a PASTE control to append clipboard text to the draft; the message field also keeps Android's normal text paste menu.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 70 · DUPLICATE PERMANENT FIX", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Resolving an activated or loyalty ability now leaves its source permanent in its current zone. Only resolving a spell moves that spell card to the battlefield or graveyard.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 69 · SOURCE UPDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Added trigger detection for recognized spell-cast, draw, and creature-entry events. Triggers show their event and effect, offer target-player selection for supported player-target effects, and keep modes or unsupported effects on a manual-resolution path. Rhystic Study and Smothering Tithe keep their pay-or-resolve choices.\n• Expanded simple automatic effect handling for targeted player life, draw, and token effects after a target is chosen.\n• The Activity Log now includes turn phase, spell cost/payment detail, trigger events, automatic changes, and manual-resolution notes, with visual emphasis for payments, triggers, and effects.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 68 · SOURCE UPDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• The opening-hand screen now shows card faces. Tap any card to open a large preview; while choosing cards to bottom, use the separate button beneath each card to select it. The selection count and required bottom count remain visible.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 67 · SOURCE UPDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Added a multiplayer opening-hand step before Ready Up. Each player can keep or mulligan; every mulligan shuffles the whole hand into the library and deals a fresh seven. The first multiplayer mulligan is free.\n• After keeping, players tap the exact number of cards to put on the bottom of their library.\n• Ready Up now requires a confirmed opening hand. LAN and Internet room state carries mulligan status, and room servers reject ready requests until both the deck and hand decision are set.\n• Starting the lobby game preserves each player's chosen hand and library order instead of dealing a new hand.\n\nThis is a source-only update; the Build 66 APK does not include these changes.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 66 · CHANGES SINCE BUILD 65", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• The hand panel can now be resized by dragging its top handle and remembers its height.\n• The stack window closes automatically when the stack is empty and pending triggers or payment choices have finished; reopen it any time from the Stack button.\n• Player views use tighter spacing, compact zone chips, and a battlefield area sized to its cards that scrolls when crowded.\n• Diagnostic logs now capture repeated deck quantities, visible card moves, zone totals, repeated card-instance IDs, and inbound snapshot sequence numbers to help trace import and sync problems.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 65", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                Text("• Added an import check that flags unmatched or unverifiable cards. Auto Fix closes the review when every card is matched; unresolved cards can be opened in the editor for manual correction.\n• Added automatic handling for supported fixed life, draw, and token effects, plus simple creature-entry life triggers. Effects the app cannot safely parse prompt the player to resolve them manually.\n• Added a persistent Stack button beside the view tabs and another in the hand tray; the tab button highlights while the stack has items.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("EARLIER CHANGES · BUILDS 60–64", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("BUILD 60", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                Text("• Rebuilt the optional visual guide with screen highlights and straight red arrows.\n• Added Share Room, the default room URL reminder, tapped-entry choices, and shock-land life prompts.\n• Added an empty-stack notice and simplified menu labels.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 61", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                Text("• Enlarged the tutorial panels and controls. The room URL step now explains that the default address is already set and can continue without opening the keyboard.\n• Improved card-action dialog layout so titles and actions fit.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 62", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                Text("• Added Next to every tutorial step, plus an import review with Auto Fix and Trim Excess.\n• Added per-card moves from Graveyard and Exile, and hid Set as Commander after one is assigned.\n• Concealed face-down card details. Made Cast from Hand the primary stack action and tucked manual ability entry behind a small control.\n• Replaced clunky view swipes with synchronized table/player paging and aligned the hand-sheet drag handle.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 63", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                Text("• Improved stack-window sizing.\n• Updated the deck editor to track cards in every zone and keep rename/remove actions available after cards move.\n• Improved AI readiness and recovery from unexpected turn errors.\n• Expanded mana-ability tracking for common mana rocks, dual-color choices, and basic lands.", color = SoftWhite, fontSize = 11.sp)
+
+                Text("BUILD 64", color = CounterGold, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                Text("• Fixed the Table overview layout so player panels remain visible.", color = SoftWhite, fontSize = 11.sp)
+            }
+        },
+        confirmButton = { TextButton(onClick = { onDismiss() }) { Text("CLOSE", color = Mint) } },
+        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
+    )
 }

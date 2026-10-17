@@ -521,9 +521,21 @@ class ArgentumGameSocket(
     @Volatile private var retryCount = 0
     @Volatile private var status = ArgentumConnectionStatus.DISCONNECTED
     @Volatile private var manualRetry: Runnable? = null
+    /** Offline games: an in-app Argentum host stands in for the server (same messages both ways). */
+    @Volatile var localHostFactory: (((JSONObject) -> Unit) -> com.arcanatable.engine.LocalArgentumHost)? = null
+    @Volatile private var localHost: com.arcanatable.engine.LocalArgentumHost? = null
+    val isOffline: Boolean get() = localHost != null || localHostFactory != null
 
     fun connect(name: String) {
         playerName = name.trim().ifBlank { "PLAYER" }.take(32)
+        localHostFactory?.let { factory ->
+            if (localHost != null) return
+            enabled.set(true)
+            localHost = factory { message -> main.post { if (enabled.get()) onMessage(message) } }
+            setStatus(ArgentumConnectionStatus.CONNECTED)
+            localHost?.receive(JSONObject().put("type", "connect").put("playerName", playerName))
+            return
+        }
         if (enabled.getAndSet(true) && status != ArgentumConnectionStatus.DISCONNECTED) return
         retryCount = 0
         openSocket()
@@ -531,7 +543,7 @@ class ArgentumGameSocket(
 
     /** Player-initiated reconnect; also the only way out of PAUSED. */
     fun retryNow() {
-        if (status == ArgentumConnectionStatus.REPLACED) return
+        if (status == ArgentumConnectionStatus.REPLACED || localHost != null) return
         enabled.set(true)
         manualRetry?.let(main::removeCallbacks)
         retryCount = 0
@@ -539,8 +551,10 @@ class ArgentumGameSocket(
         openSocket()
     }
 
-    fun send(message: JSONObject): Boolean =
-        enabled.get() && status == ArgentumConnectionStatus.CONNECTED && socket?.send(message.toString()) == true
+    fun send(message: JSONObject): Boolean {
+        localHost?.let { host -> if (!enabled.get()) return false; host.receive(JSONObject(message.toString())); return true }
+        return enabled.get() && status == ArgentumConnectionStatus.CONNECTED && socket?.send(message.toString()) == true
+    }
 
     fun send(type: String, fields: JSONObject = JSONObject()): Boolean =
         send(JSONObject(fields.toString()).put("type", type))
@@ -575,6 +589,9 @@ class ArgentumGameSocket(
 
     fun close() {
         enabled.set(false)
+        localHost?.shutdown()
+        localHost = null
+        localHostFactory = null
         manualRetry?.let(main::removeCallbacks)
         manualRetry = null
         socket?.close(1000, "Arcana closed Argentum connection")
