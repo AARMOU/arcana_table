@@ -5,6 +5,13 @@ import com.wingedsheep.engine.core.ActionProcessor
 import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.engine.core.CastSpell
 import com.wingedsheep.engine.core.PaymentStrategy
+import com.wingedsheep.engine.core.YesNoDecision
+import com.wingedsheep.engine.core.DecisionContext
+import com.wingedsheep.engine.core.ZoneChangeEvent
+import com.wingedsheep.engine.state.components.battlefield.TappedComponent
+import com.wingedsheep.engine.state.components.identity.LifeTotalComponent
+import com.wingedsheep.sdk.core.Zone
+import com.wingedsheep.sdk.scripting.EntersTapped
 import com.wingedsheep.engine.core.BottomCards
 import com.wingedsheep.engine.core.Concede
 import com.wingedsheep.engine.core.DeclareAttackers
@@ -103,6 +110,11 @@ class LocalArgentumHost(
     private var preCombatCheckpoint: Checkpoint? = null
     private var mulliganPhase = false
 
+    // Shock lands put onto the battlefield by an effect (a fetch land, reanimation): Argentum enters
+    // them tapped without asking. Offline, Arcana asks "pay N life to untap it?" right after.
+    private data class ShockOffer(val land: EntityId, val name: String, val life: Int)
+    private val shockOffers = ArrayDeque<ShockOffer>()
+
     fun receive(message: JSONObject) = worker.execute {
         runCatching { handle(message) }.onFailure { error ->
             emit(JSONObject().put("type", "error").put("code", "LOCAL_ENGINE").put("message", "Offline engine problem: ${error.javaClass.simpleName}: ${error.message?.take(200)}"))
@@ -119,6 +131,13 @@ class LocalArgentumHost(
             "submitAction" -> {
                 val current = state ?: return
                 if (mulliganPhase) { sendError("Choose your opening hand first."); return }
+                shockOffers.firstOrNull()?.let { offer ->
+                    val raw = message.getJSONObject("action")
+                    val response = raw.optJSONObject("response")
+                    if (raw.optString("type") != "SubmitDecision" || response?.optString("decisionId") != shockId(offer)) { sendError("Answer the shock land question first."); sendState(emptyList()); return }
+                    answerShock(offer, response.optBoolean("choice"))
+                    return
+                }
                 val action = json.decodeFromString(GameAction.serializer(), message.getJSONObject("action").toString())
                 if (action.playerId != humanId) { sendError("That action belongs to another seat."); return }
                 val events = mutableListOf<GameEvent>()
@@ -135,6 +154,7 @@ class LocalArgentumHost(
                 applyUndoPolicy(processed.undoPolicy, action, current)
                 state = result.state
                 events += result.events
+                queueShockOffers(events)
                 drive(events)
                 sendState(events)
             }
@@ -359,7 +379,7 @@ class LocalArgentumHost(
         }
         while (steps++ < 2_000) {
             val current = state ?: return
-            if (current.gameOver) break
+            if (current.gameOver || shockOffers.isNotEmpty()) break
             if ((current.turnNumber to current.step) != lastShown) flush(paceMs / 3)
             val decision = current.pendingDecision
             if (decision != null) {
@@ -402,7 +422,44 @@ class LocalArgentumHost(
         else applyUndoPolicy(processed.undoPolicy, action, current)
         state = result.state
         events += result.events
+        queueShockOffers(result.events)
         return true
+    }
+
+    private fun shockId(offer: ShockOffer) = "arcana-shock-${offer.land.value}"
+
+    private fun queueShockOffers(events: List<GameEvent>) {
+        val current = state ?: return
+        events.filterIsInstance<ZoneChangeEvent>()
+            .filter { it.toZone == Zone.BATTLEFIELD && it.fromZone != Zone.HAND && it.fromZone != Zone.STACK && it.ownerId == humanId }
+            .forEach { event ->
+                val entity = current.getEntity(event.entityId) ?: return@forEach
+                if (entity.get<TappedComponent>() == null) return@forEach
+                val card = entity.get<CardComponent>() ?: return@forEach
+                val cost = registry.getCard(card.cardDefinitionId)?.script?.replacementEffects
+                    ?.filterIsInstance<EntersTapped>()?.firstOrNull()?.payLifeCost ?: return@forEach
+                if (shockOffers.none { it.land == event.entityId }) shockOffers.addLast(ShockOffer(event.entityId, card.name, cost))
+            }
+    }
+
+    private fun shockDecision(offer: ShockOffer) = YesNoDecision(
+        id = shockId(offer), playerId = humanId,
+        prompt = "Pay ${offer.life} life to have ${offer.name} enter untapped?",
+        context = DecisionContext(sourceId = offer.land, sourceName = offer.name),
+        yesText = "Pay ${offer.life} life", noText = "Leave it tapped",
+    )
+
+    private fun answerShock(offer: ShockOffer, pay: Boolean) {
+        shockOffers.removeFirst()
+        val current = state ?: return
+        val life = current.getEntity(humanId)?.get<LifeTotalComponent>()?.life
+        if (pay && life != null && current.getEntity(offer.land)?.get<TappedComponent>() != null) {
+            state = current.updateEntity(offer.land) { it.without<TappedComponent>() }
+                .updateEntity(humanId) { it.with(LifeTotalComponent(life - offer.life)) }
+        }
+        val events = mutableListOf<GameEvent>()
+        drive(events)
+        sendState(events)
     }
 
     private fun legalActions(state: GameState): List<LegalActionInfo> {
@@ -452,9 +509,11 @@ class LocalArgentumHost(
         val clientEvents = ClientEventTransformer.transform(events, humanId, current, visibility)
         gameLog += clientEvents.filter { it !is ClientEvent.PermanentTapped && it !is ClientEvent.PermanentUntapped && it !is ClientEvent.ManaAdded }
         val clientState: ClientGameState = transformer.transform(current, humanId).copy(gameLog = gameLog.toList())
-        val legal = if (interactive) legalActions(current) else emptyList()
-        val decision: PendingDecision? = if (!interactive) null else current.pendingDecision?.takeIf { current.actorFor(it.playerId) == humanId }?.let { masker.maskFor(it, current, humanId) }
-        val nextStop = if (interactive && current.priorityPlayerId == humanId && current.pendingDecision == null) {
+        val offer = shockOffers.firstOrNull()?.takeIf { interactive }
+        val legal = if (interactive && offer == null) legalActions(current) else emptyList()
+        val decision: PendingDecision? = if (!interactive) null else offer?.let(::shockDecision)
+            ?: current.pendingDecision?.takeIf { current.actorFor(it.playerId) == humanId }?.let { masker.maskFor(it, current, humanId) }
+        val nextStop = if (interactive && offer == null && current.priorityPlayerId == humanId && current.pendingDecision == null) {
             autoPass.getNextStopPoint(current, humanId, autoPass.getMeaningfulActions(withoutManaLike(legal)).isNotEmpty())
         } else null
         val message = buildJsonObject {
