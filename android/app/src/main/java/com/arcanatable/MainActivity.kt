@@ -5982,7 +5982,7 @@ private fun PlayerViewTab(name: String, commander: GameCard?, selected: Boolean,
             .combinedClickable(onClick = onClick)
     ) {
         if (!artUrl.isNullOrBlank()) {
-            CardArt(artUrl, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            CardArt(artUrl, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, label = commander?.name)
         } else {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("NO COMMANDER", color = Muted, fontSize = 7.sp, fontWeight = FontWeight.Bold)
@@ -7164,7 +7164,8 @@ private fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier =
                         Modifier.size(width = if (compact) 60.dp else 92.dp, height = if (compact) 38.dp else 58.dp)
                             .clip(RoundedCornerShape(6.dp)).border(1.dp, CounterGold.copy(alpha = 0.8f), RoundedCornerShape(6.dp))
                             .combinedClickable(onClick = { onPreview(commander) }, onLongClick = { onPreview(commander) }).then(tutorialAnchor("commander-art")),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
+                        label = commander.name
                     ) else Box(
                         Modifier.size(width = if (compact) 60.dp else 92.dp, height = if (compact) 38.dp else 58.dp)
                             .clip(RoundedCornerShape(6.dp)).background(PanelLight).border(1.dp, CounterGold, RoundedCornerShape(6.dp))
@@ -7624,10 +7625,11 @@ private fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: () 
 }
 
 @Composable
-internal fun CardArt(url: String, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Fit, fallbackName: String? = null, fallbackType: String? = null) {
+internal fun CardArt(url: String, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Fit, fallbackName: String? = null, fallbackType: String? = null, label: String? = null) {
     var bitmap by remember(url) { mutableStateOf<Bitmap?>(CardBitmapCache.get(url)) }
     LaunchedEffect(url) { if (bitmap == null) bitmap = try { downloadCardBitmap(url) } catch (_: Exception) { null } }
-    if (bitmap != null) Image(bitmap!!.asImageBitmap(), contentDescription = "Magic card art", modifier = modifier, contentScale = contentScale)
+    // Loaded art is named after the card, so screen readers (and tests) can still tell cards apart.
+    if (bitmap != null) Image(bitmap!!.asImageBitmap(), contentDescription = cardArtDescription(label, fallbackName), modifier = modifier, contentScale = contentScale)
     // While art loads (or if it cannot load), keep the card identifiable.
     else if (fallbackName != null) Column(modifier.background(Color(0xFF263B35)).padding(6.dp), verticalArrangement = Arrangement.SpaceBetween) {
         Text(fallbackName, color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 4, overflow = TextOverflow.Ellipsis)
@@ -7636,6 +7638,10 @@ internal fun CardArt(url: String, modifier: Modifier = Modifier, contentScale: C
     }
     else Box(modifier.background(Color(0xFF263B35)), contentAlignment = Alignment.Center) { Text("✦", color = Mint, fontSize = 16.sp) }
 }
+
+/** Accessibility label for loaded card art: the card's name when known, never a blank label. */
+internal fun cardArtDescription(label: String?, fallbackName: String?): String =
+    label?.takeIf { it.isNotBlank() } ?: fallbackName?.takeIf { it.isNotBlank() } ?: "Magic card art"
 
 @Composable
 private fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeight: androidx.compose.ui.unit.Dp, highlightedCardId: Int?, handRevealed: Boolean, canAdvance: Boolean, canControl: Boolean, commanderCanCast: Boolean, actionOrder: List<String>, stackCount: Int, tutorialAnchor: (String) -> Modifier, onToggleReveal: (Boolean) -> Unit, onClose: () -> Unit, onDraw: () -> Unit, onCombat: () -> Unit, onNextStep: () -> Unit, onPassTurn: () -> Unit, onStack: () -> Unit, onCastCommander: () -> Unit, onMoreAction: (String) -> Unit, onSelect: (GameCard) -> Unit, onDragDrop: (GameCard, Offset) -> Unit,

@@ -61,6 +61,10 @@ class GameScreenSizesTest {
     private fun shown(text: String, substring: Boolean = true) =
         rule.onAllNodesWithText(text, substring = substring, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
+    /** A card is identifiable either by its name as text (art not loaded) or by its art's label (art loaded). */
+    private fun cardShown(name: String) = shown(name) ||
+        rule.onAllNodes(androidx.compose.ui.test.hasContentDescription(name, substring = true), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+
     private fun run(name: String) {
         fake.dealOpeningHand = true
         val scenario = ActivityScenario.launch(MainActivity::class.java)
@@ -69,7 +73,7 @@ class GameScreenSizesTest {
         UiTestSupport.awaitReal(rule, 30_000, "opening hand screen") { shown("Opening hand") && shown("MULLIGAN") }
         UiTestSupport.settle(rule, 600)
         scenario.onActivity { UiTestSupport.screenshot(it, "game-$name-0-opening-hand") }
-        assertTrue("real card names from Argentum", shown("Rampaging Baloths"))
+        assertTrue("real card names from Argentum", cardShown("Rampaging Baloths"))
         rule.onAllNodesWithText("KEEP ", substring = true)[0].performClick()
         UiTestSupport.awaitReal(rule, 30_000, "Argentum table") { shown("Game active") }
         UiTestSupport.settle(rule, 800)
