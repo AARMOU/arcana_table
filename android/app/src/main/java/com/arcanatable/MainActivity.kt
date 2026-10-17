@@ -3104,7 +3104,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                                 if (!argentumEnabled && gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Add token") }, modifier = tutorialAnchor("menu-add-token"), onClick = { guidedAction("menu-add-token") { topMenuExpanded = false; topMenuSection = null; tokenTarget = selectedPlayer; tokenPickerOpen = true } })
                                 if (!argentumEnabled && gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Mana pool · ${trackedMana(selectedPlayer)}") }, modifier = tutorialAnchor("menu-mana"), onClick = { guidedAction("menu-mana") { topMenuExpanded = false; topMenuSection = null; manaTarget = selectedPlayer; manaPoolOpen = true } })
                                 if (!argentumEnabled && !gameEndedOnline && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Search / browse library") }, modifier = tutorialAnchor("menu-search"), onClick = { guidedAction("menu-search") { topMenuExpanded = false; topMenuSection = null; librarySearchPlayer = selectedPlayer } })
-                                if (argentumEnabled && gameInProgress) DropdownMenuItem(text = { Text("Argentum legal actions · ${argentumSnapshot?.legalActions?.size ?: 0}") }, onClick = { topMenuExpanded = false; topMenuSection = null; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } })
+                                if (argentumEnabled && gameInProgress) DropdownMenuItem(text = { Text("Argentum legal actions · ${ArgentumActions.visibleChoices(argentumSnapshot?.legalActions.orEmpty()).size}") }, onClick = { topMenuExpanded = false; topMenuSection = null; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } })
                                 if (gameInProgress) DropdownMenuItem(text = { Text("Stack and priority · $visibleStackCount") }, modifier = tutorialAnchor("menu-stack"), onClick = { guidedAction("menu-stack") { topMenuExpanded = false; topMenuSection = null; stackOpen = true } })
                                 DropdownMenuItem(text = { Text("Game log") }, modifier = tutorialAnchor("menu-log"), onClick = { guidedAction("menu-log") { topMenuExpanded = false; topMenuSection = null; logOpen = true } })
                                 DropdownMenuItem(text = { Text("MTG rules") }, modifier = tutorialAnchor("menu-rules"), onClick = { guidedAction("menu-rules") { topMenuExpanded = false; topMenuSection = null; rulesOpen = true } })
@@ -3611,7 +3611,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
 
     if (argentumActionChoices.isNotEmpty()) ArgentumActionSheet(
         card = argentumActionCard,
-        choices = argentumActionChoices.filterNot { it.optBoolean("__none") },
+        choices = ArgentumActions.visibleChoices(argentumActionChoices),
+        hidManaAbilities = argentumActionChoices.any(ArgentumActions::isManaAbility),
         busy = argentumAwaitingUpdate,
         onChoose = { info -> argentumActionChoices = emptyList(); argentumActionCard = null; chooseArgentumLegalAction(info) },
         onDismiss = { argentumActionChoices = emptyList(); argentumActionCard = null }
@@ -4125,7 +4126,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         onPassTurn = { if (argentumEnabled) argentumPrimary() else passTurn() },
                         argentumMode = argentumEnabled,
                         argentumPrimaryLabel = argentumPrimaryLabel?.takeIf { !argentumAwaitingUpdate },
-                        legalActionCount = argentumSnapshot?.legalActions?.size ?: 0,
+                        legalActionCount = ArgentumActions.visibleChoices(argentumSnapshot?.legalActions.orEmpty()).size,
                         arrangement = handArrangement,
                         cardScale = handCardScale,
                         playableIds = argentumPlayableIds,
@@ -8732,7 +8733,7 @@ private fun LocalChatPanel(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, busy: Boolean, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit) {
+private fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidManaAbilities: Boolean, busy: Boolean, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 24.dp)) {
             if (card != null) Row(verticalAlignment = Alignment.Top) {
@@ -8752,6 +8753,7 @@ private fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, busy
             Text(if (card == null) "ARGENTUM ACTIONS" else if (choices.isEmpty()) "NOTHING TO DO WITH THIS CARD RIGHT NOW" else "WHAT ARGENTUM ALLOWS NOW",
                 color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
             if (choices.isEmpty()) Text(if (card == null) "Argentum isn't offering you any actions at the moment." else "Argentum offers no action for this card at this moment (wrong timing, no mana, or not your priority).", color = Muted, fontSize = 12.sp)
+            if (hidManaAbilities) Text("Mana is paid automatically: Argentum taps your lands and mana sources when you cast or activate.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
             choices.forEach { info ->
                 val unsupported = ArgentumActions.needsHandlingReason(info)
                 val affordable = info.optBoolean("isAffordable", true)

@@ -310,6 +310,20 @@ object ArgentumActions {
     /** The epoch to send with this action: its own if present, else the snapshot's. */
     fun epochFor(info: JSONObject, snapshotEpoch: String?): String? =
         info.optString("interactionEpoch").takeUnless { it.isBlank() || it == "null" } ?: snapshotEpoch
+
+    /**
+     * True for a mana ability ("{T}: Add {G}"). Argentum pays costs itself by tapping sources
+     * automatically, so Arcana never offers these as manual actions: activating one by hand at
+     * best does nothing useful and, on a tapped permanent, is rejected with INVALID_ACTION.
+     */
+    fun isManaAbility(info: JSONObject): Boolean = info.optBoolean("isManaAbility")
+
+    /**
+     * The legal actions Arcana shows as choices: drops the "nothing to do" placeholder and every
+     * mana ability. Order is preserved.
+     */
+    fun visibleChoices(choices: List<JSONObject>): List<JSONObject> =
+        choices.filterNot { it.optBoolean("__none") || isManaAbility(it) }
 }
 
 /** One target slot of a legal action (LegalActionTargetInfo), or the single implied slot. */

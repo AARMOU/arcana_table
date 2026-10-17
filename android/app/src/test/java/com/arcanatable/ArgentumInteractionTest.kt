@@ -31,6 +31,25 @@ class ArgentumInteractionTest {
         assertEquals("Bello, Bard of the Brambles", me.commanderName)
     }
 
+    @Test fun manaAbilitiesAreNeverOfferedAsManualActions() {
+        // Argentum pays mana itself. Offering "{T}: Add {G}" by hand was rejected live with
+        // INVALID_ACTION on a land that entered tapped (Sheltered Thicket), so Arcana hides them.
+        fun info(description: String, type: String, mana: Boolean?) = JSONObject().put("description", description)
+            .put("action", JSONObject().put("type", type).put("sourceId", "e7")).apply { if (mana != null) put("isManaAbility", mana) }
+        val tapForGreen = info("{T}: Add {G}", "ActivateAbility", true)
+        val tapForRed = info("{T}: Add {R}", "ActivateAbility", true)
+        val cycle = info("Cycling {2}", "ActivateAbility", false)
+        val play = info("Play Forest", "PlayLand", null)
+        val placeholder = JSONObject().put("__none", true)
+
+        assertTrue(ArgentumActions.isManaAbility(tapForGreen))
+        assertFalse(ArgentumActions.isManaAbility(cycle))
+        assertFalse("missing flag means not a mana ability", ArgentumActions.isManaAbility(play))
+        assertEquals(listOf("Cycling {2}", "Play Forest"),
+            ArgentumActions.visibleChoices(listOf(tapForGreen, cycle, tapForRed, play, placeholder)).map { it.getString("description") })
+        assertTrue("a land with only mana abilities has nothing to offer", ArgentumActions.visibleChoices(listOf(tapForGreen, tapForRed)).isEmpty())
+    }
+
     @Test fun liveLegalActionsAreAllPresentable() {
         val message = fixture("state-main-phase-with-actions.json")
         val actions = message.getJSONArray("legalActions")

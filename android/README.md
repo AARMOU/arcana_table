@@ -1,10 +1,10 @@
-# Arcana Table × Argentum — Build 89
+# Arcana Table × Argentum — Build 90
 
 This branch (`experimental/arcana-argentum-integration`) is Arcana Table's mobile table and customization UI running games on the **Argentum Engine**. Argentum owns the game state, rules, legal actions, decisions, turns and the AI opponent, and Arcana renders that state and sends the player's choices. How it fits together: [docs/ARGENTUM_INTEGRATION.md](docs/ARGENTUM_INTEGRATION.md). Build steps: [BUILD_AND_TOOLS.md](BUILD_AND_TOOLS.md).
 
 ## Play a real Argentum game
 
-1. Install `app-debug.apk`. It appears as **Arcana · Argentum B89** next to any other Arcana build.
+1. Install `app-debug.apk`. It appears as **Arcana · Argentum B90** next to any other Arcana build.
 2. Tap **IMPORT PLAYER DECK → ARGENTUM DECKS**, pick a list such as *Animated Army* (Bello), then tap **IMPORT**. Any Commander deck works; Argentum validates it.
 3. Tap **PLAY WITH ARGENTUM**. Argentum checks the deck, opens a practice table against its AI and deals. Choose **KEEP HAND** or **MULLIGAN**.
 4. Play from Arcana's table:
@@ -14,6 +14,10 @@ This branch (`experimental/arcana-argentum-integration`) is Arcana Table's mobil
    - Argentum's choices (targets, modes, discard, library search, ordering, damage assignment) open as Arcana dialogs.
 5. If anything shows **NEEDS HANDLING**, Arcana has no control for that Argentum prompt yet. Nothing was chosen for you, and the event is in **⋮ → Game tools → Diagnostic log (search)**.
 6. To leave, use **⋮ → Room & game → Leave game…**, which concedes the game on Argentum.
+
+## What's new in Build 90
+
+- **No manual mana abilities:** tapping a land no longer offers "{T}: Add {G}" and similar mana abilities. Argentum pays costs itself by tapping your lands and mana sources, and in Build 89 these buttons were rejected (`INVALID_ACTION: This permanent is already tapped`) on a land that entered tapped. The card sheet now says that mana is paid automatically, and the **ACTIONS** count no longer includes mana abilities. Playable glow already ignored them.
 
 ## What's new in Build 89 — polished Argentum table
 

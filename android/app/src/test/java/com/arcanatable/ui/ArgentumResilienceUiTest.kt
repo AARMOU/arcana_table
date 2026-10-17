@@ -244,6 +244,35 @@ class ArgentumResilienceUiTest {
         scenario.close()
     }
 
+    @Test fun manaAbilitiesAreHiddenFromTheActionSheet() {
+        // Live Build 89: "{T}: Add {G}" on a land that entered tapped was rejected three times with
+        // INVALID_ACTION. Argentum pays mana itself, so the sheet and its count leave mana abilities out.
+        val me = fake.viewingPlayerId
+        val legal = fake.stateMessage.getJSONArray("legalActions")
+        val playForest = (0 until legal.length()).map { legal.getJSONObject(it) }.first { it.optString("description") == "Play Forest" }
+        val tapForGreen = JSONObject().put("actionType", "ActivateAbility").put("description", "{T}: Add {G}").put("isManaAbility", true)
+            .put("action", JSONObject().put("type", "ActivateAbility").put("playerId", me).put("sourceId", playForest.getJSONObject("action").getString("cardId")).put("abilityId", "mana-g"))
+        fake.stateMessage = JSONObject(fake.stateMessage.toString()).put("legalActions", JSONArray().put(tapForGreen).put(playForest)).put("pendingDecision", JSONObject.NULL)
+        useServer(fake.origin)
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        UiTestSupport.settle(rule)
+        rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
+        UiTestSupport.awaitReal(rule, 30_000, "table") { shown("Game active") }
+        rule.onNode(hasTestTag("player-tab-you")).performClick()
+        UiTestSupport.settle(rule, 800)
+        rule.onNode(hasTestTag("hand-peek")).performClick()
+        UiTestSupport.settle(rule, 800)
+        assertTrue("count leaves the mana ability out", shown("ACTIONS · 1"))
+        rule.onAllNodesWithText("ACTIONS ·", substring = true)[0].performSemanticsAction(SemanticsActions.OnClick)
+        UiTestSupport.awaitReal(rule, 5_000, "action sheet") { shown("Play Forest") }
+        UiTestSupport.settle(rule, 1_200)
+        scenario.onActivity { UiTestSupport.screenshot(it, "resilience-12-no-mana-abilities") }
+        assertFalse("mana ability must not be offered", shown("Add {G}"))
+        assertTrue("sheet explains that mana is automatic", shown("Mana is paid automatically"))
+        assertTrue("nothing was sent", fake.received.none { it.optString("type") == "submitAction" })
+        scenario.close()
+    }
+
     @Test fun composerSendsDividedDamageSpellThenGameOverReturnsHome() {
         val me = fake.viewingPlayerId
         val state = fake.stateMessage.getJSONObject("state")
