@@ -1089,6 +1089,10 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         "PassPriority" in argentumLegalTypes -> ArgentumPassing.passLabel(argentumNextStop)
         else -> null
     }
+    // You have priority on someone else's turn: the pass button lights up so "you can respond now"
+    // never looks like "it's your turn".
+    val argentumCanRespond = argentumEnabled && argentumPrimaryLabel != null && !argentumAwaitingUpdate &&
+        argentumSnapshot?.let { it.activePlayer != localSeat && it.priorityPlayer == localSeat } == true
     fun argentumPrimary() {
         if ("DeclareAttackers" in argentumLegalTypes || "DeclareBlockers" in argentumLegalTypes) { if (!openArgentumCombat()) message = "Argentum's combat declaration is no longer available." }
         else sendArgentumPriority()
@@ -1371,6 +1375,17 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         delay(350) // ignore momentary priority during Argentum's own auto-passing
         if (appInForeground) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
         else if (backgroundAlertsEnabled) postGameAlert(context, "Your move", argentumPendingDecision?.optString("prompt")?.takeIf { it.isNotBlank() } ?: "Argentum is waiting for you.")
+    }
+    // A banner (and a buzz on yours) when each turn starts.
+    var turnBanner by remember { mutableStateOf<TurnBannerState?>(null) }
+    LaunchedEffect(argentumTurnKey) {
+        val (turn, active) = argentumTurnKey ?: return@LaunchedEffect
+        val seat = players.getOrNull(active) ?: return@LaunchedEffect
+        val isYou = active == localSeat
+        turnBanner = TurnBannerState(TurnColors.label(isYou, seat.name, seat.isComputer), isYou, turn)
+        if (isYou && appInForeground) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+        delay(if (isYou) 1400 else 900)
+        turnBanner = null
     }
     LaunchedEffect(argentumLastError) {
         // Socket-level problems (unreadable messages, failed connects) reach the searchable log too.
@@ -3193,6 +3208,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     ) {
         // Argentum game: one strip for connection, phase and timer (life is on the player tabs).
         val compactArgentumTable = argentumEnabled && argentumSnapshot != null
+        // The colour of whoever's turn it is: gold for you, blue for an opponent.
+        val turnAccent = argentumSnapshot?.let { TurnColors.forSeat(it.activePlayer == localSeat) } ?: Mint
         // Player tabs (seat tabs with life in Argentum games). In landscape they share the top strip.
         val seatTabs: @Composable (Modifier) -> Unit = { rowModifier ->
             Row(rowModifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -3202,6 +3219,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         val snap = argentumSnapshot
                         if (compactArgentumTable && snap != null) ArgentumSeatTab(
                             seat = ArgentumSeatChip(player.name, player.life, isYou = index == localSeat, isActive = index == snap.activePlayer, hasPriority = index == snap.priorityPlayer),
+                            turnLabel = if (index == snap.activePlayer) TurnColors.label(index == localSeat, player.name, player.isComputer) else null,
                             artUrl = player.commanderCard?.let { it.artCropUrl ?: it.imageUrl }, artLabel = player.commanderCard?.name,
                             selected = !showOverview && selectedPlayer == index,
                             onClick = { guidedAction("player-tab") { selectedPlayer = index; showOverview = false } }
@@ -3223,10 +3241,10 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 Box(Modifier.size(9.dp).clip(CircleShape).background(dotColor).semantics { contentDescription = "Argentum ${argentumStatus.name.lowercase()}" })
                 Spacer(Modifier.width(8.dp))
                 if (tabsInTopBar) {
-                    PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.width(320.dp))
+                    PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.width(320.dp), accent = turnAccent)
                     Spacer(Modifier.width(8.dp))
                     seatTabs(Modifier.weight(1f))
-                } else PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.weight(1f))
+                } else PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.weight(1f), accent = turnAccent)
                 Spacer(Modifier.width(6.dp))
             } else Column {
                 Text("ARCANA TABLE", color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
@@ -3412,7 +3430,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     } ?: false,
                     canControl = boardCanControl,
                     isActivePlayer = boardIndex == activePlayer, turnNumber = turnNumber, phaseName = phaseSteps[phaseIndex],
-                    modifier = boardModifier.onGloballyPositioned { if (boardIndex == localSeat || !sideBySideBoards) battlefieldBounds = it.boundsInRoot() },
+                    modifier = boardModifier
+                        .turnHighlight(argentumEnabled && argentumSnapshot != null, boardIndex == argentumSnapshot?.activePlayer, boardIndex == localSeat)
+                        .onGloballyPositioned { if (boardIndex == localSeat || !sideBySideBoards) battlefieldBounds = it.boundsInRoot() },
                     onLife = { delta -> guidedAction(if (delta > 0) "life-up" else "life-down") { if (boardCanControl) { val nextLife = (players[boardIndex].life + delta).coerceAtLeast(0); updatePlayer(boardIndex) { it.copy(life = nextLife) }; logAction(boardIndex, if (delta > 0) "gained life" else "lost life"); if (nextLife == 0) eliminatePlayer(boardIndex, "Life total reached 0") } } },
                     onDraw = { guidedAction("draw-action") { if (boardCanControl) { drawCard(boardIndex); showHand = true } } },
                     onShowHand = { guidedAction("hand-button") { if (boardCanControl || (argentumEnabled && boardIndex == localSeat)) showHand = true } },
@@ -3509,7 +3529,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 ) else Text("Tap a player to inspect their board", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
                 if (argentumEnabled) {
                     if (passToMyTurnFrom != null) HeaderButton("AUTO-PASSING · STOP", onClick = { guidedAction("table-pass") { togglePassToMyTurn() } }, modifier = tutorialAnchor("table-pass"))
-                    else if (argentumPrimaryLabel != null) HeaderButton(argentumPrimaryLabel, onClick = { guidedAction("table-pass") { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, modifier = tutorialAnchor("table-pass"))
+                    else if (argentumPrimaryLabel != null) PassButton(argentumPrimaryLabel, onClick = { guidedAction("table-pass") { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, canRespond = argentumCanRespond, modifier = tutorialAnchor("table-pass"))
                     else Text(when { gameEndedOnline -> "GAME OVER"; argentumSnapshot == null -> "WAITING FOR ARGENTUM"; argentumPendingDecision != null -> "YOUR CHOICE IS NEEDED"; argentumAwaitingUpdate -> "WAITING FOR ARGENTUM"; else -> "OPPONENT HAS PRIORITY" }, color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
                 } else {
                 if (gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) HeaderButton("NEXT · ${phaseSteps[phaseIndex]}", onClick = { guidedAction("table-next") { if (argentumEnabled) sendArgentumPriority() else advanceStep() } }, enabled = !argentumAwaitingUpdate, modifier = tutorialAnchor("table-next"))
@@ -3527,15 +3547,19 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         } else {
             val canPassTurnFromBoard = gameInProgress && !gameEndedOnline && selectedPlayer == activePlayer && !players[selectedPlayer].isComputer && !players[selectedPlayer].isEliminated && (!onlineMode || localSeat == activePlayer) && !argentumAwaitingUpdate
             val footerControlHeight = (54.dp * footerButtonScale).coerceIn(44.dp, 76.dp)
-            val handControlHeight = (62.dp * footerButtonScale).coerceIn(48.dp, 82.dp)
-            Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.Bottom) {
-                HeaderButton(
+            val handControlHeight = (64.dp * footerButtonScale).coerceIn(50.dp, 84.dp)
+            // Pass · Hand · Table share one baseline and height; the hand drawer is the one larger
+            // control (a little taller and wider). The pass button works whichever board you're
+            // looking at, and lights up when you can respond on someone else's turn.
+            Row(Modifier.fillMaxWidth().padding(top = 5.dp).testTag("bottom-bar"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+                PassButton(
                     if (argentumEnabled && passToMyTurnFrom != null) "AUTO-PASSING · STOP" else if (argentumEnabled) argentumPrimaryLabel ?: "WAITING" else "PASS TURN",
                     onClick = { guidedAction("pass-turn") { if (argentumEnabled && passToMyTurnFrom != null) togglePassToMyTurn() else if (argentumEnabled) argentumPrimary() else passTurn() } },
-                    enabled = if (argentumEnabled && passToMyTurnFrom != null) true else if (argentumEnabled) argentumPrimaryLabel != null && !argentumAwaitingUpdate && selectedPlayer == localSeat else canPassTurnFromBoard,
-                    modifier = Modifier.weight(if (argentumEnabled) 1.45f else 1f).height(footerControlHeight).then(tutorialAnchor("pass-turn"))
+                    enabled = if (argentumEnabled && passToMyTurnFrom != null) true else if (argentumEnabled) argentumPrimaryLabel != null && !argentumAwaitingUpdate else canPassTurnFromBoard,
+                    canRespond = argentumCanRespond,
+                    modifier = Modifier.weight(1f).height(footerControlHeight).then(tutorialAnchor("pass-turn"))
                 )
-                Box(Modifier.weight(1.18f).then(tutorialAnchor("hand-button"))) {
+                Box(Modifier.weight(1.3f).then(tutorialAnchor("hand-button"))) {
                     HandPeekBar(
                         players[if (argentumEnabled) localSeat.coerceIn(players.indices) else selectedPlayer].hand.size,
                         modifier = Modifier.fillMaxWidth().height(handControlHeight).testTag("hand-peek"),
@@ -3544,7 +3568,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 }
                 HeaderButton(
                     if (argentumEnabled) "TABLE" else "BACK TO TABLE", onClick = { guidedAction("player-back-table") { showOverview = true; showHand = false } },
-                    modifier = Modifier.weight(if (argentumEnabled) 0.62f else 1f).height(footerControlHeight).then(tutorialAnchor("player-back-table"))
+                    modifier = Modifier.weight(1f).height(footerControlHeight).then(tutorialAnchor("player-back-table"))
                 )
             }
         }
@@ -3553,6 +3577,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         @Composable
         fun TableOverlays() {
             Box(Modifier.fillMaxSize()) {
+        if (argentumEnabled && !homeOpen) TurnBanner(turnBanner)
         if (homeOpen) RoomHomeScreen(
         wide = screenWidthDp >= 700,
             tutorialAnchor = ::tutorialAnchor,
@@ -6040,7 +6065,7 @@ private fun RoomHomeScreen(
 
 @Composable
 private fun HeaderButton(label: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
-    Text(label, color = if (enabled) Mint else Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, lineHeight = 12.sp, overflow = TextOverflow.Ellipsis, modifier = modifier.heightIn(min = 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick).padding(horizontal = 13.dp, vertical = 12.dp))
+    Text(label, color = if (enabled) Mint else Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, lineHeight = 12.sp, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = modifier.heightIn(min = 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick).padding(horizontal = 13.dp, vertical = 12.dp))
 }
 
 @Composable
@@ -6107,15 +6132,9 @@ private fun HandPeekBar(cardCount: Int, modifier: Modifier = Modifier, onClick: 
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.Center
     ) {
-        Text("HAND  $cardCount", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black)
-        if (cardCount > 0) {
-            Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                repeat(cardCount.coerceAtMost(3)) {
-                    Box(Modifier.size(width = 12.dp, height = 25.dp).clip(RoundedCornerShape(3.dp)).background(Panel).border(1.dp, Muted.copy(alpha = 0.6f), RoundedCornerShape(3.dp)))
-                }
-            }
-        }
-        Icon(Icons.Filled.ExpandLess, contentDescription = "Open hand tray", tint = Mint, modifier = Modifier.size(18.dp))
+        Text("HAND  $cardCount", color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Black)
+        Spacer(Modifier.width(6.dp))
+        Icon(Icons.Filled.ExpandLess, contentDescription = "Open hand tray", tint = Mint, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -7481,6 +7500,10 @@ private fun PlayerBoard(
     }
     var moreOpen by remember { mutableStateOf(false) }
     var shuffleConfirm by remember { mutableStateOf(false) }
+    // Pinch to zoom the battlefield; remembered per screen shape.
+    val boardZoom = rememberBoardZoom()
+    val zoomContext = LocalContext.current
+    val zoomConfig = LocalConfiguration.current
     val sectionContent: Map<String, @Composable ColumnScope.() -> Unit> = mapOf(
             "STATUS" to {
         if (!engineGame) Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(RoundedCornerShape(12.dp)).background(Panel).border(if (isActivePlayer) 2.dp else 0.dp, if (isActivePlayer) Mint else Panel, RoundedCornerShape(12.dp)).combinedClickable(onClick = onTrackers).padding(horizontal = 9.dp).then(tutorialAnchor("player-status")), verticalAlignment = Alignment.CenterVertically) {
@@ -7640,25 +7663,29 @@ private fun PlayerBoard(
         } else {
             LazyColumn(
                 state = battlefieldListState,
-                modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)).background(Panel).padding(5.dp).then(tutorialAnchor("battlefield")),
+                modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)).background(Panel)
+                    .pinchToZoom(boardZoom) { saveBoardZoom(zoomContext, zoomConfig.screenWidthDp, zoomConfig.screenHeightDp, it) }
+                    .padding(5.dp).then(tutorialAnchor("battlefield")),
                 verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(3.dp)
             ) {
                 battlefieldGroups(player.battlefield).forEach { (type, cards) ->
                     item(key = "header-$type") { Text("$type  ·  ${cards.size}", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, modifier = Modifier.padding(start = 3.dp, top = 2.dp)) }
                     item(key = "cards-$type") {
-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            cards.forEach { card ->
-                                BattlefieldCard(
-                                    card, battlefieldCardWidth,
-                                    interactive = canControl,
-                                    isCommander = card.id == player.commanderCard?.id,
-                                    canSetCommander = player.commanderCard == null && player.commanderName.isNullOrBlank(),
-                                    onTap = { onTapCard(card.id) }, onPreview = { onPreview(card) },
-                                    onAction = { action -> onCardAction(card, action) },
-                                    tutorialAnchor = if (card.id == player.battlefield.firstOrNull()?.id) tutorialAnchor("card-menu") else Modifier,
-                                    glow = card.id in playableIds
-                                )
-                            }
+                        // Full rows wrap onto the next line; identical cards share one spot with a count.
+                        val stacks = if (engineGame) stackIdentical(cards) else cards.map { CardStack(listOf(it)) }
+                        WrappingCardStacks(stacks, battlefieldCardWidth * boardZoom.floatValue) { stack, width ->
+                            // Tapping a stack acts on a copy Argentum offers something for, if any.
+                            val card = stack.cards.firstOrNull { it.id in playableIds } ?: stack.top
+                            BattlefieldCard(
+                                card, width,
+                                interactive = canControl,
+                                isCommander = card.id == player.commanderCard?.id,
+                                canSetCommander = player.commanderCard == null && player.commanderName.isNullOrBlank(),
+                                onTap = { onTapCard(card.id) }, onPreview = { onPreview(card) },
+                                onAction = { action -> onCardAction(card, action) },
+                                tutorialAnchor = if (card.id == player.battlefield.firstOrNull()?.id) tutorialAnchor("card-menu") else Modifier,
+                                glow = stack.cards.any { it.id in playableIds }
+                            )
                         }
                     }
                 }
@@ -9066,6 +9093,9 @@ private fun ChangelogDialog(onDismiss: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 96 · CUSTOM CARDS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Arcana's own custom cards: 30 cards Argentum doesn't have yet, so Tokens Win (Rocco) and Artificer (Tails) play offline. Only Goblin Welder and Ratchet are still swapped for basic lands. Argentum's own version of a card always wins once it has one.\n• Offline games now show the AI's turn step by step, and your combat steps too, instead of jumping to your next move.\n• Offline mulligans (London rules) and undo.\n• Whose turn it is: you're gold, the AI is blue. The phase bar, the seat tabs (YOUR TURN / AI'S TURN) and the active board's outline use that colour, a banner shows when a turn starts, and your turn gives a small buzz.\n• The pass button lights up gold when you can respond on the AI's turn, and works whichever board you're looking at.\n• Battlefield: pinch with two fingers to zoom (remembered for each screen shape), rows wrap instead of running off the side, and identical cards stack with a count.\n• The bottom buttons are lined up, with a slightly larger hand drawer, and the little card boxes in it are gone.", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 95 · PLAY OFFLINE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• New PLAY OFFLINE VS AI button on the home screen: a full game against Argentum's AI with no internet and no server.\n• All 15,942 Argentum cards are on the phone, so your imported Commander deck plays offline against one of Argentum's premade Commander decks. Cards Argentum doesn't have are left out and replaced with basic lands (your saved deck isn't changed).\n• Not yet offline: mulligans (you keep your opening hand) and undo.", color = SoftWhite, fontSize = 13.sp)
 

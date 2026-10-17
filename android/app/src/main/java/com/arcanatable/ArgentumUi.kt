@@ -81,16 +81,16 @@ private val PhaseGroups = listOf(
 )
 
 @Composable
-fun PhaseTracker(stepKey: String, modifier: Modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+fun PhaseTracker(stepKey: String, modifier: Modifier = Modifier.fillMaxWidth().padding(top = 6.dp), accent: Color = Mint) {
     val key = stepKey.uppercase().replace(' ', '_')
     val narrow = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 380
     Row(modifier.testTag("phase-tracker"), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         PhaseGroups.forEach { (label, steps) ->
             val current = key in steps
             Text(
-                label, color = if (current) Ink else Muted, fontSize = if (narrow) 8.sp else 9.sp, fontWeight = FontWeight.Black, letterSpacing = if (narrow) 0.sp else 0.5.sp,
+                label, color = if (current) TurnColors.OnColor else Muted, fontSize = if (narrow) 8.sp else 9.sp, fontWeight = FontWeight.Black, letterSpacing = if (narrow) 0.sp else 0.5.sp,
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 1,
-                modifier = Modifier.weight(1f).clip(RoundedCornerShape(6.dp)).background(if (current) Mint else PanelLight).padding(vertical = 4.dp)
+                modifier = Modifier.weight(1f).clip(RoundedCornerShape(6.dp)).background(if (current) accent else PanelLight).padding(vertical = 4.dp)
             )
         }
     }
@@ -101,7 +101,7 @@ fun PhaseTracker(stepKey: String, modifier: Modifier = Modifier.fillMaxWidth().p
  * once. A dot marks whose turn it is, a mint ring who has priority; life flashes on change.
  */
 @Composable
-fun ArgentumSeatTab(seat: ArgentumSeatChip, artUrl: String?, artLabel: String?, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun ArgentumSeatTab(seat: ArgentumSeatChip, artUrl: String?, artLabel: String?, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier, turnLabel: String? = null) {
     var last by remember { mutableIntStateOf(seat.life) }
     val flash = remember { androidx.compose.animation.Animatable(Color.Transparent) }
     androidx.compose.runtime.LaunchedEffect(seat.life) {
@@ -114,7 +114,7 @@ fun ArgentumSeatTab(seat: ArgentumSeatChip, artUrl: String?, artLabel: String?, 
     val shape = RoundedCornerShape(9.dp)
     Row(
         modifier.height(44.dp).clip(shape).background(if (selected) Mint.copy(alpha = 0.18f) else PanelLight).background(flash.value)
-            .border(if (selected || seat.hasPriority) 2.dp else 1.dp, if (selected) Mint else if (seat.hasPriority) CounterGold else Color(0xFF33423D), shape)
+            .border(if (selected || seat.isActive) 2.dp else 1.dp, if (seat.isActive) TurnColors.forSeat(seat.isYou) else if (selected) Mint else Color(0xFF33423D), shape)
             .clickable(onClick = onClick).padding(end = 9.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -122,10 +122,14 @@ fun ArgentumSeatTab(seat: ArgentumSeatChip, artUrl: String?, artLabel: String?, 
             if (!artUrl.isNullOrBlank()) CardArt(artUrl, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop, label = artLabel)
         }
         Spacer(Modifier.width(7.dp))
-        if (seat.isActive) { Box(Modifier.size(7.dp).clip(CircleShape).background(Mint)); Spacer(Modifier.width(5.dp)) }
-        Text(if (seat.isYou) "YOU" else seat.name.uppercase(), color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Black, maxLines = 1,
-            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 420) 84.dp else 130.dp))
+        Column {
+            Text(if (seat.isYou) "YOU" else seat.name.uppercase(), color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Black, maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 420) 84.dp else 130.dp))
+            // Whose turn it is, in words, in that player's colour.
+            if (turnLabel != null) Text(turnLabel, color = TurnColors.forSeat(seat.isYou), fontSize = 8.sp, fontWeight = FontWeight.Black, maxLines = 1,
+                modifier = Modifier.testTag("seat-turn-label"))
+        }
         Spacer(Modifier.width(7.dp))
         Text("${seat.life}", color = Mint, fontSize = 17.sp, fontWeight = FontWeight.Black)
     }
