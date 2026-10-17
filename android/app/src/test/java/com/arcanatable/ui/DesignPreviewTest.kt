@@ -111,7 +111,9 @@ class DesignPreviewTest {
         scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-1-your-board") }
         assertTrue(shown("PASS → TO COMBAT"))
         // Tap-and-hold shows the card large; letting go without moving keeps it up until a tap.
-        rule.onAllNodesWithText("Rain of Riches")[0].performTouchInput { longClick() }
+        // A card shows its name as text until its art loads, then as the art's description (PC builds load art).
+        rule.onAllNodes(androidx.compose.ui.test.hasText("Rain of Riches", substring = true) or androidx.compose.ui.test.hasContentDescription("Rain of Riches", substring = true))[0]
+            .performTouchInput { longClick() }
         UiTestSupport.settle(rule, 800)
         assertTrue("hold-to-preview opened", rule.onAllNodes(hasTestTag("card-zoom"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-1b-hold-preview") }
