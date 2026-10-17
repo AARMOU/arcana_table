@@ -3566,8 +3566,10 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         onClick = { guidedAction("hand-button") { if (canControlSelectedPlayer || argentumEnabled) showHand = true } }
                     )
                 }
-                HeaderButton(
+                // Same box style as the pass button, so both fill their full height and line up.
+                PassButton(
                     if (argentumEnabled) "TABLE" else "BACK TO TABLE", onClick = { guidedAction("player-back-table") { showOverview = true; showHand = false } },
+                    enabled = true, canRespond = false,
                     modifier = Modifier.weight(1f).height(footerControlHeight).then(tutorialAnchor("player-back-table"))
                 )
             }
