@@ -73,6 +73,15 @@ class ArgentumResilienceUiTest {
         context.getSharedPreferences("argentum_session", Context.MODE_PRIVATE).edit().putString(ArgentumEndpoints.PREF_ORIGIN, origin).commit()
     }
 
+    /** The compact Argentum table is up (its phase strip is drawn). */
+
+    private fun tableShown() = rule.onAllNodes(hasTestTag("phase-tracker"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+
+    /** The connection dot reports a live Argentum connection. */
+
+    private fun connectedShown() = rule.onAllNodes(androidx.compose.ui.test.hasContentDescription("Argentum connected"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+
+
     private fun shown(text: String, substring: Boolean = true) =
         rule.onAllNodesWithText(text, substring = substring, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
 
@@ -116,7 +125,7 @@ class ArgentumResilienceUiTest {
         rule.onNodeWithText("REFRESH").performClick()
         UiTestSupport.awaitReal(rule, 10_000, "resync request reaches server") { fake.received.count { it.optString("type") == "requestResync" } > before }
         rule.onNodeWithText("VIEW TABLE").performClick()
-        UiTestSupport.awaitReal(rule, 5_000, "table with needs-handling strip") { !shown("REFRESH") && shown("Game active") }
+        UiTestSupport.awaitReal(rule, 5_000, "table with needs-handling strip") { !shown("REFRESH") && tableShown() }
         assertTrue("status strip keeps the notice visible", shown("NEEDS HANDLING"))
         shot(scenario, "03-needs-handling-strip")
         rule.onNode(hasTestTag("needs-handling")).performClick()
@@ -129,7 +138,7 @@ class ArgentumResilienceUiTest {
         fake.send(JSONObject().put("type", "stateUpdate").put("state", "garbage"))
         fake.send(JSONObject().put("type", "someFutureMessageType").put("x", 1))
         UiTestSupport.awaitReal(rule, 10_000, "unreadable message logged as an error") { diagnostics().contains("could not read") }
-        assertTrue("app still shows the game", shown("Game active"))
+        assertTrue("app still shows the game", tableShown())
 
         // Backgrounded drop: Arcana pauses instead of reconnecting (Argentum would auto-resume).
         val connectionsBefore = fake.connections.get()
@@ -149,14 +158,14 @@ class ArgentumResilienceUiTest {
 
         // Player chooses Resume -> reconnect with token -> Argentum pushes the game back.
         rule.onAllNodesWithText("RESUME", substring = false)[0].performSemanticsAction(SemanticsActions.OnClick)
-        UiTestSupport.awaitReal(rule, 15_000, "resumed connection") { fake.connections.get() > connectionsBefore && shown("ENGINE CONNECTED") }
+        UiTestSupport.awaitReal(rule, 15_000, "resumed connection") { fake.connections.get() > connectionsBefore && connectedShown() }
         assertTrue("reconnect presented the saved session token", fake.received.last { it.optString("type") == "connect" }.has("token"))
         shot(scenario, "05-resumed")
 
         // Foreground drop: reliability path reconnects automatically.
         val afterResume = fake.connections.get()
         fake.dropConnection()
-        UiTestSupport.awaitReal(rule, 20_000, "automatic reconnect in foreground") { fake.connections.get() > afterResume && shown("ENGINE CONNECTED") }
+        UiTestSupport.awaitReal(rule, 20_000, "automatic reconnect in foreground") { fake.connections.get() > afterResume && connectedShown() }
 
         // Diagnostic log: searchable through the UI, categories recorded.
         rule.onNodeWithContentDescription("App menu").performClick()
@@ -194,7 +203,7 @@ class ArgentumResilienceUiTest {
         rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
         UiTestSupport.awaitReal(rule, 30_000, "primary button offers the declaration") { shown("DECLARE ATTACKERS") }
         rule.onAllNodesWithText("DECLARE ATTACKERS")[0].performSemanticsAction(SemanticsActions.OnClick)
-        UiTestSupport.awaitReal(rule, 5_000, "attack dialog") { shown("Declare attackers") && shown("NO ATTACK") }
+        UiTestSupport.awaitReal(rule, 5_000, "attack board") { rule.onAllNodes(hasTestTag("combat-board"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() && shown("NO ATTACK") }
         rule.onAllNodesWithText("Object", substring = true)[0].performSemanticsAction(SemanticsActions.OnClick)
         UiTestSupport.awaitReal(rule, 5_000, "one attacker selected") { shown("ATTACK WITH 1") }
         scenario.onActivity { UiTestSupport.screenshot(it, "resilience-07-attack-dialog") }
@@ -260,7 +269,7 @@ class ArgentumResilienceUiTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
         rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
-        UiTestSupport.awaitReal(rule, 30_000, "table") { shown("Game active") }
+        UiTestSupport.awaitReal(rule, 30_000, "table") { tableShown() }
         rule.onNode(hasTestTag("player-tab-you")).performClick()
         UiTestSupport.settle(rule, 800)
         rule.onNode(hasTestTag("hand-peek")).performClick()
@@ -295,7 +304,7 @@ class ArgentumResilienceUiTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
         rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
-        UiTestSupport.awaitReal(rule, 30_000, "table") { shown("Game active") }
+        UiTestSupport.awaitReal(rule, 30_000, "table") { tableShown() }
         // Open Argentum's actions from the hand drawer and pick the spell.
         rule.onNode(hasTestTag("player-tab-you")).performClick()
         UiTestSupport.settle(rule, 800)

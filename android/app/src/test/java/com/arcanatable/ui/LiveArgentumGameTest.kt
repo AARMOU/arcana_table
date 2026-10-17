@@ -68,6 +68,8 @@ class LiveArgentumGameTest {
         note("Seeded ${library.length()} library cards + commander $commander from Argentum's example deck")
     }
 
+    private fun tableShown() = rule.onAllNodes(androidx.compose.ui.test.hasTestTag("phase-tracker"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+    private fun connectedShown() = rule.onAllNodes(androidx.compose.ui.test.hasContentDescription("Argentum connected"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
     private fun textShown(text: String) = rule.onAllNodesWithText(text, substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
     /** Argentum's pass button: "PASS PRIORITY", "PASS" or "PASS → <where it stops>" (not "PASS TO MY TURN"). */
     private val passButton = androidx.compose.ui.test.hasText("PASS PRIORITY") or androidx.compose.ui.test.hasText("PASS") or androidx.compose.ui.test.hasText("PASS →", substring = true)
@@ -104,7 +106,7 @@ class LiveArgentumGameTest {
                 rule.onAllNodesWithText("KEEP ", substring = true)[0].performClick()
                 kept = true
             }
-            textShown("Game active")
+            tableShown()
         }
         note("Table shows Argentum state: game active")
         shot(scenario, "03-table-game-active")
@@ -154,7 +156,7 @@ class LiveArgentumGameTest {
             UiTestSupport.awaitReal(rule, 30_000, "Argentum to confirm") { !textShown("Waiting for Argentum to confirm") }
         }
         assertTrue("Argentum never offered a land in ${passes} passes", playedLand)
-        UiTestSupport.awaitReal(rule, 30_000, "state after playing the land") { textShown("Game active") }
+        UiTestSupport.awaitReal(rule, 30_000, "state after playing the land") { tableShown() }
         shot(scenario, "06-after-land")
 
         // 3. Handoff: the activity is recreated (as after a system kill or theme change). Arcana must NOT
@@ -164,13 +166,13 @@ class LiveArgentumGameTest {
         Thread.sleep(3_000)
         UiTestSupport.settle(rule, 1_000)
         assertTrue("resume offer shown after recreation", textShown("RESUME GAME"))
-        assertFalse("game must not auto-resume", textShown("Game active"))
+        assertFalse("game must not auto-resume", tableShown())
         note("After recreation: resume offered, game not auto-resumed")
         shot(scenario, "07-resume-offer")
 
         // 4. Player chooses Resume -> Argentum pushes the live game back.
         rule.onNodeWithText("RESUME GAME").performClick()
-        UiTestSupport.awaitReal(rule, 60_000, "resumed game state") { textShown("Game active") }
+        UiTestSupport.awaitReal(rule, 60_000, "resumed game state") { tableShown() }
         note("Resumed by player choice; table shows the live game again")
         shot(scenario, "08-resumed")
 
@@ -200,7 +202,7 @@ class LiveArgentumGameTest {
         rule.onNodeWithText("PLAY FULL DECK IN SANDBOX").performClick()
         UiTestSupport.settle(rule, 1_500)
         assertTrue("sandbox table is a local Arcana game", textShown("GAME IN PROGRESS"))
-        assertFalse("Argentum is not running the sandbox", textShown("ENGINE CONNECTED"))
+        assertFalse("Argentum is not running the sandbox", connectedShown())
         // The full deck (including the unsupported card) is still the player's deck.
         val saved = ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("arcana-table", Context.MODE_PRIVATE).getString("players", "").orEmpty()
         assertTrue("saved deck kept the unsupported card", saved.contains("Arcana Test Card That Does Not Exist"))

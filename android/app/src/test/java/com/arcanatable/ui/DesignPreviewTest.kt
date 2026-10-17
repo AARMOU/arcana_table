@@ -6,6 +6,9 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.arcanatable.ArgentumEndpoints
@@ -107,6 +110,14 @@ class DesignPreviewTest {
         UiTestSupport.settle(rule, 1_000)
         scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-1-your-board") }
         assertTrue(shown("PASS → TO COMBAT"))
+        // Tap-and-hold shows the card large; letting go without moving keeps it up until a tap.
+        rule.onAllNodesWithText("Rain of Riches")[0].performTouchInput { longClick() }
+        UiTestSupport.settle(rule, 800)
+        assertTrue("hold-to-preview opened", rule.onAllNodes(hasTestTag("card-zoom"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-1b-hold-preview") }
+        rule.onNode(hasTestTag("card-zoom")).performClick()
+        UiTestSupport.settle(rule, 600)
+        assertTrue("tap closes the preview", rule.onAllNodes(hasTestTag("card-zoom"), useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
         rule.onNode(hasTestTag("player-tab-0")).performClick()
         UiTestSupport.settle(rule, 1_000)
         scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-2-opponent-board") }
@@ -114,8 +125,9 @@ class DesignPreviewTest {
         UiTestSupport.settle(rule, 1_000)
         scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-3-table") }
         rule.onNode(hasTestTag("player-tab-you")).performClick()
-        UiTestSupport.settle(rule, 800)
-        rule.onNode(hasTestTag("hand-peek")).performClick()
+        UiTestSupport.settle(rule, 1_500)
+        runCatching { rule.onNode(hasTestTag("hand-peek")).performClick() }
+            .onFailure { scenario.onActivity { a -> UiTestSupport.screenshot(a, "design-$name-x-no-hand-peek") }; throw it }
         UiTestSupport.settle(rule, 1_000)
         scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-4-hand") }
         scenario.close()
@@ -125,4 +137,45 @@ class DesignPreviewTest {
     @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xxhdpi") fun phoneLandscape() = run("phone-landscape")
     @Test @Config(sdk = [34], qualifiers = "w344dp-h882dp-port-xxhdpi") fun foldableCover() = run("foldable-cover")
     @Test @Config(sdk = [34], qualifiers = "w673dp-h841dp-port-xhdpi") fun foldableUnfolded() = run("foldable-unfolded")
+
+    /** The block board from the user's report: one first-strike attacker, three Rabbit tokens to block with. */
+    private fun blockScenario(name: String) {
+        val message = fake.stateMessage
+        val state = message.getJSONObject("state")
+        val me = state.getString("viewingPlayerId")
+        val cards = state.getJSONObject("cards")
+        val ids = cards.keys().asSequence().filter { it.startsWith("dp-") }.toList()
+        val mine = ids.filter { cards.getJSONObject(it).getString("controllerId") == me }.take(3)
+        val theirs = ids.filter { cards.getJSONObject(it).getString("controllerId") != me }.take(2)
+        mine.forEach { cards.getJSONObject(it).put("name", "Rabbit Token").put("typeLine", "Token Creature — Rabbit").put("power", 1).put("toughness", 1)
+            .put("isToken", true).put("isTapped", false).put("imageUri", JSONObject.NULL).put("keywords", JSONArray()) }
+        theirs.forEachIndexed { i, id -> cards.getJSONObject(id).put("name", if (i == 0) "Ramosian Captain" else "Goblin Raider").put("typeLine", "Creature")
+            .put("power", 2).put("toughness", if (i == 0) 2 else 1).put("isAttacking", true).put("isTapped", true).put("imageUri", JSONObject.NULL)
+            .put("keywords", if (i == 0) JSONArray().put("FIRST_STRIKE") else JSONArray()) }
+        val block = JSONObject().put("actionType", "DeclareBlockers").put("description", "Declare blockers")
+            .put("action", JSONObject().put("type", "DeclareBlockers").put("playerId", me).put("blockers", JSONObject()))
+            .put("validBlockers", JSONArray(mine))
+        message.put("legalActions", JSONArray().put(block)).put("nextStopPoint", JSONObject.NULL)
+        state.put("activePlayerId", state.getJSONArray("players").getJSONObject(0).getString("playerId")).put("currentStep", "DECLARE_BLOCKERS")
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        UiTestSupport.settle(rule)
+        rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
+        UiTestSupport.awaitReal(rule, 30_000, "declare blockers offered") { shown("DECLARE BLOCKERS") }
+        UiTestSupport.settle(rule, 800)
+        rule.onAllNodesWithText("DECLARE BLOCKERS")[0].performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)
+        UiTestSupport.awaitReal(rule, 5_000, "block board") { shown("YOUR BLOCKERS") }
+        UiTestSupport.settle(rule, 600)
+        scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-5-block-board-empty") }
+        mine.forEach { blocker ->
+            rule.onNode(hasTestTag("combat-$blocker")).performClick(); UiTestSupport.settle(rule, 300)
+            rule.onNode(hasTestTag("combat-${theirs[0]}")).performClick(); UiTestSupport.settle(rule, 300)
+        }
+        UiTestSupport.settle(rule, 600)
+        scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-6-block-board") }
+        assertTrue(shown("Ramosian Captain 2/2 first strike ← 3 Rabbit Tokens (1/1)"))
+        scenario.close()
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi") fun blockBoardPhone() = blockScenario("phone-portrait")
+    @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xxhdpi") fun blockBoardLandscape() = blockScenario("phone-landscape")
 }

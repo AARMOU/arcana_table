@@ -1,6 +1,6 @@
 # Arcana Table build and Worker tools
 
-This workspace keeps the app source, Cloudflare Worker, lockfiles, and build scripts together. The Arcana × Argentum integration (Build 91, `0.16.2-argentum`) is on `experimental/arcana-argentum-integration`, branched from `experimental/targeting`; its debug build uses the separate application ID `com.arcanatable.argentum` so it installs next to other test builds. See `docs/ARGENTUM_INTEGRATION.md` for the integration design. Argentum Experimental Build 86 remains on `experimental/targeting` (`com.arcanatable.targeting`). Stable Build 72 remains on `main`. APKs are produced by the branch's GitHub Actions workflow as downloadable build artifacts; they are not included in the source tree or project-page deployment.
+This workspace keeps the app source, Cloudflare Worker, lockfiles, and build scripts together. The Arcana × Argentum integration (Build 93, `0.18.0-argentum`) is on `experimental/arcana-argentum-integration`, branched from `experimental/targeting`; its debug build uses the separate application ID `com.arcanatable.argentum` so it installs next to other test builds. See `docs/ARGENTUM_INTEGRATION.md` for the integration design. Argentum Experimental Build 86 remains on `experimental/targeting` (`com.arcanatable.targeting`). Stable Build 72 remains on `main`. APKs are produced by the branch's GitHub Actions workflow as downloadable build artifacts; they are not included in the source tree or project-page deployment.
 
 The responsive GitHub Pages landing page is in `docs/`. Its Actions workflow stages the APK from `artifacts/` into the deployed site's `downloads/` path. See `docs/README.md` for publishing setup.
 
@@ -8,7 +8,7 @@ The responsive GitHub Pages landing page is in `docs/`. Its Actions workflow sta
 
 Requirements: JDK 17 or 21 (Kotlin's JVM target is pinned to 17 so both work) and Android SDK Platform 36 with Build Tools 36.0.0. Open this folder in Android Studio and let Gradle sync, or configure `ANDROID_HOME` / `ANDROID_SDK_ROOT` for command-line builds.
 
-Reproducible command-line build (what was used for Build 91):
+Reproducible command-line build (what was used for Build 93):
 
 ```sh
 # 1. Android SDK (skip if Android Studio already installed it)
@@ -56,6 +56,6 @@ Login and deployment require the owner's Cloudflare credentials. No credentials 
 
 ## Current environment
 
-Build 91 (`0.16.2-argentum`, version code `91`) passed `testDebugUnitTest` (90 tests, including the 2 live Argentum tests), `assembleDebug` and `lintDebug` (0 errors) on JDK 21 with SDK 36 / Build Tools 36.0.0. The Android SDK is not bundled in the source archive. Wrangler and TypeScript dependencies are recorded in the Worker lockfile; the Worker was not redeployed for this build.
+Build 93 (`0.18.0-argentum`, version code `93`) passed `testDebugUnitTest` (all non-live tests; the 2 live Argentum tests are opt-in), `assembleDebug` and `lintDebug` (0 errors) on JDK 21 with SDK 36 / Build Tools 36.0.0. The Android SDK is not bundled in the source archive. Wrangler and TypeScript dependencies are recorded in the Worker lockfile; the Worker was not redeployed for this build.
 
 On a machine with 8 GB of RAM, the live test can run out of memory with the Gradle and Kotlin daemons both running. Run it with `--no-daemon -Dorg.gradle.jvmargs=-Xmx1536m -Pkotlin.compiler.execution.strategy=in-process`.

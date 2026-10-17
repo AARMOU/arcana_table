@@ -485,11 +485,15 @@ fun TableScreen() {
     val colors = if (darkMode) darkTableColors else lightTableColors
     val scheme = if (darkMode) darkColorScheme(primary = colors.accent, background = colors.background, surface = colors.panel)
         else lightColorScheme(primary = colors.accent, background = colors.background, surface = colors.panel)
-    CompositionLocalProvider(LocalTableColors provides colors) {
-        MaterialTheme(colorScheme = scheme) { TableScreenContent(darkMode, onToggleTheme = {
-            darkMode = !darkMode
-            optionPrefs.edit().putBoolean("dark_mode", darkMode).apply()
-        }) }
+    val cardZoom = remember { CardZoomController() }
+    CompositionLocalProvider(LocalTableColors provides colors, LocalCardZoom provides cardZoom) {
+        MaterialTheme(colorScheme = scheme) {
+            TableScreenContent(darkMode, onToggleTheme = {
+                darkMode = !darkMode
+                optionPrefs.edit().putBoolean("dark_mode", darkMode).apply()
+            })
+            CardZoomOverlay(cardZoom)
+        }
     }
 }
 
@@ -589,6 +593,10 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var handActionCard by remember { mutableStateOf<GameCard?>(null) }
     var activePlayer by remember { mutableIntStateOf(0) }
     val viewPagerState = rememberPagerState(pageCount = { players.size + 1 })
+    // Not saveable: after a relaunch/recreation the player chooses Resume (Argentum resumes on reconnect).
+    var argentumEnabled by remember { mutableStateOf(false) }
+    val cardZoom = LocalCardZoom.current
+    SideEffect { cardZoom.enabled = argentumEnabled; if (!argentumEnabled) cardZoom.dismiss() }
     LaunchedEffect(showOverview, selectedPlayer, players.size, reducedSwipeMotion) {
         val targetPage = if (showOverview) 0 else (selectedPlayer + 1).coerceIn(0, players.size)
         if (viewPagerState.currentPage != targetPage) {
@@ -602,7 +610,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             .collect { page ->
                 showOverview = page == 0
                 if (page in 1..players.size) selectedPlayer = page - 1
-                if (page == 0) showHand = false
+                if (page == 0 && !argentumEnabled) showHand = false
             }
     }
     var gameTurnOrder by remember { mutableStateOf(emptyList<Int>()) }
@@ -686,7 +694,6 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var onlineStatus by remember { mutableStateOf("Offline") }
     var roomConnected by remember { mutableStateOf(false) }
     // Not saveable: after a relaunch/recreation the player chooses Resume (Argentum resumes on reconnect).
-    var argentumEnabled by remember { mutableStateOf(false) }
     var argentumResumeAvailable by remember { mutableStateOf(optionPrefs.getBoolean("argentum_game_active", false)) }
     var argentumResumeRequested by remember { mutableStateOf(false) }
     var argentumEndPreviousRequested by remember { mutableStateOf(false) }
@@ -738,6 +745,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var passToMyTurnFrom by remember { mutableStateOf<Int?>(null) }
     var followActivePlayer by remember { mutableStateOf(optionPrefs.getBoolean("follow_active_player", true)) }
     var argentumPingResult by remember { mutableStateOf<String?>(null) }
+    var lastOpponentViewed by remember { mutableIntStateOf(-1) }
     val argentumPrefs = remember { context.getSharedPreferences("argentum_session", Context.MODE_PRIVATE) }
     val argentumOrigin = remember { ArgentumEndpoints.origin(argentumPrefs) }
     val argentumQueue = remember { kotlinx.coroutines.channels.Channel<JSONObject>(kotlinx.coroutines.channels.Channel.UNLIMITED) }
@@ -798,6 +806,16 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     fun setArgentumGameActive(active: Boolean) {
         argentumResumeAvailable = active
         optionPrefs.edit().putBoolean("argentum_game_active", active).apply()
+    }
+
+    /** A card or player for the combat board, from Argentum's masked state. */
+    fun argentumPiece(id: String): CombatPiece {
+        val snap = argentumSnapshot
+        val displayId = snap?.serverCardIds?.entries?.firstOrNull { it.value == id }?.key
+        val card = displayId?.let { d -> snap.players.flatMap { it.battlefield }.firstOrNull { it.id == d } }
+        val seat = players.indexOfFirst { it.id == id }
+        val name = card?.name ?: if (seat >= 0 && seat == localSeat) "You" else players.getOrNull(seat)?.name ?: snap?.targets?.get(id)?.name ?: "Object ${id.takeLast(6)}"
+        return CombatPiece(id, name, card, players.getOrNull(seat)?.life)
     }
 
     fun argentumName(id: String): String =
@@ -1113,13 +1131,13 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     }
     // Follow whose turn it is: on each new turn, show the active player's board. A tab the player
     // picks mid-turn sticks until the next turn change.
+    LaunchedEffect(selectedPlayer, localSeat) { if (selectedPlayer != localSeat) lastOpponentViewed = selectedPlayer }
     val argentumTurnKey = argentumSnapshot?.takeIf { argentumEnabled }?.let { it.turnNumber to it.activePlayer }
     LaunchedEffect(argentumTurnKey) {
         val active = argentumTurnKey?.second ?: return@LaunchedEffect
         if (!followActivePlayer || active !in players.indices) return@LaunchedEffect
         selectedPlayer = active
         showOverview = false
-        if (active != localSeat) showHand = false
     }
     val argentumNeedsHandling: String? = argentumPendingDecision?.let { decision ->
         ArgentumDecisions.needsHandlingReason(decision)
@@ -3121,7 +3139,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                             seat = ArgentumSeatChip(player.name, player.life, isYou = index == localSeat, isActive = index == snap.activePlayer, hasPriority = index == snap.priorityPlayer),
                             artUrl = player.commanderCard?.let { it.artCropUrl ?: it.imageUrl }, artLabel = player.commanderCard?.name,
                             selected = !showOverview && selectedPlayer == index,
-                            onClick = { guidedAction("player-tab") { selectedPlayer = index; showOverview = false; showHand = false } }
+                            onClick = { guidedAction("player-tab") { selectedPlayer = index; showOverview = false } }
                         ) else PlayerViewTab(
                             name = if (onlineMode && index == localSeat) "YOU" else player.name,
                             commander = player.commanderCard,
@@ -3133,6 +3151,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             }
         }
         val tabsInTopBar = compactArgentumTable && isLandscape
+        val sideBySideBoards = compactArgentumTable && !isLandscape && screenWidthDp >= 600 && configuration.screenHeightDp >= 600 && players.size >= 2 && localSeat in players.indices
         Row(Modifier.fillMaxWidth().heightIn(min = if (compactArgentumTable) 44.dp else 48.dp), verticalAlignment = Alignment.CenterVertically) {
             if (compactArgentumTable) {
                 val dotColor = when { argentumStatus != ArgentumConnectionStatus.CONNECTED -> Color(0xFFE9978B); argentumAwaitingUpdate -> CounterGold; else -> Mint }
@@ -3311,102 +3330,118 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 }
             }
         } else {
-            val boardIndex = showingView.coerceIn(players.indices)
-            val boardCanControl = gameInProgress && !argentumEnabled && (!onlineMode || boardIndex == localSeat) && !gameEndedOnline && !players[boardIndex].isEliminated
-            PlayerBoard(
-                player = players[boardIndex].copy(name = if (onlineMode && boardIndex == localSeat) "YOU" else players[boardIndex].name), playerIndex = boardIndex, isLandscape = isLandscape, cardSizeScale = cardSizeScale,
-                boardSpacingScale = boardSpacingScale,
-                playerSectionOrder = playerSectionOrderRaw.split('|').filter(String::isNotBlank),
-                quickActionOrder = quickActionOrderRaw.split('|').filter(String::isNotBlank),
-                gameInProgress = gameInProgress,
-                tutorialAnchor = ::tutorialAnchor,
-                stackCount = visibleStackCount,
-                commanderUnavailable = players[boardIndex].commanderCard?.let { commander ->
-                    players[boardIndex].library.any { it.id == commander.id } || players[boardIndex].hand.any { it.id == commander.id } || players[boardIndex].battlefield.any { it.id == commander.id } || players[boardIndex].graveyard.any { it.id == commander.id } || players[boardIndex].exile.any { it.id == commander.id } || players[boardIndex].revealed.any { it.id == commander.id } || stackActions.any { it.card?.id == commander.id }
-                } ?: false,
-                canControl = boardCanControl,
-                isActivePlayer = boardIndex == activePlayer, turnNumber = turnNumber, phaseName = phaseSteps[phaseIndex],
-                modifier = Modifier.weight(1f).fillMaxWidth().onGloballyPositioned { battlefieldBounds = it.boundsInRoot() },
-                onLife = { delta -> guidedAction(if (delta > 0) "life-up" else "life-down") { if (boardCanControl) { val nextLife = (players[boardIndex].life + delta).coerceAtLeast(0); updatePlayer(boardIndex) { it.copy(life = nextLife) }; logAction(boardIndex, if (delta > 0) "gained life" else "lost life"); if (nextLife == 0) eliminatePlayer(boardIndex, "Life total reached 0") } } },
-                onDraw = { guidedAction("draw-action") { if (boardCanControl) { drawCard(boardIndex); showHand = true } } },
-                onShowHand = { guidedAction("hand-button") { if (boardCanControl || (argentumEnabled && boardIndex == localSeat)) showHand = true } },
-                onShowHandFromZone = { guidedAction("zone-hand") { if (boardCanControl || (argentumEnabled && boardIndex == localSeat)) showHand = true } },
-                engineControlled = argentumEnabled && boardIndex == localSeat,
-                engineGame = argentumEnabled,
-                undoAvailable = argentumEnabled && boardIndex == localSeat && argentumUndoAvailable && !argentumAwaitingUpdate,
-                passToMyTurnActive = passToMyTurnFrom != null,
-                onPassToMyTurn = { guidedAction("pass-to-my-turn") { togglePassToMyTurn() } },
-                onUndo = { guidedAction("undo") { requestArgentumUndo() } },
-                playableIds = if (boardIndex == localSeat) argentumPlayableIds else emptySet(),
-                onToken = { guidedAction("token-action") { if (boardCanControl) { tokenTarget = boardIndex; tokenPickerOpen = true } } },
-                onManageMana = { guidedAction("mana-status") { if (boardCanControl) { manaTarget = boardIndex; manaPoolOpen = true } } },
-                onZone = { zone -> guidedAction("zone-${zone.lowercase()}") { zoneDialog = boardIndex to zone } },
-                onPreview = { preview = CardPreview(boardIndex, it, fromHand = false, canManipulate = boardCanControl) },
-                onPublicPreview = { preview = CardPreview(boardIndex, it, fromHand = false, canManipulate = false) },
-                onTapCard = { id -> guidedAction("battlefield") {
-                    val card = players.getOrNull(boardIndex)?.battlefield?.firstOrNull { it.id == id }
-                    if (argentumEnabled && card != null && boardIndex == localSeat) openArgentumActions(card)
-                    else if (boardCanControl) card?.let { tapPermanent(boardIndex, it) }
-                } },
-                onCardAction = { card, action ->
-                    if (argentumEnabled && action != "INSPECT" && boardIndex == localSeat) openArgentumActions(card)
-                    else if (boardCanControl || action == "INSPECT") when (action) {
-                        "COUNTER" -> counterTarget = boardIndex to card.id
-                        "TOKEN" -> { tokenTarget = boardIndex; tokenPickerOpen = true }
-                        "TAP" -> tapPermanent(boardIndex, card)
-                        "FACE UP" -> { updateCard(boardIndex, card.id) { it.copy(isFaceDown = false) }; logAction(boardIndex, "turned a face-down card face up") }
-                        "SET COMMANDER" -> if (players[boardIndex].commanderCard == null && players[boardIndex].commanderName.isNullOrBlank()) { updatePlayer(boardIndex) { it.copy(commanderName = card.name, commanderCard = card) }; logAction(boardIndex, "marked ${card.name} as commander") }
-                        "COMMAND ZONE" -> if (players[boardIndex].commanderCard?.id == card.id) {
-                            updatePlayer(boardIndex) { p -> p.copy(battlefield = p.battlefield.filterNot { it.id == card.id }, commanderCard = card, commanderName = card.name) }
-                            logAction(boardIndex, "moved ${card.name} to the command zone")
-                        } else message = "Only your designated commander can move to the command zone."
-                        "GRAVEYARD" -> { updatePlayer(boardIndex) { p -> p.copy(battlefield = p.battlefield.filterNot { it.id == card.id }, graveyard = p.graveyard + card) }; logAction(boardIndex, "moved ${card.name} to graveyard") }
-                        "EXILE" -> { updatePlayer(boardIndex) { p -> p.copy(battlefield = p.battlefield.filterNot { it.id == card.id }, exile = p.exile + card) }; logAction(boardIndex, "exiled ${card.name}") }
-                        "INSPECT" -> preview = CardPreview(boardIndex, card, fromHand = false)
-                        else -> if (action.startsWith("ABILITY:")) {
-                            val abilityText = action.removePrefix("ABILITY:")
-                            val kind = if (card.type.contains("planeswalker", ignoreCase = true)) "LOYALTY ABILITY" else "ACTIVATED ABILITY"
-                            val stackItem = StackAction(title = "${card.name}: $abilityText", controllerId = players[boardIndex].id, kind = kind, card = card, targetText = abilityText)
-                            stackActions = stackActions + stackItem
-                            if (stackItem.targetCount != null) targetSelectionStackItemId = stackItem.id
-                            priorityPassed = emptySet()
-                            priorityPlayer = boardIndex
-                            stackOpen = stackItem.targetCount == null
-                            logAction(boardIndex, "activated an ability of ${card.name}; resolve its effect manually")
+            // One board, or on a big screen (unfolded Fold) an opponent's board beside yours.
+            @Composable
+            fun BoardFor(boardIndex: Int, boardModifier: Modifier) {
+                val boardCanControl = gameInProgress && !argentumEnabled && (!onlineMode || boardIndex == localSeat) && !gameEndedOnline && !players[boardIndex].isEliminated
+                PlayerBoard(
+                    player = players[boardIndex].copy(name = if (onlineMode && boardIndex == localSeat) "YOU" else players[boardIndex].name), playerIndex = boardIndex, isLandscape = isLandscape, cardSizeScale = cardSizeScale,
+                    boardSpacingScale = boardSpacingScale,
+                    playerSectionOrder = playerSectionOrderRaw.split('|').filter(String::isNotBlank),
+                    quickActionOrder = quickActionOrderRaw.split('|').filter(String::isNotBlank),
+                    gameInProgress = gameInProgress,
+                    tutorialAnchor = ::tutorialAnchor,
+                    stackCount = visibleStackCount,
+                    commanderUnavailable = players[boardIndex].commanderCard?.let { commander ->
+                        players[boardIndex].library.any { it.id == commander.id } || players[boardIndex].hand.any { it.id == commander.id } || players[boardIndex].battlefield.any { it.id == commander.id } || players[boardIndex].graveyard.any { it.id == commander.id } || players[boardIndex].exile.any { it.id == commander.id } || players[boardIndex].revealed.any { it.id == commander.id } || stackActions.any { it.card?.id == commander.id }
+                    } ?: false,
+                    canControl = boardCanControl,
+                    isActivePlayer = boardIndex == activePlayer, turnNumber = turnNumber, phaseName = phaseSteps[phaseIndex],
+                    modifier = boardModifier.onGloballyPositioned { if (boardIndex == localSeat || !sideBySideBoards) battlefieldBounds = it.boundsInRoot() },
+                    onLife = { delta -> guidedAction(if (delta > 0) "life-up" else "life-down") { if (boardCanControl) { val nextLife = (players[boardIndex].life + delta).coerceAtLeast(0); updatePlayer(boardIndex) { it.copy(life = nextLife) }; logAction(boardIndex, if (delta > 0) "gained life" else "lost life"); if (nextLife == 0) eliminatePlayer(boardIndex, "Life total reached 0") } } },
+                    onDraw = { guidedAction("draw-action") { if (boardCanControl) { drawCard(boardIndex); showHand = true } } },
+                    onShowHand = { guidedAction("hand-button") { if (boardCanControl || (argentumEnabled && boardIndex == localSeat)) showHand = true } },
+                    onShowHandFromZone = { guidedAction("zone-hand") { if (boardCanControl || (argentumEnabled && boardIndex == localSeat)) showHand = true } },
+                    engineControlled = argentumEnabled && boardIndex == localSeat,
+                    engineGame = argentumEnabled,
+                    undoAvailable = argentumEnabled && boardIndex == localSeat && argentumUndoAvailable && !argentumAwaitingUpdate,
+                    passToMyTurnActive = passToMyTurnFrom != null,
+                    onPassToMyTurn = { guidedAction("pass-to-my-turn") { togglePassToMyTurn() } },
+                    onUndo = { guidedAction("undo") { requestArgentumUndo() } },
+                    playableIds = if (boardIndex == localSeat) argentumPlayableIds else emptySet(),
+                    onToken = { guidedAction("token-action") { if (boardCanControl) { tokenTarget = boardIndex; tokenPickerOpen = true } } },
+                    onManageMana = { guidedAction("mana-status") { if (boardCanControl) { manaTarget = boardIndex; manaPoolOpen = true } } },
+                    onZone = { zone -> guidedAction("zone-${zone.lowercase()}") { zoneDialog = boardIndex to zone } },
+                    onPreview = { preview = CardPreview(boardIndex, it, fromHand = false, canManipulate = boardCanControl) },
+                    onPublicPreview = { preview = CardPreview(boardIndex, it, fromHand = false, canManipulate = false) },
+                    onTapCard = { id -> guidedAction("battlefield") {
+                        val card = players.getOrNull(boardIndex)?.battlefield?.firstOrNull { it.id == id }
+                        if (argentumEnabled && card != null && boardIndex == localSeat) openArgentumActions(card)
+                        else if (boardCanControl) card?.let { tapPermanent(boardIndex, it) }
+                    } },
+                    onCardAction = { card, action ->
+                        if (argentumEnabled && action != "INSPECT" && boardIndex == localSeat) openArgentumActions(card)
+                        else if (boardCanControl || action == "INSPECT") when (action) {
+                            "COUNTER" -> counterTarget = boardIndex to card.id
+                            "TOKEN" -> { tokenTarget = boardIndex; tokenPickerOpen = true }
+                            "TAP" -> tapPermanent(boardIndex, card)
+                            "FACE UP" -> { updateCard(boardIndex, card.id) { it.copy(isFaceDown = false) }; logAction(boardIndex, "turned a face-down card face up") }
+                            "SET COMMANDER" -> if (players[boardIndex].commanderCard == null && players[boardIndex].commanderName.isNullOrBlank()) { updatePlayer(boardIndex) { it.copy(commanderName = card.name, commanderCard = card) }; logAction(boardIndex, "marked ${card.name} as commander") }
+                            "COMMAND ZONE" -> if (players[boardIndex].commanderCard?.id == card.id) {
+                                updatePlayer(boardIndex) { p -> p.copy(battlefield = p.battlefield.filterNot { it.id == card.id }, commanderCard = card, commanderName = card.name) }
+                                logAction(boardIndex, "moved ${card.name} to the command zone")
+                            } else message = "Only your designated commander can move to the command zone."
+                            "GRAVEYARD" -> { updatePlayer(boardIndex) { p -> p.copy(battlefield = p.battlefield.filterNot { it.id == card.id }, graveyard = p.graveyard + card) }; logAction(boardIndex, "moved ${card.name} to graveyard") }
+                            "EXILE" -> { updatePlayer(boardIndex) { p -> p.copy(battlefield = p.battlefield.filterNot { it.id == card.id }, exile = p.exile + card) }; logAction(boardIndex, "exiled ${card.name}") }
+                            "INSPECT" -> preview = CardPreview(boardIndex, card, fromHand = false)
+                            else -> if (action.startsWith("ABILITY:")) {
+                                val abilityText = action.removePrefix("ABILITY:")
+                                val kind = if (card.type.contains("planeswalker", ignoreCase = true)) "LOYALTY ABILITY" else "ACTIVATED ABILITY"
+                                val stackItem = StackAction(title = "${card.name}: $abilityText", controllerId = players[boardIndex].id, kind = kind, card = card, targetText = abilityText)
+                                stackActions = stackActions + stackItem
+                                if (stackItem.targetCount != null) targetSelectionStackItemId = stackItem.id
+                                priorityPassed = emptySet()
+                                priorityPlayer = boardIndex
+                                stackOpen = stackItem.targetCount == null
+                                logAction(boardIndex, "activated an ability of ${card.name}; resolve its effect manually")
+                            }
                         }
-                    }
-                },
-                onNextStep = { guidedAction("next-step") { if (argentumEnabled && boardIndex == localSeat) sendArgentumPriority() else if (boardCanControl && boardIndex == activePlayer) advanceStep() } }, onOpenLog = { logOpen = true }, onOpenChat = { chatOpen = true },
-                onCombat = { guidedAction("combat-action") { if (argentumEnabled && boardIndex == localSeat) run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } else if (boardCanControl && boardIndex == activePlayer) combatDialogOpen = true } },
-                onTrackers = { if (boardCanControl) trackerPlayer = boardIndex },
-                onSearchLibrary = { guidedAction("zone-library") { if (boardCanControl) librarySearchPlayer = boardIndex } },
-                onStack = { guidedAction("stack-open") { stackOpen = true } },
-                onOpenMore = { guidedAction("more-actions") {} },
-        onCastCommander = { guidedAction("commander-cast") {
-                    if (boardCanControl) {
-                        val commander = players[boardIndex].commanderCard
-                        if (commander == null) message = "Set a commander from your deck or battlefield first."
-                        else paymentCard = boardIndex to commander
-                    } else if (argentumEnabled && boardIndex == localSeat) players[boardIndex].commanderCard?.let(::openArgentumActions)
-                } },
-                onConcede = { if (boardCanControl) concedePlayer = boardIndex },
-                onReveal = {
-                    if (boardCanControl) {
-                        updatePlayer(boardIndex) { p ->
-                            if (p.library.isEmpty()) p else p.copy(library = p.library.drop(1), revealed = p.revealed + p.library.first())
+                    },
+                    onNextStep = { guidedAction("next-step") { if (argentumEnabled && boardIndex == localSeat) sendArgentumPriority() else if (boardCanControl && boardIndex == activePlayer) advanceStep() } }, onOpenLog = { logOpen = true }, onOpenChat = { chatOpen = true },
+                    onCombat = { guidedAction("combat-action") { if (argentumEnabled && boardIndex == localSeat) run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } else if (boardCanControl && boardIndex == activePlayer) combatDialogOpen = true } },
+                    onTrackers = { if (boardCanControl) trackerPlayer = boardIndex },
+                    onSearchLibrary = { guidedAction("zone-library") { if (boardCanControl) librarySearchPlayer = boardIndex } },
+                    onStack = { guidedAction("stack-open") { stackOpen = true } },
+                    onOpenMore = { guidedAction("more-actions") {} },
+            onCastCommander = { guidedAction("commander-cast") {
+                        if (boardCanControl) {
+                            val commander = players[boardIndex].commanderCard
+                            if (commander == null) message = "Set a commander from your deck or battlefield first."
+                            else paymentCard = boardIndex to commander
+                        } else if (argentumEnabled && boardIndex == localSeat) players[boardIndex].commanderCard?.let(::openArgentumActions)
+                    } },
+                    onConcede = { if (boardCanControl) concedePlayer = boardIndex },
+                    onReveal = {
+                        if (boardCanControl) {
+                            updatePlayer(boardIndex) { p ->
+                                if (p.library.isEmpty()) p else p.copy(library = p.library.drop(1), revealed = p.revealed + p.library.first())
+                            }
+                            logAction(boardIndex, "revealed the top card")
                         }
-                        logAction(boardIndex, "revealed the top card")
-                    }
-                },
-                onShuffle = { if (boardCanControl) { updatePlayer(boardIndex) { it.copy(library = it.library.shuffled()) }; logAction(boardIndex, "shuffled their library") } }
-            )
+                    },
+                    onShuffle = { if (boardCanControl) { updatePlayer(boardIndex) { it.copy(library = it.library.shuffled()) }; logAction(boardIndex, "shuffled their library") } }
+                )
+            }
+            val shownIndex = showingView.coerceIn(players.indices)
+            if (sideBySideBoards) {
+                val leftIndex = if (shownIndex != localSeat) shownIndex
+                    else lastOpponentViewed.takeIf { it in players.indices && it != localSeat } ?: players.indices.first { it != localSeat }
+                Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    BoardFor(leftIndex, Modifier.weight(1f).fillMaxHeight())
+                    BoardFor(localSeat, Modifier.weight(1f).fillMaxHeight())
+                }
+            } else BoardFor(shownIndex, Modifier.weight(1f).fillMaxWidth())
         }
         }
         }
 
         if (showOverview) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("Tap a player to inspect their board", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
+            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                if (argentumEnabled && gameInProgress) HandPeekBar(
+                    players.getOrNull(localSeat)?.hand?.size ?: 0,
+                    modifier = Modifier.weight(1f).testTag("hand-peek-table"),
+                    onClick = { guidedAction("hand-button") { showHand = true } }
+                ) else Text("Tap a player to inspect their board", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
                 if (argentumEnabled) {
                     if (passToMyTurnFrom != null) HeaderButton("AUTO-PASSING · STOP", onClick = { guidedAction("table-pass") { togglePassToMyTurn() } }, modifier = tutorialAnchor("table-pass"))
                     else if (argentumPrimaryLabel != null) HeaderButton(argentumPrimaryLabel, onClick = { guidedAction("table-pass") { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, modifier = tutorialAnchor("table-pass"))
@@ -3437,9 +3472,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 )
                 Box(Modifier.weight(1.18f).then(tutorialAnchor("hand-button"))) {
                     HandPeekBar(
-                        players[selectedPlayer].hand.size,
+                        players[if (argentumEnabled) localSeat.coerceIn(players.indices) else selectedPlayer].hand.size,
                         modifier = Modifier.fillMaxWidth().height(handControlHeight).testTag("hand-peek"),
-                        onClick = { guidedAction("hand-button") { if (canControlSelectedPlayer) showHand = true } }
+                        onClick = { guidedAction("hand-button") { if (canControlSelectedPlayer || argentumEnabled) showHand = true } }
                     )
                 }
                 HeaderButton(
@@ -3705,7 +3740,17 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         onDismiss = { argentumActionChoices = emptyList(); argentumActionCard = null }
     )
 
-    argentumPendingDecision?.takeUnless { it.optString("type") == "PlayCardDecision" || it.optString("id") == argentumDeferredDecisionId }?.let { decision ->
+    // Combat damage is split on the combat board rather than in a dialog.
+    argentumPendingDecision?.takeIf { it.optString("type") == "CombatResolutionDecision" && it.optString("id") != argentumDeferredDecisionId }?.let { decision ->
+        ArgentumCombatResolution.from(decision)?.let { board ->
+            ArgentumDamageBoard(board, decision.optString("playerId"), ::argentumPiece, argentumAmounts, busy = argentumAwaitingUpdate,
+                onChange = { argentumAmounts = it },
+                onConfirm = { submitArgentumDecision(board.response(decision.optString("playerId"), argentumAmounts)) },
+                onDismiss = { argentumDeferredDecisionId = decision.optString("id") })
+        }
+    }
+    argentumPendingDecision?.takeUnless { it.optString("type") == "PlayCardDecision" || it.optString("id") == argentumDeferredDecisionId ||
+        (it.optString("type") == "CombatResolutionDecision" && ArgentumCombatResolution.from(it) != null) }?.let { decision ->
         val decisionId = decision.optString("id")
         val kind = decision.optString("type")
         val prompt = decision.optString("prompt", "Argentum needs a choice")
@@ -3978,7 +4023,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     }
 
     argentumAttackPlan?.let { plan ->
-        ArgentumAttackDialog(plan, ::argentumName, busy = argentumAwaitingUpdate,
+        ArgentumAttackBoard(plan, ::argentumPiece, busy = argentumAwaitingUpdate,
             onConfirm = { action ->
                 val epoch = ArgentumActions.epochFor(plan.legalAction, argentumSnapshot?.interactionEpoch)
                 if (epoch != null && submitArgentumAction(action, epoch)) {
@@ -3989,7 +4034,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             onDismiss = { argentumAttackPlan = null })
     }
     argentumBlockPlan?.let { plan ->
-        ArgentumBlockDialog(plan, ::argentumName, busy = argentumAwaitingUpdate,
+        ArgentumBlockBoard(plan, ::argentumPiece, busy = argentumAwaitingUpdate,
             onConfirm = { action ->
                 val epoch = ArgentumActions.epochFor(plan.legalAction, argentumSnapshot?.interactionEpoch)
                 if (epoch != null && submitArgentumAction(action, epoch)) {
@@ -4045,6 +4090,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 93 · MORE ROOM FOR CARDS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• A slimmer table: phases sit in one strip at the top, each player's life is on their tab, and the commander and mana are small chips. Landscape phones now show the battlefield.\n• The status box only appears for problems, a waiting confirmation or something on the stack.\n• On an unfolded Fold, an opponent's board sits beside yours.\n• Your hand opens from every table screen, including the Table tab.\n• New combat board: attackers on top, your blockers below. Tap a blocker, then the attacker; lines link them and a summary reads like \"Ramosian Captain 2/2 first strike ← 3 Rabbit Tokens (1/1)\". Attacking and combat damage use the same board.\n• Hold any card to see it large. Let go to keep it up; slide off to close.\n• Fixes: \"TYPE · null\" badges and \"null\" mana costs.", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 92 · QUICKER TURNS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• The game log shows the whole game from Argentum, newest first, with turn headers and your actions marked YOU.\n• The pass button says where passing takes you, like PASS → TO COMBAT.\n• PASS TO MY TURN keeps passing for you and stops when you're attacked, an opponent casts something, or Argentum needs a choice.\n• UNDO appears when Argentum lets you take back your last action.\n• Quick Actions only show buttons that work in Argentum games: Graveyard, Exile, Stack, Game log, Cast commander, Pass to my turn.\n• The table follows whose turn it is (turn this off in Options).\n• Options: Developer Options are gone; a new Help & diagnostics section has the connection test, diagnostic log, What's new and the guided tour.", color = SoftWhite, fontSize = 11.sp)
 
@@ -4139,9 +4187,14 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     )
 
     // The guide is layered over the real screen at the end of this composition.
+    // Argentum games: the hand drawer always shows YOUR hand and opens from any table screen.
+    val handSeat = if (argentumEnabled) localSeat.coerceIn(players.indices) else selectedPlayer
+    val handTrayVisible = showHand && gameInProgress && (if (argentumEnabled) players.getOrNull(handSeat) != null else !showOverview && canControlSelectedPlayer)
+    // While a combat board or another Argentum choice is open, the hand is for looking only.
+    val handViewOnly = argentumEnabled && (argentumPendingDecision != null || argentumAttackPlan != null || argentumBlockPlan != null || argentumComposer != null)
 
     AnimatedVisibility(
-        visible = showHand && !showOverview && gameInProgress && canControlSelectedPlayer,
+        visible = handTrayVisible,
         modifier = Modifier.fillMaxSize(),
         enter = fadeIn(),
         exit = fadeOut()
@@ -4150,7 +4203,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).clickable { showHand = false }
         ) {
             AnimatedVisibility(
-                visible = showHand && !showOverview && gameInProgress && canControlSelectedPlayer,
+                visible = handTrayVisible,
                 modifier = Modifier.align(Alignment.BottomCenter),
                 enter = slideInVertically { it } + fadeIn(),
                 exit = slideOutVertically { it } + fadeOut()
@@ -4193,18 +4246,18 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     }
                     Text("DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
                     HandSheet(
-                        cards = players[selectedPlayer].hand, isLandscape = isLandscape,
+                        cards = players[handSeat].hand, isLandscape = isLandscape,
                         availableHeight = LocalConfiguration.current.screenHeightDp.dp * effectiveHandFraction,
                         stackCount = visibleStackCount,
                         tutorialAnchor = ::tutorialAnchor,
                         highlightedCardId = highlightedHandCardId,
                         actionOrder = handActionOrderRaw.split('|').filter(String::isNotBlank),
-                        handRevealed = players[selectedPlayer].handRevealedToAll,
+                        handRevealed = players[handSeat].handRevealedToAll,
                         canAdvance = canControlSelectedPlayer && selectedPlayer == activePlayer && !players[activePlayer].isComputer,
-                        canControl = canControlSelectedPlayer,
-                        commanderCanCast = players[selectedPlayer].commanderCard?.let { commander ->
-                            val owner = players[selectedPlayer]
-                            canControlSelectedPlayer && !owner.isEliminated && !owner.library.any { it.id == commander.id } && !owner.hand.any { it.id == commander.id } && !owner.battlefield.any { it.id == commander.id } && !owner.graveyard.any { it.id == commander.id } && !owner.exile.any { it.id == commander.id } && !owner.revealed.any { it.id == commander.id } && stackActions.none { it.card?.id == commander.id }
+                        canControl = canControlSelectedPlayer || argentumEnabled,
+                        commanderCanCast = players[handSeat].commanderCard?.let { commander ->
+                            val owner = players[handSeat]
+                            (canControlSelectedPlayer || argentumEnabled) && !owner.isEliminated && !owner.library.any { it.id == commander.id } && !owner.hand.any { it.id == commander.id } && !owner.battlefield.any { it.id == commander.id } && !owner.graveyard.any { it.id == commander.id } && !owner.exile.any { it.id == commander.id } && !owner.revealed.any { it.id == commander.id } && stackActions.none { it.card?.id == commander.id }
                         } == true,
                         onToggleReveal = { revealed -> if (!argentumEnabled) {
                             updatePlayer(selectedPlayer) { it.copy(handRevealedToAll = revealed) }
@@ -4223,7 +4276,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         playableIds = argentumPlayableIds,
                         onStack = { guidedAction("stack-open") { if (argentumEnabled) run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } else stackOpen = true } },
                         onCastCommander = {
-                            val commander = players.getOrNull(selectedPlayer)?.commanderCard
+                            val commander = players.getOrNull(handSeat)?.commanderCard
                             if (argentumEnabled && commander != null) openArgentumActions(commander)
                             else if (commander == null) message = "Set a commander from your deck or battlefield first."
                             else paymentCard = selectedPlayer to commander
@@ -4251,7 +4304,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                                 "REVEALED" -> zoneDialog = selectedPlayer to "Revealed"
                             }
                         },
-                        onSelect = { card -> guidedAction("hand-card") { if (argentumEnabled) openArgentumActions(card) else handActionCard = card } },
+                        onSelect = { card -> guidedAction("hand-card") { if (handViewOnly) cardZoom.hold(card).also { cardZoom.release(false) } else if (argentumEnabled) openArgentumActions(card) else handActionCard = card } },
                         onDragDrop = { card, point ->
                             if (argentumEnabled) {
                                 // A drag is only a visual gesture in Arcana. Ask Argentum
@@ -6695,7 +6748,6 @@ private fun LayoutLabPage(
                         }
                         "STATUS" -> {
                             Text("This element can be removed below and restored from ADD ELEMENT.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp))
-                            SettingsToggle("Engine status strip", "Show Argentum connection and game status above the table. Problems and needs-handling notices always appear.", showEngineStatus, onShowEngineStatus)
                         }
                         "COMMANDER" -> Text("This element can be removed below and restored from ADD ELEMENT.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp))
                         "ZONES" -> Text("Choose which zone shortcuts and actions appear in the Quick Actions strip. Empty zones stay visible with a count of 0.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 5.dp))
@@ -7725,12 +7777,16 @@ private fun OverviewCard(card: GameCard, width: androidx.compose.ui.unit.Dp, onC
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: () -> Unit, onLongClick: () -> Unit, showCounters: Boolean = true, animateTapped: Boolean = false, glow: Boolean = false) {
+internal fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: () -> Unit, onLongClick: () -> Unit, showCounters: Boolean = true, animateTapped: Boolean = false, glow: Boolean = false) {
     val rotation by animateFloatAsState(targetValue = if (animateTapped && card.tapped) 90f else 0f, animationSpec = tween(260), label = "card-tap")
+    // Argentum games: holding any card shows it large (CardZoom.kt) instead of the older long-press actions.
+    val zoom = LocalCardZoom.current
+    val holdAction: () -> Unit = if (zoom.enabled) ({ zoom.hold(card) }) else onLongClick
     Box(
         modifier.aspectRatio(0.72f).graphicsLayer(rotationZ = rotation).clip(RoundedCornerShape(8.dp)).background(card.color)
             .border(if (glow) 2.5.dp else if (card.tapped) 2.dp else 1.dp, if (glow) Mint else if (card.tapped) Mint else Color.White.copy(alpha = 0.28f), RoundedCornerShape(8.dp))
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
+            .combinedClickable(onClick = onClick, onLongClick = holdAction)
+            .then(if (zoom.enabled) Modifier.cardZoomRelease(zoom) else Modifier)
     ) {
         if (card.isFaceDown) {
             Box(Modifier.fillMaxSize().background(Color(0xFF12221E)), contentAlignment = Alignment.Center) {
@@ -7741,7 +7797,7 @@ private fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: () 
             Text(card.name, color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 4, overflow = TextOverflow.Ellipsis)
             Text(card.type, color = Color.White.copy(alpha = 0.8f), fontSize = 8.sp, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
-        if (card.isToken && !card.isFaceDown) Text("TOKEN", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.TopStart).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xDD15221D)).padding(horizontal = 5.dp, vertical = 3.dp))
+        if (card.isToken && !card.isFaceDown) Text("TOKEN", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(if (zoom.enabled) Alignment.TopEnd else Alignment.TopStart).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xDD15221D)).padding(horizontal = 5.dp, vertical = 3.dp))
         val visibleCounters = card.counters.entries.filter { it.value > 0 }
         val counterText = visibleCounters.take(2).joinToString("  ") { "${it.key} ${it.value}" } + if (visibleCounters.size > 2) "  +${visibleCounters.size - 2}" else ""
         if (showCounters && counterText.isNotBlank()) Text(counterText, color = Ink, fontSize = 7.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(CounterGold).padding(horizontal = 4.dp, vertical = 4.dp))
@@ -7861,7 +7917,8 @@ private fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeig
                     card,
                     Modifier.width(cardWidth).height(cardHeight)
                         .onGloballyPositioned { coordinates = it }
-                        .pointerInput(card.id) {
+                        // Argentum games: holding a hand card previews it (no drag-to-play there).
+                        .then(if (argentumMode) Modifier else Modifier.pointerInput(card.id) {
                             var dragStart = Offset.Zero
                             var dragDelta = Offset.Zero
                             detectDragGesturesAfterLongPress(
@@ -7872,7 +7929,7 @@ private fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeig
                                     if (coords != null) onDragDrop(card, coords.localToRoot(dragStart + dragDelta))
                                 }
                             )
-                        }
+                        })
                         .then(if (cards.firstOrNull()?.id == card.id) tutorialAnchor("hand-card") else Modifier)
                         .then(if (card.id == highlightedCardId) Modifier.border(3.dp, Mint, RoundedCornerShape(8.dp)) else Modifier),
                     onClick = { onSelect(card) }, onLongClick = { onSelect(card) }, showCounters = false, glow = card.id in playableIds

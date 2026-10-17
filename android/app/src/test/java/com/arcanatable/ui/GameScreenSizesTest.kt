@@ -87,7 +87,7 @@ class GameScreenSizesTest {
             assertFalse("manual-only control '$it' must not be offered on an Argentum board", shown(it, substring = false))
         }
         assertFalse(shown("OTHER PLAYER · READ ONLY"))
-        assertTrue(shown("ARGENTUM RUNS THE RULES"))
+        assertTrue("compact table shows the phase strip", rule.onAllNodes(hasTestTag("phase-tracker"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         rule.onNode(hasTestTag("hand-peek")).performClick()
         UiTestSupport.settle(rule, 1_000)
         scenario.onActivity { UiTestSupport.screenshot(it, "game-$name-3-hand") }
@@ -95,7 +95,7 @@ class GameScreenSizesTest {
         assertTrue("hand tray offers Argentum's actions", shown("ACTIONS ·"))
         assertFalse("no manual draw in Argentum mode", shown("DRAW", substring = false))
         assertFalse("no manual reveal in Argentum mode", shown("REVEAL HAND"))
-        assertTrue(shown("PASS PRIORITY"))
+        assertTrue("pass button names where it stops", shown("PASS →"))
 
         // Button audit: every visible clickable node is enabled with a label, or explicitly disabled.
         val unlabeledClickable = rule.onAllNodes(androidx.compose.ui.test.hasClickAction(), useUnmergedTree = false).fetchSemanticsNodes()
