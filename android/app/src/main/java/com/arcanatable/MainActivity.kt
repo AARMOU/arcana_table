@@ -745,6 +745,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var passToMyTurnFrom by remember { mutableStateOf<Int?>(null) }
     var followActivePlayer by remember { mutableStateOf(optionPrefs.getBoolean("follow_active_player", true)) }
     var argentumPingResult by remember { mutableStateOf<String?>(null) }
+    var engineTrialResult by remember { mutableStateOf<String?>(null) }
     var lastOpponentViewed by remember { mutableIntStateOf(-1) }
     val argentumPrefs = remember { context.getSharedPreferences("argentum_session", Context.MODE_PRIVATE) }
     val argentumOrigin = remember { ArgentumEndpoints.origin(argentumPrefs) }
@@ -5327,6 +5328,23 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         onViewDiagnostics = { optionsOpen = false; diagnosticViewerOpen = true },
         onExportDiagnostics = { exportDiagnosticLog() },
         onWhatsNew = { optionsOpen = false; changelogOpen = true },
+        engineTrialResult = engineTrialResult,
+        onEngineSelfTest = {
+            engineTrialResult = "Running an AI-vs-AI game on this phone…"
+            scope.launch {
+                val result = withContext(Dispatchers.IO) {
+                    // The engine and AI recurse deeply; give them a large stack like a server thread.
+                    var outcome: com.arcanatable.engine.EmbeddedEngineTrial.Result? = null
+                    val worker = Thread(null, {
+                        outcome = com.arcanatable.engine.EmbeddedEngineTrial.run({ context.assets.open("argentum/por-cards.jsonl") })
+                    }, "argentum-engine-trial", 256L shl 20)
+                    worker.start(); worker.join()
+                    outcome
+                }
+                engineTrialResult = result?.summary() ?: "Engine trial did not return a result."
+                recordDiagnostic(engineTrialResult!!, DiagnosticCategory.ENGINE)
+            }
+        },
         onReplayTutorial = { optionsOpen = false; startTutorial() },
         onFollowActivePlayer = { value -> guidedAction("options-follow-turn") { followActivePlayer = value; optionPrefs.edit().putBoolean("follow_active_player", value).apply() } },
         reducedSwipeMotion = reducedSwipeMotion, cardSizeScale = cardSizeScale,
@@ -6561,6 +6579,7 @@ private fun OptionsPage(
     onFollowActivePlayer: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, onCardSizeScale: (Float) -> Unit,
     onTestConnection: () -> Unit, onReconnect: (() -> Unit)?, onViewDiagnostics: () -> Unit, onExportDiagnostics: () -> Unit,
     onWhatsNew: () -> Unit, onReplayTutorial: () -> Unit,
+    engineTrialResult: String? = null, onEngineSelfTest: (() -> Unit)? = null,
     onClearAllData: () -> Unit, onDismiss: () -> Unit
 ) {
     @Composable
@@ -6618,6 +6637,11 @@ private fun OptionsPage(
                 LinkRow("Export diagnostic log", "Save a text file to share when something goes wrong", onClick = onExportDiagnostics)
                 LinkRow("What's new", "Version $versionLabel", onClick = onWhatsNew)
                 LinkRow("Replay the guided tour", onClick = onReplayTutorial)
+                if (onEngineSelfTest != null) LinkRow(
+                    "Run engine self-test",
+                    engineTrialResult ?: "Plays one AI-vs-AI game with Argentum inside this phone, no server. Takes up to a minute.",
+                    modifier = Modifier.testTag("engine-self-test"),
+                    onClick = { if (engineTrialResult?.startsWith("Running") != true) onEngineSelfTest() })
                 HorizontalDivider(color = Muted.copy(alpha = 0.25f), modifier = Modifier.padding(top = 14.dp))
                 TextButton(onClick = onClearAllData, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(top = 6.dp).then(tutorialAnchor("clear-data"))) {
                     Text("CLEAR ALL DATA", color = Color(0xFFE9978B), fontWeight = FontWeight.Black, modifier = Modifier.fillMaxWidth())
