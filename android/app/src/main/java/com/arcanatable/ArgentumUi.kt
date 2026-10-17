@@ -373,3 +373,40 @@ fun ArgentumAmountEditor(ids: List<String>, nameOf: (String) -> String, amounts:
         }
     }
 }
+
+/**
+ * Combat damage board for Argentum's CombatResolutionDecision. Starts from Argentum's default
+ * amounts (so CONFIRM is a one-tap "use the engine's assignment"), lets the player move damage
+ * between the edges they own, and shows lethal hints.
+ */
+@Composable
+fun ArgentumCombatDamageEditor(resolution: ArgentumCombatResolution, playerId: String, amounts: Map<String, Int>, onChange: (Map<String, Int>) -> Unit) {
+    val mine = resolution.editableBy(playerId)
+    Column {
+        Text(if (resolution.firstStrike) "First-strike damage" else "Combat damage", color = Muted, fontSize = 11.sp)
+        if (mine.isEmpty()) Text("Nothing for you to adjust. Confirm to let Argentum apply combat damage.", color = SoftWhite, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+        mine.groupBy { it.sourceId }.forEach { (source, edges) ->
+            val left = resolution.remaining(source, amounts)
+            Text("${resolution.names[source] ?: "Creature"} · ${edges.maxOf { it.maximum }} damage" + if (left > 0) " · $left unassigned" else "",
+                color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+            edges.forEach { edge ->
+                val value = amounts[edge.id] ?: edge.defaultAmount
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("→ ${resolution.names[edge.targetId] ?: "Target"}", color = SoftWhite, fontSize = 12.sp)
+                        val hint = when {
+                            edge.isTrampleDrain -> "trample"
+                            edge.direction == "ATTACKER_TO_BLOCKER" || edge.direction == "BLOCKER_TO_ATTACKER" -> "lethal ${edge.lethal}" + if (value >= edge.lethal) " ✓" else ""
+                            else -> null
+                        }
+                        if (hint != null) Text(hint, color = if (value >= edge.lethal && !edge.isTrampleDrain) Mint else Muted, fontSize = 10.sp)
+                    }
+                    TextButton(enabled = value > 0, onClick = { onChange(amounts + (edge.id to value - 1)) }) { Text("−") }
+                    Text("$value", color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.widthIn(min = 26.dp))
+                    TextButton(enabled = value < edge.maximum && left > 0, onClick = { onChange(amounts + (edge.id to value + 1)) }) { Text("+") }
+                }
+            }
+        }
+        resolution.problem(amounts)?.let { Text(it, color = CounterGold, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp)) }
+    }
+}

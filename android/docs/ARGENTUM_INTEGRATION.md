@@ -1,4 +1,4 @@
-# Arcana × Argentum integration (Build 87)
+# Arcana × Argentum integration (Build 88)
 
 Arcana Table provides the mobile UI. Argentum Engine
 ([wingedsheep/argentum-engine](https://github.com/wingedsheep/argentum-engine)) is the game engine:
@@ -64,7 +64,7 @@ needed.
 - **Only server choices.** Every list Arcana shows (legal actions, targets, attackers, blockers, decision options) comes from the latest `stateUpdate`. Every action is sent with the server's `interactionEpoch`.
 - **No simulation.** Arcana's own rules helpers, manual life/draw/token tools and its local combat panel are disabled or hidden on an Argentum board.
 - **Needs handling, never guessing.** If Argentum sends a decision or action Arcana cannot present, Arcana shows a *Needs handling* notice and logs it. It offers Argentum's own cancel (when the decision allows it), a refresh, or *View table*. Nothing is auto-answered.
-  - Decision types with native controls: yes/no, batch yes/no, option, number, colour, card selection, targets, modes, library search, ordering (objects and library), mana sources (Argentum auto-pay or decline), combat damage assignment, distribution.
+  - Decision types with native controls: yes/no, batch yes/no, option, number, colour, card selection, targets, modes, library search, ordering (objects and library), mana sources (Argentum auto-pay or decline), combat damage assignment (`AssignDamageDecision` and the combat damage board `CombatResolutionDecision`, defined in `core/CombatResolution.kt`), distribution.
   - Decision types that show *Needs handling*: `SplitPilesDecision`, `ChooseReplacementDecision`, `BudgetModalDecision`, and any future type.
   - Actions that show *Needs handling* instead of being sent: multi-target spells, damage-division spells, and mana-colour choices.
 - **Unsupported deck cards.** When Argentum's validator rejects cards, a review lists them and nothing changes until the player chooses one of three options:

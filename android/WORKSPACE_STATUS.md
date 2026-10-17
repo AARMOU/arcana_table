@@ -1,10 +1,10 @@
 # Arcana Table workspace status
 
-## Build 87 · Arcana × Argentum integration (branch `experimental/arcana-argentum-integration`)
+## Build 88 · Arcana × Argentum integration (branch `experimental/arcana-argentum-integration`)
 
 Branched from `experimental/targeting` at `c97da64` (Build 86); `main`, `experimental/targeting` and the other branches are untouched. Debug application ID `com.arcanatable.argentum`. See `README.md` (What's new, how to play) and `docs/ARGENTUM_INTEGRATION.md` (design, protocol, adapter files).
 
-Verification on this build: 79 JVM/Robolectric tests pass, including live games through the Arcana UI against `magic.wingedsheep.com`. `assembleDebug` and `lintDebug` succeed with 0 lint errors. Not verified: installation on a physical device or emulator (no hardware acceleration was available) and card art loading (Scryfall image hosts were blocked in the build environment).
+Build 88 adds the combat damage board (`CombatResolutionDecision`), found from a device diagnostic log in which combat damage stopped at Needs handling. Verification on this build: 82 JVM/Robolectric tests pass, including live games through the Arcana UI against `magic.wingedsheep.com`. `assembleDebug` and `lintDebug` succeed with 0 lint errors. Not verified: installation on a physical device or emulator (no hardware acceleration was available) and card art loading (Scryfall image hosts were blocked in the build environment).
 
 
 ## Canonical project

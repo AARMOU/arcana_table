@@ -1,10 +1,10 @@
-# Arcana Table × Argentum — Integration Build 87
+# Arcana Table × Argentum — Integration Build 88
 
 This branch (`experimental/arcana-argentum-integration`) is Arcana Table's mobile table and customization UI running games on the **Argentum Engine**. Argentum owns the game state, rules, legal actions, decisions, turns and the AI opponent, and Arcana renders that state and sends the player's choices. How it fits together: [docs/ARGENTUM_INTEGRATION.md](docs/ARGENTUM_INTEGRATION.md). Build steps: [BUILD_AND_TOOLS.md](BUILD_AND_TOOLS.md).
 
 ## Play a real Argentum game
 
-1. Install `app-debug.apk`. It appears as **Arcana · Argentum B87** next to any other Arcana build.
+1. Install `app-debug.apk`. It appears as **Arcana · Argentum B88** next to any other Arcana build.
 2. Tap **IMPORT PLAYER DECK → ARGENTUM DECKS**, pick a list such as *Animated Army* (Bello), then tap **IMPORT**. Any Commander deck works; Argentum validates it.
 3. Tap **PLAY WITH ARGENTUM**. Argentum checks the deck, opens a practice table against its AI and deals. Choose **KEEP HAND** or **MULLIGAN**.
 4. Play from Arcana's table:
@@ -14,6 +14,10 @@ This branch (`experimental/arcana-argentum-integration`) is Arcana Table's mobil
    - Argentum's choices (targets, modes, discard, library search, ordering, damage assignment) open as Arcana dialogs.
 5. If anything shows **NEEDS HANDLING**, Arcana has no control for that Argentum prompt yet. Nothing was chosen for you, and the event is in **⋮ → Game tools → Diagnostic log (search)**.
 6. To leave, use **⋮ → Room & game → Leave game…**, which concedes the game on Argentum.
+
+## What's new in Build 88
+
+- **Combat damage:** combat damage no longer stops the game at *Needs handling*. Argentum's combat damage board (`CombatResolutionDecision`) opens with the engine's own default split, so **CONFIRM DAMAGE** applies it in one tap. You can also move damage between blockers and trample targets; lethal amounts are marked, and Arcana only allows a split Argentum will accept. This was found from a diagnostic log of a real game on a Galaxy Z Fold6.
 
 ## What's new in Build 87
 

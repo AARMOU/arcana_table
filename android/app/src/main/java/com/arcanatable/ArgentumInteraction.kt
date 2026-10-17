@@ -35,6 +35,7 @@ object ArgentumDecisions {
         "ChooseColorDecision", "SelectCardsDecision", "ChooseTargetsDecision",
         "ChooseModeDecision", "SearchLibraryDecision", "OrderObjectsDecision", "ReorderLibraryDecision",
         "SelectManaSourcesDecision", "AssignDamageDecision", "DistributeDecision",
+        "CombatResolutionDecision",
     )
 
     /** Handled outside the decision dialog (card-tap legal actions). */
@@ -115,6 +116,93 @@ object ArgentumDecisions {
         val sum = distribution.values.sum()
         val sumOk = if (decision.optBoolean("allowPartial", false)) sum in 0..total else sum == total
         return sumOk && distribution.all { (id, value) -> value >= min && (caps[id]?.let { value <= it } ?: true) }
+    }
+}
+
+/** One damage edge of Argentum's combat-resolution board (rules-engine core/CombatResolution.kt). */
+data class ArgentumDamageEdge(
+    val id: String,
+    val sourceId: String,
+    val targetId: String,
+    val direction: String,
+    val defaultAmount: Int,
+    val maximum: Int,
+    val lethal: Int,
+    val isTrampleDrain: Boolean,
+    val editableBy: String,
+)
+
+/**
+ * Parsed `CombatResolutionDecision`: every combat-damage assignment the engine wants confirmed,
+ * pre-filled with Argentum's default amounts. Validation mirrors Argentum's own
+ * DecisionValidators.validateCombatResolution so CONFIRM is only enabled for answers it accepts.
+ */
+data class ArgentumCombatResolution(
+    val decision: JSONObject,
+    val edges: List<ArgentumDamageEdge>,
+    val names: Map<String, String>,
+    val firstStrike: Boolean,
+) {
+    /** Edges the given player may change (banding can hand some to the opponent). */
+    fun editableBy(playerId: String): List<ArgentumDamageEdge> = edges.filter { it.editableBy == playerId }
+
+    fun defaults(playerId: String): Map<String, Int> = editableBy(playerId).associate { it.id to it.defaultAmount }
+
+    private fun amountOf(edge: ArgentumDamageEdge, chosen: Map<String, Int>) = chosen[edge.id] ?: edge.defaultAmount
+
+    /** Null when Argentum would accept these amounts; otherwise a player-facing reason. */
+    fun problem(chosen: Map<String, Int>): String? {
+        for (edge in edges) {
+            val amount = amountOf(edge, chosen)
+            if (amount < 0) return "Damage can't be negative."
+            if (amount > edge.maximum) return "${names[edge.sourceId] ?: "A creature"} can assign at most ${edge.maximum} to ${names[edge.targetId] ?: "that target"}."
+        }
+        edges.groupBy { it.sourceId }.forEach { (source, sourceEdges) ->
+            val total = sourceEdges.sumOf { amountOf(it, chosen) }
+            val power = sourceEdges.maxOf { it.maximum }
+            if (total > power) return "${names[source] ?: "A creature"} assigns $total but only has $power damage."
+        }
+        val toBlocker = mutableMapOf<String, Int>()
+        edges.filter { it.direction == "ATTACKER_TO_BLOCKER" }.forEach { toBlocker.merge(it.targetId, amountOf(it, chosen), Int::plus) }
+        for (drain in edges.filter { it.isTrampleDrain && amountOf(it, chosen) > 0 }) {
+            val short = edges.filter { it.sourceId == drain.sourceId && it.direction == "ATTACKER_TO_BLOCKER" }
+                .firstOrNull { (toBlocker[it.targetId] ?: 0) < it.lethal }
+            if (short != null) return "Trample: assign lethal damage to ${names[short.targetId] ?: "each blocker"} (${short.lethal}) before damaging ${names[drain.targetId] ?: "the player"}."
+        }
+        return null
+    }
+
+    /** Remaining damage a source can still assign, for the editor's + buttons. */
+    fun remaining(sourceId: String, chosen: Map<String, Int>): Int {
+        val sourceEdges = edges.filter { it.sourceId == sourceId }
+        return sourceEdges.maxOf { it.maximum } - sourceEdges.sumOf { amountOf(it, chosen) }
+    }
+
+    /** CombatResolutionResponse with only the edges this player owns. */
+    fun response(playerId: String, chosen: Map<String, Int>): JSONObject {
+        val list = JSONArray()
+        editableBy(playerId).forEach { edge -> list.put(JSONObject().put("edgeId", edge.id).put("amount", amountOf(edge, chosen))) }
+        return JSONObject().put("type", "CombatResolutionResponse").put("edges", list)
+    }
+
+    companion object {
+        fun from(decision: JSONObject): ArgentumCombatResolution? {
+            if (decision.optString("type") != "CombatResolutionDecision") return null
+            val names = mutableMapOf<String, String>()
+            listOf("attackers", "blockers", "defenders").forEach { key ->
+                val list = decision.optJSONArray(key) ?: return@forEach
+                for (i in 0 until list.length()) list.optJSONObject(i)?.let { names[it.optString("id")] = it.optString("name") }
+            }
+            val raw = decision.optJSONArray("edges") ?: JSONArray()
+            val edges = (0 until raw.length()).mapNotNull { raw.optJSONObject(it) }.map { e ->
+                ArgentumDamageEdge(
+                    id = e.optString("id"), sourceId = e.optString("sourceId"), targetId = e.optString("targetId"),
+                    direction = e.optString("direction"), defaultAmount = e.optInt("amount"), maximum = e.optInt("maximum"),
+                    lethal = e.optInt("lethal", 1), isTrampleDrain = e.optBoolean("isTrampleDrain"), editableBy = e.optString("editableBy"),
+                )
+            }
+            return ArgentumCombatResolution(decision, edges, names, decision.optBoolean("firstStrike"))
+        }
     }
 }
 

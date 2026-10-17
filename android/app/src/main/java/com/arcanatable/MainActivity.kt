@@ -1151,6 +1151,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         argentumOrderSelection = nextDecision?.let(ArgentumDecisions::orderingItems).orEmpty()
                         argentumAmounts = when (nextDecision?.optString("type")) {
                             "AssignDamageDecision" -> ArgentumDecisions.defaultDamageAssignments(nextDecision)
+                            "CombatResolutionDecision" -> ArgentumCombatResolution.from(nextDecision)?.defaults(nextDecision.optString("playerId")).orEmpty()
                             "DistributeDecision" -> nextDecision.optJSONArray("targets")?.let { t -> (0 until t.length()).associate { t.optString(it) to nextDecision.optInt("minPerTarget", 0) } }.orEmpty()
                             else -> emptyMap()
                         }
@@ -3755,6 +3756,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                             ArgentumAmountEditor(ids.distinct(), ::argentumName, argentumAmounts, decision.optInt("availablePower"),
                                 minEach = ids.associateWith { minimums?.optInt(it, 0) ?: 0 }, maxEach = emptyMap(), onChange = { argentumAmounts = it })
                         }
+                        "CombatResolutionDecision" -> ArgentumCombatResolution.from(decision)?.let { board ->
+                            ArgentumCombatDamageEditor(board, decision.optString("playerId"), argentumAmounts, onChange = { argentumAmounts = it })
+                        }
                         "DistributeDecision" -> {
                             val ids = (decision.optJSONArray("targets") ?: JSONArray()).let { t -> (0 until t.length()).map { t.optString(it) } }
                             val caps = decision.optJSONObject("maxPerTarget")
@@ -3820,6 +3824,12 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     "AssignDamageDecision" -> TextButton(enabled = ArgentumDecisions.damageAssignmentComplete(decision, argentumAmounts), onClick = {
                         submitArgentumDecision(ArgentumDecisions.damageAssignmentResponse(argentumAmounts.filterValues { it > 0 }))
                     }) { Text("ASSIGN") }
+                    "CombatResolutionDecision" -> {
+                        val board = ArgentumCombatResolution.from(decision)
+                        TextButton(enabled = board != null && board.problem(argentumAmounts) == null, onClick = {
+                            board?.let { submitArgentumDecision(it.response(decision.optString("playerId"), argentumAmounts)) }
+                        }) { Text("CONFIRM DAMAGE") }
+                    }
                     "DistributeDecision" -> TextButton(enabled = ArgentumDecisions.distributionComplete(decision, argentumAmounts), onClick = {
                         submitArgentumDecision(ArgentumDecisions.distributionResponse(argentumAmounts))
                     }) { Text("CONFIRM") }
@@ -3921,6 +3931,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 88 · COMBAT DAMAGE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Combat damage now opens a damage board instead of stopping at Needs handling. It starts from Argentum's own assignment, so Confirm damage applies it in one tap; adjust amounts per blocker and trample target with lethal hints, and Arcana only enables Confirm for splits Argentum accepts.", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 87 · ARGENTUM INTEGRATION", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Attack and block declarations come from Argentum; the main button names what it will do (Pass priority, Declare attackers, Declare blockers).\n• More Argentum choices open in Arcana dialogs: modes, library search, ordering, mana auto-pay, damage assignment and distribution. Anything else shows a Needs handling notice with Cancel, Refresh or View table instead of blocking the app.\n• Unsupported deck cards open a review: play without them for this game, play the full deck in the Arcana sandbox, or edit the deck. Your saved deck is never changed.\n• No automatic resume: after a relaunch, choose Resume game or End that game. A connection lost in the background waits for Resume.\n• Engine status strip, searchable diagnostic log with redacted export, and a hand drawer that rearranges cards as you resize it (Adjust UI → Hand).", color = SoftWhite, fontSize = 11.sp)
 

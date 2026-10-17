@@ -206,4 +206,41 @@ class ArgentumResilienceUiTest {
         assertTrue("interaction epoch echoed", sent.optString("interactionEpoch").isNotBlank())
         scenario.close()
     }
+
+    @Test fun combatDamageBoardReplacesNeedsHandlingAndSubmitsArgentumShape() {
+        val me = fake.viewingPlayerId
+        val opponent = fake.stateMessage.getJSONObject("state").getJSONArray("players").let { players ->
+            (0 until players.length()).map { players.getJSONObject(it).optString("playerId") }.first { it != me }
+        }
+        fun edge(id: String, src: String, tgt: String, dir: String, amount: Int, lethal: Int, drain: Boolean) = JSONObject()
+            .put("id", id).put("sourceId", src).put("targetId", tgt).put("direction", dir).put("amount", amount)
+            .put("maximum", 6).put("lethal", lethal).put("orderConstrained", true).put("isTrampleDrain", drain).put("editableBy", me)
+        val board = JSONObject().put("type", "CombatResolutionDecision").put("id", "combat-1").put("playerId", me)
+            .put("prompt", "Assign Wildsear, Scouring Maw's 6 combat damage").put("firstStrike", false)
+            .put("context", JSONObject())
+            .put("attackers", JSONArray().put(JSONObject().put("id", "wild").put("name", "Wildsear, Scouring Maw").put("power", 6).put("hasTrample", true)))
+            .put("blockers", JSONArray().put(JSONObject().put("id", "wall").put("name", "Stone Wall").put("toughness", 3)))
+            .put("defenders", JSONArray().put(JSONObject().put("id", opponent).put("name", "Opponent").put("kind", "PLAYER")))
+            .put("edges", JSONArray().put(edge("wild->wall", "wild", "wall", "ATTACKER_TO_BLOCKER", 3, 3, false))
+                .put(edge("wild->$opponent", "wild", opponent, "ATTACKER_TO_PLAYER", 3, 1, true)))
+        fake.stateMessage = fake.withDecision(board)
+        useServer(fake.origin)
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        UiTestSupport.settle(rule)
+        rule.onNodeWithText("PLAY WITH ARGENTUM").performClick()
+        UiTestSupport.awaitReal(rule, 30_000, "combat damage board") { shown("CONFIRM DAMAGE") }
+        assertFalse("combat damage is no longer a needs-handling case", shown("NEEDS HANDLING"))
+        assertTrue(shown("Stone Wall") && shown("lethal 3"))
+        scenario.onActivity { UiTestSupport.screenshot(it, "resilience-08-combat-damage") }
+        rule.onNodeWithText("CONFIRM DAMAGE").performClick()
+        UiTestSupport.awaitReal(rule, 10_000, "decision answer reaches server") {
+            fake.received.any { it.optString("type") == "submitAction" && it.optJSONObject("action")?.optString("type") == "SubmitDecision" }
+        }
+        val response = fake.received.last { it.optString("type") == "submitAction" }.getJSONObject("action").getJSONObject("response")
+        assertEquals("CombatResolutionResponse", response.getString("type"))
+        assertEquals("combat-1", response.getString("decisionId"))
+        assertEquals(2, response.getJSONArray("edges").length())
+        assertEquals(3, response.getJSONArray("edges").getJSONObject(0).getInt("amount"))
+        scenario.close()
+    }
 }

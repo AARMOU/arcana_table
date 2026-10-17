@@ -154,4 +154,46 @@ class ArgentumInteractionTest {
         assertEquals(listOf("x", "y"), ArgentumDecisions.orderingItems(JSONObject().put("objects", JSONArray(listOf("x", "y")))))
         assertEquals(listOf("p"), ArgentumDecisions.orderingItems(JSONObject().put("cards", JSONArray(listOf("p")))))
     }
+
+    // ---- Combat damage board (rules-engine core/CombatResolution.kt) ----
+
+    private fun tramplerBlocked(): JSONObject {
+        fun edge(id: String, src: String, tgt: String, dir: String, amount: Int, max: Int, lethal: Int, drain: Boolean) = JSONObject()
+            .put("id", id).put("sourceId", src).put("targetId", tgt).put("direction", dir).put("amount", amount)
+            .put("maximum", max).put("lethal", lethal).put("orderConstrained", true).put("isTrampleDrain", drain).put("editableBy", "me")
+        return JSONObject().put("type", "CombatResolutionDecision").put("id", "d1").put("playerId", "me")
+            .put("prompt", "Assign Wildsear, Scouring Maw's 6 combat damage").put("firstStrike", false)
+            .put("attackers", JSONArray().put(JSONObject().put("id", "wild").put("name", "Wildsear, Scouring Maw").put("power", 6).put("hasTrample", true)))
+            .put("blockers", JSONArray().put(JSONObject().put("id", "wall").put("name", "Wall").put("power", 0).put("toughness", 3)))
+            .put("defenders", JSONArray().put(JSONObject().put("id", "opp").put("name", "Opponent").put("kind", "PLAYER")))
+            .put("edges", JSONArray()
+                .put(edge("wild->wall", "wild", "wall", "ATTACKER_TO_BLOCKER", 3, 6, 3, false))
+                .put(edge("wild->opp", "wild", "opp", "ATTACKER_TO_PLAYER", 3, 6, 1, true)))
+    }
+
+    @Test fun combatResolutionIsNativeAndDefaultsAreAccepted() {
+        val decision = tramplerBlocked()
+        assertNull(ArgentumDecisions.needsHandlingReason(decision))
+        val board = requireNotNull(ArgentumCombatResolution.from(decision))
+        val defaults = board.defaults("me")
+        assertEquals(mapOf("wild->wall" to 3, "wild->opp" to 3), defaults)
+        assertNull(board.problem(defaults))
+        val response = board.response("me", defaults)
+        assertEquals("CombatResolutionResponse", response.getString("type"))
+        assertEquals(2, response.getJSONArray("edges").length())
+        assertEquals("wild->wall", response.getJSONArray("edges").getJSONObject(0).getString("edgeId"))
+    }
+
+    @Test fun combatResolutionMirrorsArgentumValidation() {
+        val board = requireNotNull(ArgentumCombatResolution.from(tramplerBlocked()))
+        // Trample: blocker below lethal while damage tramples over.
+        assertNotNull(board.problem(mapOf("wild->wall" to 2, "wild->opp" to 4)))
+        // Over budget: 4 + 3 > 6.
+        assertNotNull(board.problem(mapOf("wild->wall" to 4, "wild->opp" to 3)))
+        // All on the blocker is legal; unassigned remainder is allowed.
+        assertNull(board.problem(mapOf("wild->wall" to 6, "wild->opp" to 0)))
+        assertEquals(1, board.remaining("wild", mapOf("wild->wall" to 3, "wild->opp" to 2)))
+        // Only edges this player owns are submitted.
+        assertEquals(0, board.response("someone-else", emptyMap()).getJSONArray("edges").length())
+    }
 }
