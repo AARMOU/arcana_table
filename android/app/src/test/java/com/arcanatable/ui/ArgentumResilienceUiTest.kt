@@ -7,6 +7,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.hasTestTag
@@ -160,9 +161,11 @@ class ArgentumResilienceUiTest {
         // Diagnostic log: searchable through the UI, categories recorded.
         rule.onNodeWithContentDescription("App menu").performClick()
         UiTestSupport.settle(rule, 300)
-        rule.onNodeWithText("Game tools").performClick()
-        UiTestSupport.settle(rule, 300)
-        rule.onNodeWithText("Diagnostic log (search)").performClick()
+        rule.onNodeWithText("Options").performClick()
+        UiTestSupport.settle(rule, 500)
+        // Options → Help & diagnostics (the page scrolls; bring the row into view first).
+        rule.onNodeWithText("Diagnostic log").performScrollTo()
+        rule.onNodeWithText("Diagnostic log").performClick()
         UiTestSupport.settle(rule, 500)
         rule.onNode(hasTestTag("diagnostic-search")).performTextInput("needs handling")
         UiTestSupport.settle(rule, 500)
