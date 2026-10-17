@@ -1,0 +1,94 @@
+From d17b0a964288b13b183fe66d74b8c43971cbe1b7 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 17 Oct 2026 01:21:27 -0600
+Subject: [PATCH 1/2] Escape regex braces/brackets that Android's ICU regex
+ rejects
+
+---
+ ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt  | 2 +-
+ ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt   | 2 +-
+ mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt    | 2 +-
+ .../effects/permanent/types/ChangeWordInTextExecutor.kt         | 2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt b/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
+index bcbdc6e350..924d3d8389 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
+@@ -14,7 +14,7 @@ internal object DraftsimMana {
+     /** Canonical color order `eW`. */
+     val COLORS = listOf("W", "U", "B", "R", "G")
+ 
+-    private val SYMBOL = Regex("\\{([^}]+)}")
++    private val SYMBOL = Regex("\\{([^}]+)\\}")
+ 
+     /**
+      * Converted mana cost of a single-face cost string. Numeric generic symbols add their value;
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt b/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt
+index dd525a18e0..4f9467e9fa 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt
+@@ -23,7 +23,7 @@ class AiResponseParser {
+         }
+ 
+         // Try [X] pattern
+-        val bracketPattern = Regex("""\[([A-Z]{1,2})]""")
++        val bracketPattern = Regex("""\[([A-Z]{1,2})\]""")
+         val bracketMatch = bracketPattern.find(cleaned.uppercase())
+         if (bracketMatch != null) {
+             val index = GameStateFormatter.letterToIndex(bracketMatch.groupValues[1])
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt
+index 5cd610418e..88c908a261 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt
+@@ -436,7 +436,7 @@ data class ManaCost(val symbols: List<ManaSymbol>) {
+             if (costString.isBlank()) return ZERO
+ 
+             val symbols = mutableListOf<ManaSymbol>()
+-            val regex = Regex("""\{([^}]+)}""")
++            val regex = Regex("""\{([^}]+)\}""")
+ 
+             regex.findAll(costString).forEach { match ->
+                 val content = match.groupValues[1]
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/types/ChangeWordInTextExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/types/ChangeWordInTextExecutor.kt
+index 4df6ecf22a..11e6600b3f 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/types/ChangeWordInTextExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/permanent/types/ChangeWordInTextExecutor.kt
+@@ -20,7 +20,7 @@ import kotlin.reflect.KClass
+  */
+ internal fun oracleWords(oracleText: String?): Set<String> =
+     if (oracleText.isNullOrBlank()) emptySet()
+-    else Regex("[^A-Za-z'\\-]+").split(oracleText).filter { it.isNotBlank() }.map { it.lowercase() }.toSet()
++    else Regex("[^A-Za-z'-]+").split(oracleText).filter { it.isNotBlank() }.map { it.lowercase() }.toSet()
+ 
+ /** Offers a single FROM/TO decision constrained to the effect's word categories. */
+ class ChangeWordInTextExecutor(
+-- 
+2.43.0
+
+
+From 12a84a5f6991542c23738865bac07ab8a1d399e1 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 17 Oct 2026 01:21:41 -0600
+Subject: [PATCH 2/2] Avoid escaped hyphen in a character class (Android ICU)
+
+---
+ .../wingedsheep/engine/view/projection/CardFacesProjector.kt    | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardFacesProjector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardFacesProjector.kt
+index 4cf3234799..ee6b34b2b3 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardFacesProjector.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardFacesProjector.kt
+@@ -176,7 +176,7 @@ internal class CardFacesProjector(
+      */
+     private fun parseOracleLoyaltyLines(oracleText: String): Map<Int, List<String>> {
+         if (oracleText.isBlank()) return emptyMap()
+-        val pattern = Regex("""^\s*([+−\-]?)(\d+):\s*(.+?)\s*$""")
++        val pattern = Regex("""^\s*([+−-]?)(\d+):\s*(.+?)\s*$""")
+         val result = mutableMapOf<Int, MutableList<String>>()
+         for (raw in oracleText.lines()) {
+             val match = pattern.matchEntire(raw) ?: continue
+-- 
+2.43.0
+
