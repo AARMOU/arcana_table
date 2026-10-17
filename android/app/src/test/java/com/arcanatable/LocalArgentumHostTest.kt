@@ -27,7 +27,7 @@ class LocalArgentumHostTest {
         val you = LocalSeat("You", EmbeddedEngineTrial.monoDeck(cards, Color.GREEN, random).cards, null)
         val ai = LocalSeat("Offline AI", EmbeddedEngineTrial.monoDeck(cards, Color.RED, random).cards, null)
         val inbox = LinkedBlockingQueue<JSONObject>()
-        val host = LocalArgentumHost(registry, you, ai) { inbox.put(it) }
+        val host = LocalArgentumHost(registry, you, ai, paceMs = 0) { inbox.put(it) }
         host.receive(JSONObject().put("type", "connect"))
         host.receive(JSONObject().put("type", "createQuickGameLobby"))
         val types = mutableListOf<String>()
@@ -39,6 +39,7 @@ class LocalArgentumHostTest {
             val msg = inbox.poll(60, TimeUnit.SECONDS) ?: break
             types += msg.optString("type")
             when (msg.optString("type")) {
+                "mulliganDecision" -> host.receive(JSONObject().put("type", "keepHand"))
                 "gameOver" -> over = true
                 "stateUpdate" -> {
                     val snapshot = ArgentumTableSnapshot.parse(msg.getJSONObject("state"), msg.optJSONArray("legalActions") ?: JSONArray(), msg.optString("interactionEpoch"))
@@ -70,7 +71,7 @@ class LocalArgentumHostTest {
         }
         host.shutdown()
         println("[offline-host] messages=${types.size} turn=$lastTurn passes=$passes decisions=$decisions over=$over first=${types.take(4)}")
-        assertEquals(listOf("connected", "quickGameLobbyState", "gameStarted", "stateUpdate"), types.take(4))
+        assertEquals(listOf("connected", "quickGameLobbyState", "gameStarted", "mulliganDecision", "mulliganComplete", "stateUpdate"), types.take(6))
         assertTrue("game advanced through several turns", lastTurn >= 4 || over)
     }
 }

@@ -2844,7 +2844,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 val (setup, registry) = prepared
                 recordDiagnostic("Offline game prepared in ${System.currentTimeMillis() - started} ms: ${setup.you.commander ?: "Portal"} vs ${setup.aiDeckName}", DiagnosticCategory.ENGINE)
                 setup.notes.forEach { recordDiagnostic("Offline: $it", DiagnosticCategory.ENGINE) }
-                argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, setup.you, setup.ai, emit) }
+                argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, setup.you, setup.ai, emit = emit) }
                 argentumOffline = true
                 argentumDeckForLobby = null
                 argentumCommanderForLobby = null

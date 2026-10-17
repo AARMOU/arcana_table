@@ -32,7 +32,7 @@ class OfflineCommanderGameTest {
         assertTrue(setup.notes.any { "Not A Real Card" in it })
 
         val inbox = LinkedBlockingQueue<JSONObject>()
-        val host = LocalArgentumHost(registry, setup.you, setup.ai) { inbox.put(it) }
+        val host = LocalArgentumHost(registry, setup.you, setup.ai, paceMs = 0) { inbox.put(it) }
         host.receive(JSONObject().put("type", "connect"))
         host.receive(JSONObject().put("type", "createQuickGameLobby"))
         var lastTurn = 0; var actions = 0; var over = false; var life = ""
@@ -40,6 +40,7 @@ class OfflineCommanderGameTest {
         while (actions < 600 && !over) {
             val msg = inbox.poll(90, TimeUnit.SECONDS) ?: break
             when (msg.optString("type")) {
+                "mulliganDecision" -> host.receive(JSONObject().put("type", "keepHand"))
                 "gameOver" -> over = true
                 "error" -> println("[offline-commander] error ${msg.optString("message")}")
                 "stateUpdate" -> {
