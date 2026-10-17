@@ -131,6 +131,9 @@ class OfflineHostFlowTest {
         host.shutdown()
         println("[offline-flow] AI turn updates by turn: $aiTurnUpdates")
         assertTrue("saw AI turns", aiTurnUpdates.isNotEmpty())
-        assertTrue("each AI turn shows its steps: $aiTurnUpdates", aiTurnUpdates.values.all { it >= 3 })
+        // The last AI turn seen may be cut off when the loop stops; judge the completed ones.
+        val completed = aiTurnUpdates.filterKeys { it < turns }
+        assertTrue("saw a completed AI turn: $aiTurnUpdates", completed.isNotEmpty())
+        assertTrue("each AI turn shows its steps: $aiTurnUpdates", completed.values.all { it >= 3 })
     }
 }
