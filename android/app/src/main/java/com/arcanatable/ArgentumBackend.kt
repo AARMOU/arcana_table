@@ -113,7 +113,31 @@ data class ArgentumTargetRef(val id: String, val name: String, val type: String,
 data class ArgentumStackItem(val id: String, val name: String, val controllerName: String, val isYours: Boolean, val imageUrl: String?, val targetNames: List<String>)
 
 /** One line of Argentum's own game log (ClientEvent.description). */
-data class ArgentumLogLine(val description: String, val type: String, val isYours: Boolean?)
+data class ArgentumLogLine(val description: String, val type: String, val isYours: Boolean?) {
+    /** Argentum's "--- Turn N ---" separators. */
+    val isTurnMarker: Boolean get() = type == "turnChanged" || type == "gameRestarted"
+
+    companion object {
+        private val OWNER_KEYS = listOf("controllerId", "casterId", "playerId", "ownerId")
+
+        /**
+         * Parses `state.gameLog` (oldest first). Ownership comes from Argentum's own `isYours`
+         * flag when present, else from the event's controller/caster/player matching the viewer.
+         */
+        fun parseAll(log: JSONArray, viewerId: String?): List<ArgentumLogLine> =
+            (0 until log.length()).mapNotNull { log.optJSONObject(it) }.mapNotNull { e ->
+                val text = e.optString("description").takeIf { it.isNotBlank() && it != "null" } ?: return@mapNotNull null
+                val type = e.optString("type")
+                val yours = when {
+                    e.has("isYours") && !e.isNull("isYours") -> e.optBoolean("isYours")
+                    e.has("isYourTurn") && !e.isNull("isYourTurn") -> e.optBoolean("isYourTurn")
+                    viewerId.isNullOrBlank() -> null
+                    else -> OWNER_KEYS.firstNotNullOfOrNull { key -> e.optString(key).takeIf { it.isNotBlank() && it != "null" } }?.let { it == viewerId }
+                }
+                ArgentumLogLine(text, type, yours)
+            }
+    }
+}
 
 /** Display projection of Argentum's masked state. It carries no rules logic. */
 data class ArgentumTableSnapshot(
@@ -130,6 +154,8 @@ data class ArgentumTableSnapshot(
     val targets: Map<String, ArgentumTargetRef>,
     val stack: List<ArgentumStackItem> = emptyList(),
     val recentLog: List<ArgentumLogLine> = emptyList(),
+    /** Argentum's whole game log for this seat, oldest first. */
+    val fullLog: List<ArgentumLogLine> = emptyList(),
     val priorityPlayer: Int = -1,
     /** Argentum's Step name, e.g. DECLARE_ATTACKERS. */
     val stepKey: String = "",
@@ -276,10 +302,8 @@ data class ArgentumTableSnapshot(
                     targetNames = (0 until (chosen?.length() ?: 0)).mapNotNull { chosen!!.optJSONObject(it)?.let(::targetName) },
                 )
             }.asReversed() // top of the stack first
-            val logJson = state.optJSONArray("gameLog") ?: JSONArray()
-            val recentLog = (maxOf(0, logJson.length() - 12) until logJson.length()).mapNotNull { logJson.optJSONObject(it) }
-                .mapNotNull { e -> e.optString("description").takeIf { it.isNotBlank() }?.let { ArgentumLogLine(it, e.optString("type"), if (e.has("isYours")) e.optBoolean("isYours") else null) } }
-                .asReversed()
+            val fullLog = ArgentumLogLine.parseAll(state.optJSONArray("gameLog") ?: JSONArray(), viewerId)
+            val recentLog = fullLog.takeLast(12).asReversed()
             val activeId = state.optString("activePlayerId")
             val phase = state.optString("currentPhase", "MAIN").replace('_', ' ')
             val step = state.optString("currentStep", "MAIN").replace('_', ' ')
@@ -297,6 +321,7 @@ data class ArgentumTableSnapshot(
                 targets = playerTargets + cardTargets,
                 stack = stack,
                 recentLog = recentLog,
+                fullLog = fullLog,
                 priorityPlayer = playerIds.indexOf(state.optString("priorityPlayerId")),
                 stepKey = state.optString("currentStep"),
                 winnerName = state.optString("winnerId").takeIf { it.isNotBlank() && it != "null" }?.let { nameById[it] ?: "Unknown" },
@@ -446,6 +471,17 @@ class ArgentumDeckApi(
         }
     }
 
+    /** Light reachability check for Help & diagnostics; returns the round trip in milliseconds. */
+    fun ping(): Long {
+        val started = System.nanoTime()
+        val request = Request.Builder().url("${origin.trimEnd('/')}/api/players/online").get()
+            .header("Accept", "application/json").build()
+        http.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) throw IllegalStateException("Argentum answered with HTTP ${response.code}.")
+        }
+        return (System.nanoTime() - started) / 1_000_000
+    }
+
     companion object {
         private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
     }
@@ -529,6 +565,8 @@ class ArgentumGameSocket(
     fun mulligan(): Boolean = send("mulligan")
     fun chooseBottomCards(cardIds: List<String>): Boolean = send("chooseBottomCards", JSONObject().put("cardIds", JSONArray(cardIds)))
     fun requestResync(): Boolean = send("requestResync")
+    /** Argentum undoes the player's last non-respondable action (it reports `undoAvailable`). */
+    fun requestUndo(): Boolean = send("requestUndo")
 
     fun submitLegalAction(action: JSONObject, interactionEpoch: String): Boolean = send(
         "submitAction",

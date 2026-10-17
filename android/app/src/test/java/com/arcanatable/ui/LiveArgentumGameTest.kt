@@ -69,6 +69,9 @@ class LiveArgentumGameTest {
     }
 
     private fun textShown(text: String) = rule.onAllNodesWithText(text, substring = true, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+    /** Argentum's pass button: "PASS PRIORITY", "PASS" or "PASS → <where it stops>" (not "PASS TO MY TURN"). */
+    private val passButton = androidx.compose.ui.test.hasText("PASS PRIORITY") or androidx.compose.ui.test.hasText("PASS") or androidx.compose.ui.test.hasText("PASS →", substring = true)
+    private fun passShown() = rule.onAllNodes(passButton, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
     private fun shot(scenario: ActivityScenario<MainActivity>, name: String) = scenario.onActivity { UiTestSupport.screenshot(it, "live-$name") }
 
     @Test fun playRealArgentumGameThroughArcanaUi() {
@@ -112,7 +115,7 @@ class LiveArgentumGameTest {
         val deadline = System.currentTimeMillis() + 240_000
         while (System.currentTimeMillis() < deadline && passes < 14 && !playedLand) {
             UiTestSupport.awaitReal(rule, 120_000, "Argentum to offer us an action") {
-                textShown("PASS PRIORITY") || textShown("DECLARE ATTACKERS") || textShown("DECLARE BLOCKERS") || textShown("NEEDS HANDLING")
+                passShown() || textShown("DECLARE ATTACKERS") || textShown("DECLARE BLOCKERS") || textShown("NEEDS HANDLING")
             }
             when {
                 textShown("NEEDS HANDLING") -> { shot(scenario, "needs-handling"); throw AssertionError("Unexpected needs-handling prompt during the opening turns") }
@@ -141,7 +144,7 @@ class LiveArgentumGameTest {
                     } else {
                         rule.onNodeWithText("CLOSE").performClick() // close the action sheet
                         UiTestSupport.settle(rule, 500)
-                        rule.onAllNodesWithText("PASS PRIORITY")[0].performSemanticsAction(SemanticsActions.OnClick)
+                        rule.onAllNodes(passButton)[0].performSemanticsAction(SemanticsActions.OnClick)
                         passes++
                         note("Passed priority (#$passes)")
                     }

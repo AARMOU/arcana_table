@@ -247,14 +247,11 @@ private val tutorialStops = listOf(
     TutorialStop("THEME", "Switch between light and dark.", "options-theme", "OPTIONS", executeAction = false),
     TutorialStop("REDUCE SWIPE ANIMATION", "Use shorter screen transitions.", "options-motion", "OPTIONS", executeAction = false),
     TutorialStop("CARD SIZE", "Choose how large cards appear.", "options-card-size", "OPTIONS", executeAction = false),
-    TutorialStop("RETURN TO TABLE", "Show the table after passing your turn.", "options-return-table", "OPTIONS", executeAction = false),
-    TutorialStop("OPEN HAND AFTER DRAW", "Show your hand after drawing.", "options-open-hand", "OPTIONS", executeAction = false),
-    TutorialStop("DRAW AUTOMATICALLY", "Draw when the draw step begins.", "options-auto-draw", "OPTIONS", executeAction = false),
-    TutorialStop("UNTAP AUTOMATICALLY", "Untap your permanents at turn start.", "options-auto-untap", "OPTIONS", executeAction = false),
+    TutorialStop("FOLLOW THE TURN", "Jump to whoever's turn it is.", "options-follow-turn", "OPTIONS", executeAction = false),
     TutorialStop("TURN TIMER DISPLAY", "Show or hide the turn timer.", "options-timer", "OPTIONS", executeAction = false),
     TutorialStop("BACKGROUND ALERTS", "Get a notification when the game changes.", "options-alerts", "OPTIONS", executeAction = false),
     TutorialStop("CLEAR ALL DATA", "Reset game settings; your decks and guide progress stay.", "clear-data", "OPTIONS", executeAction = false),
-    TutorialStop("DEVELOPER OPTIONS", "Open test tools.", "options-developer", "OPTIONS", executeAction = false),
+    TutorialStop("HELP & DIAGNOSTICS", "Check the Argentum connection, read or export the diagnostic log, and replay this guide.", "options-help", "OPTIONS", executeAction = false),
     TutorialStop("CLOSE OPTIONS", "Return to the table.", "options-close", "OPTIONS"),
 
     TutorialStop("CAST FROM HAND", "Open your hand to choose a spell.", "stack-cast", "STACK"),
@@ -283,7 +280,6 @@ private val tutorialStops = listOf(
     TutorialStop("STACK MENU", "Open spells and abilities awaiting responses.", "menu-stack", "MENU_TOOLS"),
     TutorialStop("GAME LOG MENU", "Review the recorded game actions.", "menu-log", "MENU_TOOLS"),
     TutorialStop("RULES MENU", "Search the Magic rules reference.", "menu-rules", "MENU_TOOLS"),
-    TutorialStop("EXPORT DIAGNOSTICS", "Save a connection log for troubleshooting.", "menu-export", "MENU_TOOLS", executeAction = false),
     TutorialStop("ROOM HOME MENU", "Return to the home screen.", "menu-home", "MENU_GAME"),
     TutorialStop("START GAME MENU", "Begin a new local game.", "menu-start-game", "MENU_GAME", executeAction = false),
     TutorialStop("GAME LOBBY MENU", "Open room and player controls.", "menu-lobby", "MENU_GAME"),
@@ -644,7 +640,6 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var optionsOpen by remember { mutableStateOf(false) }
     var layoutLabOpen by remember { mutableStateOf(false) }
     var changelogOpen by remember { mutableStateOf(false) }
-    var developerOptionsOpen by remember { mutableStateOf(false) }
     var tutorialOpen by remember { mutableStateOf(false) }
     var tutorialIndex by remember { mutableIntStateOf(0) }
     val tutorialParentIndices = remember { mutableStateListOf<Int>() }
@@ -734,6 +729,13 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var argentumBottomSelection by remember { mutableStateOf<Set<String>>(emptySet()) }
     var argentumLastError by remember { mutableStateOf<String?>(null) }
     var argentumActionChoices by remember { mutableStateOf<List<JSONObject>>(emptyList()) }
+    /** Argentum's `nextStopPoint` for this seat: where passing priority takes you ("To Combat"). */
+    var argentumNextStop by remember { mutableStateOf<String?>(null) }
+    var argentumUndoAvailable by remember { mutableStateOf(false) }
+    /** Turn number when "Pass to my turn" was switched on; null when it is off. */
+    var passToMyTurnFrom by remember { mutableStateOf<Int?>(null) }
+    var followActivePlayer by remember { mutableStateOf(optionPrefs.getBoolean("follow_active_player", true)) }
+    var argentumPingResult by remember { mutableStateOf<String?>(null) }
     val argentumPrefs = remember { context.getSharedPreferences("argentum_session", Context.MODE_PRIVATE) }
     val argentumOrigin = remember { ArgentumEndpoints.origin(argentumPrefs) }
     val argentumQueue = remember { kotlinx.coroutines.channels.Channel<JSONObject>(kotlinx.coroutines.channels.Channel.UNLIMITED) }
@@ -1058,12 +1060,64 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         !argentumEnabled || argentumSnapshot == null || gameEndedOnline -> null
         "DeclareAttackers" in argentumLegalTypes -> "DECLARE ATTACKERS"
         "DeclareBlockers" in argentumLegalTypes -> "DECLARE BLOCKERS"
-        "PassPriority" in argentumLegalTypes -> "PASS PRIORITY"
+        "PassPriority" in argentumLegalTypes -> ArgentumPassing.passLabel(argentumNextStop)
         else -> null
     }
     fun argentumPrimary() {
         if ("DeclareAttackers" in argentumLegalTypes || "DeclareBlockers" in argentumLegalTypes) { if (!openArgentumCombat()) message = "Argentum's combat declaration is no longer available." }
         else sendArgentumPriority()
+    }
+    fun requestArgentumUndo() {
+        if (argentumAwaitingUpdate) { message = "Waiting for Argentum to confirm the previous action."; return }
+        if (!argentumUndoAvailable) { message = "Argentum has nothing to undo right now."; return }
+        passToMyTurnFrom = null
+        if (argentumSocket.requestUndo()) { argentumAwaitingUpdate = true; recordDiagnostic("Requested undo", DiagnosticCategory.ACTION) }
+        else message = "Could not reach Argentum to undo. Check your connection."
+    }
+    fun togglePassToMyTurn() {
+        if (passToMyTurnFrom != null) { passToMyTurnFrom = null; recordDiagnostic("Pass to my turn: stopped by player", DiagnosticCategory.ACTION); return }
+        val snapshot = argentumSnapshot ?: return
+        passToMyTurnFrom = snapshot.turnNumber
+        recordDiagnostic("Pass to my turn: started on turn ${snapshot.turnNumber}", DiagnosticCategory.ACTION)
+    }
+    // "Pass to my turn": press Argentum's own PassPriority until your next turn or until you're needed.
+    LaunchedEffect(passToMyTurnFrom, argentumSnapshot, argentumPendingDecision, argentumAwaitingUpdate, argentumStatus) {
+        val start = passToMyTurnFrom ?: return@LaunchedEffect
+        val snapshot = argentumSnapshot ?: return@LaunchedEffect
+        if (!argentumEnabled || argentumStatus != ArgentumConnectionStatus.CONNECTED) { passToMyTurnFrom = null; return@LaunchedEffect }
+        delay(300) // let a burst of updates settle before answering
+        val outcome = ArgentumPassing.next(
+            startTurn = start, turnNumber = snapshot.turnNumber, activePlayer = snapshot.activePlayer, localSeat = localSeat,
+            priorityPlayer = snapshot.priorityPlayer,
+            legalActionTypes = snapshot.legalActions.mapNotNull { it.optJSONObject("action")?.optString("type") }.toSet(),
+            hasPendingDecision = argentumPendingDecision != null,
+            opponentStackItem = snapshot.stack.firstOrNull { !it.isYours }?.name,
+            gameOver = gameEndedOnline || snapshot.gameOver, awaitingUpdate = argentumAwaitingUpdate,
+        )
+        when (outcome.step) {
+            ArgentumPassing.Step.PASS -> sendArgentumPriority()
+            ArgentumPassing.Step.WAIT -> Unit
+            ArgentumPassing.Step.REACHED_YOUR_TURN -> {
+                passToMyTurnFrom = null
+                recordDiagnostic("Pass to my turn: reached your turn ${snapshot.turnNumber}", DiagnosticCategory.ACTION)
+                android.widget.Toast.makeText(context, "Your turn.", android.widget.Toast.LENGTH_SHORT).show()
+            }
+            ArgentumPassing.Step.INTERRUPTED -> {
+                passToMyTurnFrom = null
+                recordDiagnostic("Pass to my turn: stopped (${outcome.reason})", DiagnosticCategory.ACTION)
+                outcome.reason?.let { android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_LONG).show() }
+            }
+        }
+    }
+    // Follow whose turn it is: on each new turn, show the active player's board. A tab the player
+    // picks mid-turn sticks until the next turn change.
+    val argentumTurnKey = argentumSnapshot?.takeIf { argentumEnabled }?.let { it.turnNumber to it.activePlayer }
+    LaunchedEffect(argentumTurnKey) {
+        val active = argentumTurnKey?.second ?: return@LaunchedEffect
+        if (!followActivePlayer || active !in players.indices) return@LaunchedEffect
+        selectedPlayer = active
+        showOverview = false
+        if (active != localSeat) showHand = false
     }
     val argentumNeedsHandling: String? = argentumPendingDecision?.let { decision ->
         ArgentumDecisions.needsHandlingReason(decision)
@@ -1185,6 +1239,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         }
                     }
                     argentumPendingDecision = nextDecision
+                    argentumNextStop = incoming.optString("nextStopPoint").takeUnless { it.isBlank() || it == "null" }
+                    argentumUndoAvailable = incoming.optBoolean("undoAvailable", false)
                     val firstSnapshot = argentumSnapshot == null
                     argentumSnapshot = snapshot
                     // Keep an open action sheet in step with the new state so it never offers stale actions.
@@ -2592,7 +2648,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             else -> "MENU_MAIN"
         }
         lobbyOpen -> "LOBBY"
-        optionsOpen || developerOptionsOpen -> "OPTIONS"
+        optionsOpen -> "OPTIONS"
         stackOpen -> "STACK"
         savedDecksOpen -> "SAVED_DECKS"
         importOpen -> "DECK_IMPORT"
@@ -2609,7 +2665,6 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         topMenuSection = null
         lobbyOpen = false
         optionsOpen = false
-        developerOptionsOpen = false
         stackOpen = false
         chatOpen = false
         logOpen = false
@@ -2655,7 +2710,6 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         topMenuSection = null
         lobbyOpen = false
         optionsOpen = false
-        developerOptionsOpen = false
         stackOpen = false
         chatOpen = false
         logOpen = false
@@ -2923,7 +2977,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             else -> "MENU_MAIN"
         }
         lobbyOpen -> "LOBBY"
-        optionsOpen || developerOptionsOpen -> "OPTIONS"
+        optionsOpen -> "OPTIONS"
         stackOpen -> "STACK"
         savedDecksOpen -> "SAVED_DECKS"
         importOpen -> "DECK_IMPORT"
@@ -3108,8 +3162,6 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                                 if (gameInProgress) DropdownMenuItem(text = { Text("Stack and priority · $visibleStackCount") }, modifier = tutorialAnchor("menu-stack"), onClick = { guidedAction("menu-stack") { topMenuExpanded = false; topMenuSection = null; stackOpen = true } })
                                 DropdownMenuItem(text = { Text("Game log") }, modifier = tutorialAnchor("menu-log"), onClick = { guidedAction("menu-log") { topMenuExpanded = false; topMenuSection = null; logOpen = true } })
                                 DropdownMenuItem(text = { Text("MTG rules") }, modifier = tutorialAnchor("menu-rules"), onClick = { guidedAction("menu-rules") { topMenuExpanded = false; topMenuSection = null; rulesOpen = true } })
-                                DropdownMenuItem(text = { Text("Diagnostic log (search)") }, onClick = { topMenuExpanded = false; topMenuSection = null; diagnosticViewerOpen = true })
-                                DropdownMenuItem(text = { Text("Export diagnostic log") }, modifier = tutorialAnchor("menu-export"), onClick = { guidedAction("menu-export") { topMenuExpanded = false; topMenuSection = null; exportDiagnosticLog() } })
                             }
                             "game" -> {
                                 DropdownMenuItem(text = { Text("Room home") }, modifier = tutorialAnchor("menu-home"), onClick = { guidedAction("menu-home") { topMenuExpanded = false; topMenuSection = null; homeOpen = true; showOverview = true; showHand = false } })
@@ -3251,6 +3303,11 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 onShowHand = { guidedAction("hand-button") { if (boardCanControl || (argentumEnabled && boardIndex == localSeat)) showHand = true } },
                 onShowHandFromZone = { guidedAction("zone-hand") { if (boardCanControl || (argentumEnabled && boardIndex == localSeat)) showHand = true } },
                 engineControlled = argentumEnabled && boardIndex == localSeat,
+                engineGame = argentumEnabled,
+                undoAvailable = argentumEnabled && boardIndex == localSeat && argentumUndoAvailable && !argentumAwaitingUpdate,
+                passToMyTurnActive = passToMyTurnFrom != null,
+                onPassToMyTurn = { guidedAction("pass-to-my-turn") { togglePassToMyTurn() } },
+                onUndo = { guidedAction("undo") { requestArgentumUndo() } },
                 playableIds = if (boardIndex == localSeat) argentumPlayableIds else emptySet(),
                 onToken = { guidedAction("token-action") { if (boardCanControl) { tokenTarget = boardIndex; tokenPickerOpen = true } } },
                 onManageMana = { guidedAction("mana-status") { if (boardCanControl) { manaTarget = boardIndex; manaPoolOpen = true } } },
@@ -3322,7 +3379,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("Tap a player to inspect their board", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
                 if (argentumEnabled) {
-                    if (argentumPrimaryLabel != null) HeaderButton(argentumPrimaryLabel, onClick = { guidedAction("table-pass") { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, modifier = tutorialAnchor("table-pass"))
+                    if (passToMyTurnFrom != null) HeaderButton("AUTO-PASSING · STOP", onClick = { guidedAction("table-pass") { togglePassToMyTurn() } }, modifier = tutorialAnchor("table-pass"))
+                    else if (argentumPrimaryLabel != null) HeaderButton(argentumPrimaryLabel, onClick = { guidedAction("table-pass") { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, modifier = tutorialAnchor("table-pass"))
                     else Text(when { gameEndedOnline -> "GAME OVER"; argentumSnapshot == null -> "WAITING FOR ARGENTUM"; argentumPendingDecision != null -> "YOUR CHOICE IS NEEDED"; argentumAwaitingUpdate -> "WAITING FOR ARGENTUM"; else -> "OPPONENT HAS PRIORITY" }, color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
                 } else {
                 if (gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) HeaderButton("NEXT · ${phaseSteps[phaseIndex]}", onClick = { guidedAction("table-next") { if (argentumEnabled) sendArgentumPriority() else advanceStep() } }, enabled = !argentumAwaitingUpdate, modifier = tutorialAnchor("table-next"))
@@ -3343,9 +3401,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             val handControlHeight = (62.dp * footerButtonScale).coerceIn(48.dp, 82.dp)
             Row(Modifier.fillMaxWidth().padding(top = 5.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalAlignment = Alignment.Bottom) {
                 HeaderButton(
-                    if (argentumEnabled) argentumPrimaryLabel ?: "WAITING" else "PASS TURN",
-                    onClick = { guidedAction("pass-turn") { if (argentumEnabled) argentumPrimary() else passTurn() } },
-                    enabled = if (argentumEnabled) argentumPrimaryLabel != null && !argentumAwaitingUpdate && selectedPlayer == localSeat else canPassTurnFromBoard,
+                    if (argentumEnabled && passToMyTurnFrom != null) "AUTO-PASSING · STOP" else if (argentumEnabled) argentumPrimaryLabel ?: "WAITING" else "PASS TURN",
+                    onClick = { guidedAction("pass-turn") { if (argentumEnabled && passToMyTurnFrom != null) togglePassToMyTurn() else if (argentumEnabled) argentumPrimary() else passTurn() } },
+                    enabled = if (argentumEnabled && passToMyTurnFrom != null) true else if (argentumEnabled) argentumPrimaryLabel != null && !argentumAwaitingUpdate && selectedPlayer == localSeat else canPassTurnFromBoard,
                     modifier = Modifier.weight(1f).height(footerControlHeight).then(tutorialAnchor("pass-turn"))
                 )
                 Box(Modifier.weight(1.18f).then(tutorialAnchor("hand-button"))) {
@@ -3958,6 +4016,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 92 · QUICKER TURNS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• The game log shows the whole game from Argentum, newest first, with turn headers and your actions marked YOU.\n• The pass button says where passing takes you, like PASS → TO COMBAT.\n• PASS TO MY TURN keeps passing for you and stops when you're attacked, an opponent casts something, or Argentum needs a choice.\n• UNDO appears when Argentum lets you take back your last action.\n• Quick Actions only show buttons that work in Argentum games: Graveyard, Exile, Stack, Game log, Cast commander, Pass to my turn.\n• The table follows whose turn it is (turn this off in Options).\n• Options: Developer Options are gone; a new Help & diagnostics section has the connection test, diagnostic log, What's new and the guided tour.", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 89 · POLISHED ARGENTUM TABLE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Game HUD: phase tracker, life totals that flash on change, who has priority, the live stack, and the latest moves from Argentum's game log.\n• Cards Argentum lets you play glow; tapping a card opens a sheet with its art, rules text and every action Argentum allows right now.\n• Battlefield badges for attacking, blocking, power/toughness with damage, and summoning sickness.\n• Every Argentum choice now has a control: multi-target spells, divided damage, X, mana colour, piles, replacement choices and mode budgets.\n• Full-screen opening hand, a Victory / Defeat screen with Play again, and a buzz (or background alert) when it's your move.\n• Fixes: graveyard targets, stale actions after a new state, and an old room dialog appearing at Argentum game over.", color = SoftWhite, fontSize = 11.sp)
 
@@ -4125,7 +4186,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         onNextStep = { if (argentumEnabled) argentumPrimary() else advanceStep() },
                         onPassTurn = { if (argentumEnabled) argentumPrimary() else passTurn() },
                         argentumMode = argentumEnabled,
-                        argentumPrimaryLabel = argentumPrimaryLabel?.takeIf { !argentumAwaitingUpdate },
+                        argentumPrimaryLabel = argentumPrimaryLabel?.takeIf { !argentumAwaitingUpdate && passToMyTurnFrom == null },
+                        onUndo = if (argentumEnabled && argentumUndoAvailable && !argentumAwaitingUpdate) ({ requestArgentumUndo() }) else null,
                         legalActionCount = ArgentumActions.visibleChoices(argentumSnapshot?.legalActions.orEmpty()).size,
                         arrangement = handArrangement,
                         cardScale = handCardScale,
@@ -5066,7 +5128,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         CardZoneDialog(
             zone, players[index].name, cards, onDismiss = { zoneDialog = null },
             onPreview = { preview = CardPreview(index, it, fromHand = false, canManipulate = false) },
-            canMoveCards = zone in listOf("Graveyard", "Exile") && (!onlineMode || index == localSeat && !gameEndedOnline),
+            // Argentum owns every zone change in its games; Arcana only shows them.
+            canMoveCards = !argentumEnabled && zone in listOf("Graveyard", "Exile") && (!onlineMode || index == localSeat && !gameEndedOnline),
             onMoveCard = { card, destination ->
                 val canControlZone = !onlineMode || index == localSeat && !gameEndedOnline
                 if (canControlZone && destination == "Command Zone" && card.id == players[index].commanderCard?.id) {
@@ -5111,7 +5174,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     if (message != null) AlertDialog(onDismissRequest = { message = null }, title = { Text("Arcana Table") }, text = { Text(message!!) }, confirmButton = { TextButton(onClick = { message = null }) { Text("OK") } }, containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted)
 
     if (logOpen) GameLogDialog(
-        entries = gameLog,
+        entries = if (argentumEnabled && argentumSnapshot != null) argentumSnapshot!!.fullLog.map { it.description } else gameLog,
+        ownership = if (argentumEnabled && argentumSnapshot != null) argentumSnapshot!!.fullLog.map { if (it.isTurnMarker) null else it.isYours } else null,
+        turnMarkers = if (argentumEnabled && argentumSnapshot != null) argentumSnapshot!!.fullLog.map { it.isTurnMarker } else null,
         previewableCards = players.flatMapIndexed { index, player ->
             (player.battlefield + player.graveyard + player.exile + player.revealed.filterNot { it.isFaceDown } + listOfNotNull(player.commanderCard))
                 .filterNot { it.isFaceDown }.map { index to it }
@@ -5156,22 +5221,39 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         tutorialIndex = tutorialIndex, tutorialTotal = tutorialStops.size, tutorialBounds = tutorialBounds, tutorialAnchor = ::tutorialAnchor,
         onTutorialBack = { goBackTutorial() }, onTutorialNext = { advanceTutorial() },
         onTutorialExit = { tutorialStops.getOrNull(tutorialIndex)?.let { markTutorialSeen(it.view) }; tutorialOpen = false },
-        darkMode = darkMode, timerRunning = turnTimerRunning, timerVisible = turnTimerVisible,
+        darkMode = darkMode, timerVisible = turnTimerVisible,
         backgroundAlertsEnabled = backgroundAlertsEnabled,
-        autoReturnTableAfterPass = autoReturnTableAfterPass, autoDrawOnDrawStep = autoDrawOnDrawStep,
-        autoUntapOnUntapStep = autoUntapOnUntapStep, openHandAfterDraw = openHandAfterDraw,
+        followActivePlayer = followActivePlayer,
+        connectionLabel = when {
+            argentumEnabled -> "Argentum · ${argentumStatus.name.lowercase().replaceFirstChar(Char::uppercase)}"
+            else -> "Argentum · not in a game"
+        },
+        pingResult = argentumPingResult,
+        versionLabel = "${BuildConfig.VERSION_NAME} · build ${BuildConfig.VERSION_CODE}",
+        diagnosticCount = diagnosticLog.entries.size,
+        onTestConnection = {
+            argentumPingResult = "Testing…"
+            scope.launch {
+                val result = withContext(Dispatchers.IO) { runCatching { ArgentumDeckApi(argentumOrigin).ping() } }
+                argentumPingResult = result.fold({ "Server reachable · $it ms" }, { "Can't reach Argentum: ${it.message ?: "network error"}" })
+                recordDiagnostic("Connection test: ${argentumPingResult}", DiagnosticCategory.CONNECTION)
+            }
+        },
+        onReconnect = if (argentumEnabled && argentumStatus != ArgentumConnectionStatus.CONNECTED && argentumStatus != ArgentumConnectionStatus.REPLACED) ({
+            recordDiagnostic("Player chose Reconnect (Options)", DiagnosticCategory.CONNECTION); argentumSocket.retryNow()
+        }) else null,
+        onViewDiagnostics = { optionsOpen = false; diagnosticViewerOpen = true },
+        onExportDiagnostics = { exportDiagnosticLog() },
+        onWhatsNew = { optionsOpen = false; changelogOpen = true },
+        onReplayTutorial = { optionsOpen = false; startTutorial() },
+        onFollowActivePlayer = { value -> guidedAction("options-follow-turn") { followActivePlayer = value; optionPrefs.edit().putBoolean("follow_active_player", value).apply() } },
         reducedSwipeMotion = reducedSwipeMotion, cardSizeScale = cardSizeScale,
         onOpenLayoutLab = { guidedAction("options-layout-lab") { optionsOpen = false; layoutLabOpen = true } },
         onToggleTheme = { guidedAction("options-theme") { onToggleTheme() } },
         onToggleTimerVisibility = { guidedAction("options-timer") { turnTimerVisible = !turnTimerVisible } },
         onToggleBackgroundAlerts = { enabled -> guidedAction("options-alerts") { setBackgroundAlerts(enabled) } },
-        onAutoReturnTable = { value -> guidedAction("options-return-table") { autoReturnTableAfterPass = value; optionPrefs.edit().putBoolean("auto_return_table", value).apply() } },
-        onAutoDraw = { value -> guidedAction("options-auto-draw") { autoDrawOnDrawStep = value; optionPrefs.edit().putBoolean("auto_draw_step", value).apply() } },
-        onAutoUntap = { value -> guidedAction("options-auto-untap") { autoUntapOnUntapStep = value; optionPrefs.edit().putBoolean("auto_untap_step", value).apply() } },
-        onOpenHandAfterDraw = { value -> guidedAction("options-open-hand") { openHandAfterDraw = value; optionPrefs.edit().putBoolean("open_hand_after_draw", value).apply() } },
         onReducedMotion = { value -> guidedAction("options-motion") { reducedSwipeMotion = value; optionPrefs.edit().putBoolean("reduced_swipe_motion", value).apply() } },
         onCardSizeScale = { value -> guidedAction("options-card-size") { cardSizeScale = value; optionPrefs.edit().putFloat("card_size_scale", value).putFloat("layout_card_size_$layoutOrientationSuffix", value).apply() } },
-        onOpenDeveloperOptions = { guidedAction("options-developer") { optionsOpen = false; developerOptionsOpen = true } },
         onClearAllData = { guidedAction("clear-data") { optionsOpen = false; clearAllConfirmOpen = true } },
         onDismiss = { guidedAction("options-close") { optionsOpen = false } }
     )
@@ -5220,15 +5302,6 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 .apply()
         },
         onDismiss = { layoutLabOpen = false; optionsOpen = true }
-    )
-    if (developerOptionsOpen) DeveloperOptionsPage(
-        players = players,
-        selectedPlayer = selectedPlayer,
-        onSelectPlayer = { index -> selectedPlayer = index; showOverview = false; developerOptionsOpen = false },
-        onLoadRandomDecks = { makeRandomDecks(); developerOptionsOpen = false },
-        onRandomizeMidgame = { randomizeMidgame(); developerOptionsOpen = false },
-        onOpenWalkthrough = { startTutorial() },
-        onDismiss = { developerOptionsOpen = false }
     )
 
     if (resetConfirmOpen) AlertDialog(
@@ -5452,7 +5525,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
     )
 
-    if (tutorialOpen && !lobbyOpen && !optionsOpen && !layoutLabOpen && !developerOptionsOpen && !stackOpen && !chatOpen && !logOpen && !importOpen && !savedDecksOpen && !deckEditorOpen && handActionCard == null) {
+    if (tutorialOpen && !lobbyOpen && !optionsOpen && !layoutLabOpen && !stackOpen && !chatOpen && !logOpen && !importOpen && !savedDecksOpen && !deckEditorOpen && handActionCard == null) {
         val step = tutorialStops.getOrNull(tutorialIndex)
         if (step != null && step.view == currentTutorialView()) {
             GuidedTutorialOverlay(
@@ -6399,14 +6472,26 @@ private fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKee
 private fun OptionsPage(
     tutorialStep: TutorialStop?, tutorialIndex: Int, tutorialTotal: Int, tutorialBounds: Map<String, Rect>, tutorialAnchor: (String) -> Modifier,
     onTutorialBack: () -> Unit, onTutorialNext: () -> Unit, onTutorialExit: () -> Unit,
-    darkMode: Boolean, timerRunning: Boolean, timerVisible: Boolean, backgroundAlertsEnabled: Boolean,
-    autoReturnTableAfterPass: Boolean, autoDrawOnDrawStep: Boolean, autoUntapOnUntapStep: Boolean, openHandAfterDraw: Boolean,
+    darkMode: Boolean, timerVisible: Boolean, backgroundAlertsEnabled: Boolean,
+    followActivePlayer: Boolean, connectionLabel: String, pingResult: String?, versionLabel: String, diagnosticCount: Int,
     reducedSwipeMotion: Boolean, cardSizeScale: Float, onOpenLayoutLab: () -> Unit,
     onToggleTheme: () -> Unit, onToggleTimerVisibility: () -> Unit, onToggleBackgroundAlerts: (Boolean) -> Unit,
-    onAutoReturnTable: (Boolean) -> Unit, onAutoDraw: (Boolean) -> Unit, onAutoUntap: (Boolean) -> Unit,
-    onOpenHandAfterDraw: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, onCardSizeScale: (Float) -> Unit,
-    onOpenDeveloperOptions: () -> Unit, onClearAllData: () -> Unit, onDismiss: () -> Unit
+    onFollowActivePlayer: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, onCardSizeScale: (Float) -> Unit,
+    onTestConnection: () -> Unit, onReconnect: (() -> Unit)?, onViewDiagnostics: () -> Unit, onExportDiagnostics: () -> Unit,
+    onWhatsNew: () -> Unit, onReplayTutorial: () -> Unit,
+    onClearAllData: () -> Unit, onDismiss: () -> Unit
 ) {
+    @Composable
+    fun Section(title: String, top: androidx.compose.ui.unit.Dp = 14.dp) =
+        Text(title, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = top, bottom = 2.dp))
+    @Composable
+    fun LinkRow(label: String, detail: String? = null, modifier: Modifier = Modifier, onClick: () -> Unit) =
+        TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).then(modifier)) {
+            Column(Modifier.fillMaxWidth()) {
+                Text(label, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                if (detail != null) Text(detail, color = Muted, fontSize = 10.sp)
+            }
+        }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.9f), shape = RoundedCornerShape(16.dp), color = Panel) {
             Box(Modifier.fillMaxSize()) {
@@ -6415,10 +6500,10 @@ private fun OptionsPage(
                     Text("OPTIONS", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 16.sp, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp).then(tutorialAnchor("options-close"))) { Icon(Icons.Filled.Close, "Close options", tint = Muted) }
                 }
-                Text("APPEARANCE", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
+                Section("APPEARANCE", top = 8.dp)
                 TextButton(onClick = onToggleTheme, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).then(tutorialAnchor("options-theme"))) { Text("Theme  ·  ${if (darkMode) "Dark" else "Light"}", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
-                SettingsToggle("Reduce swipe animation", "Skip the animated jump when selecting a view tab.", reducedSwipeMotion, onReducedMotion, tutorialAnchor("options-motion"))
-                Text("CARD SIZE", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                SettingsToggle("Reduce swipe animation", "Skip the animated jump when switching player tabs.", reducedSwipeMotion, onReducedMotion, tutorialAnchor("options-motion"))
+                Text("CARD SIZE", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
                 Row(Modifier.fillMaxWidth().then(tutorialAnchor("options-card-size")), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(0.82f to "SMALL", 1f to "STANDARD", 1.18f to "LARGE").forEach { (scale, label) ->
                         TextButton(onClick = { onCardSizeScale(scale) }, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) { Text(if (kotlin.math.abs(cardSizeScale - scale) < 0.03f) "✓ $label" else label, color = if (kotlin.math.abs(cardSizeScale - scale) < 0.03f) Mint else SoftWhite, fontSize = 9.sp) }
@@ -6427,29 +6512,35 @@ private fun OptionsPage(
                 TextButton(onClick = onOpenLayoutLab, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
                     Text("ADJUST UI LAYOUT  ›", color = Mint, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
                 }
-                Text("NAVIGATION", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
-                SettingsToggle("Return to Table after passing", "Show the full table when your turn passes.", autoReturnTableAfterPass, onAutoReturnTable, tutorialAnchor("options-return-table"))
-                SettingsToggle("Open hand after drawing", "Show the hand tray after a draw-step card is drawn.", openHandAfterDraw, onOpenHandAfterDraw, tutorialAnchor("options-open-hand"))
-                Text("GAME", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
-                SettingsToggle("Draw automatically", "Draw when turn progression reaches the draw step.", autoDrawOnDrawStep, onAutoDraw, tutorialAnchor("options-auto-draw"))
-                SettingsToggle("Untap automatically", "Untap your permanents as your new turn begins; stun counters are removed instead of untapping.", autoUntapOnUntapStep, onAutoUntap, tutorialAnchor("options-auto-untap"))
-                Text("Turn timer is ${if (timerRunning) "running" else "stopped"}. Timer controls are in the timer menu at the top of the table.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(vertical = 5.dp))
-                TextButton(onClick = onToggleTimerVisibility, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).then(tutorialAnchor("options-timer"))) { Text(if (timerVisible) "Hide turn timer display" else "Show turn timer display", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
-                Text("NOTIFICATIONS", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
+                Section("TABLE")
+                SettingsToggle("Follow whose turn it is", "When a turn starts, show that player's board. A tab you pick stays until the next turn.", followActivePlayer, onFollowActivePlayer, tutorialAnchor("options-follow-turn"))
+                SettingsToggle("Show turn timer", "Show how long the current turn has taken.", timerVisible, { onToggleTimerVisibility() }, tutorialAnchor("options-timer"))
+                Section("NOTIFICATIONS")
                 Row(Modifier.fillMaxWidth().heightIn(min = 54.dp).then(tutorialAnchor("options-alerts")), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("Background game alerts", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        Text("Notify when your turn starts or another player makes a play.", color = Muted, fontSize = 10.sp)
+                        Text("Notify you when Argentum is waiting for your move.", color = Muted, fontSize = 10.sp)
                     }
                     Switch(checked = backgroundAlertsEnabled, onCheckedChange = onToggleBackgroundAlerts)
                 }
-                TextButton(onClick = onClearAllData, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).then(tutorialAnchor("clear-data"))) {
+                Section("HELP & DIAGNOSTICS")
+                Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(PanelLight).padding(horizontal = 10.dp, vertical = 8.dp).then(tutorialAnchor("options-help"))) {
+                    Text(connectionLabel, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    if (pingResult != null) Text(pingResult, color = if (pingResult.startsWith("Can't")) Color(0xFFE9978B) else Muted, fontSize = 10.sp)
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
+                        HeaderButton("TEST CONNECTION", onTestConnection, enabled = pingResult != "Testing…")
+                        if (onReconnect != null) HeaderButton("RECONNECT", onReconnect)
+                    }
+                }
+                LinkRow("Diagnostic log", "Search $diagnosticCount recorded events", onClick = onViewDiagnostics)
+                LinkRow("Export diagnostic log", "Save a text file to share when something goes wrong", onClick = onExportDiagnostics)
+                LinkRow("What's new", "Version $versionLabel", onClick = onWhatsNew)
+                LinkRow("Replay the guided tour", onClick = onReplayTutorial)
+                HorizontalDivider(color = Muted.copy(alpha = 0.25f), modifier = Modifier.padding(top = 14.dp))
+                TextButton(onClick = onClearAllData, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(top = 6.dp).then(tutorialAnchor("clear-data"))) {
                     Text("CLEAR ALL DATA", color = Color(0xFFE9978B), fontWeight = FontWeight.Black, modifier = Modifier.fillMaxWidth())
                 }
                 Text("Saved decks and tutorial progress are kept when game data is cleared.", color = Muted, fontSize = 10.sp)
-                Text("TESTING", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
-                TextButton(onClick = onOpenDeveloperOptions, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp).then(tutorialAnchor("options-developer"))) { Text("Open Developer Options  ›", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
-                Text("Room tests connect devices on the same Wi-Fi network. Connections are not encrypted and cannot cross networks yet.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 14.dp))
             }
             tutorialStep?.let { step -> GuidedTutorialOverlay(step, tutorialIndex, tutorialTotal, tutorialBounds[step.target], onTutorialBack, onTutorialNext, onTutorialExit) }
             }
@@ -7039,31 +7130,6 @@ private fun RulesLookupDialog(onDismiss: () -> Unit) {
 }
 
 @Composable
-private fun DeveloperOptionsPage(players: List<TablePlayer>, selectedPlayer: Int, onSelectPlayer: (Int) -> Unit, onLoadRandomDecks: () -> Unit, onRandomizeMidgame: () -> Unit, onOpenWalkthrough: () -> Unit, onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxWidth(0.96f).fillMaxHeight(0.9f), shape = RoundedCornerShape(16.dp), color = Panel) {
-            Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState())) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("DEVELOPER OPTIONS", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 16.sp, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close developer options", tint = Muted) }
-                }
-                Text("Temporarily control a player's view to test how the table behaves.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(vertical = 8.dp))
-                players.forEachIndexed { index, player ->
-                    TextButton(onClick = { onSelectPlayer(index) }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                        Text("${if (index == selectedPlayer) "●  " else "○  "}${player.name}  ·  Act as player", color = if (index == selectedPlayer) Mint else SoftWhite, modifier = Modifier.fillMaxWidth())
-                    }
-                }
-                HorizontalDivider(color = PanelLight, modifier = Modifier.padding(vertical = 10.dp))
-                Text("RANDOM TEST SETUPS", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                Text("Replace current player zones with test data.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp, bottom = 8.dp))
-                TextButton(onClick = onLoadRandomDecks, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) { Text("Load randomized decks for all players", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
-                TextButton(onClick = onRandomizeMidgame, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp)) { Text("Randomize a mid-game state", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
-            }
-        }
-    }
-}
-
-@Composable
 private fun GuidedTutorialOverlay(step: TutorialStop, index: Int, total: Int, targetBounds: Rect?, onBack: () -> Unit, onNext: () -> Unit, onExit: () -> Unit) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val density = LocalDensity.current
@@ -7306,7 +7372,13 @@ private fun PlayerBoard(
     /** Own seat in an Argentum game: the engine owns rules, so manual-only tools are hidden. */
     engineControlled: Boolean = false,
     /** Cards Argentum currently offers an action for; drawn with a glow. */
-    playableIds: Set<Int> = emptySet()
+    playableIds: Set<Int> = emptySet(),
+    /** Any board in an Argentum game: Quick Actions show only controls that work there. */
+    engineGame: Boolean = false,
+    undoAvailable: Boolean = false,
+    passToMyTurnActive: Boolean = false,
+    onPassToMyTurn: () -> Unit = {},
+    onUndo: () -> Unit = {},
 ) {
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val battlefieldListState = rememberLazyListState()
@@ -7387,9 +7459,19 @@ private fun PlayerBoard(
             },
             "ZONES" to {
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).then(tutorialAnchor("zones")), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            // Manual-only shortcuts would be silent no-ops in an engine-run game, so they are not shown.
-            val engineHidden = setOf("LIBRARY", "MANA", "DRAW", "REVEAL", "TOKEN", "SHUFFLE", "NEXT_STEP", "CHAT")
-            quickActionOrder.distinct().filterNot { engineControlled && it in engineHidden }.forEach { action ->
+            // In an Argentum game only controls that work are shown: Argentum owns draws, tokens,
+            // mana, steps and shuffles, so those manual shortcuts would be silent no-ops.
+            if (engineGame) {
+                ZoneChip("GRAVEYARD", player.graveyard.size, enabled = true, onClick = { onZone("Graveyard") })
+                ZoneChip("EXILE", player.exile.size, enabled = true, onClick = { onZone("Exile") })
+                QuickActionChip(if (stackCount > 0) "STACK · $stackCount" else "STACK", enabled = true, onClick = onStack)
+                QuickActionChip("GAME LOG", enabled = true, onClick = onOpenLog)
+                if (engineControlled) {
+                    if (player.commanderCard != null && !commanderUnavailable && !player.isEliminated) QuickActionChip("CAST COMMANDER", enabled = true, onClick = onCastCommander)
+                    QuickActionChip(if (passToMyTurnActive) "STOP AUTO-PASS" else "PASS TO MY TURN", enabled = !player.isEliminated, onClick = onPassToMyTurn)
+                    if (undoAvailable) QuickActionChip("UNDO", enabled = true, onClick = onUndo)
+                }
+            } else quickActionOrder.distinct().forEach { action ->
                 val zoneCount = when (action) {
                     "LIBRARY" -> player.library.size
                     "HAND" -> player.hand.size
@@ -7645,7 +7727,7 @@ internal fun cardArtDescription(label: String?, fallbackName: String?): String =
 
 @Composable
 private fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeight: androidx.compose.ui.unit.Dp, highlightedCardId: Int?, handRevealed: Boolean, canAdvance: Boolean, canControl: Boolean, commanderCanCast: Boolean, actionOrder: List<String>, stackCount: Int, tutorialAnchor: (String) -> Modifier, onToggleReveal: (Boolean) -> Unit, onClose: () -> Unit, onDraw: () -> Unit, onCombat: () -> Unit, onNextStep: () -> Unit, onPassTurn: () -> Unit, onStack: () -> Unit, onCastCommander: () -> Unit, onMoreAction: (String) -> Unit, onSelect: (GameCard) -> Unit, onDragDrop: (GameCard, Offset) -> Unit,
-    argentumMode: Boolean = false, argentumPrimaryLabel: String? = null, legalActionCount: Int = 0,
+    argentumMode: Boolean = false, argentumPrimaryLabel: String? = null, legalActionCount: Int = 0, onUndo: (() -> Unit)? = null,
     arrangement: HandArrangement = HandArrangement.AUTO_FIT, cardScale: Float = 1f, playableIds: Set<Int> = emptySet()) {
     val handScrollState = rememberScrollState()
     var moreOpen by remember { mutableStateOf(false) }
@@ -7659,6 +7741,7 @@ private fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeig
             if (argentumMode) {
                 // Argentum owns draws, reveals, steps and combat; show only actions it can take.
                 if (argentumPrimaryLabel != null) HeaderButton(argentumPrimaryLabel, onPassTurn, modifier = tutorialAnchor("pass-turn"))
+                if (onUndo != null) HeaderButton("UNDO", onUndo)
                 HeaderButton("ACTIONS · $legalActionCount", onStack, enabled = legalActionCount > 0, modifier = tutorialAnchor("stack-hand-button"))
                 if (commanderCanCast) HeaderButton("CAST COMMANDER", onCastCommander, modifier = tutorialAnchor("commander-cast"))
                 HeaderButton("LOG", { onMoreAction("LOG") })
@@ -8651,7 +8734,7 @@ private fun SavedDecksDialog(decks: List<SavedDeck>, tutorialStep: TutorialStop?
 }
 
 @Composable
-private fun GameLogDialog(entries: List<String>, previewableCards: List<Pair<Int, GameCard>>, onPreviewCard: (Int, GameCard) -> Unit, tutorialStep: TutorialStop?, tutorialIndex: Int, tutorialTotal: Int, tutorialBounds: Map<String, Rect>, tutorialAnchor: (String) -> Modifier, onTutorialBack: () -> Unit, onTutorialNext: () -> Unit, onTutorialExit: () -> Unit, onDismiss: () -> Unit) {
+private fun GameLogDialog(entries: List<String>, ownership: List<Boolean?>? = null, turnMarkers: List<Boolean>? = null, previewableCards: List<Pair<Int, GameCard>>, onPreviewCard: (Int, GameCard) -> Unit, tutorialStep: TutorialStop?, tutorialIndex: Int, tutorialTotal: Int, tutorialBounds: Map<String, Rect>, tutorialAnchor: (String) -> Modifier, onTutorialBack: () -> Unit, onTutorialNext: () -> Unit, onTutorialExit: () -> Unit, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.82f), shape = RoundedCornerShape(14.dp), color = Panel) {
             Box(Modifier.fillMaxSize()) {
@@ -8660,11 +8743,18 @@ private fun GameLogDialog(entries: List<String>, previewableCards: List<Pair<Int
                     Text("ACTIVITY LOG · ${entries.size}", color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp).then(tutorialAnchor("log-close"))) { Icon(Icons.Filled.Close, "Close game log", tint = Muted) }
                 }
-                Text("Actions · mana payments · triggers · effects", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(bottom = 7.dp))
+                Text(if (ownership != null) "Whole game · newest first · your actions marked YOU" else "Actions · mana payments · triggers · effects", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(bottom = 7.dp))
                 if (entries.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("No actions logged yet", color = Muted) }
                 else LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                     items(entries.size) { index ->
-                        val entry = entries[entries.lastIndex - index]
+                        val entryIndex = entries.lastIndex - index
+                        val entry = entries[entryIndex]
+                        if (turnMarkers?.getOrNull(entryIndex) == true) {
+                            Text(entry.trim('-', ' ').uppercase(), color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp,
+                                modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 1.dp, start = 3.dp))
+                            return@items
+                        }
+                        val yours = ownership?.getOrNull(entryIndex) == true
                         val entryColor = when {
                             "trigger" in entry.lowercase() -> Mint
                             "paid " in entry.lowercase() || "payment" in entry.lowercase() -> CounterGold
@@ -8675,7 +8765,8 @@ private fun GameLogDialog(entries: List<String>, previewableCards: List<Pair<Int
                             previewableCards.sortedByDescending { it.second.name.length }
                                 .firstOrNull { (_, card) -> entry.contains(card.name, ignoreCase = true) }
                         }
-                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).padding(7.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).border(if (yours) 1.dp else 0.dp, if (yours) Mint else PanelLight, RoundedCornerShape(8.dp)).padding(7.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (yours) Text("YOU", color = Ink, fontSize = 8.sp, fontWeight = FontWeight.Black, modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Mint).padding(horizontal = 4.dp, vertical = 2.dp))
                             ManaSymbolText(entry, color = entryColor, fontSize = 12.sp, modifier = Modifier.weight(1f).padding(3.dp))
                             preview?.let { (owner, card) ->
                                 CardFace(card, Modifier.width(31.dp), onClick = { onPreviewCard(owner, card) }, onLongClick = { onPreviewCard(owner, card) }, showCounters = false)
@@ -8683,7 +8774,7 @@ private fun GameLogDialog(entries: List<String>, previewableCards: List<Pair<Int
                         }
                     }
                 }
-                Text("Unsupported or ambiguous effects are marked for manual resolution.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(top = 6.dp))
+                if (ownership == null) Text("Unsupported or ambiguous effects are marked for manual resolution.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(top = 6.dp))
             }
             tutorialStep?.let { step -> GuidedTutorialOverlay(step, tutorialIndex, tutorialTotal, tutorialBounds[step.target], onTutorialBack, onTutorialNext, onTutorialExit) }
             }
