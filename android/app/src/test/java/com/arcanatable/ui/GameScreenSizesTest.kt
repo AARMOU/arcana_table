@@ -75,7 +75,7 @@ class GameScreenSizesTest {
         scenario.onActivity { UiTestSupport.screenshot(it, "game-$name-0-opening-hand") }
         assertTrue("real card names from Argentum", cardShown("Rampaging Baloths"))
         rule.onAllNodesWithText("KEEP ", substring = true)[0].performClick()
-        UiTestSupport.awaitReal(rule, 30_000, "Argentum table") { shown("Game active") }
+        UiTestSupport.awaitReal(rule, 30_000, "Argentum table") { rule.onAllNodes(androidx.compose.ui.test.hasTestTag("phase-tracker"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
         UiTestSupport.settle(rule, 800)
         scenario.onActivity { UiTestSupport.screenshot(it, "game-$name-1-table") }
 

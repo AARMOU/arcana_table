@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -79,17 +81,53 @@ private val PhaseGroups = listOf(
 )
 
 @Composable
-private fun PhaseTracker(stepKey: String) {
+fun PhaseTracker(stepKey: String, modifier: Modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
     val key = stepKey.uppercase().replace(' ', '_')
-    Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+    val narrow = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 380
+    Row(modifier.testTag("phase-tracker"), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
         PhaseGroups.forEach { (label, steps) ->
             val current = key in steps
             Text(
-                label, color = if (current) Ink else Muted, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.5.sp,
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                label, color = if (current) Ink else Muted, fontSize = if (narrow) 8.sp else 9.sp, fontWeight = FontWeight.Black, letterSpacing = if (narrow) 0.sp else 0.5.sp,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center, maxLines = 1,
                 modifier = Modifier.weight(1f).clip(RoundedCornerShape(6.dp)).background(if (current) Mint else PanelLight).padding(vertical = 4.dp)
             )
         }
+    }
+}
+
+/**
+ * Player tab for Argentum games: commander art, name and life in one control, so life is shown
+ * once. A dot marks whose turn it is, a mint ring who has priority; life flashes on change.
+ */
+@Composable
+fun ArgentumSeatTab(seat: ArgentumSeatChip, artUrl: String?, artLabel: String?, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    var last by remember { mutableIntStateOf(seat.life) }
+    val flash = remember { androidx.compose.animation.Animatable(Color.Transparent) }
+    androidx.compose.runtime.LaunchedEffect(seat.life) {
+        if (seat.life != last) {
+            flash.snapTo(if (seat.life < last) Color(0x88E35656) else Color(0x8889E3B0))
+            last = seat.life
+            flash.animateTo(Color.Transparent, androidx.compose.animation.core.tween(1200))
+        }
+    }
+    val shape = RoundedCornerShape(9.dp)
+    Row(
+        modifier.height(44.dp).clip(shape).background(if (selected) Mint.copy(alpha = 0.18f) else PanelLight).background(flash.value)
+            .border(if (selected || seat.hasPriority) 2.dp else 1.dp, if (selected) Mint else if (seat.hasPriority) CounterGold else Color(0xFF33423D), shape)
+            .clickable(onClick = onClick).padding(end = 9.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(Modifier.width(40.dp).fillMaxHeight().background(Panel)) {
+            if (!artUrl.isNullOrBlank()) CardArt(artUrl, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop, label = artLabel)
+        }
+        Spacer(Modifier.width(7.dp))
+        if (seat.isActive) { Box(Modifier.size(7.dp).clip(CircleShape).background(Mint)); Spacer(Modifier.width(5.dp)) }
+        Text(if (seat.isYou) "YOU" else seat.name.uppercase(), color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Black, maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            modifier = Modifier.widthIn(max = if (androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp < 420) 84.dp else 130.dp))
+        Spacer(Modifier.width(7.dp))
+        Text("${seat.life}", color = Mint, fontSize = 17.sp, fontWeight = FontWeight.Black)
     }
 }
 
@@ -132,6 +170,8 @@ fun ArgentumStatusStrip(
     onNeedsHandling: () -> Unit,
     onLeave: () -> Unit,
     onOpenLog: () -> Unit = {},
+    /** Compact table: phase, life and passing live elsewhere; show only problems, stack and the latest event. */
+    compact: Boolean = false,
 ) {
     val (dot, headline, detail) = when (model.connection) {
         ArgentumConnectionStatus.CONNECTED -> Triple(Mint, "ENGINE CONNECTED", when {
@@ -149,7 +189,8 @@ fun ArgentumStatusStrip(
         Modifier.fillMaxWidth().padding(bottom = 4.dp).clip(RoundedCornerShape(10.dp)).background(Panel)
             .padding(horizontal = 10.dp, vertical = 6.dp).testTag("argentum-status")
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        val healthy = model.connection == ArgentumConnectionStatus.CONNECTED && !model.awaitingUpdate
+        if (!compact || !healthy || model.gameOver) Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(9.dp).clip(CircleShape).background(dot))
             Spacer(Modifier.width(7.dp))
             Column(Modifier.weight(1f)) {
@@ -160,13 +201,13 @@ fun ArgentumStatusStrip(
                 ArgentumConnectionStatus.PAUSED -> StripButton("RESUME", Mint, onResume)
                 ArgentumConnectionStatus.DISCONNECTED -> StripButton("RECONNECT", Mint, onReconnect)
                 ArgentumConnectionStatus.REPLACED -> StripButton("LEAVE", WarnRed, onLeave)
-                ArgentumConnectionStatus.CONNECTED -> if (model.priorityLabel != null && !model.awaitingUpdate && !model.gameOver) StripButton(model.priorityLabel, Mint, onPrimary)
+                ArgentumConnectionStatus.CONNECTED -> if (!compact && model.priorityLabel != null && !model.awaitingUpdate && !model.gameOver) StripButton(model.priorityLabel, Mint, onPrimary)
                 else -> Unit
             }
         }
         if (model.connection == ArgentumConnectionStatus.CONNECTED && model.gameActive) {
-            if (model.stepKey.isNotBlank()) PhaseTracker(model.stepKey)
-            if (model.seats.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            if (!compact && model.stepKey.isNotBlank()) PhaseTracker(model.stepKey)
+            if (!compact && model.seats.isNotEmpty()) Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 model.seats.forEach { SeatLifeChip(it, Modifier.weight(1f)) }
             }
             if (model.stack.isNotEmpty()) Column(
@@ -183,8 +224,8 @@ fun ArgentumStatusStrip(
                 }
                 if (model.stack.size > 4) Text("+${model.stack.size - 4} more", color = Muted, fontSize = 10.sp)
             }
-            if (model.feed.isNotEmpty()) Column(Modifier.fillMaxWidth().padding(top = 6.dp).clickable(onClick = onOpenLog).testTag("argentum-feed")) {
-                model.feed.take(2).forEachIndexed { i, line ->
+            if (!compact && model.feed.isNotEmpty()) Column(Modifier.fillMaxWidth().padding(top = if (compact) 0.dp else 6.dp).clickable(onClick = onOpenLog).testTag("argentum-feed")) {
+                model.feed.take(if (compact) 1 else 2).forEachIndexed { i, line ->
                     Text(line.description, color = when { line.isYours == false -> CounterGold; i == 0 -> SoftWhite; else -> Muted },
                         fontSize = if (i == 0) 11.sp else 10.sp, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                 }

@@ -109,6 +109,8 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.sp
 import java.util.Locale
 import androidx.compose.ui.window.Dialog
@@ -3106,8 +3108,43 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .padding(start = 10.dp, top = 8.dp, end = 10.dp)
     ) {
-        Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column {
+        // Argentum game: one strip for connection, phase and timer (life is on the player tabs).
+        val compactArgentumTable = argentumEnabled && argentumSnapshot != null
+        // Player tabs (seat tabs with life in Argentum games). In landscape they share the top strip.
+        val seatTabs: @Composable (Modifier) -> Unit = { rowModifier ->
+            Row(rowModifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Box(Modifier.then(tutorialAnchor("table-tab"))) { ViewChip("TABLE", selected = showOverview, compact = compactArgentumTable, onClick = { guidedAction("table-tab") { showOverview = true; showHand = false } }) }
+                players.forEachIndexed { index, player ->
+                    Box(Modifier.then(tutorialAnchor("player-tab")).testTag(if (onlineMode && index == localSeat) "player-tab-you" else "player-tab-$index")) {
+                        val snap = argentumSnapshot
+                        if (compactArgentumTable && snap != null) ArgentumSeatTab(
+                            seat = ArgentumSeatChip(player.name, player.life, isYou = index == localSeat, isActive = index == snap.activePlayer, hasPriority = index == snap.priorityPlayer),
+                            artUrl = player.commanderCard?.let { it.artCropUrl ?: it.imageUrl }, artLabel = player.commanderCard?.name,
+                            selected = !showOverview && selectedPlayer == index,
+                            onClick = { guidedAction("player-tab") { selectedPlayer = index; showOverview = false; showHand = false } }
+                        ) else PlayerViewTab(
+                            name = if (onlineMode && index == localSeat) "YOU" else player.name,
+                            commander = player.commanderCard,
+                            selected = !showOverview && selectedPlayer == index,
+                            onClick = { guidedAction("player-tab") { selectedPlayer = index; showOverview = false; showHand = false } }
+                        )
+                    }
+                }
+            }
+        }
+        val tabsInTopBar = compactArgentumTable && isLandscape
+        Row(Modifier.fillMaxWidth().heightIn(min = if (compactArgentumTable) 44.dp else 48.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (compactArgentumTable) {
+                val dotColor = when { argentumStatus != ArgentumConnectionStatus.CONNECTED -> Color(0xFFE9978B); argentumAwaitingUpdate -> CounterGold; else -> Mint }
+                Box(Modifier.size(9.dp).clip(CircleShape).background(dotColor).semantics { contentDescription = "Argentum ${argentumStatus.name.lowercase()}" })
+                Spacer(Modifier.width(8.dp))
+                if (tabsInTopBar) {
+                    PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.width(320.dp))
+                    Spacer(Modifier.width(8.dp))
+                    seatTabs(Modifier.weight(1f))
+                } else PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.weight(1f))
+                Spacer(Modifier.width(6.dp))
+            } else Column {
                 Text("ARCANA TABLE", color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
                 if (!argentumEnabled) {
                     Text("VERSION ${BuildConfig.VERSION_NAME} · BUILD ${BuildConfig.VERSION_CODE}", color = Muted, fontSize = 7.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.4.sp)
@@ -3115,9 +3152,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     Text(if (inProgress) "● GAME IN PROGRESS" else "● GAME NOT STARTED", color = if (inProgress) Mint else CounterGold, fontSize = 7.sp, fontWeight = FontWeight.Black, letterSpacing = 0.7.sp)
                 } else Text("ARGENTUM ENGINE", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
             }
-            Spacer(Modifier.weight(1f))
+            if (!compactArgentumTable) Spacer(Modifier.weight(1f))
             Box(Modifier.then(tutorialAnchor("timer"))) {
-                Text("GAME ${formatClock(elapsedGameSeconds)} · TURN ${if (turnTimerVisible) formatClock(elapsedTurnSeconds) else "HIDDEN"}", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                Text(if (compactArgentumTable) "T${turnNumber}${if (turnTimerVisible) " · " + formatClock(elapsedTurnSeconds) else ""}" else "GAME ${formatClock(elapsedGameSeconds)} · TURN ${if (turnTimerVisible) formatClock(elapsedTurnSeconds) else "HIDDEN"}", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.heightIn(min = 44.dp).wrapContentHeight(Alignment.CenterVertically).combinedClickable(enabled = !onlineMode || localSeat == 0, onClick = { guidedAction("timer") { timerMenuOpen = true } }, onLongClick = { turnTimerVisible = !turnTimerVisible }))
                 DropdownMenu(expanded = timerMenuOpen, onDismissRequest = { timerMenuOpen = false }) {
                     DropdownMenuItem(text = { Text(if (gameTimerRunning) "Stop session timer" else "Start session timer") }, onClick = { gameTimerRunning = !gameTimerRunning; timerMenuOpen = false })
@@ -3181,7 +3218,10 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             }
         }
 
-        if (argentumEnabled && (showEngineStatus || argentumStatus != ArgentumConnectionStatus.CONNECTED || argentumNeedsHandling != null)) ArgentumStatusStrip(
+        // Compact table: the strip appears only for problems, a waiting confirmation, game over or a non-empty stack.
+        val stripNeeded = argentumStatus != ArgentumConnectionStatus.CONNECTED || argentumNeedsHandling != null || argentumAwaitingUpdate || gameEndedOnline ||
+            argentumSnapshot == null || argentumSnapshot?.stack?.isNotEmpty() == true
+        if (argentumEnabled && stripNeeded) ArgentumStatusStrip(
             model = ArgentumStatusModel(
                 connection = argentumStatus,
                 gameActive = argentumSnapshot != null && !gameEndedOnline,
@@ -3203,21 +3243,10 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             onPrimary = { argentumPrimary() },
             onNeedsHandling = { argentumDeferredDecisionId = null },
             onLeave = { argentumLeaveConfirm = true },
+            compact = true,
         )
-        Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-            Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Box(Modifier.then(tutorialAnchor("table-tab"))) { ViewChip("TABLE", selected = showOverview, onClick = { guidedAction("table-tab") { showOverview = true; showHand = false } }) }
-                players.forEachIndexed { index, player ->
-                    Box(Modifier.then(tutorialAnchor("player-tab")).testTag(if (onlineMode && index == localSeat) "player-tab-you" else "player-tab-$index")) {
-                        PlayerViewTab(
-                            name = if (onlineMode && index == localSeat) "YOU" else player.name,
-                            commander = player.commanderCard,
-                            selected = !showOverview && selectedPlayer == index,
-                            onClick = { guidedAction("player-tab") { selectedPlayer = index; showOverview = false; showHand = false } }
-                        )
-                    }
-                }
-            }
+        if (!tabsInTopBar) Row(Modifier.fillMaxWidth().padding(vertical = if (compactArgentumTable) 3.dp else 5.dp), verticalAlignment = Alignment.CenterVertically) {
+            seatTabs(Modifier.weight(1f))
         }
 
         HorizontalPager(
@@ -3404,7 +3433,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     if (argentumEnabled && passToMyTurnFrom != null) "AUTO-PASSING · STOP" else if (argentumEnabled) argentumPrimaryLabel ?: "WAITING" else "PASS TURN",
                     onClick = { guidedAction("pass-turn") { if (argentumEnabled && passToMyTurnFrom != null) togglePassToMyTurn() else if (argentumEnabled) argentumPrimary() else passTurn() } },
                     enabled = if (argentumEnabled && passToMyTurnFrom != null) true else if (argentumEnabled) argentumPrimaryLabel != null && !argentumAwaitingUpdate && selectedPlayer == localSeat else canPassTurnFromBoard,
-                    modifier = Modifier.weight(1f).height(footerControlHeight).then(tutorialAnchor("pass-turn"))
+                    modifier = Modifier.weight(if (argentumEnabled) 1.45f else 1f).height(footerControlHeight).then(tutorialAnchor("pass-turn"))
                 )
                 Box(Modifier.weight(1.18f).then(tutorialAnchor("hand-button"))) {
                     HandPeekBar(
@@ -3414,8 +3443,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     )
                 }
                 HeaderButton(
-                    "BACK TO TABLE", onClick = { guidedAction("player-back-table") { showOverview = true; showHand = false } },
-                    modifier = Modifier.weight(1f).height(footerControlHeight).then(tutorialAnchor("player-back-table"))
+                    if (argentumEnabled) "TABLE" else "BACK TO TABLE", onClick = { guidedAction("player-back-table") { showOverview = true; showHand = false } },
+                    modifier = Modifier.weight(if (argentumEnabled) 0.62f else 1f).height(footerControlHeight).then(tutorialAnchor("player-back-table"))
                 )
             }
         }
@@ -5960,7 +5989,7 @@ private fun RoomHomeScreen(
 
 @Composable
 private fun HeaderButton(label: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
-    Text(label, color = if (enabled) Mint else Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = modifier.heightIn(min = 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick).padding(horizontal = 13.dp, vertical = 12.dp))
+    Text(label, color = if (enabled) Mint else Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, lineHeight = 12.sp, overflow = TextOverflow.Ellipsis, modifier = modifier.heightIn(min = 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick).padding(horizontal = 13.dp, vertical = 12.dp))
 }
 
 @Composable
@@ -6040,8 +6069,8 @@ private fun HandPeekBar(cardCount: Int, modifier: Modifier = Modifier, onClick: 
 }
 
 @Composable
-private fun ViewChip(label: String, selected: Boolean, onClick: () -> Unit) {
-    Text(label, color = if (selected) Ink else SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.heightIn(min = 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(if (selected) Mint else PanelLight).combinedClickable(onClick = onClick).padding(horizontal = 15.dp, vertical = 12.dp))
+private fun ViewChip(label: String, selected: Boolean, compact: Boolean = false, onClick: () -> Unit) {
+    Text(label, color = if (selected) Ink else SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.heightIn(min = if (compact) 44.dp else 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(if (selected) Mint else PanelLight).combinedClickable(onClick = onClick).padding(horizontal = 15.dp, vertical = 12.dp))
 }
 
 @Composable
@@ -7398,7 +7427,7 @@ private fun PlayerBoard(
     var shuffleConfirm by remember { mutableStateOf(false) }
     val sectionContent: Map<String, @Composable ColumnScope.() -> Unit> = mapOf(
             "STATUS" to {
-        Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(RoundedCornerShape(12.dp)).background(Panel).border(if (isActivePlayer) 2.dp else 0.dp, if (isActivePlayer) Mint else Panel, RoundedCornerShape(12.dp)).combinedClickable(onClick = onTrackers).padding(horizontal = 9.dp).then(tutorialAnchor("player-status")), verticalAlignment = Alignment.CenterVertically) {
+        if (!engineGame) Row(Modifier.fillMaxWidth().heightIn(min = 44.dp).clip(RoundedCornerShape(12.dp)).background(Panel).border(if (isActivePlayer) 2.dp else 0.dp, if (isActivePlayer) Mint else Panel, RoundedCornerShape(12.dp)).combinedClickable(onClick = onTrackers).padding(horizontal = 9.dp).then(tutorialAnchor("player-status")), verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("${if (player.isEliminated) "✕ " else if (player.isOnline) "● " else ""}${player.name}${if (player.isEliminated) " · ELIMINATED" else if (player.isOnline) " · ONLINE" else ""}${if (player.isComputer) " · AI" else ""}${if (isActivePlayer && !player.isEliminated) " · ACTIVE" else ""}", color = if (player.isEliminated) Muted else if (isActivePlayer || player.isOnline) Mint else SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Bold)
                 Text("TURN $turnNumber · ${phaseName} · P${playerIndex + 1} · ${player.hand.size} IN HAND · ${player.library.size} IN LIBRARY", color = Muted, fontSize = 8.sp, letterSpacing = 0.4.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -7410,7 +7439,8 @@ private fun PlayerBoard(
 
             },
             "MANA" to {
-        Row(
+        // Engine games show the pool as a chip in the action row, and only when it has mana.
+        if (!engineGame) Row(
             Modifier.fillMaxWidth().heightIn(min = 42.dp).clip(RoundedCornerShape(9.dp))
                 .background(if (canControl) PanelLight else Panel)
                 .combinedClickable(enabled = canControl, onClick = onManageMana)
@@ -7425,7 +7455,7 @@ private fun PlayerBoard(
             },
             "COMMANDER" to {
         val commander = player.commanderCard
-        if (commander != null || player.commanderDamageReceived.isNotEmpty() || player.playerCounters.isNotEmpty()) {
+        if (engineGame) Unit else if (commander != null || player.commanderDamageReceived.isNotEmpty() || player.playerCounters.isNotEmpty()) {
             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp)).background(Panel).padding(horizontal = 5.dp, vertical = 1.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (commander != null) {
                     CardFace(commander, Modifier.width(30.dp), glow = commander.id in playableIds, onClick = { if (!commanderUnavailable && (canControl || engineControlled)) onCastCommander() }, onLongClick = { if (!commanderUnavailable && (canControl || engineControlled)) onCastCommander() }, showCounters = false)
@@ -7443,7 +7473,7 @@ private fun PlayerBoard(
 
             },
             "STEP" to {
-        if (gameInProgress) {
+        if (gameInProgress && !engineGame) {
             Row(Modifier.fillMaxWidth().then(tutorialAnchor("next-step")), verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.weight(1f))
                 if (engineControlled && !player.isEliminated) Text("ARGENTUM RUNS THE RULES · USE ${if (isActivePlayer) "PASS PRIORITY / ACTIONS" else "ACTIONS WHEN OFFERED"}", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
@@ -7458,19 +7488,42 @@ private fun PlayerBoard(
 
             },
             "ZONES" to {
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).then(tutorialAnchor("zones")), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).then(tutorialAnchor("zones")), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             // In an Argentum game only controls that work are shown: Argentum owns draws, tokens,
             // mana, steps and shuffles, so those manual shortcuts would be silent no-ops.
             if (engineGame) {
+                // Commander as a chip: art + name; tap to see Argentum's actions for it (cast).
+                player.commanderCard?.let { commander ->
+                    val castable = engineControlled && !commanderUnavailable && !player.isEliminated
+                    Row(
+                        Modifier.height(40.dp).clip(RoundedCornerShape(9.dp)).background(PanelLight)
+                            .border(if (commander.id in playableIds) 2.dp else 0.dp, if (commander.id in playableIds) Mint else PanelLight, RoundedCornerShape(9.dp))
+                            .combinedClickable(onClick = { if (castable) onCastCommander() else onPublicPreview(commander) }, onLongClick = { onPublicPreview(commander) })
+                            .padding(end = 10.dp).testTag("commander-chip"),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        CardFace(commander, Modifier.width(29.dp), onClick = { if (castable) onCastCommander() else onPublicPreview(commander) }, onLongClick = { onPublicPreview(commander) }, showCounters = false)
+                        Column(Modifier.padding(start = 6.dp)) {
+                            Text(commander.name, color = CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 130.dp))
+                            Text(if (commanderUnavailable) "IN PLAY" else if (castable) "COMMAND ZONE · CAST" else "COMMAND ZONE", color = if (castable) Mint else Muted, fontSize = 7.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+                if (player.manaPool.values.sum() > 0) Text(
+                    "MANA " + player.manaPool.filterValues { it > 0 }.entries.joinToString(" ") { (color, n) -> "${manaLetter(color)}$n" },
+                    color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Black,
+                    modifier = Modifier.height(44.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(9.dp)).background(Panel).padding(horizontal = 10.dp)
+                )
                 ZoneChip("GRAVEYARD", player.graveyard.size, enabled = true, onClick = { onZone("Graveyard") })
                 ZoneChip("EXILE", player.exile.size, enabled = true, onClick = { onZone("Exile") })
                 QuickActionChip(if (stackCount > 0) "STACK · $stackCount" else "STACK", enabled = true, onClick = onStack)
                 QuickActionChip("GAME LOG", enabled = true, onClick = onOpenLog)
                 if (engineControlled) {
-                    if (player.commanderCard != null && !commanderUnavailable && !player.isEliminated) QuickActionChip("CAST COMMANDER", enabled = true, onClick = onCastCommander)
                     QuickActionChip(if (passToMyTurnActive) "STOP AUTO-PASS" else "PASS TO MY TURN", enabled = !player.isEliminated, onClick = onPassToMyTurn)
                     if (undoAvailable) QuickActionChip("UNDO", enabled = true, onClick = onUndo)
                 }
+                Text("${player.library.size} IN LIBRARY", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.height(44.dp).wrapContentHeight(Alignment.CenterVertically).padding(horizontal = 4.dp))
             } else quickActionOrder.distinct().forEach { action ->
                 val zoneCount = when (action) {
                     "LIBRARY" -> player.library.size
@@ -7523,7 +7576,7 @@ private fun PlayerBoard(
 
             },
             "BATTLEFIELD" to {
-        Text("BATTLEFIELD  ·  grouped by type  ·  tap to tap/untap  ·  long-press to inspect", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp, modifier = Modifier.padding(start = 3.dp))
+        if (!engineGame) Text("BATTLEFIELD  ·  grouped by type  ·  tap to tap/untap  ·  long-press to inspect", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp, modifier = Modifier.padding(start = 3.dp))
         if (player.battlefield.isEmpty()) {
             Box(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)).background(Panel), contentAlignment = Alignment.Center) {
                 Text("Your battlefield is empty", color = Muted, fontSize = 12.sp)
@@ -7565,6 +7618,11 @@ private fun PlayerBoard(
     Column(modifier.fillMaxHeight(), verticalArrangement = Arrangement.spacedBy(4.dp * boardSpacingScale)) {
         normalizedSectionOrder.forEach { section -> sectionContent[section]?.invoke(this) }
     }
+}
+
+private fun manaLetter(color: String): String = when (color.uppercase()) {
+    "WHITE", "W" -> "W"; "BLUE", "U" -> "U"; "BLACK", "B" -> "B"; "RED", "R" -> "R"; "GREEN", "G" -> "G"; "COLORLESS", "C" -> "C"
+    else -> color.take(1).uppercase()
 }
 
 private fun battlefieldGroups(cards: List<GameCard>): List<Pair<String, List<GameCard>>> {
