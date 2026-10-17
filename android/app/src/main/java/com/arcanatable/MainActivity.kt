@@ -4091,6 +4091,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 94 · ENGINE TRIAL", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Argentum's rules engine and AI now run inside the app, with no server, as a trial. Options → Help & diagnostics → Run engine self-test plays one AI-vs-AI game with the Portal cards and reports how long it took and how much memory it used.\n• Cards ship as Argentum's own card data instead of compiled code.\n• Everything else is the same as Build 93.", color = SoftWhite, fontSize = 11.sp)
+
                 Text("BUILD 93 · MORE ROOM FOR CARDS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• A slimmer table: phases sit in one strip at the top, each player's life is on their tab, and the commander and mana are small chips. Landscape phones now show the battlefield.\n• The status box only appears for problems, a waiting confirmation or something on the stack.\n• On an unfolded Fold, an opponent's board sits beside yours.\n• Your hand opens from every table screen, including the Table tab.\n• New combat board: attackers on top, your blockers below. Tap a blocker, then the attacker; lines link them and a summary reads like \"Ramosian Captain 2/2 first strike ← 3 Rabbit Tokens (1/1)\". Attacking and combat damage use the same board.\n• Hold any card to see it large. Let go to keep it up; slide off to close.\n• Fixes: \"TYPE · null\" badges and \"null\" mana costs.", color = SoftWhite, fontSize = 11.sp)
 

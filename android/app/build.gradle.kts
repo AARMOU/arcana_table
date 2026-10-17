@@ -17,16 +17,16 @@ android {
         applicationId = "com.arcanatable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 93
-        versionName = "0.18.0-argentum"
-        manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build 93"
+        versionCode = 94
+        versionName = "0.19.0-argentum-trial"
+        manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build 94"
     }
 
     buildTypes {
         debug {
             // Separate package so this build installs beside the experimental/targeting test build.
             applicationIdSuffix = ".argentum"
-            manifestPlaceholders["appLabel"] = "Arcana · Argentum B93"
+            manifestPlaceholders["appLabel"] = "Arcana · Argentum B94"
         }
     }
 
@@ -68,6 +68,13 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Chunk 3 trial: Argentum's engine, SDK, tooling and AI, built from source on Arcana's PC build
+    // (Java 17 API, Android regex fixes; see argentum-patches/). Cards ship as data in assets.
+    implementation(fileTree("libs") { include("argentum-*.jar") })
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    implementation("org.slf4j:slf4j-api:2.0.18")
     testImplementation("junit:junit:4.13.2")
     testImplementation(composeBom)
     testImplementation("androidx.compose.ui:ui-test-junit4")
