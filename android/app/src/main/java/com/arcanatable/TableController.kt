@@ -148,6 +148,8 @@ internal class TableController(
     val scope: CoroutineScope,
     val cardZoom: CardZoomController,
 ) {
+    init { CardImages.init(context) }
+
     // Set by TableScreenContent on every composition.
     var configuration: android.content.res.Configuration by mutableStateOf(android.content.res.Configuration(context.resources.configuration))
     var isLandscape by mutableStateOf(false)

@@ -535,8 +535,12 @@ internal fun TableController.startArgentumPractice(vsAi: Boolean = true, joinLob
         try {
             val api = ArgentumDeckApi(argentumOrigin)
             var commanderForGame: String = requireNotNull(commander)
+            // Premade decks skip the server deck check (it only applies to imported decks).
+            val skipDeckCheck = activeDeckId?.startsWith("builtin:") == true
+            if (skipDeckCheck) recordDiagnostic("Deck check skipped: premade deck")
             var replacementCommander = false
-            var validation = withContext(Dispatchers.IO) { api.validate(submitted, commanderForGame, "COMMANDER") }
+            var validation = if (skipDeckCheck) ArgentumDeckValidation.skipped(submitted.values.sum())
+                else withContext(Dispatchers.IO) { api.validate(submitted, commanderForGame, "COMMANDER") }
             if (validation.unsupportedCards.isNotEmpty() && !acceptSubstitutions) {
                 val rejected = validation.unsupportedCards.sortedBy { it.lowercase() }
                 rejected.forEach { reportArgentumUnsupported("card:$it", "Argentum cannot run card $it") }
@@ -738,5 +742,6 @@ internal fun TableController.argentumPickCard(id: String): PickCard {
     val ref = snap?.targets?.get(id)
     val ownerSeat = ref?.ownerId?.let { o -> snap.players.indexOfFirst { it.id == o } } ?: -1
     val owner = when { ownerSeat < 0 -> "Other"; ownerSeat == you -> "You"; else -> snap!!.players[ownerSeat].name }
-    return PickCard(id, ref?.name ?: argentumName(id), null, ref?.type.orEmpty(), owner, if (ownerSeat == you) 5 else 1 + maxOf(ownerSeat, 0) * 10 + 5, isYou = ownerSeat == you)
+    val refName = ref?.name ?: argentumName(id)
+    return PickCard(id, refName, artByName(refName, token = ref?.type?.contains("Token", ignoreCase = true) == true), ref?.type.orEmpty(), owner, if (ownerSeat == you) 5 else 1 + maxOf(ownerSeat, 0) * 10 + 5, isYou = ownerSeat == you)
 }

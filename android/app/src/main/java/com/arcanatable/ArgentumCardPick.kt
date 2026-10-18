@@ -214,3 +214,19 @@ fun StackCardList(stack: List<ArgentumStackItem>) {
     }
     zoomed?.let { PickZoom(it) { zoomed = null } }
 }
+
+/**
+ * Adds a decision's own card info (name, type, picture) to a pick card. Library cards (searches like
+ * Green Sun's Zenith) are not in any table zone, so the decision's `cardInfo` / `cards` map is the
+ * only place their details live; when it has no picture, fall back to Scryfall's art by exact name.
+ */
+fun PickCard.withDecisionInfo(info: org.json.JSONObject?, nameKnown: Boolean): PickCard {
+    fun str(key: String) = info?.optString(key)?.takeUnless { it.isBlank() || it == "null" }
+    val shownName = if (!nameKnown) str("name") ?: name else name
+    val image = imageUrl ?: str("imageUri") ?: artByName(shownName, isToken)
+    return copy(name = shownName, imageUrl = image, typeLine = typeLine.ifBlank { str("typeLine").orEmpty() })
+}
+
+/** Library-search picks are grouped under one heading so the grid reads as "your library". */
+fun libraryPick(id: String, info: org.json.JSONObject?, fallbackName: String): PickCard =
+    PickCard(id, fallbackName, null, group = "Library", groupOrder = 0, isYou = true).withDecisionInfo(info, nameKnown = false)

@@ -324,19 +324,5 @@ object CardBitmapCache {
     fun put(url: String, bitmap: Bitmap) = cache.put(url, bitmap)
 }
 
-suspend fun downloadCardBitmap(url: String): Bitmap? = withContext(Dispatchers.IO) {
-    CardBitmapCache.get(url)?.let { return@withContext it }
-    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-        connectTimeout = 15_000
-        readTimeout = 20_000
-        setRequestProperty("User-Agent", "ArcanaTable/0.7.0 (Android)")
-    }
-    try {
-        if (connection.responseCode !in 200..299) return@withContext null
-        val bitmap = connection.inputStream.use { BitmapFactory.decodeStream(it) }
-        if (bitmap != null) CardBitmapCache.put(url, bitmap)
-        bitmap
-    } finally {
-        connection.disconnect()
-    }
-}
+/** Card picture by link; see [CardImages] (phone cache, Scryfall link resolving, name fallback). */
+suspend fun downloadCardBitmap(url: String, fallbackName: String? = null): Bitmap? = CardImages.load(url, fallbackName)

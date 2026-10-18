@@ -480,10 +480,12 @@ internal fun PlayerBoard(
                     "UNDO" -> if (engineControlled && undoAvailable) QuickActionChip("UNDO", enabled = true, onClick = onUndo)
                     "HAND" -> QuickActionChip("HAND · ${player.hand.size}", enabled = true, onClick = onShowHandFromZone)
                 } }
+                // Floating mana (empties when the step ends; casting uses it first).
                 if (player.manaPool.values.sum() > 0) Text(
-                    "MANA " + player.manaPool.filterValues { it > 0 }.entries.joinToString(" ") { (color, n) -> "${manaLetter(color)}$n" },
-                    color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Black,
-                    modifier = Modifier.height(44.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(9.dp)).background(Panel).padding(horizontal = 10.dp)
+                    "FLOATING " + player.manaPool.filterValues { it > 0 }.entries.joinToString(" ") { (color, n) -> "${manaLetter(color)}$n" },
+                    color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black,
+                    modifier = Modifier.height(44.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(9.dp)).background(Panel)
+                        .border(1.dp, Mint.copy(alpha = 0.6f), RoundedCornerShape(9.dp)).padding(horizontal = 10.dp).testTag("mana-pool-badge")
                 )
                 Text("${player.library.size} IN LIBRARY", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.height(44.dp).wrapContentHeight(Alignment.CenterVertically).padding(horizontal = 4.dp))
@@ -699,7 +701,7 @@ internal fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: ()
 @Composable
 internal fun CardArt(url: String, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Fit, fallbackName: String? = null, fallbackType: String? = null, label: String? = null) {
     var bitmap by remember(url) { mutableStateOf<Bitmap?>(CardBitmapCache.get(url)) }
-    LaunchedEffect(url) { if (bitmap == null) bitmap = try { downloadCardBitmap(url) } catch (_: Exception) { null } }
+    LaunchedEffect(url) { if (bitmap == null) bitmap = try { downloadCardBitmap(url, fallbackName) } catch (_: Exception) { null } }
     // Loaded art is named after the card, so screen readers (and tests) can still tell cards apart.
     if (bitmap != null) Image(bitmap!!.asImageBitmap(), contentDescription = cardArtDescription(label, fallbackName), modifier = modifier, contentScale = contentScale)
     // While art loads (or if it cannot load), keep the card identifiable.

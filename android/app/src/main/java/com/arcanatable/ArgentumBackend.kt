@@ -84,6 +84,9 @@ data class ArgentumDeckValidation(
         get() = errors.filter { it.code == "UNKNOWN_CARD" }.mapNotNull { it.cardName }.toSet()
 
     companion object {
+        /** A pass with no server check (premade decks). */
+        fun skipped(totalCards: Int) = ArgentumDeckValidation(valid = true, totalCards = totalCards, errors = emptyList(), warnings = emptyList())
+
         fun parse(source: String): ArgentumDeckValidation {
             val json = JSONObject(source)
             fun issues(key: String): List<ArgentumDeckIssue> {

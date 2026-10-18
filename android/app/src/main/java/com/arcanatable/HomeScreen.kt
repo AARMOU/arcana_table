@@ -114,7 +114,13 @@ fun ArcanaHomeScreen(
                         }
                         Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             OutlinedButton(onClick = onChangeDeck, enabled = !argentumActive, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Change deck", color = SoftWhite, fontWeight = FontWeight.Bold) }
-                            OutlinedButton(onClick = onImport, enabled = !argentumActive, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Import new", color = SoftWhite, fontWeight = FontWeight.Bold) }
+                            // Import is parked for now (plumbing kept in onImport): greyed, tap says so.
+                            val homeContext = androidx.compose.ui.platform.LocalContext.current
+                            OutlinedButton(
+                                onClick = { android.widget.Toast.makeText(homeContext, "Not yet available", android.widget.Toast.LENGTH_SHORT).show() },
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("home-import"),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, PanelLight.copy(alpha = 0.5f)),
+                            ) { Text("Import new", color = Muted.copy(alpha = 0.6f), fontWeight = FontWeight.Bold) }
                         }
                     }
                 }

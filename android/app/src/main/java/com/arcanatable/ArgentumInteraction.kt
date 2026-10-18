@@ -332,6 +332,13 @@ object ArgentumActions {
     fun isSacrificeMana(info: JSONObject): Boolean =
         isManaAbility(info) && info.optString("description").contains("Sacrifice", ignoreCase = true)
 
+    /**
+     * Mana abilities you can use by hand to float mana ("Add {G}"), shown at the bottom of a card's
+     * actions. Sacrifice-for-mana is already in the main list.
+     */
+    fun floatManaChoices(choices: List<JSONObject>): List<JSONObject> =
+        choices.filter { isManaAbility(it) && !isSacrificeMana(it) && it.optBoolean("isAffordable", true) }
+
     /** What the card menu calls an action: Treasures read "Sacrifice for mana". */
     fun menuLabel(info: JSONObject): String =
         if (isSacrificeMana(info)) "Sacrifice for mana" else info.optString("description")

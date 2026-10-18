@@ -156,9 +156,15 @@ internal fun TableController.TableOverlays() {
             val seat = players.getOrNull(localSeat)
             val activeDeck = deckChoices.firstOrNull { it.id == activeDeckId }
                 ?: seat?.takeIf { it.deckLoaded }?.let { DeckChoice("table", it.commanderName ?: "Your table deck", it.commanderName, builtIn = false) }
-            val art = activeDeck?.commander?.let { name ->
-                seat?.commanderCard?.takeIf { it.name.equals(name, true) }?.let { it.artCropUrl ?: it.imageUrl }
-                    ?: "https://api.scryfall.com/cards/named?exact=${java.net.URLEncoder.encode(name, "UTF-8")}&format=image&version=art_crop"
+            // Commander art: the table card's own picture, else the app's card data (cached on the
+            // phone by CardImages), and only then a Scryfall name lookup.
+            val commanderName = activeDeck?.commander
+            val tableArt = commanderName?.let { name -> seat?.commanderCard?.takeIf { it.name.equals(name, true) }?.let { it.artCropUrl ?: it.imageUrl } }
+            val bundledArt by androidx.compose.runtime.produceState<String?>(null, commanderName) {
+                value = commanderName?.let { CardImages.bundledImage(context, it) }?.let { CardImages.atSize(it, "art_crop") }
+            }
+            val art = commanderName?.let { name ->
+                tableArt ?: bundledArt ?: "https://api.scryfall.com/cards/named?exact=${java.net.URLEncoder.encode(name, "UTF-8")}&format=image&version=art_crop"
             }
             ArcanaHomeScreen(
                 wide = screenWidthDp >= 700,
@@ -421,7 +427,9 @@ internal fun TableController.TableOverlays() {
     if (argentumActionChoices.isNotEmpty()) ArgentumActionSheet(
         card = argentumActionCard,
         choices = ArgentumActions.visibleChoices(argentumActionChoices),
-        hidManaAbilities = argentumActionChoices.any { ArgentumActions.isManaAbility(it) && !ArgentumActions.isSacrificeMana(it) },
+        hidManaAbilities = false,
+        // A land or mana source's own sheet lists its mana abilities at the bottom (float mana).
+        manaChoices = if (argentumActionCard != null) ArgentumActions.floatManaChoices(argentumActionChoices) else emptyList(),
         busy = argentumAwaitingUpdate,
         stackCount = { info -> StackUses.count(info, argentumSnapshot?.legalActions.orEmpty()) { id -> argentumPiece(id).name } },
         onChooseMany = { info, count ->
@@ -504,11 +512,7 @@ internal fun TableController.TableOverlays() {
                             val pickItems = (0 until options.length()).map { index ->
                                 val id = options.optString(index)
                                 val base = argentumPickCard(id)
-                                val info = cardInfo?.optJSONObject(id)
-                                if (info == null) base
-                                else base.copy(name = if (argentumSnapshot?.targets?.get(id) == null) info.optString("name", base.name) else base.name,
-                                    imageUrl = base.imageUrl ?: info.optString("imageUri").takeUnless { it.isBlank() || it == "null" },
-                                    typeLine = base.typeLine.ifBlank { info.optString("typeLine").takeUnless { it == "null" }.orEmpty() })
+                                base.withDecisionInfo(cardInfo?.optJSONObject(id), nameKnown = argentumSnapshot?.targets?.get(id) != null)
                             }
                             fun canAdd(id: String): Boolean { val cap = limits?.optInt(id, 1) ?: 1
                                 return argentumDecisionSelection.size < maxSel && argentumDecisionSelection.count { limits?.optInt(it, 1) == cap } < cap }
@@ -576,19 +580,25 @@ internal fun TableController.TableOverlays() {
                         }
                         "SearchLibraryDecision" -> {
                             val options = decision.optJSONArray("options") ?: JSONArray()
+                            val libraryInfo = decision.optJSONObject("cards") ?: decision.optJSONObject("cardInfo")
+                            val maxSel = decision.optInt("maxSelections", 1)
                             Text(decision.optString("filterDescription"), color = Muted, fontSize = 11.sp)
                             if (options.length() == 0) Text("No matching cards. Confirm to finish the search.", color = Muted, fontSize = 12.sp)
-                            for (index in 0 until options.length()) {
-                                val id = options.optString(index)
-                                val on = id in argentumDecisionSelection
-                                Row(Modifier.fillMaxWidth().clickable {
-                                    argentumDecisionSelection = if (on) argentumDecisionSelection - id else if (argentumDecisionSelection.size < decision.optInt("maxSelections", 1)) argentumDecisionSelection + id else argentumDecisionSelection
-                                }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Checkbox(checked = on, onCheckedChange = null)
-                                    Text(ArgentumDecisions.cardName(decision, id) { argentumSnapshot?.targets?.get(it)?.name }, color = SoftWhite, fontSize = 12.sp)
+                            else {
+                                val libraryItems = (0 until options.length()).map { index ->
+                                    val id = options.optString(index)
+                                    libraryPick(id, libraryInfo?.optJSONObject(id), ArgentumDecisions.cardName(decision, id) { argentumSnapshot?.targets?.get(it)?.name })
                                 }
+                                CardPickGrid(libraryItems, argentumDecisionSelection.toSet(), isEnabled = { it in argentumDecisionSelection || argentumDecisionSelection.size < maxSel || maxSel == 1 }, onTap = { id ->
+                                    argentumDecisionSelection = when {
+                                        id in argentumDecisionSelection -> argentumDecisionSelection - id
+                                        maxSel == 1 -> setOf(id)
+                                        argentumDecisionSelection.size < maxSel -> argentumDecisionSelection + id
+                                        else -> argentumDecisionSelection
+                                    }
+                                })
                             }
-                            Text("Choose ${decision.optInt("minSelections", 0)}–${decision.optInt("maxSelections", 1)} card(s).", color = Muted, fontSize = 11.sp)
+                            Text("Choose ${decision.optInt("minSelections", 0)}–$maxSel card(s).", color = Muted, fontSize = 11.sp)
                         }
                         "OrderObjectsDecision", "ReorderLibraryDecision" -> ArgentumOrderEditor(
                             items = argentumOrderSelection,
@@ -725,6 +735,7 @@ internal fun TableController.TableOverlays() {
 
     argentumAttackPlan?.let { plan ->
         ArgentumAttackBoard(plan, ::argentumPiece, busy = argentumAwaitingUpdate,
+            opponentBlockers = argentumSnapshot?.let { snap -> opponentBlockers(snap.players, snap.viewingPlayer) }.orEmpty(),
             onConfirm = { action ->
                 val epoch = ArgentumActions.epochFor(plan.legalAction, argentumSnapshot?.interactionEpoch)
                 if (epoch != null && submitArgentumAction(action, epoch)) {

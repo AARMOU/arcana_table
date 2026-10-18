@@ -137,7 +137,7 @@ import org.json.JSONObject
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidManaAbilities: Boolean, busy: Boolean, stackCount: (JSONObject) -> Int = { 1 }, onChooseMany: (JSONObject, Int) -> Unit = { _, _ -> }, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit, onSecretNudge: () -> Unit = {}) {
+internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidManaAbilities: Boolean, busy: Boolean, manaChoices: List<JSONObject> = emptyList(), stackCount: (JSONObject) -> Int = { 1 }, onChooseMany: (JSONObject, Int) -> Unit = { _, _ -> }, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit, onSecretNudge: () -> Unit = {}) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 24.dp)) {
             if (card != null) Row(verticalAlignment = Alignment.Top) {
@@ -154,9 +154,9 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
                     card.oracleText?.let { ManaSymbolText(it, SoftWhite, 12.sp, Modifier.padding(top = 6.dp)) }
                 }
             }
-            Text(if (card == null) "ACTIONS" else if (choices.isEmpty()) "NOTHING TO DO WITH THIS CARD RIGHT NOW" else "WHAT YOU CAN DO NOW",
+            Text(if (card == null) "ACTIONS" else if (choices.isEmpty() && manaChoices.isEmpty()) "NOTHING TO DO WITH THIS CARD RIGHT NOW" else if (choices.isEmpty()) "MANA" else "WHAT YOU CAN DO NOW",
                 color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
-            if (choices.isEmpty()) Text(if (card == null) "Argentum isn't offering you any actions at the moment." else "Argentum offers no action for this card at this moment (wrong timing, no mana, or not your priority).", color = Muted, fontSize = 12.sp)
+            if (choices.isEmpty() && manaChoices.isEmpty()) Text(if (card == null) "Argentum isn't offering you any actions at the moment." else "Argentum offers no action for this card at this moment (wrong timing, no mana, or not your priority).", color = Muted, fontSize = 12.sp)
             if (hidManaAbilities) Text("Mana is paid automatically: your lands and mana sources are tapped for you when you cast or activate.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
             // Things you can do first; ones you can't afford right now go to the bottom.
             choices.sortedBy { !it.optBoolean("isAffordable", true) }.forEach { info ->
@@ -181,6 +181,19 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
                         unsupported != null -> Text("NEEDS HANDLING · $unsupported", color = CounterGold, fontSize = 10.sp)
                         !affordable -> Text("Not enough mana right now.", color = Muted, fontSize = 10.sp)
                         info.optBoolean("requiresTargets") || info.optBoolean("hasXCost") -> Text("You'll choose targets or X next.", color = Muted, fontSize = 10.sp)
+                    }
+                }
+            }
+            // Float mana: this source's mana abilities, last and quieter (auto-pay still taps for you).
+            if (manaChoices.isNotEmpty()) {
+                if (choices.isNotEmpty()) Text("ADD MANA (FLOATS UNTIL THE STEP ENDS)", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))
+                else Text("Floats in your mana pool until the step ends. Casting uses floating mana first.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(bottom = 4.dp))
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    manaChoices.forEach { info ->
+                        OutlinedButton(enabled = !busy, onClick = { onChoose(info) }, modifier = Modifier.heightIn(min = 44.dp).testTag("float-mana"),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Muted.copy(alpha = 0.35f))) {
+                            ManaSymbolText(floatManaLabel(info.optString("description")), Muted, 12.sp)
+                        }
                     }
                 }
             }
@@ -257,4 +270,11 @@ internal fun ArgentumOpeningHandScreen(
             confirmButton = { TextButton(onClick = { inspected = null }) { Text("CLOSE") } }
         )
     }
+}
+
+
+/** "{T}: Add {G}." → "Add {G}"; other mana abilities keep their text without the trailing period. */
+internal fun floatManaLabel(description: String): String {
+    val add = Regex("Add [^.]*", RegexOption.IGNORE_CASE).find(description)?.value
+    return (if (add != null && description.trim().startsWith("{T}:")) add else description).trim().trimEnd('.')
 }

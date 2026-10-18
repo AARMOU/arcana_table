@@ -1,8 +1,10 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 package com.arcanatable
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -125,6 +127,7 @@ private fun CombatBoardFrame(
     confirmLabel: String, confirmEnabled: Boolean, onConfirm: () -> Unit,
     extraButton: (@Composable () -> Unit)? = null,
     onDismiss: () -> Unit,
+    topExtra: (@Composable () -> Unit)? = null,
 ) {
     val config = LocalConfiguration.current
     val combatScale = LocalContext.current.getSharedPreferences("arcana_options", android.content.Context.MODE_PRIVATE)
@@ -171,6 +174,7 @@ private fun CombatBoardFrame(
                             }
                             if (top.isEmpty()) Text("Nothing here.", color = Muted, fontSize = 12.sp)
                         }
+                        topExtra?.invoke()
                     }
                     val bottomSection: @Composable () -> Unit = {
                         Text(bottomLabel, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
@@ -265,7 +269,7 @@ fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, 
  * creature, then the player or planeswalker it attacks.
  */
 @Composable
-fun ArgentumAttackBoard(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit) {
+fun ArgentumAttackBoard(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, opponentBlockers: List<Pair<String, List<GameCard>>> = emptyList()) {
     var selection by remember(plan) { mutableStateOf(plan.options.filter { it.mandatory }.associate { it.attackerId to it.targets.first() }) }
     var pending by remember(plan) { mutableStateOf<String?>(null) }
     val targets = plan.options.flatMap { it.targets }.distinct()
@@ -326,6 +330,7 @@ fun ArgentumAttackBoard(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece
             else TextButton(onClick = { selection = plan.options.filter { it.mandatory }.associate { it.attackerId to it.targets.first() }; pending = null }) { Text("CLEAR", color = Muted) }
         },
         onDismiss = onDismiss,
+        topExtra = if (opponentBlockers.isEmpty()) null else ({ OpponentBlockersStrip(opponentBlockers) }),
     )
 }
 
@@ -394,4 +399,58 @@ fun ArgentumDamageBoard(resolution: ArgentumCombatResolution, playerId: String, 
             }
         }
     }
+}
+
+
+/** Keywords that matter when an opponent blocks, shown as badges on the blockers strip. */
+private val BlockingKeywords = listOf("FLYING", "REACH", "FIRST_STRIKE", "DOUBLE_STRIKE", "DEATHTOUCH", "INDESTRUCTIBLE", "SHADOW", "HORSEMANSHIP")
+
+/** Blocking-relevant keyword badges for a creature ("FLYING", "REACH" → "flying", "reach"). */
+fun blockingKeywords(card: GameCard): List<String> =
+    card.keywords.map { it.uppercase().replace(' ', '_') }.filter { it in BlockingKeywords }.distinct()
+        .map { it.lowercase().replace('_', ' ') }
+
+/** Each opponent's untapped creatures (who could block), opponents in seat order; empty ones left out. */
+fun opponentBlockers(players: List<TablePlayer>, you: Int): List<Pair<String, List<GameCard>>> =
+    players.mapIndexedNotNull { seat, p ->
+        if (seat == you || p.isEliminated) return@mapIndexedNotNull null
+        val ready = p.battlefield.filter { it.type.contains("Creature", ignoreCase = true) && !it.tapped }
+        if (ready.isEmpty()) null else p.name to ready
+    }
+
+/**
+ * "Who can block": one row per opponent of their untapped creatures as small cards with power/
+ * toughness and blocking keywords. Hold a card to see it large.
+ */
+@Composable
+private fun OpponentBlockersStrip(groups: List<Pair<String, List<GameCard>>>) {
+    var zoomed by remember { mutableStateOf<PickCard?>(null) }
+    Column(Modifier.fillMaxWidth().padding(top = 4.dp).testTag("opponent-blockers")) {
+        groups.forEach { (name, cards) ->
+            Text("${name.uppercase()} CAN BLOCK WITH", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 4.dp))
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                cards.forEach { card ->
+                    val shape = RoundedCornerShape(6.dp)
+                    Column(Modifier.width(56.dp)) {
+                        Box(Modifier.fillMaxWidth().aspectRatio(0.716f).clip(shape).background(Color(0xFF1C2523))
+                            .border(1.dp, Color.White.copy(alpha = 0.2f), shape)
+                            .combinedClickable(onClick = {}, onLongClick = {
+                                zoomed = PickCard(card.id.toString(), card.name, card.imageUrl?.takeIf { !card.isFaceDown }, card.type, group = name, groupOrder = 0, isToken = card.isToken)
+                            })) {
+                            val url = card.imageUrl
+                            if (url != null && !card.isFaceDown) CardArt(url, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop, fallbackName = card.name, fallbackType = card.type)
+                            else Text(card.name, color = SoftWhite, fontSize = 8.sp, modifier = Modifier.padding(3.dp))
+                            if (card.power != null && card.toughness != null) Text("${card.power}/${card.toughness}", color = Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black,
+                                modifier = Modifier.align(Alignment.BottomEnd).padding(2.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xE6101615)).padding(horizontal = 3.dp, vertical = 1.dp))
+                        }
+                        blockingKeywords(card).forEach { kw ->
+                            Text(kw, color = CounterGold, fontSize = 7.sp, fontWeight = FontWeight.Black, maxLines = 1,
+                                modifier = Modifier.padding(top = 2.dp).clip(RoundedCornerShape(3.dp)).background(Panel).padding(horizontal = 3.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+    zoomed?.let { item -> PickZoom(item) { zoomed = null } }
 }
