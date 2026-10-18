@@ -34,6 +34,12 @@ The following submitted cards are still left out. These are concrete gaps in the
 - Lotus Vale needs an enter-the-battlefield replacement that sacrifices two untapped lands.
 - Gemstone Caverns needs a starting-hand/game-start replacement effect.
 
+## Three decks reviewed for Build 108
+
+The three supplied ManaBox lists were compared with the pinned Argentum catalog before adding cards. Eleven missing cards were added with individual scenario tests: Curious Altisaur, Kinjalli's Sunwing, Migration Path, Quicksilver Amulet, Rampaging Brontodon, Polyraptor, Unclaimed Territory, Rewind, Sunken Ruins, Wayward Swordtooth, and Wakening Sun's Avatar.
+
+The following 39 cards remain unimplemented: Pantlaza, Sun-Favored; Atla Palani, Nest Tender; Bronzebeak Foragers; Devil Dinosaur; Dinosaur Egg; Dinosaurs on a Spaceship; Hunting Velociraptor; Ravenous Tyrannosaurus; Sauron, Dino Devotee; Sunfrill Imitator; Swooping Pteranodon; Temple Altisaur; Wrathful Raptors; Zacama, Primal Calamity; Zilortha, Strength Incarnate; Dino DNA; Akroma's Will; Summoner's Pact; Chandra's Ignition; Savage Order; Thunderherd Migration; Welcome to . . . // Jurassic Park; Fortified Village; Furycalm Snarl; Umbris, Fear Manifest; Avatar of Woe; Captain N'ghathrod; Mikaeus, the Unhallowed; Uchuulon; Fatal Push; Soul Shatter; Agadeem's Awakening; Irenicus's Vile Duplication; Brigone, Soldier of Meletis; Brimaz, King of Oreskos; Mikaeus, the Lunarch; Savai Thundermane; Dismantling Wave; and Champions from Beyond. They were left out because no faithful implementation with a passing scenario test was completed in this pass. Devil Dinosaur's opponent-only hexproof static effect is rejected by the pinned SDK when the card script is initialized. Hunting Velociraptor needs Prowl's alternate cost; Temple Altisaur needs damage prevention; Zilortha changes lethal damage rules; Sunfrill Imitator needs a permanent-copy effect. Thunderherd Migration needs a reveal-or-pay additional cost. Fortified Village and Furycalm Snarl need an as-enters reveal replacement. Other remaining cards require combinations such as linked exile, delayed effects, per-opponent maximum-mana-value sacrifice, or additional targeted verification before a faithful scenario can be completed.
+
 ## Existing approximations and omissions
 
 - **Blightsteel Colossus:** infect is unsupported by the pinned engine, so it deals normal damage rather than giving poison counters. Trample, indestructible, and its library replacement are represented.
@@ -51,6 +57,4 @@ The app's exported custom-card data does not add these cards to Argentum's onlin
 
 ## Export and checks
 
-There are 92 registered custom-card definitions and 92 separate scenario-test source files. The latest saved custom-card test run (2026-10-17 18:06 MDT) completed 99 tests with 0 failures, including the Constricting Sliver and Venom scenarios. The corresponding export completed at 18:07 MDT and wrote 92 unique card records to `app/src/main/assets/argentum/custom-cards.jsonl` and 92 matching names to `custom-cards.index.tsv`; a local consistency check confirmed the two files contain the same 92 names.
-
-Those saved results verify the custom-card module and export. In the current shell, the Gradle 8.13 distribution is missing and the wrapper cannot download it because network access is unavailable, so I could not rerun the tasks in this session. No Android app unit-test results are present, and app tests remain unverified here because the Android SDK is unavailable. When the build environment is available, run `./gradlew :custom-cards:test :custom-cards:exportCards :app:testDebugUnitTest` from `android/`.
+There are 103 registered custom-card definitions. The custom-card test suite completed 111 tests with 0 failures in this work session. `:custom-cards:exportCards` wrote 103 card records to `app/src/main/assets/argentum/custom-cards.jsonl` and 103 names to `custom-cards.index.tsv`; a second export produced byte-identical files.

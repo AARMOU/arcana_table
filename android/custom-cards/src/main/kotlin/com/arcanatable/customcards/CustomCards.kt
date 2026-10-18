@@ -124,6 +124,30 @@ object CustomCards {
         Entry(WakkaDevotedGuardian, "FIC", POOL),
         Entry(CaptainJamesTKirk, "TRK", POOL),
         Entry(RaphaelTheMuscle, "TMC", POOL),
+        // Missing cards from the three decks reviewed for Build 108.
+        Entry(CuriousAltisaur, "LCC", "Velociramptor Beefcake 9/26"),
+        Entry(KinjallisSunwing, "LCC", "Velociramptor Beefcake 9/26"),
+        Entry(MigrationPath, "TDC", "Velociramptor Beefcake 9/26"),
+        Entry(QuicksilverAmulet, "M12", "Velociramptor Beefcake 9/26"),
+        Entry(RampagingBrontodon, "LCC", "Velociramptor Beefcake 9/26"),
+        Entry(Polyraptor, "RIX", "Velociramptor Beefcake 9/26"),
+        Entry(UnclaimedTerritory, "XLN", "Velociramptor Beefcake 9/26"),
+        Entry(Rewind, "M21", "Velociramptor Beefcake 9/26"),
+        Entry(SunkenRuins, "SHM", "Velociramptor Beefcake 9/26"),
+        Entry(WaywardSwordtooth, "RIX", "Velociramptor Beefcake 9/26"),
+        Entry(WakeningSunsAvatar, "XLN", "Velociramptor Beefcake 9/26"),
+        // Requested follow-up cards: dinosaur deck and Mabel deck.
+        Entry(PantlazaSunFavored, "LCC", "Velociramptor Beefcake 9/26"),
+        Entry(AkromasWill, "CMR", "Velociramptor Beefcake 9/26"),
+        Entry(ChandrasIgnition, "ORI", "Velociramptor Beefcake 9/26"),
+        Entry(SavageOrder, "REX", "Velociramptor Beefcake 9/26"),
+        Entry(BronzebeakForagers, "LCC", "Velociramptor Beefcake 9/26"),
+        Entry(DismantlingWave, "C20", "Mabel deck"),
+        Entry(FatalPush, "AER", POOL),
+        Entry(DinosaurEgg, "LCC", "Velociramptor Beefcake 9/26"),
+        Entry(ZacamaPrimalCalamity, "RIX", "Velociramptor Beefcake 9/26"),
+        Entry(BrigoneSoldierOfMeletis, "J25", "Mabel deck"),
+        Entry(SavaiThundermane, "IKO", "Mabel deck"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)

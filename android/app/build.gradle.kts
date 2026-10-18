@@ -17,8 +17,8 @@ android {
         applicationId = "com.arcanatable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 110
-        versionName = "0.31.1-seatfix"
+        versionCode = 111
+        versionName = "0.32.0-gptcards"
         manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build $versionCode"
     }
 

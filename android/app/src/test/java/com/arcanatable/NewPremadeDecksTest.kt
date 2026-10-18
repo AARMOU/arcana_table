@@ -13,7 +13,7 @@ class NewPremadeDecksTest {
         val library = OfflineCardLibrary({ path -> File("src/main/assets/$path").takeIf { it.exists() }?.inputStream() })
         val json = File("src/main/assets/argentum/commander-decks.json").readText()
         val premades = OfflineGameSetup.parsePremades(json)
-        for (id in listOf("ayula_bears", "sliver_overlord", "hazel_squirrels")) {
+        for (id in listOf("ayula_bears", "sliver_overlord", "hazel_squirrels", "mabel_heir", "velociraptor_beefcake")) {
             val deck = premades.first { it.id == id }
             assertEquals("$id has 100 cards", 100, deck.cards.size)
             val missing = deck.cards.filter { library.canonical(it) == null }.distinct()
