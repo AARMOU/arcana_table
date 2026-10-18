@@ -3,6 +3,7 @@ package com.arcanatable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -316,3 +317,32 @@ internal fun TableController.WifiDialogs() {
     }
 }
 
+
+/** A short message flashed over the table: [text] in [color] (ARGB), fading out. */
+data class FlashText(val text: String, val color: Long, val id: Long = System.nanoTime())
+
+/** Vibrates the phone for [ms] milliseconds. */
+internal fun TableController.buzz(ms: Long) {
+    runCatching {
+        val vibrator = if (android.os.Build.VERSION.SDK_INT >= 31)
+            (context.getSystemService(android.content.Context.VIBRATOR_MANAGER_SERVICE) as android.os.VibratorManager).defaultVibrator
+        else @Suppress("DEPRECATION") (context.getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator)
+        vibrator.vibrate(android.os.VibrationEffect.createOneShot(ms, android.os.VibrationEffect.DEFAULT_AMPLITUDE))
+    }
+}
+
+/** Shows [TableController.flashMessage] big in the middle of the screen, fading out over about 1.5 seconds. */
+@Composable
+internal fun TableController.FlashMessage() {
+    val flash = flashMessage ?: return
+    val alpha = androidx.compose.runtime.remember(flash.id) { androidx.compose.animation.core.Animatable(1f) }
+    androidx.compose.runtime.LaunchedEffect(flash.id) {
+        alpha.animateTo(0f, androidx.compose.animation.core.tween(1_500, delayMillis = 300))
+        if (flashMessage?.id == flash.id) flashMessage = null
+    }
+    androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
+        Text(flash.text, color = androidx.compose.ui.graphics.Color(flash.color).copy(alpha = alpha.value),
+            fontSize = androidx.compose.ui.unit.TextUnit(54f, androidx.compose.ui.unit.TextUnitType.Sp),
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Black)
+    }
+}

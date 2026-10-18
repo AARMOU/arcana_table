@@ -250,6 +250,8 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
     LaunchedEffect(argentumYourMove) {
         if (!argentumYourMove) return@LaunchedEffect
         delay(350) // ignore momentary priority during Argentum's own auto-passing
+        // Playing a friend: when they're waiting on you during their turn, make it obvious.
+        if (wifiRole != null && argentumCanRespond && appInForeground) { buzz(250); flashMessage = FlashText("Your move", 0xFF8BE3B4) }
         if (appInForeground) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
         else if (backgroundAlertsEnabled) postGameAlert(context, "Your move", argentumPendingDecision?.optString("prompt")?.takeIf { it.isNotBlank() } ?: "Argentum is waiting for you.")
     }
