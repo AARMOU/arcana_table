@@ -390,7 +390,13 @@ internal class TableController(
     var wifiConnecting by run { mutableStateOf(false) }
     var wifiRole by run { mutableStateOf<String?>(null) }
     /** A big message that flashes over the table and fades ("Your go", "Your move"). */
-    var flashMessage by run { mutableStateOf<FlashText?>(null) } // "host" or "guest" while a Wi-Fi game is on
+    var flashMessage by run { mutableStateOf<FlashText?>(null) }
+    /** Offline: the engine has been working on your last action for over 10 seconds. */
+    var argentumSlow by run { mutableStateOf(false) }
+
+    /** The name shown to a friend: your name, or your commander's first name instead of the default "PLAYER". */
+    fun friendlyName(commander: String?): String = lobbyPlayerName.trim().takeIf { it.isNotBlank() && !it.equals("PLAYER", true) }
+        ?: commander?.substringBefore(',')?.substringBefore(" of ")?.trim()?.takeIf { it.isNotBlank() } ?: "Friend" // "host" or "guest" while a Wi-Fi game is on
     var argentumActionCard by run { mutableStateOf<GameCard?>(null) }
     var argentumGameOverDismissed by run { mutableStateOf(false) }
     var argentumMulliganInfo by run { mutableStateOf<Triple<Int, Boolean, Int>?>(null) } // count, on the play, cards to bottom

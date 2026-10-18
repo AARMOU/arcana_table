@@ -261,7 +261,7 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
         val isYou = active == localSeat
         turnBanner = TurnBannerState(TurnColors.label(isYou, seat.name, seat.isComputer), isYou, turn)
         if (isYou && showAiRecap && aiRecap.first in 0 until turn && !aiRecap.second.isEmpty) {
-            recapText = aiRecap.second.line(players.firstOrNull { it.isComputer }?.name ?: "Opponent")
+            recapText = aiRecap.second.line(players.filterIndexed { i, _ -> i != localSeat }.firstOrNull()?.name ?: "Opponent")
             recordDiagnostic("Recap: ${recapText}", DiagnosticCategory.ENGINE)
         }
         if (isYou && buzzOnTurn && appInForeground) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
@@ -290,7 +290,9 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
             // Offline there's no network to lose: the engine on this phone is just thinking. A resync
             // would queue behind it and make it slower, and unlocking lets stale taps through, so wait
             // much longer before giving up.
-            delay(if (argentumOffline) 90_000 else 8_000)
+            argentumSlow = false
+            if (argentumOffline) { delay(10_000); if (argentumAwaitingUpdate) argentumSlow = true; delay(80_000) } else delay(8_000)
+            argentumSlow = false
             if (argentumAwaitingUpdate) {
                 recordDiagnostic("Argentum did not confirm an action within ${if (argentumOffline) 90 else 8} s; requested a full state refresh", DiagnosticCategory.CONNECTION)
                 argentumAwaitingUpdate = false

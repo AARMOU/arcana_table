@@ -488,7 +488,11 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             recordDiagnostic("Argentum game over (${incoming.optString("reason")})", DiagnosticCategory.ENGINE)
         }
         "sessionReplaced" -> recordDiagnostic("Argentum session replaced by another connection", DiagnosticCategory.CONNECTION)
-        "error" -> {
+        "error" -> if (incoming.optString("code") == "WIFI_NOTE") {
+            // An information note from the host (e.g. a card left out of a deck), not a problem.
+            message = "Note: " + incoming.optString("message")
+            recordDiagnostic("Note from host: ${incoming.optString("message")}", DiagnosticCategory.ENGINE)
+        } else {
             argentumLastError = incoming.optString("message", "Argentum returned an error."); message = argentumLastError; argentumAwaitingUpdate = false; argentumXChecking = null
             recordDiagnostic("Argentum error ${incoming.optString("code")}: ${argentumLastError}", DiagnosticCategory.ERROR)
         }

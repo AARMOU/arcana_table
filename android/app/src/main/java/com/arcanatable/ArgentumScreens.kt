@@ -154,11 +154,12 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
                     card.oracleText?.let { ManaSymbolText(it, SoftWhite, 12.sp, Modifier.padding(top = 6.dp)) }
                 }
             }
-            Text(if (card == null) "ARGENTUM ACTIONS" else if (choices.isEmpty()) "NOTHING TO DO WITH THIS CARD RIGHT NOW" else "WHAT ARGENTUM ALLOWS NOW",
+            Text(if (card == null) "ACTIONS" else if (choices.isEmpty()) "NOTHING TO DO WITH THIS CARD RIGHT NOW" else "WHAT YOU CAN DO NOW",
                 color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
             if (choices.isEmpty()) Text(if (card == null) "Argentum isn't offering you any actions at the moment." else "Argentum offers no action for this card at this moment (wrong timing, no mana, or not your priority).", color = Muted, fontSize = 12.sp)
-            if (hidManaAbilities) Text("Mana is paid automatically: Argentum taps your lands and mana sources when you cast or activate.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
-            choices.forEach { info ->
+            if (hidManaAbilities) Text("Mana is paid automatically: your lands and mana sources are tapped for you when you cast or activate.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
+            // Things you can do first; ones you can't afford right now go to the bottom.
+            choices.sortedBy { !it.optBoolean("isAffordable", true) }.forEach { info ->
                 val unsupported = ArgentumActions.needsHandlingReason(info)
                 val affordable = info.optBoolean("isAffordable", true)
                 Column(
@@ -168,7 +169,7 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
                         .combinedClickable(enabled = !busy, onClick = { onChoose(info) })
                         .padding(horizontal = 14.dp, vertical = 12.dp)
                 ) {
-                    Text(if (ArgentumActions.isSacrificeMana(info)) "Sacrifice for mana" else info.optString("description", info.optJSONObject("action")?.optString("type") ?: "Action"), color = if (unsupported == null) SoftWhite else Muted, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(if (ArgentumActions.isSacrificeMana(info)) "Sacrifice for mana" else if (info.optJSONObject("action")?.optString("type") == "PassPriority") "Pass" else info.optString("description", info.optJSONObject("action")?.optString("type") ?: "Action"), color = if (unsupported == null) SoftWhite else Muted, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     if (ArgentumActions.isSacrificeMana(info)) Text(info.optString("description"), color = Muted, fontSize = 11.sp)
                     info.optString("manaCostString").takeIf { it.isNotBlank() && it != "null" }?.let { ManaCostPips(it) }
                     val copies = if (unsupported == null && affordable) stackCount(info) else 1
@@ -178,7 +179,7 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
                     }
                     when {
                         unsupported != null -> Text("NEEDS HANDLING · $unsupported", color = CounterGold, fontSize = 10.sp)
-                        !affordable -> Text("Argentum reports you can't pay for this right now.", color = Muted, fontSize = 10.sp)
+                        !affordable -> Text("Not enough mana right now.", color = Muted, fontSize = 10.sp)
                         info.optBoolean("requiresTargets") || info.optBoolean("hasXCost") -> Text("You'll choose targets or X next.", color = Muted, fontSize = 10.sp)
                     }
                 }

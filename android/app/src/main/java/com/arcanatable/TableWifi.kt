@@ -39,7 +39,7 @@ internal fun TableController.startWifiHost(online: Boolean = false) {
                 message = "Games with a friend use Commander decks. Pick a Commander deck on the home screen first."
                 return@launch
             }
-            val hostName = lobbyPlayerName.ifBlank { "Host" }
+            val hostName = friendlyName(setup.you.commander)
             val onGuestMessage: (JSONObject) -> Unit = { msg -> argentumSocket.runningLocalHost?.receive(msg, com.arcanatable.engine.LocalArgentumHost.GUEST_ID) }
             val onGuestLeft: () -> Unit = { argentumSocket.runningLocalHost?.receive(JSONObject().put("type", "guestLeft"), com.arcanatable.engine.LocalArgentumHost.GUEST_ID) }
             if (online) {
@@ -105,7 +105,8 @@ private suspend fun TableController.acceptWifiGuest(
     wifiWaitingAddress = null
     onlineRoomCode = null
     wifiRole = if (server is ArgentumCloudHost) "online-host" else "host"
-    argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, setup.you, seat, emit = emit).also { it.quietOpponentTurns = quietOpponentTurns } }
+    val you = setup.you.copy(name = friendlyName(setup.you.commander))
+    argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, you, seat, emit = emit).also { it.quietOpponentTurns = quietOpponentTurns } }
     argentumOffline = true
     argentumDeckForLobby = null
     argentumCommanderForLobby = null
@@ -156,7 +157,7 @@ internal fun TableController.joinWifiGame(address: String) {
         try {
             val (names, commander) = activeDeckCards()
             if (commander == null) { message = "Wi-Fi games use Commander decks. Pick a Commander deck on the home screen first."; return@launch }
-            val hello = JSONObject().put("type", "lanHello").put("name", lobbyPlayerName.ifBlank { "Friend" })
+            val hello = JSONObject().put("type", "lanHello").put("name", friendlyName(commander))
                 .put("deck", JSONArray(names)).put("commander", commander)
             argentumSocket.attachLanGuest(guest)
             withContext(Dispatchers.IO) { guest.connect(address, hello) }
@@ -195,9 +196,9 @@ internal fun TableController.joinOnlineGame(code: String) {
     recordDiagnostic("Online: joining requested", DiagnosticCategory.ACTION)
     val (names, commander) = activeDeckCards()
     if (commander == null) { wifiConnecting = false; message = "Games with a friend use Commander decks. Pick a Commander deck on the home screen first."; return }
-    val hello = JSONObject().put("type", "lanHello").put("name", lobbyPlayerName.ifBlank { "Friend" })
+    val hello = JSONObject().put("type", "lanHello").put("name", friendlyName(commander))
         .put("deck", JSONArray(names)).put("commander", commander)
-    val guest = ArgentumCloudGuest(lobbyCloudEndpoint, clean, lobbyPlayerName.ifBlank { "Friend" })
+    val guest = ArgentumCloudGuest(lobbyCloudEndpoint, clean, friendlyName(commander))
     argentumSocket.attachLanGuest(guest)
     guest.connect(hello) { failure ->
         scope.launch {
