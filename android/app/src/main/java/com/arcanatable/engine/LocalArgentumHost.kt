@@ -91,8 +91,8 @@ class LocalArgentumHost(
     private val human: LocalSeat,
     opponent: LocalSeat,
     private val paceMs: Long = 600,
-    private val emit: (JSONObject) -> Unit,
     extraOpponents: List<LocalSeat> = emptyList(),
+    private val emit: (JSONObject) -> Unit,
 ) {
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(null, r, "argentum-local", 256L shl 20) }
     private val services = EngineServices(registry)
