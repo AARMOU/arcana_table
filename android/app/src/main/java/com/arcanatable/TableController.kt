@@ -377,6 +377,15 @@ internal class TableController(
     var argentumComposer by run { mutableStateOf<ArgentumActionPlan?>(null) }
     /** Offline: card id whose real maximum X the engine is still working out for the open composer. */
     var argentumXChecking by run { mutableStateOf<String?>(null) }
+    // Wi-Fi play (one phone hosts the engine, the other joins).
+    var wifiServer: ArgentumLanServer? = null
+    var wifiWaitingAddress by run { mutableStateOf<String?>(null) }
+    var wifiJoinOpen by run { mutableStateOf(false) }
+    var wifiSearching by run { mutableStateOf(false) }
+    var wifiFound by run { mutableStateOf<List<ArgentumLan.FoundHost>>(emptyList()) }
+    var wifiAddressInput by run { mutableStateOf("") }
+    var wifiConnecting by run { mutableStateOf(false) }
+    var wifiRole by run { mutableStateOf<String?>(null) } // "host" or "guest" while a Wi-Fi game is on
     var argentumActionCard by run { mutableStateOf<GameCard?>(null) }
     var argentumGameOverDismissed by run { mutableStateOf(false) }
     var argentumMulliganInfo by run { mutableStateOf<Triple<Int, Boolean, Int>?>(null) } // count, on the play, cards to bottom
@@ -1449,6 +1458,39 @@ internal class TableController(
      * stops and shows a needs-handling review; substitutions happen only when the player chooses
      * [acceptSubstitutions], and only for this game (the saved deck is never edited here).
      */
+    /** The deck you picked on the home screen (never the table, which a finished game leaves behind): card names and commander. */
+    fun activeDeckCards(): Pair<List<String>, String?> {
+        val seat = players.getOrNull(localSeat)
+        val active = activeDeckId
+        val premade = active?.takeIf { it.startsWith("builtin:") }?.removePrefix("builtin:")?.let { id -> premadeDecks.firstOrNull { it.id == id } }
+        val saved = active?.let { a -> savedDecks.firstOrNull { it.name == a } }
+        return when {
+            premade != null -> premade.cards to premade.commander
+            saved != null -> parseDeckList(saved.text).let { e -> e.flatMap { x -> List(x.count) { x.name } } to (saved.commander ?: e.firstOrNull { it.commander }?.name) }
+            else -> seat?.takeIf { it.deckLoaded }?.let { (it.library + it.hand).filterNot { c -> c.isToken || c.name == "Hidden card" }.map { c -> c.name } }.orEmpty() to
+                seat?.takeIf { it.deckLoaded }?.commanderName?.takeIf(String::isNotBlank)
+        }
+    }
+
+    /** Loads the card library and builds an offline game's seats (on a large-stack thread). */
+    suspend fun prepareOfflineSetup(names: List<String>, commander: String?, aiDeckId: String?): Pair<com.arcanatable.engine.OfflineSetup, com.wingedsheep.engine.registry.CardRegistry> =
+        withContext(Dispatchers.IO) {
+            var result: Pair<com.arcanatable.engine.OfflineSetup, com.wingedsheep.engine.registry.CardRegistry>? = null
+            var failure: Throwable? = null
+            val worker = Thread(null, {
+                try {
+                    val library = offlineLibrary()
+                    val decks = runCatching { context.assets.open("argentum/commander-decks.json").bufferedReader().use { it.readText() } }.getOrNull()
+                    result = com.arcanatable.engine.OfflineGameSetup.build(library, lobbyPlayerName.ifBlank { "You" }, names, commander, decks, aiDeckId = aiDeckId)
+                } catch (t: Throwable) { failure = t }
+            }, "argentum-offline-setup", 256L shl 20)
+            worker.start(); worker.join()
+            failure?.let { throw it }
+            result!!
+        }
+
+    fun offlineLibrary() = com.arcanatable.engine.OfflineCardLibrary({ path -> runCatching { context.assets.open(path) }.getOrNull() })
+
     /**
      * Offline game: Argentum's engine and AI run inside the app (engine/LocalArgentumHost). Your
      * imported Commander deck plays one of Argentum's premade Commander decks when the full card
@@ -1456,37 +1498,13 @@ internal class TableController(
      */
     fun startOfflineGame() {
         if (offlineStarting || argentumEnabled) return
-        val seat = players.getOrNull(localSeat)
         offlineStarting = true
         argentumLastError = null
         scope.launch {
             try {
-                // The deck you picked on the home screen (never the table, which a finished game leaves behind).
-                val active = activeDeckId
-                val premade = active?.takeIf { it.startsWith("builtin:") }?.removePrefix("builtin:")?.let { id -> premadeDecks.firstOrNull { it.id == id } }
-                val saved = active?.let { a -> savedDecks.firstOrNull { it.name == a } }
-                val (names, commander) = when {
-                    premade != null -> premade.cards to premade.commander
-                    saved != null -> parseDeckList(saved.text).let { e -> e.flatMap { x -> List(x.count) { x.name } } to (saved.commander ?: e.firstOrNull { it.commander }?.name) }
-                    else -> seat?.takeIf { it.deckLoaded }?.let { (it.library + it.hand).filterNot { c -> c.isToken || c.name == "Hidden card" }.map { c -> c.name } }.orEmpty() to
-                        seat?.takeIf { it.deckLoaded }?.commanderName?.takeIf(String::isNotBlank)
-                }
-                val aiDeckId = offlineAiDeckId
+                val (names, commander) = activeDeckCards()
                 val started = System.currentTimeMillis()
-                val prepared = withContext(Dispatchers.IO) {
-                    var result: Pair<com.arcanatable.engine.OfflineSetup, com.wingedsheep.engine.registry.CardRegistry>? = null
-                    var failure: Throwable? = null
-                    val worker = Thread(null, {
-                        try {
-                            val library = com.arcanatable.engine.OfflineCardLibrary({ path -> runCatching { context.assets.open(path) }.getOrNull() })
-                            val decks = runCatching { context.assets.open("argentum/commander-decks.json").bufferedReader().use { it.readText() } }.getOrNull()
-                            result = com.arcanatable.engine.OfflineGameSetup.build(library, lobbyPlayerName.ifBlank { "You" }, names, commander, decks, aiDeckId = aiDeckId)
-                        } catch (t: Throwable) { failure = t }
-                    }, "argentum-offline-setup", 256L shl 20)
-                    worker.start(); worker.join()
-                    failure?.let { throw it }
-                    result!!
-                }
+                val prepared = prepareOfflineSetup(names, commander, offlineAiDeckId)
                 val (setup, registry) = prepared
                 recordDiagnostic("Offline game prepared in ${System.currentTimeMillis() - started} ms: ${setup.you.commander ?: "Portal"} vs ${setup.aiDeckName}", DiagnosticCategory.ENGINE)
                 setup.notes.forEach { recordDiagnostic("Offline: $it", DiagnosticCategory.ENGINE) }

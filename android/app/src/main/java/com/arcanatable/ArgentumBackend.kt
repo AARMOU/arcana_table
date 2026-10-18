@@ -524,7 +524,18 @@ class ArgentumGameSocket(
     /** Offline games: an in-app Argentum host stands in for the server (same messages both ways). */
     @Volatile var localHostFactory: (((JSONObject) -> Unit) -> com.arcanatable.engine.LocalArgentumHost)? = null
     @Volatile private var localHost: com.arcanatable.engine.LocalArgentumHost? = null
-    val isOffline: Boolean get() = localHost != null || localHostFactory != null
+    /** Wi-Fi guest: another phone on this network runs the engine; messages go to it and back. */
+    @Volatile private var lanGuest: ArgentumLanGuest? = null
+    val isOffline: Boolean get() = localHost != null || localHostFactory != null || lanGuest != null
+    /** The engine running on this phone, once connected (offline or Wi-Fi host). */
+    val runningLocalHost: com.arcanatable.engine.LocalArgentumHost? get() = localHost
+
+    /** Plays through a Wi-Fi host instead of the server. Call [connect] afterwards. */
+    fun attachLanGuest(guest: ArgentumLanGuest) {
+        lanGuest = guest
+        guest.onMessage = { message -> main.post { if (enabled.get()) onMessage(message) } }
+        guest.onClosed = { main.post { if (enabled.get() && lanGuest === guest) { report("Lost the connection to the host phone."); setStatus(ArgentumConnectionStatus.DISCONNECTED) } } }
+    }
 
     fun connect(name: String) {
         playerName = name.trim().ifBlank { "PLAYER" }.take(32)
@@ -536,6 +547,12 @@ class ArgentumGameSocket(
             localHost?.receive(JSONObject().put("type", "connect").put("playerName", playerName))
             return
         }
+        lanGuest?.let { guest ->
+            enabled.set(true)
+            setStatus(ArgentumConnectionStatus.CONNECTED)
+            guest.send(JSONObject().put("type", "connect").put("playerName", playerName))
+            return
+        }
         if (enabled.getAndSet(true) && status != ArgentumConnectionStatus.DISCONNECTED) return
         retryCount = 0
         openSocket()
@@ -543,7 +560,7 @@ class ArgentumGameSocket(
 
     /** Player-initiated reconnect; also the only way out of PAUSED. */
     fun retryNow() {
-        if (status == ArgentumConnectionStatus.REPLACED || localHost != null) return
+        if (status == ArgentumConnectionStatus.REPLACED || localHost != null || lanGuest != null) return
         enabled.set(true)
         manualRetry?.let(main::removeCallbacks)
         retryCount = 0
@@ -553,6 +570,7 @@ class ArgentumGameSocket(
 
     fun send(message: JSONObject): Boolean {
         localHost?.let { host -> if (!enabled.get()) return false; host.receive(JSONObject(message.toString())); return true }
+        lanGuest?.let { guest -> return enabled.get() && guest.send(message) }
         return enabled.get() && status == ArgentumConnectionStatus.CONNECTED && socket?.send(message.toString()) == true
     }
 
@@ -592,6 +610,8 @@ class ArgentumGameSocket(
         localHost?.shutdown()
         localHost = null
         localHostFactory = null
+        lanGuest?.close()
+        lanGuest = null
         manualRetry?.let(main::removeCallbacks)
         manualRetry = null
         socket?.close(1000, "Arcana closed Argentum connection")

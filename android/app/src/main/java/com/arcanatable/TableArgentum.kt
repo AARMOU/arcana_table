@@ -676,6 +676,7 @@ internal fun TableController.startArgentumPractice(vsAi: Boolean = true, joinLob
 internal fun TableController.closeArgentumSession(concede: Boolean) {
     if (concede) { if (argentumSnapshot == null) argentumSocket.leaveQuickGameLobby() else if (!gameEndedOnline) argentumSocket.concede() }
     argentumSocket.close()
+    stopWifi()
     argentumEnabled = false
     argentumOffline = false
     setArgentumGameActive(false)

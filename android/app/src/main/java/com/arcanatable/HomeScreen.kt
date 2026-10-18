@@ -159,6 +159,8 @@ fun PlaySheet(
     onCreateRoom: () -> Unit,
     onJoinRoom: () -> Unit,
     onDismiss: () -> Unit,
+    onWifiHost: () -> Unit = {},
+    onWifiJoin: () -> Unit = {},
 ) {
     var online by remember { mutableStateOf(false) }
     var showAllDecks by remember { mutableStateOf(false) }
@@ -173,6 +175,12 @@ fun PlaySheet(
                     DeckChip("Random", aiDeckId == null) { onAiDeck(null) }
                     shown.forEach { d -> DeckChip(d.name, aiDeckId == d.id) { onAiDeck(d.id) } }
                     if (!showAllDecks && shown.size < aiDecks.size) DeckChip("${aiDecks.size - shown.size} more decks ▾", false) { showAllDecks = true }
+                }
+            }
+            PlayOption("Wi-Fi with a friend", "Two phones on the same Wi-Fi. One hosts, the other joins. Commander decks.", selected = false, onClick = {}, tag = "play-wifi-option") {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onWifiHost, modifier = Modifier.testTag("wifi-host")) { Text("Host a game", color = Mint) }
+                    TextButton(onClick = onWifiJoin, modifier = Modifier.testTag("wifi-join")) { Text("Join a game", color = Mint) }
                 }
             }
             PlayOption("Online with Argentum", "Plays on Argentum's server. Needs internet.", selected = online, onClick = { online = true }, tag = "play-online-option") {

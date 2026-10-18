@@ -194,6 +194,8 @@ internal fun TableController.TableOverlays() {
                 onCreateRoom = { playSheetOpen = false; run { startArgentumPractice(vsAi = false) } },
                 onJoinRoom = { playSheetOpen = false; run { argentumLastError = null; argentumJoinCode = ""; argentumJoinDialogOpen = true } },
                 onDismiss = { playSheetOpen = false },
+                onWifiHost = { playSheetOpen = false; run { startWifiHost() } },
+                onWifiJoin = { playSheetOpen = false; run { wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() } },
             )
             if (deckPickerOpen) DeckPickerSheet(deckChoices, activeDeckId,
                 onPick = { choice ->
@@ -344,8 +346,15 @@ internal fun TableController.TableOverlays() {
             confirmButton = { TextButton(onClick = {
                 recordDiagnostic("Player chose Play again", DiagnosticCategory.ACTION)
                 val wasOffline = argentumOffline
+                val wifi = wifiRole
                 closeArgentumSession(concede = false)
-                if (wasOffline) startOfflineGame() else startArgentumPractice(vsAi = true)
+                when {
+                    // Wi-Fi: the host waits for the friend again; the guest looks for the host again.
+                    wifi == "host" -> startWifiHost()
+                    wifi == "guest" -> { wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() }
+                    wasOffline -> startOfflineGame()
+                    else -> startArgentumPractice(vsAi = true)
+                }
             }) { Text("PLAY AGAIN") } },
             dismissButton = {
                 Row {
@@ -945,4 +954,5 @@ internal fun TableController.TableOverlays() {
     )
 
             }
+    WifiDialogs()
 }

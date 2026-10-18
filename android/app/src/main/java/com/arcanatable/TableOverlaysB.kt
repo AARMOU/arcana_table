@@ -782,6 +782,8 @@ internal fun TableController.TableOverlaysB() {
         backgroundAlertsEnabled = backgroundAlertsEnabled,
         followActivePlayer = followActivePlayer,
         connectionLabel = when {
+            argentumEnabled && wifiRole == "host" -> "Wi-Fi game · you are hosting"
+            argentumEnabled && wifiRole == "guest" -> "Wi-Fi game · the other phone is hosting"
             argentumEnabled && argentumOffline -> "Offline game · Argentum running on this phone"
             argentumEnabled -> "Argentum · ${argentumStatus.name.lowercase().replaceFirstChar(Char::uppercase)}"
             else -> "Argentum · not in a game"

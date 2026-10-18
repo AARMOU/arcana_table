@@ -60,6 +60,7 @@ import kotlinx.serialization.json.put
 import org.json.JSONObject
 import java.util.concurrent.Executors
 
+
 /** One seat of an offline game: who sits there and what they play. */
 data class LocalSeat(val name: String, val deck: List<String>, val commander: String?)
 
@@ -70,18 +71,22 @@ data class LocalSeat(val name: String, val deck: List<String>, val commander: St
  *
  * Mirrors the server's per-seat pipeline (GameSession.createStateUpdate): masked ClientGameState,
  * enriched legal actions, masked pending decision, client events, the accumulated game log,
- * Argentum's auto-pass for the human seat, and nextStopPoint. All engine work runs on one
+ * Argentum's auto-pass for each person's seat, and nextStopPoint. All engine work runs on one
  * large-stack thread; [emit] is called from that thread.
  *
  * Like the server, it also runs the London mulligan (mulliganDecision / chooseBottomCards /
  * mulliganComplete), offers undo with the server's checkpoint policy, and sends a state update after
  * every AI action and every step change, [paceMs] apart, so the AI's turn plays out on the table
  * instead of jumping straight to your next decision.
+ *
+ * Wi-Fi play: after [setGuest], the second seat is a person on another phone instead of the AI.
+ * Their messages come in through `receive(message, GUEST_ID)` and their own view goes out through
+ * the guest's emit. Everything else works the same for both seats.
  */
 class LocalArgentumHost(
     private val registry: CardRegistry,
     private val human: LocalSeat,
-    private val opponent: LocalSeat,
+    opponent: LocalSeat,
     private val paceMs: Long = 600,
     private val emit: (JSONObject) -> Unit,
 ) {
@@ -97,103 +102,135 @@ class LocalArgentumHost(
     private val autoPass = AutoPassManager(registry)
     private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; classDiscriminator = "type"; serializersModule = engineSerializersModule }
 
+    private var opponent: LocalSeat = opponent
     private var state: GameState? = null
     private val humanId: EntityId = HUMAN_ID
     private val aiId: EntityId = AI_ID
-    private lateinit var ai: AIPlayer
-    private val gameLog = mutableListOf<ClientEvent>()
+    private var ai: AIPlayer? = null
+    // Wi-Fi: where the guest's messages go. Null = the second seat is the AI.
+    @Volatile private var guestEmit: ((JSONObject) -> Unit)? = null
+    private val gameLogs = mutableMapOf<EntityId, MutableList<ClientEvent>>()
     private var version = 0L
 
-    // Legal actions for the last state they were worked out for (same object = same game moment), so
-    // auto-pass and the state update don't enumerate them twice.
-    private var legalCache: Pair<GameState, List<LegalActionInfo>>? = null
+    // Legal actions for the last state they were worked out for, per seat (same object = same game
+    // moment), so auto-pass and the state update don't enumerate them twice.
+    private val legalCache = mutableMapOf<EntityId, Pair<GameState, List<LegalActionInfo>>>()
     // When the message being handled started, for the "engineMs" diagnostic.
     @Volatile private var handleStartNanos = 0L
-    // The epoch of the last update you could act on. A submit made against an older one (a tap
-    // queued while the engine was still thinking) is turned down instead of applied to a newer state.
-    private var interactiveEpoch = "offline-0"
+    // Per seat, the epoch of the last update they could act on. A submit made against an older one (a
+    // tap queued while the engine was still thinking) is turned down instead of applied to a newer state.
+    private val interactiveEpochs = mutableMapOf<EntityId, String>()
 
     // Undo, as Argentum's GameSession does it: one checkpoint, owned by the player whose action set it.
-    private data class Checkpoint(val state: GameState, val logSize: Int)
+    private data class Checkpoint(val state: GameState, val logSizes: Map<EntityId, Int>, val owner: EntityId)
     private var undoCheckpoint: Checkpoint? = null
     private var preCombatCheckpoint: Checkpoint? = null
     private var mulliganPhase = false
 
     // Shock lands put onto the battlefield by an effect (a fetch land, reanimation): Argentum enters
     // them tapped without asking. Offline, Arcana asks "pay N life to untap it?" right after.
-    private data class ShockOffer(val land: EntityId, val name: String, val life: Int)
+    private data class ShockOffer(val land: EntityId, val name: String, val life: Int, val player: EntityId)
     private val shockOffers = ArrayDeque<ShockOffer>()
 
     /**
      * "Don't stop for AI spells": on an opponent's turn, pass over their spells and abilities unless
-     * one targets you or something you control. Blocks and prompts still stop.
+     * one targets you or something you control. Blocks and prompts still stop. Host seat only.
      */
     var quietOpponentTurns: Boolean = false
 
-    fun receive(message: JSONObject) = worker.execute {
+    val isWifi: Boolean get() = guestEmit != null
+
+    private fun people(): List<EntityId> = if (guestEmit != null) listOf(humanId, aiId) else listOf(humanId)
+    private fun isPerson(id: EntityId?): Boolean = id == humanId || (id == aiId && guestEmit != null)
+    private fun other(id: EntityId): EntityId = if (id == humanId) aiId else humanId
+    private fun seatOf(id: EntityId): LocalSeat = if (id == humanId) human else opponent
+    private fun emitTo(seat: EntityId, message: JSONObject) {
+        if (seat == humanId) emit(message) else guestEmit?.invoke(message)
+    }
+    private fun logFor(seat: EntityId) = gameLogs.getOrPut(seat) { mutableListOf() }
+
+    fun receive(message: JSONObject, from: EntityId = HUMAN_ID) = worker.execute {
         handleStartNanos = System.nanoTime()
-        runCatching { handle(message) }.onFailure { error ->
-            emit(JSONObject().put("type", "error").put("code", "LOCAL_ENGINE").put("message", "Offline engine problem: ${error.javaClass.simpleName}: ${error.message?.take(200)}"))
+        runCatching { handle(message, from) }.onFailure { error ->
+            emitTo(from, JSONObject().put("type", "error").put("code", "LOCAL_ENGINE").put("message", "Offline engine problem: ${error.javaClass.simpleName}: ${error.message?.take(200)}"))
         }
+    }
+
+    /** Wi-Fi: the second seat becomes this person, whose messages go out through [guest]. Call before the game starts. */
+    fun setGuest(seat: LocalSeat, guest: (JSONObject) -> Unit) = worker.execute {
+        opponent = seat
+        guestEmit = guest
+        guest(JSONObject().put("type", "connected").put("playerId", AI_ID.value).put("token", "offline"))
     }
 
     fun shutdown() { worker.shutdownNow() }
 
-    private fun handle(message: JSONObject) {
+    private fun handle(message: JSONObject, from: EntityId) {
+        if (from != humanId && !isPerson(from)) return
         when (message.optString("type")) {
-            "connect" -> emit(JSONObject().put("type", "connected").put("playerId", HUMAN_ID.value).put("token", "offline"))
-            "createQuickGameLobby" -> startGame()
-            "requestResync" -> sendState(emptyList())
-            "refineMaxX" -> refineMaxX(message.optString("cardId"))
-            "submitAction" -> {
-                val current = state ?: return
-                if (mulliganPhase) { sendError("Choose your opening hand first."); return }
-                val epoch = message.optString("interactionEpoch")
-                if (epoch.startsWith("offline-") && epoch != interactiveEpoch) { sendError("The game moved on before that arrived. Nothing was done; try again."); return }
-                shockOffers.firstOrNull()?.let { offer ->
-                    val raw = message.getJSONObject("action")
-                    val response = raw.optJSONObject("response")
-                    if (raw.optString("type") != "SubmitDecision" || response?.optString("decisionId") != shockId(offer)) { sendError("Answer the shock land question first."); sendState(emptyList()); return }
-                    answerShock(offer, response.optBoolean("choice"))
-                    return
-                }
-                val action = json.decodeFromString(GameAction.serializer(), message.getJSONObject("action").toString())
-                if (action.playerId != humanId) { sendError("That action belongs to another seat."); return }
-                val events = mutableListOf<GameEvent>()
-                var processed = processor.process(current, action)
-                if (processed.result.error != null && needsMana(processed.result.error!!)) {
-                    // Argentum's auto-pay never sacrifices Treasures; offline, Arcana does it for you.
-                    payWithSacrificeSources(current, action)?.let { (paid, paidEvents) ->
-                        events += paidEvents
-                        processed = processor.process(paid, action)
-                    }
-                }
-                val result = processed.result
-                if (result.error != null) { sendError(friendlyError(result.error!!)); sendState(emptyList()); return }
-                applyUndoPolicy(processed.undoPolicy, action, current)
-                state = result.state
-                events += result.events
-                queueShockOffers(events)
-                drive(events)
-                sendState(events)
-            }
-            "keepHand" -> mulliganAction(KeepHand(humanId))
-            "mulligan" -> mulliganAction(TakeMulligan(humanId))
+            "connect" -> emitTo(from, JSONObject().put("type", "connected").put("playerId", from.value).put("token", "offline"))
+            "createQuickGameLobby" -> if (from == humanId) startGame()
+            "requestResync" -> if (state != null && !mulliganPhase) sendStateFor(from, emptyList(), true)
+            "refineMaxX" -> refineMaxX(message.optString("cardId"), from)
+            "submitAction" -> submitAction(message, from)
+            "keepHand" -> mulliganAction(KeepHand(from))
+            "mulligan" -> mulliganAction(TakeMulligan(from))
             "chooseBottomCards" -> {
                 val ids = message.optJSONArray("cardIds") ?: org.json.JSONArray()
-                mulliganAction(BottomCards(humanId, (0 until ids.length()).map { EntityId(ids.getString(it)) }))
+                mulliganAction(BottomCards(from, (0 until ids.length()).map { EntityId(ids.getString(it)) }))
             }
-            "concede" -> {
-                val current = state ?: return
-                val result = processor.process(current, Concede(humanId)).result
-                state = result.state
-                finishIfOver(result.events)
+            "concede" -> concede(from)
+            "guestLeft" -> if (isWifi && state?.gameOver == false) {
+                emit(JSONObject().put("type", "error").put("code", "WIFI").put("message", "Your friend left the game."))
+                concede(aiId)
             }
-            "requestUndo" -> undo()
-            "setQuietOpponentTurns" -> quietOpponentTurns = message.optBoolean("enabled")
-            "ping" -> emit(JSONObject().put("type", "pong"))
+            "requestUndo" -> undo(from)
+            "setQuietOpponentTurns" -> if (from == humanId) quietOpponentTurns = message.optBoolean("enabled")
+            "ping" -> emitTo(from, JSONObject().put("type", "pong"))
             else -> Unit // lobby, deck and preference messages need no answer offline
         }
+    }
+
+    private fun concede(seat: EntityId) {
+        val current = state ?: return
+        val result = processor.process(current, Concede(seat)).result
+        state = result.state
+        finishIfOver(result.events)
+    }
+
+    private fun submitAction(message: JSONObject, from: EntityId) {
+        val current = state ?: return
+        if (mulliganPhase) { sendError(from, "Choose your opening hand first."); return }
+        val epoch = message.optString("interactionEpoch")
+        if (epoch.startsWith("offline-") && epoch != interactiveEpochs[from]) { sendError(from, "The game moved on before that arrived. Nothing was done; try again."); return }
+        shockOffers.firstOrNull()?.let { offer ->
+            if (offer.player != from) { sendError(from, "Waiting for your opponent to answer a question."); return }
+            val raw = message.getJSONObject("action")
+            val response = raw.optJSONObject("response")
+            if (raw.optString("type") != "SubmitDecision" || response?.optString("decisionId") != shockId(offer)) { sendError(from, "Answer the shock land question first."); sendStateFor(from, emptyList(), true); return }
+            answerShock(offer, response.optBoolean("choice"))
+            return
+        }
+        val action = json.decodeFromString(GameAction.serializer(), message.getJSONObject("action").toString())
+        if (action.playerId != from) { sendError(from, "That action belongs to another seat."); return }
+        val events = mutableListOf<GameEvent>()
+        var processed = processor.process(current, action)
+        if (processed.result.error != null && needsMana(processed.result.error!!)) {
+            // Argentum's auto-pay never sacrifices Treasures; offline, Arcana does it for you.
+            payWithSacrificeSources(current, action, from)?.let { (paid, paidEvents) ->
+                events += paidEvents
+                processed = processor.process(paid, action)
+            }
+        }
+        val result = processed.result
+        if (result.error != null) { sendError(from, friendlyError(result.error!!)); sendStateFor(from, emptyList(), true); return }
+        clearOthersCheckpoint(action, from)
+        applyUndoPolicy(processed.undoPolicy, action, current, from)
+        state = result.state
+        events += result.events
+        queueShockOffers(events)
+        drive(events)
+        sendState(events)
     }
 
     private fun startGame() {
@@ -203,20 +240,23 @@ class LocalArgentumHost(
             format = if (human.commander != null && opponent.commander != null) Format.Commander() else Format.Standard,
         )
         val result = initializer.initializeGame(config)
-        ai = AIPlayer.create(registry, aiId)
+        ai = if (isWifi) null else AIPlayer.create(registry, aiId)
         state = result.state
-        gameLog.clear()
-        emit(JSONObject().put("type", "quickGameLobbyState").put("lobbyId", "offline").put("youPlayerId", humanId.value).put("vsAi", true)
-            .put("players", org.json.JSONArray().put(JSONObject().put("playerId", humanId.value).put("name", human.name)).put(JSONObject().put("playerId", aiId.value).put("name", opponent.name))))
-        emit(JSONObject().put("type", "gameStarted").put("players", org.json.JSONArray()
-            .put(JSONObject().put("playerId", humanId.value).put("isYou", true))
-            .put(JSONObject().put("playerId", aiId.value).put("isYou", false))))
+        gameLogs.clear()
+        legalCache.clear()
+        for (seat in people()) {
+            emitTo(seat, JSONObject().put("type", "quickGameLobbyState").put("lobbyId", "offline").put("youPlayerId", seat.value).put("vsAi", !isWifi)
+                .put("players", org.json.JSONArray().put(JSONObject().put("playerId", humanId.value).put("name", human.name)).put(JSONObject().put("playerId", aiId.value).put("name", opponent.name))))
+            emitTo(seat, JSONObject().put("type", "gameStarted").put("players", org.json.JSONArray()
+                .put(JSONObject().put("playerId", humanId.value).put("isYou", seat == humanId))
+                .put(JSONObject().put("playerId", aiId.value).put("isYou", seat == aiId))))
+        }
         undoCheckpoint = null
         preCombatCheckpoint = null
-        // The AI settles its opening hand first; then you get yours, as on the server.
+        // The AI settles its opening hand first; then each person gets theirs, as on the server.
         mulliganPhase = true
-        aiMulligans()
-        if (mulliganDone(humanId)) finishMulligans() else sendMulliganDecision()
+        if (!isWifi) aiMulligans()
+        if (people().all(::mulliganDone)) finishMulligans() else people().filterNot(::mulliganDone).forEach(::sendMulliganDecision)
     }
 
     // ---- Mulligans (London) ----------------------------------------------------------------------
@@ -251,28 +291,30 @@ class LocalArgentumHost(
 
     private fun mulliganAction(action: GameAction) {
         val current = state ?: return
-        if (!mulliganPhase) { sendError("The opening hands are already settled."); return }
+        val seat = action.playerId
+        if (!mulliganPhase || mulliganDone(seat)) { sendError(seat, if (mulliganPhase) "Waiting for your opponent to keep their hand." else "The opening hands are already settled."); return }
         val result = processor.process(current, action).result
-        if (result.error != null) { sendError(result.error!!); return }
+        if (result.error != null) { sendError(seat, result.error!!); return }
         state = result.state
-        val mull = mulliganState(humanId)
+        val mull = mulliganState(seat)
         when {
-            mulliganDone(humanId) -> finishMulligans()
-            mull != null && mull.hasKept -> sendBottomCards(mull.cardsToBottom)
-            else -> sendMulliganDecision()
+            people().all(::mulliganDone) -> finishMulligans()
+            mulliganDone(seat) -> Unit // kept; waiting for the other person
+            mull != null && mull.hasKept -> sendBottomCards(seat, mull.cardsToBottom)
+            else -> sendMulliganDecision(seat)
         }
     }
 
     private fun finishMulligans() {
         mulliganPhase = false
-        emit(JSONObject().put("type", "mulliganComplete").put("finalHandSize", state?.getHand(humanId)?.size ?: 7))
+        for (seat in people()) emitTo(seat, JSONObject().put("type", "mulliganComplete").put("finalHandSize", state?.getHand(seat)?.size ?: 7))
         val events = mutableListOf<GameEvent>()
         drive(events)
         sendState(events)
     }
 
-    private fun handCards(current: GameState): Pair<org.json.JSONArray, JSONObject> {
-        val hand = current.getHand(humanId)
+    private fun handCards(current: GameState, seat: EntityId): Pair<org.json.JSONArray, JSONObject> {
+        val hand = current.getHand(seat)
         val cards = JSONObject()
         hand.forEach { id ->
             val card = current.getEntity(id)?.get<CardComponent>() ?: return@forEach
@@ -285,19 +327,19 @@ class LocalArgentumHost(
         return org.json.JSONArray(hand.map { it.value }) to cards
     }
 
-    private fun sendMulliganDecision() {
+    private fun sendMulliganDecision(seat: EntityId) {
         val current = state ?: return
-        val mull = mulliganState(humanId)
-        val (hand, cards) = handCards(current)
-        emit(JSONObject().put("type", "mulliganDecision").put("hand", hand).put("cards", cards)
+        val mull = mulliganState(seat)
+        val (hand, cards) = handCards(current, seat)
+        emitTo(seat, JSONObject().put("type", "mulliganDecision").put("hand", hand).put("cards", cards)
             .put("mulliganCount", mull?.mulligansTaken ?: 0).put("cardsToPutOnBottom", mull?.cardsToBottom ?: 0)
-            .put("isOnThePlay", current.activePlayerId == humanId))
+            .put("isOnThePlay", current.activePlayerId == seat))
     }
 
-    private fun sendBottomCards(count: Int) {
+    private fun sendBottomCards(seat: EntityId, count: Int) {
         val current = state ?: return
-        val (hand, cards) = handCards(current)
-        emit(JSONObject().put("type", "chooseBottomCards").put("hand", hand).put("cards", cards).put("cardsToPutOnBottom", count))
+        val (hand, cards) = handCards(current, seat)
+        emitTo(seat, JSONObject().put("type", "chooseBottomCards").put("hand", hand).put("cards", cards).put("cardsToPutOnBottom", count))
     }
 
     // ---- Paying with Treasures ---------------------------------------------------------------
@@ -308,20 +350,20 @@ class LocalArgentumHost(
         if (needsMana(error)) "Not enough mana for that, even counting Treasures and other sacrifice-for-mana cards." else error
 
     /**
-     * Sacrifices the player's Treasure-style mana sources ("{T}, Sacrifice: add one mana"), one at a
+     * Sacrifices [player]'s Treasure-style mana sources ("{T}, Sacrifice: add one mana"), one at a
      * time, until [action] can be paid, and returns the state with that mana floating. Each one tries
      * every colour it can make and keeps the first that lets the action through; otherwise it adds a
      * colour the cost asks for and moves on to the next source. Null when it still can't be paid.
      */
-    private fun payWithSacrificeSources(start: GameState, action: GameAction): Pair<GameState, List<GameEvent>>? {
+    private fun payWithSacrificeSources(start: GameState, action: GameAction, player: EntityId): Pair<GameState, List<GameEvent>>? {
         if (action !is CastSpell && action !is ActivateAbility) return null
         if (action is CastSpell && action.paymentStrategy != PaymentStrategy.AutoPay) return null
         if (action is ActivateAbility && action.paymentStrategy != PaymentStrategy.AutoPay) return null
         // Find the sources and their mana abilities once (the full legal-action list is slow on a big
         // board), then sacrifice them in turn. A source whose ability no longer works is skipped.
-        val sacrificial = services.manaSolver.findAvailableManaSources(start, humanId).filter { it.requiresSacrifice }.map { it.entityId }.toSet()
+        val sacrificial = services.manaSolver.findAvailableManaSources(start, player).filter { it.requiresSacrifice }.map { it.entityId }.toSet()
         if (sacrificial.isEmpty()) return null
-        val options = enumerator.enumerate(start, humanId)
+        val options = enumerator.enumerate(start, player)
             .filter { it.isManaAbility && (it.action as? ActivateAbility)?.sourceId in sacrificial }
             .distinctBy { (it.action as ActivateAbility).sourceId }
             .take(MAX_SACRIFICE_SOURCES)
@@ -357,11 +399,13 @@ class LocalArgentumHost(
 
     // ---- Undo (Argentum GameSession's checkpoint policy) -------------------------------------
 
-    private fun applyUndoPolicy(policy: UndoCheckpointAction, action: GameAction, before: GameState) {
-        val here = Checkpoint(before, gameLog.size)
+    private fun logSizes(): Map<EntityId, Int> = people().associateWith { logFor(it).size }
+
+    private fun applyUndoPolicy(policy: UndoCheckpointAction, action: GameAction, before: GameState, actor: EntityId) {
+        val here = Checkpoint(before, logSizes(), actor)
         when (policy) {
             UndoCheckpointAction.SET_CHECKPOINT ->
-                undoCheckpoint = if (action is DeclareAttackers && preCombatCheckpoint != null) preCombatCheckpoint else here
+                undoCheckpoint = if (action is DeclareAttackers && preCombatCheckpoint?.owner == actor) preCombatCheckpoint else here
             UndoCheckpointAction.SET_PRECOMBAT_CHECKPOINT -> { preCombatCheckpoint = here; undoCheckpoint = here }
             UndoCheckpointAction.SET_IF_NO_EXISTING_CHECKPOINT -> if (undoCheckpoint == null) undoCheckpoint = here
             UndoCheckpointAction.PRESERVE -> Unit
@@ -369,13 +413,20 @@ class LocalArgentumHost(
         }
     }
 
-    private fun undoAvailable(): Boolean = undoCheckpoint?.state?.priorityPlayerId == humanId
+    /** As on the server: the opponent acting on what they saw ends your chance to take it back; their passes don't. */
+    private fun clearOthersCheckpoint(action: GameAction, actor: EntityId) {
+        if (action is PassPriority) return
+        if (undoCheckpoint?.owner != actor) undoCheckpoint = null
+        if (preCombatCheckpoint?.owner != actor) preCombatCheckpoint = null
+    }
 
-    private fun undo() {
+    private fun undoAvailable(seat: EntityId): Boolean = undoCheckpoint?.let { it.owner == seat && it.state.priorityPlayerId == seat } == true
+
+    private fun undo(seat: EntityId) {
         val checkpoint = undoCheckpoint
-        if (checkpoint == null || !undoAvailable()) { sendError("There's nothing to undo right now."); return }
+        if (checkpoint == null || !undoAvailable(seat)) { sendError(seat, "There's nothing to undo right now."); return }
         state = checkpoint.state
-        while (gameLog.size > checkpoint.logSize) gameLog.removeAt(gameLog.size - 1)
+        checkpoint.logSizes.forEach { (who, size) -> val log = logFor(who); while (log.size > size) log.removeAt(log.size - 1) }
         undoCheckpoint = null
         preCombatCheckpoint = null
         sendState(emptyList())
@@ -388,7 +439,7 @@ class LocalArgentumHost(
     )
 
     /**
-     * Plays the AI and Argentum's auto-pass until the human must act or the game ends. Whenever the
+     * Plays the AI and Argentum's auto-pass until a person must act or the game ends. Whenever the
      * AI does something or the game moves to a new step, the table gets that state ([flush]), so
      * the AI's turn and your auto-passed combat steps play out instead of being skipped.
      */
@@ -408,25 +459,28 @@ class LocalArgentumHost(
             if ((current.turnNumber to current.step) != lastShown) flush(paceMs / 3)
             val decision = current.pendingDecision
             if (decision != null) {
-                if (current.actorFor(decision.playerId) == humanId) break
-                if (!apply(SubmitDecision(decision.playerId, ai.respondToDecision(current, decision)), events, byAi = true)) break
+                val actor = current.actorFor(decision.playerId)
+                if (isPerson(actor)) break
+                val bot = ai ?: break
+                if (!apply(SubmitDecision(decision.playerId, bot.respondToDecision(current, decision)), events, aiId)) break
                 flush(paceMs)
                 continue
             }
             val priority = current.priorityPlayerId ?: break
-            if (priority == aiId) {
-                val chosen = ai.chooseAction(current)
-                val acted = apply(chosen, events, byAi = true) || apply(safePass(current, aiId), events, byAi = true)
+            if (!isPerson(priority)) {
+                val bot = ai ?: break
+                val chosen = bot.chooseAction(current)
+                val acted = apply(chosen, events, aiId) || apply(safePass(current, aiId), events, aiId)
                 if (!acted) break
                 if (chosen !is PassPriority) flush(paceMs)
                 continue
             }
-            // Human priority: pass automatically where Argentum's server would.
-            val legal = withoutManaLike(legalActions(current))
-            val quietPass = quietOpponentTurns && !current.isActiveTurnFor(priority) && current.stack.isNotEmpty() &&
-                legal.none { it.actionType == "DeclareBlockers" } && !stackTargetsYou(current)
+            // A person's priority: pass automatically where Argentum's server would.
+            val legal = withoutManaLike(legalActions(current, priority))
+            val quietPass = priority == humanId && quietOpponentTurns && !current.isActiveTurnFor(priority) && current.stack.isNotEmpty() &&
+                legal.none { it.actionType == "DeclareBlockers" } && !stackTargetsYou(current, priority)
             if (!quietPass && !autoPass.shouldAutoPass(current, priority, legal)) break
-            if (!apply(safePass(current, priority), events)) break
+            if (!apply(safePass(current, priority), events, priority)) break
         }
     }
 
@@ -438,28 +492,26 @@ class LocalArgentumHost(
         else -> PassPriority(player)
     }
 
-    private fun apply(action: GameAction, events: MutableList<GameEvent>, byAi: Boolean = false): Boolean {
+    private fun apply(action: GameAction, events: MutableList<GameEvent>, actor: EntityId): Boolean {
         val current = state ?: return false
         val processed = processor.process(current, action)
         val result = processed.result
         if (result.error != null) return false
-        // As on the server: the opponent acting on what they saw ends your chance to take it back;
-        // their passes don't.
-        if (byAi) { if (action !is PassPriority) { undoCheckpoint = null; preCombatCheckpoint = null } }
-        else applyUndoPolicy(processed.undoPolicy, action, current)
+        clearOthersCheckpoint(action, actor)
+        if (isPerson(actor)) applyUndoPolicy(processed.undoPolicy, action, current, actor)
         state = result.state
         events += result.events
         queueShockOffers(result.events)
         return true
     }
 
-    private fun stackTargetsYou(state: GameState): Boolean = state.stack.any { item ->
+    private fun stackTargetsYou(state: GameState, player: EntityId): Boolean = state.stack.any { item ->
         state.getEntity(item)?.get<com.wingedsheep.engine.state.components.stack.TargetsComponent>()?.targets.orEmpty().any { t ->
             when (t) {
-                is com.wingedsheep.engine.state.components.stack.ChosenTarget.Player -> t.playerId == humanId
+                is com.wingedsheep.engine.state.components.stack.ChosenTarget.Player -> t.playerId == player
                 is com.wingedsheep.engine.state.components.stack.ChosenTarget.Permanent ->
-                    state.getEntity(t.entityId)?.get<com.wingedsheep.engine.state.components.identity.ControllerComponent>()?.playerId == humanId
-                is com.wingedsheep.engine.state.components.stack.ChosenTarget.Card -> t.ownerId == humanId
+                    state.getEntity(t.entityId)?.get<com.wingedsheep.engine.state.components.identity.ControllerComponent>()?.playerId == player
+                is com.wingedsheep.engine.state.components.stack.ChosenTarget.Card -> t.ownerId == player
                 else -> false
             }
         }
@@ -470,19 +522,19 @@ class LocalArgentumHost(
     private fun queueShockOffers(events: List<GameEvent>) {
         val current = state ?: return
         events.filterIsInstance<ZoneChangeEvent>()
-            .filter { it.toZone == Zone.BATTLEFIELD && it.fromZone != Zone.HAND && it.fromZone != Zone.STACK && it.ownerId == humanId }
+            .filter { it.toZone == Zone.BATTLEFIELD && it.fromZone != Zone.HAND && it.fromZone != Zone.STACK && isPerson(it.ownerId) }
             .forEach { event ->
                 val entity = current.getEntity(event.entityId) ?: return@forEach
                 if (entity.get<TappedComponent>() == null) return@forEach
                 val card = entity.get<CardComponent>() ?: return@forEach
                 val cost = registry.getCard(card.cardDefinitionId)?.script?.replacementEffects
                     ?.filterIsInstance<EntersTapped>()?.firstOrNull()?.payLifeCost ?: return@forEach
-                if (shockOffers.none { it.land == event.entityId }) shockOffers.addLast(ShockOffer(event.entityId, card.name, cost))
+                if (shockOffers.none { it.land == event.entityId }) shockOffers.addLast(ShockOffer(event.entityId, card.name, cost, event.ownerId))
             }
     }
 
     private fun shockDecision(offer: ShockOffer) = YesNoDecision(
-        id = shockId(offer), playerId = humanId,
+        id = shockId(offer), playerId = offer.player,
         prompt = "Pay ${offer.life} life to have ${offer.name} enter untapped?",
         context = DecisionContext(sourceId = offer.land, sourceName = offer.name),
         yesText = "Pay ${offer.life} life", noText = "Leave it tapped",
@@ -491,28 +543,28 @@ class LocalArgentumHost(
     private fun answerShock(offer: ShockOffer, pay: Boolean) {
         shockOffers.removeFirst()
         val current = state ?: return
-        val life = current.getEntity(humanId)?.get<LifeTotalComponent>()?.life
+        val life = current.getEntity(offer.player)?.get<LifeTotalComponent>()?.life
         if (pay && life != null && current.getEntity(offer.land)?.get<TappedComponent>() != null) {
             state = current.updateEntity(offer.land) { it.without<TappedComponent>() }
-                .updateEntity(humanId) { it.with(LifeTotalComponent(life - offer.life)) }
+                .updateEntity(offer.player) { it.with(LifeTotalComponent(life - offer.life)) }
         }
         val events = mutableListOf<GameEvent>()
         drive(events)
         sendState(events)
     }
 
-    private fun legalActions(state: GameState): List<LegalActionInfo> {
-        legalCache?.let { (cached, legal) -> if (cached === state) return legal }
-        return computeLegalActions(state).also { legalCache = state to it }
+    private fun legalActions(state: GameState, player: EntityId): List<LegalActionInfo> {
+        legalCache[player]?.let { (cached, legal) -> if (cached === state) return legal }
+        return computeLegalActions(state, player).also { legalCache[player] = state to it }
     }
 
-    private fun computeLegalActions(state: GameState): List<LegalActionInfo> {
+    private fun computeLegalActions(state: GameState, player: EntityId): List<LegalActionInfo> {
         (state.pendingDecision as? PlayCardDecision)?.let { play ->
-            if (state.actorFor(play.playerId) != humanId) return emptyList()
+            if (state.actorFor(play.playerId) != player) return emptyList()
             return enricher.enrich(enumerator.enumerate(state, play.playerId), state, play.playerId)
         }
-        if (state.pendingDecision != null || state.priorityPlayerId != humanId) return emptyList()
-        return enricher.enrich(enumerator.enumerate(state, humanId), state, humanId)
+        if (state.pendingDecision != null || state.priorityPlayerId != player) return emptyList()
+        return enricher.enrich(enumerator.enumerate(state, player), state, player)
     }
 
     /**
@@ -520,11 +572,11 @@ class LocalArgentumHost(
      * and send it back as "maxXRefined". Done only on request, never on every update: it can mean
      * dozens of trial payments on a big board.
      */
-    private fun refineMaxX(cardId: String) {
+    private fun refineMaxX(cardId: String, seat: EntityId) {
         val current = state
-        val info = current?.let { legalActions(it) }?.firstOrNull { (it.action as? CastSpell)?.cardId?.value == cardId && it.hasXCost }
-        val refined = if (current != null && info != null) trueMaxX(current, info).maxAffordableX else null
-        emit(JSONObject().put("type", "maxXRefined").put("cardId", cardId).put("maxX", refined ?: JSONObject.NULL).put("stateVersion", version))
+        val info = current?.let { legalActions(it, seat) }?.firstOrNull { (it.action as? CastSpell)?.cardId?.value == cardId && it.hasXCost }
+        val refined = if (current != null && info != null) trueMaxX(current, info, seat).maxAffordableX else null
+        emitTo(seat, JSONObject().put("type", "maxXRefined").put("cardId", cardId).put("maxX", refined ?: JSONObject.NULL).put("stateVersion", version))
     }
 
     /**
@@ -532,46 +584,57 @@ class LocalArgentumHost(
      * For untargeted X spells, step down from its number to the first X that actually works, so the
      * X picker's default never fails.
      */
-    private fun trueMaxX(state: GameState, info: LegalActionInfo): LegalActionInfo {
+    private fun trueMaxX(state: GameState, info: LegalActionInfo, seat: EntityId): LegalActionInfo {
         val cast = info.action as? CastSpell ?: return info
         val max = info.maxAffordableX ?: return info
         if (!info.hasXCost || info.requiresTargets || max <= info.minX) return info
         for (x in max downTo maxOf(info.minX, max - 3)) {
             val attempt = cast.copy(xValue = x)
             if (processor.process(state, attempt).result.error == null) return if (x == max) info else info.copy(maxAffordableX = x)
-            val paid = payWithSacrificeSources(state, attempt) ?: continue
+            val paid = payWithSacrificeSources(state, attempt, seat) ?: continue
             if (processor.process(paid.first, attempt).result.error == null) return if (x == max) info else info.copy(maxAffordableX = x)
         }
         return info
     }
 
+    private fun gameOverMessage(current: GameState, seat: EntityId) = JSONObject().put("type", "gameOver")
+        .put("winnerId", (current.winnerId?.value as Any?) ?: JSONObject.NULL)
+        .put("reason", if (current.winnerId == seat) "OPPONENT_LOST" else if (current.winnerId == null) "DRAW" else "YOU_LOST")
+
     private fun finishIfOver(events: List<GameEvent>) {
         sendState(events)
         val current = state ?: return
-        if (current.gameOver) emit(JSONObject().put("type", "gameOver")
-            .put("winnerId", (current.winnerId?.value as Any?) ?: JSONObject.NULL)
-            .put("reason", if (current.winnerId == humanId) "OPPONENT_LOST" else if (current.winnerId == null) "DRAW" else "YOU_LOST"))
+        if (current.gameOver && events.isEmpty()) people().forEach { emitTo(it, gameOverMessage(current, it)) }
     }
 
-    private fun sendError(text: String) = emit(JSONObject().put("type", "error").put("code", "INVALID_ACTION").put("message", text))
+    private fun sendError(seat: EntityId, text: String) = emitTo(seat, JSONObject().put("type", "error").put("code", "INVALID_ACTION").put("message", text))
+
+    /** Sends every person their own view of the game. */
+    private fun sendState(events: List<GameEvent>, interactive: Boolean = true) {
+        for (seat in people()) sendStateFor(seat, events, interactive)
+    }
 
     /**
-     * Sends the human's view of the game. [interactive] = false is a progress update sent while the
+     * Sends [seat]'s view of the game. [interactive] = false is a progress update sent while the
      * AI or auto-pass is still playing: no legal actions or prompts, like the server's in-between
      * updates, so nothing on the table can be tapped against a state that's already moving on.
      */
-    private fun sendState(events: List<GameEvent>, interactive: Boolean = true) {
+    private fun sendStateFor(seat: EntityId, events: List<GameEvent>, interactive: Boolean) {
         val current = state ?: return
-        val clientEvents = ClientEventTransformer.transform(events, humanId, current, visibility)
-        gameLog += clientEvents.filter { it !is ClientEvent.PermanentTapped && it !is ClientEvent.PermanentUntapped && it !is ClientEvent.ManaAdded }
-        val clientState: ClientGameState = transformer.transform(current, humanId).copy(gameLog = gameLog.toList())
-        val offer = shockOffers.firstOrNull()?.takeIf { interactive }
-        val legal = if (interactive && offer == null) legalActions(current) else emptyList()
-        val decision: PendingDecision? = if (!interactive) null else offer?.let(::shockDecision)
-            ?: current.pendingDecision?.takeIf { current.actorFor(it.playerId) == humanId }?.let { masker.maskFor(it, current, humanId) }
-        val nextStop = if (interactive && offer == null && current.priorityPlayerId == humanId && current.pendingDecision == null) {
-            autoPass.getNextStopPoint(current, humanId, autoPass.getMeaningfulActions(withoutManaLike(legal)).isNotEmpty())
+        val clientEvents = ClientEventTransformer.transform(events, seat, current, visibility)
+        val log = logFor(seat)
+        log += clientEvents.filter { it !is ClientEvent.PermanentTapped && it !is ClientEvent.PermanentUntapped && it !is ClientEvent.ManaAdded }
+        val clientState: ClientGameState = transformer.transform(current, seat).copy(gameLog = log.toList())
+        val offer = shockOffers.firstOrNull()?.takeIf { interactive && it.player == seat }
+        val blockedByOtherOffer = shockOffers.isNotEmpty() && offer == null
+        val legal = if (interactive && offer == null && !blockedByOtherOffer) legalActions(current, seat) else emptyList()
+        val decision: PendingDecision? = if (!interactive || blockedByOtherOffer) null else offer?.let(::shockDecision)
+            ?: current.pendingDecision?.takeIf { current.actorFor(it.playerId) == seat }?.let { masker.maskFor(it, current, seat) }
+        val nextStop = if (interactive && offer == null && current.priorityPlayerId == seat && current.pendingDecision == null) {
+            autoPass.getNextStopPoint(current, seat, autoPass.getMeaningfulActions(withoutManaLike(legal)).isNotEmpty())
         } else null
+        val stateVersion = ++version
+        if (interactive) interactiveEpochs[seat] = "offline-$stateVersion"
         val message = buildJsonObject {
             put("type", "stateUpdate")
             put("state", json.encodeToJsonElement(ClientGameState.serializer(), clientState))
@@ -579,22 +642,21 @@ class LocalArgentumHost(
             put("legalActions", json.encodeToJsonElement(ListSerializer(LegalActionInfo.serializer()), legal))
             put("pendingDecision", decision?.let { json.encodeToJsonElement(PendingDecision.serializer(), it) } ?: JsonNull)
             put("nextStopPoint", nextStop?.let { JsonPrimitive(it) } ?: JsonNull)
-            put("undoAvailable", interactive && undoAvailable())
+            put("undoAvailable", interactive && undoAvailable(seat))
             put("priorityMode", "auto")
-            put("stateVersion", ++version)
-            if (interactive) interactiveEpoch = "offline-$version"
+            put("stateVersion", stateVersion)
             put("engineMs", (System.nanoTime() - handleStartNanos) / 1_000_000)
-            put("interactionEpoch", interactiveEpoch)
+            put("interactionEpoch", interactiveEpochs[seat] ?: "offline-0")
         }
-        emit(JSONObject(message.toString()))
-        if (current.gameOver && events.isNotEmpty()) emit(JSONObject().put("type", "gameOver")
-            .put("winnerId", (current.winnerId?.value as Any?) ?: JSONObject.NULL)
-            .put("reason", if (current.winnerId == humanId) "OPPONENT_LOST" else if (current.winnerId == null) "DRAW" else "YOU_LOST"))
+        emitTo(seat, JSONObject(message.toString()))
+        if (current.gameOver && events.isNotEmpty()) emitTo(seat, gameOverMessage(current, seat))
     }
 
     companion object {
         val HUMAN_ID = EntityId("offline-you")
         val AI_ID = EntityId("offline-ai")
+        /** Wi-Fi: the guest sits in the second seat. */
+        val GUEST_ID: EntityId get() = AI_ID
         private const val MAX_SACRIFICE_SOURCES = 40
     }
 }
