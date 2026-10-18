@@ -266,8 +266,9 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
         delay(if (isYou) 1400 else 900)
         turnBanner = null
     }
-    LaunchedEffect(playBanner?.key) { if (playBanner != null) { delay(2200); playBanner = null } }
-    LaunchedEffect(recapText) { if (recapText != null) { delay(6500); recapText = null } }
+    // One "Notice time" setting (Adjust UI) for banners, the played-card pop-up and the recap (twice as long: more to read).
+    LaunchedEffect(playBanner?.key) { if (playBanner != null) { delay((playedPopupSeconds * 1000).toLong()); playBanner = null } }
+    LaunchedEffect(recapText) { if (recapText != null) { delay((playedPopupSeconds * 2000).toLong().coerceAtLeast(4000)); recapText = null } }
     LaunchedEffect(argentumLastError) {
         // Socket-level problems (unreadable messages, failed connects) reach the searchable log too.
         argentumLastError?.let { recordDiagnostic("Argentum problem: $it", DiagnosticCategory.ERROR) }

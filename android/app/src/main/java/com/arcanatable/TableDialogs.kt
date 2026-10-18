@@ -2065,6 +2065,8 @@ internal fun ChangelogDialog(onDismiss: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILDS 100–102 · WI-FI AND SPEED", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Wi-Fi with a friend: PLAY → Wi-Fi with a friend. One phone hosts, the other joins (Commander decks).\n• Offline games stay fast on big boards; the bar says ENGINE THINKING… while the engine works.\n• Counters show as small badges (+1/+1 ×8); only creatures show power/toughness.\n• One Notice time setting in Adjust UI for banners, pop-ups and the recap. Triggered abilities go in the game log. Your tab comes right after TABLE.", color = SoftWhite, fontSize = 13.sp)
                 Text("BUILD 99 · ADJUST UI", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• New Adjust UI screen: choose your Quick Actions, and switch the card pop-up, recent plays, banners, recap, turn banner, buzz and card stacking on or off. Pop-up time and combat card size sliders.\n• Options regrouped. New: skip AI actions unless they affect you.\n• Recent-plays strip folds away. Fetched shock lands ask to pay life (offline). X never offers more than you can pay.", color = SoftWhite, fontSize = 13.sp)
 

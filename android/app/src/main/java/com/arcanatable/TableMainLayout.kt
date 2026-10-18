@@ -153,7 +153,9 @@ internal fun TableController.TableMainLayout() {
         val seatTabs: @Composable (Modifier) -> Unit = { rowModifier ->
             Row(rowModifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Box(Modifier) { ViewChip("TABLE", selected = showOverview, compact = compactArgentumTable, onClick = { run { showOverview = true; showHand = false } }) }
-                players.forEachIndexed { index, player ->
+                // Your own tab always comes right after TABLE, then everyone else in seat order.
+                val tabOrder = players.indices.sortedBy { if (it == localSeat) -1 else it }
+                tabOrder.forEach { index -> val player = players[index]
                     Box(Modifier.testTag(if (onlineMode && index == localSeat) "player-tab-you" else "player-tab-$index")) {
                         val snap = argentumSnapshot
                         if (compactArgentumTable && snap != null) ArgentumSeatTab(

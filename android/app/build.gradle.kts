@@ -17,8 +17,8 @@ android {
         applicationId = "com.arcanatable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 101
-        versionName = "0.25.0-wifi"
+        versionCode = 102
+        versionName = "0.26.0-wifi"
         manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build 99"
     }
 

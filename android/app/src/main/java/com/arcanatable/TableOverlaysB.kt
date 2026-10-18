@@ -852,19 +852,19 @@ internal fun TableController.TableOverlaysB() {
         turnBuzz = buzzOnTurn, onTurnBuzz = { v -> buzzOnTurn = v; optionPrefs.edit().putBoolean("adjust_turn_buzz", v).apply() },
         stackCards = stackSameCards, onStackCards = { v -> stackSameCards = v; optionPrefs.edit().putBoolean("adjust_stack_cards", v).apply() },
         respondGlow = respondGlow, onRespondGlow = { v -> respondGlow = v; optionPrefs.edit().putBoolean("adjust_respond_glow", v).apply() },
-        popupSeconds = playedPopupSeconds, onPopupSeconds = { v -> playedPopupSeconds = v.coerceIn(1f, 3f); optionPrefs.edit().putFloat("adjust_popup_seconds", playedPopupSeconds).apply() },
+        popupSeconds = playedPopupSeconds, onPopupSeconds = { v -> playedPopupSeconds = v.coerceIn(1f, 8f); optionPrefs.edit().putFloat("adjust_notice_seconds", playedPopupSeconds).apply() },
         combatSize = combatCardScale, onCombatSize = { v -> combatCardScale = v.coerceIn(.65f, 1.35f); optionPrefs.edit().putFloat("adjust_combat_card_scale", combatCardScale).apply() },
         onReset = {
             cardSizeScale = 1f; boardSpacingScale = 1f; handSheetHeightFraction = .52f; footerButtonScale = 1f; handCardScale = 1f; handArrangement = HandArrangement.AUTO_FIT
             quickActionOrderRaw = defaultQuickActionOrder
             showPlayedPopup = true; showRecentPlays = true; showAbilityBanners = true; showAiRecap = true; showTurnBanner = true; buzzOnTurn = true; stackSameCards = true; respondGlow = true
-            playedPopupSeconds = 1.5f; combatCardScale = 1f
+            playedPopupSeconds = 4f; combatCardScale = 1f
             optionPrefs.edit().putFloat("card_size_scale", 1f).putFloat("layout_card_size_$layoutOrientationSuffix", 1f).putFloat("layout_board_spacing_$layoutOrientationSuffix", 1f)
                 .putFloat("hand_sheet_height_fraction", .52f).putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", .52f).putFloat("layout_hand_card_scale_$layoutOrientationSuffix", 1f)
                 .putFloat("layout_footer_button_scale_$layoutOrientationSuffix", 1f)
                 .putString("layout_hand_arrangement_$layoutOrientationSuffix", HandArrangement.AUTO_FIT.name).putString("layout_quick_actions_$layoutOrientationSuffix", defaultQuickActionOrder)
                 .putBoolean("adjust_play_popup", true).putBoolean("adjust_recent_plays", true).putBoolean("adjust_ability_banners", true).putBoolean("adjust_ai_recap", true)
-                .putBoolean("adjust_turn_banner", true).putBoolean("adjust_turn_buzz", true).putBoolean("adjust_stack_cards", true).putBoolean("adjust_respond_glow", true).putFloat("adjust_popup_seconds", 1.5f).putFloat("adjust_combat_card_scale", 1f).apply()
+                .putBoolean("adjust_turn_banner", true).putBoolean("adjust_turn_buzz", true).putBoolean("adjust_stack_cards", true).putBoolean("adjust_respond_glow", true).putFloat("adjust_notice_seconds", 4f).putFloat("adjust_combat_card_scale", 1f).apply()
         },
         onDismiss = { layoutLabOpen = false; optionsOpen = true }
     )

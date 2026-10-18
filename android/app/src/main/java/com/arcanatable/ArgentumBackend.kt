@@ -213,8 +213,12 @@ data class ArgentumTableSnapshot(
                         .firstOrNull() ?: Color(0xFFB8C4BE)
                     val countersJson = card.optJSONObject("counters") ?: JSONObject()
                     val counters = buildMap {
-                        countersJson.keys().forEach { keyName -> put(keyName, countersJson.optInt(keyName)) }
+                        countersJson.keys().forEach { keyName -> put(counterLabel(keyName), countersJson.optInt(keyName)) }
                     }
+                    // Only creatures show power/toughness (a non-creature with stats, like an uncrewed Vehicle, doesn't).
+                    fun JSONArray?.names() = (0 until (this?.length() ?: 0)).map { this!!.optString(it) }
+                    val creatureNow = (card.optJSONArray("cardTypes").names() + card.optJSONArray("grantedCardTypes").names()).any { it.equals("CREATURE", true) } ||
+                        typeLine.contains("Creature", ignoreCase = true)
                     output += GameCard(
                         id = cardId(rawId),
                         name = card.optString("name", "Card"),
@@ -229,8 +233,8 @@ data class ArgentumTableSnapshot(
                         manaValue = card.optDouble("manaValue").takeIf { card.has("manaValue") },
                         artCropUrl = card.optString("imageUri").takeUnless { it.isBlank() || it == "null" },
                         manaCost = card.optString("manaCost").takeUnless { it.isBlank() || it == "null" },
-                        power = card.opt("power")?.toString()?.takeUnless { it == "null" },
-                        toughness = card.opt("toughness")?.toString()?.takeUnless { it == "null" },
+                        power = card.opt("power")?.toString()?.takeUnless { it == "null" || !creatureNow },
+                        toughness = card.opt("toughness")?.toString()?.takeUnless { it == "null" || !creatureNow },
                         keywords = card.optJSONArray("keywords")?.let { values ->
                             (0 until values.length()).map { values.optString(it) }.filter(String::isNotBlank)
                         }.orEmpty(),
@@ -712,3 +716,17 @@ class ArgentumGameSocket(
     }
 }
 
+
+/** Argentum's counter names ("PLUS_ONE_PLUS_ONE", "LOYALTY") as players say them ("+1/+1", "Loyalty"). */
+internal fun counterLabel(raw: String): String = when (raw.uppercase()) {
+    "PLUS_ONE_PLUS_ONE" -> "+1/+1"
+    "MINUS_ONE_MINUS_ONE" -> "-1/-1"
+    "PLUS_ONE_PLUS_ZERO" -> "+1/+0"
+    "PLUS_ZERO_PLUS_ONE" -> "+0/+1"
+    "PLUS_ONE_PLUS_TWO" -> "+1/+2"
+    "PLUS_TWO_PLUS_TWO" -> "+2/+2"
+    "MINUS_ZERO_MINUS_ONE" -> "-0/-1"
+    "MINUS_ONE_MINUS_ZERO" -> "-1/-0"
+    "MINUS_TWO_MINUS_TWO" -> "-2/-2"
+    else -> if (raw.any { it == '_' } || raw == raw.uppercase()) raw.lowercase().split('_').filter { it.isNotBlank() }.joinToString(" ").replaceFirstChar { it.uppercase() } else raw
+}

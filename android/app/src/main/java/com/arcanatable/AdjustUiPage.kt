@@ -130,7 +130,7 @@ internal fun AdjustUiPage(
                     }
                     AdjustSection("GAME DISPLAY")
                     AdjustToggle("Show played card pop-up", "Show a card when the AI plays it.", popup, onPopup)
-                    if (popup) AdjustSlider("Pop-up time", popupSeconds, 1f..3f, { "${"%.1f".format(it)} sec" }, onPopupSeconds)
+                    AdjustSlider("Notice time", popupSeconds, 1f..8f, { "${"%.1f".format(it)} sec" }, onPopupSeconds)
                     AdjustToggle("Recent-plays strip", "Show or hide the strip of recent cards.", feed, onFeed)
                     AdjustToggle("Ability and trigger banners", "Show short notices when abilities happen.", banners, onBanners)
                     AdjustToggle("AI turn recap", "Summarize the AI's turn when yours begins.", recap, onRecap)

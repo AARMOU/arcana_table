@@ -668,8 +668,15 @@ internal fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: ()
         }
         if (card.isToken && !card.isFaceDown) Text("TOKEN", color = Color.White, fontSize = 7.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(if (zoom.enabled) Alignment.TopEnd else Alignment.TopStart).padding(4.dp).clip(RoundedCornerShape(4.dp)).background(Color(0xDD15221D)).padding(horizontal = 5.dp, vertical = 3.dp))
         val visibleCounters = card.counters.entries.filter { it.value > 0 }
-        val counterText = visibleCounters.take(2).joinToString("  ") { "${it.key} ${it.value}" } + if (visibleCounters.size > 2) "  +${visibleCounters.size - 2}" else ""
-        if (showCounters && counterText.isNotBlank()) Text(counterText, color = Ink, fontSize = 7.sp, fontWeight = FontWeight.Black, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(CounterGold).padding(horizontal = 4.dp, vertical = 4.dp))
+        // Counters: small corner badges ("+1/+1 ×8"), not a strip across the art.
+        if (showCounters && visibleCounters.isNotEmpty()) Column(Modifier.align(Alignment.BottomStart).padding(start = 3.dp, bottom = 3.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            visibleCounters.take(2).forEach { (name, amount) ->
+                Text(if (amount == 1) name else "$name ×$amount", color = Ink, fontSize = 8.sp, fontWeight = FontWeight.Black, maxLines = 1,
+                    modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(CounterGold).padding(horizontal = 4.dp, vertical = 1.dp))
+            }
+            if (visibleCounters.size > 2) Text("+${visibleCounters.size - 2} more", color = Ink, fontSize = 7.sp, fontWeight = FontWeight.Black, maxLines = 1,
+                modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(CounterGold).padding(horizontal = 4.dp, vertical = 1.dp))
+        }
         // Engine facts (Argentum games): combat role, summoning sickness, power/toughness with damage.
         if (card.summoningSick && !card.isFaceDown) Box(Modifier.matchParentSize().background(Color(0x55000000)))
         card.combatRole?.let { role ->
@@ -683,7 +690,7 @@ internal fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: ()
             val remaining = card.toughness.toIntOrNull()?.minus(card.damage)
             Text(if (card.damage > 0 && remaining != null) "${card.power}/$remaining" else "${card.power}/${card.toughness}",
                 color = if (card.damage > 0) Color(0xFFFFB4A8) else Color.White, fontSize = 9.sp, fontWeight = FontWeight.Black,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 3.dp, bottom = if (showCounters && counterText.isNotBlank()) 20.dp else 3.dp)
+                modifier = Modifier.align(Alignment.BottomEnd).padding(end = 3.dp, bottom = 3.dp)
                     .clip(RoundedCornerShape(4.dp)).background(Color(0xE6101615)).padding(horizontal = 4.dp, vertical = 2.dp))
         }
     }

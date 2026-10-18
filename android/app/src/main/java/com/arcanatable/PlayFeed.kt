@@ -67,6 +67,21 @@ data class TurnRecap(val plays: List<String> = emptyList(), val attackers: Int =
 object PlayFeedParser {
     private var counter = 0
 
+    /**
+     * One game-log line for an event: its own description, and for abilities (triggers especially,
+     * which often come with none) "Trigger · Source: what it does", so they reach the log, not only a banner.
+     */
+    fun logLine(e: JSONObject): String? {
+        val description = e.optString("description").takeIf { it.isNotBlank() && it != "null" }
+        val type = e.optString("type")
+        if (type != "abilityTriggered" && type != "abilityActivated") return description
+        val text = e.optString("abilityDescription").takeIf { it.isNotBlank() && it != "null" }
+        val source = e.optString("sourceName").takeIf { it.isNotBlank() && it != "null" }
+        if (text == null || (description != null && description.contains(text))) return description
+        val label = if (type == "abilityTriggered") "Trigger" else "Ability"
+        return listOfNotNull("$label · ${source ?: "Card"}: $text", description?.takeIf { it != source }).first()
+    }
+
     fun parse(events: JSONArray?, cards: JSONObject?): List<PlayedCard> {
         if (events == null) return emptyList()
         val out = mutableListOf<PlayedCard>()
@@ -129,7 +144,7 @@ object PlayFeedParser {
 fun BoxScope.PlayFeedOverlay(popup: PlayedCard?, feed: List<PlayedCard>, banner: PlayedCard?, recap: String?, onDismissPopup: () -> Unit, onPreview: (PlayedCard) -> Unit,
     feedOpen: Boolean = true, onToggleFeed: () -> Unit = {}, popupDurationSeconds: Float = 1.5f) {
     var holding by remember { mutableStateOf(false) }
-    LaunchedEffect(popup?.key, holding, popupDurationSeconds) { if (popup != null && !holding) { delay((popupDurationSeconds.coerceIn(1f, 3f) * 1000).toLong()); onDismissPopup() } }
+    LaunchedEffect(popup?.key, holding, popupDurationSeconds) { if (popup != null && !holding) { delay((popupDurationSeconds.coerceIn(1f, 8f) * 1000).toLong()); onDismissPopup() } }
     AnimatedVisibility(visible = popup != null, enter = fadeIn(tween(140)) + scaleIn(initialScale = 0.85f, animationSpec = tween(200)), exit = fadeOut(tween(250)),
         modifier = Modifier.align(Alignment.Center).testTag("played-card-popup")) {
         val shown = popup ?: return@AnimatedVisibility

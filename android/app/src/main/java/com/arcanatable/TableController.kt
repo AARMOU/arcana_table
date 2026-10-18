@@ -244,7 +244,7 @@ internal class TableController(
     var buzzOnTurn by run { mutableStateOf(optionPrefs.getBoolean("adjust_turn_buzz", true)) }
     var stackSameCards by run { mutableStateOf(optionPrefs.getBoolean("adjust_stack_cards", true)) }
     var respondGlow by run { mutableStateOf(optionPrefs.getBoolean("adjust_respond_glow", true)) }
-    var playedPopupSeconds by run { mutableFloatStateOf(optionPrefs.getFloat("adjust_popup_seconds", 1.5f).coerceIn(1f, 3f)) }
+    var playedPopupSeconds by run { mutableFloatStateOf(optionPrefs.getFloat("adjust_notice_seconds", 4f).coerceIn(1f, 8f)) }
     var combatCardScale by run { mutableFloatStateOf(optionPrefs.getFloat("adjust_combat_card_scale", 1f).coerceIn(.65f, 1.35f)) }
     var showEngineStatus by run { mutableStateOf(optionPrefs.getBoolean("show_engine_status", true)) }
     val defaultQuickActionOrder get() = argentumQuickActionIds.joinToString("|")
@@ -640,7 +640,7 @@ internal class TableController(
     fun announceAutomaticAction(playerIndex: Int, action: String, alreadyLogged: Boolean = false) {
         val playerName = players.getOrNull(playerIndex)?.name ?: "Player"
         if (!alreadyLogged) logAction(playerIndex, "$action automatically")
-        scope.launch { automaticActionSnackbar.showSnackbar("$playerName · $action") }
+        scope.launch { automaticActionSnackbar.showSnackbar("$playerName · $action", duration = androidx.compose.material3.SnackbarDuration.Long) }
     }
     fun tapPermanent(playerIndex: Int, card: GameCard) {
         if (blockLocalRulesAction("Tapping or untapping permanents")) return
@@ -1118,7 +1118,7 @@ internal class TableController(
             val notice = "$sourceName resolved; its effects need manual resolution."
             logAction(playerIndex, notice)
             val playerName = players[playerIndex].name
-            scope.launch { automaticActionSnackbar.showSnackbar("$playerName · $notice") }
+            scope.launch { automaticActionSnackbar.showSnackbar("$playerName · $notice", duration = androidx.compose.material3.SnackbarDuration.Long) }
             return
         }
         if (effects.isEmpty) return
@@ -1162,7 +1162,7 @@ internal class TableController(
         if (parseTargetCountRange(card.oracleText) != null) {
             val notice = "${card.name} resolved; resolve its targeted effect manually."
             logAction(playerIndex, notice)
-            scope.launch { automaticActionSnackbar.showSnackbar("${players[playerIndex].name} · $notice") }
+            scope.launch { automaticActionSnackbar.showSnackbar("${players[playerIndex].name} · $notice", duration = androidx.compose.material3.SnackbarDuration.Long) }
             return
         }
         applyParsedAutomaticEffects(playerIndex, card.name, parseAutomaticResolutionEffects(card.oracleText))

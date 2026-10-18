@@ -421,7 +421,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                         val base = if (aiRecap.first == snapshot.turnNumber) aiRecap.second else TurnRecap()
                         aiRecap = snapshot.turnNumber to PlayFeedParser.recap(entries, cardsJson, argentumPlayerId, base)
                     }
-                    val eventLines = (0 until entries.length()).mapNotNull { entries.optJSONObject(it)?.optString("description")?.takeIf(String::isNotBlank) }
+                    val eventLines = (0 until entries.length()).mapNotNull { entries.optJSONObject(it)?.let(PlayFeedParser::logLine) }
                     if (eventLines.isNotEmpty()) gameLog = (gameLog + eventLines).takeLast(250)
                 }
                 recordDiagnostic("Argentum state v${incoming.optLong("stateVersion")} applied: ${snapshot.players.size} players, turn ${snapshot.turnNumber} ${snapshot.stepName}, ${snapshot.legalActions.size} legal actions${if (incoming.has("engineMs")) ", engine ${incoming.optLong("engineMs")} ms" else ""}", DiagnosticCategory.ENGINE)
