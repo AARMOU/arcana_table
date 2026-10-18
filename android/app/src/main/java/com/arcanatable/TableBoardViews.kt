@@ -828,8 +828,8 @@ internal fun CardPreviewPopup(item: CardPreview, onDismiss: () -> Unit) {
             dialogWindow?.window?.setBackgroundDrawable(ColorDrawable(android.graphics.Color.TRANSPARENT))
         }
         Box(Modifier.fillMaxSize().combinedClickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
-            Box(Modifier.combinedClickable(onClick = {}, onLongClick = {}), contentAlignment = Alignment.TopEnd) {
-            CardFace(item.card, Modifier.width(previewWidth), onClick = {}, onLongClick = {}, showCounters = false)
+            Box(Modifier.combinedClickable(onClick = onDismiss, onLongClick = {}), contentAlignment = Alignment.TopEnd) {
+            CardFace(item.card, Modifier.width(previewWidth), onClick = onDismiss, onLongClick = {}, showCounters = false)
             IconButton(onClick = onDismiss, modifier = Modifier.padding(5.dp).size(42.dp).clip(CircleShape).background(Color(0xCC101615))) {
                 Icon(Icons.Filled.Close, "Close card preview", tint = Color.White)
             }

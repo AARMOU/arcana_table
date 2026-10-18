@@ -1,5 +1,6 @@
 package com.arcanatable
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -345,6 +346,7 @@ internal fun TableController.FlashMessage() {
     androidx.compose.foundation.layout.Box(Modifier.fillMaxSize(), contentAlignment = androidx.compose.ui.Alignment.Center) {
         Text(flash.text, color = androidx.compose.ui.graphics.Color(flash.color).copy(alpha = alpha.value),
             fontSize = androidx.compose.ui.unit.TextUnit(54f, androidx.compose.ui.unit.TextUnitType.Sp),
-            fontWeight = androidx.compose.ui.text.font.FontWeight.Black)
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Black,
+            modifier = Modifier.clickable { if (flashMessage?.id == flash.id) flashMessage = null })
     }
 }

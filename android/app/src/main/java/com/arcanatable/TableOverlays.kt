@@ -141,11 +141,12 @@ import kotlinx.coroutines.CoroutineScope
 @Composable
 internal fun TableController.TableOverlays() {
             Box(Modifier.fillMaxSize()) {
-        if (argentumEnabled && !homeOpen && showTurnBanner) TurnBanner(turnBanner)
+        if (argentumEnabled && !homeOpen && showTurnBanner) TurnBanner(turnBanner, onDismiss = { turnBanner = null })
         if (argentumEnabled && !homeOpen) PlayFeedOverlay(if (showPlayedPopup) playPopup else null, if (showRecentPlays) playFeed else emptyList(), if (showAbilityBanners) playBanner else null, if (showAiRecap) recapText else null,
             onDismissPopup = { playPopup = null }, onPreview = { playPopup = it },
             feedOpen = playFeedOpen, onToggleFeed = { playFeedOpen = !playFeedOpen; runCatching { context.getSharedPreferences("arcana-table-ui", Context.MODE_PRIVATE).edit().putBoolean("playFeedOpen", playFeedOpen).apply() } },
-            popupDurationSeconds = playedPopupSeconds)
+            popupDurationSeconds = playedPopupSeconds,
+            onDismissBanner = { playBanner = null }, onDismissRecap = { recapText = null })
         if (homeOpen) {
             val deckChoices = remember(savedDecks, premadeDecks) {
                 savedDecks.map { DeckChoice(it.name, it.name, it.commander ?: parseDeckList(it.text).firstOrNull { e -> e.commander }?.name, builtIn = false) } +

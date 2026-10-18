@@ -1,5 +1,6 @@
 package com.arcanatable
 
+import androidx.compose.foundation.clickable
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -62,7 +63,7 @@ data class TurnBannerState(val text: String, val isYou: Boolean, val key: Int)
  * note for an opponent's. The caller hides it again after a moment.
  */
 @Composable
-fun BoxScope.TurnBanner(state: TurnBannerState?) {
+fun BoxScope.TurnBanner(state: TurnBannerState?, onDismiss: () -> Unit = {}) {
     AnimatedVisibility(
         visible = state != null,
         enter = fadeIn(tween(160)) + scaleIn(initialScale = 0.92f, animationSpec = tween(220)),
@@ -81,6 +82,7 @@ fun BoxScope.TurnBanner(state: TurnBannerState?) {
             modifier = Modifier.clip(RoundedCornerShape(14.dp))
                 .background(if (shown.isYou) color.copy(alpha = 0.96f) else Color(0xE6101615))
                 .border(2.dp, color, RoundedCornerShape(14.dp))
+                .clickable(onClick = onDismiss)
                 .padding(horizontal = if (shown.isYou) 34.dp else 22.dp, vertical = if (shown.isYou) 16.dp else 10.dp)
         )
     }

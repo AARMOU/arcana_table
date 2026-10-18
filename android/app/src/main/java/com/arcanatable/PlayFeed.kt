@@ -142,7 +142,8 @@ object PlayFeedParser {
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BoxScope.PlayFeedOverlay(popup: PlayedCard?, feed: List<PlayedCard>, banner: PlayedCard?, recap: String?, onDismissPopup: () -> Unit, onPreview: (PlayedCard) -> Unit,
-    feedOpen: Boolean = true, onToggleFeed: () -> Unit = {}, popupDurationSeconds: Float = 1.5f) {
+    feedOpen: Boolean = true, onToggleFeed: () -> Unit = {}, popupDurationSeconds: Float = 1.5f,
+    onDismissBanner: () -> Unit = {}, onDismissRecap: () -> Unit = {}) {
     var holding by remember { mutableStateOf(false) }
     LaunchedEffect(popup?.key, holding, popupDurationSeconds) { if (popup != null && !holding) { delay((popupDurationSeconds.coerceIn(1f, 8f) * 1000).toLong()); onDismissPopup() } }
     AnimatedVisibility(visible = popup != null, enter = fadeIn(tween(140)) + scaleIn(initialScale = 0.85f, animationSpec = tween(200)), exit = fadeOut(tween(250)),
@@ -178,10 +179,10 @@ fun BoxScope.PlayFeedOverlay(popup: PlayedCard?, feed: List<PlayedCard>, banner:
     AnimatedVisibility(visible = banner != null, enter = fadeIn(tween(120)), exit = fadeOut(tween(300)), modifier = Modifier.align(Alignment.TopCenter).padding(top = 64.dp).testTag("ability-banner")) {
         val shown = banner ?: return@AnimatedVisibility
         Text("${shown.name}: ${shown.detail}", color = SoftWhite, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 340.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xEE101615)).border(1.dp, TurnColors.forSeat(shown.byYou), RoundedCornerShape(10.dp)).padding(horizontal = 12.dp, vertical = 6.dp))
+            modifier = Modifier.widthIn(max = 340.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xEE101615)).border(1.dp, TurnColors.forSeat(shown.byYou), RoundedCornerShape(10.dp)).combinedClickable(onClick = onDismissBanner).padding(horizontal = 12.dp, vertical = 6.dp))
     }
     AnimatedVisibility(visible = recap != null, enter = fadeIn(tween(160)), exit = fadeOut(tween(400)), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp).testTag("turn-recap")) {
         Text(recap.orEmpty(), color = SoftWhite, fontSize = 13.sp, maxLines = 4, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 380.dp).padding(horizontal = 16.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xF0101615)).border(1.dp, TurnColors.forSeat(false), RoundedCornerShape(12.dp)).padding(horizontal = 14.dp, vertical = 8.dp))
+            modifier = Modifier.widthIn(max = 380.dp).padding(horizontal = 16.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xF0101615)).border(1.dp, TurnColors.forSeat(false), RoundedCornerShape(12.dp)).combinedClickable(onClick = onDismissRecap).padding(horizontal = 14.dp, vertical = 8.dp))
     }
 }

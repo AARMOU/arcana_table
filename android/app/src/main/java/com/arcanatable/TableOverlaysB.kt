@@ -740,7 +740,7 @@ internal fun TableController.TableOverlaysB() {
         )
     }
 
-    if (message != null) AlertDialog(onDismissRequest = { message = null }, title = { Text("Arcana Table") }, text = { Text(message!!) }, confirmButton = { TextButton(onClick = { message = null }) { Text("OK") } }, containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted)
+    if (message != null) AlertDialog(onDismissRequest = { message = null }, title = { Text("Arcana Table") }, text = { Text(message!!, modifier = Modifier.clickable { message = null }) }, confirmButton = { TextButton(onClick = { message = null }) { Text("OK") } }, containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted)
 
     if (logOpen) GameLogDialog(
         entries = if (argentumEnabled && argentumSnapshot != null) argentumSnapshot!!.fullLog.map { it.description } else gameLog,
