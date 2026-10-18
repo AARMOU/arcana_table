@@ -38,6 +38,7 @@ val ShorikaiGenesisEngine = card("Shorikai, Genesis Engine") {
     metadata {
         rarity = Rarity.MYTHIC
         collectorNumber = "224"
+        imageUri = "https://cards.scryfall.io/normal/front/9/6/969ac7dd-f3aa-4888-9ff0-d16a31b5e7a9.jpg?1783923999"
         artist = "Paolo Parente"
     }
 }

@@ -39,6 +39,7 @@ val CyberdriveAwakener = card("Cyberdrive Awakener") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "69"
+        imageUri = "https://cards.scryfall.io/normal/front/2/a/2a2c0a2f-07fb-4cc0-9b99-e5ff4303028d.jpg?1783923995"
         artist = "Zezhou Chen"
     }
 }

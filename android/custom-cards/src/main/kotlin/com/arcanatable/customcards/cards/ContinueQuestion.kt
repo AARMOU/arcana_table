@@ -31,6 +31,7 @@ val ContinueQuestion = card("Continue?") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "7"
+        imageUri = "https://cards.scryfall.io/normal/front/2/c/2c99c472-8820-43d8-9dfa-508dc3d07478.jpg?1783904172"
         artist = "Irina Nordsol"
     }
 }

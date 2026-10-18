@@ -85,6 +85,7 @@ val UrzasSaga = card("Urza's Saga") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "259"
+        imageUri = "https://cards.scryfall.io/normal/front/c/1/c1e0f201-42cb-46a1-901a-65bb4fc18f6c.jpg?1783926791"
         artist = "Bryan Sola"
     }
 }

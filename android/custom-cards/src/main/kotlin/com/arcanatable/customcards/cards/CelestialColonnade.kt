@@ -52,6 +52,7 @@ val CelestialColonnade = card("Celestial Colonnade") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "133"
+        imageUri = "https://cards.scryfall.io/normal/front/f/6/f6929259-2903-4f6f-9b06-42048fd55c6a.jpg?1783942037"
         artist = "Eric Deschamps"
     }
 }

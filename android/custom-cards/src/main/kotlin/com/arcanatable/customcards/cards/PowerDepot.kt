@@ -50,6 +50,7 @@ val PowerDepot = card("Power Depot") {
     metadata {
         rarity = Rarity.UNCOMMON
         collectorNumber = "250"
+        imageUri = "https://cards.scryfall.io/normal/front/0/3/032eba04-0a63-4823-85e1-64861330a8d7.jpg?1783926795"
         artist = "Steven Belledin"
     }
 }

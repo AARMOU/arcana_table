@@ -35,6 +35,7 @@ val FoodChain = card("Food Chain") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "103"
+        imageUri = "https://cards.scryfall.io/normal/front/1/8/18a1bb9e-006c-495e-8f99-d451183d2669.jpg?1783945925"
         artist = "Viktor Titov"
     }
 }

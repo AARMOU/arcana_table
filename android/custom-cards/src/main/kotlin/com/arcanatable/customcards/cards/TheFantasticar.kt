@@ -49,6 +49,7 @@ val TheFantasticar = card("The Fantasticar") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "104"
+        imageUri = "https://cards.scryfall.io/normal/front/e/d/ed0beb69-8441-4104-9990-81bd82f81f9a.jpg?1786399169"
         artist = "Maxim Ruabtsev"
     }
 }

@@ -37,6 +37,7 @@ val SneakAttack = card("Sneak Attack") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "212"
+        imageUri = "https://cards.scryfall.io/normal/front/d/0/d07dc95d-82a8-4a58-8ea2-d4513bd7316d.jpg?1783946324"
         artist = "Jerry Tiritilli"
     }
 }

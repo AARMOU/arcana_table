@@ -2065,6 +2065,8 @@ internal fun ChangelogDialog(onDismiss: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILDS 105–106 · NEW CARDS AND DECKS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• 62 more custom cards (92 in all). New premade decks for you or the AI: Ayula Bears, Sliver Overlord, Hazel Squirrels.\n• Waiting for your friend shows in the bar; a secret nudge; prompts name the card asking; custom cards load their art.", color = SoftWhite, fontSize = 13.sp)
                 Text("BUILD 104 · ONLINE WITH A FRIEND", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• PLAY → Play with a friend → Host online. Your phone runs the game and shows a room code; your friend picks Join online and types it. Works across any networks.", color = SoftWhite, fontSize = 13.sp)
                 Text("BUILDS 100–102 · WI-FI AND SPEED", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)

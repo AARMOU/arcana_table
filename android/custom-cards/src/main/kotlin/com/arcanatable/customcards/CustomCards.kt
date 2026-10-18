@@ -17,6 +17,10 @@ object CustomCards {
 
     private const val TOKENS_WIN = "Tokens Win 9/26"
     private const val ARTIFICER = "Artificer v4"
+    private const val AYULA = "Ayula Bears"
+    private const val HAZEL = "Hazel Squirrels"
+    private const val SLIVERS = "Sliver Overlord"
+    private const val POOL = "Card pool 10/26"
 
     val entries: List<Entry> = listOf(
         // Tokens Win 9/26 (Rocco, Cabaretti Caterer)
@@ -51,6 +55,75 @@ object CustomCards {
         Entry(FlashPhotography, "FIC", ARTIFICER),
         Entry(SakashimaOfAThousandFaces, "CMR", ARTIFICER),
         Entry(UrzasSaga, "MH2", ARTIFICER),
+        // Ayula, Queen Among Bears deck.
+        Entry(MotherBear, "MH1", AYULA),
+        Entry(Werebear, "ODY", AYULA),
+        Entry(BoscoJustABear, "TLE", AYULA),
+        Entry(WilsonRefinedGrizzly, "CLB", AYULA),
+        Entry(DruidsDeliverance, "RTR", AYULA),
+        Entry(TraverseTheOutlands, "C17", AYULA),
+        Entry(Bearscape, "ODY", AYULA),
+        // Hazel of the Rootbloom deck. Tippy-Toe is omitted: its copy-token replacement
+        // behavior is not represented by the pinned engine's current building blocks.
+        Entry(FrogSquirrels, "TLE", HAZEL),
+        Entry(ScurryOak, "MH2", HAZEL),
+        Entry(NutCollector, "DMR", HAZEL),
+        Entry(CompySwarm, "REX", HAZEL),
+        Entry(PrimalAmulet, "XLN", HAZEL),
+        Entry(ImmoralBargain, "SOC", HAZEL),
+        Entry(AcornHarvest, "TOR", HAZEL),
+        Entry(CloakwoodHermit, "CLB", HAZEL),
+        Entry(SpringleafParade, "ECC", HAZEL),
+        Entry(BlackMarketConnections, "MSC", HAZEL),
+        // Sliver Overlord deck. Hatchery Sliver (Replicate) and Pulmonic Sliver's
+        // optional replacement effect remain unsupported by this engine version.
+        Entry(AcidicSliver, "TPR", SLIVERS),
+        Entry(CloudshredderSliver, "CMM", SLIVERS),
+        Entry(CrystallineSliver, "CMM", SLIVERS),
+        Entry(DiffusionSliver, "CMM", SLIVERS),
+        Entry(DregscapeSliver, "MH1", SLIVERS),
+        Entry(FirstSliversChosen, "MH1", SLIVERS),
+        Entry(FreneticSliver, "PLC", SLIVERS),
+        Entry(FungusSliver, "TSR", SLIVERS),
+        Entry(HarmonicSliver, "CMM", SLIVERS),
+        Entry(HibernationSliver, "CMM", SLIVERS),
+        Entry(HomingSliver, "TSR", SLIVERS),
+        Entry(LavabellySliver, "CMM", SLIVERS),
+        Entry(LeechingSliver, "M15", SLIVERS),
+        Entry(SliverQueen, "STH", SLIVERS),
+        Entry(SliverGravemother, "CMM", SLIVERS),
+        // Other cards from the submitted collection. Unsupported mechanics remain listed in
+        // android/docs/CUSTOM_CARDS_HANDOFF.md rather than being approximated silently.
+        Entry(ConstrictingSliver, "CMM", POOL),
+        Entry(KodamaOfTheWestTree, "NEO", POOL),
+        Entry(AllosaurusShepherd, "2X2", POOL),
+        Entry(BarretAvalancheLeader, "FIC", POOL),
+        Entry(KratosGodOfWar, "SLD", POOL),
+        Entry(BlightsteelColossus, "MBS", POOL),
+        Entry(NekusarTheMindrazer, "CMM", POOL),
+        Entry(MichelangeloTheHeart, "TMC", POOL),
+        Entry(VenomEddieBrock, "SPE", POOL),
+        Entry(PurphorosGodOfTheForge, "CMM", POOL),
+        Entry(HornOfGreed, "CN2", POOL),
+        Entry(Silence, "M14", POOL),
+        Entry(SwordOfBodyAndMind, "2XM", POOL),
+        Entry(SwordOfFeastAndFamine, "2XM", POOL),
+        Entry(SwordOfFireAndIce, "2XM", POOL),
+        Entry(SwordOfLightAndShadow, "2XM", POOL),
+        Entry(SwordOfWarAndPeace, "2XM", POOL),
+        Entry(SigardasAid, "CMR", POOL),
+        Entry(YavimayaHollow, "VMA", POOL),
+        Entry(ViolentOutburst, "ARB", POOL),
+        Entry(EleshNornGrandCenobite, "NPH", POOL),
+        Entry(RampagingFerocidon, "XLN", POOL),
+        Entry(SpittingDilophosaurus, "REX", POOL),
+        Entry(DescendantsPath, "TLE", POOL),
+        Entry(RaffineSchemingSeer, "SNC", POOL),
+        Entry(CloudExSoldier, "FIC", POOL),
+        Entry(LeonardoTheBalance, "TMC", POOL),
+        Entry(WakkaDevotedGuardian, "FIC", POOL),
+        Entry(CaptainJamesTKirk, "TRK", POOL),
+        Entry(RaphaelTheMuscle, "TMC", POOL),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)

@@ -40,6 +40,7 @@ val QuestForRenewal = card("Quest for Renewal") {
     metadata {
         rarity = Rarity.UNCOMMON
         collectorNumber = "180"
+        imageUri = "https://cards.scryfall.io/normal/front/4/1/41b7ad82-1115-4f80-886a-3f59f568423f.jpg?1783942043"
         artist = "Jason Chan"
     }
 }

@@ -34,6 +34,7 @@ val IronManBleedingEdge = card("Iron Man, Bleeding Edge") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "626"
+        imageUri = "https://cards.scryfall.io/normal/front/b/1/b14b6721-6491-41a4-afb4-93bd76f21173.jpg?1783903072"
         artist = "Ryan Pancoast"
     }
 }

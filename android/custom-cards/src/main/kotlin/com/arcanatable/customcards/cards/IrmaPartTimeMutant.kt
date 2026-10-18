@@ -37,6 +37,7 @@ val IrmaPartTimeMutant = card("Irma, Part-Time Mutant") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "12"
+        imageUri = "https://cards.scryfall.io/normal/front/c/3/c3128529-4ccd-4809-8388-03f7faa0eabe.jpg?1783904172"
         artist = "Mirko Failoni"
     }
 }

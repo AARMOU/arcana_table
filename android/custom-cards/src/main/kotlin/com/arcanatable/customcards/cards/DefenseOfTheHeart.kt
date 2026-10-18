@@ -42,6 +42,7 @@ val DefenseOfTheHeart = card("Defense of the Heart") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "245"
+        imageUri = "https://cards.scryfall.io/normal/front/9/e/9e93381f-627f-41b6-b1b6-45d712a44d8e.jpg?1783946231"
         artist = "Pete Venters"
     }
 }

@@ -41,6 +41,7 @@ val TataruTaru = card("Tataru Taru") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "30"
+        imageUri = "https://cards.scryfall.io/normal/front/9/3/93176e85-2343-43a8-8578-69699b464b86.jpg?1783906365"
         artist = "Livia Prima"
     }
 }

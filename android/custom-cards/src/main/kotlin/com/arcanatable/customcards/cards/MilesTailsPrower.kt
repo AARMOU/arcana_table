@@ -36,6 +36,7 @@ val MilesTailsPrower = card("Miles \"Tails\" Prower") {
     metadata {
         rarity = Rarity.MYTHIC
         collectorNumber = "2085"
+        imageUri = "https://cards.scryfall.io/normal/front/7/d/7d4bd7e1-9861-4f8a-9ad5-a41aeaee1928.jpg?1783906091"
         artist = "John Thacker"
     }
 }

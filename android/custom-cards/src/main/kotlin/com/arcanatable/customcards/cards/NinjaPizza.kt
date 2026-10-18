@@ -42,6 +42,7 @@ val NinjaPizza = card("Ninja Pizza") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "32"
+        imageUri = "https://cards.scryfall.io/normal/front/7/4/74c24ff9-882d-4ffb-bf8b-dba803481a99.jpg?1783904164"
         artist = "Brian Yuen"
     }
 }

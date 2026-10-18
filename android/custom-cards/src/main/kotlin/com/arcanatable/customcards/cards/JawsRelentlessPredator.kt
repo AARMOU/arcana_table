@@ -44,6 +44,7 @@ val JawsRelentlessPredator = card("Jaws, Relentless Predator") {
     metadata {
         rarity = Rarity.MYTHIC
         collectorNumber = "2175"
+        imageUri = "https://cards.scryfall.io/normal/front/c/6/c6d16a9e-98c0-46e0-987c-f0de0915a204.jpg?1791470750"
         artist = "Stephen Andrade"
     }
 }

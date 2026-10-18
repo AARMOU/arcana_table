@@ -36,6 +36,7 @@ val SmugglersCopter = card("Smuggler's Copter") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "235"
+        imageUri = "https://cards.scryfall.io/normal/front/7/8/7832abb5-5107-4603-904e-491b221bd3e3.jpg?1783937147"
         artist = "Florian de Gesincourt"
     }
 }

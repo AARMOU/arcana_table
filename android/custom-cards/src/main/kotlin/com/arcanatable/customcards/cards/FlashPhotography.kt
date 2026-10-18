@@ -33,6 +33,7 @@ val FlashPhotography = card("Flash Photography") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "463"
+        imageUri = "https://cards.scryfall.io/normal/front/2/b/2bca2cd2-4d4a-44e4-87c3-732692b77921.jpg?1783904649"
         artist = "Winona Nelson"
     }
 }

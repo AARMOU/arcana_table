@@ -39,6 +39,7 @@ val ReflectingPool = card("Reflecting Pool") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "328"
+        imageUri = "https://cards.scryfall.io/normal/front/7/b/7b633ac2-bf98-42bd-8c26-8737a7d8edc7.jpg?1783946597"
         artist = "Adam Paquette"
     }
 }

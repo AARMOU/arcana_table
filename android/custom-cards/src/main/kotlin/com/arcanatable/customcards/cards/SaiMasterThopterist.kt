@@ -42,6 +42,7 @@ val SaiMasterThopterist = card("Sai, Master Thopterist") {
     metadata {
         rarity = Rarity.MYTHIC
         collectorNumber = "69"
+        imageUri = "https://cards.scryfall.io/normal/front/1/9/19316cbb-d1af-4ab7-b588-78637503e986.jpg?1783934583"
         artist = "Adam Paquette"
     }
 }

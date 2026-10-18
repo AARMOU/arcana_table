@@ -45,6 +45,7 @@ val TheCabbageMerchant = card("The Cabbage Merchant") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "134"
+        imageUri = "https://cards.scryfall.io/normal/front/2/f/2fea0356-6684-4730-9eb4-0262856bc1f9.jpg?1783904816"
         artist = "Patrick Gañas"
     }
 }

@@ -30,6 +30,7 @@ val MotherOfRunes = card("Mother of Runes") {
     metadata {
         rarity = Rarity.UNCOMMON
         collectorNumber = "16"
+        imageUri = "https://cards.scryfall.io/normal/front/0/b/0b1a46ab-95cb-4c24-924f-fc2afd4fcac7.jpg?1783946251"
         artist = "Scott M. Fischer"
     }
 }

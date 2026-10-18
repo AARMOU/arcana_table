@@ -39,6 +39,7 @@ val AncientCopperDragon = card("Ancient Copper Dragon") {
     metadata {
         rarity = Rarity.MYTHIC
         collectorNumber = "161"
+        imageUri = "https://cards.scryfall.io/normal/front/3/8/3836dddd-a7e4-499f-ad49-ce298aa65720.jpg?1783922745"
         artist = "Simon Dominic"
     }
 }

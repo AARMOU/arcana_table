@@ -53,6 +53,7 @@ val SakashimaOfAThousandFaces = card("Sakashima of a Thousand Faces") {
     metadata {
         rarity = Rarity.MYTHIC
         collectorNumber = "84"
+        imageUri = "https://cards.scryfall.io/normal/front/7/1/714c3a1f-7b30-4ed8-8f38-6176758741fb.jpg?1783928853"
         artist = "Kieran Yanner"
     }
 }

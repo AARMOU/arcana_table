@@ -38,6 +38,7 @@ val LotusField = card("Lotus Field") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "249"
+        imageUri = "https://cards.scryfall.io/normal/front/0/e/0e013033-3995-4ba8-b0c3-0614c79aaaab.jpg?1783932935"
         artist = "John Avon"
     }
 }

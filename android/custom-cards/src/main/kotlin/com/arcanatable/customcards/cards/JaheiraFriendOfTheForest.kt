@@ -38,6 +38,7 @@ val JaheiraFriendOfTheForest = card("Jaheira, Friend of the Forest") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "237"
+        imageUri = "https://cards.scryfall.io/normal/front/f/e/feb7ad1b-4466-48f7-b46d-cc83d4e22b51.jpg?1783922710"
         artist = "Bryan Sola"
     }
 }

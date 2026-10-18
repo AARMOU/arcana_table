@@ -34,6 +34,7 @@ val BagEndBanquet = card("Bag End Banquet") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "5"
+        imageUri = "https://cards.scryfall.io/normal/front/0/2/028f284b-4b4c-44e2-8ded-bc59ec71250f.jpg?1784377206"
         artist = "Dmitry Burmak"
     }
 }

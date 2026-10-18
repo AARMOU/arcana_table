@@ -44,6 +44,7 @@ val DisplacedDinosaurs = card("Displaced Dinosaurs") {
     metadata {
         rarity = Rarity.UNCOMMON
         collectorNumber = "100"
+        imageUri = "https://cards.scryfall.io/normal/front/4/3/43319645-53b0-41f6-be90-9690e86e12d3.jpg?1783914644"
         artist = "Simon Dominic"
     }
 }
