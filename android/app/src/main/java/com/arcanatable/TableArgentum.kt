@@ -462,6 +462,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             argentumBottomCardCount = incoming.optInt("cardsToPutOnBottom", 0)
             argentumBottomSelection = emptySet()
         }
+        "arcanaNudge" -> { buzz(500); flashMessage = FlashText("Your go", 0xFFE5484D) }
         "maxXRefined" -> {
             val cardId = incoming.optString("cardId")
             val plan = argentumComposer

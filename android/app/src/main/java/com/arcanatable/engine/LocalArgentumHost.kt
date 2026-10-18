@@ -186,6 +186,7 @@ class LocalArgentumHost(
             }
             "requestUndo" -> undo(from)
             "setQuietOpponentTurns" -> if (from == humanId) quietOpponentTurns = message.optBoolean("enabled")
+            "arcanaNudge" -> if (isWifi) emitTo(other(from), JSONObject().put("type", "arcanaNudge"))
             "ping" -> emitTo(from, JSONObject().put("type", "pong"))
             else -> Unit // lobby, deck and preference messages need no answer offline
         }

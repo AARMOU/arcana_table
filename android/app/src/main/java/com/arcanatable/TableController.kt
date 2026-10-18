@@ -388,7 +388,9 @@ internal class TableController(
     var wifiFound by run { mutableStateOf<List<ArgentumLan.FoundHost>>(emptyList()) }
     var wifiAddressInput by run { mutableStateOf("") }
     var wifiConnecting by run { mutableStateOf(false) }
-    var wifiRole by run { mutableStateOf<String?>(null) } // "host" or "guest" while a Wi-Fi game is on
+    var wifiRole by run { mutableStateOf<String?>(null) }
+    /** A big message that flashes over the table and fades ("Your go", "Your move"). */
+    var flashMessage by run { mutableStateOf<FlashText?>(null) } // "host" or "guest" while a Wi-Fi game is on
     var argentumActionCard by run { mutableStateOf<GameCard?>(null) }
     var argentumGameOverDismissed by run { mutableStateOf(false) }
     var argentumMulliganInfo by run { mutableStateOf<Triple<Int, Boolean, Int>?>(null) } // count, on the play, cards to bottom

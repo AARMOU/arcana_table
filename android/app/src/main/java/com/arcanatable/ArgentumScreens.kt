@@ -137,7 +137,7 @@ import org.json.JSONObject
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidManaAbilities: Boolean, busy: Boolean, stackCount: (JSONObject) -> Int = { 1 }, onChooseMany: (JSONObject, Int) -> Unit = { _, _ -> }, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit) {
+internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidManaAbilities: Boolean, busy: Boolean, stackCount: (JSONObject) -> Int = { 1 }, onChooseMany: (JSONObject, Int) -> Unit = { _, _ -> }, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit, onSecretNudge: () -> Unit = {}) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 24.dp)) {
             if (card != null) Row(verticalAlignment = Alignment.Top) {
@@ -183,7 +183,18 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
                     }
                 }
             }
-            TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End).heightIn(min = 48.dp)) { Text("CLOSE", color = Muted) }
+            // Two tiny invisible spots on this row: left, then right within 1 second, sends the secret nudge.
+            var leftTapAt by remember { mutableStateOf(0L) }
+            BoxWithConstraints(Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                val spot = 28.dp
+                Box(Modifier.offset(x = maxWidth * 0.2f - spot / 2).align(Alignment.CenterStart).size(spot)
+                    .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) { leftTapAt = System.currentTimeMillis() })
+                Box(Modifier.offset(x = maxWidth * 0.67f - spot / 2).align(Alignment.CenterStart).size(spot)
+                    .clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {
+                        if (leftTapAt > 0 && System.currentTimeMillis() - leftTapAt <= 1_000) { leftTapAt = 0; onSecretNudge() } else leftTapAt = 0
+                    })
+                TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterEnd).heightIn(min = 48.dp)) { Text("CLOSE", color = Muted) }
+            }
         }
     }
 }

@@ -426,7 +426,8 @@ internal fun TableController.TableOverlays() {
             argentumActionChoices = emptyList(); argentumActionCard = null; chooseArgentumLegalAction(info)
         },
         onChoose = { info -> argentumActionChoices = emptyList(); argentumActionCard = null; argentumStackUse = null; chooseArgentumLegalAction(info) },
-        onDismiss = { argentumActionChoices = emptyList(); argentumActionCard = null }
+        onSecretNudge = { if (wifiRole != null) argentumSocket.send("arcanaNudge") },
+            onDismiss = { argentumActionChoices = emptyList(); argentumActionCard = null }
     )
 
     // Combat damage is split on the combat board rather than in a dialog.
@@ -442,7 +443,11 @@ internal fun TableController.TableOverlays() {
         (it.optString("type") == "CombatResolutionDecision" && ArgentumCombatResolution.from(it) != null) }?.let { decision ->
         val decisionId = decision.optString("id")
         val kind = decision.optString("type")
-        val prompt = decision.optString("prompt", "Argentum needs a choice")
+        val prompt = decision.optString("prompt", "Argentum needs a choice").let { base ->
+            // Say which card is asking, so "Choose up to 1 card" reads "Lady Octopus: Choose up to 1 card".
+            val source = decision.optJSONObject("context")?.optString("sourceName")?.takeIf { it.isNotBlank() && it != "null" }
+            if (source != null && !base.contains(source, ignoreCase = true)) "$source: $base" else base
+        }
         AlertDialog(
             onDismissRequest = {},
             title = { Text(prompt) },
@@ -959,4 +964,5 @@ internal fun TableController.TableOverlays() {
 
             }
     WifiDialogs()
+    FlashMessage()
 }

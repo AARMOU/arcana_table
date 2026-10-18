@@ -225,7 +225,7 @@ data class ArgentumTableSnapshot(
                         type = typeLine,
                         color = color,
                         tapped = card.optBoolean("isTapped"),
-                        imageUrl = card.optString("imageUri").takeUnless { it.isBlank() || it == "null" },
+                        imageUrl = card.optString("imageUri").takeUnless { it.isBlank() || it == "null" } ?: artByName(card.optString("name"), card.optBoolean("isToken")),
                         isToken = card.optBoolean("isToken"),
                         counters = counters,
                         isFaceDown = card.optBoolean("isFaceDown"),
@@ -729,4 +729,14 @@ internal fun counterLabel(raw: String): String = when (raw.uppercase()) {
     "MINUS_ONE_MINUS_ZERO" -> "-1/-0"
     "MINUS_TWO_MINUS_TWO" -> "-2/-2"
     else -> if (raw.any { it == '_' } || raw == raw.uppercase()) raw.lowercase().split('_').filter { it.isNotBlank() }.joinToString(" ").replaceFirstChar { it.uppercase() } else raw
+}
+
+/**
+ * Art for a card that came with none (Arcana's own custom cards): Scryfall's image for that exact
+ * name. Null for tokens and hidden cards, which Scryfall can't look up by name.
+ */
+internal fun artByName(name: String?, token: Boolean): String? {
+    val clean = name?.trim()?.takeIf { it.isNotBlank() && it != "null" && it != "Card" && it != "Hidden card" } ?: return null
+    if (token) return null
+    return "https://api.scryfall.com/cards/named?exact=" + java.net.URLEncoder.encode(clean.substringBefore(" // "), "UTF-8") + "&format=image&version=normal"
 }
