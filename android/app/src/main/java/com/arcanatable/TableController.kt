@@ -444,6 +444,8 @@ internal class TableController(
     var passToMyTurnFrom by run { mutableStateOf<Int?>(null) }
     var followActivePlayer by run { mutableStateOf(optionPrefs.getBoolean("follow_active_player", true)) }
     var quietOpponentTurns by run { mutableStateOf(optionPrefs.getBoolean("quiet_opponent_turns", false)) }
+    /** Offline games: how many AI opponents (1 = a duel, 3 = a four-player game). */
+    var offlineAiCount by run { mutableStateOf(optionPrefs.getInt("offline_ai_count", 1).coerceIn(1, 3)) }
     var argentumPingResult by run { mutableStateOf<String?>(null) }
     var engineTrialResult by run { mutableStateOf<String?>(null) }
     var lastOpponentViewed by run { mutableIntStateOf(-1) }
@@ -1484,7 +1486,7 @@ internal class TableController(
     }
 
     /** Loads the card library and builds an offline game's seats (on a large-stack thread). */
-    suspend fun prepareOfflineSetup(names: List<String>, commander: String?, aiDeckId: String?): Pair<com.arcanatable.engine.OfflineSetup, com.wingedsheep.engine.registry.CardRegistry> =
+    suspend fun prepareOfflineSetup(names: List<String>, commander: String?, aiDeckId: String?, aiCount: Int = 1): Pair<com.arcanatable.engine.OfflineSetup, com.wingedsheep.engine.registry.CardRegistry> =
         withContext(Dispatchers.IO) {
             var result: Pair<com.arcanatable.engine.OfflineSetup, com.wingedsheep.engine.registry.CardRegistry>? = null
             var failure: Throwable? = null
@@ -1492,7 +1494,7 @@ internal class TableController(
                 try {
                     val library = offlineLibrary()
                     val decks = runCatching { context.assets.open("argentum/commander-decks.json").bufferedReader().use { it.readText() } }.getOrNull()
-                    result = com.arcanatable.engine.OfflineGameSetup.build(library, lobbyPlayerName.ifBlank { "You" }, names, commander, decks, aiDeckId = aiDeckId)
+                    result = com.arcanatable.engine.OfflineGameSetup.build(library, lobbyPlayerName.ifBlank { "You" }, names, commander, decks, aiDeckId = aiDeckId, aiCount = aiCount)
                 } catch (t: Throwable) { failure = t }
             }, "argentum-offline-setup", 256L shl 20)
             worker.start(); worker.join()
@@ -1515,11 +1517,11 @@ internal class TableController(
             try {
                 val (names, commander) = activeDeckCards()
                 val started = System.currentTimeMillis()
-                val prepared = prepareOfflineSetup(names, commander, offlineAiDeckId)
+                val prepared = prepareOfflineSetup(names, commander, offlineAiDeckId, offlineAiCount)
                 val (setup, registry) = prepared
-                recordDiagnostic("Offline game prepared in ${System.currentTimeMillis() - started} ms: ${setup.you.commander ?: "Portal"} vs ${setup.aiDeckName}", DiagnosticCategory.ENGINE)
+                recordDiagnostic("Offline game prepared in ${System.currentTimeMillis() - started} ms: ${setup.you.commander ?: "Portal"} vs ${setup.aiDeckName} (${setup.extraAis.size + 2} players)", DiagnosticCategory.ENGINE)
                 setup.notes.forEach { recordDiagnostic("Offline: $it", DiagnosticCategory.ENGINE) }
-                argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, setup.you, setup.ai, emit = emit).also { it.quietOpponentTurns = quietOpponentTurns } }
+                argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, setup.you, setup.ai, emit = emit, extraOpponents = setup.extraAis).also { it.quietOpponentTurns = quietOpponentTurns } }
                 argentumOffline = true
                 argentumDeckForLobby = null
                 argentumCommanderForLobby = null
@@ -1533,7 +1535,7 @@ internal class TableController(
                 var waitCount = 0
                 while (argentumStatus != ArgentumConnectionStatus.CONNECTED && waitCount < 20) { delay(100); waitCount++ }
                 argentumSocket.createCommanderPracticeLobby(vsAi = true)
-                if (setup.notes.isNotEmpty()) message = setup.notes.joinToString("\n\n") + "\n\nOpponent: ${setup.aiDeckName}."
+                if (setup.notes.isNotEmpty()) message = setup.notes.joinToString("\n\n") + "\n\n${if (setup.extraAis.isEmpty()) "Opponent" else "Opponents"}: ${setup.aiDeckName}."
             } catch (error: Throwable) {
                 argentumSocket.localHostFactory = null
                 argentumOffline = false

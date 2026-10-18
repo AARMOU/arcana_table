@@ -88,7 +88,7 @@ class OfflineCardLibrary(private val open: (String) -> InputStream?, forcedBase:
 }
 
 /** Who plays what in an offline game, and anything the player should be told about it. */
-data class OfflineSetup(val you: LocalSeat, val ai: LocalSeat, val notes: List<String>, val aiDeckName: String)
+data class OfflineSetup(val you: LocalSeat, val ai: LocalSeat, val notes: List<String>, val aiDeckName: String, val extraAis: List<LocalSeat> = emptyList())
 
 object OfflineGameSetup {
     private val BASICS = mapOf(Color.WHITE to "Plains", Color.BLUE to "Island", Color.BLACK to "Swamp", Color.RED to "Mountain", Color.GREEN to "Forest")
@@ -106,7 +106,9 @@ object OfflineGameSetup {
         aiDecksJson: String?,
         random: Random = Random.Default,
         aiDeckId: String? = null,
+        aiCount: Int = 1,
     ): Pair<OfflineSetup, CardRegistry> {
+        val count = aiCount.coerceIn(1, 3)
         val notes = mutableListOf<String>()
         val yourCommander = commander?.let(library::canonical)
         val premades = aiDecksJson?.let(::parsePremades).orEmpty()
@@ -118,7 +120,10 @@ object OfflineGameSetup {
             val registry = CardRegistry().apply { register(portalCards) }
             val you = EmbeddedEngineTrial.monoDeck(portalCards, Color.GREEN, random)
             val ai = EmbeddedEngineTrial.monoDeck(portalCards, Color.RED, random)
-            return OfflineSetup(LocalSeat(playerName, you.cards, null), LocalSeat("Offline AI", ai.cards, null), notes, "Red (Portal)") to registry
+            val extraColors = listOf(Color.BLUE to "Blue", Color.BLACK to "Black").take(count - 1)
+            val extras = extraColors.map { (color, name) -> LocalSeat("AI · $name", EmbeddedEngineTrial.monoDeck(portalCards, color, random).cards, null) }
+            val firstName = if (count > 1) "AI · Red" else "Offline AI"
+            return OfflineSetup(LocalSeat(playerName, you.cards, null), LocalSeat(firstName, ai.cards, null), notes, "Red (Portal)", extras) to registry
         }
         // Your deck: the 99 without the commander, unsupported cards left out.
         val yourList = argentumLibraryList(deckNames, yourCommander)
@@ -130,7 +135,12 @@ object OfflineGameSetup {
             (complete.ifEmpty { ranked.take(1) }).random(random)
         }
         val aiList = argentumLibraryList(premade.cards, premade.commander).mapNotNull(library::canonical)
-        val cards = library.load((supported + aiList + yourCommander + premade.commander).toSet())
+        // Seats 3 and 4: other decks, complete ones first, never the same deck twice.
+        val others = premades.filter { it.id != premade.id }.shuffled(random)
+            .sortedByDescending { d -> d.cards.all { library.canonical(it) != null } }
+            .take(count - 1)
+        val otherLists = others.map { d -> d to argentumLibraryList(d.cards, d.commander).mapNotNull(library::canonical) }
+        val cards = library.load((supported + aiList + yourCommander + premade.commander + otherLists.flatMap { (d, l) -> l + d.commander }).toSet())
         val registry = CardRegistry().apply { register(cards) }
         fun filled(list: List<String>, commanderName: String): List<String> {
             if (list.size >= 99) return list.take(99)
@@ -142,8 +152,12 @@ object OfflineGameSetup {
         if (custom.isNotEmpty()) notes += "Using Arcana's own versions of ${custom.size} card(s) Argentum doesn't have yet (${custom.take(4).joinToString()}${if (custom.size > 4) ", …" else ""})."
         if (missing.isNotEmpty()) notes += "Left out ${missing.size} card(s) Argentum can't run offline (${missing.take(4).joinToString()}${if (missing.size > 4) ", …" else ""}) and filled with basic lands. Your saved deck is unchanged."
         val you = LocalSeat(playerName, filled(supported, yourCommander), yourCommander)
-        val ai = LocalSeat("Offline AI", filled(aiList, library.canonical(premade.commander)!!), library.canonical(premade.commander))
-        return OfflineSetup(you, ai, notes, premade.name) to registry
+        fun aiName(commanderName: String) = if (count > 1) "AI · ${commanderName.substringBefore(',').trim()}" else "Offline AI"
+        val ai = LocalSeat(aiName(premade.commander), filled(aiList, library.canonical(premade.commander)!!), library.canonical(premade.commander))
+        val extras = otherLists.mapNotNull { (d, list) -> library.canonical(d.commander)?.let { cmd -> LocalSeat(aiName(cmd), filled(list, cmd), cmd) } }
+        if (extras.size < count - 1) notes += "Only ${extras.size + 1} AI deck(s) could be made, so this game has ${extras.size + 2} players."
+        val name = (listOf(premade.name) + others.map { it.name }).joinToString(", ")
+        return OfflineSetup(you, ai, notes, name, extras) to registry
     }
 
     /**

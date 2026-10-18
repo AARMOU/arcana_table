@@ -189,6 +189,8 @@ internal fun TableController.TableOverlays() {
                 aiDecks = premadeDecks.map { DeckChoice(it.id, it.name, it.commander, builtIn = true) },
                 aiDeckId = offlineAiDeckId,
                 onAiDeck = { offlineAiDeckId = it },
+                aiCount = offlineAiCount,
+                onAiCount = { offlineAiCount = it; optionPrefs.edit().putInt("offline_ai_count", it).apply() },
                 onOffline = { playSheetOpen = false; run { startOfflineGame() } },
                 onOnline = { playSheetOpen = false; run { startArgentumPractice(vsAi = true) } },
                 onCreateRoom = { playSheetOpen = false; run { startArgentumPractice(vsAi = false) } },

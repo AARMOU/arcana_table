@@ -82,6 +82,9 @@ data class LocalSeat(val name: String, val deck: List<String>, val commander: St
  * Wi-Fi play: after [setGuest], the second seat is a person on another phone instead of the AI.
  * Their messages come in through `receive(message, GUEST_ID)` and their own view goes out through
  * the guest's emit. Everything else works the same for both seats.
+ *
+ * Up to four players: [extraOpponents] sit in seats 3 and 4, always played by the AI (Argentum's
+ * engine runs Free-for-All). Each AI seat gets its own AIPlayer.
  */
 class LocalArgentumHost(
     private val registry: CardRegistry,
@@ -89,6 +92,7 @@ class LocalArgentumHost(
     opponent: LocalSeat,
     private val paceMs: Long = 600,
     private val emit: (JSONObject) -> Unit,
+    extraOpponents: List<LocalSeat> = emptyList(),
 ) {
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(null, r, "argentum-local", 256L shl 20) }
     private val services = EngineServices(registry)
@@ -106,7 +110,10 @@ class LocalArgentumHost(
     private var state: GameState? = null
     private val humanId: EntityId = HUMAN_ID
     private val aiId: EntityId = AI_ID
-    private var ai: AIPlayer? = null
+    private val extraSeats: List<Pair<EntityId, LocalSeat>> = extraOpponents.take(2).mapIndexed { i, seat -> EntityId("offline-ai-${i + 2}") to seat }
+    private val allSeats: List<EntityId> get() = listOf(humanId, aiId) + extraSeats.map { it.first }
+    // One AI per computer seat (the second seat has none while a Wi-Fi guest sits there).
+    private var ais: Map<EntityId, AIPlayer> = emptyMap()
     // Wi-Fi: where the guest's messages go. Null = the second seat is the AI.
     @Volatile private var guestEmit: ((JSONObject) -> Unit)? = null
     private val gameLogs = mutableMapOf<EntityId, MutableList<ClientEvent>>()
@@ -143,7 +150,7 @@ class LocalArgentumHost(
     private fun people(): List<EntityId> = if (guestEmit != null) listOf(humanId, aiId) else listOf(humanId)
     private fun isPerson(id: EntityId?): Boolean = id == humanId || (id == aiId && guestEmit != null)
     private fun other(id: EntityId): EntityId = if (id == humanId) aiId else humanId
-    private fun seatOf(id: EntityId): LocalSeat = if (id == humanId) human else opponent
+    private fun seatOf(id: EntityId): LocalSeat = when (id) { humanId -> human; aiId -> opponent; else -> extraSeats.firstOrNull { it.first == id }?.second ?: opponent }
     private fun emitTo(seat: EntityId, message: JSONObject) {
         if (seat == humanId) emit(message) else guestEmit?.invoke(message)
     }
@@ -236,27 +243,26 @@ class LocalArgentumHost(
 
     private fun startGame() {
         val config = GameConfig(
-            players = listOf(seatConfig(human, HUMAN_ID), seatConfig(opponent, AI_ID)),
+            players = allSeats.map { seatConfig(seatOf(it), it) },
             skipMulligans = false,
-            format = if (human.commander != null && opponent.commander != null) Format.Commander() else Format.Standard,
+            format = if (allSeats.all { seatOf(it).commander != null }) Format.Commander() else Format.Standard,
         )
         val result = initializer.initializeGame(config)
-        ai = if (isWifi) null else AIPlayer.create(registry, aiId)
+        ais = allSeats.filterNot(::isPerson).associateWith { AIPlayer.create(registry, it) }
         state = result.state
         gameLogs.clear()
         legalCache.clear()
         for (seat in people()) {
             emitTo(seat, JSONObject().put("type", "quickGameLobbyState").put("lobbyId", "offline").put("youPlayerId", seat.value).put("vsAi", !isWifi)
-                .put("players", org.json.JSONArray().put(JSONObject().put("playerId", humanId.value).put("name", human.name)).put(JSONObject().put("playerId", aiId.value).put("name", opponent.name))))
-            emitTo(seat, JSONObject().put("type", "gameStarted").put("players", org.json.JSONArray()
-                .put(JSONObject().put("playerId", humanId.value).put("isYou", seat == humanId))
-                .put(JSONObject().put("playerId", aiId.value).put("isYou", seat == aiId))))
+                .put("players", org.json.JSONArray(allSeats.map { JSONObject().put("playerId", it.value).put("name", seatOf(it).name) })))
+            emitTo(seat, JSONObject().put("type", "gameStarted").put("players", org.json.JSONArray(allSeats.map { JSONObject().put("playerId", it.value).put("isYou", seat == it) })))
         }
         undoCheckpoint = null
         preCombatCheckpoint = null
-        // The AI settles its opening hand first; then each person gets theirs, as on the server.
+        peopleOutSent = false
+        // The AIs settle their opening hands first; then each person gets theirs, as on the server.
         mulliganPhase = true
-        if (!isWifi) aiMulligans()
+        ais.keys.forEach(::aiMulligans)
         if (people().all(::mulliganDone)) finishMulligans() else people().filterNot(::mulliganDone).forEach(::sendMulliganDecision)
     }
 
@@ -265,7 +271,7 @@ class LocalArgentumHost(
     private fun mulliganState(player: EntityId): MulliganStateComponent? = state?.getEntity(player)?.get<MulliganStateComponent>()
     private fun mulliganDone(player: EntityId): Boolean = mulliganState(player).let { it == null || (it.hasKept && it.cardsToBottom == 0) }
 
-    private fun aiMulligans() {
+    private fun aiMulligans(aiId: EntityId) {
         var guard = 0
         while (!mulliganDone(aiId) && guard++ < 10) {
             val current = state ?: return
@@ -454,24 +460,26 @@ class LocalArgentumHost(
             lastShown = current.turnNumber to current.step
             if (pause > 0) Thread.sleep(pause)
         }
-        while (steps++ < 2_000) {
+        while (steps++ < 6_000) {
             val current = state ?: return
             if (current.gameOver || shockOffers.isNotEmpty()) break
+            // Everyone at this phone (and the Wi-Fi guest) is out: stop instead of watching the AIs finish.
+            if (people().none { it in current.activePlayers }) { peopleOut(); break }
             if ((current.turnNumber to current.step) != lastShown) flush(paceMs / 3)
             val decision = current.pendingDecision
             if (decision != null) {
                 val actor = current.actorFor(decision.playerId)
                 if (isPerson(actor)) break
-                val bot = ai ?: break
-                if (!apply(SubmitDecision(decision.playerId, bot.respondToDecision(current, decision)), events, aiId)) break
+                val bot = ais[actor] ?: break
+                if (!apply(SubmitDecision(decision.playerId, bot.respondToDecision(current, decision)), events, actor)) break
                 flush(paceMs)
                 continue
             }
             val priority = current.priorityPlayerId ?: break
             if (!isPerson(priority)) {
-                val bot = ai ?: break
+                val bot = ais[priority] ?: break
                 val chosen = bot.chooseAction(current)
-                val acted = apply(chosen, events, aiId) || apply(safePass(current, aiId), events, aiId)
+                val acted = apply(chosen, events, priority) || apply(safePass(current, priority), events, priority)
                 if (!acted) break
                 if (chosen !is PassPriority) flush(paceMs)
                 continue
@@ -602,10 +610,21 @@ class LocalArgentumHost(
         .put("winnerId", (current.winnerId?.value as Any?) ?: JSONObject.NULL)
         .put("reason", if (current.winnerId == seat) "OPPONENT_LOST" else if (current.winnerId == null) "DRAW" else "YOU_LOST")
 
+    private var peopleOutSent = false
+
+    /** Every person has lost while AIs play on: the game is over for them. */
+    private fun peopleOut() {
+        if (peopleOutSent) return
+        peopleOutSent = true
+        sendState(emptyList(), interactive = false)
+        people().forEach { emitTo(it, JSONObject().put("type", "gameOver").put("winnerId", JSONObject.NULL).put("reason", "YOU_LOST")) }
+    }
+
     private fun finishIfOver(events: List<GameEvent>) {
         sendState(events)
         val current = state ?: return
         if (current.gameOver && events.isEmpty()) people().forEach { emitTo(it, gameOverMessage(current, it)) }
+        else if (!current.gameOver && people().none { it in current.activePlayers }) peopleOut()
     }
 
     private fun sendError(seat: EntityId, text: String) = emitTo(seat, JSONObject().put("type", "error").put("code", "INVALID_ACTION").put("message", text))
