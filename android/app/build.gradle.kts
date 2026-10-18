@@ -19,14 +19,15 @@ android {
         targetSdk = 36
         versionCode = 102
         versionName = "0.26.0-wifi"
-        manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build 99"
+        manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build $versionCode"
     }
 
     buildTypes {
         debug {
             // Separate package so this build installs beside the experimental/targeting test build.
             applicationIdSuffix = ".argentum"
-            manifestPlaceholders["appLabel"] = "Arcana · Argentum B99"
+            // The build number follows versionCode, so the installer never shows a stale one.
+            manifestPlaceholders["appLabel"] = "Arcana · Argentum B${defaultConfig.versionCode}"
         }
     }
 
