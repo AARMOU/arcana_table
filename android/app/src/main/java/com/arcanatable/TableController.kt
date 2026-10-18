@@ -239,6 +239,7 @@ internal class TableController(
     var showPlayedPopup by run { mutableStateOf(optionPrefs.getBoolean("adjust_play_popup", true)) }
     var showRecentPlays by run { mutableStateOf(optionPrefs.getBoolean("adjust_recent_plays", true)) }
     var showAbilityBanners by run { mutableStateOf(optionPrefs.getBoolean("adjust_ability_banners", true)) }
+    var showStackPile by run { mutableStateOf(optionPrefs.getBoolean("adjust_stack_pile", true)) }
     var showAiRecap by run { mutableStateOf(optionPrefs.getBoolean("adjust_ai_recap", true)) }
     var showTurnBanner by run { mutableStateOf(optionPrefs.getBoolean("adjust_turn_banner", true)) }
     var buzzOnTurn by run { mutableStateOf(optionPrefs.getBoolean("adjust_turn_buzz", true)) }

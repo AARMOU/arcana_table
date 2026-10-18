@@ -17,8 +17,8 @@ android {
         applicationId = "com.arcanatable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 108
-        versionName = "0.30.1-tapdismiss"
+        versionCode = 109
+        versionName = "0.31.0-cardpicks"
         manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build $versionCode"
     }
 

@@ -849,6 +849,7 @@ internal fun TableController.TableOverlaysB() {
         popup = showPlayedPopup, onPopup = { v -> showPlayedPopup = v; optionPrefs.edit().putBoolean("adjust_play_popup", v).apply() },
         feed = showRecentPlays, onFeed = { v -> showRecentPlays = v; optionPrefs.edit().putBoolean("adjust_recent_plays", v).apply() },
         banners = showAbilityBanners, onBanners = { v -> showAbilityBanners = v; optionPrefs.edit().putBoolean("adjust_ability_banners", v).apply() },
+        stackPile = showStackPile, onStackPile = { v -> showStackPile = v; optionPrefs.edit().putBoolean("adjust_stack_pile", v).apply() },
         recap = showAiRecap, onRecap = { v -> showAiRecap = v; optionPrefs.edit().putBoolean("adjust_ai_recap", v).apply() },
         turnBanner = showTurnBanner, onTurnBanner = { v -> showTurnBanner = v; optionPrefs.edit().putBoolean("adjust_turn_banner", v).apply() },
         turnBuzz = buzzOnTurn, onTurnBuzz = { v -> buzzOnTurn = v; optionPrefs.edit().putBoolean("adjust_turn_buzz", v).apply() },
@@ -859,13 +860,13 @@ internal fun TableController.TableOverlaysB() {
         onReset = {
             cardSizeScale = 1f; boardSpacingScale = 1f; handSheetHeightFraction = .52f; footerButtonScale = 1f; handCardScale = 1f; handArrangement = HandArrangement.AUTO_FIT
             quickActionOrderRaw = defaultQuickActionOrder
-            showPlayedPopup = true; showRecentPlays = true; showAbilityBanners = true; showAiRecap = true; showTurnBanner = true; buzzOnTurn = true; stackSameCards = true; respondGlow = true
+            showPlayedPopup = true; showRecentPlays = true; showAbilityBanners = true; showStackPile = true; showAiRecap = true; showTurnBanner = true; buzzOnTurn = true; stackSameCards = true; respondGlow = true
             playedPopupSeconds = 4f; combatCardScale = 1f
             optionPrefs.edit().putFloat("card_size_scale", 1f).putFloat("layout_card_size_$layoutOrientationSuffix", 1f).putFloat("layout_board_spacing_$layoutOrientationSuffix", 1f)
                 .putFloat("hand_sheet_height_fraction", .52f).putFloat("layout_hand_sheet_height_$layoutOrientationSuffix", .52f).putFloat("layout_hand_card_scale_$layoutOrientationSuffix", 1f)
                 .putFloat("layout_footer_button_scale_$layoutOrientationSuffix", 1f)
                 .putString("layout_hand_arrangement_$layoutOrientationSuffix", HandArrangement.AUTO_FIT.name).putString("layout_quick_actions_$layoutOrientationSuffix", defaultQuickActionOrder)
-                .putBoolean("adjust_play_popup", true).putBoolean("adjust_recent_plays", true).putBoolean("adjust_ability_banners", true).putBoolean("adjust_ai_recap", true)
+                .putBoolean("adjust_play_popup", true).putBoolean("adjust_recent_plays", true).putBoolean("adjust_ability_banners", true).putBoolean("adjust_stack_pile", true).putBoolean("adjust_ai_recap", true)
                 .putBoolean("adjust_turn_banner", true).putBoolean("adjust_turn_buzz", true).putBoolean("adjust_stack_cards", true).putBoolean("adjust_respond_glow", true).putFloat("adjust_notice_seconds", 4f).putFloat("adjust_combat_card_scale", 1f).apply()
         },
         onDismiss = { layoutLabOpen = false; optionsOpen = true }
@@ -993,11 +994,9 @@ internal fun TableController.TableOverlaysB() {
         title = { Text("Argentum stack and priority") },
         text = {
             Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                val stackItems = argentumSnapshot?.targets?.values.orEmpty().filter { it.type == "Spell" }
+                val stackItems = argentumSnapshot?.stack.orEmpty()
                 Text(if (stackItems.isEmpty()) "The Argentum stack is empty." else "ON THE STACK · ${stackItems.size}", color = Mint, fontWeight = FontWeight.Bold)
-                stackItems.forEach { item ->
-                    Text(item.name, color = SoftWhite, fontSize = 13.sp)
-                }
+                StackCardList(stackItems)
                 Text("Argentum controls priority and resolves the stack. Arcana displays the server state and offers only server-provided actions.", color = Muted, fontSize = 12.sp)
                 TextButton(onClick = { stackOpen = false; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } }, enabled = argentumSnapshot?.legalActions?.isNotEmpty() == true) {
                     Text("VIEW LEGAL ACTIONS", color = Mint)

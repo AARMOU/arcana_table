@@ -45,6 +45,7 @@ internal fun AdjustUiPage(
     popupSeconds: Float, onPopupSeconds: (Float) -> Unit,
     combatSize: Float, onCombatSize: (Float) -> Unit,
     onReset: () -> Unit, onDismiss: () -> Unit,
+    stackPile: Boolean = true, onStackPile: (Boolean) -> Unit = {},
 ) {
     val catalog = listOf(
         AdjustableAction("GRAVEYARD", "Graveyard"), AdjustableAction("EXILE", "Exile"),
@@ -133,6 +134,7 @@ internal fun AdjustUiPage(
                     AdjustSlider("Notice time", popupSeconds, 1f..8f, { "${"%.1f".format(it)} sec" }, onPopupSeconds)
                     AdjustToggle("Recent-plays strip", "Show or hide the strip of recent cards.", feed, onFeed)
                     AdjustToggle("Ability and trigger banners", "Show short notices when abilities happen.", banners, onBanners)
+                    AdjustToggle("Stack on the table", "Show what's on the stack as cards at the edge of the table.", stackPile, onStackPile)
                     AdjustToggle("AI turn recap", "Summarize the AI's turn when yours begins.", recap, onRecap)
                     AdjustToggle("Turn banner", "Show a banner when a turn begins.", turnBanner, onTurnBanner)
                     AdjustToggle("Buzz on your turn", "Give a short buzz when your turn begins.", turnBuzz, onTurnBuzz)

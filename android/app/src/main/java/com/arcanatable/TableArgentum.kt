@@ -706,3 +706,37 @@ internal fun TableController.closeArgentumSession(concede: Boolean) {
     showOverview = true
     showHand = false
 }
+
+/**
+ * What a card-grid pick shows for one Argentum object id: the card's picture, and who controls it
+ * (you first, then each opponent by seat, then players themselves, then the stack).
+ */
+internal fun TableController.argentumPickCard(id: String): PickCard {
+    val snap = argentumSnapshot
+    val you = snap?.viewingPlayer ?: localSeat
+    val seatOfPlayer = snap?.players?.indexOfFirst { it.id == id } ?: -1
+    if (seatOfPlayer >= 0) {
+        val p = snap!!.players[seatOfPlayer]
+        return PickCard(id, if (seatOfPlayer == you) "You" else p.name, null, group = "Players", groupOrder = 100, isPlayer = true, detail = "${p.life} life")
+    }
+    val displayId = snap?.serverCardIds?.entries?.firstOrNull { it.value == id }?.key
+    if (snap != null && displayId != null) {
+        snap.players.forEachIndexed { seat, p ->
+            val zones = listOf("" to p.battlefield, "graveyard" to p.graveyard, "exile" to p.exile, "hand" to p.hand, "revealed" to p.revealed)
+            for ((zone, cards) in zones) {
+                val card = cards.firstOrNull { it.id == displayId } ?: continue
+                val owner = if (seat == you) "You" else p.name
+                val group = if (zone.isEmpty()) owner else "$owner · $zone"
+                val order = (if (seat == you) 0 else 1 + seat) * 10 + if (zone.isEmpty()) 0 else 1
+                return PickCard(id, card.name, card.imageUrl?.takeIf { !card.isFaceDown }, card.type, group, order, isYou = seat == you, isToken = card.isToken)
+            }
+        }
+    }
+    snap?.stack?.firstOrNull { it.id == id }?.let { item ->
+        return PickCard(id, item.name, item.imageUrl, group = "On the stack", groupOrder = 200, isYou = item.isYours, detail = item.controllerName)
+    }
+    val ref = snap?.targets?.get(id)
+    val ownerSeat = ref?.ownerId?.let { o -> snap.players.indexOfFirst { it.id == o } } ?: -1
+    val owner = when { ownerSeat < 0 -> "Other"; ownerSeat == you -> "You"; else -> snap!!.players[ownerSeat].name }
+    return PickCard(id, ref?.name ?: argentumName(id), null, ref?.type.orEmpty(), owner, if (ownerSeat == you) 5 else 1 + maxOf(ownerSeat, 0) * 10 + 5, isYou = ownerSeat == you)
+}

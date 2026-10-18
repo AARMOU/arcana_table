@@ -141,6 +141,7 @@ import kotlinx.coroutines.CoroutineScope
 @Composable
 internal fun TableController.TableOverlays() {
             Box(Modifier.fillMaxSize()) {
+        if (argentumEnabled && !homeOpen && gameInProgress && showStackPile) StackPile(argentumSnapshot?.stack.orEmpty(), onOpenStack = { stackOpen = true })
         if (argentumEnabled && !homeOpen && showTurnBanner) TurnBanner(turnBanner, onDismiss = { turnBanner = null })
         if (argentumEnabled && !homeOpen) PlayFeedOverlay(if (showPlayedPopup) playPopup else null, if (showRecentPlays) playFeed else emptyList(), if (showAbilityBanners) playBanner else null, if (showAiRecap) recapText else null,
             onDismissPopup = { playPopup = null }, onPreview = { playPopup = it },
@@ -459,7 +460,11 @@ internal fun TableController.TableOverlays() {
                     when (kind) {
                         "YesNoDecision" -> Text(decision.optString("hint").takeIf(String::isNotBlank).orEmpty(), color = Muted)
                         "ChooseOptionDecision" -> (decision.optJSONArray("options") ?: JSONArray()).let { options ->
-                            for (index in 0 until options.length()) {
+                            var optionQuery by remember(decisionId) { mutableStateOf("") }
+                            if (options.length() > SEARCH_THRESHOLD) PickSearchField(optionQuery, { optionQuery = it })
+                            val shownOptions = (0 until options.length()).filter { matchesSearch(options.optString(it), optionQuery) }
+                            if (shownOptions.isEmpty()) Text("Nothing matches \"$optionQuery\".", color = Muted, fontSize = 12.sp)
+                            for (index in shownOptions) {
                                 val option = options.optString(index)
                                 TextButton(onClick = {
                                     submitArgentumDecision(JSONObject().put("type", "OptionChosenResponse").put("optionIndex", index))
@@ -495,22 +500,22 @@ internal fun TableController.TableOverlays() {
                             val options = decision.optJSONArray("options") ?: JSONArray()
                             val limits = decision.optJSONObject("selectionLimits")
                             val cardInfo = decision.optJSONObject("cardInfo")
-                            for (index in 0 until options.length()) {
+                            val maxSel = decision.optInt("maxSelections", 1)
+                            val pickItems = (0 until options.length()).map { index ->
                                 val id = options.optString(index)
-                                val target = argentumSnapshot?.targets?.get(id)
-                                val name = target?.name ?: cardInfo?.optJSONObject(id)?.optString("name") ?: id.takeLast(6)
-                                val cap = limits?.optInt(id, 1) ?: 1
-                                Row(Modifier.fillMaxWidth().clickable {
-                                    argentumDecisionSelection = if (id in argentumDecisionSelection) argentumDecisionSelection - id
-                                        else if (argentumDecisionSelection.size < decision.optInt("maxSelections", 1) && (argentumDecisionSelection.count { limits?.optInt(it, 1) == cap } < cap)) argentumDecisionSelection + id
-                                        else argentumDecisionSelection
-                                }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Checkbox(checked = id in argentumDecisionSelection, onCheckedChange = { checked ->
-                                        argentumDecisionSelection = if (checked) argentumDecisionSelection + id else argentumDecisionSelection - id
-                                    })
-                                    Text(name, color = SoftWhite, fontSize = 12.sp)
-                                }
+                                val base = argentumPickCard(id)
+                                val info = cardInfo?.optJSONObject(id)
+                                if (info == null) base
+                                else base.copy(name = if (argentumSnapshot?.targets?.get(id) == null) info.optString("name", base.name) else base.name,
+                                    imageUrl = base.imageUrl ?: info.optString("imageUri").takeUnless { it.isBlank() || it == "null" },
+                                    typeLine = base.typeLine.ifBlank { info.optString("typeLine").takeUnless { it == "null" }.orEmpty() })
                             }
+                            fun canAdd(id: String): Boolean { val cap = limits?.optInt(id, 1) ?: 1
+                                return argentumDecisionSelection.size < maxSel && argentumDecisionSelection.count { limits?.optInt(it, 1) == cap } < cap }
+                            CardPickGrid(pickItems, argentumDecisionSelection.toSet(), isEnabled = { it in argentumDecisionSelection || canAdd(it) }, onTap = { id ->
+                                argentumDecisionSelection = if (id in argentumDecisionSelection) argentumDecisionSelection - id
+                                    else if (maxSel == 1) setOf(id) else if (canAdd(id)) argentumDecisionSelection + id else argentumDecisionSelection
+                            })
                             Text("Choose ${decision.optInt("minSelections", 0)}–${decision.optInt("maxSelections", 1)} card(s).", color = Muted, fontSize = 11.sp)
                         }
                         "ChooseTargetsDecision" -> {
@@ -533,29 +538,21 @@ internal fun TableController.TableOverlays() {
                                     ?: JSONArray()
                                 val selectionGroups = requirement.optJSONArray("selectionGroups")
                                 val currentSet = chosen.toSet()
-                                for (index in 0 until ids.length()) {
-                                    val id = ids.optString(index)
+                                val idList = (0 until ids.length()).map { ids.optString(it) }
+                                fun allowed(id: String): Boolean {
+                                    if (id in chosen) return true
                                     val groupAllows = selectionGroups == null || selectionGroups.length() == 0 ||
                                         (0 until selectionGroups.length()).any { groupIndex ->
                                             val group = selectionGroups.optJSONArray(groupIndex) ?: return@any false
                                             (0 until group.length()).map { group.optString(it) }.containsAll(currentSet + id)
                                         }
-                                    val checked = id in chosen
-                                    val enabled = checked || (chosen.size < maxTargets && groupAllows)
-                                    val label = argentumSnapshot?.targets?.get(id)?.name ?: id.takeLast(6)
-                                    Row(Modifier.fillMaxWidth().clickable(enabled = enabled) {
-                                        argentumDecisionTargets = argentumDecisionTargets.toMutableMap().apply {
-                                            put(requirementIndex, if (checked) chosen - id else chosen + id)
-                                        }
-                                    }.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        Checkbox(checked = checked, enabled = enabled, onCheckedChange = { checkedNow ->
-                                            argentumDecisionTargets = argentumDecisionTargets.toMutableMap().apply {
-                                                put(requirementIndex, if (checkedNow) chosen + id else chosen - id)
-                                            }
-                                        })
-                                        Text(label, color = if (enabled) SoftWhite else Muted, fontSize = 12.sp)
-                                    }
+                                    return groupAllows && (chosen.size < maxTargets || maxTargets == 1)
                                 }
+                                CardPickGrid(idList.map { argentumPickCard(it) }, currentSet, isEnabled = ::allowed, onTap = { id ->
+                                    argentumDecisionTargets = argentumDecisionTargets.toMutableMap().apply {
+                                        put(requirementIndex, when { id in chosen -> chosen - id; maxTargets == 1 -> listOf(id); chosen.size < maxTargets -> chosen + id; else -> chosen })
+                                    }
+                                })
                                 Text("Choose ${requirement.optInt("minTargets", 0)}–$maxTargets target(s).", color = Muted, fontSize = 11.sp)
                             }
                         }
