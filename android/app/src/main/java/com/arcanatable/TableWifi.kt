@@ -48,6 +48,7 @@ internal fun TableController.startWifiHost(online: Boolean = false) {
                     onGuest = { hello -> scope.launch { acceptWifiGuest(host, hello, setup, registry) } },
                     onGuestMessage = onGuestMessage, onGuestLeft = onGuestLeft,
                     onFailed = { reason -> scope.launch { if (wifiServer === host) { stopWifi(); message = "Couldn't open the online room: $reason"; recordDiagnostic("Online host failed: $reason", DiagnosticCategory.ERROR) } } },
+                    onNotice = { text -> scope.launch { if (wifiServer === host) handleArgentumMessage(JSONObject().put("type", "error").put("code", ArgentumCloudGuest.LINK_NOTE).put("message", text)) } },
                 )
                 wifiServer = host
                 onlineRoomCode = host.code

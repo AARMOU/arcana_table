@@ -488,7 +488,11 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             recordDiagnostic("Argentum game over (${incoming.optString("reason")})", DiagnosticCategory.ENGINE)
         }
         "sessionReplaced" -> recordDiagnostic("Argentum session replaced by another connection", DiagnosticCategory.CONNECTION)
-        "error" -> if (incoming.optString("code") == "WIFI_NOTE") {
+        "error" -> if (incoming.optString("code") == ArgentumCloudGuest.LINK_NOTE) {
+            // Online connection news (dropped, reconnecting, back): shown, not treated as an error.
+            message = incoming.optString("message")
+            recordDiagnostic("Online: ${incoming.optString("message")}", DiagnosticCategory.CONNECTION)
+        } else if (incoming.optString("code") == "WIFI_NOTE") {
             // An information note from the host (e.g. a card left out of a deck), not a problem.
             message = "Note: " + incoming.optString("message")
             recordDiagnostic("Note from host: ${incoming.optString("message")}", DiagnosticCategory.ENGINE)

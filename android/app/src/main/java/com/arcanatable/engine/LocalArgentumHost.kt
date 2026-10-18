@@ -177,7 +177,7 @@ class LocalArgentumHost(
         when (message.optString("type")) {
             "connect" -> emitTo(from, JSONObject().put("type", "connected").put("playerId", from.value).put("token", "offline"))
             "createQuickGameLobby" -> if (from == humanId) startGame()
-            "requestResync" -> if (state != null && !mulliganPhase) sendStateFor(from, emptyList(), true)
+            "requestResync" -> if (state != null) resync(from)
             "refineMaxX" -> refineMaxX(message.optString("cardId"), from)
             "submitAction" -> submitAction(message, from)
             "keepHand" -> mulliganAction(KeepHand(from))
@@ -197,6 +197,17 @@ class LocalArgentumHost(
             "ping" -> emitTo(from, JSONObject().put("type", "pong"))
             else -> Unit // lobby, deck and preference messages need no answer offline
         }
+    }
+
+    /**
+     * Sends [seat] where the game stands again (after an online reconnect, say). During opening
+     * hands that's their mulligan question, if they haven't settled yet; otherwise their full view.
+     */
+    private fun resync(seat: EntityId) {
+        if (!mulliganPhase) { sendStateFor(seat, emptyList(), true); return }
+        if (mulliganDone(seat)) return
+        val mull = mulliganState(seat)
+        if (mull != null && mull.hasKept) sendBottomCards(seat, mull.cardsToBottom) else sendMulliganDecision(seat)
     }
 
     private fun concede(seat: EntityId) {
