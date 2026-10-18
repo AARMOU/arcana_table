@@ -250,8 +250,22 @@ internal class TableController(
     var showEngineStatus by run { mutableStateOf(optionPrefs.getBoolean("show_engine_status", true)) }
     val defaultQuickActionOrder get() = argentumQuickActionIds.joinToString("|")
     var nextId by run { mutableIntStateOf(20) }
-    var players by run { mutableStateOf(loadSavedPlayers(context) ?: samplePlayers()) }
-    var selectedPlayer by run { mutableIntStateOf(0) }
+    // Seat indexes always stay inside the current player list. Ending a 3–4 player game swaps the
+    // list back to the 2-seat table; without this, a board/turn index left on seat 3 or 4 crashed
+    // the next screen that read players[index] (Build 107 crash after choosing a deck).
+    private var playersState by run { mutableStateOf(loadSavedPlayers(context) ?: samplePlayers()) }
+    var players: List<TablePlayer>
+        get() = playersState
+        set(value) {
+            playersState = value
+            val last = (value.size - 1).coerceAtLeast(0)
+            if (selectedPlayerState > last) selectedPlayerState = last
+            if (activePlayerState > last) activePlayerState = last
+        }
+    private var selectedPlayerState by run { mutableIntStateOf(0) }
+    var selectedPlayer: Int
+        get() = selectedPlayerState
+        set(value) { selectedPlayerState = value.coerceIn(0, (playersState.size - 1).coerceAtLeast(0)) }
     var showOverview by run { mutableStateOf(true) }
     var showHand by run { mutableStateOf(false) }
     var importOpen by run { mutableStateOf(false) }
@@ -298,7 +312,10 @@ internal class TableController(
     var message by run { mutableStateOf<String?>(null) }
     var cardActionTarget by run { mutableStateOf<Pair<Int, Int>?>(null) }
     var handActionCard by run { mutableStateOf<GameCard?>(null) }
-    var activePlayer by run { mutableIntStateOf(0) }
+    private var activePlayerState by run { mutableIntStateOf(0) }
+    var activePlayer: Int
+        get() = activePlayerState
+        set(value) { activePlayerState = value.coerceIn(0, (playersState.size - 1).coerceAtLeast(0)) }
     // Not saveable: after a relaunch/recreation the player chooses Resume (Argentum resumes on reconnect).
     var argentumEnabled by run { mutableStateOf(false) }
     /** True while the current Argentum game runs on the in-app engine (no server). */
