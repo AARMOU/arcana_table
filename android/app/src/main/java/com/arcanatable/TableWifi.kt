@@ -29,6 +29,7 @@ internal fun TableController.startWifiHost() {
     if (offlineStarting || argentumEnabled || wifiServer != null) return
     offlineStarting = true
     argentumLastError = null
+    recordDiagnostic("Wi-Fi: hosting requested", DiagnosticCategory.ACTION)
     scope.launch {
         try {
             val (names, commander) = activeDeckCards()
@@ -112,6 +113,7 @@ private suspend fun TableController.acceptWifiGuest(
 internal fun TableController.searchWifiHosts() {
     if (wifiSearching) return
     wifiSearching = true
+    recordDiagnostic("Wi-Fi: searching for a host", DiagnosticCategory.CONNECTION)
     scope.launch {
         val lock = runCatching {
             (context.applicationContext.getSystemService(android.content.Context.WIFI_SERVICE) as android.net.wifi.WifiManager)
@@ -119,6 +121,7 @@ internal fun TableController.searchWifiHosts() {
         }.getOrNull()
         try {
             wifiFound = withContext(Dispatchers.IO) { ArgentumLan.discover(3_000) }
+            recordDiagnostic("Wi-Fi: found ${wifiFound.size} host(s)", DiagnosticCategory.CONNECTION)
         } finally {
             runCatching { lock?.release() }
             wifiSearching = false
@@ -131,6 +134,7 @@ internal fun TableController.joinWifiGame(address: String) {
     if (wifiConnecting || argentumEnabled || address.isBlank()) return
     wifiConnecting = true
     argentumLastError = null
+    recordDiagnostic("Wi-Fi: joining requested", DiagnosticCategory.ACTION)
     scope.launch {
         val guest = ArgentumLanGuest()
         try {

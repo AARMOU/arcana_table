@@ -163,12 +163,14 @@ fun PlaySheet(
     onWifiJoin: () -> Unit = {},
 ) {
     var online by remember { mutableStateOf(false) }
+    // Wi-Fi with a friend: null = not chosen; true = host, false = join.
+    var wifiHost by remember { mutableStateOf<Boolean?>(null) }
     var showAllDecks by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("How do you want to play?", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
             Text(deckName?.let { "Your deck: $it" } ?: "No deck yet: offline uses a quick Portal duel.", color = Muted, fontSize = 14.sp)
-            PlayOption("Offline vs AI", "Runs on your phone. No internet needed.", selected = !online, onClick = { online = false }, tag = "play-offline-option") {
+            PlayOption("Offline vs AI", "Runs on your phone. No internet needed.", selected = !online && wifiHost == null, onClick = { online = false; wifiHost = null }, tag = "play-offline-option") {
                 Text("AI'S DECK", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
                 val shown = if (showAllDecks) aiDecks else aiDecks.filter { !it.builtIn || it.id in setOf("tokens_win", "artificer_v4") || it.id == aiDeckId }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -177,23 +179,23 @@ fun PlaySheet(
                     if (!showAllDecks && shown.size < aiDecks.size) DeckChip("${aiDecks.size - shown.size} more decks ▾", false) { showAllDecks = true }
                 }
             }
-            PlayOption("Wi-Fi with a friend", "Two phones on the same Wi-Fi. One hosts, the other joins. Commander decks.", selected = false, onClick = {}, tag = "play-wifi-option") {
+            PlayOption("Wi-Fi with a friend", "Two phones on the same Wi-Fi. One hosts, the other joins. Commander decks.", selected = wifiHost != null, onClick = { online = false; if (wifiHost == null) wifiHost = true }, tag = "play-wifi-option") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onWifiHost, modifier = Modifier.testTag("wifi-host")) { Text("Host a game", color = Mint) }
-                    TextButton(onClick = onWifiJoin, modifier = Modifier.testTag("wifi-join")) { Text("Join a game", color = Mint) }
+                    DeckChip("Host (this phone runs the game)", wifiHost == true) { online = false; wifiHost = true }
+                    DeckChip("Join a friend", wifiHost == false) { online = false; wifiHost = false }
                 }
             }
-            PlayOption("Online with Argentum", "Plays on Argentum's server. Needs internet.", selected = online, onClick = { online = true }, tag = "play-online-option") {
+            PlayOption("Online with Argentum", "Plays on Argentum's server. Needs internet.", selected = online, onClick = { online = true; wifiHost = null }, tag = "play-online-option") {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     TextButton(onClick = onCreateRoom) { Text("Room for friends", color = Mint) }
                     TextButton(onClick = onJoinRoom) { Text("Join a room", color = Mint) }
                 }
             }
             Button(
-                onClick = { if (online) onOnline() else onOffline() },
+                onClick = { when { online -> onOnline(); wifiHost == true -> onWifiHost(); wifiHost == false -> onWifiJoin(); else -> onOffline() } },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp).testTag("play-start"),
                 colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
-            ) { Text(if (online) "PLAY WITH ARGENTUM" else "PLAY OFFLINE VS AI", fontSize = 17.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
+            ) { Text(when { online -> "PLAY WITH ARGENTUM"; wifiHost == true -> "HOST A WI-FI GAME"; wifiHost == false -> "JOIN A WI-FI GAME"; else -> "PLAY OFFLINE VS AI" }, fontSize = 17.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
         }
     }
 }
