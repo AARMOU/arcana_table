@@ -728,17 +728,17 @@ internal fun TableController.TableOverlays() {
             onDismiss = { argentumBlockPlan = null })
     }
     argentumComposer?.let { plan ->
-        ArgentumActionComposer(plan, ::argentumName, busy = argentumAwaitingUpdate,
+        ArgentumActionComposer(plan, ::argentumName, busy = argentumAwaitingUpdate || argentumXChecking != null,
             onConfirm = { picks, x, distribution, color ->
                 val refs = argentumSnapshot?.targets.orEmpty()
                 val action = plan.build(picks, x, distribution, color) { id -> refs[id]?.let(ArgentumActionPlan::chosenTarget) }
                 val epoch = ArgentumActions.epochFor(plan.info, argentumSnapshot?.interactionEpoch)
                 if (epoch != null && submitArgentumAction(action, epoch)) {
                     recordDiagnostic("Sent ${action.optString("type")} (${plan.description}) with ${plan.chosenTargets(picks).size} target(s)${x?.let { ", X=$it" }.orEmpty()}", DiagnosticCategory.ACTION)
-                    argentumComposer = null
+                    argentumComposer = null; argentumXChecking = null
                 } else message = "Could not send that to Argentum. Refresh and try again."
             },
-            onDismiss = { argentumComposer = null; argentumStackUse = null })
+            onDismiss = { argentumComposer = null; argentumXChecking = null; argentumStackUse = null })
     }
     argentumDeckReview?.let { review ->
         ArgentumDeckReviewDialog(review,

@@ -284,9 +284,12 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
     }
     LaunchedEffect(argentumAwaitingUpdate) {
         if (argentumAwaitingUpdate) {
-            delay(8_000)
+            // Offline there's no network to lose: the engine on this phone is just thinking. A resync
+            // would queue behind it and make it slower, and unlocking lets stale taps through, so wait
+            // much longer before giving up.
+            delay(if (argentumOffline) 90_000 else 8_000)
             if (argentumAwaitingUpdate) {
-                recordDiagnostic("Argentum did not confirm an action within 8 s; requested a full state refresh", DiagnosticCategory.CONNECTION)
+                recordDiagnostic("Argentum did not confirm an action within ${if (argentumOffline) 90 else 8} s; requested a full state refresh", DiagnosticCategory.CONNECTION)
                 argentumAwaitingUpdate = false
                 argentumSocket.requestResync()
                 message = "Argentum has not confirmed that action yet. Arcana refreshed the table state."

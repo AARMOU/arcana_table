@@ -104,6 +104,15 @@ class LocalArgentumHost(
     private val gameLog = mutableListOf<ClientEvent>()
     private var version = 0L
 
+    // Legal actions for the last state they were worked out for (same object = same game moment), so
+    // auto-pass and the state update don't enumerate them twice.
+    private var legalCache: Pair<GameState, List<LegalActionInfo>>? = null
+    // When the message being handled started, for the "engineMs" diagnostic.
+    @Volatile private var handleStartNanos = 0L
+    // The epoch of the last update you could act on. A submit made against an older one (a tap
+    // queued while the engine was still thinking) is turned down instead of applied to a newer state.
+    private var interactiveEpoch = "offline-0"
+
     // Undo, as Argentum's GameSession does it: one checkpoint, owned by the player whose action set it.
     private data class Checkpoint(val state: GameState, val logSize: Int)
     private var undoCheckpoint: Checkpoint? = null
@@ -122,6 +131,7 @@ class LocalArgentumHost(
     var quietOpponentTurns: Boolean = false
 
     fun receive(message: JSONObject) = worker.execute {
+        handleStartNanos = System.nanoTime()
         runCatching { handle(message) }.onFailure { error ->
             emit(JSONObject().put("type", "error").put("code", "LOCAL_ENGINE").put("message", "Offline engine problem: ${error.javaClass.simpleName}: ${error.message?.take(200)}"))
         }
@@ -134,9 +144,12 @@ class LocalArgentumHost(
             "connect" -> emit(JSONObject().put("type", "connected").put("playerId", HUMAN_ID.value).put("token", "offline"))
             "createQuickGameLobby" -> startGame()
             "requestResync" -> sendState(emptyList())
+            "refineMaxX" -> refineMaxX(message.optString("cardId"))
             "submitAction" -> {
                 val current = state ?: return
                 if (mulliganPhase) { sendError("Choose your opening hand first."); return }
+                val epoch = message.optString("interactionEpoch")
+                if (epoch.startsWith("offline-") && epoch != interactiveEpoch) { sendError("The game moved on before that arrived. Nothing was done; try again."); return }
                 shockOffers.firstOrNull()?.let { offer ->
                     val raw = message.getJSONObject("action")
                     val response = raw.optJSONObject("response")
@@ -304,15 +317,20 @@ class LocalArgentumHost(
         if (action !is CastSpell && action !is ActivateAbility) return null
         if (action is CastSpell && action.paymentStrategy != PaymentStrategy.AutoPay) return null
         if (action is ActivateAbility && action.paymentStrategy != PaymentStrategy.AutoPay) return null
+        // Find the sources and their mana abilities once (the full legal-action list is slow on a big
+        // board), then sacrifice them in turn. A source whose ability no longer works is skipped.
+        val sacrificial = services.manaSolver.findAvailableManaSources(start, humanId).filter { it.requiresSacrifice }.map { it.entityId }.toSet()
+        if (sacrificial.isEmpty()) return null
+        val options = enumerator.enumerate(start, humanId)
+            .filter { it.isManaAbility && (it.action as? ActivateAbility)?.sourceId in sacrificial }
+            .distinctBy { (it.action as ActivateAbility).sourceId }
+            .take(MAX_SACRIFICE_SOURCES)
+        if (options.isEmpty()) return null
         val costColors = (action as? CastSpell)?.let { start.getEntity(it.cardId)?.get<CardComponent>()?.manaCost?.colors }.orEmpty()
         var current = start
         val events = mutableListOf<GameEvent>()
-        val used = mutableSetOf<EntityId>()
-        repeat(40) {
-            val sacrificial = services.manaSolver.findAvailableManaSources(current, humanId).filter { it.requiresSacrifice }.map { it.entityId }.toSet() - used
-            val option = enumerator.enumerate(current, humanId).firstOrNull { it.isManaAbility && (it.action as? ActivateAbility)?.sourceId in sacrificial } ?: return null
+        for (option in options) {
             val ability = option.action as ActivateAbility
-            used += ability.sourceId
             // "Any colour" sources (a Treasure) list no colours: try all five, never a blank choice
             // (a blank one opens a colour prompt mid-payment instead of adding mana).
             val colors = option.availableManaColors.orEmpty().ifEmpty { if (option.requiresManaColorChoice) com.wingedsheep.sdk.core.Color.entries else emptyList() }
@@ -324,7 +342,7 @@ class LocalArgentumHost(
                 if (fallback == null) fallback = activated.state to activated.events
                 if (processor.process(activated.state, action).result.error == null) return activated.state to (events + activated.events)
             }
-            val (next, nextEvents) = fallback ?: return null
+            val (next, nextEvents) = fallback ?: continue
             current = next; events += nextEvents
         }
         return null
@@ -484,12 +502,29 @@ class LocalArgentumHost(
     }
 
     private fun legalActions(state: GameState): List<LegalActionInfo> {
+        legalCache?.let { (cached, legal) -> if (cached === state) return legal }
+        return computeLegalActions(state).also { legalCache = state to it }
+    }
+
+    private fun computeLegalActions(state: GameState): List<LegalActionInfo> {
         (state.pendingDecision as? PlayCardDecision)?.let { play ->
             if (state.actorFor(play.playerId) != humanId) return emptyList()
             return enricher.enrich(enumerator.enumerate(state, play.playerId), state, play.playerId)
         }
         if (state.pendingDecision != null || state.priorityPlayerId != humanId) return emptyList()
-        return enricher.enrich(enumerator.enumerate(state, humanId), state, humanId).map { trueMaxX(state, it) }
+        return enricher.enrich(enumerator.enumerate(state, humanId), state, humanId)
+    }
+
+    /**
+     * The X picker just opened for [cardId]: work out the X auto-pay (with Treasures) can really pay
+     * and send it back as "maxXRefined". Done only on request, never on every update: it can mean
+     * dozens of trial payments on a big board.
+     */
+    private fun refineMaxX(cardId: String) {
+        val current = state
+        val info = current?.let { legalActions(it) }?.firstOrNull { (it.action as? CastSpell)?.cardId?.value == cardId && it.hasXCost }
+        val refined = if (current != null && info != null) trueMaxX(current, info).maxAffordableX else null
+        emit(JSONObject().put("type", "maxXRefined").put("cardId", cardId).put("maxX", refined ?: JSONObject.NULL).put("stateVersion", version))
     }
 
     /**
@@ -547,7 +582,9 @@ class LocalArgentumHost(
             put("undoAvailable", interactive && undoAvailable())
             put("priorityMode", "auto")
             put("stateVersion", ++version)
-            put("interactionEpoch", "offline")
+            if (interactive) interactiveEpoch = "offline-$version"
+            put("engineMs", (System.nanoTime() - handleStartNanos) / 1_000_000)
+            put("interactionEpoch", interactiveEpoch)
         }
         emit(JSONObject(message.toString()))
         if (current.gameOver && events.isNotEmpty()) emit(JSONObject().put("type", "gameOver")
@@ -558,5 +595,6 @@ class LocalArgentumHost(
     companion object {
         val HUMAN_ID = EntityId("offline-you")
         val AI_ID = EntityId("offline-ai")
+        private const val MAX_SACRIFICE_SOURCES = 40
     }
 }

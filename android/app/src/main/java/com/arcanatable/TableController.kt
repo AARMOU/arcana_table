@@ -375,6 +375,8 @@ internal class TableController(
     var argentumAmounts by run { mutableStateOf<Map<String, Int>>(emptyMap()) }
     var argentumDeckReview by run { mutableStateOf<ArgentumDeckReview?>(null) }
     var argentumComposer by run { mutableStateOf<ArgentumActionPlan?>(null) }
+    /** Offline: card id whose real maximum X the engine is still working out for the open composer. */
+    var argentumXChecking by run { mutableStateOf<String?>(null) }
     var argentumActionCard by run { mutableStateOf<GameCard?>(null) }
     var argentumGameOverDismissed by run { mutableStateOf(false) }
     var argentumMulliganInfo by run { mutableStateOf<Triple<Int, Boolean, Int>?>(null) } // count, on the play, cards to bottom

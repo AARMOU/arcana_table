@@ -257,6 +257,10 @@ internal fun TableController.chooseArgentumLegalAction(info: JSONObject) {
         // A separate ChooseTargetsDecision from the server takes precedence over pre-chosen targets.
         if (argentumPendingDecision?.optString("type") == "ChooseTargetsDecision") return
         argentumComposer = plan
+        // Offline, the engine works out the X auto-pay can really pay only now, not on every update.
+        val cardId = action.optString("cardId")
+        argentumXChecking = if (argentumOffline && plan.xRange != null && type == "CastSpell" && cardId.isNotBlank() && !info.optBoolean("requiresTargets") &&
+            argentumSocket.send("refineMaxX", JSONObject().put("cardId", cardId))) cardId else null
         return
     }
     val epoch = ArgentumActions.epochFor(info, argentumSnapshot?.interactionEpoch)
@@ -420,7 +424,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                     val eventLines = (0 until entries.length()).mapNotNull { entries.optJSONObject(it)?.optString("description")?.takeIf(String::isNotBlank) }
                     if (eventLines.isNotEmpty()) gameLog = (gameLog + eventLines).takeLast(250)
                 }
-                recordDiagnostic("Argentum state v${incoming.optLong("stateVersion")} applied: ${snapshot.players.size} players, turn ${snapshot.turnNumber} ${snapshot.stepName}, ${snapshot.legalActions.size} legal actions", DiagnosticCategory.ENGINE)
+                recordDiagnostic("Argentum state v${incoming.optLong("stateVersion")} applied: ${snapshot.players.size} players, turn ${snapshot.turnNumber} ${snapshot.stepName}, ${snapshot.legalActions.size} legal actions${if (incoming.has("engineMs")) ", engine ${incoming.optLong("engineMs")} ms" else ""}", DiagnosticCategory.ENGINE)
             }
         }
         "stateDeltaUpdate" -> {
@@ -458,6 +462,17 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             argentumBottomCardCount = incoming.optInt("cardsToPutOnBottom", 0)
             argentumBottomSelection = emptySet()
         }
+        "maxXRefined" -> {
+            val cardId = incoming.optString("cardId")
+            val plan = argentumComposer
+            if (argentumXChecking == cardId) argentumXChecking = null
+            val range = plan?.xRange
+            if (plan != null && range != null && plan.info.optJSONObject("action")?.optString("cardId") == cardId && !incoming.isNull("maxX")) {
+                val max = incoming.optInt("maxX").coerceIn(range.first, range.last)
+                if (max != range.last) argentumComposer = plan.copy(xRange = range.first..max)
+                recordDiagnostic("X for ${plan.description}: up to $max (engine ${incoming.optLong("engineMs", -1)} ms)", DiagnosticCategory.ENGINE)
+            }
+        }
         "mulliganComplete" -> { argentumMulliganPrompt = false; argentumAwaitingUpdate = false }
         "gameOver" -> {
             setArgentumGameActive(false)
@@ -473,7 +488,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
         }
         "sessionReplaced" -> recordDiagnostic("Argentum session replaced by another connection", DiagnosticCategory.CONNECTION)
         "error" -> {
-            argentumLastError = incoming.optString("message", "Argentum returned an error."); message = argentumLastError; argentumAwaitingUpdate = false
+            argentumLastError = incoming.optString("message", "Argentum returned an error."); message = argentumLastError; argentumAwaitingUpdate = false; argentumXChecking = null
             recordDiagnostic("Argentum error ${incoming.optString("code")}: ${argentumLastError}", DiagnosticCategory.ERROR)
         }
     }
