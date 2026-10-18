@@ -529,13 +529,13 @@ class ArgentumGameSocket(
     @Volatile var localHostFactory: (((JSONObject) -> Unit) -> com.arcanatable.engine.LocalArgentumHost)? = null
     @Volatile private var localHost: com.arcanatable.engine.LocalArgentumHost? = null
     /** Wi-Fi guest: another phone on this network runs the engine; messages go to it and back. */
-    @Volatile private var lanGuest: ArgentumLanGuest? = null
+    @Volatile private var lanGuest: ArgentumGuestLink? = null
     val isOffline: Boolean get() = localHost != null || localHostFactory != null || lanGuest != null
     /** The engine running on this phone, once connected (offline or Wi-Fi host). */
     val runningLocalHost: com.arcanatable.engine.LocalArgentumHost? get() = localHost
 
     /** Plays through a Wi-Fi host instead of the server. Call [connect] afterwards. */
-    fun attachLanGuest(guest: ArgentumLanGuest) {
+    fun attachLanGuest(guest: ArgentumGuestLink) {
         lanGuest = guest
         guest.onMessage = { message -> main.post { if (enabled.get()) onMessage(message) } }
         guest.onClosed = { main.post { if (enabled.get() && lanGuest === guest) { report("Lost the connection to the host phone."); setStatus(ArgentumConnectionStatus.DISCONNECTED) } } }

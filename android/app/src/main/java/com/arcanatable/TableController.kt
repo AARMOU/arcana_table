@@ -378,7 +378,10 @@ internal class TableController(
     /** Offline: card id whose real maximum X the engine is still working out for the open composer. */
     var argentumXChecking by run { mutableStateOf<String?>(null) }
     // Wi-Fi play (one phone hosts the engine, the other joins).
-    var wifiServer: ArgentumLanServer? = null
+    var wifiServer: ArgentumHostLink? = null
+    var onlineRoomCode by run { mutableStateOf<String?>(null) } // host: the code to share
+    var onlineJoinOpen by run { mutableStateOf(false) }
+    var onlineCodeInput by run { mutableStateOf("") }
     var wifiWaitingAddress by run { mutableStateOf<String?>(null) }
     var wifiJoinOpen by run { mutableStateOf(false) }
     var wifiSearching by run { mutableStateOf(false) }

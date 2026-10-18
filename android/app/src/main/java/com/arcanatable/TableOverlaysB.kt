@@ -782,6 +782,8 @@ internal fun TableController.TableOverlaysB() {
         backgroundAlertsEnabled = backgroundAlertsEnabled,
         followActivePlayer = followActivePlayer,
         connectionLabel = when {
+            argentumEnabled && wifiRole == "online-host" -> "Online game with a friend · you are hosting"
+            argentumEnabled && wifiRole == "online-guest" -> "Online game with a friend · the other phone is hosting"
             argentumEnabled && wifiRole == "host" -> "Wi-Fi game · you are hosting"
             argentumEnabled && wifiRole == "guest" -> "Wi-Fi game · the other phone is hosting"
             argentumEnabled && argentumOffline -> "Offline game · Argentum running on this phone"

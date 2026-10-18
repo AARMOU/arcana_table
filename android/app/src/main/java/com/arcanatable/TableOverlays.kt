@@ -196,6 +196,8 @@ internal fun TableController.TableOverlays() {
                 onDismiss = { playSheetOpen = false },
                 onWifiHost = { playSheetOpen = false; run { startWifiHost() } },
                 onWifiJoin = { playSheetOpen = false; run { wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() } },
+                onOnlineHost = { playSheetOpen = false; run { startWifiHost(online = true) } },
+                onOnlineJoin = { playSheetOpen = false; run { onlineCodeInput = ""; onlineJoinOpen = true } },
             )
             if (deckPickerOpen) DeckPickerSheet(deckChoices, activeDeckId,
                 onPick = { choice ->
@@ -352,6 +354,8 @@ internal fun TableController.TableOverlays() {
                     // Wi-Fi: the host waits for the friend again; the guest looks for the host again.
                     wifi == "host" -> startWifiHost()
                     wifi == "guest" -> { wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() }
+                    wifi == "online-host" -> startWifiHost(online = true)
+                    wifi == "online-guest" -> { onlineCodeInput = ""; onlineJoinOpen = true }
                     wasOffline -> startOfflineGame()
                     else -> startArgentumPractice(vsAi = true)
                 }

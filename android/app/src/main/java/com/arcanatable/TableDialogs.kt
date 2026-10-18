@@ -2065,6 +2065,8 @@ internal fun ChangelogDialog(onDismiss: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 104 · ONLINE WITH A FRIEND", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• PLAY → Play with a friend → Host online. Your phone runs the game and shows a room code; your friend picks Join online and types it. Works across any networks.", color = SoftWhite, fontSize = 13.sp)
                 Text("BUILDS 100–102 · WI-FI AND SPEED", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Wi-Fi with a friend: PLAY → Wi-Fi with a friend. One phone hosts, the other joins (Commander decks).\n• Offline games stay fast on big boards; the bar says ENGINE THINKING… while the engine works.\n• Counters show as small badges (+1/+1 ×8); only creatures show power/toughness.\n• One Notice time setting in Adjust UI for banners, pop-ups and the recap. Triggered abilities go in the game log. Your tab comes right after TABLE.", color = SoftWhite, fontSize = 13.sp)
                 Text("BUILD 99 · ADJUST UI", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)

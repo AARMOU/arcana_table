@@ -71,6 +71,20 @@ object ArgentumLan {
     }
 }
 
+/** The host phone's link to its guest (over Wi-Fi or online). */
+interface ArgentumHostLink {
+    fun send(message: JSONObject): Boolean
+    fun close()
+}
+
+/** The guest phone's link to the host (over Wi-Fi or online). */
+interface ArgentumGuestLink {
+    var onMessage: (JSONObject) -> Unit
+    var onClosed: () -> Unit
+    fun send(message: JSONObject): Boolean
+    fun close()
+}
+
 /** One line-delimited JSON connection, with a background reader and an ordered writer. */
 private class LanLink(private val socket: Socket, private val onMessage: (JSONObject) -> Unit, private val onClosed: () -> Unit) {
     private val open = AtomicBoolean(true)
@@ -117,7 +131,7 @@ class ArgentumLanServer(
     private val onGuest: (hello: JSONObject) -> Unit,
     private val onGuestMessage: (JSONObject) -> Unit,
     private val onGuestLeft: () -> Unit,
-) {
+) : ArgentumHostLink {
     private val running = AtomicBoolean(false)
     @Volatile private var server: ServerSocket? = null
     @Volatile private var guest: LanLink? = null
@@ -165,9 +179,9 @@ class ArgentumLanServer(
         }, "argentum-lan-announce").apply { isDaemon = true }.start()
     }
 
-    fun send(message: JSONObject): Boolean = guest?.send(message) == true
+    override fun send(message: JSONObject): Boolean = guest?.send(message) == true
 
-    fun close() {
+    override fun close() {
         running.set(false)
         guest?.close(); guest = null
         runCatching { server?.close() }
@@ -176,9 +190,9 @@ class ArgentumLanServer(
 }
 
 /** The guest phone's side: one connection to the host, messages in both directions. */
-class ArgentumLanGuest {
-    @Volatile var onMessage: (JSONObject) -> Unit = {}
-    @Volatile var onClosed: () -> Unit = {}
+class ArgentumLanGuest : ArgentumGuestLink {
+    @Volatile override var onMessage: (JSONObject) -> Unit = {}
+    @Volatile override var onClosed: () -> Unit = {}
     @Volatile private var link: LanLink? = null
 
     /** Connects to the host at [address] and sends [hello]. Blocking; call off the main thread. */
@@ -193,7 +207,7 @@ class ArgentumLanGuest {
         newLink.send(hello)
     }
 
-    fun send(message: JSONObject): Boolean = link?.send(message) == true
+    override fun send(message: JSONObject): Boolean = link?.send(message) == true
 
-    fun close() { link?.close(); link = null }
+    override fun close() { link?.close(); link = null }
 }

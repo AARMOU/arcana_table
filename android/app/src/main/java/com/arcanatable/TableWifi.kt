@@ -24,28 +24,42 @@ import org.json.JSONObject
  * joins over the local network and plays through it. Both need the app and a Commander deck.
  */
 
-/** Host: prepares your deck, then waits on the network for a friend to join. */
-internal fun TableController.startWifiHost() {
+/** Host: prepares your deck, then waits for a friend to join, on this Wi-Fi or ([online]) over the internet. */
+internal fun TableController.startWifiHost(online: Boolean = false) {
     if (offlineStarting || argentumEnabled || wifiServer != null) return
     offlineStarting = true
     argentumLastError = null
-    recordDiagnostic("Wi-Fi: hosting requested", DiagnosticCategory.ACTION)
+    recordDiagnostic(if (online) "Online: hosting requested" else "Wi-Fi: hosting requested", DiagnosticCategory.ACTION)
     scope.launch {
         try {
             val (names, commander) = activeDeckCards()
             val (setup, registry) = prepareOfflineSetup(names, commander, null)
             if (setup.you.commander == null) {
-                message = "Wi-Fi games use Commander decks. Pick a Commander deck on the home screen first."
+                message = "Games with a friend use Commander decks. Pick a Commander deck on the home screen first."
+                return@launch
+            }
+            val hostName = lobbyPlayerName.ifBlank { "Host" }
+            val onGuestMessage: (JSONObject) -> Unit = { msg -> argentumSocket.runningLocalHost?.receive(msg, com.arcanatable.engine.LocalArgentumHost.GUEST_ID) }
+            val onGuestLeft: () -> Unit = { argentumSocket.runningLocalHost?.receive(JSONObject().put("type", "guestLeft"), com.arcanatable.engine.LocalArgentumHost.GUEST_ID) }
+            if (online) {
+                lateinit var host: ArgentumCloudHost
+                host = ArgentumCloudHost(lobbyCloudEndpoint, hostName,
+                    onGuest = { hello -> scope.launch { acceptWifiGuest(host, hello, setup, registry) } },
+                    onGuestMessage = onGuestMessage, onGuestLeft = onGuestLeft,
+                    onFailed = { reason -> scope.launch { if (wifiServer === host) { stopWifi(); message = "Couldn't open the online room: $reason"; recordDiagnostic("Online host failed: $reason", DiagnosticCategory.ERROR) } } },
+                )
+                wifiServer = host
+                onlineRoomCode = host.code
+                host.start()
+                recordDiagnostic("Online host waiting (room code made)", DiagnosticCategory.CONNECTION)
                 return@launch
             }
             val address = ArgentumLan.localAddress()
             if (address.isBlank()) { message = "This phone isn't on a Wi-Fi network. Connect to Wi-Fi and try again."; return@launch }
-            val hostName = lobbyPlayerName.ifBlank { "Host" }
             lateinit var server: ArgentumLanServer
             server = ArgentumLanServer(hostName,
                 onGuest = { hello -> scope.launch { acceptWifiGuest(server, hello, setup, registry) } },
-                onGuestMessage = { msg -> argentumSocket.runningLocalHost?.receive(msg, com.arcanatable.engine.LocalArgentumHost.GUEST_ID) },
-                onGuestLeft = { argentumSocket.runningLocalHost?.receive(JSONObject().put("type", "guestLeft"), com.arcanatable.engine.LocalArgentumHost.GUEST_ID) },
+                onGuestMessage = onGuestMessage, onGuestLeft = onGuestLeft,
             )
             server.start()
             wifiServer = server
@@ -65,7 +79,7 @@ internal fun TableController.startWifiHost() {
 
 /** Host: a friend joined with their deck. Builds their seat and starts the game. */
 private suspend fun TableController.acceptWifiGuest(
-    server: ArgentumLanServer,
+    server: ArgentumHostLink,
     hello: JSONObject,
     setup: com.arcanatable.engine.OfflineSetup,
     registry: com.wingedsheep.engine.registry.CardRegistry,
@@ -88,7 +102,8 @@ private suspend fun TableController.acceptWifiGuest(
     }
     notes.forEach { note -> recordDiagnostic("Wi-Fi: $note", DiagnosticCategory.ENGINE); server.send(JSONObject().put("type", "error").put("code", "WIFI_NOTE").put("message", note)) }
     wifiWaitingAddress = null
-    wifiRole = "host"
+    onlineRoomCode = null
+    wifiRole = if (server is ArgentumCloudHost) "online-host" else "host"
     argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, setup.you, seat, emit = emit).also { it.quietOpponentTurns = quietOpponentTurns } }
     argentumOffline = true
     argentumDeckForLobby = null
@@ -170,11 +185,54 @@ internal fun TableController.joinWifiGame(address: String) {
     }
 }
 
+/** Guest: join a friend's online game by its room code. */
+internal fun TableController.joinOnlineGame(code: String) {
+    val clean = ArgentumCloudLink.cleanCode(code)
+    if (wifiConnecting || argentumEnabled || clean.length !in 6..8) { if (clean.length !in 6..8) message = "Room codes are 6 letters or numbers."; return }
+    wifiConnecting = true
+    argentumLastError = null
+    recordDiagnostic("Online: joining requested", DiagnosticCategory.ACTION)
+    val (names, commander) = activeDeckCards()
+    if (commander == null) { wifiConnecting = false; message = "Games with a friend use Commander decks. Pick a Commander deck on the home screen first."; return }
+    val hello = JSONObject().put("type", "lanHello").put("name", lobbyPlayerName.ifBlank { "Friend" })
+        .put("deck", JSONArray(names)).put("commander", commander)
+    val guest = ArgentumCloudGuest(lobbyCloudEndpoint, clean, lobbyPlayerName.ifBlank { "Friend" })
+    argentumSocket.attachLanGuest(guest)
+    guest.connect(hello) { failure ->
+        scope.launch {
+            wifiConnecting = false
+            if (failure != null) {
+                guest.close()
+                argentumSocket.close()
+                argentumLastError = "Couldn't join room $clean: $failure"
+                message = argentumLastError
+                recordDiagnostic("Online join failed: $failure", DiagnosticCategory.ERROR)
+                return@launch
+            }
+            onlineJoinOpen = false
+            wifiRole = "online-guest"
+            argentumOffline = true
+            argentumDeckForLobby = null
+            argentumCommanderForLobby = null
+            argentumVsAiLobby = false
+            argentumLobbySubmitted = true
+            argentumLocalPlayersBackup = players.toList()
+            argentumEnabled = true
+            homeOpen = false
+            lobbyOpen = false
+            argentumSocket.connect(lobbyPlayerName)
+            message = "Joined room $clean. Waiting for the host's phone to start the game…"
+            recordDiagnostic("Online: joined a room", DiagnosticCategory.CONNECTION)
+        }
+    }
+}
+
 /** Stops hosting or waiting (the game itself ends through closeArgentumSession). */
 internal fun TableController.stopWifi() {
     wifiServer?.close()
     wifiServer = null
     wifiWaitingAddress = null
+    onlineRoomCode = null
     wifiRole = null
 }
 
@@ -191,6 +249,36 @@ internal fun TableController.WifiDialogs() {
             },
             confirmButton = {},
             dismissButton = { TextButton(onClick = { stopWifi() }) { Text("CANCEL") } },
+        )
+    }
+    onlineRoomCode?.let { code ->
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Waiting for your friend") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Tell your friend this room code. On their phone: PLAY → Play with a friend → Join online.")
+                    Text(code, fontSize = androidx.compose.ui.unit.TextUnit(34f, androidx.compose.ui.unit.TextUnitType.Sp), fontWeight = androidx.compose.ui.text.font.FontWeight.Black, letterSpacing = androidx.compose.ui.unit.TextUnit(6f, androidx.compose.ui.unit.TextUnitType.Sp))
+                    Text("Keep this screen open until they join.")
+                }
+            },
+            confirmButton = {},
+            dismissButton = { TextButton(onClick = { stopWifi() }) { Text("CANCEL") } },
+        )
+    }
+    if (onlineJoinOpen) {
+        AlertDialog(
+            onDismissRequest = { if (!wifiConnecting) onlineJoinOpen = false },
+            title = { Text("Join online") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (wifiConnecting) "Connecting…" else "Type the room code shown on your friend's phone.")
+                    OutlinedTextField(value = onlineCodeInput, onValueChange = { onlineCodeInput = ArgentumCloudLink.cleanCode(it).take(8) },
+                        label = { Text("Room code") }, singleLine = true)
+                }
+            },
+            confirmButton = { TextButton(enabled = !wifiConnecting && onlineCodeInput.length >= 6, onClick = { joinOnlineGame(onlineCodeInput) }) { Text("JOIN") } },
+            dismissButton = { TextButton(enabled = !wifiConnecting, onClick = { onlineJoinOpen = false }) { Text("CLOSE") } },
         )
     }
     if (wifiJoinOpen) {
