@@ -881,8 +881,6 @@ internal fun TableController.TableOverlays() {
                         playableIds = argentumPlayableIds,
                         canRespond = argentumCanRespond && respondGlow,
                         commanderAffordable = argentumEnabled && players.getOrNull(handSeat)?.commanderCard?.id?.let { it in argentumPlayableIds } == true,
-                        passToMyTurnActive = passToMyTurnFrom != null,
-                        onPassToMyTurn = if (argentumEnabled && (players.getOrNull(localSeat)?.isEliminated != true || passToMyTurnFrom != null)) ({ togglePassToMyTurn() }) else null,
                         onStack = { run { if (argentumEnabled) run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } else stackOpen = true } },
                         onCastCommander = {
                             val commander = players.getOrNull(handSeat)?.commanderCard

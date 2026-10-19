@@ -471,8 +471,8 @@ internal fun TableController.TableMainLayout() {
                     onClick = { run { showHand = true } }
                 ) else Text("Tap a player to inspect their board", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
                 if (argentumEnabled) {
-                    if (passToMyTurnFrom != null) HeaderButton("AUTO-PASSING · STOP", onClick = { run { togglePassToMyTurn() } }, modifier = Modifier)
-                    else if (argentumPrimaryLabel != null) PassButton(argentumPrimaryLabel!!, onClick = { run { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, canRespond = argentumCanRespond && respondGlow, modifier = Modifier)
+                    if (passToMyTurnFrom != null) HeaderButton("AUTO-PASSING · STOP", onClick = { run { togglePassToMyTurn() } }, modifier = Modifier, onLongClick = { run { togglePassToMyTurn() } })
+                    else if (argentumPrimaryLabel != null) PassButton(argentumPrimaryLabel!!, onClick = { run { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, canRespond = argentumCanRespond && respondGlow, modifier = Modifier, onLongClick = { run { togglePassToMyTurn() } })
                     else Text(when { gameEndedOnline -> "GAME OVER"; argentumSnapshot == null -> "WAITING FOR ARGENTUM"; argentumPendingDecision != null -> "YOUR CHOICE IS NEEDED"; argentumAwaitingUpdate -> if (argentumSlow) "STILL WORKING…" else if (argentumOffline) "ENGINE THINKING…" else "WAITING FOR ARGENTUM"; wifiRole != null -> "WAITING FOR ${(argentumSnapshot?.let { players.getOrNull(it.priorityPlayer)?.name } ?: "YOUR FRIEND").uppercase()}…"; else -> "OPPONENT HAS PRIORITY" }, color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
                 } else {
                 if (gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) HeaderButton("NEXT · ${phaseSteps[phaseIndex]}", onClick = { run { if (argentumEnabled) sendArgentumPriority() else advanceStep() } }, enabled = !argentumAwaitingUpdate, modifier = Modifier)
@@ -500,7 +500,8 @@ internal fun TableController.TableMainLayout() {
                     onClick = { run { if (argentumEnabled && passToMyTurnFrom != null) togglePassToMyTurn() else if (argentumEnabled) argentumPrimary() else passTurn() } },
                     enabled = if (argentumEnabled && passToMyTurnFrom != null) true else if (argentumEnabled) argentumPrimaryLabel != null && !argentumAwaitingUpdate else canPassTurnFromBoard,
                     canRespond = argentumCanRespond && respondGlow,
-                    modifier = Modifier.weight(1f).height(footerControlHeight)
+                    modifier = Modifier.weight(1f).height(footerControlHeight).testTag("bottom-bar-pass-button"),
+                    onLongClick = if (argentumEnabled) ({ run { togglePassToMyTurn() } }) else null
                 )
                 Box(Modifier.weight(1.3f)) {
                     HandPeekBar(

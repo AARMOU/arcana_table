@@ -733,8 +733,7 @@ internal fun cardArtDescription(label: String?, fallbackName: String?): String =
 internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeight: androidx.compose.ui.unit.Dp, highlightedCardId: Int?, handRevealed: Boolean, canAdvance: Boolean, canControl: Boolean, commanderCanCast: Boolean, actionOrder: List<String>, stackCount: Int, onToggleReveal: (Boolean) -> Unit, onClose: () -> Unit, onDraw: () -> Unit, onCombat: () -> Unit, onNextStep: () -> Unit, onPassTurn: () -> Unit, onStack: () -> Unit, onCastCommander: () -> Unit, onMoreAction: (String) -> Unit, onSelect: (GameCard) -> Unit, onDragDrop: (GameCard, Offset) -> Unit,
     argentumMode: Boolean = false, argentumPrimaryLabel: String? = null, legalActionCount: Int = 0, onUndo: (() -> Unit)? = null,
     arrangement: HandArrangement = HandArrangement.AUTO_FIT, cardScale: Float = 1f, playableIds: Set<Int> = emptySet(),
-    canRespond: Boolean = false, commanderAffordable: Boolean = false,
-    passToMyTurnActive: Boolean = false, onPassToMyTurn: (() -> Unit)? = null) {
+    canRespond: Boolean = false, commanderAffordable: Boolean = false) {
     val handScrollState = rememberScrollState()
     var moreOpen by remember { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -746,11 +745,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             if (argentumMode) {
                 // Argentum owns draws, reveals, steps and combat; show only actions it can take.
-                if (passToMyTurnActive) {
-                    HeaderButton("STOP AUTO-PASS", onPassToMyTurn ?: {}, modifier = Modifier.testTag("hand-tray-pass-button"), onLongClick = onPassToMyTurn)
-                } else if (argentumPrimaryLabel != null) {
-                    PassButton(argentumPrimaryLabel, onClick = onPassTurn, enabled = true, canRespond = canRespond, modifier = Modifier.testTag("hand-tray-pass-button"), onLongClick = onPassToMyTurn)
-                }
+                if (argentumPrimaryLabel != null) PassButton(argentumPrimaryLabel, onClick = onPassTurn, enabled = true, canRespond = canRespond, modifier = Modifier.heightIn(min = 50.dp))
                 if (onUndo != null) HeaderButton("UNDO", onUndo)
                 HeaderButton("ACTIONS · $legalActionCount", onStack, enabled = legalActionCount > 0, modifier = Modifier)
                 if (commanderCanCast) HeaderButton("CAST COMMANDER", onCastCommander, modifier = Modifier, glow = commanderAffordable)

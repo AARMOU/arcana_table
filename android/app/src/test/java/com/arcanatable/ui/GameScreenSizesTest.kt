@@ -7,6 +7,7 @@ import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
@@ -97,10 +98,12 @@ class GameScreenSizesTest {
         assertFalse("no manual draw in Argentum mode", shown("DRAW", substring = false))
         assertFalse("no manual reveal in Argentum mode", shown("REVEAL HAND"))
         assertTrue("pass button names where it stops", shown("PASS →"))
-        rule.onNode(hasTestTag("hand-tray-pass-button")).performTouchInput { down(center); advanceEventTime(1_000); up() }
-        UiTestSupport.awaitReal(rule, 5_000, "hand-tray auto-pass control") { shown("STOP AUTO-PASS", substring = false) }
-        rule.onNode(hasTestTag("hand-tray-pass-button")).performClick()
-        UiTestSupport.awaitReal(rule, 5_000, "hand-tray auto-pass stopped") { !shown("STOP AUTO-PASS", substring = false) }
+        rule.onNodeWithContentDescription("Close hand").performClick()
+        UiTestSupport.settle(rule)
+        rule.onNode(hasTestTag("bottom-bar-pass-button")).performTouchInput { down(center); advanceEventTime(1_000); up() }
+        UiTestSupport.awaitReal(rule, 5_000, "adjacent pass button enables auto-pass") { shown("AUTO-PASSING · STOP", substring = false) }
+        rule.onNode(hasTestTag("bottom-bar-pass-button")).performClick()
+        UiTestSupport.awaitReal(rule, 5_000, "adjacent pass button stops auto-pass") { shown("PASS →", substring = false) }
 
         // Button audit: every visible clickable node is enabled with a label, or explicitly disabled.
         val unlabeledClickable = rule.onAllNodes(androidx.compose.ui.test.hasClickAction(), useUnmergedTree = false).fetchSemanticsNodes()
