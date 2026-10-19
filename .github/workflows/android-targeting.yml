@@ -5,7 +5,7 @@ on:
     branches:
       - experimental/targeting
       - experimental/arcana-argentum-integration
-      - GPT-eating-glue
+      - GPT-eating-glue # Build the hand-tray auto-pass change
   workflow_dispatch:
 
 permissions:
