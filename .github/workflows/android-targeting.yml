@@ -5,6 +5,7 @@ on:
     branches:
       - experimental/targeting
       - experimental/arcana-argentum-integration
+      - GPT-eating-glue
   workflow_dispatch:
 
 permissions:
