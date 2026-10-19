@@ -137,6 +137,10 @@ import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.unit.Density
 import kotlinx.coroutines.CoroutineScope
 
+// Temporarily hide automatic deck-import review and status popups while keeping
+// the card lookup needed to populate card details and artwork.
+internal const val SHOW_DECK_IMPORT_REVIEW_UI = false
+
 /**
  * State and game logic for the main table screen. It used to live inside one giant composable
  * (TableScreenContent); it was moved here so the screen's UI could be split into smaller files
@@ -1406,7 +1410,7 @@ internal class TableController(
                 showOverview = false
                 showHand = false
                 importOpen = false
-                if (issueDescriptions.isNotEmpty() || overflowIds.isNotEmpty()) {
+                if (SHOW_DECK_IMPORT_REVIEW_UI && (issueDescriptions.isNotEmpty() || overflowIds.isNotEmpty())) {
                     importReviewCardIds = issueCardIds + overflowIds
                     importOverflowCardIds = overflowIds
                     importReviewMessage = buildString {
@@ -1429,7 +1433,7 @@ internal class TableController(
                         }
                     }
                     importReviewOpen = true
-                } else {
+                } else if (SHOW_DECK_IMPORT_REVIEW_UI) {
                     message = buildString {
                         append("Import check passed: all ${entries.size} card names matched. ")
                         if (autoFixedNames.isNotEmpty()) append("Automatically corrected ${autoFixedNames.size} ${if (autoFixedNames.size == 1) "card name" else "card names"}. ")
