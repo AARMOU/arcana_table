@@ -286,6 +286,14 @@ internal class TableController(
     var playSheetOpen by run { mutableStateOf(false) }
     var offlineAiDeckId by run { mutableStateOf<String?>(null) }
     val premadeDecks = run { runCatching { context.assets.open("argentum/commander-decks.json").bufferedReader().use { it.readText() } }.getOrNull()?.let { runCatching { com.arcanatable.engine.OfflineGameSetup.parsePremades(it) }.getOrNull() }.orEmpty() }
+    val preconDecks = listOf(
+        runCatching { AppPreconDeck("fallout_scrappy_survivors", "Fallout: Scrappy Survivors", "Dogmeat, Ever Loyal", context.assets.open("precons/fallout_scrappy_survivors.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
+        runCatching { AppPreconDeck("fallout_hail_caesar", "Fallout: Hail, Caesar", "Caesar, Legion's Emperor", context.assets.open("precons/fallout_hail_caesar.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
+        runCatching { AppPreconDeck("fallout_mutant_menace", "Fallout: Mutant Menace", "The Wise Mothman", context.assets.open("precons/fallout_mutant_menace.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
+        runCatching { AppPreconDeck("fallout_science", "Fallout: Science!", "Dr. Madison Li", context.assets.open("precons/fallout_science.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
+        runCatching { AppPreconDeck("bloomburrow_family_matters", "Bloomburrow: Family Matters", "Zinnia, Valley's Voice", context.assets.open("precons/bloomburrow_family_matters.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
+        runCatching { AppPreconDeck("bloomburrow_peace_offering", "Bloomburrow: Peace Offering", "Ms. Bumbleflower", context.assets.open("precons/bloomburrow_peace_offering.txt").bufferedReader().use { it.readText() }) }.getOrNull()
+    ).filterNotNull()
     var savedDecksOpen by run { mutableStateOf(false) }
     var localDeckSyncConfirmed by run { mutableStateOf(false) }
     // Structured, redacted diagnostic log (DiagnosticLog.kt). Legacy free-text entries are migrated on load.
@@ -1501,9 +1509,11 @@ internal class TableController(
     fun activeDeckCards(): Pair<List<String>, String?> {
         val seat = players.getOrNull(localSeat)
         val active = activeDeckId
+        val precon = active?.takeIf { it.startsWith("precon:") }?.removePrefix("precon:")?.let { id -> preconDecks.firstOrNull { it.id == id } }
         val premade = active?.takeIf { it.startsWith("builtin:") }?.removePrefix("builtin:")?.let { id -> premadeDecks.firstOrNull { it.id == id } }
         val saved = active?.let { a -> savedDecks.firstOrNull { it.name == a } }
         return when {
+            precon != null -> parseDeckList(precon.decklist).let { entries -> entries.flatMap { entry -> List(entry.count) { entry.name } } to precon.commander }
             premade != null -> premade.cards to premade.commander
             saved != null -> parseDeckList(saved.text).let { e -> e.flatMap { x -> List(x.count) { x.name } } to (saved.commander ?: e.firstOrNull { it.commander }?.name) }
             else -> seat?.takeIf { it.deckLoaded }?.let { (it.library + it.hand).filterNot { c -> c.isToken || c.name == "Hidden card" }.map { c -> c.name } }.orEmpty() to

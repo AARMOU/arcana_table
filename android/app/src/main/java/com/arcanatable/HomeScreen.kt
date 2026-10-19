@@ -55,8 +55,18 @@ import androidx.compose.ui.unit.sp
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 
-/** A deck you can play: one of yours, or one that ships with the app. */
-data class DeckChoice(val id: String, val name: String, val commander: String?, val builtIn: Boolean)
+enum class DeckChoiceCategory { PRECON, ARGENTUM, OTHER }
+
+/** A deck you can play: one of yours, a precon, or an Argentum premade deck. */
+data class DeckChoice(
+    val id: String,
+    val name: String,
+    val commander: String?,
+    val builtIn: Boolean,
+    val category: DeckChoiceCategory = DeckChoiceCategory.OTHER
+)
+
+data class AppPreconDeck(val id: String, val name: String, val commander: String, val decklist: String)
 
 /**
  * Home: your deck at the top, one PLAY button, small footer. PLAY opens [PlaySheet] (offline vs AI
@@ -242,15 +252,19 @@ private fun DeckChip(label: String, selected: Boolean, onClick: () -> Unit) {
             .clickable(onClick = onClick).heightIn(min = 44.dp).padding(horizontal = 16.dp, vertical = 12.dp))
 }
 
-/** Pick the deck you play: yours first, then the decks that ship with the app. */
+/** Pick from precons, Argentum premades, and then your other decks. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text("Choose your deck", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
-            listOf(false to "YOUR DECKS", true to "DECKS IN THE APP").forEach { (builtIn, heading) ->
-                val list = decks.filter { it.builtIn == builtIn }
+            listOf(
+                DeckChoiceCategory.PRECON to "FALLOUT & BLOOMBURROW PRECONS",
+                DeckChoiceCategory.ARGENTUM to "ARGENTUM PREMADE DECKS",
+                DeckChoiceCategory.OTHER to "YOUR OTHER DECKS"
+            ).forEach { (category, heading) ->
+                val list = decks.filter { it.category == category }
                 Text(heading, color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
                 if (list.isEmpty()) Text("None yet. Import a deck and it lands here.", color = Muted, fontSize = 13.sp)
                 list.forEach { d ->

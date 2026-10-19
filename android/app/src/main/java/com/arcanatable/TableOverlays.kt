@@ -149,9 +149,10 @@ internal fun TableController.TableOverlays() {
             popupDurationSeconds = playedPopupSeconds,
             onDismissBanner = { playBanner = null }, onDismissRecap = { recapText = null })
         if (homeOpen) {
-            val deckChoices = remember(savedDecks, premadeDecks) {
-                savedDecks.map { DeckChoice(it.name, it.name, it.commander ?: parseDeckList(it.text).firstOrNull { e -> e.commander }?.name, builtIn = false) } +
-                    premadeDecks.map { DeckChoice("builtin:${it.id}", it.name, it.commander, builtIn = true) }
+            val deckChoices = remember(savedDecks, premadeDecks, preconDecks) {
+                preconDecks.map { DeckChoice("precon:${it.id}", it.name, it.commander, builtIn = true, category = DeckChoiceCategory.PRECON) } +
+                    premadeDecks.map { DeckChoice("builtin:${it.id}", it.name, it.commander, builtIn = true, category = DeckChoiceCategory.ARGENTUM) } +
+                    savedDecks.map { DeckChoice(it.name, it.name, it.commander ?: parseDeckList(it.text).firstOrNull { e -> e.commander }?.name, builtIn = false, category = DeckChoiceCategory.OTHER) }
             }
             val seat = players.getOrNull(localSeat)
             val activeDeck = deckChoices.firstOrNull { it.id == activeDeckId }
@@ -213,7 +214,8 @@ internal fun TableController.TableOverlays() {
                     activeDeckId = choice.id; saveActiveDeck(context, choice.id)
                     recordDiagnostic("Deck chosen: ${choice.name}", DiagnosticCategory.ACTION)
                     // Also put it on your table (card art, online play). Offline games read the choice directly.
-                    val text = savedDecks.firstOrNull { it.name == choice.id }?.text
+                    val text = preconDecks.firstOrNull { "precon:${it.id}" == choice.id }?.decklist
+                        ?: savedDecks.firstOrNull { it.name == choice.id }?.text
                         ?: premadeDecks.firstOrNull { "builtin:${it.id}" == choice.id }?.let { d -> "Commander\n1 ${d.commander}\nDeck\n" + d.cards.filterNot { it == d.commander }.groupingBy { it }.eachCount().entries.joinToString("\n") { (n, c) -> "$c $n" } }
                     if (text != null) { selectedPlayer = localSeat; importDeck(text, saveAsMine = false) }
                 },
