@@ -97,7 +97,7 @@ class GameScreenSizesTest {
         assertFalse("no manual draw in Argentum mode", shown("DRAW", substring = false))
         assertFalse("no manual reveal in Argentum mode", shown("REVEAL HAND"))
         assertTrue("pass button names where it stops", shown("PASS →"))
-        rule.onNode(hasTestTag("hand-tray-pass-button")).performTouchInput { longClick() }
+        rule.onNode(hasTestTag("hand-tray-pass-button")).performTouchInput { down(); advanceEventTime(1_000); up() }
         UiTestSupport.awaitReal(rule, 5_000, "hand-tray auto-pass control") { shown("STOP AUTO-PASS", substring = false) }
         rule.onNode(hasTestTag("hand-tray-pass-button")).performClick()
         UiTestSupport.awaitReal(rule, 5_000, "hand-tray auto-pass stopped") { !shown("STOP AUTO-PASS", substring = false) }
