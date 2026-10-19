@@ -52,6 +52,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import android.widget.Toast
+import androidx.compose.ui.platform.LocalContext
 
 /** A deck you can play: one of yours, or one that ships with the app. */
 data class DeckChoice(val id: String, val name: String, val commander: String?, val builtIn: Boolean)
@@ -203,12 +205,9 @@ fun PlaySheet(
                     DeckChip("Join online", friendMode == 4) { online = false; friendMode = 4 }
                 }
             }
-            PlayOption("Online with Argentum", "Plays on Argentum's server. Needs internet.", selected = online, onClick = { online = true; friendMode = null }, tag = "play-online-option") {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onCreateRoom) { Text("Room for friends", color = Mint) }
-                    TextButton(onClick = onJoinRoom) { Text("Join a room", color = Mint) }
-                }
-            }
+            // Argentum server play parked for now (Build 113); plumbing kept.
+            val context = LocalContext.current
+            PlayOption("Online with Argentum", "Not yet available", selected = false, onClick = { Toast.makeText(context, "Not yet available", Toast.LENGTH_SHORT).show() }, tag = "play-online-option", disabled = true) {}
             Button(
                 onClick = { when { online -> onOnline(); friendMode == 1 -> onWifiHost(); friendMode == 2 -> onWifiJoin(); friendMode == 3 -> onOnlineHost(); friendMode == 4 -> onOnlineJoin(); else -> onOffline() } },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp).testTag("play-start"),
@@ -219,17 +218,17 @@ fun PlaySheet(
 }
 
 @Composable
-private fun PlayOption(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit, tag: String, extra: @Composable () -> Unit) {
+private fun PlayOption(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit, tag: String, disabled: Boolean = false, extra: @Composable () -> Unit) {
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).border(if (selected) 2.dp else 1.dp, if (selected) Mint else PanelLight, RoundedCornerShape(18.dp))
             .background(if (selected) PanelLight else Panel).clickable(onClick = onClick).padding(14.dp).testTag(tag),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            RadioButton(selected = selected, onClick = onClick)
+            RadioButton(selected = selected, onClick = onClick, enabled = !disabled)
             Column {
-                Text(title, color = SoftWhite, fontSize = 17.sp, fontWeight = FontWeight.Black)
-                Text(subtitle, color = Muted, fontSize = 13.sp)
+                Text(title, color = if (disabled) Muted.copy(alpha = .6f) else SoftWhite, fontSize = 17.sp, fontWeight = FontWeight.Black)
+                Text(subtitle, color = if (disabled) Muted.copy(alpha = .6f) else Muted, fontSize = 13.sp)
             }
         }
         if (selected) extra()

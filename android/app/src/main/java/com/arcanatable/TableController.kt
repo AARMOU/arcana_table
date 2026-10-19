@@ -247,6 +247,7 @@ internal class TableController(
     var buzzOnTurn by run { mutableStateOf(optionPrefs.getBoolean("adjust_turn_buzz", true)) }
     var stackSameCards by run { mutableStateOf(optionPrefs.getBoolean("adjust_stack_cards", true)) }
     var respondGlow by run { mutableStateOf(optionPrefs.getBoolean("adjust_respond_glow", true)) }
+    var autoOpenHand by run { mutableStateOf(optionPrefs.getBoolean("adjust_auto_open_hand", true)) }
     var playedPopupSeconds by run { mutableFloatStateOf(optionPrefs.getFloat("adjust_notice_seconds", 4f).coerceIn(1f, 8f)) }
     var combatCardScale by run { mutableFloatStateOf(optionPrefs.getFloat("adjust_combat_card_scale", 1f).coerceIn(.65f, 1.35f)) }
     var showEngineStatus by run { mutableStateOf(optionPrefs.getBoolean("show_engine_status", true)) }
@@ -263,6 +264,7 @@ internal class TableController(
             val last = (value.size - 1).coerceAtLeast(0)
             if (selectedPlayerState > last) selectedPlayerState = last
             if (activePlayerState > last) activePlayerState = last
+            localSeat = localSeat.coerceIn(0, last)
         }
     private var selectedPlayerState by run { mutableIntStateOf(0) }
     var selectedPlayer: Int
@@ -449,7 +451,7 @@ internal class TableController(
     var playFeed by run { mutableStateOf(emptyList<PlayedCard>()) }
     var playFeedOpen by run { mutableStateOf(runCatching { context.getSharedPreferences("arcana-table-ui", Context.MODE_PRIVATE).getBoolean("playFeedOpen", true) }.getOrDefault(true)) }
     var playBanner by run { mutableStateOf<PlayedCard?>(null) }
-    var aiRecap by run { mutableStateOf(-1 to TurnRecap()) }
+    var aiRecaps by run { mutableStateOf(emptyList<TurnRecapEntry>()) }
     var recapText by run { mutableStateOf<String?>(null) }
     var argentumMulliganPrompt by run { mutableStateOf(false) }
     var argentumBottomCardIds by run { mutableStateOf<List<String>?>(null) }

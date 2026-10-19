@@ -418,8 +418,9 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                     played.lastOrNull { it.kind != PlayedCard.Kind.ABILITY && !it.byYou }?.let { playPopup = it }
                     played.lastOrNull { it.kind == PlayedCard.Kind.ABILITY }?.let { playBanner = it }
                     if (snapshot.activePlayer != localSeat) {
-                        val base = if (aiRecap.first == snapshot.turnNumber) aiRecap.second else TurnRecap()
-                        aiRecap = snapshot.turnNumber to PlayFeedParser.recap(entries, cardsJson, argentumPlayerId, base)
+                        val base = aiRecaps.firstOrNull { it.turn == snapshot.turnNumber && it.seat == snapshot.activePlayer }?.recap ?: TurnRecap()
+                        val recap = PlayFeedParser.recap(entries, cardsJson, argentumPlayerId, base)
+                        aiRecaps = mergeTurnRecap(aiRecaps, snapshot.turnNumber, snapshot.activePlayer, recap)
                     }
                     val eventLines = (0 until entries.length()).mapNotNull { entries.optJSONObject(it)?.let(PlayFeedParser::logLine) }
                     if (eventLines.isNotEmpty()) gameLog = (gameLog + eventLines).takeLast(250)
@@ -697,7 +698,7 @@ internal fun TableController.closeArgentumSession(concede: Boolean) {
     argentumPendingDecision = null
     argentumActionChoices = emptyList(); argentumActionCard = null; argentumComposer = null
     argentumAttackPlan = null; argentumBlockPlan = null
-    playPopup = null; playFeed = emptyList(); playBanner = null; recapText = null; aiRecap = -1 to TurnRecap(); argentumStackUse = null; argentumAutoYes = emptyMap()
+    playPopup = null; playFeed = emptyList(); playBanner = null; recapText = null; aiRecaps = emptyList(); argentumStackUse = null; argentumAutoYes = emptyMap()
     argentumLocalPlayersBackup?.let { players = it; argentumLocalPlayersBackup = null }
     argentumDeckForLobby = null
     argentumCommanderForLobby = null

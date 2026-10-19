@@ -260,13 +260,23 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
         val seat = players.getOrNull(active) ?: return@LaunchedEffect
         val isYou = active == localSeat
         turnBanner = TurnBannerState(TurnColors.label(isYou, seat.name, seat.isComputer), isYou, turn)
-        if (isYou && showAiRecap && aiRecap.first in 0 until turn && !aiRecap.second.isEmpty) {
-            recapText = aiRecap.second.line(players.filterIndexed { i, _ -> i != localSeat }.firstOrNull()?.name ?: "Opponent")
+        if (isYou && aiRecaps.isNotEmpty()) {
+            if (showAiRecap) recapText = formatTurnRecaps(aiRecaps.filter { it.turn < turn }, players.map { it.name }).takeIf { it.isNotBlank() }
+            aiRecaps = emptyList()
+        }
+        if (isYou && showAiRecap && !recapText.isNullOrBlank()) {
             recordDiagnostic("Recap: ${recapText}", DiagnosticCategory.ENGINE)
         }
         if (isYou && buzzOnTurn && appInForeground) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
         delay(if (isYou) 1400 else 900)
         turnBanner = null
+    }
+    LaunchedEffect(argentumTurnKey) {
+        val (_, active) = argentumTurnKey ?: return@LaunchedEffect
+        if (active != localSeat || !autoOpenHand || !argentumEnabled) return@LaunchedEffect
+        delay(350)
+        if (argentumPendingDecision == null && argentumAttackPlan == null && argentumBlockPlan == null &&
+            argentumActionChoices.isEmpty() && !gameEndedOnline) showHand = true
     }
     // One "Notice time" setting (Adjust UI) for banners, the played-card pop-up and the recap (twice as long: more to read).
     LaunchedEffect(playBanner?.key) { if (playBanner != null) { delay((playedPopupSeconds * 1000).toLong()); playBanner = null } }

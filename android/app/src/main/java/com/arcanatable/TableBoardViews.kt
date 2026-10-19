@@ -53,6 +53,10 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -137,8 +141,14 @@ internal val debugCardPool = listOf(
 )
 
 @Composable
-internal fun HeaderButton(label: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier, onLongClick: (() -> Unit)? = null) {
-    Text(label, color = if (enabled) Mint else Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, lineHeight = 12.sp, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = modifier.heightIn(min = 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick, onLongClick = onLongClick).padding(horizontal = 13.dp, vertical = 12.dp))
+internal fun HeaderButton(label: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier, glow: Boolean = false, onLongClick: (() -> Unit)? = null) {
+    val pulse = if (glow && enabled) {
+        val transition = rememberInfiniteTransition(label = "commander-affordable-pulse")
+        val alpha by transition.animateFloat(.25f, .45f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "commander-affordable-alpha")
+        alpha
+    } else .25f
+    val shape = RoundedCornerShape(8.dp)
+    Text(label, color = if (enabled) Mint else Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, lineHeight = 12.sp, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = modifier.heightIn(min = 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(shape).background(if (glow && enabled) Mint.copy(alpha = pulse) else if (enabled) PanelLight else Panel).border(if (glow && enabled) 2.dp else 0.dp, if (glow && enabled) Mint else Color.Transparent, shape).combinedClickable(enabled = enabled, onClick = onClick, onLongClick = onLongClick).padding(horizontal = 13.dp, vertical = 12.dp))
 }
 
 @Composable
@@ -365,6 +375,8 @@ internal fun PlayerBoard(
     passToMyTurnActive: Boolean = false,
     onPassToMyTurn: () -> Unit = {},
     onUndo: () -> Unit = {},
+    argentumGame: Boolean = false,
+    localPlayerEliminated: Boolean = false,
 ) {
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val battlefieldListState = rememberLazyListState()
@@ -454,7 +466,7 @@ internal fun PlayerBoard(
             // mana, steps and shuffles, so those manual shortcuts would be silent no-ops.
             if (engineGame) {
                 // Quick Actions in the order chosen in Adjust UI (only actions that work in Argentum games).
-                quickActionOrder.distinct().forEach { action -> when (action) {
+                quickActionOrder.distinct().sortedBy { if (it == "PASS_TO_TURN") 0 else if (it == "UNDO") 1 else 2 }.forEach { action -> when (action) {
                     "CAST_COMMANDER" -> player.commanderCard?.let { commander ->
                         // Commander as a chip: art + name; tap to see Argentum's actions for it (cast).
                         val castable = engineControlled && !commanderUnavailable && !player.isEliminated
@@ -476,7 +488,7 @@ internal fun PlayerBoard(
                     "EXILE" -> ZoneChip("EXILE", player.exile.size, enabled = true, onClick = { onZone("Exile") })
                     "STACK" -> QuickActionChip(if (stackCount > 0) "STACK · $stackCount" else "STACK", enabled = true, onClick = onStack)
                     "LOG" -> QuickActionChip("GAME LOG", enabled = true, onClick = onOpenLog)
-                    "PASS_TO_TURN" -> if (engineControlled) QuickActionChip(if (passToMyTurnActive) "STOP AUTO-PASS" else "PASS TO MY TURN", enabled = !player.isEliminated, onClick = onPassToMyTurn)
+                    "PASS_TO_TURN" -> if (argentumGame) QuickActionChip(if (passToMyTurnActive) "STOP AUTO-PASS" else "PASS TO MY TURN", enabled = !localPlayerEliminated, onClick = onPassToMyTurn)
                     "UNDO" -> if (engineControlled && undoAvailable) QuickActionChip("UNDO", enabled = true, onClick = onUndo)
                     "HAND" -> QuickActionChip("HAND · ${player.hand.size}", enabled = true, onClick = onShowHandFromZone)
                 } }
@@ -719,8 +731,10 @@ internal fun cardArtDescription(label: String?, fallbackName: String?): String =
 
 @Composable
 internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeight: androidx.compose.ui.unit.Dp, highlightedCardId: Int?, handRevealed: Boolean, canAdvance: Boolean, canControl: Boolean, commanderCanCast: Boolean, actionOrder: List<String>, stackCount: Int, onToggleReveal: (Boolean) -> Unit, onClose: () -> Unit, onDraw: () -> Unit, onCombat: () -> Unit, onNextStep: () -> Unit, onPassTurn: () -> Unit, onStack: () -> Unit, onCastCommander: () -> Unit, onMoreAction: (String) -> Unit, onSelect: (GameCard) -> Unit, onDragDrop: (GameCard, Offset) -> Unit,
-    argentumMode: Boolean = false, argentumPrimaryLabel: String? = null, argentumAutoPassActive: Boolean = false, onPassToMyTurn: () -> Unit = {}, legalActionCount: Int = 0, onUndo: (() -> Unit)? = null,
-    arrangement: HandArrangement = HandArrangement.AUTO_FIT, cardScale: Float = 1f, playableIds: Set<Int> = emptySet()) {
+    argentumMode: Boolean = false, argentumPrimaryLabel: String? = null, legalActionCount: Int = 0, onUndo: (() -> Unit)? = null,
+    arrangement: HandArrangement = HandArrangement.AUTO_FIT, cardScale: Float = 1f, playableIds: Set<Int> = emptySet(),
+    canRespond: Boolean = false, commanderAffordable: Boolean = false,
+    passToMyTurnActive: Boolean = false, onPassToMyTurn: (() -> Unit)? = null) {
     val handScrollState = rememberScrollState()
     var moreOpen by remember { mutableStateOf(false) }
     val density = LocalDensity.current
@@ -732,14 +746,14 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             if (argentumMode) {
                 // Argentum owns draws, reveals, steps and combat; show only actions it can take.
-                if (argentumAutoPassActive) {
-                    HeaderButton("STOP AUTO-PASS", onPassToMyTurn, modifier = Modifier.testTag("hand-tray-pass-button"), onLongClick = onPassToMyTurn)
+                if (passToMyTurnActive) {
+                    HeaderButton("STOP AUTO-PASS", onPassToMyTurn ?: {}, modifier = Modifier.testTag("hand-tray-pass-button"), onLongClick = onPassToMyTurn)
                 } else if (argentumPrimaryLabel != null) {
-                    HeaderButton(argentumPrimaryLabel, onPassTurn, modifier = Modifier.testTag("hand-tray-pass-button"), onLongClick = onPassToMyTurn)
+                    PassButton(argentumPrimaryLabel, onClick = onPassTurn, enabled = true, canRespond = canRespond, modifier = Modifier.testTag("hand-tray-pass-button"), onLongClick = onPassToMyTurn)
                 }
                 if (onUndo != null) HeaderButton("UNDO", onUndo)
                 HeaderButton("ACTIONS · $legalActionCount", onStack, enabled = legalActionCount > 0, modifier = Modifier)
-                if (commanderCanCast) HeaderButton("CAST COMMANDER", onCastCommander, modifier = Modifier)
+                if (commanderCanCast) HeaderButton("CAST COMMANDER", onCastCommander, modifier = Modifier, glow = commanderAffordable)
                 HeaderButton("LOG", { onMoreAction("LOG") })
             } else actionOrder.forEach { action ->
                 when (action) {
