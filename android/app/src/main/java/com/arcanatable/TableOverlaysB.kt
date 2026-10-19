@@ -552,7 +552,7 @@ internal fun TableController.TableOverlaysB() {
         onDismiss = { run { savedDecksOpen = false } }
     )
 
-    if (importReviewOpen) {
+    if (SHOW_DECK_IMPORT_REVIEW_UI && importReviewOpen) {
         val reviewPlayerIndex = selectedPlayer
         val reviewPlayer = players.getOrNull(reviewPlayerIndex)
         val cardsNeedingReview = reviewPlayer?.let { player ->
