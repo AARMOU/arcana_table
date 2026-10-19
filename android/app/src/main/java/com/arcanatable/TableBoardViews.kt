@@ -137,8 +137,8 @@ internal val debugCardPool = listOf(
 )
 
 @Composable
-internal fun HeaderButton(label: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier) {
-    Text(label, color = if (enabled) Mint else Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, lineHeight = 12.sp, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = modifier.heightIn(min = 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick).padding(horizontal = 13.dp, vertical = 12.dp))
+internal fun HeaderButton(label: String, onClick: () -> Unit, enabled: Boolean = true, modifier: Modifier = Modifier, onLongClick: (() -> Unit)? = null) {
+    Text(label, color = if (enabled) Mint else Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 2, lineHeight = 12.sp, overflow = TextOverflow.Ellipsis, textAlign = androidx.compose.ui.text.style.TextAlign.Center, modifier = modifier.heightIn(min = 50.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(8.dp)).background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick, onLongClick = onLongClick).padding(horizontal = 13.dp, vertical = 12.dp))
 }
 
 @Composable
@@ -719,7 +719,7 @@ internal fun cardArtDescription(label: String?, fallbackName: String?): String =
 
 @Composable
 internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeight: androidx.compose.ui.unit.Dp, highlightedCardId: Int?, handRevealed: Boolean, canAdvance: Boolean, canControl: Boolean, commanderCanCast: Boolean, actionOrder: List<String>, stackCount: Int, onToggleReveal: (Boolean) -> Unit, onClose: () -> Unit, onDraw: () -> Unit, onCombat: () -> Unit, onNextStep: () -> Unit, onPassTurn: () -> Unit, onStack: () -> Unit, onCastCommander: () -> Unit, onMoreAction: (String) -> Unit, onSelect: (GameCard) -> Unit, onDragDrop: (GameCard, Offset) -> Unit,
-    argentumMode: Boolean = false, argentumPrimaryLabel: String? = null, legalActionCount: Int = 0, onUndo: (() -> Unit)? = null,
+    argentumMode: Boolean = false, argentumPrimaryLabel: String? = null, argentumAutoPassActive: Boolean = false, onPassToMyTurn: () -> Unit = {}, legalActionCount: Int = 0, onUndo: (() -> Unit)? = null,
     arrangement: HandArrangement = HandArrangement.AUTO_FIT, cardScale: Float = 1f, playableIds: Set<Int> = emptySet()) {
     val handScrollState = rememberScrollState()
     var moreOpen by remember { mutableStateOf(false) }
@@ -732,7 +732,11 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             if (argentumMode) {
                 // Argentum owns draws, reveals, steps and combat; show only actions it can take.
-                if (argentumPrimaryLabel != null) HeaderButton(argentumPrimaryLabel, onPassTurn, modifier = Modifier)
+                if (argentumAutoPassActive) {
+                    HeaderButton("STOP AUTO-PASS", onPassToMyTurn, modifier = Modifier.testTag("hand-tray-pass-button"), onLongClick = onPassToMyTurn)
+                } else if (argentumPrimaryLabel != null) {
+                    HeaderButton(argentumPrimaryLabel, onPassTurn, modifier = Modifier.testTag("hand-tray-pass-button"), onLongClick = onPassToMyTurn)
+                }
                 if (onUndo != null) HeaderButton("UNDO", onUndo)
                 HeaderButton("ACTIONS · $legalActionCount", onStack, enabled = legalActionCount > 0, modifier = Modifier)
                 if (commanderCanCast) HeaderButton("CAST COMMANDER", onCastCommander, modifier = Modifier)

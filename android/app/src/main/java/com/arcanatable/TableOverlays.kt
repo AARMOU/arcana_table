@@ -876,6 +876,8 @@ internal fun TableController.TableOverlays() {
                         onPassTurn = { if (argentumEnabled) argentumPrimary() else passTurn() },
                         argentumMode = argentumEnabled,
                         argentumPrimaryLabel = argentumPrimaryLabel?.takeIf { !argentumAwaitingUpdate && passToMyTurnFrom == null },
+                        argentumAutoPassActive = argentumEnabled && passToMyTurnFrom != null,
+                        onPassToMyTurn = { togglePassToMyTurn() },
                         onUndo = if (argentumEnabled && argentumUndoAvailable && !argentumAwaitingUpdate) ({ requestArgentumUndo() }) else null,
                         legalActionCount = ArgentumActions.visibleChoices(argentumSnapshot?.legalActions.orEmpty()).size,
                         arrangement = handArrangement,

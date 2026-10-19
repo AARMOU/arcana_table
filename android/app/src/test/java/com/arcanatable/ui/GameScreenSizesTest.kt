@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.arcanatable.ArgentumEndpoints
@@ -96,6 +97,10 @@ class GameScreenSizesTest {
         assertFalse("no manual draw in Argentum mode", shown("DRAW", substring = false))
         assertFalse("no manual reveal in Argentum mode", shown("REVEAL HAND"))
         assertTrue("pass button names where it stops", shown("PASS →"))
+        rule.onNode(hasTestTag("hand-tray-pass-button")).performTouchInput { longClick() }
+        UiTestSupport.awaitReal(rule, 5_000, "hand-tray auto-pass control") { shown("STOP AUTO-PASS", substring = false) }
+        rule.onNode(hasTestTag("hand-tray-pass-button")).performClick()
+        UiTestSupport.awaitReal(rule, 5_000, "hand-tray auto-pass stopped") { !shown("STOP AUTO-PASS", substring = false) }
 
         // Button audit: every visible clickable node is enabled with a label, or explicitly disabled.
         val unlabeledClickable = rule.onAllNodes(androidx.compose.ui.test.hasClickAction(), useUnmergedTree = false).fetchSemanticsNodes()
