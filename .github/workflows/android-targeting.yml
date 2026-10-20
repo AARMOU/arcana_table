@@ -18,6 +18,26 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Check out Argentum engine
+        uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: d1b1c36aaeb293529986d68faf77744b8b308122
+          path: argentum-engine
+
+      - name: Set up Java 21 for rules engine
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Build patched Argentum rules engine
+        run: |
+          cd argentum-engine
+          git apply ../android/patches/argentum-engine-name-equals.patch
+          ./gradlew :rules-engine:jar
+          cp rules-engine/build/libs/rules-engine.jar ../android/app/libs/argentum-rules-engine.jar
+
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:

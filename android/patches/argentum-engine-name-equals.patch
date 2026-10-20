@@ -1,0 +1,11 @@
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
+index d800a63d..0da60e94 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
+@@ -1664,5 +1664,6 @@ class TriggerMatcher(
+             is com.wingedsheep.sdk.scripting.predicates.CardPredicate.IsLegendary -> cardComponent.typeLine.isLegendary
+             is com.wingedsheep.sdk.scripting.predicates.CardPredicate.IsSnow -> cardComponent.typeLine.isSnow
+             is com.wingedsheep.sdk.scripting.predicates.CardPredicate.IsNonlegendary -> !cardComponent.typeLine.isLegendary
++            is com.wingedsheep.sdk.scripting.predicates.CardPredicate.NameEquals -> cardComponent.name == predicate.name
+             is com.wingedsheep.sdk.scripting.predicates.CardPredicate.HasSubtype ->
+                 cardComponent.typeLine.hasSubtype(predicate.subtype)
