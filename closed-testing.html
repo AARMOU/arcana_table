@@ -23,6 +23,7 @@ h2{margin:0 0 6px;font-size:24px}.hint{font-size:14px;color:var(--muted);margin:
 footer{border-top:1px solid #ffffff13;color:#849187;font-size:13px;padding:25px 0}
 @media(max-width:600px){main{padding:44px 0 55px}.panel{padding:22px}.nav{flex-wrap:wrap}}
 </style>
+<link rel="stylesheet" href="./assets/beta-signup.css">
 </head>
 <body>
 <header><nav class="wrap nav"><a class="brand" href="./"><img src="./assets/arcana-logo.png" alt=""><span>ARCANA TABLE</span></a><a href="./" class="back">← Back to site</a></nav></header>
@@ -33,13 +34,20 @@ footer{border-top:1px solid #ffffff13;color:#849187;font-size:13px;padding:25px 
 <section class="panel">
 <h2>Closed-test signup</h2>
 <p class="hint">Your email address is all we need. Signing up does not guarantee an invitation or automatically grant Google Play access.</p>
-<p>Continue to FormSubmit to enter your email address and send your closed-testing request directly to the developer.</p>
-<p><a class="signup-link" href="https://formsubmit.co/el/kotihi/?subject=Arcana+Table+Closed+Testing+Signup&amp;message=I+would+like+to+join+the+Arcana+Table+Android+closed+test." rel="noopener noreferrer">Open closed-test signup form ↗</a></p>
-<p class="fine">Submitting a request means you agree to be contacted about Arcana Table closed-test invitations and essential testing updates. An invitation is not guaranteed.</p>
-<p class="fine">Only used for closed-testing communications. The form provider processes your email to send it to the developer. Review our <a href="./privacy.html">Privacy Policy</a>.</p>
+<form class="beta-signup-form" aria-label="Arcana closed-testing signup">
+  <label for="arcana-beta-email">Email address</label>
+  <div class="beta-signup-fields">
+    <input id="arcana-beta-email" name="email" type="email" maxlength="254" placeholder="you@example.com" autocomplete="email" required>
+    <button type="submit">Request beta access</button>
+  </div>
+  <div class="beta-honeypot" aria-hidden="true"><label>Leave this field empty<input type="text" name="_honey" tabindex="-1" autocomplete="off"></label></div>
+  <p class="beta-status" aria-live="polite" role="status"></p>
+  <p class="beta-fineprint">Signups only request an invitation; they do not grant immediate Google Play access. We use your email for invitations and essential testing updates. See the <a href="./privacy.html">Privacy Policy</a>.</p>
+</form>
 </section>
 </main>
 <footer><div class="wrap">Arcana Table · Independent fan-made project. · <a href="./privacy.html">Privacy Policy</a></div></footer>
 
+<script defer src="./assets/beta-signup.js"></script>
 </body>
 </html>
