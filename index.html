@@ -40,6 +40,7 @@ section{padding:68px 0}.section-title{max-width:710px;margin:0 0 28px}.section-t
 @media(max-width:760px){.wrap{width:calc(100% - 28px)}.nav{align-items:flex-start;flex-wrap:wrap;gap:10px;padding:13px 0}.navlinks{gap:11px}.hero{padding:42px 0 28px}.hero .intro{display:block}.hero h1{font-size:46px}.hero p{font-size:17px;margin-bottom:22px}.hero-visual{border-radius:14px}.hero-visual figcaption{font-size:9px;left:9px;bottom:9px}.feature-row{grid-template-columns:1fr;padding:18px;min-height:0;gap:12px}.feature-copy{padding:10px 5px}.feature-row.alt .screenshot{order:2}.phone{width:min(265px,100%)}.gallery{grid-template-columns:1fr}.gallery article{display:grid;grid-template-columns:130px 1fr;gap:16px;align-items:center;padding:15px}.gallery figure{margin:0;grid-row:span 2}.gallery img{width:130px;height:200px}.gallery h3{margin:0 0 6px}.gallery p{font-size:13px}.cta{display:block;padding:24px}.cta .actions{margin-top:23px}section{padding:47px 0}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn{transition:none}}
 </style>
+<link rel="stylesheet" href="./assets/beta-signup.css">
 </head>
 <body>
 <header class="wrap nav"><a class="brand" href="./"><img src="./assets/arcana-logo.png" alt="Arcana logo"><span>ARCANA TABLE</span></a>
@@ -73,8 +74,21 @@ section{padding:68px 0}.section-title{max-width:710px;margin:0 0 28px}.section-t
 </div>
 <div class="notice"><strong>Closed-test limitations:</strong> Build 112 is still under development. Human-vs-human play currently supports two players, only included premade decks are available, and some cards and rules interactions may need manual attention. AI opponent counts and feature availability can differ by game mode.</div>
 </section>
-<section class="wrap" id="testing"><div class="cta"><div><div class="eyebrow">Testers wanted</div><h2>Help build a better table.</h2><p>Join the Android closed-testing waitlist. Leave your email through our form and we'll contact you about access when an invitation is available.</p></div><div class="actions"><a class="btn primary" href="https://formsubmit.co/el/kotihi/" rel="noopener noreferrer">Request a test invite ↗</a><a class="btn" href="./closed-testing.html">Learn more</a></div></div>
-<p class="bottom-links">Follow development in the <a href="https://github.com/AARMOU/arcana_table">GitHub repository</a>. Closed-test invitations are not automatic.</p></section>
+<section class="wrap" id="testing">
+<div class="cta arcana-beta-section"><div class="arcana-beta-copy"><div class="eyebrow">Testers wanted</div><h2>Help build a better table.</h2><p>Join the Android closed-testing waitlist right here, without opening an external signup website.</p><p style="margin-top:16px"><a href="./closed-testing.html">Read about closed testing →</a></p></div>
+<form class="beta-signup-form" aria-label="Arcana closed-testing signup">
+  <label for="arcana-beta-email">Email address</label>
+  <div class="beta-signup-fields">
+    <input id="arcana-beta-email" name="email" type="email" maxlength="254" placeholder="you@example.com" autocomplete="email" required>
+    <button type="submit">Request beta access</button>
+  </div>
+  <div class="beta-honeypot" aria-hidden="true"><label>Leave this field empty<input type="text" name="_honey" tabindex="-1" autocomplete="off"></label></div>
+  <p class="beta-status" aria-live="polite" role="status"></p>
+  <p class="beta-fineprint">Signups only request an invitation; they do not grant immediate Google Play access. We use your email for invitations and essential testing updates. See the <a href="./privacy.html">Privacy Policy</a>.</p>
+</form></div>
+<p class="bottom-links">Follow development in the <a href="https://github.com/AARMOU/arcana_table">GitHub repository</a>. Closed-test invitations are not automatic.</p>
+</section>
 </main>
 <footer><div class="wrap footrow"><span>Arcana Table · Independent fan-made project.</span><span>Magic: The Gathering is owned by Wizards of the Coast. · <a href="./privacy.html">Privacy Policy</a></span></div></footer>
+<script defer src="./assets/beta-signup.js"></script>
 </body></html>
