@@ -57,8 +57,11 @@ import androidx.compose.ui.platform.LocalContext
 
 enum class DeckChoiceCategory { PRECON, ARCANA, ARGENTUM, OTHER }
 
-internal fun argentumDeckCategory(deckId: String): DeckChoiceCategory =
-    if (deckId.startsWith("edhrec_")) DeckChoiceCategory.ARGENTUM else DeckChoiceCategory.ARCANA
+internal fun argentumDeckCategory(deckId: String): DeckChoiceCategory = when {
+    deckId == "animated_army" -> DeckChoiceCategory.PRECON
+    deckId.startsWith("edhrec_") -> DeckChoiceCategory.ARGENTUM
+    else -> DeckChoiceCategory.ARCANA
+}
 
 /** A deck you can play: one of yours, a precon, or an Argentum premade deck. */
 data class DeckChoice(
@@ -263,7 +266,7 @@ fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckCho
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text("Choose your deck", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
             listOf(
-                DeckChoiceCategory.PRECON to "FALLOUT & BLOOMBURROW PRECONS",
+                DeckChoiceCategory.PRECON to "WOTC PRECONS",
                 DeckChoiceCategory.ARCANA to "ARCANA",
                 DeckChoiceCategory.ARGENTUM to "ARGENTUM PREMADE DECKS",
                 DeckChoiceCategory.OTHER to "YOUR OTHER DECKS"
