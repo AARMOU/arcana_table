@@ -1,72 +1,80 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#111612">
-  <meta name="description" content="Arcana Table is a mobile-first digital tabletop for Magic: The Gathering Commander games.">
-  <meta property="og:title" content="Arcana Table">
-  <meta property="og:description" content="A mobile-first digital tabletop for multiplayer Magic: The Gathering Commander games.">
-  <meta property="og:type" content="website">
-  <meta property="og:url" content="https://aarmou.github.io/arcana_table/">
-  <meta property="og:image" content="https://aarmou.github.io/arcana_table/assets/arcana-social.jpg">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://aarmou.github.io/arcana_table/assets/arcana-social.jpg">
-  <link rel="icon" type="image/png" href="./assets/arcana-logo.png">
-  <title>Arcana Table — Your table, anywhere</title>
-  <style>
-    :root{color-scheme:dark;--bg:#101511;--panel:#171f19;--line:#2b392f;--ink:#eef5ed;--muted:#a4b2a5;--green:#a7f06c;--gold:#f0c778}
-    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 78% 4%,#263a2a 0,transparent 40%),var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,Segoe UI,sans-serif}
-    a{color:inherit}.wrap{width:min(1120px,calc(100% - 40px));margin:auto}.nav{height:76px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #ffffff13}.brand{display:flex;align-items:center;gap:11px;font-weight:800;letter-spacing:.02em}.brand-logo{display:block;width:52px;height:52px;object-fit:contain;border-radius:10px}.navlinks{display:flex;gap:24px;color:var(--muted);font-size:14px}.navlinks a{text-decoration:none}.hero{padding:92px 0 76px;display:grid;grid-template-columns:1.1fr .9fr;gap:56px;align-items:center}.eyebrow{color:var(--green);font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase}.hero h1{font-size:clamp(44px,7vw,78px);line-height:.99;letter-spacing:-.055em;margin:18px 0 22px;max-width:680px}.hero h1 em{color:var(--green);font-style:normal}.lead{font-size:19px;color:var(--muted);max-width:580px}.actions{display:flex;gap:12px;flex-wrap:wrap;margin-top:30px}.btn{display:inline-flex;align-items:center;justify-content:center;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:750;border:1px solid var(--line);background:#ffffff08}.btn.primary{background:var(--green);border-color:var(--green);color:#14200e}.stamp{margin-top:20px;color:#879689;font-size:13px}
-    .table{background:linear-gradient(145deg,#26362a,#151c17);border:1px solid #42604a;border-radius:24px;padding:22px;box-shadow:0 30px 90px #0008;transform:rotate(1deg)}.tabletop{border:1px solid #49694e;background:#1c3422;border-radius:18px;padding:18px}.tablehead{display:flex;justify-content:space-between;align-items:center;color:#dcebdc;font-size:12px;font-weight:800;letter-spacing:.1em}.live{color:var(--green)}.player{margin-top:16px;padding:17px;background:#101711;border:1px solid #344738;border-radius:13px}.playerrow{display:flex;justify-content:space-between;align-items:center}.playername{font-weight:750}.life{font-size:32px;color:var(--green);font-weight:850}.cards{display:flex;gap:8px;margin-top:13px}.card{height:82px;flex:1;border-radius:9px;padding:9px;color:#121713;font-size:10px;font-weight:800;display:flex;align-items:end;background:linear-gradient(150deg,#e0c993,#887e60)}.card:nth-child(2){background:linear-gradient(150deg,#b6c9b6,#58735d)}.card:nth-child(3){background:linear-gradient(150deg,#d8a5a0,#805657)}.card:nth-child(4){background:linear-gradient(150deg,#abbcdd,#5b688d)}.tablefoot{color:#a8bbab;font-size:12px;text-align:center;margin-top:12px}
-    section{padding:56px 0}.sectionhead{max-width:620px;margin-bottom:26px}.sectionhead h2{font-size:clamp(28px,4vw,42px);letter-spacing:-.04em;margin:8px 0}.sectionhead p{color:var(--muted);margin:0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.feature{padding:22px;border:1px solid var(--line);background:#ffffff06;border-radius:15px}.feature .num{color:var(--gold);font-size:12px;font-weight:800;letter-spacing:.12em}.feature h3{margin:10px 0 6px;font-size:18px}.feature p{color:var(--muted);margin:0;font-size:14px}.security-note{margin-top:14px;padding:18px 20px;border:1px solid #665b3f;border-radius:14px;background:#f0c7780a;color:#d7dfd6;font-size:14px}.security-note strong{color:var(--gold)}.callout{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:28px;border-radius:18px;border:1px solid #4b654a;background:linear-gradient(120deg,#1e3021,#171d18)}.callout h2{margin:0 0 5px;font-size:25px}.callout p{margin:0;color:var(--muted)}footer{padding:28px 0 40px;border-top:1px solid #ffffff13;color:#849187;font-size:13px}.footrow{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
-    @media(max-width:760px){.nav{height:auto;min-height:76px;flex-wrap:wrap;padding:12px 0;gap:8px}.navlinks{flex-wrap:wrap;gap:8px 14px}.hero{grid-template-columns:1fr;padding:62px 0 44px;gap:32px}.hero h1{font-size:56px}.table{transform:none}.grid{grid-template-columns:1fr}.navlinks{gap:13px;font-size:13px}.callout{align-items:flex-start;flex-direction:column}.wrap{width:min(100% - 28px,1120px)}}
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0d1513">
+<meta name="description" content="Arcana Table brings Magic: The Gathering to Android with AI opponents, real card art, and the Argentum rules engine. Join our closed test.">
+<meta property="og:title" content="Arcana Table — Magic on your terms">
+<meta property="og:description" content="Two-player Magic battles, AI opponents, and automated rules on Android.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://aarmou.github.io/arcana_table/">
+<meta property="og:image" content="https://aarmou.github.io/arcana_table/assets/arcana-social.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://aarmou.github.io/arcana_table/assets/arcana-social.jpg">
+<link rel="icon" type="image/png" href="./assets/arcana-logo.png">
+<title>Arcana Table — Play Magic your way</title>
+<style>
+:root{color-scheme:dark;--bg:#0c1412;--panel:#14221d;--panel2:#192c24;--ink:#edf8f1;--muted:#a2b6ab;--line:#2c4539;--mint:#90ebbe;--gold:#f2cc7d}
+*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 50% -10%,#294c35 0,transparent 38%),var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+a{color:inherit}a:focus-visible,button:focus-visible{outline:3px solid var(--gold);outline-offset:4px}
+.wrap{width:min(1140px,calc(100% - 44px));margin-inline:auto}.nav{display:flex;gap:24px;justify-content:space-between;align-items:center;min-height:80px;border-bottom:1px solid #ffffff12}
+.brand{display:flex;gap:12px;align-items:center;font-size:17px;letter-spacing:.09em;font-weight:850;text-decoration:none}.brand img{width:45px;height:45px;object-fit:contain;border-radius:10px}
+.navlinks{display:flex;gap:20px;flex-wrap:wrap;align-items:center;font-size:13px;color:var(--muted)}.navlinks a{text-decoration:none}.navlinks a:hover{color:var(--mint)}
+.btn{display:inline-flex;align-items:center;justify-content:center;min-height:46px;padding:12px 20px;border-radius:11px;text-decoration:none;font-weight:760;border:1px solid #506f5e;background:#ffffff07;transition:transform .2s,border-color .2s}
+.btn:hover{transform:translateY(-2px);border-color:var(--mint)}.btn.primary{background:var(--mint);border-color:var(--mint);color:#10241a}.actions{display:flex;gap:12px;flex-wrap:wrap}
+.hero{padding:76px 0 45px}.eyebrow{color:var(--mint);font-size:12px;letter-spacing:.18em;text-transform:uppercase;font-weight:800}.hero h1{font-size:clamp(42px,6vw,70px);line-height:1.05;letter-spacing:-.052em;max-width:860px;margin:18px 0}.hero h1 em{color:var(--mint);font-style:normal}
+.hero .intro{display:flex;justify-content:space-between;align-items:end;gap:38px;margin-bottom:38px}.hero p{font-size:19px;color:var(--muted);max-width:610px;margin:0}
+.hero-visual{margin:0;position:relative;overflow:hidden;border:1px solid #426044;border-radius:23px;background:linear-gradient(125deg,#10271a,#172015);box-shadow:0 28px 90px #0006}
+.hero-visual img{display:block;width:100%;height:auto;aspect-ratio:2/1;object-fit:cover}.hero-visual figcaption{position:absolute;left:20px;bottom:18px;padding:6px 11px;border-radius:8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#edf9ec;background:#0a140bc9}
+.strip{display:flex;justify-content:center;gap:13px;flex-wrap:wrap;padding:24px 0 10px}.strip span{font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#c3d5c8;padding:8px 15px;border:1px solid #344b39;border-radius:30px;background:#ffffff04}
+section{padding:68px 0}.section-title{max-width:710px;margin:0 0 28px}.section-title h2{font-size:clamp(30px,4.2vw,48px);line-height:1.12;letter-spacing:-.04em;margin:10px 0}.section-title p{color:var(--muted);margin:0;font-size:17px}
+.feature-row{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:center;padding:35px;border-radius:22px;border:1px solid var(--line);background:linear-gradient(120deg,#183126,#111c18);margin-top:18px;min-height:450px}
+.feature-row.alt{background:linear-gradient(120deg,#121e1b,#1a2b24)}.feature-copy{padding:16px 30px}.feature-copy .number{color:var(--gold);font-weight:850;font-size:12px;letter-spacing:.16em}.feature-copy h3{font-size:clamp(26px,3.8vw,42px);line-height:1.13;letter-spacing:-.045em;margin:12px 0}.feature-copy p{color:var(--muted);max-width:455px}.feature-copy .detail{color:var(--mint);font-size:13px;font-weight:750}
+.screenshot{margin:0;display:flex;align-items:center;justify-content:center;min-width:0}.phone{display:block;width:min(290px,100%);max-height:540px;object-fit:contain;border:7px solid #111d1b;border-radius:27px;background:#0b1311;box-shadow:0 20px 48px #0007}
+.gallery{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px}.gallery article{border:1px solid var(--line);border-radius:19px;padding:25px;background:linear-gradient(170deg,#182820,#101b17)}.gallery figure{margin:0 auto 25px;text-align:center}.gallery img{display:block;width:min(240px,100%);height:345px;object-fit:cover;object-position:top center;border-radius:15px;border:4px solid #07120e;margin:auto}.gallery h3{font-size:20px;letter-spacing:-.025em;margin:10px 0 7px}.gallery p{color:var(--muted);margin:0;font-size:14px}
+.notice{border-left:3px solid var(--gold);padding:15px 20px;background:#f2cc7d0b;color:#d0ddd2;font-size:14px;margin-top:23px;border-radius:0 12px 12px 0}
+.cta{padding:34px;border:1px solid #557959;border-radius:20px;background:linear-gradient(120deg,#223e2b,#17241c);display:flex;align-items:center;justify-content:space-between;gap:28px}
+.cta h2{font-size:30px;line-height:1.2;letter-spacing:-.035em;margin:0 0 8px}.cta p{margin:0;color:#bccfc1;max-width:620px}
+.bottom-links{margin:22px 0 0;color:var(--muted);font-size:14px}footer{border-top:1px solid #ffffff12;padding:26px 0 40px;color:#849b8c;font-size:13px}.footrow{display:flex;flex-wrap:wrap;justify-content:space-between;gap:15px}
+@media(max-width:760px){.wrap{width:calc(100% - 28px)}.nav{align-items:flex-start;flex-wrap:wrap;gap:10px;padding:13px 0}.navlinks{gap:11px}.hero{padding:42px 0 28px}.hero .intro{display:block}.hero h1{font-size:46px}.hero p{font-size:17px;margin-bottom:22px}.hero-visual{border-radius:14px}.hero-visual figcaption{font-size:9px;left:9px;bottom:9px}.feature-row{grid-template-columns:1fr;padding:18px;min-height:0;gap:12px}.feature-copy{padding:10px 5px}.feature-row.alt .screenshot{order:2}.phone{width:min(265px,100%)}.gallery{grid-template-columns:1fr}.gallery article{display:grid;grid-template-columns:130px 1fr;gap:16px;align-items:center;padding:15px}.gallery figure{margin:0;grid-row:span 2}.gallery img{width:130px;height:200px}.gallery h3{margin:0 0 6px}.gallery p{font-size:13px}.cta{display:block;padding:24px}.cta .actions{margin-top:23px}section{padding:47px 0}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn{transition:none}}
+</style>
 </head>
 <body>
-  <header class="wrap nav">
-    <a class="brand" href="#" style="text-decoration:none"><img class="brand-logo" src="./assets/arcana-logo.png" alt="Arcana logo"><span>ARCANA TABLE</span></a>
-    <nav class="navlinks" aria-label="Main navigation"><a href="#features">Features</a><a href="#security">Security</a><a href="#project">Project</a><a href="./closed-testing.html">Closed testing</a><a href="./privacy.html">Privacy Policy</a><a href="https://github.com/AARMOU/arcana_table">GitHub ↗</a></nav>
-  </header>
-  <main>
-    <div class="wrap hero">
-      <div>
-        <div class="eyebrow">A digital Commander table</div>
-        <h1>Your table.<br><em>Anywhere.</em></h1>
-        <p class="lead">Arcana Table brings your multiplayer Magic: The Gathering games to your phone, with a shared table built for the way your group plays.</p>
-        <div class="actions"><a class="btn primary" href="https://formsubmit.co/el/kotihi/?subject=Arcana+Table+Closed+Testing+Signup&amp;message=I+would+like+to+join+the+Arcana+Table+Android+closed+test." rel="noopener noreferrer">Join closed testing ↗</a><a class="btn" href="#features">Explore the project</a><a class="btn" href="https://github.com/AARMOU/arcana_table">View source on GitHub ↗</a></div>
-        <div class="stamp">Android · Multiplayer · Built for Commander</div>
-      </div>
-      <div class="table" aria-label="Illustration of a multiplayer card table">
-        <div class="tabletop">
-          <div class="tablehead"><span>ARCANA TABLE</span><span class="live">● GAME IN PROGRESS</span></div>
-          <div class="player"><div class="playerrow"><span class="playername">Your battlefield</span><span class="life">40</span></div><div class="cards"><div class="card">LAND</div><div class="card">ARTIFACT</div><div class="card">CREATURE</div><div class="card">SPELL</div></div></div>
-          <div class="player"><div class="playerrow"><span class="playername">Player 2</span><span class="life">36</span></div><div class="cards"><div class="card">COMMANDER</div><div class="card">TOKEN</div><div class="card">LAND</div></div></div>
-          <div class="tablefoot">LIFE · BATTLEFIELDS · GAME ACTIONS</div>
-        </div>
-      </div>
-    </div>
-    <section class="wrap" id="features">
-      <div class="sectionhead"><div class="eyebrow">At the table</div><h2>Keep the game moving.</h2><p>A phone-friendly interface for managing the shared details of a multiplayer game while everyone stays focused on the table.</p></div>
-      <div class="grid">
-        <article class="feature"><div class="num">01 / PLAY TOGETHER</div><h3>Multiplayer rooms</h3><p>Create or join a room and bring your group into the same game.</p></article>
-        <article class="feature"><div class="num">02 / SEE THE BOARD</div><h3>Player battlefields</h3><p>Keep cards and game state organized in a readable, touch-first layout.</p></article>
-        <article class="feature"><div class="num">03 / STAY IN CONTROL</div><h3>Game tools</h3><p>Use the table’s built-in controls to manage turns and common game actions.</p></article>
-      </div>
-    </section>
-    <section class="wrap" id="security">
-      <div class="sectionhead"><div class="eyebrow">Privacy &amp; security</div><h2>Safer rooms for casual play.</h2><p>Internet rooms use secure WebSockets, require a room code and password, and filter hidden cards from what other players receive.</p></div>
-      <div class="grid">
-        <article class="feature"><div class="num">01 / CONNECTION</div><h3>Encrypted connection</h3><p>The Internet client requires WSS, which protects room traffic while it travels between devices and the room service.</p></article>
-        <article class="feature"><div class="num">02 / HIDDEN CARDS</div><h3>Private hands and libraries</h3><p>Each player receives a filtered game view. Other players’ libraries and unrevealed hands are withheld.</p></article>
-        <article class="feature"><div class="num">03 / PLAYER SEATS</div><h3>Basic seat permissions</h3><p>The room service assigns player seats and limits which seat can update player data and shared turn or stack state.</p></article>
-      </div>
-      <div class="security-note"><strong>Prototype status:</strong> Players share a room password, and the service does not enforce all Magic rules or provide full anti-cheat protection. Use a long, unique room password and keep sensitive information out of chat. Internet rooms also require the room service to be deployed separately.</div>
-    </section>
-    <section class="wrap" id="project">
-      <div class="callout"><div><h2>Follow Arcana Table on GitHub</h2><p>Explore the source and follow the project as it develops.</p></div><div class="actions" style="margin-top:0"><a class="btn primary" href="https://formsubmit.co/el/kotihi/?subject=Arcana+Table+Closed+Testing+Signup&amp;message=I+would+like+to+join+the+Arcana+Table+Android+closed+test." rel="noopener noreferrer">Closed test signup ↗</a><a class="btn" href="https://github.com/AARMOU/arcana_table">Open the repository ↗</a></div></div>
-    </section>
-  </main>
-  <footer><div class="wrap footrow"><span>Arcana Table · An independent fan-made project.</span><span>Magic: The Gathering is owned by Wizards of the Coast. · <a href="./privacy.html">Privacy Policy</a></span></div></footer>
-</body>
-</html>
+<header class="wrap nav"><a class="brand" href="./"><img src="./assets/arcana-logo.png" alt="Arcana logo"><span>ARCANA TABLE</span></a>
+<nav class="navlinks" aria-label="Main navigation"><a href="#experience">Experience</a><a href="#screenshots">Screenshots</a><a href="#testing">Closed testing</a><a href="./privacy.html">Privacy</a><a href="https://github.com/AARMOU/arcana_table">GitHub ↗</a></nav></header>
+<main>
+<div class="wrap hero">
+<div class="eyebrow">Built for Android · Powered by Argentum</div>
+<h1>A whole Magic table.<br><em>Right in your hand.</em></h1>
+<div class="intro"><p>Play against AI opponents, see the real cards on the battlefield, and let the Argentum rules engine handle much of the heavy lifting.</p>
+<div class="actions"><a class="btn primary" href="#testing">Join closed testing ↓</a><a class="btn" href="#screenshots">See the app ↓</a></div></div>
+<figure class="hero-visual"><img src="./assets/arcana-hero.webp" width="1500" height="750" fetchpriority="high" alt="Arcana Table promotional artwork showing the Arcana app icon, an Android phone with the deck selection screen, and highlights for AI opponents and automated rules"><figcaption>Actual Build 112 · Android</figcaption></figure>
+<div class="strip"><span>Two-player battles</span><span>Offline AI opponents</span><span>Automated rules</span><span>Real card art</span></div>
+</div>
+<section class="wrap" id="experience">
+<div class="section-title"><div class="eyebrow">Inside Arcana</div><h2>From choosing your commander to casting your first spell.</h2><p>A closer look at the real app—not another collection of decorative mockups.</p></div>
+<div class="feature-row">
+<div class="feature-copy"><span class="number">01 / THE HOME SCREEN</span><h3>Pick a deck. Start a game.</h3><p>Choose from the included premade Commander decks, change your selection, and get into the action in a couple of taps.</p><span class="detail">Designed for a phone-sized table</span></div>
+<figure class="screenshot"><img class="phone" src="./assets/arcana-deck.webp" width="800" height="1424" loading="lazy" alt="Arcana Table home screen showing Sliver Overlord selected and the green Play button"></figure>
+</div>
+<div class="feature-row alt">
+<figure class="screenshot"><img class="phone" src="./assets/arcana-ai.webp" width="800" height="1424" loading="lazy" alt="Arcana offline AI game setup, showing player count and opponent deck options"></figure>
+<div class="feature-copy"><span class="number">02 / THE OPPONENTS</span><h3>Ready when you are.</h3><p>Set up an offline game with AI players, select a deck for the first opponent, or leave the selection to chance. No internet connection is needed for offline AI play.</p><span class="detail">Local Argentum game engine</span></div>
+</div>
+</section>
+<section class="wrap" id="screenshots">
+<div class="section-title"><div class="eyebrow">Actual in-game screenshots</div><h2>What playing looks like.</h2><p>Cards you recognize, game actions you can follow, and controls made for touch.</p></div>
+<div class="gallery">
+<article><figure><img src="./assets/arcana-hand.webp" width="800" height="1424" loading="lazy" alt="Seven-card opening hand showing Hedge Maze and Sliver cards in the Argentum game"></figure><div><h3>Real opening hands</h3><p>See your seven cards, inspect their artwork, and make your opening decisions.</p></div></article>
+<article><figure><img src="./assets/arcana-battlefield.webp" width="800" height="1424" loading="lazy" alt="Arcana Table battlefield interface with phase controls, life totals, and a Bello card played by an AI opponent"></figure><div><h3>A live battlefield</h3><p>Track phases, boards, the stack, and AI actions while the game unfolds.</p></div></article>
+<article><figure><img src="./assets/arcana-settings.webp" width="800" height="1424" loading="lazy" alt="Arcana gameplay settings screen with card size, player following, AI action, timer, and background alert controls"></figure><div><h3>Settings that matter</h3><p>Adjust card size, UI layout, turn behavior, and game notifications to suit your play style.</p></div></article>
+</div>
+<div class="notice"><strong>Closed-test limitations:</strong> Build 112 is still under development. Human-vs-human play currently supports two players, only included premade decks are available, and some cards and rules interactions may need manual attention. AI opponent counts and feature availability can differ by game mode.</div>
+</section>
+<section class="wrap" id="testing"><div class="cta"><div><div class="eyebrow">Testers wanted</div><h2>Help build a better table.</h2><p>Join the Android closed-testing waitlist. Leave your email through our form and we'll contact you about access when an invitation is available.</p></div><div class="actions"><a class="btn primary" href="https://formsubmit.co/el/kotihi/" rel="noopener noreferrer">Request a test invite ↗</a><a class="btn" href="./closed-testing.html">Learn more</a></div></div>
+<p class="bottom-links">Follow development in the <a href="https://github.com/AARMOU/arcana_table">GitHub repository</a>. Closed-test invitations are not automatic.</p></section>
+</main>
+<footer><div class="wrap footrow"><span>Arcana Table · Independent fan-made project.</span><span>Magic: The Gathering is owned by Wizards of the Coast. · <a href="./privacy.html">Privacy Policy</a></span></div></footer>
+</body></html>
