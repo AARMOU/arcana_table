@@ -21,12 +21,12 @@
     .table{background:linear-gradient(145deg,#26362a,#151c17);border:1px solid #42604a;border-radius:24px;padding:22px;box-shadow:0 30px 90px #0008;transform:rotate(1deg)}.tabletop{border:1px solid #49694e;background:#1c3422;border-radius:18px;padding:18px}.tablehead{display:flex;justify-content:space-between;align-items:center;color:#dcebdc;font-size:12px;font-weight:800;letter-spacing:.1em}.live{color:var(--green)}.player{margin-top:16px;padding:17px;background:#101711;border:1px solid #344738;border-radius:13px}.playerrow{display:flex;justify-content:space-between;align-items:center}.playername{font-weight:750}.life{font-size:32px;color:var(--green);font-weight:850}.cards{display:flex;gap:8px;margin-top:13px}.card{height:82px;flex:1;border-radius:9px;padding:9px;color:#121713;font-size:10px;font-weight:800;display:flex;align-items:end;background:linear-gradient(150deg,#e0c993,#887e60)}.card:nth-child(2){background:linear-gradient(150deg,#b6c9b6,#58735d)}.card:nth-child(3){background:linear-gradient(150deg,#d8a5a0,#805657)}.card:nth-child(4){background:linear-gradient(150deg,#abbcdd,#5b688d)}.tablefoot{color:#a8bbab;font-size:12px;text-align:center;margin-top:12px}
     section{padding:56px 0}.sectionhead{max-width:620px;margin-bottom:26px}.sectionhead h2{font-size:clamp(28px,4vw,42px);letter-spacing:-.04em;margin:8px 0}.sectionhead p{color:var(--muted);margin:0}.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}.feature{padding:22px;border:1px solid var(--line);background:#ffffff06;border-radius:15px}.feature .num{color:var(--gold);font-size:12px;font-weight:800;letter-spacing:.12em}.feature h3{margin:10px 0 6px;font-size:18px}.feature p{color:var(--muted);margin:0;font-size:14px}.security-note{margin-top:14px;padding:18px 20px;border:1px solid #665b3f;border-radius:14px;background:#f0c7780a;color:#d7dfd6;font-size:14px}.security-note strong{color:var(--gold)}.callout{display:flex;justify-content:space-between;align-items:center;gap:24px;padding:28px;border-radius:18px;border:1px solid #4b654a;background:linear-gradient(120deg,#1e3021,#171d18)}.callout h2{margin:0 0 5px;font-size:25px}.callout p{margin:0;color:var(--muted)}footer{padding:28px 0 40px;border-top:1px solid #ffffff13;color:#849187;font-size:13px}.footrow{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
     @media(max-width:760px){.nav{height:auto;min-height:76px;flex-wrap:wrap;padding:12px 0;gap:8px}.navlinks{flex-wrap:wrap;gap:8px 14px}.hero{grid-template-columns:1fr;padding:62px 0 44px;gap:32px}.hero h1{font-size:56px}.table{transform:none}.grid{grid-template-columns:1fr}.navlinks{gap:13px;font-size:13px}.callout{align-items:flex-start;flex-direction:column}.wrap{width:min(100% - 28px,1120px)}}
-  </style>
+  .arcana-gallery{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.arcana-gallery figure{margin:0;padding:18px;border:1px solid #395447;border-radius:18px;background:#18251d;min-width:0}.arcana-gallery img{display:block;max-width:100%;max-height:460px;width:auto;height:auto;object-fit:contain;margin:0 auto;border-radius:12px}.arcana-gallery figcaption{font-size:14px;color:var(--muted);margin-top:12px}.arcana-gallery-wide{grid-column:1/-1}.arcana-gallery-wide img{width:100%;max-height:none}@media(max-width:700px){.arcana-gallery{grid-template-columns:1fr}.arcana-gallery-wide{grid-column:auto}}</style>
 </head>
 <body>
   <header class="wrap nav">
     <a class="brand" href="#" style="text-decoration:none"><img class="brand-logo" src="./assets/arcana-logo.png" alt="Arcana logo"><span>ARCANA TABLE</span></a>
-    <nav class="navlinks" aria-label="Main navigation"><a href="#features">Features</a><a href="#security">Security</a><a href="#project">Project</a><a href="./closed-testing.html">Closed testing</a><a href="./privacy.html">Privacy Policy</a><a href="https://github.com/AARMOU/arcana_table">GitHub ↗</a></nav>
+    <nav class="navlinks" aria-label="Main navigation"><a href="#gallery">Screenshots</a><a href="#features">Features</a><a href="#security">Security</a><a href="#project">Project</a><a href="./closed-testing.html">Closed testing</a><a href="./privacy.html">Privacy Policy</a><a href="https://github.com/AARMOU/arcana_table">GitHub ↗</a></nav>
   </header>
   <main>
     <div class="wrap hero">
@@ -46,7 +46,17 @@
         </div>
       </div>
     </div>
-    <section class="wrap" id="features">
+    <section class="wrap" id="gallery">
+<div class="sectionhead"><div class="eyebrow">Arcana Table in action</div><h2>See the actual app.</h2><p>Deck selection, offline AI, gameplay, and interface settings from Build 112.</p></div>
+<div class="arcana-gallery">
+<figure class="arcana-gallery-wide"><img src="./assets/arcana-hero.webp" alt="Arcana Table promotional banner showing the app on a phone" loading="lazy"><figcaption>Commander battles, AI opponents, and automated rules.</figcaption></figure>
+<figure><img src="./assets/arcana-deck.webp" alt="Sliver Overlord deck selection screen" loading="lazy"><figcaption>Choose a premade Commander deck.</figcaption></figure>
+<figure><img src="./assets/arcana-ai.webp" alt="Offline AI game setup with player count and deck selection" loading="lazy"><figcaption>Configure offline AI opponents.</figcaption></figure>
+<figure><img src="./assets/arcana-hand.webp" alt="Card hand display" loading="lazy"><figcaption>Inspect your cards.</figcaption></figure>
+<figure><img src="./assets/arcana-battlefield.webp" alt="Gameplay battlefield showing a card being cast" loading="lazy"><figcaption>Track turns, actions, and the stack.</figcaption></figure>
+<figure><img src="./assets/arcana-settings.webp" alt="App gameplay and interface settings" loading="lazy"><figcaption>Customize the experience.</figcaption></figure>
+</div></section>
+<section class="wrap" id="features">
       <div class="sectionhead"><div class="eyebrow">At the table</div><h2>Keep the game moving.</h2><p>A phone-friendly interface for managing the shared details of a multiplayer game while everyone stays focused on the table.</p></div>
       <div class="grid">
         <article class="feature"><div class="num">01 / PLAY TOGETHER</div><h3>Multiplayer rooms</h3><p>Create or join a room and bring your group into the same game.</p></article>
