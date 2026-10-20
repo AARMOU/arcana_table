@@ -35,7 +35,8 @@ jobs:
         run: |
           cd argentum-engine
           git apply ../android/patches/argentum-engine-name-equals.patch
-          ./gradlew :rules-engine:jar
+          ./gradlew :mtg-sdk:jar :rules-engine:jar
+          cp mtg-sdk/build/libs/mtg-sdk.jar ../android/app/libs/argentum-mtg-sdk.jar
           cp rules-engine/build/libs/rules-engine.jar ../android/app/libs/argentum-rules-engine.jar
 
       - name: Set up Android SDK
