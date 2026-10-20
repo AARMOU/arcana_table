@@ -22,13 +22,6 @@ object CardPool {
     /** Library tokens and basic lands: always loaded, because cards create and fetch them by name. */
     private val alwaysLoaded: List<CardDefinition> by lazy { load(emptySet()) }
 
-    private val overrides: Map<String, CardDefinition> by lazy {
-        File(assets, "card-overrides.jsonl").takeIf(File::exists)?.useLines { lines ->
-            lines.filter(String::isNotBlank).map(CardLoader::fromJsonPreservingIds)
-                .associateBy { it.name.lowercase() }
-        }.orEmpty()
-    }
-
     /** Library cards named in [names] plus every token and basic land. */
     fun load(names: Set<String>): List<CardDefinition> {
         val wanted = names.map(String::lowercase).toSet()
@@ -36,10 +29,7 @@ object CardPool {
         File(assets, "all-cards.jsonl").useLines { lines ->
             lines.filter(String::isNotBlank).forEachIndexed { i, line ->
                 val (name, kind) = index[i]
-                if (kind != "card" || name.lowercase() in wanted) {
-                    val card = CardLoader.fromJsonPreservingIds(line)
-                    out += overrides[card.name.lowercase()] ?: card
-                }
+                if (kind != "card" || name.lowercase() in wanted) out += CardLoader.fromJsonPreservingIds(line)
             }
         }
         return out

@@ -38,17 +38,6 @@ class OfflineCardLibrary(private val open: (String) -> InputStream?, forcedBase:
     private val customByLower: Map<String, String> by lazy {
         customIndex.map { it.first }.filter { it.lowercase() !in byLower }.associateBy { it.lowercase() }
     }
-    private val cardOverrides: Map<String, CardDefinition> by lazy {
-        open("argentum/card-overrides.jsonl")?.bufferedReader()?.useLines { lines ->
-            lines.filter(String::isNotBlank).map(CardLoader::fromJsonPreservingIds)
-                .associateBy { it.name.lowercase() }
-        }.orEmpty()
-    }
-
-    private fun loadDefinition(line: String): CardDefinition {
-        val card = CardLoader.fromJsonPreservingIds(line)
-        return cardOverrides[card.name.lowercase()] ?: card
-    }
 
     val size: Int get() = index.size
 
@@ -70,7 +59,7 @@ class OfflineCardLibrary(private val open: (String) -> InputStream?, forcedBase:
 
     /** Every card in the library (only sensible for the small Portal library). */
     fun loadAll(): List<CardDefinition> = open("argentum/$base.jsonl")!!.bufferedReader().useLines { lines ->
-        lines.filter(String::isNotBlank).map(::loadDefinition).toList()
+        lines.filter(String::isNotBlank).map(CardLoader::fromJsonPreservingIds).toList()
     }
 
     /** Decodes [names] plus every token and basic land, in one streaming pass (and custom cards). */
@@ -80,7 +69,7 @@ class OfflineCardLibrary(private val open: (String) -> InputStream?, forcedBase:
         open("argentum/$base.jsonl")!!.bufferedReader().useLines { lines ->
             lines.filter(String::isNotBlank).forEachIndexed { i, line ->
                 val (name, kind) = index.getOrNull(i) ?: return@forEachIndexed
-                if (kind != "card" || name in wanted) out += loadDefinition(line)
+                if (kind != "card" || name in wanted) out += CardLoader.fromJsonPreservingIds(line)
             }
         }
         val customWanted = wanted.filter { it.lowercase() in customByLower }.toSet()

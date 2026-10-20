@@ -59,7 +59,6 @@ import org.json.JSONObject
 data class CombatPiece(val id: String, val name: String, val card: GameCard? = null, val life: Int? = null)
 
 private val CombatKeywords = listOf("FLYING", "REACH", "FIRST_STRIKE", "DOUBLE_STRIKE", "TRAMPLE", "DEATHTOUCH", "LIFELINK", "MENACE", "VIGILANCE", "INDESTRUCTIBLE", "HEXPROOF", "SHADOW", "HORSEMANSHIP")
-private val StandoutCombatKeywords = setOf("trample", "flying", "deathtouch", "first strike", "double strike", "menace")
 
 /** "2/2 first strike" — power/toughness and combat keywords, as on the summary line. */
 fun combatStats(card: GameCard?): String {
@@ -87,7 +86,6 @@ fun blockSummary(attackers: List<CombatPiece>, blockers: List<CombatPiece>, sele
 @Composable
 private fun CombatTile(piece: CombatPiece, width: androidx.compose.ui.unit.Dp, selected: Boolean, linked: Boolean, enabled: Boolean,
                        onClick: () -> Unit, onBounds: (Rect) -> Unit, badge: String? = null) {
-    var zoomed by remember { mutableStateOf<PickCard?>(null) }
     val ring = when { selected -> CounterGold; linked -> Mint; else -> Color.Transparent }
     Column(
         Modifier.width(width).onGloballyPositioned { onBounds(it.boundsInRoot()) }.testTag("combat-${piece.id}"),
@@ -95,7 +93,7 @@ private fun CombatTile(piece: CombatPiece, width: androidx.compose.ui.unit.Dp, s
     ) {
         Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).border(3.dp, ring, RoundedCornerShape(10.dp)).padding(3.dp)) {
             // The board itself shows who attacks and blocks, so the card's own combat badge is dropped.
-            if (piece.card != null) CardFace(piece.card.copy(combatRole = null), Modifier.fillMaxWidth(), onClick = { if (enabled) onClick() }, onLongClick = { zoomed = piece.card.toCombatPick() }, showCounters = true)
+            if (piece.card != null) CardFace(piece.card.copy(combatRole = null), Modifier.fillMaxWidth(), onClick = { if (enabled) onClick() }, onLongClick = {}, showCounters = true)
             else Box(
                 Modifier.fillMaxWidth().aspectRatio(1.1f).clip(RoundedCornerShape(8.dp)).background(PanelLight)
                     .clickable(enabled = enabled, onClick = onClick),
@@ -110,21 +108,10 @@ private fun CombatTile(piece: CombatPiece, width: androidx.compose.ui.unit.Dp, s
                 modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).clip(RoundedCornerShape(5.dp)).background(Mint).padding(horizontal = 5.dp, vertical = 2.dp))
         }
         if (piece.card != null) Text(piece.name, color = SoftWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
-        piece.card?.let { card ->
-            if (card.power != null && card.toughness != null) Text("${card.power}/${card.toughness}", color = Muted, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            combatKeywords(card).forEach { keyword ->
-                Text(keyword, color = if (keyword in StandoutCombatKeywords) Color(0xFFFFB4A8) else CounterGold, fontSize = 7.sp, fontWeight = FontWeight.Black, maxLines = 1,
-                    modifier = Modifier.padding(top = 2.dp).clip(RoundedCornerShape(3.dp)).background(Panel).padding(horizontal = 3.dp, vertical = 1.dp))
-            }
-        }
+        val stats = combatStats(piece.card)
+        if (stats.isNotBlank()) Text(stats, color = Muted, fontSize = 8.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
-    zoomed?.let { PickZoom(it) { zoomed = null } }
 }
-
-private fun GameCard.toCombatPick() = PickCard(id.toString(), name, imageUrl?.takeIf { !isFaceDown }, type, group = "Combat", groupOrder = 0, isToken = isToken)
-
-private fun combatKeywords(card: GameCard): List<String> = card.keywords.map { it.uppercase().replace(' ', '_') }
-    .filter { it in CombatKeywords }.distinct().map { it.lowercase().replace('_', ' ') }
 
 @Composable
 private fun CombatBoardFrame(
@@ -359,7 +346,6 @@ fun attackGroups(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece): Map<
 @Composable
 fun ArgentumDamageBoard(resolution: ArgentumCombatResolution, playerId: String, piece: (String) -> CombatPiece, amounts: Map<String, Int>,
                         busy: Boolean, onChange: (Map<String, Int>) -> Unit, onConfirm: () -> Unit, onDismiss: () -> Unit) {
-    var zoomed by remember { mutableStateOf<PickCard?>(null) }
     val mine = resolution.editableBy(playerId)
     val problem = resolution.problem(amounts)
     // The decision names every combatant; prefer that over a bare id when the card isn't on our table.
@@ -376,7 +362,7 @@ fun ArgentumDamageBoard(resolution: ArgentumCombatResolution, playerId: String, 
                         val sourcePiece = pieceOf(source)
                         Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                             Column(Modifier.width(96.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                if (sourcePiece.card != null) CardFace(sourcePiece.card, Modifier.width(84.dp), onClick = {}, onLongClick = { zoomed = sourcePiece.card.toCombatPick() })
+                                if (sourcePiece.card != null) CardFace(sourcePiece.card, Modifier.width(84.dp), onClick = {}, onLongClick = {})
                                 Text(sourcePiece.name, color = SoftWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 Text("${edges.maxOf { it.maximum }} dmg" + if (left > 0) " · $left left" else "", color = if (left > 0) CounterGold else Muted, fontSize = 9.sp)
                             }
@@ -386,7 +372,7 @@ fun ArgentumDamageBoard(resolution: ArgentumCombatResolution, playerId: String, 
                                     val value = amounts[edge.id] ?: edge.defaultAmount
                                     val target = pieceOf(edge.targetId)
                                     Column(Modifier.width(92.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                                        if (target.card != null) CardFace(target.card, Modifier.width(80.dp), onClick = {}, onLongClick = { zoomed = target.card.toCombatPick() })
+                                        if (target.card != null) CardFace(target.card, Modifier.width(80.dp), onClick = {}, onLongClick = {})
                                         else Text(target.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(vertical = 18.dp))
                                         if (target.card != null) Text(target.name, color = SoftWhite, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -413,7 +399,6 @@ fun ArgentumDamageBoard(resolution: ArgentumCombatResolution, playerId: String, 
             }
         }
     }
-    zoomed?.let { PickZoom(it) { zoomed = null } }
 }
 
 

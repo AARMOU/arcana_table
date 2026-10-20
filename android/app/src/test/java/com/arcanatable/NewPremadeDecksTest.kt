@@ -9,24 +9,6 @@ import java.io.File
 
 /** The user's three premade decks (Ayula, Slivers, Hazel): every card runs offline, for you or the AI. */
 class NewPremadeDecksTest {
-    @Test fun wotcPreconsArcanaDecksAndEdhrecDecksHaveSeparateCategories() {
-        val json = File("src/main/assets/argentum/commander-decks.json").readText()
-        val premades = OfflineGameSetup.parsePremades(json)
-        val preconIds = premades.filter { argentumDeckCategory(it.id) == DeckChoiceCategory.PRECON }.map { it.id }.toSet()
-        val arcanaIds = premades.filter { argentumDeckCategory(it.id) == DeckChoiceCategory.ARCANA }.map { it.id }.toSet()
-        val argentumIds = premades.filter { argentumDeckCategory(it.id) == DeckChoiceCategory.ARGENTUM }.map { it.id }.toSet()
-
-        assertEquals(setOf("animated_army"), preconIds)
-        assertEquals(
-            setOf("tokens_win", "artificer_v4", "ayula_bears", "sliver_overlord", "hazel_squirrels", "mabel_heir", "velociraptor_beefcake"),
-            arcanaIds
-        )
-        assertEquals(
-            setOf("edhrec_baylen", "edhrec_bello", "edhrec_animar", "edhrec_wandering_minstrel", "edhrec_avatar_aang"),
-            argentumIds
-        )
-    }
-
     @Test fun everyCardResolves() {
         val library = OfflineCardLibrary({ path -> File("src/main/assets/$path").takeIf { it.exists() }?.inputStream() })
         val json = File("src/main/assets/argentum/commander-decks.json").readText()

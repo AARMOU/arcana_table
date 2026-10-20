@@ -41,7 +41,7 @@ data class ScryfallCard(
     val keywords: List<String> = emptyList()
 )
 
-private val deckSectionHeadings = setOf("creatures", "instants", "sorceries", "artifacts", "enchantments", "lands", "planeswalkers", "battles", "other", "others", "other spells", "tokens", "noncreatures")
+private val deckSectionHeadings = setOf("creatures", "instants", "sorceries", "artifacts", "enchantments", "lands", "planeswalkers", "battles", "other", "others", "tokens", "noncreatures")
 
 fun isDeckSectionHeading(name: String): Boolean = name.trim().trim('[', ']', ':', ' ').lowercase(Locale.ROOT) in deckSectionHeadings
 
@@ -91,7 +91,7 @@ fun parseDeckList(raw: String): List<DeckEntry> {
         }
         // Some exports include bracketed/category headings. They are structure,
         // not cards (e.g. the literal "[INSTANTS]" should never become a card).
-        if (normalizedLine in deckSectionHeadings) { commanderSection = false; return@forEach }
+        if (normalizedLine in deckSectionHeadings) return@forEach
         if (normalizedLine in setOf("mainboard", "main", "deck")) {
             sideboard = false
             commanderSection = false

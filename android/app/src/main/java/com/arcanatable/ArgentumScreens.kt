@@ -221,7 +221,7 @@ internal fun ArgentumOpeningHandScreen(
     primaryLabel: String, primaryEnabled: Boolean, onPrimary: () -> Unit,
     secondaryLabel: String?, secondaryEnabled: Boolean, onSecondary: () -> Unit,
 ) {
-    var inspected by remember { mutableStateOf<PickCard?>(null) }
+    var inspected by remember { mutableStateOf<GameCard?>(null) }
     Dialog(onDismissRequest = {}, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false, dismissOnClickOutside = false)) {
         Surface(Modifier.fillMaxSize(), color = Ink) {
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(18.dp)) {
@@ -236,8 +236,8 @@ internal fun ArgentumOpeningHandScreen(
                                 row.forEach { card ->
                                     val chosen = card.id in selection
                                     Box(Modifier.width(grid.cardWidth.dp)) {
-                                        CardFace(card, Modifier.width(grid.cardWidth.dp), onClick = { if (selectable) onToggle(card) },
-                                            onLongClick = { inspected = PickCard(card.id.toString(), card.name, card.imageUrl?.takeIf { !card.isFaceDown }, card.type, group = "Opening hand", groupOrder = 0, isToken = card.isToken) }, showCounters = false, glow = chosen)
+                                        CardFace(card, Modifier.width(grid.cardWidth.dp), onClick = { if (selectable) onToggle(card) else inspected = card },
+                                            onLongClick = { inspected = card }, showCounters = false, glow = chosen)
                                         if (chosen) Text("BOTTOM", color = Ink, fontSize = 9.sp, fontWeight = FontWeight.Black,
                                             modifier = Modifier.align(Alignment.TopCenter).padding(4.dp).clip(RoundedCornerShape(5.dp)).background(Mint).padding(horizontal = 6.dp, vertical = 2.dp))
                                     }
@@ -246,7 +246,7 @@ internal fun ArgentumOpeningHandScreen(
                         }
                     }
                 }
-                Text("Hold a card to see it large.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(vertical = 8.dp))
+                Text(if (selectable) "Long-press a card to read it." else "Tap a card to read it.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(vertical = 8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (secondaryLabel != null) OutlinedButton(onClick = onSecondary, enabled = secondaryEnabled, modifier = Modifier.weight(1f).heightIn(min = 54.dp)) { Text(secondaryLabel, fontWeight = FontWeight.Bold) }
                     Button(onClick = onPrimary, enabled = primaryEnabled, modifier = Modifier.weight(if (secondaryLabel != null) 1.4f else 1f).heightIn(min = 54.dp),
@@ -255,7 +255,21 @@ internal fun ArgentumOpeningHandScreen(
             }
         }
     }
-    inspected?.let { item -> PickZoom(item) { inspected = null } }
+    inspected?.let { card ->
+        AlertDialog(
+            onDismissRequest = { inspected = null },
+            title = { Text(card.name) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    card.manaCost?.let { ManaCostPips(it) }
+                    Text(card.type, color = Muted, fontSize = 12.sp)
+                    if (card.power != null && card.toughness != null) Text("${card.power}/${card.toughness}", color = SoftWhite, fontWeight = FontWeight.Bold)
+                    card.oracleText?.let { ManaSymbolText(it, SoftWhite, 13.sp, Modifier.padding(top = 8.dp)) }
+                }
+            },
+            confirmButton = { TextButton(onClick = { inspected = null }) { Text("CLOSE") } }
+        )
+    }
 }
 
 

@@ -244,10 +244,8 @@ internal fun TableController.TableMainLayout() {
                             }
                             "game" -> {
                                 DropdownMenuItem(text = { Text("Room home") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; homeOpen = true; showOverview = true; showHand = false } })
-                                // Argentum server play parked for now (Build 113); plumbing kept.
-                                if (!onlineMode && !localGameStarted) DropdownMenuItem(text = { Text("Start Argentum game", color = Muted.copy(alpha = .6f)) }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; android.widget.Toast.makeText(context, "Not yet available", android.widget.Toast.LENGTH_SHORT).show() } })
-                                // Argentum server play parked for now (Build 113); plumbing kept.
-                                if (!argentumEnabled) DropdownMenuItem(text = { Text("Argentum room", color = Muted.copy(alpha = .6f)) }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; android.widget.Toast.makeText(context, "Not yet available", android.widget.Toast.LENGTH_SHORT).show() } })
+                                if (!onlineMode && !localGameStarted) DropdownMenuItem(text = { Text("Start Argentum game") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; startArgentumPractice(vsAi = true) } })
+                                if (!argentumEnabled) DropdownMenuItem(text = { Text("Argentum room") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; startArgentumPractice(vsAi = false) } })
                                 if (onlineMode && gameStartedOnline && !gameEndedOnline) DropdownMenuItem(text = { Text("Propose ending the game") }, modifier = Modifier, onClick = { run {
                                     topMenuExpanded = false; topMenuSection = null
                                     if (endProposalBy < 0) { endProposalBy = localSeat; endVotes = mapOf(localSeat to true); logAction(localSeat, "proposed ending the game") }
@@ -385,8 +383,6 @@ internal fun TableController.TableMainLayout() {
                     onPassToMyTurn = { run { togglePassToMyTurn() } },
                     onUndo = { run { requestArgentumUndo() } },
                     playableIds = if (boardIndex == localSeat) argentumPlayableIds else emptySet(),
-                    argentumGame = argentumEnabled,
-                    localPlayerEliminated = players.getOrNull(localSeat)?.isEliminated != false,
                     onToken = { run { if (boardCanControl) { tokenTarget = boardIndex; tokenPickerOpen = true } } },
                     onManageMana = { run { if (boardCanControl) { manaTarget = boardIndex; manaPoolOpen = true } } },
                     onZone = { zone -> run { zoneDialog = boardIndex to zone } },
@@ -471,8 +467,8 @@ internal fun TableController.TableMainLayout() {
                     onClick = { run { showHand = true } }
                 ) else Text("Tap a player to inspect their board", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
                 if (argentumEnabled) {
-                    if (passToMyTurnFrom != null) HeaderButton("AUTO-PASSING · STOP", onClick = { run { togglePassToMyTurn() } }, modifier = Modifier, onLongClick = { run { togglePassToMyTurn() } })
-                    else if (argentumPrimaryLabel != null) PassButton(argentumPrimaryLabel!!, onClick = { run { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, canRespond = argentumCanRespond && respondGlow, modifier = Modifier, onLongClick = { run { togglePassToMyTurn() } })
+                    if (passToMyTurnFrom != null) HeaderButton("AUTO-PASSING · STOP", onClick = { run { togglePassToMyTurn() } }, modifier = Modifier)
+                    else if (argentumPrimaryLabel != null) PassButton(argentumPrimaryLabel!!, onClick = { run { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, canRespond = argentumCanRespond && respondGlow, modifier = Modifier)
                     else Text(when { gameEndedOnline -> "GAME OVER"; argentumSnapshot == null -> "WAITING FOR ARGENTUM"; argentumPendingDecision != null -> "YOUR CHOICE IS NEEDED"; argentumAwaitingUpdate -> if (argentumSlow) "STILL WORKING…" else if (argentumOffline) "ENGINE THINKING…" else "WAITING FOR ARGENTUM"; wifiRole != null -> "WAITING FOR ${(argentumSnapshot?.let { players.getOrNull(it.priorityPlayer)?.name } ?: "YOUR FRIEND").uppercase()}…"; else -> "OPPONENT HAS PRIORITY" }, color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
                 } else {
                 if (gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) HeaderButton("NEXT · ${phaseSteps[phaseIndex]}", onClick = { run { if (argentumEnabled) sendArgentumPriority() else advanceStep() } }, enabled = !argentumAwaitingUpdate, modifier = Modifier)
@@ -500,12 +496,11 @@ internal fun TableController.TableMainLayout() {
                     onClick = { run { if (argentumEnabled && passToMyTurnFrom != null) togglePassToMyTurn() else if (argentumEnabled) argentumPrimary() else passTurn() } },
                     enabled = if (argentumEnabled && passToMyTurnFrom != null) true else if (argentumEnabled) argentumPrimaryLabel != null && !argentumAwaitingUpdate else canPassTurnFromBoard,
                     canRespond = argentumCanRespond && respondGlow,
-                    modifier = Modifier.weight(1f).height(footerControlHeight).testTag("bottom-bar-pass-button"),
-                    onLongClick = if (argentumEnabled) ({ run { togglePassToMyTurn() } }) else null
+                    modifier = Modifier.weight(1f).height(footerControlHeight)
                 )
                 Box(Modifier.weight(1.3f)) {
                     HandPeekBar(
-                        players[if (argentumEnabled) localSeat.coerceIn(players.indices) else selectedPlayer.coerceIn(players.indices)].hand.size,
+                        players[if (argentumEnabled) localSeat.coerceIn(players.indices) else selectedPlayer].hand.size,
                         modifier = Modifier.fillMaxWidth().height(handControlHeight).testTag("hand-peek"),
                         onClick = { run { if (canControlSelectedPlayer || argentumEnabled) showHand = true } }
                     )

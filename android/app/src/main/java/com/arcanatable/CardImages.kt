@@ -177,18 +177,3 @@ object CardImages {
         } catch (_: Exception) { null } finally { connection.disconnect() }
     }
 }
-
-/** Artwork-only commander art for home and deck-selection surfaces. */
-internal fun homeArtUrl(tableArt: String?, bundled: String?, name: String): String {
-    val nameUrl = "https://api.scryfall.com/cards/named?exact=${URLEncoder.encode(name, "UTF-8")}&format=image&version=art_crop"
-    for (candidate in listOfNotNull(tableArt, bundled)) {
-        val artworkOnly = CardImages.atSize(candidate, "art_crop")
-        if (artworkOnly.startsWith("https://cards.scryfall.io/")) return artworkOnly
-        if (artworkOnly.startsWith("https://api.scryfall.com/")) {
-            val base = artworkOnly.substringBefore('?')
-            val query = artworkOnly.substringAfter('?', "").split('&').filter { it.isNotBlank() && !it.startsWith("version=") }
-            return base + "?" + (query + "version=art_crop").joinToString("&")
-        }
-    }
-    return nameUrl
-}
