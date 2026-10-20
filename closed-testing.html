@@ -18,10 +18,8 @@ header{border-bottom:1px solid #ffffff13}.brand{display:flex;align-items:center;
 h1{font-size:clamp(38px,7vw,62px);line-height:1.06;letter-spacing:-.05em;margin:15px 0}.lead{font-size:18px;color:var(--muted)}
 .panel{margin-top:34px;padding:30px;border:1px solid #456446;border-radius:18px;background:linear-gradient(145deg,#1d2b20,#151c17)}
 h2{margin:0 0 6px;font-size:24px}.hint{font-size:14px;color:var(--muted);margin:0 0 23px}
-label{display:block;font-weight:700;margin-bottom:8px}input[type=email]{width:100%;padding:14px;border-radius:10px;border:1px solid #536553;background:#101711;color:var(--ink);font:inherit}
-.check{display:flex;gap:12px;align-items:flex-start;margin:19px 0;font-size:14px;color:#d1dfd0}.check label{font-weight:400;margin:0}.check input{width:18px;height:18px;margin:3px 0 0;flex:none;accent-color:var(--green)}
-button{border:1px solid var(--green);background:var(--green);color:#14200e;padding:12px 20px;border-radius:10px;font:inherit;font-weight:800;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}
-.status{color:#f0c778;font-size:14px;margin:14px 0}.fine{font-size:13px;color:var(--muted);margin:22px 0 0}
+.fine{font-size:13px;color:var(--muted);margin:22px 0 0}
+.signup-link{display:inline-flex;align-items:center;justify-content:center;background:var(--green);color:#14200e;font-weight:800;text-decoration:none;border-radius:10px;padding:13px 20px;margin:10px 0}
 footer{border-top:1px solid #ffffff13;color:#849187;font-size:13px;padding:25px 0}
 @media(max-width:600px){main{padding:44px 0 55px}.panel{padding:22px}.nav{flex-wrap:wrap}}
 </style>
@@ -35,33 +33,13 @@ footer{border-top:1px solid #ffffff13;color:#849187;font-size:13px;padding:25px 
 <section class="panel">
 <h2>Closed-test signup</h2>
 <p class="hint">Your email address is all we need. Signing up does not guarantee an invitation or automatically grant Google Play access.</p>
-<form id="signup-form" method="POST">
-<label for="email">Email address</label>
-<input id="email" type="email" name="email" autocomplete="email" placeholder="you@example.com" maxlength="254" required disabled>
-<div class="check"><input type="checkbox" id="consent" name="consent" value="yes" required disabled><label for="consent">I agree to receive Arcana Table closed-test invitations and essential testing updates by email. I can ask to be removed.</label></div>
-<input type="hidden" name="_subject" value="New Arcana Table closed-test signup">
-<input type="hidden" name="source" value="Arcana Table closed testing landing page">
-<div style="position:absolute;left:-10000px" aria-hidden="true"><label for="trap">Leave empty</label><input type="text" name="_honey" id="trap" tabindex="-1" autocomplete="off"></div>
-<button type="submit" id="submit" disabled>Request an invitation</button>
-<p class="status" role="status" id="status">Signups are being prepared. Check back soon.</p>
-</form>
+<p>Continue to FormSubmit to enter your email address and send your closed-testing request directly to the developer.</p>
+<p><a class="signup-link" href="https://formsubmit.co/el/kotihi/?subject=Arcana+Table+Closed+Testing+Signup&message=I+would+like+to+join+the+Arcana+Table+Android+closed+test." rel="noopener noreferrer">Open closed-test signup form ↗</a></p>
+<p class="fine">Submitting a request means you agree to be contacted about Arcana Table closed-test invitations and essential testing updates. An invitation is not guaranteed.</p>
 <p class="fine">Only used for closed-testing communications. The form provider processes your email to send it to the developer. Review our <a href="./privacy.html">Privacy Policy</a>.</p>
 </section>
 </main>
 <footer><div class="wrap">Arcana Table · Independent fan-made project. · <a href="./privacy.html">Privacy Policy</a></div></footer>
-<script>
-  // Activation step: set the URL to an activated FormSubmit token endpoint.
-  // Use the provider's hidden-email token, not a personal email in public source.
-  const FORM_ENDPOINT = "";
-  const enabled = FORM_ENDPOINT.startsWith("https://formsubmit.co/") &&
-    FORM_ENDPOINT.length > "https://formsubmit.co/".length;
-  if (enabled) {
-    document.getElementById("signup-form").action = FORM_ENDPOINT;
-    document.getElementById("email").disabled = false;
-    document.getElementById("consent").disabled = false;
-    document.getElementById("submit").disabled = false;
-    document.getElementById("status").textContent = "You may be asked to complete a spam-prevention check.";
-  }
-</script>
+
 </body>
 </html>
