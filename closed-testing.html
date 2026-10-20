@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#111612">
+<meta name="description" content="Sign up to test Arcana Table for Android.">
+<title>Closed Testing — Arcana Table</title>
+<link rel="icon" href="./assets/arcana-logo.png">
+<style>
+:root{color-scheme:dark;--bg:#101511;--ink:#eef5ed;--muted:#a4b2a5;--green:#a7f06c;--line:#2b392f}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(ellipse at 80% 0%,#263a2a 0,transparent 42%),var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,Segoe UI,sans-serif}
+a{color:var(--green)}a:focus-visible,input:focus-visible,button:focus-visible{outline:2px solid var(--green);outline-offset:3px}
+.wrap{width:min(760px,calc(100% - 36px));margin:auto}.nav{min-height:76px;display:flex;gap:18px;align-items:center;justify-content:space-between}
+header{border-bottom:1px solid #ffffff13}.brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--ink);font-weight:800}.brand img{width:44px;height:44px}
+.back{color:var(--muted);font-size:14px;text-decoration:none}main{padding:66px 0 82px}.eyebrow{font-size:12px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--green)}
+h1{font-size:clamp(38px,7vw,62px);line-height:1.06;letter-spacing:-.05em;margin:15px 0}.lead{font-size:18px;color:var(--muted)}
+.panel{margin-top:34px;padding:30px;border:1px solid #456446;border-radius:18px;background:linear-gradient(145deg,#1d2b20,#151c17)}
+h2{margin:0 0 6px;font-size:24px}.hint{font-size:14px;color:var(--muted);margin:0 0 23px}
+label{display:block;font-weight:700;margin-bottom:8px}input[type=email]{width:100%;padding:14px;border-radius:10px;border:1px solid #536553;background:#101711;color:var(--ink);font:inherit}
+.check{display:flex;gap:12px;align-items:flex-start;margin:19px 0;font-size:14px;color:#d1dfd0}.check label{font-weight:400;margin:0}.check input{width:18px;height:18px;margin:3px 0 0;flex:none;accent-color:var(--green)}
+button{border:1px solid var(--green);background:var(--green);color:#14200e;padding:12px 20px;border-radius:10px;font:inherit;font-weight:800;cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}
+.status{color:#f0c778;font-size:14px;margin:14px 0}.fine{font-size:13px;color:var(--muted);margin:22px 0 0}
+footer{border-top:1px solid #ffffff13;color:#849187;font-size:13px;padding:25px 0}
+@media(max-width:600px){main{padding:44px 0 55px}.panel{padding:22px}.nav{flex-wrap:wrap}}
+</style>
+</head>
+<body>
+<header><nav class="wrap nav"><a class="brand" href="./"><img src="./assets/arcana-logo.png" alt=""><span>ARCANA TABLE</span></a><a href="./" class="back">← Back to site</a></nav></header>
+<main class="wrap">
+<div class="eyebrow">Android · Limited access</div>
+<h1>Help shape the next game.</h1>
+<p class="lead">Sign up to request access to the Arcana Table Google Play closed test. Test the interface, explore the rules engine, and report the things that need fixing.</p>
+<section class="panel">
+<h2>Closed-test signup</h2>
+<p class="hint">Your email address is all we need. Signing up does not guarantee an invitation or automatically grant Google Play access.</p>
+<form id="signup-form" method="POST">
+<label for="email">Email address</label>
+<input id="email" type="email" name="email" autocomplete="email" placeholder="you@example.com" maxlength="254" required disabled>
+<div class="check"><input type="checkbox" id="consent" name="consent" value="yes" required disabled><label for="consent">I agree to receive Arcana Table closed-test invitations and essential testing updates by email. I can ask to be removed.</label></div>
+<input type="hidden" name="_subject" value="New Arcana Table closed-test signup">
+<input type="hidden" name="source" value="Arcana Table closed testing landing page">
+<div style="position:absolute;left:-10000px" aria-hidden="true"><label for="trap">Leave empty</label><input type="text" name="_honey" id="trap" tabindex="-1" autocomplete="off"></div>
+<button type="submit" id="submit" disabled>Request an invitation</button>
+<p class="status" role="status" id="status">Signups are being prepared. Check back soon.</p>
+</form>
+<p class="fine">Only used for closed-testing communications. The form provider processes your email to send it to the developer. Review our <a href="./privacy.html">Privacy Policy</a>.</p>
+</section>
+</main>
+<footer><div class="wrap">Arcana Table · Independent fan-made project. · <a href="./privacy.html">Privacy Policy</a></div></footer>
+<script>
+  // Activation step: set the URL to an activated FormSubmit token endpoint.
+  // Use the provider's hidden-email token, not a personal email in public source.
+  const FORM_ENDPOINT = "";
+  const enabled = FORM_ENDPOINT.startsWith("https://formsubmit.co/") &&
+    FORM_ENDPOINT.length > "https://formsubmit.co/".length;
+  if (enabled) {
+    document.getElementById("signup-form").action = FORM_ENDPOINT;
+    document.getElementById("email").disabled = false;
+    document.getElementById("consent").disabled = false;
+    document.getElementById("submit").disabled = false;
+    document.getElementById("status").textContent = "You may be asked to complete a spam-prevention check.";
+  }
+</script>
+</body>
+</html>
