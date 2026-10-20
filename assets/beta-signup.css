@@ -1,0 +1,17 @@
+/* Arcana Table embedded beta signup */
+.beta-signup-form{min-width:0;width:100%;padding:22px;border:1px solid #527c5d;border-radius:15px;background:#0a170f70}
+.beta-signup-form label{display:block;font-size:14px;font-weight:750;margin-bottom:8px}
+.beta-signup-fields{display:flex;gap:10px;flex-wrap:wrap}
+.beta-signup-fields input{min-width:180px;flex:1;background:#101a14;border:1px solid #618b72;border-radius:10px;color:#edf8f1;padding:13px 14px;font:inherit}
+.beta-signup-fields input:focus-visible{outline:2px solid #f2cc7d;outline-offset:2px}
+.beta-signup-fields button{border:0;border-radius:10px;background:#90ebbe;color:#10241a;padding:13px 18px;font:inherit;font-weight:800;cursor:pointer}
+.beta-signup-fields button:disabled{opacity:.6;cursor:wait}
+.beta-honeypot{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.beta-status{min-height:1.5em;font-size:14px;margin:10px 0 0;color:#a2b6ab}
+.beta-status[data-state="success"]{color:#90ebbe}
+.beta-status[data-state="error"]{color:#f2cc7d}
+.beta-fineprint{font-size:13px;line-height:1.5;color:#b6c6ba;margin:8px 0 0}
+.arcana-beta-section{align-items:center;gap:24px}
+.arcana-beta-copy{flex:1}
+.arcana-beta-section .beta-signup-form{flex:0 1 480px}
+@media(max-width:850px){.arcana-beta-section{display:block}.arcana-beta-section .beta-signup-form{margin-top:24px}}
