@@ -151,7 +151,7 @@ internal fun TableController.TableOverlays() {
         if (homeOpen) {
             val deckChoices = remember(savedDecks, premadeDecks, preconDecks) {
                 preconDecks.map { DeckChoice("precon:${it.id}", it.name, it.commander, builtIn = true, category = DeckChoiceCategory.PRECON) } +
-                    premadeDecks.map { DeckChoice("builtin:${it.id}", it.name, it.commander, builtIn = true, category = DeckChoiceCategory.ARGENTUM) } +
+                    premadeDecks.map { DeckChoice("builtin:${it.id}", it.name, it.commander, builtIn = true, category = argentumDeckCategory(it.id)) } +
                     savedDecks.map { DeckChoice(it.name, it.name, it.commander ?: parseDeckList(it.text).firstOrNull { e -> e.commander }?.name, builtIn = false, category = DeckChoiceCategory.OTHER) }
             }
             val seat = players.getOrNull(localSeat)

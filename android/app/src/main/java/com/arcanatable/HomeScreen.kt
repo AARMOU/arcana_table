@@ -55,7 +55,10 @@ import androidx.compose.ui.unit.sp
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 
-enum class DeckChoiceCategory { PRECON, ARGENTUM, OTHER }
+enum class DeckChoiceCategory { PRECON, ARCANA, ARGENTUM, OTHER }
+
+internal fun argentumDeckCategory(deckId: String): DeckChoiceCategory =
+    if (deckId.startsWith("edhrec_")) DeckChoiceCategory.ARGENTUM else DeckChoiceCategory.ARCANA
 
 /** A deck you can play: one of yours, a precon, or an Argentum premade deck. */
 data class DeckChoice(
@@ -252,7 +255,7 @@ private fun DeckChip(label: String, selected: Boolean, onClick: () -> Unit) {
             .clickable(onClick = onClick).heightIn(min = 44.dp).padding(horizontal = 16.dp, vertical = 12.dp))
 }
 
-/** Pick from precons, Argentum premades, and then your other decks. */
+/** Pick from precons, Arcana decks, Argentum EDHREC decks, and then your other decks. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit) {
@@ -261,6 +264,7 @@ fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckCho
             Text("Choose your deck", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
             listOf(
                 DeckChoiceCategory.PRECON to "FALLOUT & BLOOMBURROW PRECONS",
+                DeckChoiceCategory.ARCANA to "ARCANA",
                 DeckChoiceCategory.ARGENTUM to "ARGENTUM PREMADE DECKS",
                 DeckChoiceCategory.OTHER to "YOUR OTHER DECKS"
             ).forEach { (category, heading) ->
