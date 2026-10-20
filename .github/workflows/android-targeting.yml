@@ -47,3 +47,7 @@ jobs:
       - name: Run unit tests
         working-directory: android
         run: ./gradlew testDebugUnitTest
+
+      - name: Run custom card rules scenarios
+        working-directory: android
+        run: ./gradlew :custom-cards:test
