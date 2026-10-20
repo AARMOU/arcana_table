@@ -25,11 +25,11 @@ jobs:
           ref: d1b1c36aaeb293529986d68faf77744b8b308122
           path: argentum-engine
 
-      - name: Set up Java 21 for rules engine
+      - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: '17'
 
       - name: Build patched Argentum rules engine
         run: |
@@ -37,12 +37,6 @@ jobs:
           git apply ../android/patches/argentum-engine-name-equals.patch
           ./gradlew :rules-engine:jar
           cp rules-engine/build/libs/rules-engine.jar ../android/app/libs/argentum-rules-engine.jar
-
-      - name: Set up Java 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
