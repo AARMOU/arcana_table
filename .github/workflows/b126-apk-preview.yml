@@ -1,0 +1,43 @@
+name: Build 126 experimental APK
+on:
+  push:
+    branches:
+      - gpt/b126-apk-preview
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Check source and manifest version
+        run: |
+          grep -F 'applicationId = "com.arcanatable"' android/app/build.gradle.kts
+          grep -F 'versionCode = 126' android/app/build.gradle.kts
+          grep -F 'versionName = "0.33.2-build126-preview"' android/app/build.gradle.kts
+      - name: Compile candidate release APK
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:assembleRelease
+      - name: Stage artifact for offline signing
+        run: |
+          set -euo pipefail
+          mkdir -p preview
+          cp android/app/build/outputs/apk/release/*.apk preview/ArcanaTable-B126-unsigned.apk
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" preview/apksigner.jar
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging preview/ArcanaTable-B126-unsigned.apk | head -n 8 > preview/package-info.txt
+          sha256sum preview/ArcanaTable-B126-unsigned.apk > preview/SHA256SUMS.txt
+          printf 'Build=126\nSourceCommit=%s\nRuntime=pinned Build123 Argentum\nSigner=offline user key\n' "$GITHUB_SHA" > preview/source.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArcanaTable-B126-unsigned
+          path: preview/
+          retention-days: 7
