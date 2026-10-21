@@ -15,5 +15,5 @@ val DesertOfTheGlorified = card("Desert of the Glorified") {
         timing = TimingRule.ManaAbility
     }
     keywordAbility(KeywordAbility.cycling("{1}{B}"))
-    metadata { rarity = Rarity.COMMON; collectorNumber = "84"; artist = "Daniel Ljunggren" }
+    metadata { rarity = Rarity.COMMON; collectorNumber = "171"; artist = "Jonas De Ro" }
 }

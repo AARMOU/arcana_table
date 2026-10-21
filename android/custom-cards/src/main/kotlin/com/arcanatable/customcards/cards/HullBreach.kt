@@ -24,5 +24,5 @@ val HullBreach = card("Hull Breach") {
             }
         }
     }
-    metadata { rarity = Rarity.COMMON; artist = "Brian Snoddy" }
+    metadata { rarity = Rarity.COMMON; collectorNumber = "111"; artist = "Brian Snoddy" }
 }
