@@ -1,0 +1,65 @@
+name: Generic trigger / life gain performance baseline (Build 125)
+on:
+  push:
+    branches:
+      - gpt/generic-life-trigger-stress-tests
+permissions:
+  contents: read
+concurrency:
+  group: generic-trigger-stress-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  trigger-stress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: one-large-lifegain
+            test: oneHugeLifeGainIsNotTwoHundredIndividualTriggers
+          - label: repeated-lifegain
+            test: twoHundredSeparateLifeGainsWithoutCreatures
+          - label: artifact-etb
+            test: twoHundredArtifactEtbsAreRealHaliyaTriggers
+          - label: creature-etb
+            test: twoHundredCreatureEtbsAreRealHaliyaTriggers
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Run one stress scenario on pinned Argentum engine
+        working-directory: android
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:test \
+            --tests '*GenericTriggerStressTest.${{ matrix.test }}' --info 2>&1 | tee ../stress.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build125-${{ matrix.label }}
+          path: |
+            stress.log
+            android/custom-cards/build/test-results/test/
+  existing-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Baseline end-step parity and AI regression
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests '*OfflineHumanAutoPassParityTest' --tests '*AiRetargetingSearchTest' --tests '*OfflineAiLargeBoardTest'
