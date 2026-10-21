@@ -148,6 +148,12 @@ object CustomCards {
         Entry(ZacamaPrimalCalamity, "RIX", "Velociramptor Beefcake 9/26"),
         Entry(BrigoneSoldierOfMeletis, "J25", "Mabel deck"),
         Entry(SavaiThundermane, "IKO", "Mabel deck"),
+        // Six official Warhammer 40K and Eldrazi Commander precons (import batch 1).
+        // These card definitions use existing Argentum primitives; deck publication waits
+        // until the entire precon passes catalog and behavior validation.
+        Entry(SpatialContortion, "OGW", "Six WotC precons"),
+        Entry(SkitteringInvasion, "ROE", "Six WotC precons"),
+        Entry(BlightGrenade, "40K", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
