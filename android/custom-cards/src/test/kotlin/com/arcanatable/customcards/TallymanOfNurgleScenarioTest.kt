@@ -36,7 +36,34 @@ class TallymanOfNurgleScenarioTest {
         d.resolveAll()
 
         assertEquals(19, d.getLifeTotal(p))
+        assertEquals(20, d.getLifeTotal(d.player2))
         assertEquals(beforeEnd + 1, d.getHand(p).size)
+    }
+
+    @Test
+    fun sevenCreatureDeathsDrawSevenAndLoseSevenLife() {
+        val d = customScenario(TallymanOfNurgle, "Grizzly Bears", "Doom Blade")
+        val p = d.player1
+        d.putCreatureOnBattlefield(p, "Tallyman of Nurgle")
+        repeat(7) {
+            val creature = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
+            val blade = d.putCardInHand(p, "Doom Blade")
+            d.giveMana(p, Color.BLACK)
+            d.giveColorlessMana(p, 1)
+            assertNull(d.castSpell(p, blade, listOf(creature)).error)
+            d.resolveAll()
+        }
+        assertEquals(0, d.permanentsNamed(d.player2, "Grizzly Bears").size)
+        val deaths = d.state.turnOrder.sumOf { playerId ->
+            d.state.getEntity(playerId)!!.get<CreaturesDiedThisTurnComponent>()?.count ?: 0
+        }
+        assertEquals(7, deaths)
+        val beforeEnd = d.getHand(p).size
+        d.passPriorityUntil(Step.END, activePlayer = p)
+        d.resolveAll()
+        assertEquals(13, d.getLifeTotal(p))
+        assertEquals(20, d.getLifeTotal(d.player2))
+        assertEquals(beforeEnd + 7, d.getHand(p).size)
     }
 
     @Test
