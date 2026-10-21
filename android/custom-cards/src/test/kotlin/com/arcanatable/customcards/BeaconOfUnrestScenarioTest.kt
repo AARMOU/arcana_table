@@ -4,6 +4,7 @@ import com.arcanatable.customcards.cards.BeaconOfUnrest
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Zone
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -16,7 +17,7 @@ class BeaconOfUnrestScenarioTest {
         val spell = d.putCardInHand(p, "Beacon of Unrest")
         d.giveMana(p, Color.BLACK, 2)
         d.giveColorlessMana(p, 3)
-        assertNull(d.castSpell(p, spell, listOf(target)).error)
+        assertNull(d.castSpellWithTargets(p, spell, listOf(ChosenTarget.Card(target, d.player2, Zone.GRAVEYARD))).error)
         d.resolveAll()
         assertEquals(1, d.permanentsNamed(p, "Grizzly Bears").size)
         assertTrue(d.permanentsNamed(d.player2, "Grizzly Bears").isEmpty())
@@ -33,7 +34,7 @@ class BeaconOfUnrestScenarioTest {
         val spell = d.putCardInHand(p, "Beacon of Unrest")
         d.giveMana(p, Color.BLACK, 2)
         d.giveColorlessMana(p, 3)
-        assertNull(d.castSpell(p, spell, listOf(target)).error)
+        assertNull(d.castSpellWithTargets(p, spell, listOf(ChosenTarget.Card(target, d.player2, Zone.GRAVEYARD))).error)
         d.resolveAll()
         assertNotNull(d.findPermanent(p, "Sol Ring"))
         assertTrue(d.zoneNames(p, Zone.LIBRARY).contains("Beacon of Unrest"))
