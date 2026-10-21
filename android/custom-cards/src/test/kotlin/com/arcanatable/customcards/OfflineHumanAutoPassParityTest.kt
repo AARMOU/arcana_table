@@ -149,6 +149,7 @@ class OfflineHumanAutoPassParityTest {
         val enteredEnd = booleanArrayOf(false)
         var windows = 0
         var stackedWindows = 0
+        var fastStackWindows = 0
         var decisions = 0
         var iterations = 0
         while (iterations++ < 3000) {
@@ -161,15 +162,19 @@ class OfflineHumanAutoPassParityTest {
                 continue
             }
             val actor = d.state.priorityPlayerId ?: error("No priority holder during Ocelot cascade")
-            if (d.state.stack.isNotEmpty()) stackedWindows++
+            if (d.state.stack.isNotEmpty()) {
+                stackedWindows++
+                if (OfflineHumanAutoPass.canPassOwnedStackWithoutEnumerating(d.state, actor, d.cardRegistry)) fastStackWindows++
+            }
             assertSameVerdict(d, "ocelot-end-step-window-$windows")
             windows++
             assertNull("PassPriority rejected", d.submit(PassPriority(actor)).error)
         }
-        println("AUTO_PASS_CASCADE completed=${enteredEnd[0] && d.state.step != Step.END} windows=$windows stackedWindows=$stackedWindows decisions=$decisions iterations=$iterations finalTokens=${d.getPermanents(d.player1).size}")
+        println("AUTO_PASS_CASCADE completed=${enteredEnd[0] && d.state.step != Step.END} windows=$windows stackedWindows=$stackedWindows fastStackWindows=$fastStackWindows decisions=$decisions iterations=$iterations finalTokens=${d.getPermanents(d.player1).size}")
         assertTrue("fixture must reach its end step", enteredEnd[0])
         assertTrue("fixture must cover actual triggered stack windows", stackedWindows > 0)
         assertTrue("fixture must exercise multiple priority windows", windows >= 10)
+        assertTrue("fast path should remove real stack-window enumerations", fastStackWindows >= 10)
         assertTrue("original/pass-only cascade must complete", d.state.step != Step.END)
     }
 }
