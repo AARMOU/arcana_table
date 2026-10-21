@@ -173,6 +173,10 @@ object CustomCards {
         Entry(Plasmancer, "40K", "Six WotC precons"),
         Entry(UlamogsCrusher, "ROE", "Six WotC precons"),
         Entry(AssaultIntercessor, "40K", "Six WotC precons"),
+        Entry(HeraldOfSlaanesh, "40K", "Six WotC precons"),
+        Entry(NoiseMarine, "40K", "Six WotC precons"),
+        Entry(ChaosTerminatorLord, "40K", "Six WotC precons"),
+        Entry(SisterHospitaller, "40K", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
