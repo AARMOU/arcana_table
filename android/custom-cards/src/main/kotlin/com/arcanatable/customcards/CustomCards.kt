@@ -154,6 +154,8 @@ object CustomCards {
         Entry(SpatialContortion, "OGW", "Six WotC precons"),
         Entry(SkitteringInvasion, "ROE", "Six WotC precons"),
         Entry(BlightGrenade, "40K", "Six WotC precons"),
+        Entry(DenyReality, "ARB", "Six WotC precons"),
+        Entry(BituminousBlast, "ARB", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
