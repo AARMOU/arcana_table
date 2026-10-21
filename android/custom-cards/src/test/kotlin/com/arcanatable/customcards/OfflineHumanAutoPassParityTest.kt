@@ -54,7 +54,8 @@ class OfflineHumanAutoPassParityTest {
         assertEquals("$label (stack=${state.stack.size}, oldActions=${oldDto.size})", baseline, candidate)
         val guaranteed = com.wingedsheep.engine.legalactions.MeaningfulActionFilter
             .canAutoPassWithoutEnumerating(state, player)
-        assertEquals("$label whether enumeration is skipped", if (guaranteed) 0 else 1, newEnumCalls)
+        val ownStackFastPass = OfflineHumanAutoPass.canPassOwnedStackWithoutEnumerating(state, player, d.cardRegistry)
+        assertEquals("$label whether enumeration is skipped", if (guaranteed || ownStackFastPass) 0 else 1, newEnumCalls)
         println("AUTO_PASS_PARITY case=$label stack=${state.stack.size} battlefield=${state.getBattlefield().size} original=$baseline candidate=$candidate fullActions=${oldDto.size} candidateEnumerations=$newEnumCalls")
     }
 
@@ -66,6 +67,22 @@ class OfflineHumanAutoPassParityTest {
             assertSameVerdict(d, "main-$token-$count")
             d.passPriorityUntil(Step.END)
             assertSameVerdict(d, "end-empty-$token-$count")
+        }
+    }
+
+    @Test(timeout = 180000)
+    fun ownStackFastPassSkipsFullTokenEnumerationAndPreservesVerdict() {
+        for (amount in listOf(40, 200, 600)) {
+            val d = scenario("Grizzly Bears")
+            repeat(amount) { d.putToken(d.player1, "Food") }
+            val creature = d.putCardInHand(d.player1, "Grizzly Bears")
+            d.giveMana(d.player1, Color.GREEN, 2)
+            assertNull("Casting a creature must be legal", d.castSpell(d.player1, creature).error)
+            assertEquals(d.player1, d.state.priorityPlayerId)
+            assertTrue(d.state.stack.isNotEmpty())
+            assertTrue("Safely skippable own stack with $amount Foods",
+                OfflineHumanAutoPass.canPassOwnedStackWithoutEnumerating(d.state, d.player1, d.cardRegistry))
+            assertSameVerdict(d, "owned-spell-food-$amount")
         }
     }
 
