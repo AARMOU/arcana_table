@@ -3,6 +3,7 @@ package com.arcanatable.customcards
 import com.arcanatable.customcards.support.*
 import com.arcanatable.engine.ai.OfflineAiPolicy
 import com.wingedsheep.engine.core.DeclareAttackers
+import com.wingedsheep.engine.core.DeclareBlockers
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Step
 import org.junit.Assert.*
@@ -10,6 +11,26 @@ import org.junit.Test
 
 /** The app's actual mobile profile, on the same engine and card data as its offline host. */
 class OfflineAiLargeBoardTest {
+    @Test(timeout = 60000)
+    fun crowdedBlockingReturnsLegalAssignments() {
+        val d = scenario("Grizzly Bears")
+        val attackers = List(140) {
+            d.putToken(d.player1, "Grizzly Bears").also(d::removeSummoningSickness)
+        }
+        repeat(140) { d.putToken(d.player2, "Grizzly Bears") }
+        d.passPriorityUntil(Step.DECLARE_ATTACKERS)
+        assertNull(d.submit(DeclareAttackers(d.player1, attackers.associateWith { d.player2 })).error)
+        d.passPriorityUntil(Step.DECLARE_BLOCKERS)
+        val bot = OfflineAiPolicy.create(d.cardRegistry, d.player2)
+        val started = System.nanoTime()
+        val action = bot.chooseAction(d.state)
+        val ms = (System.nanoTime() - started) / 1_000_000
+        println("[mobile-ai] blockers permanents=${d.state.getBattlefield().size} ms=$ms action=${action.javaClass.simpleName}")
+        assertTrue(action is DeclareBlockers)
+        assertTrue("large blocking search returned in ${ms}ms", ms < 5000)
+        assertNull(d.submit(action).error)
+    }
+
     @Test(timeout = 60000)
     fun crowdedCombatReturnsALegalDeclaration() {
         for (perSide in listOf(70, 140)) {
