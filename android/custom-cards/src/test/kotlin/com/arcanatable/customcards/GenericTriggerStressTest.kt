@@ -69,6 +69,7 @@ class GenericTriggerStressTest {
         expectedOpponentLoss: Int,
         expectedCreated: Int,
         threshold: Int = 200,
+        preExistingFood: Int = 0,
     ): Stats {
         val fixture = "Synthetic $label"
         val driver = scenario(*(listOfNotNull(watcher).filter { it != "Synthetic Life Watcher" }.toTypedArray()))
@@ -77,6 +78,7 @@ class GenericTriggerStressTest {
         driver.setLifeTotal(driver.player1, 1000)
         driver.setLifeTotal(driver.player2, 1000)
         if (watcher != null) driver.putCreatureOnBattlefield(driver.player1, watcher)
+        repeat(preExistingFood) { driver.putToken(driver.player1, "Food") }
         val boardBefore = driver.getPermanents(driver.player1).size
         val spell = driver.putCardInHand(driver.player1, fixture)
         val cast = driver.castSpell(driver.player1, spell)
@@ -193,4 +195,23 @@ class GenericTriggerStressTest {
             expectedLifeGain = 200, expectedOpponentLoss = 0, expectedCreated = 200)
         assertTrue(result.peakStack >= 50)
     }
+    @Test(timeout = 180000)
+    fun oneHugeLifeGainOnLargeFoodBoardStillTriggersOnce() {
+        val result = runCase(
+            "gain200once-foodboard", Effects.GainLife(200), "Synthetic Life Watcher",
+            expectedLifeGain = 200, expectedOpponentLoss = 1, expectedCreated = 0,
+            preExistingFood = 200)
+        assertTrue(result.peakStack < 8)
+    }
+
+    @Test(timeout = 300000)
+    fun repeatedLifeGainWithLargeFoodBoardShowsEnumerationCost() {
+        val result = runCase(
+            "gain1x200-foodboard", Effects.Repeat(DynamicAmounts.fixed(200), Effects.GainLife(1)),
+            "Synthetic Life Watcher",
+            expectedLifeGain = 200, expectedOpponentLoss = 200, expectedCreated = 0,
+            preExistingFood = 200)
+        assertTrue(result.peakStack >= 50)
+    }
+
 }
