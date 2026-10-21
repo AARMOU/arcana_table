@@ -19,7 +19,7 @@ class AiRetargetingSearchTest {
         d.giveMana(d.player1, Color.GREEN, 2)
         assertNull(d.castSpell(d.player1, spell).error)
         assertNull(d.submit(PassPriority(d.player1)).error)
-        val offer = d.legalActions(d.player2).first { it.actionType == "ActivateAbility" && it.affordable }
+        val offer = d.legalActions(d.player2).first { it.actionType == "ActivateAbility" && it.affordable && !it.isManaAbility }
         assertTrue(offer.validTargets.orEmpty().isNotEmpty())
         assertFalse(RetargetingCandidateFilter.hasPotentialEffect(d.state, offer, d.cardRegistry))
         assertTrue(OfflineAiPolicy.create(d.cardRegistry, d.player2).chooseAction(d.state) is PassPriority)
@@ -35,7 +35,7 @@ class AiRetargetingSearchTest {
         d.giveMana(d.player1, Color.BLACK, 3)
         assertNull(d.castSpell(d.player1, murder, listOf(bears)).error)
         assertNull(d.submit(PassPriority(d.player1)).error)
-        val offer = d.legalActions(d.player2).first { it.actionType == "ActivateAbility" && it.affordable }
+        val offer = d.legalActions(d.player2).first { it.actionType == "ActivateAbility" && it.affordable && !it.isManaAbility }
         assertTrue(RetargetingCandidateFilter.hasPotentialEffect(d.state, offer, d.cardRegistry))
         val target = offer.validTargets!!.single()
         assertNull(d.submit((offer.action as ActivateAbility).copy(targets = listOf(ChosenTarget.Spell(target)))).error)
