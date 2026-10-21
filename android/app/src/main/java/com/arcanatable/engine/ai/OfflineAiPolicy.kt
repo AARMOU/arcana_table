@@ -13,16 +13,26 @@ import com.wingedsheep.sdk.model.EntityId
 
 /** Mobile search limits; leaves the engine's reference and server profiles unchanged. */
 object OfflineAiPolicy : BudgetPolicy {
-    private val burstDeadline = ThreadLocal<Long>()
+    private class ThinkingBurst(var remainingNanos: Long, var activeDeadline: Long? = null)
+    private val thinkingBurst = ThreadLocal<ThinkingBurst>()
 
-    /** Bound optional search across a host resolution burst, including nested AI decisions. */
+    /** Share optional AI search time across a host burst. Animation and rules work are uncharged. */
     fun <T> withThinkingBurst(searchMillis: Long = 600, work: () -> T): T {
         require(searchMillis >= 0)
-        val previous = burstDeadline.get()
-        val deadline = System.nanoTime() + searchMillis * 1_000_000L
-        burstDeadline.set(minOf(previous ?: Long.MAX_VALUE, deadline))
+        if (thinkingBurst.get() != null) return work()
+        thinkingBurst.set(ThinkingBurst(searchMillis * 1_000_000L))
+        return try { work() } finally { thinkingBurst.remove() }
+    }
+
+    /** Charge only AI calls; nested decision probes retain the outer call's deadline. */
+    fun <T> think(work: () -> T): T {
+        val burst = thinkingBurst.get() ?: return work()
+        if (burst.activeDeadline != null) return work()
+        val started = System.nanoTime()
+        burst.activeDeadline = started + burst.remainingNanos
         return try { work() } finally {
-            if (previous == null) burstDeadline.remove() else burstDeadline.set(previous)
+            burst.remainingNanos = maxOf(0L, burst.remainingNanos - (System.nanoTime() - started))
+            burst.activeDeadline = null
         }
     }
 
@@ -52,7 +62,9 @@ object OfflineAiPolicy : BudgetPolicy {
             attackSearchIterations = 1,
             rolloutPlayouts = 0,
         )
-        val remaining = burstDeadline.get()?.let { maxOf(0L, (it - System.nanoTime()) / 1_000_000L) }
+        val remaining = thinkingBurst.get()?.let { burst ->
+            maxOf(0L, (burst.activeDeadline?.minus(System.nanoTime()) ?: burst.remainingNanos) / 1_000_000L)
+        }
         return DecisionBudget(tier, work, minOf(millis, remaining ?: millis))
     }
 }

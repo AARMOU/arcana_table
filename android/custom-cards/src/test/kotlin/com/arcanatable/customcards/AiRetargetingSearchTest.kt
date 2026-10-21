@@ -44,6 +44,35 @@ class AiRetargetingSearchTest {
         assertFalse(skite in d.state.getBattlefield())
     }
 
+    @Test(timeout = 60000)
+    fun mobileAiStillChoosesAUsefulRedirectToSaveAMoreValuableCreature() {
+        val d = scenario("Spellskite", "Shivan Dragon", "Murder")
+        val skite = d.putCreatureOnBattlefield(d.player2, "Spellskite")
+        val dragon = d.putCreatureOnBattlefield(d.player2, "Shivan Dragon")
+        d.putLandOnBattlefield(d.player2, "Island")
+        val murder = d.putCardInHand(d.player1, "Murder")
+        d.giveMana(d.player1, Color.BLACK, 3)
+        assertNull(d.castSpell(d.player1, murder, listOf(dragon)).error)
+        assertNull(d.submit(PassPriority(d.player1)).error)
+        val action = OfflineAiPolicy.create(d.cardRegistry, d.player2).chooseAction(d.state)
+        assertTrue("AI should use Spellskite to save Shivan Dragon, got $action", action is ActivateAbility)
+        assertNull(d.submit(action).error)
+        d.resolveAll()
+        assertTrue(dragon in d.state.getBattlefield())
+        assertFalse(skite in d.state.getBattlefield())
+    }
+
+    @Test(timeout = 10000)
+    fun animationAndRulesTimeDoNotSpendTheThinkingAllowance() {
+        val d = scenario("Grizzly Bears")
+        OfflineAiPolicy.withThinkingBurst(searchMillis = 50) {
+            Thread.sleep(75)
+            assertEquals(50L, OfflineAiPolicy.budgetForDecision(d.state, d.player1).millis)
+            OfflineAiPolicy.think { Thread.sleep(20) }
+            assertTrue(OfflineAiPolicy.budgetForDecision(d.state, d.player1).millis < 50L)
+        }
+    }
+
     @Test
     fun burstExpiryIsSharedAndRestoresAfterAnException() {
         val d = scenario("Grizzly Bears")

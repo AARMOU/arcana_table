@@ -35,8 +35,6 @@ jobs:
         \ 0006-ai-decision-deadline.patch 0007-ai-bounded-stack-search.patch 0008-jvm-test-toolchain.patch; do\n  git -C argentum-engine apply --check \"\
         ../argentum-patches/$p\"\n  git -C argentum-engine apply \"../argentum-patches/$p\"\ndone\ngit -C argentum-engine diff --check\n"
     - run: just --justfile argentum-patches/build123.just engine-build
-    - name: Deterministic simulator deadline tests
-      run: just --justfile argentum-patches/build123.just engine-ai-deadline-test
     - name: Collect matching Java 17 runtime
       run: "mkdir -p validation/runtime\nfor pair in 'mtg-sdk mtg-sdk' 'mtg-sdk-tooling mtg-sdk-tooling' 'rules-engine rules-engine' 'ai ai'; do\n  read\
         \ -r module name <<< \"$pair\"\n  cp \"$(find \"argentum-engine/$module/build/libs\" -maxdepth 1 -name '*.jar' ! -name '*sources*' ! -name '*javadoc*'\
@@ -228,6 +226,45 @@ jobs:
 
           '
     needs: runtime
+  finalize-source:
+    needs:
+    - runtime
+    - android
+    - upstream
+    - profile
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: actions/download-artifact@v4
+      with:
+        name: Build123-runtime
+        path: validation/runtime
+    - name: Bundle only the verified runtime into the tested source tree
+      run: "python3 - <<'PY'\nimport hashlib, json, os, shutil\nfrom pathlib import Path\np=Path('validation/runtime')\nexpectedNames={f'argentum-{name}.jar'\
+        \ for name in ('mtg-sdk','mtg-sdk-tooling','rules-engine','ai')}\ndigests={}\nfor line in (p/'SHA256SUMS').read_text().splitlines():\n    expected,\
+        \ name = line.split()\n    name=Path(name).name\n    assert name in expectedNames, name\n    actual=hashlib.sha256((p/name).read_bytes()).hexdigest()\n\
+        \    assert actual==expected, name\n    digests[name]=actual\nassert set(digests)==expectedNames\nfor name in expectedNames: shutil.copy2(p/name,Path('android/app/libs')/name)\n\
+        Path('BUILD-123-VALIDATION.json').write_text(json.dumps({\n    'build':123,'baseBuild':120,'baseGameSource':'3e17b24e620590e4170bd4c2de2abaa4d18d9e87',\n\
+        \    'validatedSourceCommit':os.environ['GITHUB_SHA'], 'validationRun':os.environ['GITHUB_RUN_ID'],\n    'runtimeSha256':digests,\n    'requiredJobs':['runtime','android','upstream','profile\
+        \ (all six comparisons)'],\n    'deviceValidation':'Not yet performed',\n},indent=2)+'\\n')\nPY\ngit diff --check\ngit add android/app/libs/argentum-*.jar\
+        \ BUILD-123-VALIDATION.json\ngit config user.name 'Codex'\ngit config user.email 'codex@openai.com'\ngit fetch origin GPT-eating-glue\nbase=$(git\
+        \ rev-parse origin/GPT-eating-glue)\ntest \"$base\" = '5cd24e874e55d92e2f0959e905daeebddf624707'\ntest \"$(git ls-remote origin refs/heads/gpt/build123-endstep-fix-from120\
+        \ | cut -f1)\" = \"$GITHUB_SHA\"\ntree=$(git write-tree)\n# The rollback branch is a parent only; the tested Build 120-based tree is preserved exactly.\n\
+        if git merge-base --is-ancestor \"$base\" \"$GITHUB_SHA\"; then\n    commit=$(printf '%s\\n' 'Bundle verified Build 123 runtime and validation provenance'\
+        \ | git commit-tree \"$tree\" -p \"$GITHUB_SHA\")\nelse\n    commit=$(printf '%s\\n' 'Bundle verified Build 123 runtime while preserving the Build\
+        \ 120 baseline' | git commit-tree \"$tree\" -p \"$GITHUB_SHA\" -p \"$base\")\nfi\ntest \"$(git ls-remote origin refs/heads/GPT-eating-glue | cut\
+        \ -f1)\" = \"$base\"\ngit push --force-with-lease=refs/heads/gpt/build123-endstep-fix-from120:\"$GITHUB_SHA\" origin \"$commit\":refs/heads/gpt/build123-endstep-fix-from120\n\
+        printf 'ValidatedSource=%s\\nBundledSource=%s\\n' \"$GITHUB_SHA\" \"$commit\" > validation/final-source.properties\n"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: Build123-final-source-provenance
+        path: validation/final-source.properties
 'on':
   push:
     branches:

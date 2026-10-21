@@ -188,7 +188,7 @@ class EndStepBacklogInvestigationTest {
                 val stackBefore = d.state.stack.size
                 val battlefieldBefore = d.state.getBattlefield().size
                 val action: GameAction = if (who == d.player2 && useAi) {
-                    val (chosen, nanos) = measure("ai-choice") { bot.chooseAction(d.state) }
+                    val (chosen, nanos) = measure("ai-choice") { OfflineAiPolicy.think { bot.chooseAction(d.state) } }
                     aiCalls++; aiNanos += nanos; maxAiNanos = maxOf(maxAiNanos, nanos)
                     if (chosen !is PassPriority) nonPassActions++
                     write("ai-calls.jsonl", buildJsonObject {

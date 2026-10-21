@@ -499,7 +499,7 @@ class LocalArgentumHost(
                 val actor = current.actorFor(decision.playerId)
                 if (isPerson(actor)) break
                 val bot = ais[actor] ?: break
-                val response = timed("aiDecision") { bot.respondToDecision(current, decision) }
+                val response = timed("aiDecision") { OfflineAiPolicy.think { bot.respondToDecision(current, decision) } }
                 if (!apply(SubmitDecision(decision.playerId, response), events, actor)) break
                 flush(paceMs)
                 continue
@@ -507,7 +507,7 @@ class LocalArgentumHost(
             val priority = current.priorityPlayerId ?: break
             if (!isPerson(priority)) {
                 val bot = ais[priority] ?: break
-                val chosen = timed("aiChoice") { bot.chooseAction(current) }
+                val chosen = timed("aiChoice") { OfflineAiPolicy.think { bot.chooseAction(current) } }
                 val acted = apply(chosen, events, priority) || apply(safePass(current, priority), events, priority)
                 if (!acted) break
                 if (chosen !is PassPriority) flush(paceMs)
