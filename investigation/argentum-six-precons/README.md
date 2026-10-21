@@ -50,7 +50,7 @@ in `CustomCards.kt`, and only become Android assets after
 `:custom-cards:exportCards`. Each new behavior gets its own scenario test.
 ## Verified implementation progress — October 21, 2026
 
-**37 distinct missing cards implemented, scenario-tested and exported.**
+**47 distinct missing cards implemented, scenario-tested and exported** (10 newly verified after the 37-card handoff).
 The first 16 were:
 
 - Spatial Contortion; Skittering Invasion; Blight Grenade; Deny Reality; Bituminous Blast
@@ -73,26 +73,45 @@ uses the SDK's self-shuffle-on-resolve flag. Sea Gate Wreckage's empty-hand gate
 is an activation restriction; Geier Reach Sanitarium makes every player draw
 before any player discards.
 
+Three subsequent batches added ten cards and individually tested their real SDK behavior:
+
+- **Batch 1:** Deploy to the Front; Spawning Bed; Mage-Ring Network.
+  Tested multiplayer creature counts, sacrifice-for-mana Eldrazi Scions,
+  and variable storage-counter payments.
+- **Batch 2:** Ugin's Insight; Gargoyle Flock; Sifter of Skulls; Drowner of Hope.
+  Tested variable scrying, end-step Tyranid creation, nontoken death
+  triggers, Devoid, Scion creation, and sacrifice-to-tap abilities.
+- **Batch 3:** Molten Slagheap; Ruins of Oran-Rief; Shrine of the Forsaken Gods.
+  Tested the mana-split decision, creature-color/entry targeting, the
+  seven-land gate, and mana restricted to colorless spells.
+
+All three batches passed full custom-card CI regressions and committed generated
+Android assets. Latest successful run:
+https://github.com/AARMOU/arcana_table/actions/runs/39687965995
+
 Every implemented card has a scenario test. The verified GitHub Actions card
 regression, export, duplicate/coverage validation and asset commits include:
 
 - https://github.com/AARMOU/arcana_table/actions/runs/39675301048
 - https://github.com/AARMOU/arcana_table/actions/runs/39680532346
 - https://github.com/AARMOU/arcana_table/actions/runs/39681757357
+- https://github.com/AARMOU/arcana_table/actions/runs/39686282839
+- https://github.com/AARMOU/arcana_table/actions/runs/39687026625
+- https://github.com/AARMOU/arcana_table/actions/runs/39687965995
 
-**Latest checked, exported commit:** `1ff2efd9c024003edbf77ee0f2aaf936ed7396f6`.
-The custom-card index contains **151 distinct names**. Comparing both indexes
-against the six official 100-card decklists leaves **239 distinct cards (248 deck
+**Latest checked, exported commit:** `ec7d23a7cf174ad3d1f95e3130c848c88ce5ac2d`.
+The custom-card index contains **161 distinct names**. Comparing both indexes
+against the six official 100-card decklists leaves **229 distinct cards (236 deck
 slots) missing**.
 
 | Deck | Missing deck slots |
 | --- | ---: |
-| Forces of the Imperium | 42 |
-| Tyranid Swarm | 42 |
+| Forces of the Imperium | 41 |
+| Tyranid Swarm | 41 |
 | Necron Dynasties | 42 |
-| The Ruinous Powers | 41 |
-| Eldrazi Unbound | 40 |
-| Eldrazi Incursion | 41 |
+| The Ruinous Powers | 40 |
+| Eldrazi Unbound | 37 |
+| Eldrazi Incursion | 35 |
 
 This audit counts card definitions available in the two indexes; it is **not**
 an end-to-end certificate that every interaction in each deck works.
