@@ -17,6 +17,7 @@ import com.wingedsheep.sdk.scripting.GrantActivatedAbility
 import com.wingedsheep.sdk.scripting.GrantStaticAbility
 import com.wingedsheep.sdk.scripting.HasAllActivatedAbilitiesOfCards
 import com.wingedsheep.sdk.model.EntityId
+import com.wingedsheep.sdk.core.Step
 
 /**
  * A behavior-preserving auto-pass probe for Arcana's local human seat.
@@ -86,6 +87,34 @@ object OfflineHumanAutoPass {
         return true
     }
 
+    /**
+     * Opponent-owned non-spell stack objects are an unconditional STOP under the
+     * pinned engine's AUTO stackVerdict, unless a persistent yield applies.
+     *
+     * Do not apply this in Quiet Opponent Turns, where the app deliberately auto-passes
+     * un-targeted opponent objects independently of the engine's normal STOP.
+     * Spell objects retain their original full enumeration: permanent spells can
+     * auto-pass when the player has no valid instant-speed responses.
+     */
+    internal fun canStopOnOpponentNonSpellWithoutEnumerating(
+        state: GameState,
+        player: EntityId,
+        quietOpponentTurn: Boolean = false,
+    ): Boolean {
+        if (state.priorityPlayerId != player || state.pendingDecision != null || state.stack.isEmpty()) return false
+        if (quietOpponentTurn && !state.isActiveTurnFor(player)) return false
+        val top = state.getEntity(state.stack.last()) ?: return false
+        if (top.get<SpellOnStackComponent>() != null) return false
+        val controller = top.get<TriggeredAbilityOnStackComponent>()?.controllerId
+            ?: top.get<ActivatedAbilityOnStackComponent>()?.controllerId
+            ?: top.get<ControllerComponent>()?.playerId
+        if (controller == player) return false
+        val identity = top.get<TriggeredAbilityOnStackComponent>()?.abilityIdentity
+            ?: top.get<ActivatedAbilityOnStackComponent>()?.abilityIdentity
+        if (identity != null && state.isYieldingTo(player, identity)) return false
+        return true
+    }
+
     fun shouldPass(
         state: GameState,
         player: EntityId,
@@ -98,6 +127,18 @@ object OfflineHumanAutoPass {
         // Arcana local play has no stop overrides or FULL_CONTROL setting on this path.
         // Non-empty-stack windows never qualify.
         if (MeaningfulActionFilter.canAutoPassWithoutEnumerating(state, player)) return true
+
+        // Preserve the preexisting Quiet Opponent Turns path. When the engine is in
+        // DECLARE_BLOCKERS, only enumeration can establish whether declaring is due.
+        // For all other stacked windows a blockers declaration cannot be offered.
+        if (quietOpponentTurn && !state.isActiveTurnFor(player) && state.stack.isNotEmpty() &&
+            state.step != Step.DECLARE_BLOCKERS && !stackTargetsPlayer()
+        ) return true
+
+        // The engine's opponent non-spell stack verdict is STOP unless the player
+        // opted to yield; no legal action enumeration is needed to establish that.
+        if (canStopOnOpponentNonSpellWithoutEnumerating(state, player, quietOpponentTurn)) return false
+
         // The own-stack verdict inspects just meaningful holdPriority offers. If no source
         // in this game can create one, its result is unconditionally PASS; this check
         // costs O(permanents) rather than O(permanent x affordability/target search).
