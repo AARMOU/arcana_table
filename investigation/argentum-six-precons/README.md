@@ -50,35 +50,49 @@ in `CustomCards.kt`, and only become Android assets after
 `:custom-cards:exportCards`. Each new behavior gets its own scenario test.
 ## Verified implementation progress — October 21, 2026
 
-**Sixteen distinct missing cards implemented, scenario-tested and exported.**
-The original five were Spatial Contortion, Skittering Invasion, Blight Grenade,
-Deny Reality, and Bituminous Blast. The eleven added in the next batches:
+**37 distinct missing cards implemented, scenario-tested and exported.**
+The first 16 were:
 
+- Spatial Contortion; Skittering Invasion; Blight Grenade; Deny Reality; Bituminous Blast
 - Awakening Zone; Crashing Drawbridge; All Is Dust
 - For the Emperor!; Knight Paladin; Bloodcrusher of Khorne
-- Tyranid Invasion; Sanguinary Priest
-- Venomthrope; Tyranid Prime; Space Marine Scout
+- Tyranid Invasion; Sanguinary Priest; Venomthrope; Tyranid Prime; Space Marine Scout
 
-Every card has a separate scenario test. This branch's Android/JVM custom-card
-regression suites, export, duplicate/coverage checks and asset commits completed:
+The following sixteen-card batch was then scenario-tested and exported:
 
-- https://github.com/AARMOU/arcana_table/actions/runs/39662265274
-- https://github.com/AARMOU/arcana_table/actions/runs/39663998627
-- https://github.com/AARMOU/arcana_table/actions/runs/39664986287
-- https://github.com/AARMOU/arcana_table/actions/runs/39665719967
+- Defile; Mutilate; Their Name Is Death; Plasmancer; Ulamog's Crusher
+- Assault Intercessor; Herald of Slaanesh; Noise Marine; Chaos Terminator Lord
+- Sister Hospitaller; Desert of the Glorified; Guildless Commons; Tendo Ice Bridge
+- Hull Breach; Atalan Jackal; Winged Hive Tyrant
 
-**Latest checked, exported commit** `c32097ecc9d13f5a01fdc78c0c519cdf2d84c29c`:
-the custom-card index contains 130 distinct names. Comparing both indexes
-against the 600 deck slots leaves **260 distinct cards (269 deck slots) missing**.
+The next five implemented cards are **Tallyman of Nurgle, Necron Deathmark,
+Sea Gate Wreckage, Beacon of Unrest, and Geier Reach Sanitarium**. Tallyman's
+one- and seven-creature-death branches explicitly charge life to its controller.
+Beacon reanimates a card from either graveyard under its caster's control and
+uses the SDK's self-shuffle-on-resolve flag. Sea Gate Wreckage's empty-hand gate
+is an activation restriction; Geier Reach Sanitarium makes every player draw
+before any player discards.
+
+Every implemented card has a scenario test. The verified GitHub Actions card
+regression, export, duplicate/coverage validation and asset commits include:
+
+- https://github.com/AARMOU/arcana_table/actions/runs/39675301048
+- https://github.com/AARMOU/arcana_table/actions/runs/39680532346
+- https://github.com/AARMOU/arcana_table/actions/runs/39681757357
+
+**Latest checked, exported commit:** `1ff2efd9c024003edbf77ee0f2aaf936ed7396f6`.
+The custom-card index contains **151 distinct names**. Comparing both indexes
+against the six official 100-card decklists leaves **239 distinct cards (248 deck
+slots) missing**.
 
 | Deck | Missing deck slots |
 | --- | ---: |
-| Forces of the Imperium | 44 |
-| Tyranid Swarm | 45 |
-| Necron Dynasties | 49 |
-| The Ruinous Powers | 45 |
-| Eldrazi Unbound | 43 |
-| Eldrazi Incursion | 43 |
+| Forces of the Imperium | 42 |
+| Tyranid Swarm | 42 |
+| Necron Dynasties | 42 |
+| The Ruinous Powers | 41 |
+| Eldrazi Unbound | 40 |
+| Eldrazi Incursion | 41 |
 
 This audit counts card definitions available in the two indexes; it is **not**
 an end-to-end certificate that every interaction in each deck works.
