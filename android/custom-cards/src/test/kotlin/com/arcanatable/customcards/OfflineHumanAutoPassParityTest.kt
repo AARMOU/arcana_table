@@ -6,7 +6,8 @@ import com.wingedsheep.engine.core.PassPriority
 import com.wingedsheep.engine.legalactions.EnumerationMode
 import com.wingedsheep.engine.legalactions.LegalActionEnumerator
 import com.wingedsheep.engine.view.LegalActionEnricher
-import com.wingedsheep.gameserver.priority.AutoPassManager
+import com.wingedsheep.engine.legalactions.MeaningfulActionFilter
+import com.wingedsheep.engine.view.asPriorityAction
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Step
 import org.junit.Assert.*
@@ -32,7 +33,10 @@ class OfflineHumanAutoPassParityTest {
                 it.actionType == "ActivateAbility" && !it.isManaAbility &&
                     it.description.substringAfter(':', "").trim().startsWith("Add ", ignoreCase = true)
             }
-        val baseline = AutoPassManager(d.cardRegistry).shouldAutoPass(state, player, oldDto)
+        val baseline = MeaningfulActionFilter.shouldAutoPass(
+            state = state, playerId = player,
+            legalActions = oldDto.map { it.asPriorityAction() }, cardRegistry = d.cardRegistry,
+        )
         var newEnumCalls = 0
         val candidate = OfflineHumanAutoPass.shouldPass(
             state = state, player = player, registry = d.cardRegistry,
