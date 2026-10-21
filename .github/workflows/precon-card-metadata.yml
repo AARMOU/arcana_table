@@ -1,0 +1,25 @@
+name: Import card metadata probe
+on:
+  push:
+    branches:
+      - gpt/argentum-warhammer-eldrazi-import
+    paths:
+      - '.github/workflows/precon-card-metadata.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify Spatial Contortion original and reprint from Scryfall
+        run: |
+          for printing in ogw/8 cmm/809; do
+            curl --fail --silent --show-error --retry 3 \
+              -H 'User-Agent: ArcanaTable-PreconImport/0.1 (rules testing)' \
+              -H 'Accept: application/json' \
+              "https://api.scryfall.com/cards/$printing" > card.json
+            python3 -c 'import json; c=json.load(open("card.json")); print({k:c.get(k) for k in ("name","set","collector_number","mana_cost","type_line","oracle_text","rarity","artist","flavor_text")}); print("imageUri =",c.get("image_uris",{}).get("normal","<missing>"))'
+            sleep 0.15
+          done
