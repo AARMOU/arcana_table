@@ -21,7 +21,11 @@ val TallymanOfNurgle = card("Tallyman of Nurgle") {
     keywords(Keyword.LIFELINK)
     triggeredAbility {
         trigger = Triggers.you.beginningOf(Step.END)
-        interveningIf = Conditions.CreatureDiedThisTurn
+        interveningIf = Conditions.CompareAmounts(
+            DynamicAmounts.creaturesDiedThisTurn(Player.Each),
+            ComparisonOperator.GTE,
+            1
+        )
         effect = Effects.If(
             condition = Conditions.CompareAmounts(
                 DynamicAmounts.creaturesDiedThisTurn(Player.Each),

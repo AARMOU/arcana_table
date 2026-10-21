@@ -22,6 +22,7 @@ class TallymanOfNurgleScenarioTest {
         d.giveColorlessMana(p, 1)
         assertNull(d.castSpell(p, blade, listOf(bear)).error)
         d.resolveAll()
+        assertTrue("Doom Blade destroyed the creature before end step", d.permanentsNamed(d.player2, "Grizzly Bears").isEmpty())
         val beforeEnd = d.getHand(p).size
 
         d.passPriorityUntil(Step.END, activePlayer = p)
