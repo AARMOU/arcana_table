@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - gpt/engine-delay-test-only
+      - gpt/engine-delay-autopass-candidate
   workflow_dispatch:
 permissions:
   contents: read
@@ -60,7 +61,7 @@ jobs:
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - name: Existing AI and action parity coverage (no source modifications)
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests '*OfflineAiLargeBoardTest' --tests '*AiRetargetingSearchTest'
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests '*OfflineAiLargeBoardTest' --tests '*AiRetargetingSearchTest' --tests '*OfflineHumanAutoPassParityTest'
       - name: Offline Android host smoke test
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests '*LocalArgentumHostTest'
