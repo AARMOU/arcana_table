@@ -11,6 +11,9 @@ import com.wingedsheep.engine.view.asPriorityAction
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.dsl.DynamicAmounts
 import com.wingedsheep.sdk.dsl.Effects
+import com.wingedsheep.sdk.dsl.Triggers
+import com.wingedsheep.sdk.scripting.references.Player
+import com.wingedsheep.sdk.scripting.targets.EffectTarget
 import com.wingedsheep.sdk.dsl.card
 import com.wingedsheep.sdk.scripting.effects.Effect
 import org.junit.Assert.*
@@ -30,6 +33,19 @@ class GenericTriggerStressTest {
         typeLine = "Sorcery"
         oracleText = "TEST ONLY: generic triggered-event stress fixture"
         spell { this.effect = effect }
+    }
+
+    private fun testLifeWatcher() = card("Synthetic Life Watcher") {
+        manaCost = "{B}"
+        colorIdentity = "B"
+        typeLine = "Creature — Vampire"
+        oracleText = "TEST ONLY: Whenever you gain life, each opponent loses 1 life."
+        power = 1
+        toughness = 1
+        triggeredAbility {
+            trigger = Triggers.you.gainsLife()
+            effect = Effects.LoseLife(1, EffectTarget.PlayerRef(Player.EachOpponent))
+        }
     }
 
     private data class Stats(
@@ -55,7 +71,8 @@ class GenericTriggerStressTest {
         threshold: Int = 200,
     ): Stats {
         val fixture = "Synthetic $label"
-        val driver = scenario(*(listOfNotNull(watcher).toTypedArray()))
+        val driver = scenario(*(listOfNotNull(watcher).filter { it != "Synthetic Life Watcher" }.toTypedArray()))
+        if (watcher == "Synthetic Life Watcher") driver.registerCard(testLifeWatcher())
         driver.registerCard(testSpell(fixture, effect))
         driver.setLifeTotal(driver.player1, 1000)
         driver.setLifeTotal(driver.player2, 1000)
@@ -146,7 +163,7 @@ class GenericTriggerStressTest {
     @Test(timeout = 180000)
     fun oneHugeLifeGainIsNotTwoHundredIndividualTriggers() {
         val result = runCase(
-            "gain200once", Effects.GainLife(200), "Dina, Soul Steeper",
+            "gain200once", Effects.GainLife(200), "Synthetic Life Watcher",
             expectedLifeGain = 200, expectedOpponentLoss = 1, expectedCreated = 0)
         assertTrue("One life-gain event should create a tiny stack", result.peakStack < 8)
     }
@@ -155,7 +172,7 @@ class GenericTriggerStressTest {
     fun twoHundredSeparateLifeGainsWithoutCreatures() {
         val result = runCase(
             "gain1x200", Effects.Repeat(DynamicAmounts.fixed(200), Effects.GainLife(1)),
-            "Dina, Soul Steeper",
+            "Synthetic Life Watcher",
             expectedLifeGain = 200, expectedOpponentLoss = 200, expectedCreated = 0)
         assertTrue("Separate life-gain events should produce a large stack", result.peakStack >= 50)
     }
