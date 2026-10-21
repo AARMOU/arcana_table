@@ -87,6 +87,19 @@ class OfflineHumanAutoPassParityTest {
     }
 
     @Test(timeout = 60000)
+    fun holdPriorityAbilityDisablesOwnedStackShortcut() {
+        val d = scenario("Kitsa, Otterball Elite", "Grizzly Bears")
+        d.putCreatureOnBattlefield(d.player1, "Kitsa, Otterball Elite")
+        val spell = d.putCardInHand(d.player1, "Grizzly Bears")
+        d.giveMana(d.player1, Color.GREEN, 2)
+        assertNull(d.castSpell(d.player1, spell).error)
+        assertTrue(d.state.stack.isNotEmpty())
+        assertFalse("A printed holdPriority source must always force full enumeration",
+            OfflineHumanAutoPass.canPassOwnedStackWithoutEnumerating(d.state, d.player1, d.cardRegistry))
+        assertSameVerdict(d, "owned-stack-with-kitsa-hold-priority")
+    }
+
+    @Test(timeout = 60000)
     fun targetlessStackWithSpellskiteStillPassesOnlyWhenOriginalDoes() {
         val d = scenario("Spellskite", "Grizzly Bears")
         d.putCreatureOnBattlefield(d.player2, "Spellskite")
