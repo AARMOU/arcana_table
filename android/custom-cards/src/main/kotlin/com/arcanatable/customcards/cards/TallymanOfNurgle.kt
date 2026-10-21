@@ -6,6 +6,7 @@ import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.model.Rarity
 import com.wingedsheep.sdk.scripting.conditions.ComparisonOperator
 import com.wingedsheep.sdk.scripting.references.Player
+import com.wingedsheep.sdk.scripting.targets.EffectTarget
 
 /** Tallyman of Nurgle — Warhammer 40,000 Commander #60. */
 val TallymanOfNurgle = card("Tallyman of Nurgle") {
@@ -32,8 +33,8 @@ val TallymanOfNurgle = card("Tallyman of Nurgle") {
                 ComparisonOperator.GTE,
                 7
             ),
-            then = Effects.DrawCards(7) then Effects.LoseLife(7),
-            otherwise = Effects.DrawCards(1) then Effects.LoseLife(1)
+            then = Effects.DrawCards(7) then Effects.LoseLife(7, EffectTarget.Controller),
+            otherwise = Effects.DrawCards(1) then Effects.LoseLife(1, EffectTarget.Controller)
         )
     }
     metadata {
