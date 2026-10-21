@@ -20,6 +20,6 @@ jobs:
               -H 'User-Agent: ArcanaTable-PreconImport/0.1 (rules testing)' \
               -H 'Accept: application/json' \
               "https://api.scryfall.com/cards/$printing" > card.json
-            python3 -c 'import json; c=json.load(open("card.json")); print({k:c.get(k) for k in ("name","set","collector_number","mana_cost","type_line","oracle_text","rarity","artist","flavor_text")}); print("imageUri =",c.get("image_uris",{}).get("normal","<missing>"))'
+            python3 -c 'import json; c=json.load(open("card.json")); print({k:c.get(k) for k in ("name","set","collector_number","oracle_id","mana_cost","type_line","oracle_text","rarity","artist","flavor_text")}); print("imageUri =",c.get("image_uris",{}).get("normal","<missing>"))'
             sleep 0.15
           done
