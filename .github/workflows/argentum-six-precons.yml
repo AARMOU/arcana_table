@@ -8,7 +8,7 @@ on:
       - .github/workflows/argentum-six-precons.yml
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: argentum-six-precons-${{ github.ref }}
   cancel-in-progress: true
@@ -41,6 +41,17 @@ jobs:
           PY
       - name: Detect whitespace errors in generated card data
         run: git diff --check
+      - name: Commit successfully tested card exports to isolated branch
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add android/app/src/main/assets/argentum/custom-cards.index.tsv
+          git add android/app/src/main/assets/argentum/custom-cards.jsonl
+          if ! git diff --cached --quiet; then
+            git commit -m "data: export verified six-precon card batch"
+            git push origin HEAD:gpt/argentum-six-precons
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
