@@ -1,7 +1,7 @@
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/EnumerationContext.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/EnumerationContext.kt
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/EnumerationContext.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/EnumerationContext.kt
-@@ -1,80 +1,140 @@
+@@ -1,80 +1,144 @@
  package com.wingedsheep.engine.legalactions
  
  import com.wingedsheep.engine.state.LifePaymentPurpose
@@ -204,6 +204,10 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/En
 +                if (container.has<FaceDownComponent>()) return@any false
 +                val card = container.get<CardComponent>() ?: return@any false
 +                val def = cardRegistry.getCard(card.cardDefinitionId) ?: return@any false
++                // Conservatively preserve full scans for Class/multiface sources, whose
++                // effective statics can depend on their current face or activated level.
++                if (container.get<com.wingedsheep.engine.state.components.battlefield.ClassLevelComponent>() != null ||
++                    def.cardFaces.isNotEmpty() || def.flipSide != null) return@any true
 +                RoomFaceStatics.activeStaticAbilities(container, def).any { sa ->
 +                    sa is GrantActivatedAbility ||
 +                        sa is HasAllActivatedAbilitiesOfCards ||
