@@ -63,16 +63,19 @@ object OfflineHumanAutoPass {
             val entity = state.getEntity(id) ?: return false
             val card = entity.get<CardComponent>() ?: continue
             if (card.copyActivatedAbilities.any { it.holdPriority }) return false
-            if (entity.get<ClassLevelComponent>() != null) return false
-            val definitionId: Any = card.cardDefinitionId
+            // Class level changes which printed activated/static abilities are active.
+            // Include the level in the cache key instead of forcing an unconditional
+            // full-board scan for every priority window containing any Class.
+            val classLevel = entity.get<ClassLevelComponent>()?.currentLevel
+            val definitionId: Any = card.cardDefinitionId to classLevel
             val uncertain = definitionRisk.getOrPut(definitionId) {
                 // A source with no registered definition contributes no printed abilities.
                 // Its copied and dynamically granted abilities were checked above.
                 val def = registry.getCard(card.cardDefinitionId) ?: return@getOrPut false
                 // Multifaced and flipped cards can expose non-front-face scripts.
                 if (def.cardFaces.isNotEmpty() || def.flipSide != null) return@getOrPut true
-                def.script.activatedAbilities.any { it.holdPriority } ||
-                    def.script.staticAbilities.any { static ->
+                def.script.effectiveActivatedAbilities(classLevel).any { it.holdPriority } ||
+                    def.script.effectiveStaticAbilities(classLevel).any { static ->
                         when (static) {
                             // The grant is harmless unless its embedded ability requires a stop.
                             is GrantActivatedAbility -> static.ability.holdPriority
