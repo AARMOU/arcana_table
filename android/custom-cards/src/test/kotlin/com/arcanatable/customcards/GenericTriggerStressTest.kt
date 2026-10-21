@@ -141,6 +141,26 @@ class GenericTriggerStressTest {
                 if (calls == 0) fast++
                 assertEquals("$label priority=$windows stack=${state.stack.size} seat=$seat",
                     expected, actual)
+                // Arcana's Quiet Opponent Turns option overrides an otherwise valid
+                // opponent-trigger STOP only when the object does not target the user.
+                // Verify the exact original host rule on every sampled opponent window.
+                if (!state.isActiveTurnFor(seat) && state.stack.isNotEmpty()) {
+                    val originalQuiet = if (original.none { it.actionType == "DeclareBlockers" }) true else expected
+                    var quietEnumCalls = 0
+                    val quietActual = OfflineHumanAutoPass.shouldPass(
+                        state, seat, driver.cardRegistry,
+                        enumerateActionsOnly = {
+                            quietEnumCalls++
+                            enumerator.enumerate(state, seat, EnumerationMode.ACTIONS_ONLY)
+                        },
+                        quietOpponentTurn = true,
+                        stackTargetsPlayer = { false },
+                    )
+                    assertEquals("$label quiet opponent window=$windows", originalQuiet, quietActual)
+                    if (state.step != com.wingedsheep.sdk.core.Step.DECLARE_BLOCKERS) {
+                        assertEquals("$label quiet opponent window should avoid enumeration", 0, quietEnumCalls)
+                    }
+                }
             }
             val t2 = System.nanoTime()
             assertNull("$label rejected pass at window $windows",
