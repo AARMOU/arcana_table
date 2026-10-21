@@ -99,6 +99,10 @@ class LocalArgentumHost(
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(null, r, "argentum-local", 256L shl 20) }
     private val services = EngineServices(registry)
     private val processor = ActionProcessor(services)
+    // AI actions never receive or use an undo checkpoint. Preserve the validated transition
+    // while omitting the unconsumed UndoPolicyComputer pass for AI turns.
+    // Human actions retain the original processor and full undo behavior.
+    private val aiResolutionProcessor = ActionProcessor(services, computeUndo = false)
     private val initializer = GameInitializer(registry, services.printingRegistry)
     private val transformer = ClientStateTransformer(registry, predicateEvaluator = PredicateEvaluator(cardRegistry = null))
     private val enumerator = LegalActionEnumerator(registry, services.manaSolver, services.costCalculator, services.predicateEvaluator, services.conditionEvaluator, services.turnManager)
@@ -564,7 +568,9 @@ class LocalArgentumHost(
         val current = state ?: return false
         val isPass = action is PassPriority
         val processed = timed("actionResolution") {
-            timed(if (isPass) "passResolution" else "otherResolution") { processor.process(current, action) }
+            timed(if (isPass) "passResolution" else "otherResolution") {
+                (if (isPerson(actor)) processor else aiResolutionProcessor).process(current, action)
+            }
         }
         countDiagnostic(if (isPass) "passResolutions" else "otherResolutions")
         val result = processed.result
