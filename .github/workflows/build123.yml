@@ -1,0 +1,235 @@
+name: Build 123 end-step AI fix from Build 120
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: build123-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - uses: android-actions/setup-android@v3
+      with:
+        packages: platform-tools
+    - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+    - uses: actions/checkout@v4
+      with:
+        repository: wingedsheep/argentum-engine
+        ref: 7a9663d8e4df4ce7db223023ae7714f0028e08a9
+        path: argentum-engine
+        persist-credentials: false
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+    - run: sudo apt-get update && sudo apt-get install -y just
+    - name: Apply runtime patches
+      run: "for p in 0001-android-regex.patch 0002-engine-trial-build.patch 0004-token-copy-triggered-abilities.patch 0005-last-known-negative-subtype.patch\
+        \ 0006-ai-decision-deadline.patch 0007-ai-bounded-stack-search.patch 0008-jvm-test-toolchain.patch; do\n  git -C argentum-engine apply --check \"\
+        ../argentum-patches/$p\"\n  git -C argentum-engine apply \"../argentum-patches/$p\"\ndone\ngit -C argentum-engine diff --check\n"
+    - run: just --justfile argentum-patches/build123.just engine-build
+    - name: Deterministic simulator deadline tests
+      run: just --justfile argentum-patches/build123.just engine-ai-deadline-test
+    - name: Collect matching Java 17 runtime
+      run: "mkdir -p validation/runtime\nfor pair in 'mtg-sdk mtg-sdk' 'mtg-sdk-tooling mtg-sdk-tooling' 'rules-engine rules-engine' 'ai ai'; do\n  read\
+        \ -r module name <<< \"$pair\"\n  cp \"$(find \"argentum-engine/$module/build/libs\" -maxdepth 1 -name '*.jar' ! -name '*sources*' ! -name '*javadoc*'\
+        \ | head -1)\" \"validation/runtime/argentum-$name.jar\"\ndone\npython3 - <<'PY'\nimport zipfile, struct\nfrom pathlib import Path\nfor p in Path('validation/runtime').glob('*.jar'):\n\
+        \    with zipfile.ZipFile(p) as z:\n        majors = [struct.unpack('>H', z.read(n)[6:8])[0] for n in z.namelist() if n.endswith('.class')]\n  \
+        \      assert majors and max(majors) <= 61, (p, max(majors))\nPY\nsha256sum validation/runtime/*.jar > validation/runtime/SHA256SUMS\n"
+    - uses: actions/upload-artifact@v4
+      with:
+        name: Build123-runtime
+        path: validation/runtime/
+  android:
+    needs: runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        name: Build123-runtime
+        path: android/app/libs/
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - uses: android-actions/setup-android@v3
+      with:
+        packages: platform-tools
+    - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+    - name: Full shipped-card suite and large-board AI tests
+      working-directory: android
+      run: ./gradlew --no-daemon :custom-cards:test
+    - name: Focused Android host and popup tests
+      working-directory: android
+      run: ./gradlew --no-daemon :app:testDebugUnitTest --tests '*QuickUiTipsTest' --tests '*LocalArgentumHostTest' --tests '*OfflineHostFlowTest' --tests
+        '*WifiHostTest' --tests '*GameRulesTest'
+    - name: Compile release APK and AAB
+      working-directory: android
+      run: ./gradlew --no-daemon :app:assembleRelease :app:bundleRelease
+    - name: Record source identity
+      run: 'mkdir -p validation
+
+        printf ''Build=123\nBaseBuild=120\nBaseGameSource=3e17b24e620590e4170bd4c2de2abaa4d18d9e87\nSourceCommit=%s\n'' "$GITHUB_SHA" > validation/build123.properties
+
+        sha256sum android/app/build/outputs/apk/release/*.apk android/app/build/outputs/bundle/release/*.aab > validation/UNSIGNED-SHA256SUMS
+
+        '
+    - uses: actions/upload-artifact@v4
+      with:
+        name: ArcanaTable-Build123-unsigned
+        path: 'android/app/build/outputs/apk/release/*.apk
+
+          android/app/build/outputs/bundle/release/*.aab
+
+          validation/
+
+          '
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: Build123-Android-reports-and-previews
+        path: 'android/custom-cards/build/test-results/
+
+          android/app/build/test-results/
+
+          android/app/build/screenshots/
+
+          '
+  upstream:
+    needs: runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+      with:
+        repository: wingedsheep/argentum-engine
+        ref: 7a9663d8e4df4ce7db223023ae7714f0028e08a9
+        path: argentum-engine
+        persist-credentials: false
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+    - run: sudo apt-get update && sudo apt-get install -y just
+    - name: Apply runtime patches
+      run: "for p in 0001-android-regex.patch 0002-engine-trial-build.patch 0004-token-copy-triggered-abilities.patch 0005-last-known-negative-subtype.patch\
+        \ 0006-ai-decision-deadline.patch 0007-ai-bounded-stack-search.patch 0008-jvm-test-toolchain.patch; do\n  git -C argentum-engine apply \"../argentum-patches/$p\"\
+        \ndone\n"
+    - name: Engine, card and AI regression suites
+      run: just --justfile argentum-patches/build123.just engine-test
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: Build123-upstream-test-reports
+        path: 'argentum-engine/rules-engine/build/test-results/
+
+          argentum-engine/mtg-sets/**/build/test-results/
+
+          argentum-engine/ai/build/test-results/
+
+          '
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - name: small
+          tokens: 40
+          prides: 2
+          haliya: true
+          panharmonicon: true
+          elspeth: true
+          spellskite: true
+        - name: large
+          tokens: 200
+          prides: 4
+          haliya: true
+          panharmonicon: true
+          elspeth: true
+          spellskite: true
+        - name: no-spellskite
+          tokens: 200
+          prides: 4
+          haliya: true
+          panharmonicon: true
+          elspeth: true
+          spellskite: false
+        - name: no-haliya
+          tokens: 200
+          prides: 4
+          haliya: false
+          panharmonicon: true
+          elspeth: true
+          spellskite: true
+        - name: no-panharmonicon
+          tokens: 200
+          prides: 4
+          haliya: true
+          panharmonicon: false
+          elspeth: true
+          spellskite: true
+        - name: no-elspeth
+          tokens: 200
+          prides: 4
+          haliya: true
+          panharmonicon: true
+          elspeth: false
+          spellskite: true
+    env:
+      REPRO_CASE: ${{ matrix.name }}
+      REPRO_OLD_TOKENS: ${{ matrix.tokens }}
+      REPRO_PRIDES: ${{ matrix.prides }}
+      REPRO_RECENT_PRIDES: '1'
+      REPRO_HALIYA: ${{ matrix.haliya }}
+      REPRO_PANHARMONICON: ${{ matrix.panharmonicon }}
+      REPRO_ELSPETH: ${{ matrix.elspeth }}
+      REPRO_SPELLSKITE: ${{ matrix.spellskite }}
+      REPRO_OUTPUT: ${{ github.workspace }}/profile-output
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/download-artifact@v4
+      with:
+        name: Build123-runtime
+        path: android/app/libs/
+    - name: Verify matching Build 123 runtime
+      run: "python3 - <<'PY'\nimport hashlib\nfrom pathlib import Path\np = Path('android/app/libs')\nfor line in (p/'SHA256SUMS').read_text().splitlines():\n\
+        \    expected, name = line.split()\n    name = Path(name).name\n    actual = hashlib.sha256((p/name).read_bytes()).hexdigest()\n    assert actual\
+        \ == expected, name\n    print(actual, name)\nPY\n"
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '17'
+    - uses: android-actions/setup-android@v3
+      with:
+        packages: platform-tools
+    - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+    - run: sudo apt-get update && sudo apt-get install -y just
+    - name: Run controlled pass-only and mobile-AI comparisons
+      run: just --justfile investigation/reproduce.just profile
+    - uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: Build123-endstep-${{ matrix.name }}
+        path: 'profile-output/
+
+          android/custom-cards/build/test-results/
+
+          '
+    needs: runtime
+'on':
+  push:
+    branches:
+    - gpt/build123-endstep-fix-from120
+  workflow_dispatch: {}

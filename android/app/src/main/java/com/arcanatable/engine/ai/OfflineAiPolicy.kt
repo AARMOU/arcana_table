@@ -13,8 +13,21 @@ import com.wingedsheep.sdk.model.EntityId
 
 /** Mobile search limits; leaves the engine's reference and server profiles unchanged. */
 object OfflineAiPolicy : BudgetPolicy {
+    private val burstDeadline = ThreadLocal<Long>()
+
+    /** Bound optional search across a host resolution burst, including nested AI decisions. */
+    fun <T> withThinkingBurst(searchMillis: Long = 600, work: () -> T): T {
+        require(searchMillis >= 0)
+        val previous = burstDeadline.get()
+        val deadline = System.nanoTime() + searchMillis * 1_000_000L
+        burstDeadline.set(minOf(previous ?: Long.MAX_VALUE, deadline))
+        return try { work() } finally {
+            if (previous == null) burstDeadline.remove() else burstDeadline.set(previous)
+        }
+    }
+
     val profile: AiProfile = AiProfile.CURRENT.copy(
-        id = "arcana-mobile-b122",
+        id = "arcana-mobile-b123",
         useMeaningfulFilter = true,
         budgetPolicy = this,
     )
@@ -39,6 +52,8 @@ object OfflineAiPolicy : BudgetPolicy {
             attackSearchIterations = 1,
             rolloutPlayouts = 0,
         )
-        return DecisionBudget(tier, work, millis)
+        val remaining = burstDeadline.get()?.let { maxOf(0L, (it - System.nanoTime()) / 1_000_000L) }
+        return DecisionBudget(tier, work, minOf(millis, remaining ?: millis))
     }
 }
+

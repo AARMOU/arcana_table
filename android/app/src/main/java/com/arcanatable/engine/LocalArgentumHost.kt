@@ -471,14 +471,20 @@ class LocalArgentumHost(
      * AI does something or the game moves to a new step, the table gets that state ([flush]), so
      * the AI's turn and your auto-passed combat steps play out instead of being skipped.
      */
-    private fun drive(events: MutableList<GameEvent>) {
+    private fun drive(events: MutableList<GameEvent>) = OfflineAiPolicy.withThinkingBurst {
+        driveBurst(events)
+    }
+
+    private fun driveBurst(events: MutableList<GameEvent>) {
         var steps = 0
+        var lastProgressNanos = System.nanoTime()
         var lastShown = state?.let { it.turnNumber to it.step }
         fun flush(pause: Long) {
             val current = state ?: return
             sendState(events.toList(), interactive = false)
             events.clear()
             lastShown = current.turnNumber to current.step
+            lastProgressNanos = System.nanoTime()
             if (pause > 0) Thread.sleep(pause)
         }
         while (steps++ < 6_000) {
@@ -487,6 +493,7 @@ class LocalArgentumHost(
             // Everyone at this phone (and the Wi-Fi guest) is out: stop instead of watching the AIs finish.
             if (people().none { it in current.activePlayers }) { peopleOut(); break }
             if ((current.turnNumber to current.step) != lastShown) flush(paceMs / 3)
+            else if (System.nanoTime() - lastProgressNanos >= 1_000_000_000L) flush(0)
             val decision = current.pendingDecision
             if (decision != null) {
                 val actor = current.actorFor(decision.playerId)
@@ -705,3 +712,4 @@ class LocalArgentumHost(
         private const val MAX_SACRIFICE_SOURCES = 40
     }
 }
+

@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
 import jdk.jfr.Recording
 
-/** Investigation only: unmodified Build 122 jars, controlled end-step fixtures, no performance fix. */
+/** Controlled end-step regression: same fixture and outcomes as the Build 122 investigation. */
 class EndStepBacklogInvestigationTest {
     private val output = File(System.getenv("REPRO_OUTPUT") ?: "build/endstep-investigation").apply { mkdirs() }
     private val caseName = System.getenv("REPRO_CASE") ?: "small"
@@ -84,8 +84,8 @@ class EndStepBacklogInvestigationTest {
             put("baselineMs", baseline.elapsedMs); put("normalMs", normal.elapsedMs)
         })
         assertTrue("pass-only rules baseline must settle", baseline.completed)
-        // A controlled all-pass result is expected when the opponent has only mana abilities.
-        if (!flag("REPRO_SPELLSKITE") && normal.completed) assertEquals(baseline.fingerprint, normal.fingerprint)
+        assertTrue("mobile AI must settle", normal.completed)
+        assertEquals("search optimization must preserve the final game state", baseline.fingerprint, normal.fingerprint)
     }
 
     private fun fingerprintAfterRestore(d: GameTestDriver, root: GameState): JsonObject {
@@ -171,6 +171,7 @@ class EndStepBacklogInvestigationTest {
         var maxStack = 0
         var nonPassActions = 0
         try {
+            OfflineAiPolicy.withThinkingBurst {
             while (steps < 30000 && System.nanoTime() - started < 240_000_000_000L) {
                 if (d.state.step == Step.END) enteredEnd = true
                 if (enteredEnd && d.state.step != Step.END) { completed = true; break }
@@ -218,6 +219,11 @@ class EndStepBacklogInvestigationTest {
                     })
                 }
                 phase.set("between-operations"); phaseStarted.set(System.nanoTime())
+            }
+            }
+            if (useAi) {
+                assertEquals("targetless cascade must not activate Spellskite", 0, nonPassActions)
+                assertTrue("AI work must remain bounded: ${aiNanos / 1_000_000}ms", aiNanos < 5_000_000_000L)
             }
             val elapsed = (System.nanoTime() - started) / 1_000_000
             val finalFingerprint = fingerprint(d)
