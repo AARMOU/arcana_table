@@ -1,16 +1,3 @@
-diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt b/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
-index bcbdc6e350..924d3d8389 100644
---- a/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
-+++ b/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
-@@ -14,7 +14,7 @@ internal object DraftsimMana {
-     /** Canonical color order `eW`. */
-     val COLORS = listOf("W", "U", "B", "R", "G")
- 
--    private val SYMBOL = Regex("\\{([^}]+)}")
-+    private val SYMBOL = Regex("\\{([^}]+)\\}")
- 
-     /**
-      * Converted mana cost of a single-face cost string. Numeric generic symbols add their value;
 diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
 index 86add920c5..e1af8871fb 100644
 --- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
@@ -101,19 +88,6 @@ index 4f3b8a25c7..1e5deef9a3 100644
      fun remainingMs(): Long =
          if (deadlineNanos == Long.MAX_VALUE) Long.MAX_VALUE
          else max(0L, (deadlineNanos - System.nanoTime()) / NANOS_PER_MILLI)
-diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt b/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt
-index dd525a18e0..4f9467e9fa 100644
---- a/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt
-+++ b/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt
-@@ -23,7 +23,7 @@ class AiResponseParser {
-         }
- 
-         // Try [X] pattern
--        val bracketPattern = Regex("""\[([A-Z]{1,2})]""")
-+        val bracketPattern = Regex("""\[([A-Z]{1,2})\]""")
-         val bracketMatch = bracketPattern.find(cleaned.uppercase())
-         if (bracketMatch != null) {
-             val index = GameStateFormatter.letterToIndex(bracketMatch.groupValues[1])
 diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt
 index 2235591ec0..b900a5b3b3 100644
 --- a/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt
