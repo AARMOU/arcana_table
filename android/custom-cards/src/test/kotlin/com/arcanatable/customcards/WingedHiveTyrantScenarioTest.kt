@@ -3,7 +3,7 @@ import com.arcanatable.customcards.cards.WingedHiveTyrant
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.sdk.core.*
 import com.wingedsheep.sdk.dsl.Effects
-import com.wingedsheep.sdk.dsl.Targets
+import com.wingedsheep.sdk.scripting.filters.unified.TargetFilter
 import com.wingedsheep.sdk.dsl.card
 import org.junit.Assert.*
 import org.junit.Test
@@ -14,7 +14,7 @@ class WingedHiveTyrantScenarioTest {
             typeLine = "Sorcery"
             oracleText = "Put a +1/+1 counter on target creature."
             spell {
-                val targetCreature = target(Targets.Creature)
+                val targetCreature = target(TargetFilter.Creature)
                 effect = Effects.AddCounters(CounterType.PLUS_ONE_PLUS_ONE, 1, targetCreature)
             }
         }
