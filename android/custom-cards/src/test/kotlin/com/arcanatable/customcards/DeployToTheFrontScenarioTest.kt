@@ -20,8 +20,8 @@ class DeployToTheFrontScenarioTest {
         d.giveMana(p, Color.WHITE, 2)
         assertNull(d.castSpell(p, card).error)
         d.resolveAll()
-        assertEquals(3, d.permanentsNamed(p, "Soldier").size)
-        assertEquals(0, d.permanentsNamed(q, "Soldier").size)
+        assertEquals(3, d.getCreatures(p).count { d.getCardName(it)?.contains("Soldier") == true })
+        assertEquals(0, d.getCreatures(q).count { d.getCardName(it)?.contains("Soldier") == true })
     }
 
     @Test
@@ -33,6 +33,6 @@ class DeployToTheFrontScenarioTest {
         d.giveMana(p, Color.WHITE, 2)
         assertNull(d.castSpell(p, card).error)
         d.resolveAll()
-        assertTrue(d.permanentsNamed(p, "Soldier").isEmpty())
+        assertTrue(d.getCreatures(p).none { d.getCardName(it)?.contains("Soldier") == true })
     }
 }
