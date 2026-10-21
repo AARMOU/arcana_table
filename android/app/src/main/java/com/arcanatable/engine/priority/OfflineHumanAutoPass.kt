@@ -8,6 +8,7 @@ import com.wingedsheep.engine.state.components.identity.CardComponent
 import com.wingedsheep.engine.state.components.identity.ControllerComponent
 import com.wingedsheep.engine.state.components.identity.EmblemActivatedAbilityComponent
 import com.wingedsheep.engine.state.components.identity.EmblemOwnedActivatedAbilityComponent
+import com.wingedsheep.engine.state.components.identity.EmblemStaticAbilityComponent
 import com.wingedsheep.engine.state.components.battlefield.ClassLevelComponent
 import com.wingedsheep.engine.state.components.stack.SpellOnStackComponent
 import com.wingedsheep.engine.state.components.stack.TriggeredAbilityOnStackComponent
@@ -52,7 +53,8 @@ object OfflineHumanAutoPass {
         // Fall back even for harmless emblems rather than infer their effective grants.
         if (state.entities.values.any {
                 it.get<EmblemActivatedAbilityComponent>() != null ||
-                it.get<EmblemOwnedActivatedAbilityComponent>() != null
+                it.get<EmblemOwnedActivatedAbilityComponent>() != null ||
+                it.get<EmblemStaticAbilityComponent>() != null
             }) return false
 
         val definitionRisk = HashMap<Any, Boolean>()
@@ -63,7 +65,9 @@ object OfflineHumanAutoPass {
             if (entity.get<ClassLevelComponent>() != null) return false
             val definitionId: Any = card.cardDefinitionId
             val uncertain = definitionRisk.getOrPut(definitionId) {
-                val def = registry.getCard(card.cardDefinitionId) ?: return@getOrPut true
+                // A source with no registered definition contributes no printed abilities.
+                // Its copied and dynamically granted abilities were checked above.
+                val def = registry.getCard(card.cardDefinitionId) ?: return@getOrPut false
                 // Multifaced and flipped cards can expose non-front-face scripts.
                 if (def.cardFaces.isNotEmpty() || def.flipSide != null) return@getOrPut true
                 def.script.activatedAbilities.any { it.holdPriority } ||
