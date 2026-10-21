@@ -237,7 +237,11 @@ class EndStepBacklogInvestigationTest {
             return Result(completed, elapsed, finalFingerprint)
         } finally {
             stop.set(true); watcher.interrupt(); watcher.join(2000)
-            dumpSamples(); recording.stop(); recording.dump(recordingFile); recording.close()
+            dumpSamples()
+            samples.entries.sortedByDescending { it.value.get() }.take(16).forEach { (location, hits) ->
+                println("BUILD127_JFR_TOP case=$caseName mode=$mode hits=${hits.get()} sample=$location")
+            }
+            recording.stop(); recording.dump(recordingFile); recording.close()
         }
     }
 }
