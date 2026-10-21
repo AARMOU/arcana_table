@@ -167,6 +167,12 @@ object CustomCards {
         Entry(Venomthrope, "40K", "Six WotC precons"),
         Entry(TyranidPrime, "40K", "Six WotC precons"),
         Entry(SpaceMarineScout, "40K", "Six WotC precons"),
+        Entry(Defile, "MH1", "Six WotC precons"),
+        Entry(Mutilate, "TOR", "Six WotC precons"),
+        Entry(TheirNameIsDeath, "40K", "Six WotC precons"),
+        Entry(Plasmancer, "40K", "Six WotC precons"),
+        Entry(UlamogsCrusher, "ROE", "Six WotC precons"),
+        Entry(AssaultIntercessor, "40K", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
