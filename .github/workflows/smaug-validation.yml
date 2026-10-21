@@ -1,0 +1,209 @@
+name: Smaug death-trigger validation
+
+on:
+  push:
+    branches:
+      - gpt/smaug-death-trigger-122
+    paths:
+      - 'argentum-patches/**'
+      - 'android/custom-cards/**'
+      - '.github/workflows/smaug-validation.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: smaug-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out isolated Arcana fix
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17 for Android baseline
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android 36 SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Prove shipped engine reproduces missing Treasures
+        working-directory: android
+        shell: bash
+        run: |
+          set +e
+          ./gradlew --no-daemon :custom-cards:test --tests 'com.arcanatable.customcards.SmaugTokenCopyScenarioTest.copiedSmaugCreatesFourteenTreasuresWhenItDiesToLegendRule'
+          result=$?
+          set -e
+          if [ "$result" -eq 0 ]; then
+            echo "The stock engine unexpectedly passed; reassess the regression before patching."
+            exit 1
+          fi
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          p = Path("custom-cards/build/test-results/test/TEST-com.arcanatable.customcards.SmaugTokenCopyScenarioTest.xml")
+          root = ET.parse(p).getroot()
+          assert int(root.attrib["tests"]) == 1, root.attrib
+          assert int(root.attrib["errors"]) == 0, root.attrib
+          case = root.find("testcase")
+          assert case is not None and case.attrib["name"] == "copiedSmaugCreatesFourteenTreasuresWhenItDiesToLegendRule"
+          failure = case.find("failure")
+          assert failure is not None and failure.attrib.get("type") == "java.lang.AssertionError", ET.tostring(root).decode()
+          message = failure.attrib.get("message", "")
+          assert "expected:<14> but was:<0>" in message, message
+          print("Reproduced precisely: copied Smaug produced 0 rather than 14 Treasures.")
+          PY
+          mkdir -p ../smaug-validation/baseline
+          cp custom-cards/build/test-results/test/TEST-com.arcanatable.customcards.SmaugTokenCopyScenarioTest.xml ../smaug-validation/baseline/
+
+      - name: Check out exact engine source used by Arcana
+        uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 7a9663d8e4df4ce7db223023ae7714f0028e08a9
+          path: argentum-engine
+          persist-credentials: false
+
+      - name: Set up Java 21 engine build toolchain
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Install engine task runner
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y just
+
+      - name: Apply Android compatibility and token-copy patches
+        working-directory: argentum-engine
+        run: |
+          git apply --check ../argentum-patches/0001-android-regex.patch
+          git apply ../argentum-patches/0001-android-regex.patch
+          git apply --check ../argentum-patches/0002-engine-trial-build.patch
+          git apply ../argentum-patches/0002-engine-trial-build.patch
+          git apply --check ../argentum-patches/0003-token-copy-triggered-abilities.patch
+          git apply ../argentum-patches/0003-token-copy-triggered-abilities.patch
+          git diff --check
+
+      - name: Build matching SDK, tooling, rules engine and AI for Java 17
+        run: just --justfile argentum-patches/smaug-build.just build
+
+      - name: Stage built runtime libraries and reject Java 21 bytecode
+        shell: bash
+        run: |
+          cp argentum-engine/mtg-sdk/build/libs/mtg-sdk.jar android/app/libs/argentum-mtg-sdk.jar
+          cp argentum-engine/mtg-sdk-tooling/build/libs/mtg-sdk-tooling.jar android/app/libs/argentum-mtg-sdk-tooling.jar
+          cp argentum-engine/rules-engine/build/libs/rules-engine.jar android/app/libs/argentum-rules-engine.jar
+          cp argentum-engine/ai/build/libs/ai.jar android/app/libs/argentum-ai.jar
+          python3 - <<'PY'
+          from pathlib import Path
+          import struct, zipfile
+          for path in sorted(Path("android/app/libs").glob("argentum-*.jar")):
+              with zipfile.ZipFile(path) as z:
+                  versions = [struct.unpack(">H", z.read(n)[6:8])[0] for n in z.namelist() if n.endswith(".class")]
+              assert versions and max(versions) <= 61, (str(path), max(versions, default=0))
+              print(path.name, "maximum class version", max(versions))
+          PY
+
+      - name: Return to Java 17 for Android verification
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Run all custom-card regressions with the rebuilt engine
+        working-directory: android
+        run: ./gradlew --no-daemon :custom-cards:test --rerun-tasks
+
+      - name: Verify all six Smaug scenarios ran and passed
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          path = Path("android/custom-cards/build/test-results/test/TEST-com.arcanatable.customcards.SmaugTokenCopyScenarioTest.xml")
+          root = ET.parse(path).getroot()
+          assert int(root.attrib["tests"]) == 6, root.attrib
+          assert all(int(root.attrib.get(key, "0")) == 0 for key in ["failures", "errors", "skipped"]), root.attrib
+          print("All six Smaug and negative-control scenarios passed.")
+          PY
+
+      - name: Run Android unit tests and compile APK with rebuilt engine
+        working-directory: android
+        run: ./gradlew --no-daemon testDebugUnitTest assembleDebug
+
+      - name: Set up Java 21 for engine regression suite
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Run upstream engine and card scenario suite
+        working-directory: argentum-engine
+        run: |
+          cat >> gradle.properties <<'EOF'
+
+          org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m
+          kotlin.compiler.execution.strategy=in-process
+          kotlinCompileParallelism=1
+          org.gradle.workers.max=2
+          org.gradle.daemon=false
+          EOF
+          just test-rules
+
+      - name: Record validation and runtime checksums
+        shell: bash
+        run: |
+          mkdir -p smaug-validation/runtime
+          cp android/app/libs/argentum-*.jar smaug-validation/runtime/
+          sha256sum android/app/libs/argentum-*.jar > smaug-validation/runtime/SHA256SUMS.txt
+          printf '%s\n' "Source commit: $GITHUB_SHA" "Engine base: 7a9663d8e4df4ce7db223023ae7714f0028e08a9" "Regression: stock engine reproduced 0/14; patched engine passed all six cases." "Java 17 bytecode verified; custom-card suite, Android tests, APK build, and upstream engine/card scenarios passed." > smaug-validation/VALIDATION.txt
+
+      - name: Commit only validated runtime libraries to isolated branch
+        if: github.event_name == 'push' && github.ref == 'refs/heads/gpt/smaug-death-trigger-122'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add android/app/libs/argentum-ai.jar android/app/libs/argentum-mtg-sdk-tooling.jar android/app/libs/argentum-mtg-sdk.jar android/app/libs/argentum-rules-engine.jar
+          if ! git diff --cached --quiet; then
+            git commit -m "Bundle verified Smaug token-copy engine fix"
+            git push origin HEAD:gpt/smaug-death-trigger-122
+          fi
+
+      - name: Upload validated runtime and test APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Smaug-validated-runtime-and-test-apk
+          path: |
+            smaug-validation/
+            android/app/build/outputs/apk/debug/app-debug.apk
+            argentum-patches/0003-token-copy-triggered-abilities.patch
+          if-no-files-found: error
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Smaug-validation-test-reports
+          path: |
+            smaug-validation/baseline/
+            android/custom-cards/build/test-results/
+            android/app/build/test-results/
+            argentum-engine/rules-engine/build/test-results/
+            argentum-engine/mtg-sets/**/build/test-results/
+          if-no-files-found: ignore
