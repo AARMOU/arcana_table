@@ -88,6 +88,18 @@ class OfflineHumanAutoPassParityTest {
     }
 
     @Test(timeout = 60000)
+    fun harmlessClassLevelDoesNotForceFullBoardEnumeration() {
+        val d = scenario("Wizard Class", "Grizzly Bears")
+        d.putPermanentOnBattlefield(d.player1, "Wizard Class", classLevel = 3)
+        val spell = d.putCardInHand(d.player1, "Grizzly Bears")
+        d.giveMana(d.player1, Color.GREEN, 2)
+        assertNull(d.castSpell(d.player1, spell).error)
+        assertTrue("Class must still be safe when none of its active abilities hold priority",
+            OfflineHumanAutoPass.canPassOwnedStackWithoutEnumerating(d.state, d.player1, d.cardRegistry))
+        assertSameVerdict(d, "owned-stack-safe-class-level3")
+    }
+
+    @Test(timeout = 60000)
     fun holdPriorityAbilityDisablesOwnedStackShortcut() {
         val d = scenario("Kitsa, Otterball Elite", "Grizzly Bears")
         d.putCreatureOnBattlefield(d.player1, "Kitsa, Otterball Elite")
