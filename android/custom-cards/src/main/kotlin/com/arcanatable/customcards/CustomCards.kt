@@ -159,6 +159,8 @@ object CustomCards {
         Entry(AwakeningZone, "ROE", "Six WotC precons"),
         Entry(CrashingDrawbridge, "ELD", "Six WotC precons"),
         Entry(AllIsDust, "ROE", "Six WotC precons"),
+        Entry(ForTheEmperor, "40K", "Six WotC precons"),
+        Entry(KnightPaladin, "40K", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
