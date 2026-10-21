@@ -185,6 +185,7 @@ object CustomCards {
         Entry(WingedHiveTyrant, "40K", "Six WotC precons"),
         Entry(TallymanOfNurgle, "40K", "Six WotC precons"),
         Entry(NecronDeathmark, "40K", "Six WotC precons"),
+        Entry(SeaGateWreckage, "CMM", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
