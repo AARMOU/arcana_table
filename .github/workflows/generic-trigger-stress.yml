@@ -20,6 +20,10 @@ jobs:
             test: oneHugeLifeGainIsNotTwoHundredIndividualTriggers
           - label: repeated-lifegain
             test: twoHundredSeparateLifeGainsWithoutCreatures
+          - label: one-gain-foodboard
+            test: oneHugeLifeGainOnLargeFoodBoardStillTriggersOnce
+          - label: repeated-gain-foodboard
+            test: repeatedLifeGainWithLargeFoodBoardShowsEnumerationCost
           - label: artifact-etb
             test: twoHundredArtifactEtbsAreRealHaliyaTriggers
           - label: creature-etb
