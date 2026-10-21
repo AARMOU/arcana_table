@@ -1,0 +1,90 @@
+name: Build 127 isolated engine absence-index proof
+on:
+  push:
+    branches:
+      - gpt/engine-delay-127-engine-index-candidate
+permissions:
+  contents: read
+concurrency:
+  group: build127-index-proof-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  compile-engine-and-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 7a9663d8e4df4ce7db223023ae7714f0028e08a9
+          path: argentum-engine
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Apply all pinned runtime fixes plus candidate performance-only index
+        run: |
+          set -euo pipefail
+          for p in 0001-android-regex.patch 0002-engine-trial-build.patch 0004-token-copy-triggered-abilities.patch 0005-last-known-negative-subtype.patch 0006-ai-decision-deadline.patch 0007-ai-bounded-stack-search.patch 0008-jvm-test-toolchain.patch 0010-enumeration-absence-index.patch; do
+            git -C argentum-engine apply --check "../argentum-patches/$p"
+            git -C argentum-engine apply "../argentum-patches/$p"
+          done
+          git -C argentum-engine diff --check
+      - name: Compile Android-compatible engine with unchanged AI behavior
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar
+      - name: Run upstream rules, AI, and card scenario regression suites
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :rules-engine:test :ai:test :mtg-sets:scenarioTest
+      - name: Replace only the isolated candidate runtime in this temporary CI workspace
+        run: |
+          set -euo pipefail
+          engine=$(find argentum-engine/rules-engine/build/libs -maxdepth 1 -name '*.jar' ! -name '*sources*' ! -name '*javadoc*' | head -1)
+          test -n "$engine"
+          cp "$engine" android/app/libs/argentum-rules-engine.jar
+          sha256sum android/app/libs/argentum-*.jar
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Preserve complete legal actions and trigger results in Arcana regression suite
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:test             --tests '*GenericTriggerStressTest'             --tests '*OfflineHumanAutoPassParityTest'             --tests '*AiEndStepCascadeProfileTest'             --tests '*OfflineAiLargeBoardTest'             --tests '*AiRetargetingSearchTest'
+      - name: Measure candidate on realistic complex end-step fixture
+        working-directory: android
+        env:
+          REPRO_CASE: large-indexed
+          REPRO_OLD_TOKENS: '200'
+          REPRO_PRIDES: '4'
+          REPRO_RECENT_PRIDES: '1'
+          REPRO_HALIYA: 'true'
+          REPRO_PANHARMONICON: 'true'
+          REPRO_ELSPETH: 'true'
+          REPRO_SPELLSKITE: 'true'
+          REPRO_OUTPUT: ${{ github.workspace }}/build127-index-measure
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests '*EndStepBacklogInvestigationTest.compareNormalAiWithPassOnlyFromTheSameEndStep'
+      - name: Verify Android offline host compiles with candidate runtime
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests '*LocalArgentumHostTest' --tests '*OfflineLagFixTest'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build127-index-evidence-only
+          retention-days: 14
+          path: |
+            build127-index-measure/
+            android/custom-cards/build/test-results/
+            android/app/build/test-results/
+            argentum-engine/rules-engine/build/test-results/
+            argentum-engine/ai/build/test-results/
+            argentum-engine/mtg-sets/**/build/test-results/
