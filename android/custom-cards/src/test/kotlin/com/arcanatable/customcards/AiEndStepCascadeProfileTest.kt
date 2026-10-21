@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.support.*
 import com.arcanatable.engine.ai.OfflineAiPolicy
+import com.wingedsheep.engine.core.ActionProcessor
 import com.wingedsheep.engine.core.PassPriority
 import com.wingedsheep.sdk.dsl.Effects
 import com.wingedsheep.sdk.dsl.card
@@ -95,6 +96,39 @@ class AiEndStepCascadeProfileTest {
         assertTrue("Must exercise a long stack", peakStack >= 100)
         assertTrue("Must complete every priority window", windows >= foodCreated * 2)
         return Result(windows, aiChoices, peakStack, life, foodCount, aiNanos / 1_000_000, resolutionNanos / 1_000_000)
+    }
+
+    @Test(timeout = 120000)
+    fun aiProcessorWithoutUnusedUndoPreservesExactRulesTransition() {
+        val d = scenario("Haliya, Guided by Light")
+        val name = "Synthetic Undo Parity Food Cascade"
+        d.registerCard(card(name) {
+            manaCost = "{0}"
+            colorIdentity = ""
+            typeLine = "Instant"
+            oracleText = "TEST ONLY"
+            spell { effect = Effects.CreateFood(20) }
+        })
+        d.putCreatureOnBattlefield(d.player1, "Haliya, Guided by Light")
+        val spell = d.putCardInHand(d.player1, name)
+        assertNull(d.castSpell(d.player1, spell).error)
+        val originalProcessor = ActionProcessor(d.services)
+        val aiProcessor = ActionProcessor(d.services, computeUndo = false)
+        var compared = 0
+        while (d.state.stack.isNotEmpty() && compared < 28) {
+            if (d.state.pendingDecision != null) { d.decide(); continue }
+            val priority = d.state.priorityPlayerId ?: error("No priority")
+            val action = PassPriority(priority)
+            val entry = d.state
+            val baseline = originalProcessor.process(entry, action).result
+            val candidate = aiProcessor.process(entry, action).result
+            assertEquals("No difference in rules-engine error", baseline.error, candidate.error)
+            assertEquals("No difference in events", baseline.events, candidate.events)
+            assertEquals("No difference in immutable game state", baseline.state, candidate.state)
+            assertNull(d.submit(action).error)
+            compared++
+        }
+        assertTrue("Must compare both players and actual stack resolution", compared >= 20)
     }
 
     @Test(timeout = 900000)
