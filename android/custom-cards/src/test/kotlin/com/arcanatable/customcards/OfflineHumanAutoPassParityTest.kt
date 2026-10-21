@@ -55,7 +55,8 @@ class OfflineHumanAutoPassParityTest {
         val guaranteed = com.wingedsheep.engine.legalactions.MeaningfulActionFilter
             .canAutoPassWithoutEnumerating(state, player)
         val ownStackFastPass = OfflineHumanAutoPass.canPassOwnedStackWithoutEnumerating(state, player, d.cardRegistry)
-        assertEquals("$label whether enumeration is skipped", if (guaranteed || ownStackFastPass) 0 else 1, newEnumCalls)
+        val opponentStackStop = OfflineHumanAutoPass.canStopOnOpponentNonSpellWithoutEnumerating(state, player)
+        assertEquals("$label whether enumeration is skipped", if (guaranteed || ownStackFastPass || opponentStackStop) 0 else 1, newEnumCalls)
         println("AUTO_PASS_PARITY case=$label stack=${state.stack.size} battlefield=${state.getBattlefield().size} original=$baseline candidate=$candidate fullActions=${oldDto.size} candidateEnumerations=$newEnumCalls")
     }
 
