@@ -5,6 +5,7 @@ import com.arcanatable.customcards.support.*
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
+import com.wingedsheep.engine.state.components.player.CreaturesDiedThisTurnComponent
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -23,9 +24,15 @@ class TallymanOfNurgleScenarioTest {
         assertNull(d.castSpell(p, blade, listOf(bear)).error)
         d.resolveAll()
         assertTrue("Doom Blade destroyed the creature before end step", d.permanentsNamed(d.player2, "Grizzly Bears").isEmpty())
+        val deathsByPlayer = d.state.turnOrder.map { playerId ->
+            d.state.getEntity(playerId)!!.get<CreaturesDiedThisTurnComponent>()?.count ?: 0
+        }
+        assertTrue("A creature died but the engine recorded no death: $deathsByPlayer", deathsByPlayer.sum() > 0)
         val beforeEnd = d.getHand(p).size
 
         d.passPriorityUntil(Step.END, activePlayer = p)
+        assertTrue("Tallyman must have a pending end-step trigger with recorded deaths $deathsByPlayer",
+            d.state.stack.isNotEmpty())
         d.resolveAll()
 
         assertEquals(19, d.getLifeTotal(p))
