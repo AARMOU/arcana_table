@@ -119,6 +119,15 @@ class LocalArgentumHost(
     // Wi-Fi: where the guest's messages go. Null = the second seat is the AI.
     @Volatile private var guestEmit: ((JSONObject) -> Unit)? = null
     private val gameLogs = mutableMapOf<EntityId, MutableList<ClientEvent>>()
+    // Intermediate progress updates usually contain no new visible log entries. Keep their
+    // immutable wire snapshot until the underlying list actually changes; do not discard events.
+    private data class LogSnapshot(val source: MutableList<ClientEvent>, val size: Int, val value: List<ClientEvent>)
+    private val logSnapshots = mutableMapOf<EntityId, LogSnapshot>()
+    private fun stableLog(seat: EntityId, log: MutableList<ClientEvent>): List<ClientEvent> {
+        val saved = logSnapshots[seat]
+        if (saved != null && saved.source === log && saved.size == log.size) return saved.value
+        return log.toList().also { logSnapshots[seat] = LogSnapshot(log, log.size, it) }
+    }
     private var version = 0L
 
     // Legal actions for the last state they were worked out for, per seat (same object = same game
@@ -127,6 +136,10 @@ class LocalArgentumHost(
     // When the message being handled started, for the "engineMs" diagnostic.
     @Volatile private var handleStartNanos = 0L
     private val phaseNanos = mutableMapOf<String, Long>()
+    private val diagnosticCounts = mutableMapOf<String, Long>()
+    private fun countDiagnostic(name: String) {
+        diagnosticCounts[name] = (diagnosticCounts[name] ?: 0L) + 1L
+    }
 
     private inline fun <T> timed(phase: String, work: () -> T): T {
         val started = System.nanoTime()
@@ -169,6 +182,7 @@ class LocalArgentumHost(
     fun receive(message: JSONObject, from: EntityId = HUMAN_ID) = worker.execute {
         handleStartNanos = System.nanoTime()
         phaseNanos.clear()
+        diagnosticCounts.clear()
         runCatching { handle(message, from) }.onFailure { error ->
             emitTo(from, JSONObject().put("type", "error").put("code", "LOCAL_ENGINE").put("message", "Offline engine problem: ${error.javaClass.simpleName}: ${error.message?.take(200)}"))
         }
@@ -273,6 +287,7 @@ class LocalArgentumHost(
         ais = allSeats.filterNot(::isPerson).associateWith { OfflineAiPolicy.create(registry, it) }
         state = result.state
         gameLogs.clear()
+        logSnapshots.clear()
         legalCache.clear()
         for (seat in people()) {
             emitTo(seat, JSONObject().put("type", "quickGameLobbyState").put("lobbyId", "offline").put("youPlayerId", seat.value).put("vsAi", !isWifi)
@@ -455,7 +470,7 @@ class LocalArgentumHost(
         val checkpoint = undoCheckpoint
         if (checkpoint == null || !undoAvailable(seat)) { sendError(seat, "There's nothing to undo right now."); return }
         state = checkpoint.state
-        checkpoint.logSizes.forEach { (who, size) -> val log = logFor(who); while (log.size > size) log.removeAt(log.size - 1) }
+        checkpoint.logSizes.forEach { (who, size) -> val log = logFor(who); while (log.size > size) log.removeAt(log.size - 1); logSnapshots.remove(who) }
         undoCheckpoint = null
         preCombatCheckpoint = null
         sendState(emptyList())
@@ -508,7 +523,11 @@ class LocalArgentumHost(
             val priority = current.priorityPlayerId ?: break
             if (!isPerson(priority)) {
                 val bot = ais[priority] ?: break
+                val startedChoice = System.nanoTime()
                 val chosen = timed("aiChoice") { OfflineAiPolicy.think { bot.chooseAction(current) } }
+                val choiceType = if (chosen is PassPriority) "aiChoicePass" else "aiChoiceAction"
+                phaseNanos[choiceType] = (phaseNanos[choiceType] ?: 0L) + System.nanoTime() - startedChoice
+                countDiagnostic(if (chosen is PassPriority) "aiPassChoices" else "aiActionChoices")
                 val acted = apply(chosen, events, priority) || apply(safePass(current, priority), events, priority)
                 if (!acted) break
                 if (chosen !is PassPriority) flush(paceMs)
@@ -543,7 +562,11 @@ class LocalArgentumHost(
 
     private fun apply(action: GameAction, events: MutableList<GameEvent>, actor: EntityId): Boolean {
         val current = state ?: return false
-        val processed = timed("actionResolution") { processor.process(current, action) }
+        val isPass = action is PassPriority
+        val processed = timed("actionResolution") {
+            timed(if (isPass) "passResolution" else "otherResolution") { processor.process(current, action) }
+        }
+        countDiagnostic(if (isPass) "passResolutions" else "otherResolutions")
         val result = processed.result
         if (result.error != null) return false
         clearOthersCheckpoint(action, actor)
@@ -684,7 +707,10 @@ class LocalArgentumHost(
         val clientEvents = ClientEventTransformer.transform(events, seat, current, visibility)
         val log = logFor(seat)
         log += clientEvents.filter { it !is ClientEvent.PermanentTapped && it !is ClientEvent.PermanentUntapped && it !is ClientEvent.ManaAdded }
-        val clientState: ClientGameState = timed("snapshot") { transformer.transform(current, seat).copy(gameLog = log.toList()) }
+        val clientState: ClientGameState = timed("snapshot") {
+            val projection = timed("snapshotProjection") { transformer.transform(current, seat) }
+            projection.copy(gameLog = timed("snapshotLog") { stableLog(seat, log) })
+        }
         val offer = shockOffers.firstOrNull()?.takeIf { interactive && it.player == seat }
         val blockedByOtherOffer = shockOffers.isNotEmpty() && offer == null
         val legal = if (interactive && offer == null && !blockedByOtherOffer) legalActions(current, seat) else emptyList()
@@ -709,6 +735,11 @@ class LocalArgentumHost(
             put("engineTimingsMs", buildJsonObject {
                 phaseNanos.forEach { (phase, nanos) -> put(phase, nanos / 1_000_000) }
             })
+            put("engineCounts", buildJsonObject {
+                diagnosticCounts.forEach { (name, total) -> put(name, total) }
+            })
+            put("stackSize", current.stack.size)
+            put("battlefieldSize", current.getBattlefield().size)
             put("interactionEpoch", interactiveEpochs[seat] ?: "offline-0")
         }
         emitTo(seat, JSONObject(message.toString()))
