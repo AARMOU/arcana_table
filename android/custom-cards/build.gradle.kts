@@ -11,6 +11,7 @@ plugins {
 
 kotlin {
     sourceSets.getByName("test").kotlin.srcDir("../app/src/main/java/com/arcanatable/engine/ai")
+    sourceSets.getByName("test").kotlin.srcDir("../app/src/main/java/com/arcanatable/engine/priority")
     compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
 }
 java {
