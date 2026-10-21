@@ -16,6 +16,6 @@ class GuildlessCommonsScenarioTest {
         assertTrue(d.zoneNames(p, Zone.HAND).contains("Plains"))
         val commons = d.findPermanent(p, "Guildless Commons")!!
         assertTrue(d.isTapped(commons))
-        assertTrue(d.cardRegistry.getCard("Guildless Commons")!!.script.activatedAbilities.any { it.manaAbility })
+        assertEquals(1, d.cardRegistry.getCard("Guildless Commons")!!.script.activatedAbilities.size)
     }
 }

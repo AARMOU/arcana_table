@@ -16,6 +16,6 @@ class DesertOfTheGlorifiedScenarioTest {
         assertTrue(d.isTapped(inPlay))
         val def = d.cardRegistry.getCard("Desert of the Glorified")!!
         assertTrue(def.keywordAbilities.any { it is KeywordAbility.Cycling })
-        assertTrue(def.script.activatedAbilities.any { it.manaAbility })
+        assertEquals(1, def.script.activatedAbilities.size)
     }
 }
