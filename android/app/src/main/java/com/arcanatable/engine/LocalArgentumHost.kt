@@ -2,6 +2,7 @@ package com.arcanatable.engine
 
 import com.wingedsheep.ai.engine.AIPlayer
 import com.arcanatable.engine.ai.OfflineAiPolicy
+import com.arcanatable.engine.priority.OfflineHumanAutoPass
 import com.wingedsheep.engine.core.ActionProcessor
 import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.engine.core.CastSpell
@@ -513,11 +514,21 @@ class LocalArgentumHost(
                 if (chosen !is PassPriority) flush(paceMs)
                 continue
             }
-            // A person's priority: pass automatically where Argentum's server would.
-            val legal = withoutManaLike(legalActions(current, priority))
-            val quietPass = priority == humanId && quietOpponentTurns && !current.isActiveTurnFor(priority) && current.stack.isNotEmpty() &&
-                legal.none { it.actionType == "DeclareBlockers" } && !stackTargetsYou(current, priority)
-            if (!quietPass && !autoPass.shouldAutoPass(current, priority, legal)) break
+            // Human auto-pass needs only engine PriorityActions, not the FULL/enriched UI menu.
+            // Interactive state updates still build and send the original complete legal-action DTO.
+            val shouldPass = OfflineHumanAutoPass.shouldPass(
+                state = current,
+                player = priority,
+                registry = registry,
+                enumerateActionsOnly = {
+                    timed("autoPassEnumerate") {
+                        enumerator.enumerate(current, priority, com.wingedsheep.engine.legalactions.EnumerationMode.ACTIONS_ONLY)
+                    }
+                },
+                quietOpponentTurn = priority == humanId && quietOpponentTurns,
+                stackTargetsPlayer = { stackTargetsYou(current, priority) },
+            )
+            if (!shouldPass) break
             if (!apply(safePass(current, priority), events, priority)) break
         }
     }
