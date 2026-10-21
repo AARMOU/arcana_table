@@ -60,6 +60,15 @@ data class TurnRecap(val plays: List<String> = emptyList(), val attackers: Int =
     }
 }
 
+data class TurnRecapEntry(val turn: Int, val seat: Int, val recap: TurnRecap)
+
+internal fun mergeTurnRecap(entries: List<TurnRecapEntry>, turn: Int, seat: Int, recap: TurnRecap): List<TurnRecapEntry> =
+    (entries.filterNot { it.turn == turn && it.seat == seat } + TurnRecapEntry(turn, seat, recap)).sortedWith(compareBy<TurnRecapEntry> { it.turn }.thenBy { it.seat })
+
+internal fun formatTurnRecaps(entries: List<TurnRecapEntry>, names: List<String>): String = entries
+    .filterNot { it.recap.isEmpty }
+    .joinToString("\n") { entry -> entry.recap.line(names.getOrNull(entry.seat) ?: "Opponent") }
+
 /**
  * Turns Argentum's client events into the played-card feed. Tokens are left out of the feed (lands
  * are kept); abilities and triggers become short banners instead of feed entries.

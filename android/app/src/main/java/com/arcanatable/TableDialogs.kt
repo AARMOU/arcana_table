@@ -2065,6 +2065,10 @@ internal fun ChangelogDialog(onDismiss: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                Text("BUILD 123 · LARGE END-STEP AI FIX", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• The offline AI skips pointless redirect searches on targetless spells and abilities.\\n• AI simulations share a deadline, including nested choices, and long resolution sequences show progress updates.\\n• Retains the Build 122 fixes and Quick UI Tips, based on Build 120.", color = SoftWhite, fontSize = 13.sp)
+                Text("BUILD 122 · FIXES AND QUICK UI TIPS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Smaug copies keep their death ability and create 14 Treasures when they die.\n• Valkyrie’s Call returns Cid as an Angel with flying and a +1/+1 counter. A returned Angel’s next death ends the legend-rule sequence.\n• The offline AI spends less time searching on large boards, with bounded thinking budgets and more useful timing diagnostics.\n• New Quick UI Tips popup, grouped by interaction, with Dismiss and Don’t remind me again.\n• Temporarily removed the custom-card/opponent notice after choosing your opening hand.\n• Based on Build 120, preserving the seven WotC precons. Build 122 is now shown consistently in the app and installer.", color = SoftWhite, fontSize = 13.sp)
                 Text("BUILDS 105–106 · NEW CARDS AND DECKS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• 62 more custom cards (92 in all). New premade decks for you or the AI: Ayula Bears, Sliver Overlord, Hazel Squirrels.\n• Waiting for your friend shows in the bar; a secret nudge; prompts name the card asking; custom cards load their art.", color = SoftWhite, fontSize = 13.sp)
                 Text("BUILD 104 · ONLINE WITH A FRIEND", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)

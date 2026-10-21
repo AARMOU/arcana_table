@@ -46,6 +46,7 @@ internal fun AdjustUiPage(
     combatSize: Float, onCombatSize: (Float) -> Unit,
     onReset: () -> Unit, onDismiss: () -> Unit,
     stackPile: Boolean = true, onStackPile: (Boolean) -> Unit = {},
+    autoOpenHand: Boolean = true, onAutoOpenHand: (Boolean) -> Unit = {},
 ) {
     val catalog = listOf(
         AdjustableAction("GRAVEYARD", "Graveyard"), AdjustableAction("EXILE", "Exile"),
@@ -136,6 +137,7 @@ internal fun AdjustUiPage(
                     AdjustToggle("Ability and trigger banners", "Show short notices when abilities happen.", banners, onBanners)
                     AdjustToggle("Stack on the table", "Show what's on the stack as cards at the edge of the table.", stackPile, onStackPile)
                     AdjustToggle("AI turn recap", "Summarize the AI's turn when yours begins.", recap, onRecap)
+                    AdjustToggle("Open hand on your turn", "Open your hand tray automatically when your turn starts.", autoOpenHand, onAutoOpenHand)
                     AdjustToggle("Turn banner", "Show a banner when a turn begins.", turnBanner, onTurnBanner)
                     AdjustToggle("Buzz on your turn", "Give a short buzz when your turn begins.", turnBuzz, onTurnBuzz)
                     AdjustToggle("Stack identical cards", "Show matching battlefield cards as one stack.", stackCards, onStackCards)

@@ -6,6 +6,7 @@ import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.onNodeWithText
 import org.robolectric.Shadows.shadowOf
 import java.io.File
 
@@ -17,6 +18,10 @@ object UiTestSupport {
 
     /** Home → PLAY → Online with Argentum → start (the Build 97 home screen). */
     fun playWithArgentum(rule: ComposeTestRule) {
+        if (rule.onAllNodesWithTag("quick-ui-tips").fetchSemanticsNodes().isNotEmpty()) {
+            rule.onNodeWithText("Dismiss").performClick()
+            settle(rule, 300)
+        }
         rule.onNodeWithTag("home-play").performClick()
         settle(rule, 800)
         rule.onNodeWithTag("play-online-option").performClick()

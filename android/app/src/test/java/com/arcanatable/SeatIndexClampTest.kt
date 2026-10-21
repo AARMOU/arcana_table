@@ -24,9 +24,11 @@ class SeatIndexClampTest {
         t.players = List(4) { TablePlayer("P${it + 1}") }
         t.selectedPlayer = 2
         t.activePlayer = 3
+        t.localSeat = 2
         t.players = List(2) { TablePlayer("P${it + 1}") }
         assertEquals(1, t.selectedPlayer)
         assertEquals(1, t.activePlayer)
+        assertEquals(1, t.localSeat)
         // What TableMainLayout does on every frame must not throw.
         t.players[t.selectedPlayer].hand.size
         t.players[t.activePlayer].isComputer

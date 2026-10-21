@@ -149,9 +149,17 @@ internal fun TableController.TableOverlays() {
             popupDurationSeconds = playedPopupSeconds,
             onDismissBanner = { playBanner = null }, onDismissRecap = { recapText = null })
         if (homeOpen) {
-            val deckChoices = remember(savedDecks, premadeDecks) {
-                savedDecks.map { DeckChoice(it.name, it.name, it.commander ?: parseDeckList(it.text).firstOrNull { e -> e.commander }?.name, builtIn = false) } +
-                    premadeDecks.map { DeckChoice("builtin:${it.id}", it.name, it.commander, builtIn = true) }
+            if (quickUiTipsOpen) QuickUiTipsDialog(
+                onDismiss = { quickUiTipsOpen = false },
+                onDontRemind = {
+                    optionPrefs.edit().putBoolean("quick_ui_tips_disabled", true).apply()
+                    quickUiTipsOpen = false
+                },
+            )
+            val deckChoices = remember(savedDecks, premadeDecks, preconDecks) {
+                preconDecks.map { DeckChoice("precon:${it.id}", it.name, it.commander, builtIn = true, category = DeckChoiceCategory.PRECON) } +
+                    premadeDecks.map { DeckChoice("builtin:${it.id}", it.name, it.commander, builtIn = true, category = argentumDeckCategory(it.id)) } +
+                    savedDecks.map { DeckChoice(it.name, it.name, it.commander ?: parseDeckList(it.text).firstOrNull { e -> e.commander }?.name, builtIn = false, category = DeckChoiceCategory.OTHER) }
             }
             val seat = players.getOrNull(localSeat)
             val activeDeck = deckChoices.firstOrNull { it.id == activeDeckId }
@@ -163,9 +171,7 @@ internal fun TableController.TableOverlays() {
             val bundledArt by androidx.compose.runtime.produceState<String?>(null, commanderName) {
                 value = commanderName?.let { CardImages.bundledImage(context, it) }?.let { CardImages.atSize(it, "art_crop") }
             }
-            val art = commanderName?.let { name ->
-                tableArt ?: bundledArt ?: "https://api.scryfall.com/cards/named?exact=${java.net.URLEncoder.encode(name, "UTF-8")}&format=image&version=art_crop"
-            }
+            val art = commanderName?.let { name -> homeArtUrl(tableArt, bundledArt, name) }
             ArcanaHomeScreen(
                 wide = screenWidthDp >= 700,
                 deck = activeDeck, commanderArt = art,
@@ -215,7 +221,8 @@ internal fun TableController.TableOverlays() {
                     activeDeckId = choice.id; saveActiveDeck(context, choice.id)
                     recordDiagnostic("Deck chosen: ${choice.name}", DiagnosticCategory.ACTION)
                     // Also put it on your table (card art, online play). Offline games read the choice directly.
-                    val text = savedDecks.firstOrNull { it.name == choice.id }?.text
+                    val text = preconDecks.firstOrNull { "precon:${it.id}" == choice.id }?.decklist
+                        ?: savedDecks.firstOrNull { it.name == choice.id }?.text
                         ?: premadeDecks.firstOrNull { "builtin:${it.id}" == choice.id }?.let { d -> "Commander\n1 ${d.commander}\nDeck\n" + d.cards.filterNot { it == d.commander }.groupingBy { it }.eachCount().entries.joinToString("\n") { (n, c) -> "$c $n" } }
                     if (text != null) { selectedPlayer = localSeat; importDeck(text, saveAsMine = false) }
                 },
@@ -796,7 +803,7 @@ internal fun TableController.TableOverlays() {
 
     // The guide is layered over the real screen at the end of this composition.
     // Argentum games: the hand drawer always shows YOUR hand and opens from any table screen.
-    val handSeat = if (argentumEnabled) localSeat.coerceIn(players.indices) else selectedPlayer
+    val handSeat = if (argentumEnabled) localSeat.coerceIn(players.indices) else selectedPlayer.coerceIn(players.indices)
     val handTrayVisible = showHand && gameInProgress && (if (argentumEnabled) players.getOrNull(handSeat) != null else !showOverview && canControlSelectedPlayer)
     // While a combat board or another Argentum choice is open, the hand is for looking only.
     val handViewOnly = argentumEnabled && (argentumPendingDecision != null || argentumAttackPlan != null || argentumBlockPlan != null || argentumComposer != null)
@@ -854,7 +861,7 @@ internal fun TableController.TableOverlays() {
                     }
                     Text("DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
                     HandSheet(
-                        cards = players[handSeat].hand, isLandscape = isLandscape,
+                        cards = players.getOrNull(handSeat.coerceIn(players.indices))?.hand.orEmpty(), isLandscape = isLandscape,
                         availableHeight = LocalConfiguration.current.screenHeightDp.dp * effectiveHandFraction,
                         stackCount = visibleStackCount,
                         highlightedCardId = highlightedHandCardId,
@@ -881,6 +888,8 @@ internal fun TableController.TableOverlays() {
                         arrangement = handArrangement,
                         cardScale = handCardScale,
                         playableIds = argentumPlayableIds,
+                        canRespond = argentumCanRespond && respondGlow,
+                        commanderAffordable = argentumEnabled && players.getOrNull(handSeat)?.commanderCard?.id?.let { it in argentumPlayableIds } == true,
                         onStack = { run { if (argentumEnabled) run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } else stackOpen = true } },
                         onCastCommander = {
                             val commander = players.getOrNull(handSeat)?.commanderCard

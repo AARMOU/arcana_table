@@ -94,7 +94,7 @@ fun BoxScope.TurnBanner(state: TurnBannerState?, onDismiss: () -> Unit = {}) {
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun PassButton(label: String, onClick: () -> Unit, enabled: Boolean, canRespond: Boolean, modifier: Modifier = Modifier) {
+fun PassButton(label: String, onClick: () -> Unit, enabled: Boolean, canRespond: Boolean, modifier: Modifier = Modifier, onLongClick: (() -> Unit)? = null) {
     val pulse = if (canRespond && enabled) {
         val transition = rememberInfiniteTransition(label = "respond-pulse")
         val alpha by transition.animateFloat(0.72f, 1f, infiniteRepeatable(tween(700), RepeatMode.Reverse), label = "respond-alpha")
@@ -106,7 +106,7 @@ fun PassButton(label: String, onClick: () -> Unit, enabled: Boolean, canRespond:
         modifier.heightIn(min = 50.dp).clip(shape)
             .background(if (lit) TurnColors.You.copy(alpha = pulse) else if (enabled) PanelLight else Panel)
             .border(if (lit) 2.dp else 0.dp, if (lit) TurnColors.You else Color.Transparent, shape)
-            .combinedClickable(enabled = enabled, onClick = onClick)
+            .combinedClickable(enabled = enabled, onClick = onClick, onLongClick = onLongClick)
             .testTag(if (lit) "pass-button-respond" else "pass-button"),
         contentAlignment = Alignment.Center
     ) {
