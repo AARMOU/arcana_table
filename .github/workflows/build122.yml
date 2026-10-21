@@ -1,0 +1,166 @@
+name: Build 122 from verified Build 120
+on:
+  push:
+    branches: [gpt/build122-fixes-from120]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build122-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Reproduce stock Smaug and Cid failures
+        working-directory: android
+        run: |
+          set +e
+          ./gradlew --no-daemon :custom-cards:test --tests '*SmaugTokenCopyScenarioTest.copiedSmaugCreatesFourteenTreasuresWhenItDiesToLegendRule' --tests '*ValkyriesCallScenarioTest.returnedAngelStaysDeadWhenDestroyedAgain'
+          status=$?
+          set -e
+          test "$status" -ne 0
+          python3 - <<'PY'
+          import xml.etree.ElementTree as E
+          from pathlib import Path
+          cases = [('SmaugTokenCopyScenarioTest', 'copiedSmaugCreatesFourteenTreasuresWhenItDiesToLegendRule'), ('ValkyriesCallScenarioTest', 'returnedAngelStaysDeadWhenDestroyedAgain')]
+          for cls, test in cases:
+              root = E.parse(Path('custom-cards/build/test-results/test') / ('TEST-com.arcanatable.customcards.'+cls+'.xml')).getroot()
+              assert int(root.attrib['tests']) == 1 and int(root.attrib['failures']) == 1 and int(root.attrib['errors']) == 0, root.attrib
+              case = root.find('testcase')
+              assert case.attrib['name'] == test
+              failure = case.find('failure')
+              assert failure.attrib['type'] == 'java.lang.AssertionError', failure.attrib
+              if cls.startswith('Smaug'): assert 'expected:<14> but was:<0>' in failure.attrib['message']
+          PY
+          mkdir -p ../validation/baseline
+          cp custom-cards/build/test-results/test/TEST-*.xml ../validation/baseline/
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 7a9663d8e4df4ce7db223023ae7714f0028e08a9
+          path: argentum-engine
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: sudo apt-get update && sudo apt-get install -y just
+      - name: Apply runtime patches
+        run: |
+          for p in 0001-android-regex.patch 0002-engine-trial-build.patch 0004-token-copy-triggered-abilities.patch 0005-last-known-negative-subtype.patch 0006-ai-decision-deadline.patch; do
+            git -C argentum-engine apply --check "../argentum-patches/$p"
+            git -C argentum-engine apply "../argentum-patches/$p"
+          done
+          git -C argentum-engine diff --check
+      - run: just --justfile argentum-patches/build122.just engine-build
+      - name: Collect matching Java 17 runtime
+        run: |
+          mkdir -p validation/runtime
+          for pair in 'mtg-sdk mtg-sdk' 'mtg-sdk-tooling mtg-sdk-tooling' 'rules-engine rules-engine' 'ai ai'; do
+            read -r module name <<< "$pair"
+            cp "$(find "argentum-engine/$module/build/libs" -maxdepth 1 -name '*.jar' ! -name '*sources*' ! -name '*javadoc*' | head -1)" "validation/runtime/argentum-$name.jar"
+          done
+          python3 - <<'PY'
+          import zipfile, struct
+          from pathlib import Path
+          for p in Path('validation/runtime').glob('*.jar'):
+              with zipfile.ZipFile(p) as z:
+                  majors = [struct.unpack('>H', z.read(n)[6:8])[0] for n in z.namelist() if n.endswith('.class')]
+                  assert majors and max(majors) <= 61, (p, max(majors))
+          PY
+          sha256sum validation/runtime/*.jar > validation/runtime/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Build122-runtime
+          path: validation/runtime/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Build122-stock-regressions
+          path: validation/baseline/
+  android:
+    needs: runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Build122-runtime
+          path: android/app/libs/
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Full shipped-card suite and large-board AI tests
+        working-directory: android
+        run: ./gradlew --no-daemon :custom-cards:test
+      - name: Focused Android host and popup tests
+        working-directory: android
+        run: ./gradlew --no-daemon :app:testDebugUnitTest --tests '*QuickUiTipsTest' --tests '*LocalArgentumHostTest' --tests '*OfflineHostFlowTest' --tests '*WifiHostTest' --tests '*GameRulesTest'
+      - name: Compile release APK and AAB
+        working-directory: android
+        run: ./gradlew --no-daemon :app:assembleRelease :app:bundleRelease
+      - name: Record source identity
+        run: |
+          mkdir -p validation
+          printf 'Build=122\nBaseBuild=120\nBaseGameSource=3e17b24e620590e4170bd4c2de2abaa4d18d9e87\nSourceCommit=%s\n' "$GITHUB_SHA" > validation/build122.properties
+          sha256sum android/app/build/outputs/apk/release/*.apk android/app/build/outputs/bundle/release/*.aab > validation/UNSIGNED-SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArcanaTable-Build122-unsigned
+          path: |
+            android/app/build/outputs/apk/release/*.apk
+            android/app/build/outputs/bundle/release/*.aab
+            validation/
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Build122-Android-reports-and-previews
+          path: |
+            android/custom-cards/build/test-results/
+            android/app/build/test-results/
+            android/app/build/screenshots/
+  upstream:
+    needs: runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 7a9663d8e4df4ce7db223023ae7714f0028e08a9
+          path: argentum-engine
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: sudo apt-get update && sudo apt-get install -y just
+      - name: Apply runtime patches
+        run: |
+          for p in 0001-android-regex.patch 0002-engine-trial-build.patch 0004-token-copy-triggered-abilities.patch 0005-last-known-negative-subtype.patch 0006-ai-decision-deadline.patch; do
+            git -C argentum-engine apply "../argentum-patches/$p"
+          done
+      - name: Engine, card and AI regression suites
+        run: just --justfile argentum-patches/build122.just engine-test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Build122-upstream-test-reports
+          path: |
+            argentum-engine/rules-engine/build/test-results/
+            argentum-engine/mtg-sets/**/build/test-results/
+            argentum-engine/ai/build/test-results/

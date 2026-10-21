@@ -376,6 +376,7 @@ internal class TableController(
     var changelogOpen by run { mutableStateOf(false) }
     var lobbyOpen by run { mutableStateOf(false) }
     var homeOpen by run { mutableStateOf(true) }
+    var quickUiTipsOpen by mutableStateOf(!optionPrefs.getBoolean("quick_ui_tips_disabled", false))
     var lobbyCreated by run { mutableStateOf(false) }
     var lobbyJoinMode by run { mutableStateOf(false) }
     var lobbyReadyPlayers by run { mutableStateOf(emptySet<Int>()) }
@@ -1571,7 +1572,7 @@ internal class TableController(
                 var waitCount = 0
                 while (argentumStatus != ArgentumConnectionStatus.CONNECTED && waitCount < 20) { delay(100); waitCount++ }
                 argentumSocket.createCommanderPracticeLobby(vsAi = true)
-                if (setup.notes.isNotEmpty()) message = setup.notes.joinToString("\n\n") + "\n\n${if (setup.extraAis.isEmpty()) "Opponent" else "Opponents"}: ${setup.aiDeckName}."
+                // Temporarily keep setup notices in diagnostics instead of opening a game-start dialog.
             } catch (error: Throwable) {
                 argentumSocket.localHostFactory = null
                 argentumOffline = false

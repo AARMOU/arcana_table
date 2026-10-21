@@ -425,7 +425,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                     val eventLines = (0 until entries.length()).mapNotNull { entries.optJSONObject(it)?.let(PlayFeedParser::logLine) }
                     if (eventLines.isNotEmpty()) gameLog = (gameLog + eventLines).takeLast(250)
                 }
-                recordDiagnostic("Argentum state v${incoming.optLong("stateVersion")} applied: ${snapshot.players.size} players, turn ${snapshot.turnNumber} ${snapshot.stepName}, ${snapshot.legalActions.size} legal actions${if (incoming.has("engineMs")) ", engine ${incoming.optLong("engineMs")} ms" else ""}", DiagnosticCategory.ENGINE)
+                recordDiagnostic("Argentum state v${incoming.optLong("stateVersion")} applied: ${snapshot.players.size} players, turn ${snapshot.turnNumber} ${snapshot.stepName}, ${snapshot.legalActions.size} legal actions${if (incoming.has("engineMs")) ", engine ${incoming.optLong("engineMs")} ms" else ""}${incoming.optJSONObject("engineTimingsMs")?.let { ", stages $it" } ?: ""}", DiagnosticCategory.ENGINE)
             }
         }
         "stateDeltaUpdate" -> {

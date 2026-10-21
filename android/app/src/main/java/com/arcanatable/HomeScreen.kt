@@ -164,7 +164,7 @@ fun ArcanaHomeScreen(
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.weight(1f))
-                Text("v${BuildConfig.VERSION_NAME} · Build ${BuildConfig.VERSION_CODE}", color = Muted, fontSize = 12.sp)
+                Text("Build ${BuildConfig.VERSION_CODE} · Based on Build ${BuildConfig.BASE_BUILD}", color = Muted, fontSize = 12.sp)
             }
         }
     }

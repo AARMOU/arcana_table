@@ -1,0 +1,137 @@
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt b/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
+index bcbdc6e350..924d3d8389 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/draftsim/DraftsimMana.kt
+@@ -14,7 +14,7 @@ internal object DraftsimMana {
+     /** Canonical color order `eW`. */
+     val COLORS = listOf("W", "U", "B", "R", "G")
+ 
+-    private val SYMBOL = Regex("\\{([^}]+)}")
++    private val SYMBOL = Regex("\\{([^}]+)\\}")
+ 
+     /**
+      * Converted mana cost of a single-face cost string. Numeric generic symbols add their value;
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
+index 86add920c5..e1af8871fb 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
+@@ -70,11 +70,12 @@ class AIPlayer(
+      * ~20-30 windows it crosses.
+      */
+     fun chooseAction(state: GameState): GameAction {
++        val decisionStartedNanos = System.nanoTime()
+         if (useMeaningfulFilter && MeaningfulActionFilter.canAutoPassWithoutEnumerating(state, playerId)) {
+             return PassPriority(playerId)
+         }
+         val legalActions = simulator.getLegalActions(state, playerId)
+-        return chooseFrom(state, legalActions).action
++        return strategist.chooseAction(state, legalActions, playerId, decisionStartedNanos).action
+     }
+ 
+     /**
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
+index e8714f2aed..3f69981622 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
+@@ -283,7 +283,8 @@ class Strategist(
+     fun chooseAction(
+         state: GameState,
+         legalActions: List<LegalAction>,
+-        playerId: EntityId
++        playerId: EntityId,
++        decisionStartedNanos: Long? = null,
+     ): LegalAction {
+         val startNanos = if (insightSink != null) System.nanoTime() else 0L
+         val forcedPlay = state.pendingDecision is com.wingedsheep.engine.core.PlayCardDecision
+@@ -293,7 +294,9 @@ class Strategist(
+         // returns a single DeclareAttackers/DeclareBlockers with an empty default map).
+         val combatAction = legalActions.find { it.actionType == "DeclareAttackers" || it.actionType == "DeclareBlockers" }
+         if (combatAction != null) {
+-            val budget = budgetPolicy.budgetFor(state, playerId, listOf(combatAction))
++            val budget = budgetPolicy.budgetFor(state, playerId, listOf(combatAction)).let {
++                if (decisionStartedNanos != null) it.startingAt(decisionStartedNanos) else it
++            }
+             return handleCombatDeclaration(evaluationState, combatAction, playerId, budget, startNanos)
+         }
+ 
+@@ -310,7 +313,10 @@ class Strategist(
+             } else {
+                 single
+             }
+-            return only.copy(action = chooseCommittedTargets(state, only, playerId))
++            val budget = budgetPolicy.budgetFor(state, playerId, listOf(only)).let {
++                if (decisionStartedNanos != null) it.startingAt(decisionStartedNanos) else it
++            }
++            return only.copy(action = chooseCommittedTargets(state, only, playerId, budget))
+         }
+ 
+         val pass = legalActions.find { it.actionType == "PassPriority" }
+@@ -327,7 +333,10 @@ class Strategist(
+ 
+         if (affordable.isEmpty()) return pass ?: legalActions.first()
+ 
+-        val budget = budgetPolicy.budgetFor(state, playerId, affordable)
++        val budget = budgetPolicy.budgetFor(state, playerId, affordable).let {
++            if (decisionStartedNanos != null) it.startingAt(decisionStartedNanos) else it
++        }
++        if (budget.expired() && pass != null) return pass
+         val here = StateProgress.digest(evaluationState)
+ 
+         // ── Pass 1: one simulation per candidate, to the quiet state it leads to ──
+@@ -1596,7 +1605,7 @@ class Strategist(
+         if (TargetSelection.targetsAlreadyFilled(baseAction) != false) {
+             return withSumGatedExilePayment(state, action, baseAction)
+         }
+-        if (!budget.allowances.refineTargetsBySimulation && !forceTargetRefinement) {
++        if (budget.expired() || (!budget.allowances.refineTargetsBySimulation && !forceTargetRefinement)) {
+             return heuristicTargets(state, action, playerId)
+         }
+         val targetInfos = TargetSelection.fillableRequirements(action, useMeaningfulFilter)
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudget.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudget.kt
+index 4f3b8a25c7..1e5deef9a3 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudget.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudget.kt
+@@ -173,6 +173,9 @@ class DecisionBudget(
+ 
+     fun expired(): Boolean = deadlineNanos != Long.MAX_VALUE && System.nanoTime() >= deadlineNanos
+ 
++    /** Include work already spent enumerating actions in this decision's deadline. */
++    fun startingAt(nanos: Long): DecisionBudget = DecisionBudget(tier, allowances, millis, nanos)
++
+     fun remainingMs(): Long =
+         if (deadlineNanos == Long.MAX_VALUE) Long.MAX_VALUE
+         else max(0L, (deadlineNanos - System.nanoTime()) / NANOS_PER_MILLI)
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt b/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt
+index dd525a18e0..4f9467e9fa 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/llm/AiResponseParser.kt
+@@ -23,7 +23,7 @@ class AiResponseParser {
+         }
+ 
+         // Try [X] pattern
+-        val bracketPattern = Regex("""\[([A-Z]{1,2})]""")
++        val bracketPattern = Regex("""\[([A-Z]{1,2})\]""")
+         val bracketMatch = bracketPattern.find(cleaned.uppercase())
+         if (bracketMatch != null) {
+             val index = GameStateFormatter.letterToIndex(bracketMatch.groupValues[1])
+diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt
+index 2235591ec0..b900a5b3b3 100644
+--- a/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt
++++ b/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt
+@@ -12,6 +12,16 @@ import io.kotest.matchers.shouldBe
+  */
+ class DecisionBudgetTest : FunSpec({
+ 
++    test("enumeration time is charged to the same decision deadline") {
++        val start = System.nanoTime() - 1_000_000_000L
++        val opened = DecisionBudget(BudgetTier.NORMAL, SearchAllowances.forMillis(150), 150)
++        val afterEnumeration = opened.startingAt(start)
++        afterEnumeration.deadlineNanos shouldBe start + 150_000_000L
++        afterEnumeration.expired() shouldBe true
++        afterEnumeration.remainingMs() shouldBe 0L
++        afterEnumeration.allowances shouldBe opened.allowances
++    }
++
+     test("the NORMAL tier reproduces today's search counts exactly") {
+         // If this ever fails, the permanent reference opponent has moved and every published
+         // arena number is measured against a different baseline than it claims.

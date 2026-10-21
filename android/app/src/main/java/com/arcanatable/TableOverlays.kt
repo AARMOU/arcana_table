@@ -149,6 +149,13 @@ internal fun TableController.TableOverlays() {
             popupDurationSeconds = playedPopupSeconds,
             onDismissBanner = { playBanner = null }, onDismissRecap = { recapText = null })
         if (homeOpen) {
+            if (quickUiTipsOpen) QuickUiTipsDialog(
+                onDismiss = { quickUiTipsOpen = false },
+                onDontRemind = {
+                    optionPrefs.edit().putBoolean("quick_ui_tips_disabled", true).apply()
+                    quickUiTipsOpen = false
+                },
+            )
             val deckChoices = remember(savedDecks, premadeDecks, preconDecks) {
                 preconDecks.map { DeckChoice("precon:${it.id}", it.name, it.commander, builtIn = true, category = DeckChoiceCategory.PRECON) } +
                     premadeDecks.map { DeckChoice("builtin:${it.id}", it.name, it.commander, builtIn = true, category = argentumDeckCategory(it.id)) } +

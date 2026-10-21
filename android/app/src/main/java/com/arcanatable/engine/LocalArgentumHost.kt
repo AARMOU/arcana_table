@@ -1,6 +1,7 @@
 package com.arcanatable.engine
 
 import com.wingedsheep.ai.engine.AIPlayer
+import com.arcanatable.engine.ai.OfflineAiPolicy
 import com.wingedsheep.engine.core.ActionProcessor
 import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.engine.core.CastSpell
@@ -124,6 +125,14 @@ class LocalArgentumHost(
     private val legalCache = mutableMapOf<EntityId, Pair<GameState, List<LegalActionInfo>>>()
     // When the message being handled started, for the "engineMs" diagnostic.
     @Volatile private var handleStartNanos = 0L
+    private val phaseNanos = mutableMapOf<String, Long>()
+
+    private inline fun <T> timed(phase: String, work: () -> T): T {
+        val started = System.nanoTime()
+        try { return work() } finally {
+            phaseNanos[phase] = (phaseNanos[phase] ?: 0L) + System.nanoTime() - started
+        }
+    }
     // Per seat, the epoch of the last update they could act on. A submit made against an older one (a
     // tap queued while the engine was still thinking) is turned down instead of applied to a newer state.
     private val interactiveEpochs = mutableMapOf<EntityId, String>()
@@ -158,6 +167,7 @@ class LocalArgentumHost(
 
     fun receive(message: JSONObject, from: EntityId = HUMAN_ID) = worker.execute {
         handleStartNanos = System.nanoTime()
+        phaseNanos.clear()
         runCatching { handle(message, from) }.onFailure { error ->
             emitTo(from, JSONObject().put("type", "error").put("code", "LOCAL_ENGINE").put("message", "Offline engine problem: ${error.javaClass.simpleName}: ${error.message?.take(200)}"))
         }
@@ -259,7 +269,7 @@ class LocalArgentumHost(
             format = if (allSeats.all { seatOf(it).commander != null }) Format.Commander() else Format.Standard,
         )
         val result = initializer.initializeGame(config)
-        ais = allSeats.filterNot(::isPerson).associateWith { AIPlayer.create(registry, it) }
+        ais = allSeats.filterNot(::isPerson).associateWith { OfflineAiPolicy.create(registry, it) }
         state = result.state
         gameLogs.clear()
         legalCache.clear()
@@ -482,14 +492,15 @@ class LocalArgentumHost(
                 val actor = current.actorFor(decision.playerId)
                 if (isPerson(actor)) break
                 val bot = ais[actor] ?: break
-                if (!apply(SubmitDecision(decision.playerId, bot.respondToDecision(current, decision)), events, actor)) break
+                val response = timed("aiDecision") { bot.respondToDecision(current, decision) }
+                if (!apply(SubmitDecision(decision.playerId, response), events, actor)) break
                 flush(paceMs)
                 continue
             }
             val priority = current.priorityPlayerId ?: break
             if (!isPerson(priority)) {
                 val bot = ais[priority] ?: break
-                val chosen = bot.chooseAction(current)
+                val chosen = timed("aiChoice") { bot.chooseAction(current) }
                 val acted = apply(chosen, events, priority) || apply(safePass(current, priority), events, priority)
                 if (!acted) break
                 if (chosen !is PassPriority) flush(paceMs)
@@ -514,7 +525,7 @@ class LocalArgentumHost(
 
     private fun apply(action: GameAction, events: MutableList<GameEvent>, actor: EntityId): Boolean {
         val current = state ?: return false
-        val processed = processor.process(current, action)
+        val processed = timed("actionResolution") { processor.process(current, action) }
         val result = processed.result
         if (result.error != null) return false
         clearOthersCheckpoint(action, actor)
@@ -575,7 +586,7 @@ class LocalArgentumHost(
 
     private fun legalActions(state: GameState, player: EntityId): List<LegalActionInfo> {
         legalCache[player]?.let { (cached, legal) -> if (cached === state) return legal }
-        return computeLegalActions(state, player).also { legalCache[player] = state to it }
+        return timed("legalActions") { computeLegalActions(state, player) }.also { legalCache[player] = state to it }
     }
 
     private fun computeLegalActions(state: GameState, player: EntityId): List<LegalActionInfo> {
@@ -655,7 +666,7 @@ class LocalArgentumHost(
         val clientEvents = ClientEventTransformer.transform(events, seat, current, visibility)
         val log = logFor(seat)
         log += clientEvents.filter { it !is ClientEvent.PermanentTapped && it !is ClientEvent.PermanentUntapped && it !is ClientEvent.ManaAdded }
-        val clientState: ClientGameState = transformer.transform(current, seat).copy(gameLog = log.toList())
+        val clientState: ClientGameState = timed("snapshot") { transformer.transform(current, seat).copy(gameLog = log.toList()) }
         val offer = shockOffers.firstOrNull()?.takeIf { interactive && it.player == seat }
         val blockedByOtherOffer = shockOffers.isNotEmpty() && offer == null
         val legal = if (interactive && offer == null && !blockedByOtherOffer) legalActions(current, seat) else emptyList()
@@ -677,6 +688,9 @@ class LocalArgentumHost(
             put("priorityMode", "auto")
             put("stateVersion", stateVersion)
             put("engineMs", (System.nanoTime() - handleStartNanos) / 1_000_000)
+            put("engineTimingsMs", buildJsonObject {
+                phaseNanos.forEach { (phase, nanos) -> put(phase, nanos / 1_000_000) }
+            })
             put("interactionEpoch", interactiveEpochs[seat] ?: "offline-0")
         }
         emitTo(seat, JSONObject(message.toString()))
