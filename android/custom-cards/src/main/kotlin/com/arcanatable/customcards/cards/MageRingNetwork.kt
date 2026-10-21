@@ -31,7 +31,7 @@ val MageRingNetwork = card("Mage-Ring Network") {
             Costs.Tap,
             Costs.RemoveXCounters(counterType = CounterType.STORAGE, self = true),
         )
-        effect = Effects.AddColorlessMana(DynamicAmounts.countersRemovedAsCost())
+        effect = Effects.AddColorlessMana(DynamicAmounts.xValue())
         manaAbility = true
         timing = TimingRule.ManaAbility
     }

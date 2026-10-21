@@ -9,7 +9,7 @@ import org.junit.Test
 class DeployToTheFrontScenarioTest {
     @Test
     fun createsSoldiersEqualToAllPlayersCreaturesNotJustControllers() {
-        val d = customScenario(DeployToTheFront)
+        val d = customScenario(DeployToTheFront, "Grizzly Bears")
         val p = d.player1
         val q = d.player2
         d.putPermanentOnBattlefield(p, "Grizzly Bears")
