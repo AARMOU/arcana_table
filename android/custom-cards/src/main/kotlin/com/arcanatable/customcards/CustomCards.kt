@@ -195,6 +195,9 @@ object CustomCards {
         Entry(GargoyleFlock, "40K", "Six WotC precons"),
         Entry(SifterOfSkulls, "M3C", "Six WotC precons"),
         Entry(DrownerOfHope, "M3C", "Six WotC precons"),
+        Entry(MoltenSlagheap, "40K", "Six WotC precons"),
+        Entry(RuinsOfOranRief, "CMM", "Six WotC precons"),
+        Entry(ShrineOfTheForsakenGods, "CMM", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
