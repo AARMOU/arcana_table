@@ -67,7 +67,7 @@ class AiEndStepCascadeProfileTest {
                 val action = if (withAi && actor == d.player2) {
                     aiChoices++
                     val t0 = System.nanoTime()
-                    val chosen = ai.chooseAction(d.state)
+                    val chosen = OfflineAiPolicy.think { ai.chooseAction(d.state) }
                     aiNanos += System.nanoTime() - t0
                     assertTrue(
                         "Control opponent unexpectedly found a real response: ${chosen.javaClass.simpleName}",
