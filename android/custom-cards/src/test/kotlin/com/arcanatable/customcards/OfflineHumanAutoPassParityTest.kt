@@ -10,6 +10,12 @@ import com.wingedsheep.engine.legalactions.MeaningfulActionFilter
 import com.wingedsheep.engine.view.asPriorityAction
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Step
+import com.wingedsheep.engine.state.components.battlefield.CountersComponent
+import com.wingedsheep.engine.state.components.battlefield.EnteredThisTurnComponent
+import com.wingedsheep.engine.state.components.player.LifeGainedThisTurnComponent
+import com.wingedsheep.engine.state.components.player.LifeGainedAmountThisTurnComponent
+import com.wingedsheep.engine.state.components.player.PlayerCitysBlessingComponent
+import com.wingedsheep.sdk.core.CounterType
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -88,5 +94,52 @@ class OfflineHumanAutoPassParityTest {
         assertNull(d.submit(PassPriority(d.player1)).error)
         assertTrue(d.state.stack.isNotEmpty())
         assertSameVerdict(d, "spellskite-targeted-stack")
+    }
+
+    @Test(timeout = 240000)
+    fun realOcelotEndStepCascadeNeverChangesPassOrStopDecisions() {
+        val d = scenario("Ocelot Pride", "Elspeth, Storm Slayer", "Haliya, Guided by Light", "Panharmonicon",
+            "The Jolly Balloon Man", "Grizzly Bears", "Spellskite")
+        d.passPriorityUntil(Step.POSTCOMBAT_MAIN)
+        repeat(40) { d.putToken(d.player1, "Grizzly Bears") }
+        d.putCreatureOnBattlefield(d.player1, "Ocelot Pride")
+        d.putToken(d.player1, "Ocelot Pride").also { d.addComponent(it, EnteredThisTurnComponent) }
+        d.putCreatureOnBattlefield(d.player1, "Haliya, Guided by Light")
+        d.putPermanentOnBattlefield(d.player1, "Panharmonicon")
+        d.putPermanentOnBattlefield(d.player1, "Elspeth, Storm Slayer")
+            .also { d.addComponent(it, CountersComponent(mapOf(CounterType.LOYALTY to 5))) }
+        d.putCreatureOnBattlefield(d.player1, "The Jolly Balloon Man")
+        d.putCreatureOnBattlefield(d.player2, "Spellskite")
+        d.addComponent(d.player1, PlayerCitysBlessingComponent)
+        d.addComponent(d.player1, LifeGainedThisTurnComponent)
+        d.addComponent(d.player1, LifeGainedAmountThisTurnComponent(3))
+        d.setLifeTotal(d.player1, 40)
+        d.setLifeTotal(d.player2, 40)
+
+        val enteredEnd = booleanArrayOf(false)
+        var windows = 0
+        var stackedWindows = 0
+        var decisions = 0
+        var iterations = 0
+        while (iterations++ < 3000) {
+            if (d.state.step == Step.END) enteredEnd[0] = true
+            if (enteredEnd[0] && d.state.step != Step.END) break
+            if (d.state.gameOver) break
+            if (d.state.pendingDecision != null) {
+                d.decide()
+                decisions++
+                continue
+            }
+            val actor = d.state.priorityPlayerId ?: error("No priority holder during Ocelot cascade")
+            if (d.state.stack.isNotEmpty()) stackedWindows++
+            assertSameVerdict(d, "ocelot-end-step-window-$windows")
+            windows++
+            assertNull("PassPriority rejected", d.submit(PassPriority(actor)).error)
+        }
+        println("AUTO_PASS_CASCADE completed=${enteredEnd[0] && d.state.step != Step.END} windows=$windows stackedWindows=$stackedWindows decisions=$decisions iterations=$iterations finalTokens=${d.getPermanents(d.player1).size}")
+        assertTrue("fixture must reach its end step", enteredEnd[0])
+        assertTrue("fixture must cover actual triggered stack windows", stackedWindows > 0)
+        assertTrue("fixture must exercise multiple priority windows", windows >= 10)
+        assertTrue("original/pass-only cascade must complete", d.state.step != Step.END)
     }
 }
