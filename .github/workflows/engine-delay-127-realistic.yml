@@ -1,0 +1,64 @@
+name: Build 127 realistic end-step JFR attribution
+on:
+  push:
+    branches:
+      - gpt/engine-delay-127-realistic-profile
+permissions:
+  contents: read
+concurrency:
+  group: build127-realistic-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  realistic-endstep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: small
+            oldTokens: 40
+            prides: 2
+            haliya: true
+          - label: large
+            oldTokens: 200
+            prides: 4
+            haliya: true
+          - label: large-without-haliya
+            oldTokens: 200
+            prides: 4
+            haliya: false
+    env:
+      REPRO_CASE: ${{ matrix.label }}
+      REPRO_OLD_TOKENS: ${{ matrix.oldTokens }}
+      REPRO_PRIDES: ${{ matrix.prides }}
+      REPRO_RECENT_PRIDES: '1'
+      REPRO_HALIYA: ${{ matrix.haliya }}
+      REPRO_PANHARMONICON: 'true'
+      REPRO_ELSPETH: 'true'
+      REPRO_SPELLSKITE: 'true'
+      REPRO_OUTPUT: ${{ github.workspace }}/build127-jfr/${{ matrix.label }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Compare complete end-step resolution with AI and pass-only using pinned Build 123 runtime
+        working-directory: android
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:test             --tests '*EndStepBacklogInvestigationTest.compareNormalAiWithPassOnlyFromTheSameEndStep' --info 2>&1 | tee ../build127-realistic.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: build127-realistic-${{ matrix.label }}
+          retention-days: 14
+          path: |
+            build127-realistic.log
+            build127-jfr/${{ matrix.label }}/
+            android/custom-cards/build/test-results/test/
