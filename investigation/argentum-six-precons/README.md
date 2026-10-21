@@ -50,22 +50,43 @@ in `CustomCards.kt`, and only become Android assets after
 `:custom-cards:exportCards`. Each new behavior gets its own scenario test.
 ## Verified implementation progress — October 21, 2026
 
-**Five newly implemented and exported cards** are in the work branch:
-Spatial Contortion, Skittering Invasion, Blight Grenade, Deny Reality, and
-Bituminous Blast. Each has its own Kotlin scenario test. Two successive complete
-CI runs passed and each committed the generated data assets:
-- First batch: https://github.com/AARMOU/arcana_table/actions/runs/39659876554
-- Second batch: https://github.com/AARMOU/arcana_table/actions/runs/39660505506
+**Sixteen distinct missing cards implemented, scenario-tested and exported.**
+The original five were Spatial Contortion, Skittering Invasion, Blight Grenade,
+Deny Reality, and Bituminous Blast. The eleven added in the next batches:
 
-The custom-card index contains 119 cards after the second batch. Rechecking
-the six deck manifests against both stock and custom indexes leaves **271
-distinct cards / 281 deck slots still unsupported**:
-Forces of the Imperium 48, Tyranid Swarm 48, Necron Dynasties 49,
-The Ruinous Powers 46, Eldrazi Unbound 45, Eldrazi Incursion 45.
+- Awakening Zone; Crashing Drawbridge; All Is Dust
+- For the Emperor!; Knight Paladin; Bloodcrusher of Khorne
+- Tyranid Invasion; Sanguinary Priest
+- Venomthrope; Tyranid Prime; Space Marine Scout
 
-These five definitions are not a completed precon. No six-deck selection or
-APK release has been enabled. More difficult commanders and novel rules
-interactions must not be approximated or substituted with inert placeholders.
+Every card has a separate scenario test. This branch's Android/JVM custom-card
+regression suites, export, duplicate/coverage checks and asset commits completed:
+
+- https://github.com/AARMOU/arcana_table/actions/runs/39662265274
+- https://github.com/AARMOU/arcana_table/actions/runs/39663998627
+- https://github.com/AARMOU/arcana_table/actions/runs/39664986287
+- https://github.com/AARMOU/arcana_table/actions/runs/39665719967
+
+**Latest checked, exported commit** `c32097ecc9d13f5a01fdc78c0c519cdf2d84c29c`:
+the custom-card index contains 130 distinct names. Comparing both indexes
+against the 600 deck slots leaves **260 distinct cards (269 deck slots) missing**.
+
+| Deck | Missing deck slots |
+| --- | ---: |
+| Forces of the Imperium | 44 |
+| Tyranid Swarm | 45 |
+| Necron Dynasties | 49 |
+| The Ruinous Powers | 45 |
+| Eldrazi Unbound | 43 |
+| Eldrazi Incursion | 43 |
+
+This audit counts card definitions available in the two indexes; it is **not**
+an end-to-end certificate that every interaction in each deck works.
+Full-deck runs, mechanics spanning unsupported cards, and six-deck UI
+publication remain untested/not implemented. More difficult commanders and
+novel rules interactions must never be approximated or substituted with
+inert placeholders. No release branch, APK signing or Play Store upload occurs
+from this import branch without separate authorization.
 
 CI: `.github/workflows/argentum-six-precons.yml` runs the custom-card
 tests on the isolated branch. No six-deck selection/UI publication, merging into
