@@ -12,6 +12,22 @@ import org.junit.Test
 /** The app's actual mobile profile, on the same engine and card data as its offline host. */
 class OfflineAiLargeBoardTest {
     @Test(timeout = 60000)
+    fun manyAffordableTokenAbilitiesDoNotCauseUnboundedSimulation() {
+        val d = scenario()
+        repeat(140) { d.putToken(d.player1, "Clue") }
+        d.giveColorlessMana(d.player1, 100)
+        val count = d.legalActions(d.player1).count { it.actionType == "ActivateAbility" && it.affordable }
+        assertTrue("fixture offers a large candidate set, got $count", count >= 100)
+        val bot = OfflineAiPolicy.create(d.cardRegistry, d.player1)
+        val started = System.nanoTime()
+        val action = bot.chooseAction(d.state)
+        val ms = (System.nanoTime() - started) / 1_000_000
+        println("[mobile-ai] token-abilities=$count permanents=${d.state.getBattlefield().size} ms=$ms action=${action.javaClass.simpleName}")
+        assertTrue("large candidate search returned in ${ms}ms", ms < 5000)
+        assertNull(d.submit(action).error)
+    }
+
+    @Test(timeout = 60000)
     fun crowdedBlockingReturnsLegalAssignments() {
         val d = scenario("Grizzly Bears")
         val attackers = List(140) {
