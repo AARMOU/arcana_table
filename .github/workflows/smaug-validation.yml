@@ -153,17 +153,7 @@ jobs:
           java-version: '21'
 
       - name: Run upstream engine and card scenario suite
-        working-directory: argentum-engine
-        run: |
-          cat >> gradle.properties <<'EOF'
-
-          org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m
-          kotlin.compiler.execution.strategy=in-process
-          kotlinCompileParallelism=1
-          org.gradle.workers.max=2
-          org.gradle.daemon=false
-          EOF
-          just test-rules
+        run: just --justfile argentum-patches/smaug-build.just test-rules
 
       - name: Record validation and runtime checksums
         shell: bash
