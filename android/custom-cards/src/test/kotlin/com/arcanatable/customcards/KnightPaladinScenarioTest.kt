@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.KnightPaladin
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.CrewVehicle
 import com.wingedsheep.sdk.core.Keyword
 import org.junit.Assert.*
 import org.junit.Test
@@ -23,6 +24,9 @@ class KnightPaladinScenarioTest {
         assertEquals(16, d.getLifeTotal(d.player2))
         assertEquals(20, d.getLifeTotal(p))
         assertTrue(d.projected.hasKeyword(permanent, Keyword.TRAMPLE))
-        assertTrue("Crew 1 is available with a 2-power creature", d.abilityActions(p, permanent).isNotEmpty())
+        assertNull("Crew 1 should accept the 2-power Grizzly Bears",
+            d.submit(CrewVehicle(p, permanent, listOf(crewMember))).error)
+        d.resolveAll()
+        assertTrue("Crewed Knight Paladin must become a creature", d.projected.isCreature(permanent))
     }
 }
