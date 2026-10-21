@@ -164,6 +164,8 @@ object CustomCards {
         Entry(BloodcrusherOfKhorne, "40K", "Six WotC precons"),
         Entry(TyranidInvasion, "40K", "Six WotC precons"),
         Entry(SanguinaryPriest, "40K", "Six WotC precons"),
+        Entry(Venomthrope, "40K", "Six WotC precons"),
+        Entry(TyranidPrime, "40K", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
