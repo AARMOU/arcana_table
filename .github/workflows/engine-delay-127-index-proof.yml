@@ -47,9 +47,31 @@ jobs:
       - name: Replace only the isolated candidate runtime in this temporary CI workspace
         run: |
           set -euo pipefail
-          engine=$(find argentum-engine/rules-engine/build/libs -maxdepth 1 -name '*.jar' ! -name '*sources*' ! -name '*javadoc*' | head -1)
-          test -n "$engine"
+          # Never select the first JAR returned by find: Gradle also emits
+          # test-fixtures artifacts that do not contain the production engine.
+          mapfile -d '' -t jars < <(find argentum-engine/rules-engine/build/libs -maxdepth 1 \
+            -type f -name '*.jar' ! -name '*sources*' ! -name '*javadoc*' -print0 | sort -z)
+          printf 'Candidate Gradle JARs:\\n'
+          printf '  %s\\n' "${jars[@]}"
+          matches=()
+          for candidate in "${jars[@]}"; do
+            jar tf "$candidate" > "$RUNNER_TEMP/build127-jar-entries.txt"
+            if grep -Fxq 'com/wingedsheep/engine/core/GameAction.class' "$RUNNER_TEMP/build127-jar-entries.txt" \
+              && grep -Fxq 'com/wingedsheep/engine/state/GameState.class' "$RUNNER_TEMP/build127-jar-entries.txt"; then
+              matches+=("$candidate")
+            fi
+          done
+          if [ "${#matches[@]}" -ne 1 ]; then
+            printf 'Expected exactly one production rules engine JAR; found %s.\\n' "${#matches[@]}" >&2
+            exit 1
+          fi
+          engine="${matches[0]}"
+          printf 'Selected verified engine JAR: %s\\n' "$engine"
           cp "$engine" android/app/libs/argentum-rules-engine.jar
+          jar tf android/app/libs/argentum-rules-engine.jar > "$RUNNER_TEMP/build127-selected-jar-entries.txt"
+          grep -Fxq 'com/wingedsheep/engine/core/GameAction.class' "$RUNNER_TEMP/build127-selected-jar-entries.txt"
+          grep -Fxq 'com/wingedsheep/engine/state/GameState.class' "$RUNNER_TEMP/build127-selected-jar-entries.txt"
+          ls -lh android/app/libs/argentum-*.jar
           sha256sum android/app/libs/argentum-*.jar
       - uses: actions/setup-java@v4
         with:
