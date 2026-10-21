@@ -1,0 +1,49 @@
+name: Warhammer Eldrazi precon coverage audit
+
+on:
+  push:
+    branches:
+      - gpt/argentum-warhammer-eldrazi-import
+    paths:
+      - 'precon-import/**'
+      - '.github/workflows/precon-import-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  catalog-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout isolated import branch
+        uses: actions/checkout@v4
+
+      - name: Python standard library unit tests
+        run: python3 -m unittest discover -s precon-import -p 'test_*.py' -v
+
+      - name: Download pinned machine-readable precon data
+        run: |
+          mkdir -p "$RUNNER_TEMP/precon-source"
+          curl --fail --location --retry 3 --silent --show-error \
+            'https://raw.githubusercontent.com/taw/magic-preconstructed-decks-data/1f43fd58eb58d67f1c769a2c5f8e8461b4695ee8/decks_v2.json' \
+            --output "$RUNNER_TEMP/precon-source/decks_v2.json"
+          test -s "$RUNNER_TEMP/precon-source/decks_v2.json"
+
+      - name: Audit 600 playable card copies and generate 15 partitions
+        run: |
+          python3 precon-import/audit.py \
+            --decks "$RUNNER_TEMP/precon-source/decks_v2.json" \
+            --all-index android/app/src/main/assets/argentum/all-cards.index.tsv \
+            --custom-index android/app/src/main/assets/argentum/custom-cards.index.tsv \
+            --out precon-import/results \
+            --batches 15
+
+      - name: Publish coverage results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: warhammer-eldrazi-precon-audit
+          path: precon-import/results/
+          if-no-files-found: warn
