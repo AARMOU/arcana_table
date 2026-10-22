@@ -54,6 +54,10 @@ jobs:
               if not old.exists():
                   shutil.copy2(new,old)
                   imported.append(name)
+          helper_source=card_src/"EldraziScionFactory.kt"
+          helper_target=card_dest/"EldraziScionFactory.kt"
+          assert helper_source.is_file() and not helper_target.exists()
+          shutil.copy2(helper_source, helper_target)
           test_src=src/"test/kotlin/com/arcanatable/customcards"
           test_dest=dest/"test/kotlin/com/arcanatable/customcards"
           count=0
