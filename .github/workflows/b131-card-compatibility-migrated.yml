@@ -1,0 +1,163 @@
+name: Build 131 — staged upstream-card reconciliation and retest
+on:
+  push:
+    branches: [gpt/b131-card-compatibility-20261022]
+    paths: [.github/workflows/b131-card-compatibility-migrated.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: b131-card-compatibility-reconciled-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  cards:
+    name: "${{ matrix.label }} against B131"
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        include:
+          - {label: "six-precons-parent", sha: "ff5e2b719159904b51e3a46d479afa7018d9f4c9", app_check: "yes"}
+          - {label: "warhammer-eldrazi-import", sha: "ab0a1fe19453494b7e3f12828bc880dc7e71014d", app_check: "no"}
+          - {label: "necron-two-cards", sha: "a9de306a6f0916e96fa013ce8c3ac082ab9c3536", app_check: "no"}
+          - {label: "zoanthrope", sha: "da7ca5c0e0ccabb31a3a67c89d2a36d11697677a", app_check: "no"}
+          - {label: "chittering-dispatcher", sha: "ac807d746fac1c89f7586717ab0e6c42dfbd1e17", app_check: "no"}
+          - {label: "deny-the-witch", sha: "61c93b02c8e95bac63af434caac606a6545515c6", app_check: "no"}
+          - {label: "triarch-praetorian", sha: "8189e69efb8e602cc1843e55d5ff3651cea4c364", app_check: "no"}
+          - {label: "tribal-protection", sha: "878a91d3381eec1b1f56a48de44109111b769c6a", app_check: "no"}
+          - {label: "canoptek-tomb-sentinel", sha: "33e8d125f7a3651716bb554097b0e1aefa9ff361", app_check: "no"}
+          - {label: "myriad-engine-worker", sha: "09ffe470283cc54caeca1372fdf8f1a1c89e8746", app_check: "no"}
+    steps:
+      - name: Check out pinned Build 131 source and audit
+        uses: actions/checkout@v4
+        with:
+          path: build131
+      - name: Check out exact card worker commit (never a moving head)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.sha }}
+          path: candidate
+      - name: Obtain byte-verified Build 131 engine artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: Argentum-Verified-Runtime
+          run-id: 39844575500
+          github-token: ${{ github.token }}
+          path: b131-artifact
+      - name: Verify exact replacement-engine fingerprints and install into both worktrees
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, shutil, struct, zipfile
+          from pathlib import Path
+          root=Path("b131-artifact")
+          manifests=[p for p in root.rglob("manifest.json") if p.parent.name=="runtime-bundle"]
+          validated=list(root.rglob("validated-runtime.json"))
+          assert len(manifests)==1 and len(validated)==1, (manifests,validated)
+          bundle=manifests[0].parent
+          m=json.loads(manifests[0].read_text())
+          v=json.loads(validated[0].read_text())
+          assert v["upstream"]=="61e71e586b100faa661f86cac827ac3c3bbb5a78", "NOT the B131 upstream engine"
+          modules=("mtg-sdk","mtg-sdk-tooling","rules-engine","ai")
+          expected={f"libs/argentum-{x}.jar" for x in modules}|{"assets/all-cards.jsonl","assets/all-cards.index.tsv","assets/por-cards.jsonl"}
+          assert set(m["files"])==expected, "Mixed or incomplete B131 bundle"
+          for rel,hexdigest in m["files"].items():
+              f=bundle/rel
+              assert f.is_file() and hashlib.sha256(f.read_bytes()).hexdigest()==hexdigest, rel
+          for worktree in ("candidate","build131"):
+              libs=Path(worktree)/"android/app/libs"
+              assets=Path(worktree)/"android/app/src/main/assets/argentum"
+              libs.mkdir(parents=True,exist_ok=True)
+              assets.mkdir(parents=True,exist_ok=True)
+              for old in libs.glob("argentum-*.jar"): old.unlink()
+              for module in modules:
+                  name=f"argentum-{module}.jar"
+                  jar=bundle/"libs"/name
+                  assert hashlib.sha256(jar.read_bytes()).hexdigest()==v["jars"][name]["sha256"], name
+                  with zipfile.ZipFile(jar) as z:
+                      versions=[struct.unpack(">H",z.read(n)[6:8])[0] for n in z.namelist() if n.endswith(".class")]
+                      assert versions and max(versions)<=61, (name, max(versions) if versions else None)
+                  shutil.copy2(jar,libs/name)
+              for name in ("all-cards.jsonl","all-cards.index.tsv","por-cards.jsonl"):
+                  shutil.copy2(bundle/"assets"/name,assets/name)
+          print("B131 pinned upstream, four JAR SHA-256 values, Java 17 bytecode and card corpus VERIFIED")
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            candidate/android/**/*.gradle.kts
+            candidate/android/gradle/wrapper/gradle-wrapper.properties
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install exact Android platform/build tools
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Stage Build 131 upstream ownership of three cards (only in CI worktree)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source=Path("candidate/android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt")
+          shipped=Path("build131/android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt").read_text()
+          owned=("RoccoCabarettiCaterer","KodamaOfTheWestTree","RaffineSchemingSeer")
+          original=source.read_text()
+          changed=original
+          for symbol in owned:
+              key="Entry("+symbol+","
+              assert original.count(key)==1, f"Expected one old registration for {symbol}"
+              assert key not in shipped, f"B131 has not adopted {symbol} upstream"
+              changed="\n".join(line for line in changed.split("\n") if key not in line)
+          assert changed!=original and all(("Entry("+n+",") not in changed for n in owned)
+          source.write_text(changed)
+          print("Removed exactly the three superseded CUSTOM registrations in ephemeral CI only; source branches untouched")
+          PY
+      - name: Compile, export, and execute complete real-engine card scenarios
+        working-directory: candidate/android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test
+      - name: Audit exported cards and detect overlap with Build 131 upstream definitions
+        if: success()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          assets=Path("candidate/android/app/src/main/assets/argentum")
+          names=lambda f: [x.split("\t")[0] for x in (assets/f).read_text().splitlines() if x.strip()]
+          custom=names("custom-cards.index.tsv")
+          stock=names("all-cards.index.tsv")
+          rows=[json.loads(x)["name"] for x in (assets/"custom-cards.jsonl").read_text().splitlines() if x.strip()]
+          assert len(custom)==len(rows) and custom==rows, "Export/index or ordering mismatch"
+          assert len({n.casefold() for n in custom})==len(custom), "Duplicate custom definitions"
+          overlaps=sorted({n for n in custom if n.casefold() in {x.casefold() for x in stock}})
+          report={"custom_definitions":len(custom),"build131_stock_definitions":len(stock),
+                  "upstream_name_collisions":overlaps}
+          Path("candidate/b131-card-audit.json").write_text(json.dumps(report,indent=2)+"\n")
+          print(json.dumps(report,indent=2))
+          PY
+      - name: Exercise Build 131 Android consumer with six-precon card assets
+        if: matrix.app_check == 'yes'
+        shell: bash
+        run: |
+          cp candidate/android/app/src/main/assets/argentum/custom-cards.jsonl build131/android/app/src/main/assets/argentum/
+          cp candidate/android/app/src/main/assets/argentum/custom-cards.index.tsv build131/android/app/src/main/assets/argentum/
+          cd build131/android
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest :app:lintDebug
+      - name: Retain test reports, exported card audit and collisions for each pinned commit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b131-card-compat-${{ matrix.label }}
+          path: |
+            candidate/b131-card-audit.json
+            candidate/android/custom-cards/build/test-results/
+            candidate/android/custom-cards/build/reports/tests/
+            build131/android/app/build/test-results/
+            build131/android/app/build/reports/lint-results-debug.*
+          if-no-files-found: warn
+          retention-days: 30
