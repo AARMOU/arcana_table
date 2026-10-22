@@ -166,6 +166,21 @@ internal fun TableController.TableOverlays() {
             popupDurationSeconds = playedPopupSeconds,
             onDismissBanner = { playBanner = null }, onDismissRecap = { recapText = null })
         if (homeOpen) {
+            if (offlineDiscardConfirm) AlertDialog(
+                onDismissRequest = { offlineDiscardConfirm = false },
+                title = { Text("Discard saved offline game?") },
+                text = { Text("This permanently deletes the full offline checkpoint. It cannot be recovered.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        OfflineCheckpointStore.clear(context)
+                        offlineResumeAvailable = false
+                        offlineDiscardConfirm = false
+                    }) { Text("DISCARD SAVE", color = CounterGold) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { offlineDiscardConfirm = false }) { Text("CANCEL") }
+                }
+            )
             if (quickUiTipsOpen) QuickUiTipsDialog(
                 onDismiss = { quickUiTipsOpen = false },
                 onDontRemind = {
@@ -198,6 +213,7 @@ internal fun TableController.TableOverlays() {
                 resumeAvailable = argentumResumeAvailable && !argentumEnabled,
                 offlineResumeAvailable = offlineResumeAvailable && !argentumEnabled,
                 onResumeOffline = { resumeOfflineGame() },
+                onDiscardOffline = { offlineDiscardConfirm = true },
                 onResume = {
                     recordDiagnostic("Player chose to resume the previous Argentum game", DiagnosticCategory.CONNECTION)
                     argentumResumeRequested = true
