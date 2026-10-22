@@ -36,12 +36,18 @@ class ForgeOfHeroesScenarioTest {
         d.replaceState(d.state.copy(format = Format.Commander()))
         val forge = d.putPermanentOnBattlefield(p, "Forge of Heroes")
         val walker = d.putPermanentOnBattlefield(p, "Jace, the Mind Sculptor")
+        // Direct-board test helper bypasses planeswalker entry, including starting
+        // loyalty. Set Jace's printed three counters so he survives state-based actions.
         d.replaceState(d.state.updateEntity(walker) { c ->
-            c.with(CommanderComponent(ownerId = p)).with(EnteredThisTurnComponent)
+            c.with(CommanderComponent(ownerId = p))
+                .with(EnteredThisTurnComponent)
+                .with(com.wingedsheep.engine.state.components.battlefield.CountersComponent()
+                    .withAdded(CounterType.LOYALTY, 3))
         })
         val before = d.state.getEntity(walker)!!
             .get<com.wingedsheep.engine.state.components.battlefield.CountersComponent>()
             ?.getCount(CounterType.LOYALTY) ?: 0
+        assertEquals("initial Jace loyalty", 3, before)
         val ability = d.cardRegistry.getCard("Forge of Heroes")!!.script.activatedAbilities[1]
         assertNull(d.submit(ActivateAbility(p, forge, ability.id,
             targets = listOf(ChosenTarget.Permanent(walker)))).error)
