@@ -8,6 +8,7 @@ import com.wingedsheep.engine.state.components.combat.AttackingComponent
 import com.wingedsheep.engine.state.components.identity.TokenComponent
 import com.wingedsheep.engine.support.GameTestDriver
 import com.wingedsheep.engine.support.TestCards
+import com.wingedsheep.mtg.sets.tokens.PredefinedTokens
 import com.wingedsheep.sdk.core.CounterType
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
@@ -45,7 +46,10 @@ class MyriadDefenderChoiceTest : FunSpec({
 
     fun driver(count: Int): Pair<GameTestDriver, List<EntityId>> {
         val d = GameTestDriver()
-        d.registerCards(TestCards.all + listOf(myriad, walker))
+        // Copies leaving the battlefield create real Eldrazi Spawn; the predefined token
+        // CardDefinition must be registered or its creation is rejected during resolution.
+        d.registerCards(TestCards.all + PredefinedTokens.allTokens + listOf(myriad, walker))
+        requireNotNull(d.cardRegistry.getCard("Eldrazi Spawn")) { "Missing test token definition" }
         val players = d.initMultiplayer(List(count) { Deck.of("Forest" to 40) })
         d.passPriorityUntil(Step.PRECOMBAT_MAIN)
         return d to players
