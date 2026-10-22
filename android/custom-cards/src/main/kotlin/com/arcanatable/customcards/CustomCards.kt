@@ -242,6 +242,7 @@ object CustomCards {
         Entry(DeathsPresence, "40K", "Six WotC precons"),
         Entry(ScreamerKiller, "40K", "Six WotC precons"),
         Entry(GreatUncleanOne, "40K", "Six WotC precons"),
+        Entry(TectonicEdge, "M3C", "Six WotC precons"),
         Entry(AndTheyShallKnowNoFear, "40K", "Six WotC precons"),
         Entry(CanoptekSpyder, "40K", "Six WotC precons"),
         Entry(CanoptekTombSentinel, "40K", "Six WotC precons"),
