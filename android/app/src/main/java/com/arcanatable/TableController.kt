@@ -364,6 +364,8 @@ internal class TableController(
     var concedePlayer by run { mutableIntStateOf(-1) }
     var shuffleConfirmPlayer by run { mutableIntStateOf(-1) }
     var paymentCard by run { mutableStateOf<Pair<Int, GameCard>?>(null) }
+    /** Source of a manually cast spell; null means Hand (or command zone for the commander). */
+    var paymentSourceZone by run { mutableStateOf<String?>(null) }
     var landEntryPrompt by run { mutableStateOf<LandEntryPrompt?>(null) }
     var librarySearchPlayer by run { mutableIntStateOf(-1) }
     var manaPoolOpen by run { mutableStateOf(false) }
@@ -979,7 +981,7 @@ internal class TableController(
         turnTimerVisible = true
         if (!darkMode) onToggleTheme()
         triggerPrompts = emptyList(); endProposalBy = -1; endVotes = emptyMap()
-        stackActions = emptyList(); priorityPlayer = 0; trackerPlayer = -1; concedePlayer = -1; paymentCard = null; creatureTypeChoicePrompt = null
+        stackActions = emptyList(); priorityPlayer = 0; trackerPlayer = -1; concedePlayer = -1; paymentCard = null; paymentSourceZone = null; creatureTypeChoicePrompt = null
         priorityPassed = emptySet()
         importText = ""; importError = null; importReviewCardIds = emptySet(); importOverflowCardIds = emptySet()
         lobbyNotice = null; chatDraft = ""; preview = null; zoneDialog = null; handActionCard = null; cardActionTarget = null
@@ -1021,6 +1023,7 @@ internal class TableController(
                     if (needsCreatureTypeChoice(card)) creatureTypeChoicePrompt = CreatureTypeChoicePrompt(owner, card.id, card.name)
                 } else {
                     val castRequest = owner to card.copy(isFaceDown = action == "PLAY FACE DOWN")
+                    paymentSourceZone = null
                     val actionDialogIsOpen = handActionCard?.id == card.id
                     handActionCard = null
                     if (actionDialogIsOpen) {
@@ -1083,26 +1086,67 @@ internal class TableController(
         }
     }
 
+    /** Sandbox play from a public zone; the user determines whether a card grants permission.
+     * In Argentum mode all casting permissions, timing, alternate costs and destination
+     * replacements are decided by Argentum's legal actions, never this manual pathway.
+     */
+    fun beginManualPlayFromZone(index: Int, zone: String, card: GameCard) {
+        if (argentumEnabled || zone !in setOf("Graveyard", "Exile") ||
+            index !in players.indices || (onlineMode && (index != localSeat || gameEndedOnline))) return
+        if (players[index].cardsInPlaySource(zone).none { it.id == card.id }) {
+            message = "That card is no longer in $zone."
+            return
+        }
+        zoneDialog = null
+        if (card.type.contains("Land", ignoreCase = true)) {
+            val condition = landEntryCondition(card)
+            if (shockLandChoiceRequired(card) || condition != null) {
+                landEntryPrompt = LandEntryPrompt(index, card, shockLandChoiceRequired(card), condition.orEmpty(), zone)
+            } else {
+                val entersTapped = landAlwaysEntersTapped(card)
+                updatePlayer(index) { p ->
+                    val withoutCard = p.removeFromPlaySource(zone, card.id) ?: return@updatePlayer p
+                    withoutCard.copy(battlefield = withoutCard.battlefield + card.copy(tapped = entersTapped))
+                }
+                logAction(index, "played ${card.name} from ${zone.lowercase()} (sandbox; permission checked manually)")
+                if (needsCreatureTypeChoice(card)) creatureTypeChoicePrompt = CreatureTypeChoicePrompt(index, card.id, card.name)
+            }
+        } else {
+            paymentSourceZone = zone
+            paymentCard = index to card
+        }
+    }
+
     fun castFromPayment(index: Int, card: GameCard, commander: Boolean = false, manualPayment: Boolean = false) {
-        if (blockLocalRulesAction("Casting spells")) { paymentCard = null; handActionCard = null; return }
+        if (blockLocalRulesAction("Casting spells")) { paymentCard = null; paymentSourceZone = null; handActionCard = null; return }
         if (index !in players.indices || (onlineMode && index != localSeat) || gameEndedOnline) {
             paymentCard = null
+            paymentSourceZone = null
             handActionCard = null
             return
         }
         val current = players[index]
-        recordDiagnostic("Spell-cast confirmation accepted; processing tracked or manual mana")
+        val sourceZone = if (commander) "Command Zone" else paymentSourceZone ?: "Hand"
+        if (!commander && current.cardsInPlaySource(sourceZone).none { it.id == card.id }) {
+            message = "Cannot cast ${card.name}: it is no longer in $sourceZone."
+            paymentCard = null
+            paymentSourceZone = null
+            return
+        }
+        recordDiagnostic("Spell-cast confirmation accepted from $sourceZone; processing tracked or manual mana")
         val tax = if (commander) current.commanderCastCount * 2 else 0
         val remainingMana = if (manualPayment) current.manaPool else paySimpleManaCost(current.manaPool, card.manaCost, tax)
         if (remainingMana == null) {
             message = "Not enough tracked mana for ${card.name}${if (tax > 0) " and commander tax" else ""}."
             return
         }
-        updatePlayer(index) { p -> p.copy(
-            manaPool = if (manualPayment) p.manaPool else remainingMana,
-            hand = if (commander) p.hand else p.hand.filterNot { it.id == card.id },
-            commanderCastCount = if (commander) p.commanderCastCount + 1 else p.commanderCastCount
-        ) }
+        updatePlayer(index) { p ->
+            val withoutCard = if (commander) p else p.removeFromPlaySource(sourceZone, card.id) ?: p
+            withoutCard.copy(
+                manaPool = if (manualPayment) p.manaPool else remainingMana,
+                commanderCastCount = if (commander) p.commanderCastCount + 1 else p.commanderCastCount
+            )
+        }
         val title = if (card.isFaceDown) "Face-down spell" else card.name
         val typeText = card.type.lowercase()
         val isAura = Regex("\\baura\\b").containsMatchIn(typeText)
@@ -1122,7 +1166,7 @@ internal class TableController(
         if (stackItem.targetCount != null) targetSelectionStackItemId = stackItem.id
         priorityPlayer = index
         priorityPassed = emptySet()
-        val castDescription = if (commander) "cast ${card.name} from the command zone" else if (card.isFaceDown) "cast a face-down spell" else "cast ${card.name}"
+        val castDescription = if (commander) "cast ${card.name} from the command zone" else if (card.isFaceDown) "cast a face-down spell from ${sourceZone.lowercase()}" else "cast ${card.name} from ${sourceZone.lowercase()}"
         val listedCost = card.manaCost?.takeIf { it.isNotBlank() }
         val paymentDescription = when {
             manualPayment -> "payment handled manually${listedCost?.let { " · listed cost $it" }.orEmpty()}${if (tax > 0) " · commander tax {$tax}" else ""}"
@@ -1133,6 +1177,7 @@ internal class TableController(
         logAction(index, "$castDescription · $paymentDescription")
         queueKnownTriggers("CAST", index)
         paymentCard = null
+        paymentSourceZone = null
         handActionCard = null
         pendingStackOpen = true
         recordDiagnostic("Spell added to stack; waiting for payment and trigger dialogs to close")
