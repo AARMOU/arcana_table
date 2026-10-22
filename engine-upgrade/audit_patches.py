@@ -53,6 +53,7 @@ def main() -> int:
     }
     forward_ports = {
         "0004-token-copy-triggered-abilities.patch": ROOT / "engine-upgrade" / "forward-ports" / "0004-token-copy-triggered-abilities.patch",
+        "0007-ai-bounded-stack-search.patch": ROOT / "engine-upgrade" / "forward-ports" / "0007-ai-bounded-stack-search.patch",
     }
     for patch_name in MANDATORY:
         patch = forward_ports.get(patch_name, PATCHES / patch_name)
