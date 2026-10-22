@@ -430,6 +430,10 @@ internal class TableController(
     var flashMessage by run { mutableStateOf<FlashText?>(null) }
     /** Offline: the engine has been working on your last action for over 10 seconds. */
     var argentumSlow by run { mutableStateOf(false) }
+    /** True only when Argentum marks its latest local state update non-interactive. */
+    var argentumEngineAdvancing by run { mutableStateOf(false) }
+    /** Duration of the previous completed engine update; never presented as an ETA. */
+    var argentumLastCompletedEngineMs by run { mutableStateOf<Long?>(null) }
 
     /** The name shown to a friend: your name, or your commander's first name instead of the default "PLAYER". */
     fun friendlyName(commander: String?): String = lobbyPlayerName.trim().takeIf { it.isNotBlank() && !it.equals("PLAYER", true) }
