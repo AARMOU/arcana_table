@@ -110,6 +110,13 @@ Both initial tests compiled far enough to reveal test-harness defects. This is n
 - Graveyard/exile [run 39727726145](https://github.com/AARMOU/arcana_table/actions/runs/39727726145) and subsequent [run 39728096272](https://github.com/AARMOU/arcana_table/actions/runs/39728096272) failed unit-test compilation because the derived branch still had outdated TableOverview test assertion imports. Fixed inherited imports and class Robolectric config. Latest commit `8c62a3f0`, [run 39728542228](https://github.com/AARMOU/arcana_table/actions/runs/39728542228) **pending**.
 - Both corrections were test-harness-only; feature source was not merged or changed. **Do not call either branch passing until green.**
 
+### 2026-10-21 ~23:38 (America/Denver) — Four passing branch suites, Table investigation
+
+- Team 14 graveyard/exile [Actions run 39728542228](https://github.com/AARMOU/arcana_table/actions/runs/39728542228), head `8c62a3f0`: **completed SUCCESS**. Real JVM/Android compilation and focused `ZonePlaySourceTest`, `GraveyardExileLegalActionsTest`, `ZoneCardActionsUiTest` executed.
+- Teams 10, 11 and 12 previously completed **SUCCESS** in Actions runs `39727464475`, `39727467578` and `39727471127`.
+- Team 09 Table overview [Actions run 39728537192](https://github.com/AARMOU/arcana_table/actions/runs/39728537192): **5 tests executed, 1 failed**; `TableOverviewInteractionTest.playerPanelsOnlyExpandWhenTappedAndStayOpenAcrossTurnChanges` failed on line 66 checking the expanded card grid's `testTag`. The element is nested inside an ancestor `combinedClickable` that merges semantics; altered test query to use `useUnmergedTree = true` (commit `929dedf5`), without changing app code. [Rerun 39729020743](https://github.com/AARMOU/arcana_table/actions/runs/39729020743) **pending**. Do not claim Table view behavior confirmed until passing.
+- Focused JVM/Robolectric tests are distinct from release build, all-project regressions or real-device tests. No APK, no signing and no production merge.
+
 ### Update format to use for future work
 
 ```text
