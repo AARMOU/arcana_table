@@ -234,6 +234,11 @@ object CustomCards {
         Entry(FellTheMighty, "40K", "Six WotC precons"),
         Entry(SkorpekhDestroyer, "40K", "Six WotC precons"),
         Entry(TyrantGuard, "40K", "Six WotC precons"),
+        Entry(FlayedOne, "40K", "Six WotC precons"),
+        Entry(SicarianInfiltrator, "40K", "Six WotC precons"),
+        Entry(Aberrant, "40K", "Six WotC precons"),
+        Entry(MandateOfAbaddon, "40K", "Six WotC precons"),
+        Entry(PrimarisEliminator, "40K", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
