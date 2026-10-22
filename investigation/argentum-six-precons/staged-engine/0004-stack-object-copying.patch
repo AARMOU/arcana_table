@@ -977,6 +977,7 @@ index b41d899272..9e500a1490 100644
 +                    }?.takeIf { index > 0 },
                      prefixLength = index.takeIf { tables != null && index > 0 })
                  legal[slot] = byRequirement[index].orEmpty()
+                 slot++
 @@ -105,12 +110,13 @@ internal object SpellCopyTargets {
  
      /** The prospective copy, on a scratch state, so legality reads its colors and controller. */
