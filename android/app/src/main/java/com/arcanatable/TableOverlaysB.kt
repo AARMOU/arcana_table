@@ -975,7 +975,7 @@ internal fun TableController.TableOverlaysB() {
     }
 
     paymentCard?.let { (owner, card) ->
-        val commanderCast = players.getOrNull(owner)?.commanderCard?.id == card.id
+        val commanderCast = paymentSourceZone == "Command Zone" && players.getOrNull(owner)?.commanderCard?.id == card.id
         val tax = if (commanderCast) (players.getOrNull(owner)?.commanderCastCount ?: 0) * 2 else 0
         val payable = paySimpleManaCost(players.getOrNull(owner)?.manaPool.orEmpty(), card.manaCost, tax)
         val costKnown = card.manaCost != null
