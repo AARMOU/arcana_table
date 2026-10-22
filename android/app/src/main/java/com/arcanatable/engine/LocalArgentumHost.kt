@@ -411,10 +411,11 @@ class LocalArgentumHost(
         // board), then sacrifice them in turn. A source whose ability no longer works is skipped.
         val sacrificial = services.manaSolver.findAvailableManaSources(start, player).filter { it.requiresSacrifice }.map { it.entityId }.toSet()
         if (sacrificial.isEmpty()) return null
-        val options = enumerator.enumerate(start, player)
-            .filter { it.isManaAbility && (it.action as? ActivateAbility)?.sourceId in sacrificial }
+        // Enumerate mana abilities only; scanning every cast/target/action becomes very
+        // expensive on large token boards. Never cap the number of real mana sources.
+        val options = enumerator.enumerateManaAbilities(start, player)
+            .filter { (it.action as? ActivateAbility)?.sourceId in sacrificial }
             .distinctBy { (it.action as ActivateAbility).sourceId }
-            .take(MAX_SACRIFICE_SOURCES)
         if (options.isEmpty()) return null
         val costColors = (action as? CastSpell)?.let { start.getEntity(it.cardId)?.get<CardComponent>()?.manaCost?.colors }.orEmpty()
         var current = start
@@ -642,7 +643,26 @@ class LocalArgentumHost(
             return enricher.enrich(enumerator.enumerate(state, play.playerId), state, play.playerId)
         }
         if (state.pendingDecision != null || state.priorityPlayerId != player) return emptyList()
-        return enricher.enrich(enumerator.enumerate(state, player), state, player)
+        val actions = enumerator.enumerate(state, player)
+        val enriched = enricher.enrich(actions, state, player)
+        // Some mana abilities require an explicit cost (Food for Gilded Goose, or
+        // the source itself for Treasure). canPay can count such abilities even
+        // when the actual automatic payment path cannot execute them. Verify
+        // real casting only when these sources are present.
+        val hasManualMana = actions.any { it.isManaAbility && it.description.contains("Sacrifice", ignoreCase = true) }
+        if (!hasManualMana) return enriched
+        return enriched.map { info ->
+            val cast = info.action as? CastSpell
+            if (cast == null || !info.isAffordable || info.hasXCost || info.requiresTargets) info
+            else {
+                val attempted = processor.process(state, cast).result
+                val payable = attempted.error == null ||
+                    (needsMana(attempted.error!!) && payWithSacrificeSources(state, cast, player)?.let { (paid, _) ->
+                        processor.process(paid, cast).result.error == null
+                    } == true)
+                if (payable) info else info.copy(isAffordable = false)
+            }
+        }
     }
 
     /**
@@ -757,7 +777,6 @@ class LocalArgentumHost(
         val AI_ID = EntityId("offline-ai")
         /** Wi-Fi: the guest sits in the second seat. */
         val GUEST_ID: EntityId get() = AI_ID
-        private const val MAX_SACRIFICE_SOURCES = 40
     }
 }
 
