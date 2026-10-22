@@ -196,6 +196,8 @@ internal fun TableController.TableOverlays() {
                 working = argentumDeckValidationRunning || offlineStarting,
                 workingLabel = if (offlineStarting) "PREPARING OFFLINE GAME…" else "CHECKING DECK WITH ARGENTUM…",
                 resumeAvailable = argentumResumeAvailable && !argentumEnabled,
+                offlineResumeAvailable = offlineResumeAvailable && !argentumEnabled,
+                onResumeOffline = { resumeOfflineGame() },
                 onResume = {
                     recordDiagnostic("Player chose to resume the previous Argentum game", DiagnosticCategory.CONNECTION)
                     argentumResumeRequested = true
