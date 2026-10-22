@@ -143,6 +143,15 @@ internal fun TableController.TableOverlays() {
             Box(Modifier.fillMaxSize()) {
         if (argentumEnabled && !homeOpen && gameInProgress && showStackPile) StackPile(argentumSnapshot?.stack.orEmpty(), onOpenStack = { stackOpen = true })
         if (argentumEnabled && !homeOpen && showTurnBanner) TurnBanner(turnBanner, onDismiss = { turnBanner = null })
+        if (argentumEnabled && !homeOpen && showEngineStatus &&
+            (argentumAwaitingUpdate || argentumEngineAdvancing)) {
+            EngineProcessingPanel(
+                offline = argentumOffline, awaitingAction = argentumAwaitingUpdate,
+                nonInteractiveEngineUpdate = argentumEngineAdvancing,
+                lastCompletedMs = argentumLastCompletedEngineMs,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 148.dp)
+            )
+        }
         // Distinct from fading play notifications: this remains until Argentum removes
         // the targeting spell/ability from the stack. Never dismiss on a timer.
         if (argentumEnabled && !homeOpen) {
