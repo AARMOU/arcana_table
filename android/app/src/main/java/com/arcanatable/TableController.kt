@@ -1073,10 +1073,10 @@ internal class TableController(
                 val nextCard = players[activePlayer].library.firstOrNull()
                 if (nextCard != null) {
                     drawCard(activePlayer, "drew for turn")
-                    selectedPlayer = activePlayer
-                    if (openHandAfterDraw) {
-                        showOverview = false
-                        showHand = true
+                    // Auto-draw must not pull the user out of Table view.
+                    if (!showOverview) {
+                        selectedPlayer = activePlayer
+                        if (openHandAfterDraw) showHand = true
                     }
                 }
             }
@@ -1416,7 +1416,7 @@ internal class TableController(
                 }
                 pendingAiPlayerIndex = -1
                 logAction(selectedPlayer, "imported a ${deck.size}-card deck")
-                showOverview = false
+                // Completing a deck import does not request a view change.
                 showHand = false
                 importOpen = false
                 if (SHOW_DECK_IMPORT_REVIEW_UI && (issueDescriptions.isNotEmpty() || overflowIds.isNotEmpty())) {

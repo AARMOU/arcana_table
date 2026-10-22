@@ -88,6 +88,24 @@ fun saveBoardZoom(context: Context, widthDp: Int, heightDp: Int, zoom: Float) {
     context.getSharedPreferences("arcana_options", Context.MODE_PRIVATE).edit().putFloat(boardZoomKey(widthDp, heightDp), zoom).apply()
 }
 
+/** Table overview zoom is shared by its player panels, but independent of full player-board zoom. */
+fun tableZoomKey(widthDp: Int, heightDp: Int): String =
+    "table_zoom_${if (widthDp > heightDp) "landscape" else "portrait"}_${if (minOf(widthDp, heightDp) >= 600) "wide" else "narrow"}"
+
+@Composable
+fun rememberTableZoom(): MutableFloatState {
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val key = tableZoomKey(configuration.screenWidthDp, configuration.screenHeightDp)
+    val prefs = context.getSharedPreferences("arcana_options", Context.MODE_PRIVATE)
+    return remember(key) { mutableFloatStateOf(prefs.getFloat(key, 1f).coerceIn(MIN_BOARD_ZOOM, MAX_BOARD_ZOOM)) }
+}
+
+fun saveTableZoom(context: Context, widthDp: Int, heightDp: Int, zoom: Float) {
+    context.getSharedPreferences("arcana_options", Context.MODE_PRIVATE).edit()
+        .putFloat(tableZoomKey(widthDp, heightDp), zoom.coerceIn(MIN_BOARD_ZOOM, MAX_BOARD_ZOOM)).apply()
+}
+
 /**
  * Two-finger pinch on the board changes [zoom]. One finger is left alone, so scrolling, tapping and
  * holding cards work exactly as before; [onEnd] runs when the fingers lift (to save the zoom).
