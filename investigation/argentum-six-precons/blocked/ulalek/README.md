@@ -19,3 +19,9 @@ Required before registration:
 Oracle source: Scryfall exact-name API, `set=m3c`, fetched October 22, 2026, checked against the
 Wizards Modern Horizons 3 release notes. The scenario-only fixtures in the engine tests are
 synthetic mechanic probes, never substitute playable card definitions.
+
+`ArcanaUlalekManaProbe.java` was executed against both the newly compiled source SDK and the
+actual pinned `android/app/libs/argentum-mtg-sdk.jar` on Java 17. `{C}{C}` parsed correctly;
+all five `{C/color}` symbols threw `IllegalArgumentException: Unknown hybrid mana symbol`.
+The probe completed with exit code 0 because it deliberately verifies this blocker. It is not
+a passing card test and is not evidence of colorless-hybrid support.

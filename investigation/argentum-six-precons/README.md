@@ -48,6 +48,18 @@ Source definitions are written using the existing Argentum SDK under
 `android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/`, registered
 in `CustomCards.kt`, and only become Android assets after
 `:custom-cards:exportCards`. Each new behavior gets its own scenario test.
+## Active hardest-first work — October 22, 2026
+
+The resumed work starts with **Ulalek, Fused Atrocity**, ahead of simpler card definitions.
+Its stack-copy engine patch and executable scenarios are in
+`staged-engine/0004-stack-object-copying.patch`; the exact unregistered card candidate and
+an executed reproduction of the missing colorless-hybrid mana parser are in `blocked/ulalek/`.
+The 12 existing spell-copy retargeting regressions passed locally. New SDK/batch-copy validation
+and the dedicated stack-copy CI workflow are still in progress; they are not reported as passed.
+No pinned app JAR, live registry, exported asset, release or APK changed. The verified card
+count below therefore remains **80**, with **196 distinct cards / 201 deck slots missing**.
+See `SDK-GAPS.md` for the remaining engine and Android integration gates.
+
 ## Verified implementation progress — October 21, 2026
 
 **80 distinct missing cards implemented, scenario-tested and exported** (33 beyond the previous 47-card checkpoint).
