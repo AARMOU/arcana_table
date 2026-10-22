@@ -32,6 +32,7 @@ import org.robolectric.annotation.GraphicsMode
 
 @RunWith(RobolectricTestRunner::class)
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34])
 class TableOverviewInteractionTest {
     @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
 
