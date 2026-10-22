@@ -201,7 +201,6 @@ object CustomCards {
         Entry(BileBlight, "BNG", "Six WotC precons"),
         Entry(Exterminatus, "40K", "Six WotC precons"),
         Entry(EndlessAtlas, "CMM", "Six WotC precons"),
-        Entry(PortTown, "MSC", "Six WotC precons"),
         Entry(Cryptothrall, "40K", "Six WotC precons"),
         Entry(NightScythe, "40K", "Six WotC precons"),
         Entry(SautekhImmortal, "40K", "Six WotC precons"),

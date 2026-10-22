@@ -22,8 +22,10 @@ class BredForTheHuntScenarioTest {
         val before = d.getHand(p).size
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
         assertNull(d.declareAttackers(p, bears, d.player2).error)
+        d.passPriorityUntil(Step.COMBAT_DAMAGE)
+        // The general turn walker declines optional choices; explicitly accept these draws.
+        d.resolveAll(Choices(yes = true))
         d.passPriorityUntil(Step.POSTCOMBAT_MAIN)
-        d.resolveAll()
         assertEquals(before + 2, d.getHand(p).size)
     }
 
