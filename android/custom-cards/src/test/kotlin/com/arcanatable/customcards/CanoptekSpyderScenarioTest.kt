@@ -21,6 +21,7 @@ class CanoptekSpyderScenarioTest {
 
         val ring = d.putCardInHand(p, "Sol Ring")
         val beforeRing = d.getHand(p).size
+        d.giveColorlessMana(p, 1)
         assertNull(d.castSpell(p, ring).error)
         d.resolveAll()
         assertEquals(beforeRing - 1, d.getHand(p).size)
