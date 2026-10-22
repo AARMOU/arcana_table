@@ -169,7 +169,7 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
                         .combinedClickable(enabled = !busy, onClick = { onChoose(info) })
                         .padding(horizontal = 14.dp, vertical = 12.dp)
                 ) {
-                    Text(if (ArgentumActions.isSacrificeMana(info)) "Sacrifice for mana" else if (info.optJSONObject("action")?.optString("type") == "PassPriority") "Pass" else info.optString("description", info.optJSONObject("action")?.optString("type") ?: "Action"), color = if (unsupported == null) SoftWhite else Muted, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                    Text(if (ArgentumActions.isSacrificeMana(info)) ArgentumActions.menuLabel(info) else if (info.optJSONObject("action")?.optString("type") == "PassPriority") "Pass" else info.optString("description", info.optJSONObject("action")?.optString("type") ?: "Action"), color = if (unsupported == null) SoftWhite else Muted, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     if (ArgentumActions.isSacrificeMana(info)) Text(info.optString("description"), color = Muted, fontSize = 11.sp)
                     info.optString("manaCostString").takeIf { it.isNotBlank() && it != "null" }?.let { ManaCostPips(it) }
                     val copies = if (unsupported == null && affordable) stackCount(info) else 1
