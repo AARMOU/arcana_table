@@ -83,6 +83,15 @@ This is a durable, append-only notebook for development team handoffs and any ve
 - Issues #21/#22 now have evidence comments distinguishing source commits from actual agent execution. No merge, APK/AAB, signing change or production deployment.
 - **Next:** Obtain an authorized coding-agent session tool that can supply per-issue `base_branch`, or continue directly implementing feature work in current turns with test verification. Do not claim agent concurrency without verified task IDs.
 
+### 2026-10-21 — Notification readability workstream committed directly
+
+- [Team 12 issue #23](https://github.com/AARMOU/arcana_table/issues/23), branch `gpt/work-popup-notifications`, new source commits `849cb820`, `89c9ab96` and test commit `ed92f6c0`.
+- Long text in card popup, top-center ability banner and turn recap no longer uses two/four-line truncation; it can scroll within a bounded-height notice.
+- Transient notice duration now has a readable minimum, scales with content length and caps at 30 seconds. Critical decisions remain separate from transient notices. Dedicated targeting alerts are **not** bundled into the popup changes.
+- Added `ReadableNotificationDurationTest.kt`; **not executed**; notification queues and multi-event deduplication remain outstanding.
+- No coding-agent session was launched or confirmed. These are edits by ChatGPT via the connected GitHub repository.
+- No feature branch merge, APK/AAB, release, or production change.
+
 ### Update format to use for future work
 
 ```text
