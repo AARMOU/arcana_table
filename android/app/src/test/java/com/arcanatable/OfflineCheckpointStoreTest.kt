@@ -1,6 +1,5 @@
 package com.arcanatable
 
-import androidx.test.core.app.ApplicationProvider
 import android.content.Context
 import com.arcanatable.engine.LocalSeat
 import org.json.JSONArray
@@ -17,7 +16,7 @@ import org.robolectric.annotation.Config
 @Config(sdk = [34])
 class OfflineCheckpointStoreTest {
     @Test fun privateSnapshotRoundTripIncludesUnmaskedStateAndOriginalDecks() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
         OfflineCheckpointStore.clear(context)
         val you = LocalSeat("You", listOf("Plains", "Forest"), "Commander")
         val ai = LocalSeat("AI", listOf("Island"), null)
