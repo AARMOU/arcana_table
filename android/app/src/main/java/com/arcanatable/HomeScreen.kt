@@ -91,6 +91,7 @@ fun ArcanaHomeScreen(
     onDismissResume: () -> Unit,
     offlineResumeAvailable: Boolean = false,
     onResumeOffline: () -> Unit = {},
+    onDiscardOffline: () -> Unit = {},
     onPlay: () -> Unit,
     onChangeDeck: () -> Unit,
     onImport: () -> Unit,
@@ -126,9 +127,14 @@ fun ArcanaHomeScreen(
                 Text("SAVED OFFLINE GAME", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
                 Text("Restore the complete Argentum engine state, including the stack, pending decisions and private zones.",
                     color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-                Button(onClick = onResumeOffline, modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 48.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) {
-                    Text("RESUME OFFLINE GAME", fontWeight = FontWeight.Black)
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = onResumeOffline, modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) {
+                        Text("RESUME", fontWeight = FontWeight.Black)
+                    }
+                    OutlinedButton(onClick = onDiscardOffline, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+                        Text("DISCARD SAVE")
+                    }
                 }
             }
             // Phone landscape: deck on the left, PLAY on the right, so nothing needs scrolling.
@@ -163,7 +169,7 @@ fun ArcanaHomeScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
                 ) { Text("RETURN TO TABLE", fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
                 else Button(
-                    onClick = onPlay, enabled = !working && !resumeAvailable,
+                    onClick = onPlay, enabled = !working && !resumeAvailable && !offlineResumeAvailable,
                     modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp).testTag("home-play"),
                     colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
                 ) { Text(if (working) (workingLabel ?: "PREPARING…") else "PLAY", fontSize = if (working) 15.sp else 22.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp) }
