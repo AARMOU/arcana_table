@@ -141,6 +141,15 @@ Both initial tests compiled far enough to reveal test-harness defects. This is n
 - Build targets **debug-signed, separately installable `com.arcanatable.argentum`**, not the production app id/signing key. APK artifact should be `ArcanaTable-Five-Feature-Debug-APK` with SHA256 and signing provenance. No main merge, Play Store release or original key use.
 - This entry documents *started* build, not a successful artifact until CI concludes. Remaining 9 of 14 feature teams have not been silently included; only five implemented/tested workstreams are part of this preview.
 
+### 2026-10-21 ~23:54 (America/Denver) — Combined APK compiled, signed and exported
+
+- **Success:** [CI run 39730056278](https://github.com/AARMOU/arcana_table/actions/runs/39730056278) on `gpt/arcana-five-feature-preview`, commit `dc0cac32e07e40905794919f8b539d319a7a6472`. The ten specified focused/existing app regression test filters **passed** in a single `BUILD SUCCESSFUL in 3m` run; `:app:assembleDebug` also **BUILD SUCCESSFUL in 1m51s**.
+- Artifact [ArcanaTable-Five-Feature-Debug-APK, ID 12405271903](https://github.com/AARMOU/arcana_table/actions/runs/39730056278/artifacts/12405271903) uploaded. The test APK is `ArcanaTable-5-Feature-Preview-debug.apk`, 37,449,886 bytes.
+- Package verifier: `com.arcanatable.argentum`, `versionCode=124`. Debug signing certificate `CN=Android Debug`, fingerprint SHA256 `4068c025123e237fdbea4689421d279821d6013c94fca340dcdad9e3dfa3b0c9`. This is **not** signed with the original production keystore and will install separately, not update `com.arcanatable`.
+- APK SHA256 verified from downloaded GitHub artifact: `7740a5abfed067d2cbb2e94772ab4ee3c8ddad4c5397409d0250769b8752b5e2`.
+- The artifact was downloaded into the active conversation working container, extracted, hash-verified and copied to `/mnt/data/ArcanaTable-5-Feature-Preview-debug.apk` for delivery.
+- Included five tested feature groups: Table overview/navigation, graveyard and exile play controls, menu decision cleanup, game-log event counting, notification readability. The remaining unimplemented teams are excluded. No production signing, merge or Play Store release. Real-device validation still outstanding.
+
 ### Update format to use for future work
 
 ```text
