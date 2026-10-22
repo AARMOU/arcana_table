@@ -229,10 +229,7 @@ internal fun TableController.openArgentumActions(card: GameCard) {
     val snapshot = argentumSnapshot ?: return
     val serverId = snapshot.serverCardIds[card.id]
     if (serverId == null) { message = "This card is not part of Argentum's current state."; return }
-    val choices = snapshot.legalActions.filter { info ->
-        val action = info.optJSONObject("action") ?: return@filter false
-        listOf("cardId", "sourceId", "permanentId", "entityId").any { key -> action.optString(key) == serverId }
-    }
+    val choices = ArgentumActions.forCardServerId(snapshot.legalActions, serverId)
     argentumActionCard = card
     // Always open the sheet: it shows the card's text even when there is nothing to do with it now.
     argentumActionChoices = choices.ifEmpty { listOf(JSONObject().put("__none", true)) }
