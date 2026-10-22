@@ -89,6 +89,8 @@ fun ArcanaHomeScreen(
     resumeAvailable: Boolean,
     onResume: () -> Unit,
     onDismissResume: () -> Unit,
+    offlineResumeAvailable: Boolean = false,
+    onResumeOffline: () -> Unit = {},
     onPlay: () -> Unit,
     onChangeDeck: () -> Unit,
     onImport: () -> Unit,
@@ -115,6 +117,18 @@ fun ArcanaHomeScreen(
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(onClick = onResume, modifier = Modifier.weight(1f).heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { Text("RESUME GAME", fontWeight = FontWeight.Black) }
                     OutlinedButton(onClick = onDismissResume, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("END THAT GAME") }
+                }
+            }
+            if (offlineResumeAvailable && !argentumActive) Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Panel)
+                    .padding(14.dp).testTag("offline-resume-card")
+            ) {
+                Text("SAVED OFFLINE GAME", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                Text("Restore the complete Argentum engine state, including the stack, pending decisions and private zones.",
+                    color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                Button(onClick = onResumeOffline, modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 48.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) {
+                    Text("RESUME OFFLINE GAME", fontWeight = FontWeight.Black)
                 }
             }
             // Phone landscape: deck on the left, PLAY on the right, so nothing needs scrolling.
