@@ -159,6 +159,7 @@ jobs:
             --tests 'com.arcanatable.ui.ArgentumResilienceUiTest' \
             --tests 'com.arcanatable.ui.DesignPreviewTest' \
             --tests 'com.arcanatable.ui.GameScreenSizesTest' \
+            --tests 'com.arcanatable.ui.ArgentumGestureUiTest' \
             --tests 'com.arcanatable.ManaReliability128Test' \
             --tests 'com.arcanatable.ui.QuickUiTipsTest'
 
@@ -174,6 +175,28 @@ jobs:
         run: ./gradlew --no-daemon --max-workers=2 :app:lintDebug :app:assembleDebug
 
       # Build stays in CI. No APK upload, release signing, or publication.
+
+      - name: Summarize actual Android XML reports
+        if: always()
+        env:
+          RUNTIME_LABEL: ${{ matrix.runtime }}
+        run: |
+          python3 - <<'PYREPORT'
+          import os
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          counts = dict(tests=0, failures=0, errors=0, skipped=0)
+          reports = list(Path("android/app/build/test-results/testDebugUnitTest").glob("TEST-*.xml"))
+          for report in reports:
+              root = ET.parse(report).getroot()
+              for key in counts:
+                  counts[key] += int(root.get(key, "0"))
+          passed = counts["tests"] - counts["failures"] - counts["errors"] - counts["skipped"]
+          line = f"ANDROID_TEST_SUMMARY runtime={os.environ['RUNTIME_LABEL']} reports={len(reports)} passed={passed} {counts}"
+          print(line)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as out:
+              out.write(line + "\n")
+          PYREPORT
 
       - name: Retain upgrade evidence, never publish or push generated binaries
         if: always()

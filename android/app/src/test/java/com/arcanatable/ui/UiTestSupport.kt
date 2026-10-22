@@ -2,17 +2,18 @@ package com.arcanatable.ui
 
 import android.graphics.Bitmap
 import android.os.Looper
-import androidx.activity.compose.setContent
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
-import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.hasClickAction
+import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.semantics.SemanticsActions
 import org.robolectric.Shadows.shadowOf
 import androidx.test.core.app.ActivityScenario
 import com.arcanatable.MainActivity
-import com.arcanatable.TableController
-import com.arcanatable.TableScreen
 import com.arcanatable.startArgentumPractice
 import java.io.File
 
@@ -25,24 +26,30 @@ object UiTestSupport {
     /**
      * Exercise the real server startup/validation path against the test server. Server play has
      * been parked since Build 113, so clicking its disabled menu starts an unrelated offline game.
-     * Install the same screen with a controller observer; production keeps the disabled menu.
+     * Keep the activity's existing composition and touch-input owner, and use its current
+     * controller. Production keeps the disabled menu.
      */
     fun playWithArgentum(rule: ComposeTestRule, scenario: ActivityScenario<MainActivity>) {
-        lateinit var controller: TableController
-        scenario.onActivity { activity ->
-            activity.setContent { TableScreen(onControllerReady = { controller = it }) }
-        }
-        settle(rule, 800)
         if (rule.onAllNodesWithTag("quick-ui-tips").fetchSemanticsNodes().isNotEmpty()) {
             rule.onNodeWithText("Dismiss").performClick()
             settle(rule, 300)
         }
-        rule.runOnIdle { controller.startArgentumPractice(vsAi = true) }
+        scenario.onActivity { activity ->
+            checkNotNull(activity.tableController).startArgentumPractice(vsAi = true)
+        }
     }
 
     /** True while the home screen's PLAY button is showing. */
     fun homeShown(rule: ComposeTestRule): Boolean =
         rule.onAllNodesWithTag("home-play", useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty()
+
+    /** Invoke the real accessible action, including tabs whose tag is on a non-clickable wrapper. */
+    fun clickTag(rule: ComposeTestRule, tag: String) {
+        val taggedAction = hasTestTag(tag) and hasClickAction()
+        val target = if (rule.onAllNodes(taggedAction).fetchSemanticsNodes().isNotEmpty()) taggedAction
+            else hasAnyAncestor(hasTestTag(tag)) and hasClickAction()
+        rule.onNode(target).performSemanticsAction(SemanticsActions.OnClick)
+    }
 
     /** The app runs an endless 1 s game-clock loop, so tests drive the Compose clock manually. */
     fun settle(rule: ComposeTestRule, ms: Long = 1_500) {

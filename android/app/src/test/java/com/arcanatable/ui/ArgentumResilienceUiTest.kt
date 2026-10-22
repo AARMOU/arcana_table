@@ -295,7 +295,9 @@ class ArgentumResilienceUiTest {
         UiTestSupport.settle(rule, 1_200)
         scenario.onActivity { UiTestSupport.screenshot(it, "resilience-12-no-mana-abilities") }
         assertFalse("mana ability must not be offered", shown("Add {G}"))
-        assertTrue("sheet explains that mana is automatic", shown("Mana is paid automatically"))
+        // Build 128 also supports explicitly floating mana from a source's own sheet, so the
+        // global action list no longer claims that all mana use is automatic.
+        assertFalse("global actions do not show the retired automatic-only mana hint", shown("Mana is paid automatically"))
         assertTrue("nothing was sent", fake.received.none { it.optString("type") == "submitAction" })
         scenario.close()
     }
