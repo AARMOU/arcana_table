@@ -239,6 +239,8 @@ object CustomCards {
         Entry(Aberrant, "40K", "Six WotC precons"),
         Entry(MandateOfAbaddon, "40K", "Six WotC precons"),
         Entry(PrimarisEliminator, "40K", "Six WotC precons"),
+        Entry(DeathsPresence, "40K", "Six WotC precons"),
+        Entry(ScreamerKiller, "40K", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
