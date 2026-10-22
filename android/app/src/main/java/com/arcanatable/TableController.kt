@@ -404,6 +404,7 @@ internal class TableController(
     var argentumResumeRequested by run { mutableStateOf(false) }
     var offlineResumeAvailable by run { mutableStateOf(OfflineCheckpointStore.available(context)) }
     var offlineRestoreRequested by run { mutableStateOf(false) }
+    var offlineDiscardConfirm by run { mutableStateOf(false) }
     var argentumEndPreviousRequested by run { mutableStateOf(false) }
     var argentumLastStateJson by run { mutableStateOf<JSONObject?>(null) }
     var argentumAttackPlan by run { mutableStateOf<ArgentumAttackPlan?>(null) }
