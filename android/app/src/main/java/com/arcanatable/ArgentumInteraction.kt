@@ -28,6 +28,12 @@ private fun JSONObject?.intMap(): Map<String, Int> {
     return keys().asSequence().associateWith { optInt(it) }
 }
 
+/** Display fallback for engine-supplied labels: JSONObject.optString() returns the literal
+ * "null" for JSON-null values, which must never become a button or dialog title.
+ */
+internal fun JSONObject.decisionDisplayText(key: String, fallback: String): String =
+    optString(key).trim().takeIf { it.isNotBlank() && it != "null" } ?: fallback
+
 object ArgentumDecisions {
     /** Decision types Arcana renders with its own controls. */
     val NATIVE_TYPES = setOf(
