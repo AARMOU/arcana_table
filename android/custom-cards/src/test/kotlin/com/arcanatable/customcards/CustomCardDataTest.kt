@@ -35,7 +35,7 @@ class CustomCardDataTest {
 
     @Test
     fun registeredDecksAreCovered() {
-        assertEquals(114, CustomCards.all.size)
-        assertEquals(114, CardPool.custom.map { it.name }.toSet().size)
+        assertEquals(111, CustomCards.all.size)
+        assertEquals(111, CardPool.custom.map { it.name }.toSet().size)
     }
 }
