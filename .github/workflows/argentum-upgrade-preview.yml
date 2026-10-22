@@ -1,0 +1,128 @@
+name: Package validated Argentum upgrade preview
+on:
+  push:
+    branches: [gpt/argentum-upgrade-preview-20261022]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: argentum-upgrade-preview-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Read pinned validation run
+        id: config
+        run: |
+          python3 - <<'PY'
+          import json, os
+          c=json.load(open('engine-upgrade/preview-config.json'))
+          with open(os.environ['GITHUB_OUTPUT'],'a') as out:
+              out.write(f"run={int(c['validation_run'])}\nupstream={c['upstream']}\nversion={int(c['version_code'])}\n")
+          PY
+      - name: Download evidence from successful candidate validation
+        uses: actions/download-artifact@v4
+        with:
+          name: argentum-upgrade-focused-test-evidence-replacement
+          run-id: ${{ steps.config.outputs.run }}
+          github-token: ${{ github.token }}
+          path: validated-evidence
+      - name: Require unchanged validated app and patch inputs
+        id: inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 engine-upgrade/preview.py source
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle.kts
+            android/gradle/wrapper/gradle-wrapper.properties
+      - name: Restore exact engine bundle by input hash
+        id: runtime
+        uses: actions/cache@v4
+        with:
+          path: engine-upgrade/runtime-bundle
+          key: argentum-java17-v1-${{ steps.inputs.outputs.engine_key }}
+      - name: Check out pinned engine only on cache miss
+        if: steps.runtime.outputs.cache-hit != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: ${{ steps.config.outputs.upstream }}
+          path: argentum-engine
+          persist-credentials: false
+      - name: Apply mandatory patches exactly
+        if: steps.runtime.outputs.cache-hit != 'true'
+        run: python3 engine-upgrade/audit_patches.py
+      - name: Build matching runtime and export only on cache miss
+        if: steps.runtime.outputs.cache-hit != 'true'
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar :arcana-export:run
+      - name: Assemble reusable runtime bundle
+        if: steps.runtime.outputs.cache-hit != 'true'
+        run: python3 engine-upgrade/preview.py stage
+      - name: Check hashes against tested runtime and install matching data
+        run: python3 engine-upgrade/preview.py install
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Compile isolated preview APK from previously validated source
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
+      - name: Verify package/version and preserve unsigned payload for private signing
+        run: |
+          mkdir -p dist
+          python3 - <<'PY'
+          import hashlib, json, os, pathlib, subprocess, zipfile
+          c=json.load(open('engine-upgrade/preview-config.json'))
+          src=pathlib.Path('android/app/build/outputs/apk/debug/app-debug.apk')
+          aapt=os.environ['ANDROID_HOME']+'/build-tools/36.0.0/aapt'
+          badging=subprocess.check_output([aapt,'dump','badging',str(src)],text=True)
+          expected=f"package: name='{c['package']}' versionCode='{c['version_code']}' versionName='{c['version_name']}'"
+          assert expected in badging, badging[:300]
+          dest=pathlib.Path(f"dist/ArcanaTable-B{c['version_code']}-Argentum-Upgrade-unsigned.apk")
+          with zipfile.ZipFile(src) as source, zipfile.ZipFile(dest,'w') as out:
+              for entry in source.infolist():
+                  if entry.filename.upper().startswith('META-INF/') and entry.filename.upper().endswith(('.SF','.RSA','.DSA','.EC','MANIFEST.MF')):
+                      continue
+                  out.writestr(entry,source.read(entry.filename))
+          manifest=json.load(open('engine-upgrade/runtime-bundle/manifest.json'))
+          c.update(source_commit=os.environ['GITHUB_SHA'], validated_run_url=f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{c['validation_run']}",
+                   unsigned_apk_sha256=hashlib.sha256(dest.read_bytes()).hexdigest(), runtime=manifest)
+          pathlib.Path('dist/provenance.json').write_text(json.dumps(c,indent=2)+'\n')
+          pathlib.Path('dist/package-info.txt').write_text(badging)
+          PY
+      - name: Retain reusable verified runtime and preview evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: Argentum-Verified-Runtime
+          path: |
+            engine-upgrade/runtime-bundle/
+            engine-upgrade/validated-runtime.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload preview for offline signing
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArcanaTable-B${{ steps.config.outputs.version }}-Argentum-Upgrade-unsigned
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
