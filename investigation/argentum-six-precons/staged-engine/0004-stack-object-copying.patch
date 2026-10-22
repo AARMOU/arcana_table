@@ -286,6 +286,15 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serializat
 index 736b345d53..5e48194a47 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
+@@ -72,7 +72,8 @@ val engineSerializersModule = SerializersModule {
+         subclass(DamagePreventionShieldCreatedEvent::class)
+         subclass(BlockerDeclarationPolicyChangedEvent::class)
+         subclass(PlayerActionPermissionsChangedEvent::class)
+         subclass(AbilityTriggeredEvent::class)
++        subclass(AbilityCopiedEvent::class)
+         subclass(ResolvedEvent::class)
+         subclass(SpellCounteredEvent::class)
+         subclass(SpellFizzledEvent::class)
 @@ -484,7 +484,7 @@ val engineSerializersModule = SerializersModule {
          subclass(CopyActivatedAbilityTargetContinuation::class)
          subclass(CopyAbilityTargetContinuation::class)
@@ -958,7 +967,17 @@ index b41d899272..9e500a1490 100644
          val infos = mutableListOf<TargetRequirementInfo>()
          val legal = mutableMapOf<Int, List<EntityId>>()
          var slot = 0
-@@ -105,12 +108,13 @@ internal object SpellCopyTargets {
+@@ -61,7 +64,9 @@ internal object SpellCopyTargets {
+                 infos += TargetRequirementInfo(index = slot, minTargets = 0, maxTargets = 1,
+                     description = "${req.description} — target ${slot + 1}" +
+                         (amount?.let { ": $it to this target" } ?: ""), emptyChoiceLabel = "Keep original target",
+-                    legalTargetsByPrefix = tables?.get(index)?.takeIf { index > 0 },
++                    legalTargetsByPrefix = tables?.get(index)?.filterKeys {
++                        it.isNotEmpty() || state.getEntity(sourceId)?.get<SpellOnStackComponent>() != null
++                    }?.takeIf { index > 0 },
+                     prefixLength = index.takeIf { tables != null && index > 0 })
+                 legal[slot] = byRequirement[index].orEmpty()
+@@ -105,12 +110,13 @@ internal object SpellCopyTargets {
  
      /** The prospective copy, on a scratch state, so legality reads its colors and controller. */
      private class Preview(val state: GameState, val copyId: EntityId, val card: CardComponent,
@@ -974,7 +993,7 @@ index b41d899272..9e500a1490 100644
                  pipelineContext = if (prefix.isEmpty()) null else PredicateContext(controllerId = controllerId,
                      sourceId = copyId, xValue = xValue, targets = prefix, namedTargets = named),
              ).filter { candidate ->
-@@ -124,7 +128,7 @@ internal object SpellCopyTargets {
+@@ -124,7 +130,7 @@ internal object SpellCopyTargets {
                      sourceId = copyId,
                      xValue = xValue,
                      allTargets = prefix,
@@ -983,7 +1002,7 @@ index b41d899272..9e500a1490 100644
                      namedTargets = named,
                  ) == null
              }
-@@ -132,12 +136,30 @@ internal object SpellCopyTargets {
+@@ -132,12 +138,30 @@ internal object SpellCopyTargets {
  
      private fun preview(state: GameState, sourceId: EntityId, controllerId: EntityId, exceptions: CopyExceptions): Preview? {
          val source = state.getEntity(sourceId) ?: return null
@@ -1020,7 +1039,7 @@ index b41d899272..9e500a1490 100644
      }
  
      fun validate(state: GameState, finder: TargetFinder, answer: AnswerContinuation, response: TargetsResponse): String? {
-@@ -156,15 +178,19 @@ internal object SpellCopyTargets {
+@@ -156,15 +180,19 @@ internal object SpellCopyTargets {
                  requirements = answer.modeTargetRequirements[answer.chosenModes[answer.currentOrdinal]].orEmpty()
                  exceptions = answer.exceptions; ordinal = answer.currentOrdinal
              }
@@ -1042,7 +1061,7 @@ index b41d899272..9e500a1490 100644
              ?: unseatedKeptTarget(preview, finder, aligned, originals(state, sourceId, ordinal), selection)
      }
  
-@@ -190,7 +216,7 @@ internal object SpellCopyTargets {
+@@ -190,7 +218,7 @@ internal object SpellCopyTargets {
              state = preview.state, target = original, requirement = requirement,
              casterId = preview.controllerId, sourceColors = preview.card.colors, sourceSubtypes = preview.subtypes,
              sourceId = preview.copyId, xValue = preview.xValue, allTargets = among,
