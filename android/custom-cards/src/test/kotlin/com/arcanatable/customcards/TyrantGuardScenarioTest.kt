@@ -1,7 +1,6 @@
 package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.TyrantGuard
-import com.arcanatable.customcards.cards.StonecoilSerpent
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.sdk.core.*
 import org.junit.Assert.*
@@ -35,7 +34,7 @@ class TyrantGuardScenarioTest {
 
     @Test
     fun sacrificingGuardProtectsOnlyFriendlyCounterBearingCreaturesForThisTurn() {
-        val d = customScenario(TyrantGuard, StonecoilSerpent, "Grizzly Bears")
+        val d = customScenario(TyrantGuard, "Stonecoil Serpent", "Grizzly Bears")
         val p = d.player1
         val guard = d.putCreatureOnBattlefield(p, "Tyrant Guard")
         val serpent = d.putCardInHand(p, "Stonecoil Serpent")
