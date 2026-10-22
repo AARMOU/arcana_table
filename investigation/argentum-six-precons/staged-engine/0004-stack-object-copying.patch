@@ -132,7 +132,7 @@ index cd1ebdc293..1d038b4894 100644
  /**
 diff --git a/mtg-sdk/src/test/kotlin/com/wingedsheep/sdk/scripting/StackObjectCopySdkTest.kt b/mtg-sdk/src/test/kotlin/com/wingedsheep/sdk/scripting/StackObjectCopySdkTest.kt
 new file mode 100644
-index 0000000000..afc50e5f97
+index 0000000000..6e28f051f3
 --- /dev/null
 +++ b/mtg-sdk/src/test/kotlin/com/wingedsheep/sdk/scripting/StackObjectCopySdkTest.kt
 @@ -0,0 +1,21 @@
@@ -153,7 +153,7 @@ index 0000000000..afc50e5f97
 +    }
 +    test("controlled stack copies round-trip with player and ability kinds") {
 +        val effect = Effects.CopyControlledStackObjects(
-+            setOf(StackObjectKind.ActivatedAbility, StackObjectKind.TriggeredAbility), Player.Opponent)
++            setOf(StackObjectKind.ActivatedAbility, StackObjectKind.TriggeredAbility), Player.TargetOpponent)
 +        Json.decodeFromString(Effect.serializer(), Json.encodeToString(Effect.serializer(), effect)) shouldBe effect
 +    }
 +})
@@ -1087,10 +1087,10 @@ index f2cf7c91c5..6dfdfc2f87 100644
          d.replaceState(result.state)
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/StackObjectCopyEngineTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/StackObjectCopyEngineTest.kt
 new file mode 100644
-index 0000000000..9b2cb12be9
+index 0000000000..078d081cd1
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/StackObjectCopyEngineTest.kt
-@@ -0,0 +1,250 @@
+@@ -0,0 +1,262 @@
 +package com.wingedsheep.engine.scenarios
 +
 +import com.wingedsheep.engine.core.*
@@ -1309,6 +1309,18 @@ index 0000000000..9b2cb12be9
 +            }
 +            d.state.stack shouldBe listOf(spell)
 +        }
++    }
++    test("paying the optional cost consumes two colorless mana and copies the spell") {
++        val d = setup()
++        cast(d)
++        d.giveColorlessMana(d.player1, 2)
++        execute(d, Effects.MayPay(ManaCost.parse("{C}{C}"), then = batch))
++        d.submitYesNo(d.player1, true).error shouldBe null
++        if (d.pendingDecision is SelectManaSourcesDecision)
++            d.submitManaAutoPayOrDecline(d.player1, true).error shouldBe null
++        d.pendingDecision shouldBe null
++        d.state.stack.size shouldBe 2
++        d.state.getEntity(d.player1)!!.get<com.wingedsheep.engine.state.components.player.ManaPoolComponent>()!!.colorless shouldBe 0
 +    }
 +    test("a departed ability source keeps its last known color when choosing new targets") {
 +        val d = setup()
