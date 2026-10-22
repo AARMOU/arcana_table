@@ -38,6 +38,17 @@ jobs:
           git -C b131/argentum-engine apply --check "$PATCH"
           git -C b131/argentum-engine apply "$PATCH"
           git -C b131/argentum-engine diff --check
+      - name: Execute explicit 2-, 3-, and 4-player Myriad defender/cleanup scenarios
+        shell: bash
+        run: |
+          cp myriad-worker/investigation/argentum-six-precons/staged-engine/MyriadDefenderChoiceTest.kt \
+             b131/argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/multiplayer/MyriadDefenderChoiceTest.kt
+          cd b131/argentum-engine
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :rules-engine:test --tests '*MyriadDefenderChoiceTest' \
+            --tests '*MyriadTest' --tests '*EnteringAttackDefenderChoiceTest'
       - name: Recompile and run full core SDK, rules, cards and AI tests
         working-directory: b131/argentum-engine
         run: |
