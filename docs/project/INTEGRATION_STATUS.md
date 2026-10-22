@@ -11,11 +11,11 @@
 | Build 130 candidate base | `gpt/arcana-b130-priority-three-preview@43b27a89f01e850ec651f85f9be775d7804cb0bd` | Foundation for the Argentum upgrade. | Capture suite-specific evidence and runtime provenance. |
 | Argentum upgrade preview | `gpt/argentum-upgrade-preview-20261022@83aa342e3fcd200710fb9188192189fc7cea7abf` | Packaging workflow passed at that SHA, but full integration of all custom cards not established. | Engine behavior parity, app regressions, exact JAR/card export manifests. |
 | Precon implementation | `gpt/argentum-six-precons@ff5e2b719159904b51e3a46d479afa7018d9f4c9` | Card worker PRs isolated from Argentum upgrade. | Full custom-card suite, exact engine compatibility, integration review. |
-| Card worker integration | `gpt/six-precon-worker-integration-20261022` (live head changes) | Draft PR #43; latest inspected full test 353/354? **353 total, 1 failure** at `a368c3f7`. | Solve Forge of Heroes loyalty-counter failure and rerun full regressions at fixed SHA. |
+| Card worker integration | `gpt/six-precon-worker-integration-20261022` (live head changes) | Draft PR #43; latest inspected full suite: **353 tests completed, 1 failed** at `a368c3f7`. | Solve Forge of Heroes loyalty-counter failure and rerun full regressions at fixed SHA. |
 | Outcome diagnostics | `gpt/game-over-cause-logging-20261022@273df437383d6766d0f2f8858382361412acb3a8` | Draft PR #42; Kotlin compile failed on nullable viewer ID. | Resolve type error and run outcome tests. |
 | Governance rules/docs | `gpt/repository-governance-20261022` | This isolated documentation PR; app behavior unchanged. | Review governance docs for merging into main separately. |
 
-**Correction:** The card-worker run reported **353 tests completed, 1 failed** (not 354). The above status must be checked against any newer worker commit/run before integration.
+Test status must be refreshed against newer worker commits or runs before integration.
 
 ## Dependency map
 
