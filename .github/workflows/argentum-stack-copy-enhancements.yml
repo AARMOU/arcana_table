@@ -48,6 +48,15 @@ jobs:
           just test-class SpellCopyRetargetingTest --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Dorg.gradle.configuration-cache=false
           just test-class SdkSurfaceBaselineTest --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Dorg.gradle.configuration-cache=false
           just test-class SdkIndexTest --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Dorg.gradle.configuration-cache=false
+      - name: Guard event registration and dependent ability-copy targeting
+        working-directory: upstream-engine
+        run: |
+          # These two regressions failed on an earlier stack-copy candidate.
+          # Run against freshly compiled classes; no Gradle task cache may mask a failure.
+          ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
+            -Dorg.gradle.configuration-cache=false :rules-engine:test --rerun-tasks \
+            --tests '*SerializationPolymorphicRegistrationTest' \
+            --tests '*DependentCopyTargetTest'
       - name: Run full engine and card-scenario regressions
         working-directory: upstream-engine
         run: just test-rules
