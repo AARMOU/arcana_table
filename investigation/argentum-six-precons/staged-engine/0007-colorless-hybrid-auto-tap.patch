@@ -128,3 +128,105 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/
                  else -> {}
              }
          }
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt
+new file mode 100644
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ColorlessHybridManaSolverTest.kt
+@@ -0,0 +1,97 @@
++package com.wingedsheep.engine.scenarios
++
++import com.wingedsheep.engine.core.Outcome
++import com.wingedsheep.engine.handlers.PredicateEvaluator
++import com.wingedsheep.engine.mechanics.mana.ManaSolver
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.engine.support.TestCards
++import com.wingedsheep.sdk.core.ManaCost
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.dsl.*
++import com.wingedsheep.sdk.model.Deck
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.shouldBe
++
++/** Proves hybrid land auto-tapping without requiring Ulalek's unregistered stack ability. */
++class ColorlessHybridManaSolverTest : FunSpec({
++    val hybridWatcher = card("Hybrid Test Watcher") {
++        manaCost = "{C/W}{W}"
++        typeLine = "Creature — Eldrazi"
++        power = 2
++        toughness = 2
++    }
++    val fivePipWatcher = card("Five Hybrid Test Watcher") {
++        manaCost = "{C/W}{C/U}{C/B}{C/R}{C/G}"
++        typeLine = "Creature — Eldrazi"
++        power = 5
++        toughness = 5
++    }
++    val testColorlessLand = card("Hybrid Test Wastes") {
++        typeLine = "Land"
++        activatedAbility {
++            cost = Costs.Tap
++            effect = Effects.AddColorlessMana(1)
++            manaAbility = true
++        }
++    }
++
++    fun driver(): GameTestDriver {
++        val d = GameTestDriver()
++        d.registerCards(TestCards.all + listOf(hybridWatcher, fivePipWatcher, testColorlessLand))
++        d.initMirrorMatch(deck = Deck.of("Mountain" to 40))
++        d.passPriorityUntil(Step.PRECOMBAT_MAIN)
++        return d
++    }
++
++    fun solver(d: GameTestDriver) = ManaSolver(
++        d.cardRegistry, predicateEvaluator = PredicateEvaluator(cardRegistry = null)
++    )
++
++    test("strict white and hybrid are payable with one Plains and one true colorless land") {
++        val d = driver()
++        val player = d.activePlayer!!
++        val plains = d.putPermanentOnBattlefield(player, "Plains")
++        val wastes = d.putPermanentOnBattlefield(player, "Hybrid Test Wastes")
++        val cost = ManaCost.parse("{C/W}{W}")
++        solver(d).canPay(d.state, player, cost) shouldBe true
++        val creature = d.putCardInHand(player, "Hybrid Test Watcher")
++        val result = d.castSpell(player, creature)
++        result.outcome shouldBe Outcome.Done
++        d.bothPass()
++        d.findPermanent(player, "Hybrid Test Watcher") shouldBe creature
++        d.isTapped(plains) shouldBe true
++        d.isTapped(wastes) shouldBe true
++    }
++
++    test("strict white and hybrid can both be paid with white sources") {
++        val d = driver()
++        val player = d.activePlayer!!
++        repeat(2) { d.putPermanentOnBattlefield(player, "Plains") }
++        solver(d).canPay(d.state, player, ManaCost.parse("{C/W}{W}")) shouldBe true
++    }
++
++    test("hybrid cannot be paid with unrelated color, even if one generic mana is present") {
++        val d = driver()
++        val player = d.activePlayer!!
++        d.putPermanentOnBattlefield(player, "Mountain")
++        solver(d).canPay(d.state, player, ManaCost.parse("{C/W}")) shouldBe false
++    }
++
++    test("Ulalek's five printed pips are payable with one source for each true color") {
++        val d = driver()
++        val player = d.activePlayer!!
++        listOf("Plains", "Island", "Swamp", "Mountain", "Forest").forEach {
++            d.putPermanentOnBattlefield(player, it)
++        }
++        solver(d).canPay(d.state, player, ManaCost.parse("{C/W}{C/U}{C/B}{C/R}{C/G}")) shouldBe true
++    }
++
++    test("Ulalek's five printed pips are payable with five colorless sources, not four") {
++        val d = driver()
++        val player = d.activePlayer!!
++        repeat(4) { d.putPermanentOnBattlefield(player, "Hybrid Test Wastes") }
++        solver(d).canPay(d.state, player, ManaCost.parse("{C/W}{C/U}{C/B}{C/R}{C/G}")) shouldBe false
++        d.putPermanentOnBattlefield(player, "Hybrid Test Wastes")
++        solver(d).canPay(d.state, player, ManaCost.parse("{C/W}{C/U}{C/B}{C/R}{C/G}")) shouldBe true
++    }
++})
