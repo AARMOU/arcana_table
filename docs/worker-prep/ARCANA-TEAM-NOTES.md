@@ -92,6 +92,17 @@ This is a durable, append-only notebook for development team handoffs and any ve
 - No coding-agent session was launched or confirmed. These are edits by ChatGPT via the connected GitHub repository.
 - No feature branch merge, APK/AAB, release, or production change.
 
+### 2026-10-21 ~23:26 (America/Denver) — Android test execution, actual GitHub Actions evidence
+
+Real CI workflows were created and automatically executed on each isolated development branch; no release builds or production merge.
+
+- **Team 10 menu cleanup:** [GitHub Actions run 39727464475](https://github.com/AARMOU/arcana_table/actions/runs/39727464475); commit `5b2669b3ab06dee75b11250ab7ef1d0773a19c30`; executed `./gradlew --no-daemon --stacktrace --max-workers=2 :app:testDebugUnitTest --tests '*DecisionDisplayTextTest*'`; **BUILD SUCCESSFUL** (2m57s). App Kotlin and test Kotlin compiled; artifacts uploaded.
+- **Team 11 log grouping:** [GitHub Actions run 39727467578](https://github.com/AARMOU/arcana_table/actions/runs/39727467578); commit `74fe1e2e139bce8375bfe0e258dd5b9a658c43da`; executed `./gradlew --no-daemon --stacktrace --max-workers=2 :app:testDebugUnitTest --tests '*GameLogGroupingTest*'`; **BUILD SUCCESSFUL** (2m36s). App and test Kotlin compiled; test reports uploaded.
+- **Team 12 notification timing:** [GitHub Actions run 39727471127](https://github.com/AARMOU/arcana_table/actions/runs/39727471127); commit `88b8894eb45b189ce18f8623cb3044baad80f677`; executed `./gradlew --no-daemon --stacktrace --max-workers=2 :app:testDebugUnitTest --tests '*ReadableNotificationDurationTest*'`; **success**. Test artifacts uploaded.
+- **Team 09 Table view:** [Run 39727721906](https://github.com/AARMOU/arcana_table/actions/runs/39727721906); checks `TableViewNavigationTest` and `TableOverviewInteractionTest`; **running at this note entry**, no result yet.
+- **Team 14 graveyard/exile:** [Run 39727726145](https://github.com/AARMOU/arcana_table/actions/runs/39727726145); checks `ZonePlaySourceTest`, `GraveyardExileLegalActionsTest`, `ZoneCardActionsUiTest`; **running at this note entry**, no result yet.
+- These are **focused CI unit/UI JVM tests**, not an all-project regression suite or on-device test. No autonomous Copilot agent was launched.
+
 ### Update format to use for future work
 
 ```text
