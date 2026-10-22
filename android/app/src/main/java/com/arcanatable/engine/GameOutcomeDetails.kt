@@ -30,8 +30,13 @@ internal object GameOutcomeDetails {
         val winner = state.winnerId
         val lossEvents = events.filterIsInstance<PlayerLostEvent>()
         val ended = events.filterIsInstance<GameEndedEvent>().lastOrNull()
-        val detailedLoss = lossEvents.lastOrNull { !it.message.isNullOrBlank() }
-        val engineReason = ended?.reason ?: detailedLoss?.reason ?: lossEvents.lastOrNull()?.reason
+        // The latest elimination controls causality. An unrelated card effect that removed an
+        // earlier player must not be advertised as the cause of a later life-total loss.
+        val latestLoss = lossEvents.lastOrNull()
+        val detailedLoss = latestLoss?.takeIf {
+            !it.message.isNullOrBlank() && (ended == null || it.reason == ended.reason)
+        }
+        val engineReason = ended?.reason ?: latestLoss?.reason
         val winCondition = detailedLoss?.message?.takeIf(String::isNotBlank)
         val sourceCard = winCondition?.substringBefore(':')?.takeIf {
             it != winCondition && it.isNotBlank() && it.length <= 100
