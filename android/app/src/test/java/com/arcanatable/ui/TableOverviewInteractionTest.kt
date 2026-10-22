@@ -61,9 +61,9 @@ class TableOverviewInteractionTest {
         }
         // Active player starts collapsed rather than expanding automatically.
         rule.onNodeWithContentDescription("Expand player details").assertExists()
-        rule.onNodeWithTag("table-card-zoom").assertDoesNotExist()
+        rule.onNodeWithTag("table-card-zoom", useUnmergedTree = true).assertDoesNotExist()
         rule.onNodeWithContentDescription("Expand player details").performClick()
-        rule.onNodeWithTag("table-card-zoom").assertExists()
+        rule.onNodeWithTag("table-card-zoom", useUnmergedTree = true).assertExists()
 
         // Switching whose turn it is never overrides the player's manual selection.
         rule.onNodeWithText("CHANGE ACTIVE PLAYER").performClick()
@@ -72,7 +72,7 @@ class TableOverviewInteractionTest {
         rule.onNodeWithContentDescription("Collapse player details").assertExists()
 
         rule.onNodeWithContentDescription("Collapse player details").performClick()
-        rule.onNodeWithTag("table-card-zoom").assertDoesNotExist()
+        rule.onNodeWithTag("table-card-zoom", useUnmergedTree = true).assertDoesNotExist()
     }
 
     @Test fun tableZoomPreferencesDoNotChangeThePlayerBoardSetting() {
