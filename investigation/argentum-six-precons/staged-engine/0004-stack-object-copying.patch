@@ -854,7 +854,7 @@ index 85f6ddf0af..dc01923641 100644
  
          private fun sourceNameOf(container: ComponentContainer): String =
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetTriggeredAbilityExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetTriggeredAbilityExecutor.kt
-index 44252c0694..334c202150 100644
+index 44252c0694..e585e5de83 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetTriggeredAbilityExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetTriggeredAbilityExecutor.kt
 @@ -48,70 +48,10 @@ class CopyTargetTriggeredAbilityExecutor(
@@ -932,6 +932,16 @@ index 44252c0694..334c202150 100644
      }
  
      companion object {
+@@ -128,6 +68,9 @@ class CopyTargetTriggeredAbilityExecutor(
+             return source.copy(
+                 controllerId = copyController,
+                 stateTriggerAbilityId = null,
++                // A leading "you may" is a resolution choice, even when the original's UI
++                // answered it early while targeting. The copy must make its own choice.
++                consentAnsweredAtTargeting = false,
+                 description = "Copy of ${source.description}"
+             )
+         }
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/SpellCopyTargets.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/SpellCopyTargets.kt
 index b41d899272..9e500a1490 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/SpellCopyTargets.kt
@@ -1132,10 +1142,10 @@ index f2cf7c91c5..6dfdfc2f87 100644
          d.replaceState(result.state)
 diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/StackObjectCopyEngineTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/StackObjectCopyEngineTest.kt
 new file mode 100644
-index 0000000000..078d081cd1
+index 0000000000..c0f8a2cb90
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/StackObjectCopyEngineTest.kt
-@@ -0,0 +1,262 @@
+@@ -0,0 +1,276 @@
 +package com.wingedsheep.engine.scenarios
 +
 +import com.wingedsheep.engine.core.*
@@ -1385,6 +1395,20 @@ index 0000000000..078d081cd1
 +        val decision = d.pendingDecision as ChooseTargetsDecision
 +        (redGuard in decision.legalTargets.getValue(0)) shouldBe false
 +        (blueGuard in decision.legalTargets.getValue(0)) shouldBe true
++    }
++    test("a copied optional trigger does not inherit a resolution consent choice") {
++        val d = setup()
++        val source = d.putPermanentOnBattlefield(d.player1, redSource.name)
++        val original = triggered(d, source, effect = Effects.May(Effects.GainLife(2)))
++        d.replaceState(d.state.updateEntity(original) { entity ->
++            entity.with(entity.get<TriggeredAbilityOnStackComponent>()!!.copy(consentAnsweredAtTargeting = true))
++        })
++        execute(d, Effects.CopyControlledStackObjects(setOf(StackObjectKind.TriggeredAbility)))
++        val copy = d.state.getEntity(d.state.stack.last())!!.get<TriggeredAbilityOnStackComponent>()!!
++        copy.consentAnsweredAtTargeting shouldBe false
++        d.bothPass().error shouldBe null
++        d.pendingDecision!!::class shouldBe YesNoDecision::class
++        d.submitYesNo(d.player1, false).error shouldBe null
 +    }
 +    test("ordering answers cannot omit, duplicate, or invent objects") {
 +        val d = setup()
