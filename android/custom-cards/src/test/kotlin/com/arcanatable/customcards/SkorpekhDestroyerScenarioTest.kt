@@ -31,13 +31,20 @@ class SkorpekhDestroyerScenarioTest {
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = d.player2)
         assertFalse(d.projected.hasKeyword(creature, Keyword.FIRST_STRIKE))
         assertTrue(d.projected.hasKeyword(creature, Keyword.DEATHTOUCH))
-        d.putPermanentOnBattlefield(d.player2, "Ornithopter")
+        // Direct fixture placement does not emit an enters event. Cast each artifact
+        // through the rules engine so the trigger has a real zone-change event.
+        val enemyArtifact = d.putCardInHand(d.player2, "Ornithopter")
+        assertNull(d.castSpell(d.player2, enemyArtifact).error)
         d.resolveAll()
         assertFalse(d.projected.hasKeyword(creature, Keyword.FIRST_STRIKE))
-        d.putPermanentOnBattlefield(p, "Ornithopter")
+
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = p)
+        val friendlyArtifact = d.putCardInHand(p, "Ornithopter")
+        assertNull(d.castSpell(p, friendlyArtifact).error)
         d.resolveAll()
         assertTrue(d.projected.hasKeyword(creature, Keyword.FIRST_STRIKE))
-        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = p)
+
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = d.player2)
         assertFalse(d.projected.hasKeyword(creature, Keyword.FIRST_STRIKE))
         assertTrue(d.projected.hasKeyword(creature, Keyword.DEATHTOUCH))
     }
