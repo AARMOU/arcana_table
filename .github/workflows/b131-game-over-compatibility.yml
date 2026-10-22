@@ -1,0 +1,97 @@
+name: Build 131 — merged game-over logging compatibility
+on:
+  push:
+    branches: [gpt/b131-post-merge-compatibility-20261022]
+    paths: [.github/workflows/b131-game-over-compatibility.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  game-over-b131:
+    name: Pinned Build 131 engine against merged game-over logging
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out post-merge game-over source
+        uses: actions/checkout@v4
+        with:
+          ref: dca22b4bfc3e453ebbb849c846859bcdffda5d54
+          path: candidate
+      - name: Download pinned Build 131 verified engine
+        uses: actions/download-artifact@v4
+        with:
+          name: Argentum-Verified-Runtime
+          run-id: 39844575500
+          github-token: ${{ github.token }}
+          path: b131-artifact
+      - name: Verify upstream identity and binary hashes, stage runtime in ephemeral checkout
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,json,shutil,struct,zipfile
+          root=Path("b131-artifact")
+          manifest_candidates=[p for p in root.rglob("manifest.json") if p.parent.name=="runtime-bundle"]
+          validated_candidates=list(root.rglob("validated-runtime.json"))
+          assert len(manifest_candidates)==1 and len(validated_candidates)==1, (manifest_candidates,validated_candidates)
+          bundle=manifest_candidates[0].parent
+          m=json.loads(manifest_candidates[0].read_text())
+          v=json.loads(validated_candidates[0].read_text())
+          assert v["upstream"]=="61e71e586b100faa661f86cac827ac3c3bbb5a78", "Wrong B131 upstream revision"
+          modules=("mtg-sdk","mtg-sdk-tooling","rules-engine","ai")
+          expected={f"libs/argentum-{name}.jar" for name in modules}|{"assets/all-cards.jsonl","assets/all-cards.index.tsv","assets/por-cards.jsonl"}
+          assert set(m["files"])==expected, "Invalid or incomplete engine package"
+          libs=Path("candidate/android/app/libs")
+          assets=Path("candidate/android/app/src/main/assets/argentum")
+          for rel,sha in m["files"].items():
+              f=bundle/rel
+              assert f.is_file() and hashlib.sha256(f.read_bytes()).hexdigest()==sha, rel
+          for module in modules:
+              fn=f"argentum-{module}.jar"
+              jar=bundle/"libs"/fn
+              assert hashlib.sha256(jar.read_bytes()).hexdigest()==v["jars"][fn]["sha256"], fn
+              with zipfile.ZipFile(jar) as z:
+                  bytecodes=[struct.unpack(">H",z.read(n)[6:8])[0] for n in z.namelist() if n.endswith(".class")]
+                  assert bytecodes and max(bytecodes)<=61, fn
+              shutil.copy2(jar,libs/fn)
+          for fn in ("all-cards.jsonl","all-cards.index.tsv","por-cards.jsonl"):
+              shutil.copy2(bundle/"assets"/fn,assets/fn)
+          Path("b131-outcome-runtime-verification.json").write_text(json.dumps({
+              "candidate_sha":"dca22b4bfc3e453ebbb849c846859bcdffda5d54",
+              "engine_upstream":v["upstream"],
+              "verified_runtime_run":39844575500,
+              "files":m["files"]
+          },indent=2)+"\n")
+          print("PASS: Build 131 runtime SHA-256, upstream identity, Java 17 bytecode and card corpus")
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Run game-over and host integration tests against Build 131 runtime
+        working-directory: candidate/android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests '*GameOutcomeDetailsTest*' --tests '*LocalArgentumHostTest*'
+      - name: Run complete Android unit tests and lint against Build 131 runtime
+        working-directory: candidate/android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      - name: Check source checkout is untouched by compatibility job
+        run: |
+          git -C candidate diff --check
+          git -C candidate status --short
+      - name: Archive compatibility test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b131-post-merge-game-over-compatibility
+          path: |
+            b131-outcome-runtime-verification.json
+            candidate/android/app/build/test-results/
+            candidate/android/app/build/reports/tests/
+            candidate/android/app/build/reports/lint-results-debug.*
+          retention-days: 30
+          if-no-files-found: warn
