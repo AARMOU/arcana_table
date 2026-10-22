@@ -2005,27 +2005,32 @@ internal fun SavedDecksDialog(decks: List<SavedDeck>, onLoad: (SavedDeck) -> Uni
 }
 
 @Composable
-internal fun GameLogDialog(entries: List<String>, ownership: List<Boolean?>? = null, turnMarkers: List<Boolean>? = null, previewableCards: List<Pair<Int, GameCard>>, onPreviewCard: (Int, GameCard) -> Unit, onDismiss: () -> Unit) {
+internal fun GameLogDialog(entries: List<String>, ownership: List<Boolean?>? = null, turnMarkers: List<Boolean>? = null, previewableCards: List<Pair<Int, GameCard>>, onPreviewCard: (Int, GameCard) -> Unit, onDismiss: () -> Unit, groupingKeys: List<String?>? = null) {
+    val rows = remember(entries, ownership, turnMarkers, groupingKeys) {
+        collapsedGameLogRows(entries, ownership, turnMarkers, groupingKeys)
+    }
+    // Paginate expanded events to keep thousand-trigger turns responsive.
+    var expandedCounts by remember { mutableStateOf<Map<Int, Int>>(emptyMap()) }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.82f), shape = RoundedCornerShape(14.dp), color = Panel) {
-            Box(Modifier.fillMaxSize()) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("ACTIVITY LOG · ${entries.size}", color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close game log", tint = Muted) }
                 }
-                Text(if (ownership != null) "Whole game · newest first · your actions marked YOU" else "Actions · mana payments · triggers · effects", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(bottom = 7.dp))
+                Text(if (ownership != null) "Whole game · newest first · your actions marked YOU" else "Actions · mana payments · triggers · effects",
+                    color = Muted, fontSize = 9.sp, modifier = Modifier.padding(bottom = 7.dp))
                 if (entries.isEmpty()) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { Text("No actions logged yet", color = Muted) }
                 else LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                    items(entries.size) { index ->
-                        val entryIndex = entries.lastIndex - index
-                        val entry = entries[entryIndex]
-                        if (turnMarkers?.getOrNull(entryIndex) == true) {
+                    items(rows.size) { displayIndex ->
+                        val row = rows[rows.lastIndex - displayIndex]
+                        val entry = row.description
+                        if (row.isTurnMarker) {
                             Text(entry.trim('-', ' ').uppercase(), color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp,
                                 modifier = Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 1.dp, start = 3.dp))
                             return@items
                         }
-                        val yours = ownership?.getOrNull(entryIndex) == true
+                        val yours = row.isYours == true
                         val entryColor = when {
                             "trigger" in entry.lowercase() -> Mint
                             "paid " in entry.lowercase() || "payment" in entry.lowercase() -> CounterGold
@@ -2036,17 +2041,44 @@ internal fun GameLogDialog(entries: List<String>, ownership: List<Boolean?>? = n
                             previewableCards.sortedByDescending { it.second.name.length }
                                 .firstOrNull { (_, card) -> entry.contains(card.name, ignoreCase = true) }
                         }
-                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).border(if (yours) 1.dp else 0.dp, if (yours) Mint else PanelLight, RoundedCornerShape(8.dp)).padding(7.dp), verticalAlignment = Alignment.CenterVertically) {
-                            if (yours) Text("YOU", color = Ink, fontSize = 8.sp, fontWeight = FontWeight.Black, modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Mint).padding(horizontal = 4.dp, vertical = 2.dp))
-                            ManaSymbolText(entry, color = entryColor, fontSize = 12.sp, modifier = Modifier.weight(1f).padding(3.dp))
-                            preview?.let { (owner, card) ->
-                                CardFace(card, Modifier.width(31.dp), onClick = { onPreviewCard(owner, card) }, onLongClick = { onPreviewCard(owner, card) }, showCounters = false)
+                        Column {
+                            Row(
+                                Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight)
+                                    .border(if (yours) 1.dp else 0.dp, if (yours) Mint else PanelLight, RoundedCornerShape(8.dp))
+                                    .clickable(enabled = row.count > 1) {
+                                        expandedCounts = if (row.firstIndex in expandedCounts) expandedCounts - row.firstIndex
+                                            else expandedCounts + (row.firstIndex to minOf(25, row.count))
+                                    }
+                                    .padding(7.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                if (yours) Text("YOU", color = Ink, fontSize = 8.sp, fontWeight = FontWeight.Black,
+                                    modifier = Modifier.clip(RoundedCornerShape(4.dp)).background(Mint).padding(horizontal = 4.dp, vertical = 2.dp))
+                                ManaSymbolText(entry, color = entryColor, fontSize = 12.sp, modifier = Modifier.weight(1f).padding(3.dp))
+                                if (row.count > 1) Text("×${row.count} ${if (row.firstIndex in expandedCounts) "▲" else "▼"}",
+                                    color = CounterGold, fontWeight = FontWeight.Black, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 4.dp))
+                                preview?.let { (owner, card) ->
+                                    CardFace(card, Modifier.width(31.dp), onClick = { onPreviewCard(owner, card) },
+                                        onLongClick = { onPreviewCard(owner, card) }, showCounters = false)
+                                }
+                            }
+                            val shown = expandedCounts[row.firstIndex] ?: 0
+                            if (row.count > 1 && shown > 0) {
+                                val displayed = minOf(shown, row.count)
+                                // These are references to the original log entries, not fabricated summaries.
+                                for (original in row.firstIndex until row.firstIndex + displayed) {
+                                    Text("#${original + 1} · ${entries[original]}", color = Muted, fontSize = 11.sp,
+                                        modifier = Modifier.fillMaxWidth().padding(start = 14.dp, top = 2.dp, bottom = 2.dp))
+                                }
+                                if (displayed < row.count) TextButton(
+                                    onClick = { expandedCounts = expandedCounts + (row.firstIndex to minOf(row.count, displayed + 25)) }
+                                ) { Text("SHOW NEXT ${minOf(25, row.count - displayed)} · ${row.count - displayed} REMAIN", color = Mint, fontSize = 10.sp) }
                             }
                         }
                     }
                 }
-                if (ownership == null) Text("Unsupported or ambiguous effects are marked for manual resolution.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(top = 6.dp))
-            }
+                if (ownership == null) Text("Unsupported or ambiguous effects are marked for manual resolution.",
+                    color = Muted, fontSize = 9.sp, modifier = Modifier.padding(top = 6.dp))
             }
         }
     }
