@@ -1,4 +1,4 @@
-name: Arcana five-feature combined debug APK
+name: Arcana Build 129 five-feature debug APK
 on:
   push:
     branches:
@@ -48,12 +48,12 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/ArcanaTable-5-Feature-Preview-debug.apk
-          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging dist/ArcanaTable-5-Feature-Preview-debug.apk | head -n 8 | tee dist/package-info.txt
-          grep -F "package: name='com.arcanatable.argentum'" dist/package-info.txt
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs dist/ArcanaTable-5-Feature-Preview-debug.apk | tee dist/signing-info.txt
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/ArcanaTable-B129-Five-Feature-Preview-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging dist/ArcanaTable-B129-Five-Feature-Preview-debug.apk | head -n 8 | tee dist/package-info.txt
+          grep -F "package: name='com.arcanatable.argentum' versionCode='129' versionName='0.33.7-build129-five-feature-preview'" dist/package-info.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs dist/ArcanaTable-B129-Five-Feature-Preview-debug.apk | tee dist/signing-info.txt
           printf 'branch=%s\ncommit=%s\ntest_package=com.arcanatable.argentum\nsignature=Android debug signing (NOT the Play Store production signing key)\nproduction_changed=false\n' "$GITHUB_REF_NAME" "$GITHUB_SHA" > dist/provenance.txt
-          sha256sum dist/ArcanaTable-5-Feature-Preview-debug.apk > dist/SHA256SUMS.txt
+          sha256sum dist/ArcanaTable-B129-Five-Feature-Preview-debug.apk > dist/SHA256SUMS.txt
       - name: Upload test reports
         uses: actions/upload-artifact@v4
         if: always()
@@ -67,7 +67,7 @@ jobs:
       - name: Upload signed installable debug preview APK
         uses: actions/upload-artifact@v4
         with:
-          name: ArcanaTable-Five-Feature-Debug-APK
+          name: ArcanaTable-B129-Five-Feature-Debug-APK
           path: dist/
           if-no-files-found: error
           retention-days: 14
