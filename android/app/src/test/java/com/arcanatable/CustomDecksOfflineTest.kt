@@ -42,7 +42,20 @@ class CustomDecksOfflineTest {
         listOf("Sneak Attack", "Food Chain", "Reflecting Pool", "Jaws, Relentless Predator").forEach { assertNotNull(it, registry.getCard(it)) }
         assertTrue(setup.notes.toString(), setup.notes.any { "Goblin Welder" in it })
         assertTrue(setup.notes.toString(), setup.notes.none { "Sneak Attack" in it && "Left out" in it })
-        assertTrue(setup.notes.any { it.startsWith("Using Arcana's own versions of 15") })
+        // Preserve every previously custom card even when upstream now supplies its definition.
+        // The custom-only count is expected to shrink as Argentum gains those implementations.
+        val preserved = listOf(
+            "Ancient Copper Dragon", "Bag End Banquet", "Defense of the Heart", "Displaced Dinosaurs",
+            "Food Chain", "Jaheira, Friend of the Forest", "Jaws, Relentless Predator", "Mother of Runes",
+            "Ninja Pizza", "Quest for Renewal", "Reflecting Pool", "Rocco, Cabaretti Caterer",
+            "Sneak Attack", "Tataru Taru", "The Cabbage Merchant",
+        )
+        preserved.forEach { name -> assertNotNull("Preserved card: $name", registry.getCard(name)) }
+        assertEquals(listOf("Goblin Welder"), names.filter { lib.canonical(it) == null }.distinct())
+        val custom = (setup.you.deck + setup.you.commander!!).filter(lib::isCustom).distinct()
+        assertTrue(setup.notes.toString(), setup.notes.any {
+            it.startsWith("Using Arcana's own versions of ${custom.size} card(s)")
+        })
     }
 
     @Test fun artificerUsesCustomCardsAndOnlyLeavesOutRatchet() {
