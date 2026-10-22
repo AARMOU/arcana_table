@@ -4,6 +4,7 @@ import com.arcanatable.customcards.cards.ForgeOfHeroes
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.engine.state.components.identity.CommanderComponent
+import com.wingedsheep.engine.state.components.battlefield.EnteredThisTurnComponent
 import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.*
 import org.junit.Assert.*
@@ -20,7 +21,7 @@ class ForgeOfHeroesScenarioTest {
         val action = ActivateAbility(p, forge, ability.id, targets = listOf(ChosenTarget.Permanent(bear)))
         assertNotNull("ordinary creature isn't a commander", d.submit(action).error)
         d.replaceState(d.state.updateEntity(bear) { c ->
-            c.with(CommanderComponent(ownerId = p))
+            c.with(CommanderComponent(ownerId = p)).with(EnteredThisTurnComponent)
         })
         assertNull(d.submit(action).error)
         d.resolveAll()
@@ -36,7 +37,7 @@ class ForgeOfHeroesScenarioTest {
         val forge = d.putPermanentOnBattlefield(p, "Forge of Heroes")
         val walker = d.putPermanentOnBattlefield(p, "Jace, the Mind Sculptor")
         d.replaceState(d.state.updateEntity(walker) { c ->
-            c.with(CommanderComponent(ownerId = p))
+            c.with(CommanderComponent(ownerId = p)).with(EnteredThisTurnComponent)
         })
         val before = d.state.getEntity(walker)!!
             .get<com.wingedsheep.engine.state.components.battlefield.CountersComponent>()
