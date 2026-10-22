@@ -5,6 +5,7 @@ on:
     paths:
       - investigation/argentum-six-precons/staged-engine/0005-colorless-hybrid-sdk.patch
       - investigation/argentum-six-precons/staged-engine/0006-colorless-hybrid-floating-payment.patch
+      - investigation/argentum-six-precons/staged-engine/0007-colorless-hybrid-auto-tap.patch
       - .github/workflows/argentum-colorless-hybrid-mana.yml
   workflow_dispatch:
 permissions:
@@ -37,6 +38,8 @@ jobs:
           git apply ../investigation/argentum-six-precons/staged-engine/0005-colorless-hybrid-sdk.patch
           git apply --check ../investigation/argentum-six-precons/staged-engine/0006-colorless-hybrid-floating-payment.patch
           git apply ../investigation/argentum-six-precons/staged-engine/0006-colorless-hybrid-floating-payment.patch
+          git apply --check ../investigation/argentum-six-precons/staged-engine/0007-colorless-hybrid-auto-tap.patch
+          git apply ../investigation/argentum-six-precons/staged-engine/0007-colorless-hybrid-auto-tap.patch
           git diff --check
       - name: Verify exact colorless-hybrid mana payment and existing hybrid payments
         working-directory: upstream-engine
@@ -44,7 +47,9 @@ jobs:
           ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
             -Dorg.gradle.configuration-cache=false :rules-engine:test \
             --tests '*ColorlessHybridManaPaymentTest' \
-            --tests '*MonocolorHybridManaPaymentTest'
+            --tests '*MonocolorHybridManaPaymentTest' \
+            --tests '*ColorlessHybridManaSolverTest' \
+            --tests '*MonocolorHybridManaSolverTest'
       - name: Verify full engine regression
         working-directory: upstream-engine
         run: |
