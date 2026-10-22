@@ -1,0 +1,40 @@
+name: Isolated Forge loyalty fixture CI fix
+on:
+  push:
+    branches:
+      - gpt/ci-fix-forge-loyalty-20261022
+permissions:
+  contents: read
+jobs:
+  forge-card-validation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Generate card export and run all custom-card regressions
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test
+      - name: Verify generated card inventory and original source unchanged
+        run: |
+          python3 investigation/argentum-six-precons/coverage-audit.py
+          git diff --check
+      - name: Archive evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: forge-loyalty-regression-results
+          path: |
+            android/custom-cards/build/test-results/
+            android/custom-cards/build/reports/tests/
+          if-no-files-found: warn
+          retention-days: 14
