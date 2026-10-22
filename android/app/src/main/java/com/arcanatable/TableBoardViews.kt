@@ -208,9 +208,9 @@ internal fun ManaSymbolText(text: String, color: Color, fontSize: androidx.compo
 }
 
 @Composable
-internal fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier = Modifier, compact: Boolean = false, isActivePlayer: Boolean = false, turnNumber: Int, phaseName: String, turnTime: Long?, showTurnTimer: Boolean, onToggleTimer: () -> Unit, onMoveUp: () -> Unit, onMoveDown: () -> Unit, onOpen: () -> Unit, onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit, canReorder: Boolean = true) {
-    var expanded by remember(player.id) { mutableStateOf(isActivePlayer) }
-    LaunchedEffect(player.id, isActivePlayer) { expanded = isActivePlayer }
+internal fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier = Modifier, compact: Boolean = false, isActivePlayer: Boolean = false, turnNumber: Int, phaseName: String, turnTime: Long?, showTurnTimer: Boolean, onToggleTimer: () -> Unit, onMoveUp: () -> Unit, onMoveDown: () -> Unit, onOpen: () -> Unit, onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit, tableZoom: MutableFloatState, onTableZoomEnd: (Float) -> Unit, canReorder: Boolean = true) {
+    // A turn change must not expand or collapse a player's overview panel.
+    var expanded by rememberSaveable(player.id) { mutableStateOf(false) }
     val paymentCards = player.battlefield.filter { card ->
         if (card.isFaceDown) return@filter false
         val name = card.name.lowercase()
@@ -285,14 +285,15 @@ internal fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier 
             ).filter { it.second.isNotEmpty() }
             if (cardGroups.isEmpty()) Text("No public cards to show", color = Muted, fontSize = 10.sp)
             else {
-                Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.fillMaxWidth().pinchToZoom(tableZoom, onTableZoomEnd).testTag("table-card-zoom"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("PINCH TO RESIZE CARDS · SCROLL TO BROWSE", color = Muted, fontSize = 8.sp)
                     cardGroups.forEach { (title, cards) ->
                         Text(title, color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp)
                         BoxWithConstraints(Modifier.fillMaxWidth()) {
                             val panelWidth = maxWidth
                             val cardGap = 7.dp
-                            val minCardWidth = if (compact) 62.dp else 116.dp
-                            val maxCardWidth = if (compact) 120.dp else 190.dp
+                            val minCardWidth = (if (compact) 62.dp else 116.dp) * tableZoom.floatValue
+                            val maxCardWidth = (if (compact) 120.dp else 190.dp) * tableZoom.floatValue
                             val cardRows = buildList {
                                 var row = mutableListOf<GameCard>()
                                 var occupiedWidth = 0.dp
