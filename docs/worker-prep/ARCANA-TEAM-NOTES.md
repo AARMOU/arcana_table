@@ -49,6 +49,13 @@ This is a durable, append-only notebook for development team handoffs and any ve
 
 **Open integration and correctness rules:** Preserve legal actions, game states, hidden information, trigger counts, legitimate tokens and AI capabilities; no approximations, skipped events or release builds. Every completed task requires an independent code review and **executed** tests, not a written checklist.
 
+### 2026-10-21 22:56 (America/Denver) — Notes monitoring enabled
+
+- Created an hourly **condition-based** Arcana team notes check covering issues #12–#25, branch/PR changes, test evidence, meaningful blockers and independent review.
+- It is configured to **append only verifiable developments** to this ledger and notify only about meaningful changes. It has not run yet; no future success or GitHub edits are assumed.
+- This scheduled monitor is **not** a coding agent, and none of the 42 coding roles has a verified launch/task ID.
+- No source changes, merges, signing operations or releases were performed as part of the monitoring setup.
+
 ### Update format to use for future work
 
 ```text
