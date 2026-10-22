@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.CompanyCommander
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
 import org.junit.Assert.*
@@ -11,8 +12,13 @@ class CompanyCommanderScenarioTest {
     @Test fun etbMakesOneWhiteSoldierForEachOpponent() {
         val d = customScenario(CompanyCommander)
         val p = d.player1
-        val commander = d.putCreatureOnBattlefield(p, "Company Commander")
+        val spell = d.putCardInHand(p, "Company Commander")
+        d.giveColorlessMana(p, 2)
+        d.giveMana(p, Color.WHITE)
+        d.giveMana(p, Color.BLACK)
+        assertNull(d.castSpell(p, spell).error)
         d.resolveAll()
+        val commander = d.findPermanent(p, "Company Commander")!!
         val soldiers = d.getCreatures(p).filter {
             it != commander && d.getCardName(it)?.contains("Soldier") == true
         }
@@ -25,8 +31,13 @@ class CompanyCommanderScenarioTest {
     @Test fun attackingGrantsDeathtouchToFriendlyAttackersAndReservesButNotOpponents() {
         val d = customScenario(CompanyCommander, "Grizzly Bears")
         val p = d.player1
-        val commander = d.putCreatureOnBattlefield(p, "Company Commander")
+        val spell = d.putCardInHand(p, "Company Commander")
+        d.giveColorlessMana(p, 2)
+        d.giveMana(p, Color.WHITE)
+        d.giveMana(p, Color.BLACK)
+        assertNull(d.castSpell(p, spell).error)
         d.resolveAll()
+        val commander = d.findPermanent(p, "Company Commander")!!
         val soldier = d.getCreatures(p).single { it != commander }
         val reserve = d.putCreatureOnBattlefield(p, "Grizzly Bears")
         val enemy = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
