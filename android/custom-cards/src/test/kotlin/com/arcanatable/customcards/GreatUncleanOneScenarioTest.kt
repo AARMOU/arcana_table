@@ -3,6 +3,7 @@ package com.arcanatable.customcards
 import com.arcanatable.customcards.cards.GreatUncleanOne
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.sdk.core.Step
+import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.model.Deck
 import org.junit.Assert.*
 import org.junit.Test
@@ -11,7 +12,11 @@ class GreatUncleanOneScenarioTest {
     @Test fun twoPlayerEndStepLosesTwoThenMintsOnePlaguebearer() {
         val d = customScenario(GreatUncleanOne)
         val p = d.player1
-        d.putCreatureOnBattlefield(p, "Great Unclean One")
+        val unclean = d.putCardInHand(p, "Great Unclean One")
+        d.giveMana(p, Color.BLACK)
+        d.giveColorlessMana(p, 4)
+        assertNull(d.castSpell(p, unclean).error)
+        d.resolveAll()
 
         d.passPriorityUntil(Step.END, activePlayer = p)
         d.resolveAll()
@@ -28,7 +33,11 @@ class GreatUncleanOneScenarioTest {
         val players = d.initMultiplayer(List(3) { Deck.of("Swamp" to 40) })
         val (p1, p2, p3) = players
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = p1)
-        d.putCreatureOnBattlefield(p1, "Great Unclean One")
+        val unclean = d.putCardInHand(p1, "Great Unclean One")
+        d.giveMana(p1, Color.BLACK)
+        d.giveColorlessMana(p1, 4)
+        assertNull(d.castSpell(p1, unclean).error)
+        d.resolveAll()
         // p2 (18->16) qualifies, but p3 (22->20) ties with controller after losing 2.
         d.setLifeTotal(p2, 18)
         d.setLifeTotal(p3, 22)
@@ -46,7 +55,11 @@ class GreatUncleanOneScenarioTest {
         val d = customScenario(GreatUncleanOne)
         val p = d.player1
         d.setLifeTotal(p, 10)
-        d.putCreatureOnBattlefield(p, "Great Unclean One")
+        val unclean = d.putCardInHand(p, "Great Unclean One")
+        d.giveMana(p, Color.BLACK)
+        d.giveColorlessMana(p, 4)
+        assertNull(d.castSpell(p, unclean).error)
+        d.resolveAll()
         d.passPriorityUntil(Step.END, activePlayer = p)
         d.resolveAll()
         assertEquals(18, d.getLifeTotal(d.player2))
