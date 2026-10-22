@@ -462,7 +462,7 @@ internal fun TableController.TableOverlays() {
         (it.optString("type") == "CombatResolutionDecision" && ArgentumCombatResolution.from(it) != null) }?.let { decision ->
         val decisionId = decision.optString("id")
         val kind = decision.optString("type")
-        val prompt = decision.optString("prompt", "Argentum needs a choice").let { base ->
+        val prompt = decision.decisionDisplayText("prompt", "Argentum needs a choice").let { base ->
             // Say which card is asking, so "Choose up to 1 card" reads "Lady Octopus: Choose up to 1 card".
             val source = decision.optJSONObject("context")?.optString("sourceName")?.takeIf { it.isNotBlank() && it != "null" }
             if (source != null && !base.contains(source, ignoreCase = true)) "$source: $base" else base
@@ -651,15 +651,15 @@ internal fun TableController.TableOverlays() {
             confirmButton = {
                 when (kind) {
                     "YesNoDecision" -> Column(horizontalAlignment = Alignment.End) {
-                        TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "YesNoResponse").put("choice", true)) }) { Text(decision.optString("yesText", "YES")) }
+                        TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "YesNoResponse").put("choice", true)) }) { Text(decision.decisionDisplayText("yesText", "YES")) }
                         TextButton(onClick = {
                             argentumAutoYes = argentumAutoYes + (autoYesKey(decision) to (argentumSnapshot?.turnNumber ?: 0))
                             submitArgentumDecision(JSONObject().put("type", "YesNoResponse").put("choice", true))
-                        }) { Text("${decision.optString("yesText", "YES").uppercase()} · ALWAYS THIS TURN", fontSize = 12.sp) }
+                        }) { Text("${decision.decisionDisplayText("yesText", "YES").uppercase()} · ALWAYS THIS TURN", fontSize = 12.sp) }
                     }
-                    "BatchYesNoDecision" -> Row {
-                        TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", true).put("applyToAll", false)) }) { Text("${decision.optString("yesText", "YES")} · ONCE") }
-                        TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", true).put("applyToAll", true)) }) { Text("${decision.optString("yesText", "YES")} · ALL") }
+                    "BatchYesNoDecision" -> Column(horizontalAlignment = Alignment.End) {
+                        TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", true).put("applyToAll", false)) }) { Text("${decision.decisionDisplayText("yesText", "YES")} · ONCE") }
+                        TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", true).put("applyToAll", true)) }) { Text("${decision.decisionDisplayText("yesText", "YES")} · ALL") }
                     }
                     "ChooseColorDecision" -> TextButton(enabled = argentumDecisionColors.isNotEmpty() && argentumDecisionColors.size <= decision.optInt("maxColors", 1), onClick = {
                         val colors = argentumDecisionColors.toList()
@@ -725,14 +725,14 @@ internal fun TableController.TableOverlays() {
                 }
             },
             dismissButton = {
-                if (kind == "YesNoDecision") TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "YesNoResponse").put("choice", false)) }) { Text(decision.optString("noText", "NO")) }
-                else if (kind == "BatchYesNoDecision") Row {
-                    TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", false).put("applyToAll", false)) }) { Text("${decision.optString("noText", "NO")} · ONCE") }
-                    TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", false).put("applyToAll", true)) }) { Text("${decision.optString("noText", "NO")} · ALL") }
+                if (kind == "YesNoDecision") TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "YesNoResponse").put("choice", false)) }) { Text(decision.decisionDisplayText("noText", "NO")) }
+                else if (kind == "BatchYesNoDecision") Column(horizontalAlignment = Alignment.End) {
+                    TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", false).put("applyToAll", false)) }) { Text("${decision.decisionDisplayText("noText", "NO")} · ONCE") }
+                    TextButton(onClick = { submitArgentumDecision(JSONObject().put("type", "BatchYesNoResponse").put("choice", false).put("applyToAll", true)) }) { Text("${decision.decisionDisplayText("noText", "NO")} · ALL") }
                 }
                 else if (kind == "SelectCardsDecision" && decision.optInt("minSelections", 0) == 0) TextButton(onClick = {
                     submitArgentumDecision(JSONObject().put("type", "CardsSelectedResponse").put("selectedCards", JSONArray()))
-                }) { Text(decision.optString("declineLabel", "SELECT NONE")) }
+                }) { Text(decision.decisionDisplayText("declineLabel", "SELECT NONE")) }
                 else if (kind == "SelectManaSourcesDecision" && decision.optBoolean("canDecline")) TextButton(onClick = { submitArgentumDecision(ArgentumDecisions.declineManaResponse()) }) { Text("DECLINE") }
                 // Every decision can be set aside to look at the board; the status strip brings it back.
                 if (kind !in setOf("YesNoDecision", "BatchYesNoDecision")) TextButton(onClick = { argentumDeferredDecisionId = decisionId }) { Text("VIEW TABLE") }
