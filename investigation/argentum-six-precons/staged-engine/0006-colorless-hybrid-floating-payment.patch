@@ -101,3 +101,90 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/
          }
          if (hybridIndex >= 0) {
              mutableSymbols.removeAt(hybridIndex)
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/mana/ColorlessHybridManaPaymentTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/mana/ColorlessHybridManaPaymentTest.kt
+new file mode 100644
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/mana/ColorlessHybridManaPaymentTest.kt
+@@ -0,0 +1,82 @@
++package com.wingedsheep.engine.handlers.mana
++
++import com.wingedsheep.engine.mechanics.mana.ManaPool
++import com.wingedsheep.engine.mechanics.mana.allocateFloating
++import com.wingedsheep.sdk.core.Color
++import com.wingedsheep.sdk.core.ManaCost
++import io.kotest.core.spec.style.StringSpec
++import io.kotest.matchers.shouldBe
++
++/** Genuine colorless-or-one-color pips: no generic substitution, with competing strict costs. */
++class ColorlessHybridManaPaymentTest : StringSpec({
++    val symbols = listOf("W", "U", "B", "R", "G")
++
++    "each hybrid pip accepts either its own color or one actual colorless" {
++        for (symbol in symbols) {
++            val cost = ManaCost.parse("{C/$symbol}")
++            val matching = Color.fromSymbol(symbol.single())!!
++            val colored = ManaPool.EMPTY.add(matching)
++            colored.canPay(cost) shouldBe true
++            colored.pay(cost) shouldBe ManaPool.EMPTY
++            ManaPool(colorless = 1).canPay(cost) shouldBe true
++            ManaPool(colorless = 1).pay(cost) shouldBe ManaPool.EMPTY
++        }
++    }
++
++    "hybrid rejects unrelated colored mana and cannot be paid with zero or generic" {
++        val cost = ManaCost.parse("{C/W}")
++        ManaPool(blue = 1).canPay(cost) shouldBe false
++        ManaPool(blue = 1).pay(cost) shouldBe null
++        ManaPool.EMPTY.canPay(cost) shouldBe false
++    }
++
++    "strict colored cost reserves its colored mana regardless of pip order" {
++        for (symbols in listOf("{C/W}{W}", "{W}{C/W}")) {
++            val cost = ManaCost.parse(symbols)
++            val pool = ManaPool(white = 1, colorless = 1)
++            pool.canPay(cost) shouldBe true
++            pool.pay(cost) shouldBe ManaPool.EMPTY
++        }
++    }
++
++    "strict colorless cost reserves actual colorless mana regardless of pip order" {
++        for (symbols in listOf("{C/W}{C}", "{C}{C/W}")) {
++            val cost = ManaCost.parse(symbols)
++            val pool = ManaPool(white = 1, colorless = 1)
++            pool.canPay(cost) shouldBe true
++            pool.pay(cost) shouldBe ManaPool.EMPTY
++        }
++    }
++
++    "Ulalek's five hybrid pips accept all five colors, all colorless, or mixed" {
++        val cost = ManaCost.parse("{C/W}{C/U}{C/B}{C/R}{C/G}")
++        for (pool in listOf(
++            ManaPool(white = 1, blue = 1, black = 1, red = 1, green = 1),
++            ManaPool(colorless = 5),
++            ManaPool(white = 1, blue = 1, black = 1, red = 1, colorless = 1),
++        )) {
++            pool.canPay(cost) shouldBe true
++            pool.pay(cost) shouldBe ManaPool.EMPTY
++        }
++        ManaPool(colorless = 4).canPay(cost) shouldBe false
++    }
++
++    "partial floating payment leaves its actual unpaid hybrid symbol intact" {
++        val cost = ManaCost.parse("{C/W}{W}")
++        val partial = ManaPool(white = 1).payPartial(cost)
++        partial.manaSpent shouldBe ManaPool(white = 1)
++        partial.remainingCost shouldBe ManaCost.parse("{C/W}")
++        partial.newPool shouldBe ManaPool.EMPTY
++    }
++
++    "exact floating allocation uses colorless for hybrid to preserve strict color" {
++        val cost = ManaCost.parse("{C/W}{W}")
++        val allocation = ManaPool(white = 1, colorless = 1).allocateFloating(cost, null)
++        (allocation != null) shouldBe true
++        allocation!!.pool shouldBe ManaPool.EMPTY
++    }
++
++    "exact floating allocation rejects an off-color pool even when total mana is enough" {
++        ManaPool(blue = 2).allocateFloating(ManaCost.parse("{C/W}{1}"), null) shouldBe null
++    }
++})
