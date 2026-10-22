@@ -515,6 +515,8 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             argentumWon = if (winner == null) null else won
             val namesById = players.associate { it.id to it.name }
             argentumGameOverText = ArgentumOutcomeLog.banner(incoming, argentumPlayerId, namesById)
+            val gameOverLine = "Game over — ${argentumGameOverText.orEmpty()}"
+            if (gameLog.lastOrNull() != gameOverLine) gameLog = (gameLog + gameOverLine).takeLast(250)
             recordDiagnostic(ArgentumOutcomeLog.diagnostic(incoming, namesById), DiagnosticCategory.ENGINE)
         }
         "sessionReplaced" -> recordDiagnostic("Argentum session replaced by another connection", DiagnosticCategory.CONNECTION)
