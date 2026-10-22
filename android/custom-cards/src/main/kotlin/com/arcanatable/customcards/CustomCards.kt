@@ -241,6 +241,13 @@ object CustomCards {
         Entry(PrimarisEliminator, "40K", "Six WotC precons"),
         Entry(DeathsPresence, "40K", "Six WotC precons"),
         Entry(ScreamerKiller, "40K", "Six WotC precons"),
+        Entry(AndTheyShallKnowNoFear, "40K", "Six WotC precons"),
+        Entry(CanoptekSpyder, "40K", "Six WotC precons"),
+        Entry(CanoptekTombSentinel, "40K", "Six WotC precons"),
+        Entry(DenyTheWitch, "40K", "Six WotC precons"),
+        Entry(HexmarkDestroyer, "40K", "Six WotC precons"),
+        Entry(TriarchPraetorian, "40K", "Six WotC precons"),
+        Entry(Zoanthrope, "40K", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
