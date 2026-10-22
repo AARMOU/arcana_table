@@ -24,7 +24,7 @@ internal object OfflineCheckpointStore {
         require(payload.optInt("schema") == FORMAT && payload.optString("mode") == "local-ai") {
             "Unsupported offline checkpoint format"
         }
-        require(payload.has("gameState") && payload.optJSONArray("seats")?.length() in 2..4) {
+        require(payload.has("gameState") && (payload.optJSONArray("seats")?.length() ?: 0) in 2..4) {
             "Incomplete offline game checkpoint"
         }
         val atomic = file(context)
@@ -47,7 +47,7 @@ internal object OfflineCheckpointStore {
         return JSONObject(data).also {
             require(it.optInt("schema") == FORMAT && it.optString("mode") == "local-ai")
             require(it.optJSONObject("gameState") != null)
-            require(it.optJSONArray("seats")?.length() in 2..4)
+            require((it.optJSONArray("seats")?.length() ?: 0) in 2..4)
         }
     }
 
