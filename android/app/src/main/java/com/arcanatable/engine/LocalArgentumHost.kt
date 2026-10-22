@@ -127,6 +127,9 @@ class LocalArgentumHost(
     // Wi-Fi: where the guest's messages go. Null = the second seat is the AI.
     @Volatile private var guestEmit: ((JSONObject) -> Unit)? = null
     private val gameLogs = mutableMapOf<EntityId, MutableList<ClientEvent>>()
+    // Final engine result events must survive empty-event resyncs and terminal follow-up messages.
+    private var lastGameOutcomeEvents: List<GameEvent> = emptyList()
+    private val observedLossEvents = mutableListOf<com.wingedsheep.engine.core.PlayerLostEvent>()
     // Intermediate progress updates usually contain no new visible log entries. Keep their
     // immutable wire snapshot until the underlying list actually changes; do not discard events.
     private data class LogSnapshot(val source: MutableList<ClientEvent>, val size: Int, val value: List<ClientEvent>)
@@ -366,6 +369,8 @@ class LocalArgentumHost(
         legalCache.clear()
         logSnapshots.clear()
         interactiveEpochs.clear()
+        lastGameOutcomeEvents = emptyList()
+        observedLossEvents.clear()
         ais = allSeats.filterNot(::isPerson).associateWith { OfflineAiPolicy.create(registry, it) }
         for (seat in people()) {
             emitTo(seat, JSONObject().put("type", "quickGameLobbyState").put("lobbyId", "offline")
@@ -394,6 +399,8 @@ class LocalArgentumHost(
         gameLogs.clear()
         logSnapshots.clear()
         legalCache.clear()
+        lastGameOutcomeEvents = emptyList()
+        observedLossEvents.clear()
         for (seat in people()) {
             emitTo(seat, JSONObject().put("type", "quickGameLobbyState").put("lobbyId", "offline").put("youPlayerId", seat.value).put("vsAi", !isWifi)
                 .put("players", org.json.JSONArray(allSeats.map { JSONObject().put("playerId", it.value).put("name", seatOf(it).name) })))
@@ -803,9 +810,8 @@ class LocalArgentumHost(
         return info
     }
 
-    private fun gameOverMessage(current: GameState, seat: EntityId) = JSONObject().put("type", "gameOver")
-        .put("winnerId", (current.winnerId?.value as Any?) ?: JSONObject.NULL)
-        .put("reason", if (current.winnerId == seat) "OPPONENT_LOST" else if (current.winnerId == null) "DRAW" else "YOU_LOST")
+    private fun gameOverMessage(current: GameState, seat: EntityId) =
+        GameOutcomeDetails.toMessage(current, seat, { seatOf(it).name }, lastGameOutcomeEvents) { registry.getCard(it) != null }
 
     private var peopleOutSent = false
 
@@ -828,6 +834,15 @@ class LocalArgentumHost(
 
     /** Sends every person their own view of the game. */
     private fun sendState(events: List<GameEvent>, interactive: Boolean = true) {
+        // Retain elimination events across the host's intermediate AI/progress flushes. A
+        // PlayerLostEvent and the final GameEndedEvent need not be delivered in one update.
+        observedLossEvents += events.filterIsInstance<com.wingedsheep.engine.core.PlayerLostEvent>()
+        val final = state
+        if (final?.gameOver == true) {
+            lastGameOutcomeEvents = (
+                observedLossEvents.filter { it.playerId !in final.activePlayers } + events
+            ).distinct()
+        }
         for (seat in people()) sendStateFor(seat, events, interactive)
     }
 
