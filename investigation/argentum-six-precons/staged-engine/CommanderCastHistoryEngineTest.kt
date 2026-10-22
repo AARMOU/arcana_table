@@ -36,7 +36,7 @@ class CommanderCastHistoryEngineTest : FunSpec({
         d.bothPass()
         d.bothPass()
         val permanent = d.findPermanent(p, "Scenario Swarmlord Counters")!!
-        return d.state.projectedState.getPower(permanent)
+        return d.state.projectedState.getPower(permanent) ?: error("Missing projected creature power")
     }
 
     test("a single commander cast three times grants six +1/+1 counters") {

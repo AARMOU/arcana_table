@@ -5,6 +5,8 @@ on:
       - gpt/argentum-six-precons
     paths:
       - investigation/argentum-six-precons/engine-patches/**
+      - investigation/argentum-six-precons/staged-engine/0002-commander-casts.patch
+      - investigation/argentum-six-precons/staged-engine/CommanderCastHistoryEngineTest.kt
       - .github/workflows/argentum-engine-enhancements.yml
   workflow_dispatch:
 permissions:
