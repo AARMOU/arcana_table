@@ -10,7 +10,7 @@ Shared base for all unmodified teams: `gpt/build128-mana-reliability` at `7593b1
 
 ## Team model
 
-**13 teams × 3 coding workers each = 39 defined worker assignments.** Each team has Worker A (source and engine), Worker B (UI/integration), Worker C (independent tests/review). Independent workers should use unique worktrees or subbranches (suggestion: `<team-branch>-a`, `-b`, `-c`) and submit their results to the team's integration branch. **Only the integration worker lands the team's changes.**
+**14 teams × 3 coding workers each = 42 defined worker assignments.** Each team has Worker A (source and engine), Worker B (UI/integration), Worker C (independent tests/review). Independent workers should use unique worktrees or subbranches (suggestion: `<team-branch>-a`, `-b`, `-c`) and submit their results to the team's integration branch. **Only the integration worker lands the team's changes.**
 
 Do not launch all 39 blindly if execution capacity is lower. Start teams in waves, avoiding shared file conflicts. These are prepared assignments, not claims that agent slots or builds exist.
 
@@ -66,10 +66,11 @@ Do not launch all 39 blindly if execution capacity is lower. Start teams in wave
 | 11 | Collapse consecutive identical game-log events | `gpt/work-log-grouping` | 3 (A/B/C) |
 | 12 | Readable notification popups and timing | `gpt/work-popup-notifications` | 3 (A/B/C) |
 | 13 | Dedicated targeting alerts | `gpt/work-targeting-alerts` | 3 (A/B/C) |
+| 14 | Graveyard/exile plays — finish and verify | `gpt/zone-casting-graveyard-exile` | 3 (A/B/C) |
 
 ## Launch sequencing (once an actual coding-agent runner is available)
 
-- **Wave A (low-conflict):** 07 diagnostic repro, 10 menu cleanup, 12 popup usability, 08 deck support report, 09 Table branch validation.
+- **Wave A (low-conflict):** 07 diagnostic repro, 10 menu cleanup, 12 popup usability, 08 deck support report, 09 Table branch validation, 14 graveyard/exile play validation.
 - **Wave B (shared contract first):** 01 log failure reasons and 11 grouping; 13 targeting alert; 05 turn recap.
 - **Wave C (engine/persistence-sensitive):** 02 progress, 03 tokens, 06 priority stops, 04 exact save/resume.
 - Worker C review may start with test plans, fixtures and baseline evidence before implementation. No team merges directly to `main`.
@@ -243,9 +244,23 @@ Do not launch all 39 blindly if execution capacity is lower. Start teams in wave
 
 **Required result:** Committable implementation on the isolated branch, new automated regressions, exact execution results, limitations, source change log and approval-ready integration notes; no release.
 
+### 14. Graveyard/exile play controls — complete and certify
+
+**Branch:** `gpt/zone-casting-graveyard-exile`
+
+**Worker 14-A — Core/source:** Audit the committed source-zone-aware casting and payment logic and all legal-action lookups. Verify Argentum engine actions reference the exact spell/object ID; no client-simulated permissions, lost triggers or inappropriate command-zone tax. Track flashback/escape/adventure and exile-to-other-zone destination semantics as engine requirements, not guessed Android effects.
+
+**Worker 14-B — UI/integration:** Verify the graveyard/exile action buttons and hand-drawer shortcuts are functional and readable; preserve inspection and manual sandbox actions separately; handle stale selections and changed zones without losing objects. Coordinate with menu layout team 10.
+
+**Worker 14-C — Independent QA:** Run `ZonePlaySourceTest.kt`, `GraveyardExileLegalActionsTest.kt`, `ui/ZoneCardActionsUiTest.kt` and all existing applicable unit/UI/device regressions. Test special permissions, alternate casting costs, zone-destination replacement, land plays, priority, hidden cards, stale ids and 4-seat games. Record exact failures and build/device evidence.
+
+**Required result:** Compile-verified and scenario-tested source code with independent review, evidence, and unresolved mechanics explicitly listed. Initial implementation is committed but **not certified**.
+
 ## Existing branch reminder
 
 `gpt/table-manual-expand-pinch-zoom` already contains manual expand/pinch changes and a new Robolectric test from the preceding conversation. These have not been compiled or exercised on device; treat any claim of completion as unverified until Worker 09-C certifies the behavior.
+
+The 14 team issues are [#12–#25](https://github.com/AARMOU/arcana_table/issues). Maintain dated evidence in [the notes ledger](./ARCANA-TEAM-NOTES.md); creation of these issues does not start an agent.
 
 ## Instructions to the eventual orchestration runner
 
