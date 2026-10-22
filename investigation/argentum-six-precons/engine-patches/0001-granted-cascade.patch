@@ -74,12 +74,15 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/
                  ) {
                      count++
                  }
-@@ -164,18 +166,33 @@
+@@ -164,18 +166,36 @@
          matchesSpellFilter(rider.spellFilter, cardDef)
  
      /** [castZone] is only consulted by a zone-scoped grant, so the zone scan stays off the common path. */
 -    private inline fun grantApplies(grant: GrantKeywordToOwnSpells, cardDef: CardDefinition, castZone: () -> Zone?): Boolean =
 -        matchesSpellFilter(grant.spellFilter, cardDef) && (grant.fromZone == null || grant.fromZone == castZone())
++    // Keep the three-argument overload for existing pre-cast keyword consumers (casualty).
++    private inline fun grantApplies(grant: GrantKeywordToOwnSpells, cardDef: CardDefinition, castZone: () -> Zone?): Boolean =
++        matchesSpellFilter(grant.spellFilter, cardDef) && (grant.fromZone == null || grant.fromZone == castZone())
 +    private inline fun grantApplies(
 +        grant: GrantKeywordToOwnSpells,
 +        cardDef: CardDefinition,
