@@ -1,0 +1,42 @@
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Myriad.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Myriad.kt
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Myriad.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Myriad.kt
+@@ -6,7 +6,8 @@
+ import com.wingedsheep.sdk.dsl.Conditions
+ import com.wingedsheep.sdk.dsl.Effects
+ import com.wingedsheep.sdk.dsl.Triggers
+-import com.wingedsheep.sdk.model.CardDefinition
++import com.wingedsheep.sdk.model.CardDefinition
++import com.wingedsheep.sdk.scripting.effects.EnteringAttackDefender
+ import com.wingedsheep.sdk.scripting.references.Player
+ import com.wingedsheep.sdk.scripting.targets.EffectTarget
+ 
+@@ -27,11 +28,11 @@
+  *   two-player game the only opponent is the defending player, so myriad does nothing.
+  * - **"you may create"** — `May`, asked of the source's controller rather than the visited
+  *   opponent (the loop rebinds "you"), and the copy is created under that same controller.
+- * - **"a copy of this creature that's tapped and attacking that player"** —
+- *   `CreateTokenCopyOfTarget(Self, tapped, attacking, attackedPlayer = You)`. The copy *enters*
+- *   attacking, so it never "attacked" (CR 508.4) and its own myriad doesn't trigger. The engine
+- *   picks the player rather than one of their planeswalkers, the same CR 508.4 simplification
+- *   every "enters attacking" effect here makes.
++ * - **"a copy of this creature that's tapped and attacking that player or a planeswalker"** —
++ *   `CreateTokenCopyOfTarget(Self, tapped, attacking, attackedPlayer = You,
++ *   attackDefender = CONTROLLER_CHOOSES)`. The choice is limited to that opponent or a
++ *   planeswalker they control, one choice per copy. Copies enter already attacking, so
++ *   they never "attacked" (CR 508.4) and their own myriad does not trigger.
+  * - **"exile the tokens at end of combat"** — `exileAtStep = END_COMBAT`, one delayed exile per
+  *   copy.
+  *
+@@ -70,8 +71,9 @@
+                         Effects.CreateTokenCopyOfTarget(
+                             target = EffectTarget.Self,
+                             tapped = true,
+-                            attacking = true,
+-                            attackedPlayer = EffectTarget.PlayerRef(Player.You),
++                            attacking = true,
++                            attackDefender = EnteringAttackDefender.CONTROLLER_CHOOSES,
++                            attackedPlayer = EffectTarget.PlayerRef(Player.You),
+                             controller = sourceController,
+                             exileAtStep = Step.END_COMBAT,
+                         ),
