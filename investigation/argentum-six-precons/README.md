@@ -50,7 +50,7 @@ in `CustomCards.kt`, and only become Android assets after
 `:custom-cards:exportCards`. Each new behavior gets its own scenario test.
 ## Verified implementation progress — October 21, 2026
 
-**77 distinct missing cards implemented, scenario-tested and exported** (30 beyond the previous 47-card checkpoint).
+**80 distinct missing cards implemented, scenario-tested and exported** (33 beyond the previous 47-card checkpoint).
 The first 16 were:
 
 - Spatial Contortion; Skittering Invasion; Blight Grenade; Deny Reality; Bituminous Blast
@@ -98,13 +98,15 @@ Soul of New Phyrexia, Inquisitor Greyfax, and Szarekh, the Silent King**. Scenar
 were executed for each. These definitions are exported; this count does not include the
 blocked Port Town candidate documented in `SDK-GAPS.md`.
 
-The latest five verified implementations are **Bastion Protector, Reverberate,
+The preceding five verified implementations are **Bastion Protector, Reverberate,
 Warping Wail, Stonecoil Serpent, and Return of the Wildspeaker**.
 Their executable tests cover controller-specific commander buffs, stack-spell copying,
 all three modal choices including Scion mana generation, X entry counters and
 multicolored protection, and Human-excluding modal draw or combat buffs.
 Full custom-card regressions and index/export verification passed:
 https://github.com/AARMOU/arcana_table/actions/runs/39719229079
+
+Three more tested and exported implementations are **Thunderwolf Cavalry**, **Vanguard Suppressor**, and **Company Commander**. They have real combat, squad, and entry-trigger scenarios. Full custom-card regressions, asset export, and coverage audit passed in [Actions run 39730047167](https://github.com/AARMOU/arcana_table/actions/runs/39730047167).
 
 Every implemented card has a scenario test. The verified GitHub Actions card
 regression, export, duplicate/coverage validation and asset commits include:
@@ -118,14 +120,14 @@ regression, export, duplicate/coverage validation and asset commits include:
 - https://github.com/AARMOU/arcana_table/actions/runs/39717112709
 - https://github.com/AARMOU/arcana_table/actions/runs/39719229079
 
-**Latest checked, exported commit:** `753a535d4fe1eb0b0ec06f2a665664dfef9d7c48`.
-The custom-card index contains **191 distinct names**. Comparing both indexes
-against the six official 100-card decklists leaves **199 distinct cards (204 deck
+**Latest checked, exported commit:** `abf16c3a114859673d04ad2c434d4e073ad5348a`.
+The custom-card index contains **194 distinct names**. Comparing both indexes
+against the six official 100-card decklists leaves **196 distinct cards (201 deck
 slots) missing**.
 
 | Deck | Missing deck slots |
 | --- | ---: |
-| Forces of the Imperium | 34 |
+| Forces of the Imperium | 31 |
 | Tyranid Swarm | 37 |
 | Necron Dynasties | 36 |
 | The Ruinous Powers | 34 |
