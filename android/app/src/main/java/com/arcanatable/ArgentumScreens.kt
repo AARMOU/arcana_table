@@ -166,7 +166,7 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
                     Modifier.fillMaxWidth().padding(vertical = 4.dp).clip(RoundedCornerShape(12.dp))
                         .background(if (unsupported == null && affordable) PanelLight else Panel)
                         .border(1.dp, if (unsupported == null && affordable) Mint.copy(alpha = 0.5f) else Muted.copy(alpha = 0.25f), RoundedCornerShape(12.dp))
-                        .combinedClickable(enabled = !busy, onClick = { onChoose(info) })
+                        .combinedClickable(enabled = !busy && affordable && unsupported == null, onClick = { onChoose(info) })
                         .padding(horizontal = 14.dp, vertical = 12.dp)
                 ) {
                     Text(if (ArgentumActions.isSacrificeMana(info)) ArgentumActions.menuLabel(info) else if (info.optJSONObject("action")?.optString("type") == "PassPriority") "Pass" else info.optString("description", info.optJSONObject("action")?.optString("type") ?: "Action"), color = if (unsupported == null) SoftWhite else Muted, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -179,7 +179,7 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
                     }
                     when {
                         unsupported != null -> Text("NEEDS HANDLING · $unsupported", color = CounterGold, fontSize = 10.sp)
-                        !affordable -> Text("Not enough mana right now.", color = Muted, fontSize = 10.sp)
+                        !affordable -> Text("Not enough spendable mana. Activate conditional mana sources first.", color = Muted, fontSize = 10.sp)
                         info.optBoolean("requiresTargets") || info.optBoolean("hasXCost") -> Text("You'll choose targets or X next.", color = Muted, fontSize = 10.sp)
                     }
                 }
