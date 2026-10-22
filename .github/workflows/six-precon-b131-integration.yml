@@ -1,7 +1,7 @@
-name: Build 131 — twelve-card six-precon integration gate
+name: Build 131 — post-merge six-precon compatibility
 on:
   push:
-    branches: [gpt/six-precon-worker-integration-20261022]
+    branches: [gpt/b131-post-merge-compatibility-20261022]
     paths: [.github/workflows/six-precon-b131-integration.yml]
   workflow_dispatch:
 permissions:
@@ -20,12 +20,12 @@ jobs:
       max-parallel: 5
       matrix:
         include:
-          - {label: "six-precon-twelve-card-batch", sha: "d3687c849dfc8b048d7b3551ff8d0bdb01848a47", app_check: "yes"}
+          - {label: "six-precon-twelve-card-batch", sha: "93eaeebf85e0f60cecad5a8f134a6163d7fab5cd", app_check: "yes"}
     steps:
       - name: Check out pinned Build 131 source and audit
         uses: actions/checkout@v4
         with:
-          ref: gpt/argentum-upgrade-preview-20261022
+          ref: 83aa342e3fcd200710fb9188192189fc7cea7abf
           path: build131
       - name: Check out exact card worker commit (never a moving head)
         uses: actions/checkout@v4
