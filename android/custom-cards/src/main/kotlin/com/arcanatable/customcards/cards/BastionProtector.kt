@@ -28,6 +28,6 @@ val BastionProtector = card("Bastion Protector") {
     metadata {
         rarity = Rarity.RARE
         collectorNumber = "182"
-        artist = "Victor Adame Minguez"
+        artist = "Steve Argyle"
     }
 }

@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.Reverberate
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.dsl.Effects
 import com.wingedsheep.sdk.dsl.card
@@ -25,7 +26,7 @@ class ReverberateScenarioTest {
         d.giveMana(p, Color.BLUE)
         d.giveMana(p, Color.RED, 2)
         assertNull(d.castSpell(p, original).error)
-        assertNull(d.castSpell(p, reverberate, listOf(original)).error)
+        assertNull(d.castSpellWithTargets(p, reverberate, listOf(ChosenTarget.Spell(original))).error)
         d.resolveAll()
         // Original + its copy each draw once; both cast cards leave hand.
         assertEquals(startingCards, d.getHand(p).size)

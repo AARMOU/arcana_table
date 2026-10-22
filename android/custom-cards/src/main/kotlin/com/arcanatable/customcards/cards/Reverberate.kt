@@ -19,7 +19,7 @@ val Reverberate = card("Reverberate") {
 
     metadata {
         rarity = Rarity.RARE
-        collectorNumber = "156"
-        artist = "jD"
+        collectorNumber = "207"
+        artist = "David Astruga"
     }
 }
