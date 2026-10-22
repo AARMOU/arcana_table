@@ -1,0 +1,46 @@
+name: Argentum upgrade Android baseline control tests
+on:
+  push:
+    branches:
+      - gpt/argentum-upgrade-baseline-20261022
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: argentum-upgrade-baseline-control
+  cancel-in-progress: true
+jobs:
+  baseline-control:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout Arcana candidate with original bundled engine (no replacement)
+        uses: actions/checkout@v4
+      - name: Set up JDK 17 for Android
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Configure Android
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android SDK 36
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Run the exact 5 focused Android test filters against bundled engine
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
+            --tests 'com.arcanatable.Build97Test.treasuresShowAsSacrificeForMana' \
+            --tests 'com.arcanatable.CustomDecksOfflineTest.tokensWinUsesCustomCardsAndOnlyLeavesOutGoblinWelder' \
+            --tests 'com.arcanatable.ui.ArgentumResilienceUiTest' \
+            --tests 'com.arcanatable.ui.DesignPreviewTest' \
+            --tests 'com.arcanatable.ui.GameScreenSizesTest'
+      - name: Upload exact baseline test results even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: argentum-upgrade-baseline-control-evidence
+          path: android/app/build/test-results/testDebugUnitTest/
+          if-no-files-found: warn
+          retention-days: 30
