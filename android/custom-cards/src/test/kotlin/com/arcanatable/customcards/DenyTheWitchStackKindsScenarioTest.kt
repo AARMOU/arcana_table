@@ -39,7 +39,7 @@ class DenyTheWitchStackKindsScenarioTest {
         d.giveMana(opp, Color.BLACK)
         assertNull(d.castSpell(opp, creature).error)
         assertNull(d.bothPass().error)
-        assertEquals("Company Commander", d.findPermanent(opp, "Company Commander")?.let { d.getName(it) })
+        assertNotNull(d.findPermanent(opp, "Company Commander"))
         val triggerId = d.getTopOfStack()!!
         assertNull(d.passPriority(opp).error)
         counterStackObject(d, triggerId)
@@ -48,7 +48,7 @@ class DenyTheWitchStackKindsScenarioTest {
     }
 
     @Test fun counteringActivatedNonmanaAbilityPreventsSpawnProduction() {
-        val d = customScenario(DenyTheWitch, SpawningBed)
+        val d = customScenario(DenyTheWitch, SpawningBed, "Grizzly Bears")
         val p = d.player1
         val opp = d.player2
         d.putCreatureOnBattlefield(p, "Grizzly Bears")
