@@ -1,0 +1,70 @@
+name: Isolated Argentum Myriad choice validation
+on:
+  push:
+    branches:
+      - gpt/argentum-myriad-planeswalker
+    paths:
+      - investigation/argentum-six-precons/staged-engine/0008-myriad-defender-choice.patch
+      - investigation/argentum-six-precons/staged-engine/MyriadDefenderChoiceTest.kt
+      - .github/workflows/argentum-myriad-validation.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: isolated-myriad-planeswalker-validation
+  cancel-in-progress: true
+jobs:
+  myriad-regressions:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    env:
+      ORG_GRADLE_PROJECT_kotlinCompileParallelism: '1'
+      GRADLE_OPTS: '-Dorg.gradle.workers.max=2 -Dorg.gradle.configuration-cache=false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 28d2b4f54bd4fcfe8a264ea0517a9b4307362562
+          path: upstream-engine
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Apply only Myriad patch and scenario tests to ephemeral upstream
+        working-directory: upstream-engine
+        run: |
+          git apply --check ../investigation/argentum-six-precons/staged-engine/0008-myriad-defender-choice.patch
+          git apply ../investigation/argentum-six-precons/staged-engine/0008-myriad-defender-choice.patch
+          cp ../investigation/argentum-six-precons/staged-engine/MyriadDefenderChoiceTest.kt \
+             rules-engine/src/test/kotlin/com/wingedsheep/engine/multiplayer/MyriadDefenderChoiceTest.kt
+          git diff --check
+          git diff -- mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Myriad.kt
+      - name: Run new Myriad and existing token-defender scenarios
+        working-directory: upstream-engine
+        run: |
+          ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
+            -Dorg.gradle.configuration-cache=false :rules-engine:test \
+            --tests '*MyriadDefenderChoiceTest' \
+            --tests '*MyriadTest' \
+            --tests '*EnteringAttackDefenderChoiceTest'
+      - name: Complete SDK and rules-engine regression
+        working-directory: upstream-engine
+        run: |
+          ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
+            -Dorg.gradle.configuration-cache=false :mtg-sdk:test :rules-engine:test
+      - name: Compile and test AI consumer against changed engine
+        working-directory: upstream-engine
+        run: |
+          ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
+            -Dorg.gradle.configuration-cache=false :ai:test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: myriad-opponent-planeswalker-regression-evidence
+          path: |
+            upstream-engine/rules-engine/build/test-results/
+            upstream-engine/rules-engine/build/reports/tests/
+            upstream-engine/mtg-sdk/build/test-results/
+            upstream-engine/ai/build/test-results/
+          retention-days: 14
