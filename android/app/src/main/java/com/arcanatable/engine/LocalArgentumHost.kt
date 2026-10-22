@@ -96,6 +96,8 @@ class LocalArgentumHost(
     private val paceMs: Long = 600,
     extraOpponents: List<LocalSeat> = emptyList(),
     private val resumeCheckpoint: String? = null,
+    /** Optional reproducible shuffle for scenario tests; normal games keep the engine's randomness. */
+    private val gameSeed: Long? = null,
     private val emit: (JSONObject) -> Unit,
 ) {
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(null, r, "argentum-local", 256L shl 20) }
@@ -384,6 +386,7 @@ class LocalArgentumHost(
             players = allSeats.map { seatConfig(seatOf(it), it) },
             skipMulligans = false,
             format = if (allSeats.all { seatOf(it).commander != null }) Format.Commander() else Format.Standard,
+            seed = gameSeed,
         )
         val result = initializer.initializeGame(config)
         ais = allSeats.filterNot(::isPerson).associateWith { OfflineAiPolicy.create(registry, it) }

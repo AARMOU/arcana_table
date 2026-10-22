@@ -149,7 +149,7 @@ jobs:
 
       # Custom-card suite passed at 1a42f808; omit it for focused iteration.
 
-      - name: Focused Android failures (two assertions + UI resilience and layout)
+      - name: Focused Android regressions (mana, preservation, resilience and layout)
         timeout-minutes: 10
         working-directory: android
         run: |
@@ -161,6 +161,7 @@ jobs:
             --tests 'com.arcanatable.ui.GameScreenSizesTest' \
             --tests 'com.arcanatable.ui.ArgentumGestureUiTest' \
             --tests 'com.arcanatable.ManaReliability128Test' \
+            --tests 'com.arcanatable.FloatManaTest' \
             --tests 'com.arcanatable.ui.QuickUiTipsTest'
 
       - name: Run complete Android suite after focused replacement tests pass
