@@ -20,7 +20,7 @@ class Build97Test {
     @Test fun treasuresShowAsSacrificeForMana() {
         val t = treasure("t1")
         assertTrue(ArgentumActions.isSacrificeMana(t))
-        assertEquals("Sacrifice for mana", ArgentumActions.menuLabel(t))
+        assertEquals("Sacrifice this source for mana", ArgentumActions.menuLabel(t))
         val landMana = JSONObject().put("description", "{T}: Add {G}.").put("isManaAbility", true).put("action", JSONObject().put("type", "ActivateAbility"))
         assertEquals(listOf(t), ArgentumActions.visibleChoices(listOf(t, landMana)))
     }

@@ -2,12 +2,18 @@ package com.arcanatable.ui
 
 import android.graphics.Bitmap
 import android.os.Looper
+import androidx.activity.compose.setContent
 import androidx.compose.ui.test.junit4.ComposeTestRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.onNodeWithText
 import org.robolectric.Shadows.shadowOf
+import androidx.test.core.app.ActivityScenario
+import com.arcanatable.MainActivity
+import com.arcanatable.TableController
+import com.arcanatable.TableScreen
+import com.arcanatable.startArgentumPractice
 import java.io.File
 
 /** Shared helpers for Robolectric UI tests. Screenshots go to app/build/screenshots. */
@@ -16,17 +22,22 @@ object UiTestSupport {
         File(System.getProperty("arcana.screenshots") ?: "build/screenshots").apply { mkdirs() }
     }
 
-    /** Home → PLAY → Online with Argentum → start (the Build 97 home screen). */
-    fun playWithArgentum(rule: ComposeTestRule) {
+    /**
+     * Exercise the real server startup/validation path against the test server. Server play has
+     * been parked since Build 113, so clicking its disabled menu starts an unrelated offline game.
+     * Install the same screen with a controller observer; production keeps the disabled menu.
+     */
+    fun playWithArgentum(rule: ComposeTestRule, scenario: ActivityScenario<MainActivity>) {
+        lateinit var controller: TableController
+        scenario.onActivity { activity ->
+            activity.setContent { TableScreen(onControllerReady = { controller = it }) }
+        }
+        settle(rule, 800)
         if (rule.onAllNodesWithTag("quick-ui-tips").fetchSemanticsNodes().isNotEmpty()) {
             rule.onNodeWithText("Dismiss").performClick()
             settle(rule, 300)
         }
-        rule.onNodeWithTag("home-play").performClick()
-        settle(rule, 800)
-        rule.onNodeWithTag("play-online-option").performClick()
-        settle(rule, 300)
-        rule.onNodeWithTag("play-start").performClick()
+        rule.runOnIdle { controller.startArgentumPractice(vsAi = true) }
     }
 
     /** True while the home screen's PLAY button is showing. */

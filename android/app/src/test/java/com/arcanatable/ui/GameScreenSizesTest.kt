@@ -71,7 +71,7 @@ class GameScreenSizesTest {
         fake.dealOpeningHand = true
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        UiTestSupport.playWithArgentum(rule)
+        UiTestSupport.playWithArgentum(rule, scenario)
         UiTestSupport.awaitReal(rule, 30_000, "opening hand screen") { shown("Opening hand") && shown("MULLIGAN") }
         UiTestSupport.settle(rule, 600)
         scenario.onActivity { UiTestSupport.screenshot(it, "game-$name-0-opening-hand") }
