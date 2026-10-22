@@ -239,6 +239,7 @@ object CustomCards {
         Entry(Aberrant, "40K", "Six WotC precons"),
         Entry(MandateOfAbaddon, "40K", "Six WotC precons"),
         Entry(PrimarisEliminator, "40K", "Six WotC precons"),
+        Entry(CanoptekSpyder, "40K", "Six WotC precons"),
         Entry(HexmarkDestroyer, "40K", "Six WotC precons"),
     )
 
