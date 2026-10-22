@@ -461,7 +461,35 @@ internal fun PlayerBoard(
 
             },
             "ZONES" to {
-        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+            // Keep the actual floating pool visible even at zero. Untapped lands are
+            // deliberately labelled as lands, NOT as spendable mana: fetch lands,
+            // restrictions and conditional sources make that number different.
+            if (engineGame && engineControlled) {
+                val floating = player.manaPool.filterValues { it > 0 }
+                val readyLands = player.battlefield.count { it.type.contains("Land", ignoreCase = true) && !it.tapped }
+                Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp))
+                        .background(PanelLight).padding(horizontal = 10.dp, vertical = 7.dp)
+                        .testTag("argentum-mana-summary"),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        Text("MANA POOL  ·  " + floating.values.sum(), color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                        Text(
+                            if (floating.isEmpty()) "NO FLOATING MANA"
+                            else floating.entries.joinToString("  ") { (color, amount) -> "${manaLetter(color)}$amount" },
+                            color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                        )
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("UNTAPPED LANDS  ·  $readyLands", color = SoftWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text("Other mana: tap its card", color = Muted, fontSize = 9.sp)
+                    }
+                }
+            }
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             // In an Argentum game only controls that work are shown: Argentum owns draws, tokens,
             // mana, steps and shuffles, so those manual shortcuts would be silent no-ops.
             if (engineGame) {
@@ -492,13 +520,8 @@ internal fun PlayerBoard(
                     "UNDO" -> if (engineControlled && undoAvailable) QuickActionChip("UNDO", enabled = true, onClick = onUndo)
                     "HAND" -> QuickActionChip("HAND · ${player.hand.size}", enabled = true, onClick = onShowHandFromZone)
                 } }
-                // Floating mana (empties when the step ends; casting uses it first).
-                if (player.manaPool.values.sum() > 0) Text(
-                    "FLOATING " + player.manaPool.filterValues { it > 0 }.entries.joinToString(" ") { (color, n) -> "${manaLetter(color)}$n" },
-                    color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black,
-                    modifier = Modifier.height(44.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(9.dp)).background(Panel)
-                        .border(1.dp, Mint.copy(alpha = 0.6f), RoundedCornerShape(9.dp)).padding(horizontal = 10.dp).testTag("mana-pool-badge")
-                )
+                // The non-scrolling mana summary above replaces the old hidden-when-zero
+                // chip. It remains visible without horizontally scrolling Quick Actions.
                 Text("${player.library.size} IN LIBRARY", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold,
                     modifier = Modifier.height(44.dp).wrapContentHeight(Alignment.CenterVertically).padding(horizontal = 4.dp))
             } else quickActionOrder.distinct().forEach { action ->
@@ -538,6 +561,7 @@ internal fun PlayerBoard(
                     } else QuickActionChip(label, enabled = canControl && (action != "NEXT_STEP" || isActivePlayer), onClick = click)
                 }
             }
+        }
         }
 
             },

@@ -339,9 +339,16 @@ object ArgentumActions {
     fun floatManaChoices(choices: List<JSONObject>): List<JSONObject> =
         choices.filter { isManaAbility(it) && !isSacrificeMana(it) && it.optBoolean("isAffordable", true) }
 
-    /** What the card menu calls an action: Treasures read "Sacrifice for mana". */
-    fun menuLabel(info: JSONObject): String =
-        if (isSacrificeMana(info)) "Sacrifice for mana" else info.optString("description")
+    /** Preserve the extra cost in the UI: sacrificing Food is not sacrificing a Treasure. */
+    fun menuLabel(info: JSONObject): String {
+        val description = info.optString("description")
+        return when {
+            !isSacrificeMana(info) -> description
+            description.contains("Sacrifice a Food", ignoreCase = true) -> "Tap Goose · sacrifice Food for mana"
+            description.contains("Sacrifice this", ignoreCase = true) -> "Sacrifice this source for mana"
+            else -> "Sacrifice for mana"
+        }
+    }
 }
 
 /** One target slot of a legal action (LegalActionTargetInfo), or the single implied slot. */

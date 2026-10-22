@@ -1,0 +1,107 @@
+name: Build 128 mana reliability (isolated)
+on:
+  push:
+    branches:
+      - gpt/build128-mana-reliability
+permissions:
+  contents: read
+concurrency:
+  group: build128-mana-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  build128-mana:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 7a9663d8e4df4ce7db223023ae7714f0028e08a9
+          path: argentum-engine
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Apply exactly the validated Build 127 engine patches
+        run: |
+          set -euo pipefail
+          for p in 0001-android-regex.patch 0002-engine-trial-build.patch 0004-token-copy-triggered-abilities.patch 0005-last-known-negative-subtype.patch 0006-ai-decision-deadline.patch 0007-ai-bounded-stack-search.patch 0008-jvm-test-toolchain.patch 0010-enumeration-absence-index.patch; do
+            git -C argentum-engine apply --check "../argentum-patches/$p"
+            git -C argentum-engine apply "../argentum-patches/$p"
+          done
+          git -C argentum-engine diff --check
+      - name: Compile Build 127 Android-compatible engine
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar
+      - name: Verify and stage correct Build 127 rules engine JAR
+        run: |
+          set -euo pipefail
+          mapfile -d '' -t jars < <(find argentum-engine/rules-engine/build/libs -maxdepth 1 -type f -name '*.jar' ! -name '*sources*' ! -name '*javadoc*' -print0 | sort -z)
+          matches=()
+          for candidate in "${jars[@]}"; do
+            jar tf "$candidate" > "$RUNNER_TEMP/engine-jar-entries.txt"
+            if grep -Fxq 'com/wingedsheep/engine/core/GameAction.class' "$RUNNER_TEMP/engine-jar-entries.txt" &&
+               grep -Fxq 'com/wingedsheep/engine/state/GameState.class' "$RUNNER_TEMP/engine-jar-entries.txt"; then
+              matches+=("$candidate")
+            fi
+          done
+          test "${#matches[@]}" -eq 1
+          cp "${matches[0]}" android/app/libs/argentum-rules-engine.jar
+          jar tf android/app/libs/argentum-rules-engine.jar | grep -Fxq 'com/wingedsheep/engine/core/GameAction.class'
+          ls -lh android/app/libs/argentum-*.jar
+          sha256sum android/app/libs/argentum-*.jar
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set isolated Build 128 release identity
+        run: |
+          set -euo pipefail
+          grep -F 'applicationId = "com.arcanatable"' android/app/build.gradle.kts
+          grep -F 'versionCode = 124' android/app/build.gradle.kts
+          sed -i 's/versionCode = 124/versionCode = 128/' android/app/build.gradle.kts
+          sed -i 's/versionName = "0.33.2-build124-preview"/versionName = "0.33.6-build128-preview"/' android/app/build.gradle.kts
+          grep -F 'versionCode = 128' android/app/build.gradle.kts
+          grep -F 'versionName = "0.33.6-build128-preview"' android/app/build.gradle.kts
+      - name: Verify mana regressions and existing UI behavior
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests '*ManaReliability128Test' --tests '*ArgentumInteractionTest' --tests '*FloatManaTest' --tests '*LocalArgentumHostTest'
+
+      - name: Compile release APK with tested Build 127 engine
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:assembleRelease
+      - name: Validate and package unsigned APK for offline original-key signing
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          mapfile -t apks < <(find android/app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | sort)
+          test "${#apks[@]}" -eq 1
+          cp "${apks[0]}" dist/ArcanaTable-Build128-unsigned.apk
+          cp "$ANDROID_HOME/build-tools/36.0.0/lib/apksigner.jar" dist/apksigner.jar
+          cp "$ANDROID_HOME/build-tools/36.0.0/zipalign" dist/zipalign
+          cp "$ANDROID_HOME/build-tools/36.0.0/aapt" dist/aapt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging dist/ArcanaTable-Build128-unsigned.apk | head -n 8 > dist/package-info.txt
+          grep -F "package: name='com.arcanatable' versionCode='128'" dist/package-info.txt
+          printf 'source_branch=gpt/build128-mana-reliability\nsource_commit=%s\nengine=argentum upstream 7a9663d8 plus pinned Build 127 patch 0010\noriginal_key_not_uploaded=true\nci_signed=false\n' "$GITHUB_SHA" > dist/provenance.txt
+          sha256sum dist/ArcanaTable-Build128-unsigned.apk > dist/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ArcanaTable-Build128-test-results
+          path: android/app/build/test-results/testDebugUnitTest/
+          if-no-files-found: ignore
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ArcanaTable-Build128-unsigned-and-signing-tools
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
