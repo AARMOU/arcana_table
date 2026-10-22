@@ -19,7 +19,7 @@ val MandateOfAbaddon = card("Mandate of Abaddon") {
 
     metadata {
         rarity = Rarity.RARE
-        collectorNumber = "48"
+        collectorNumber = "40"
         artist = "Games Workshop"
     }
 }
