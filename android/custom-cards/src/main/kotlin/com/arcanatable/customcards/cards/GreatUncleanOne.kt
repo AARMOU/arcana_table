@@ -6,6 +6,7 @@ import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.model.Rarity
 import com.wingedsheep.sdk.scripting.conditions.ComparisonOperator
 import com.wingedsheep.sdk.scripting.references.Player
+import com.wingedsheep.sdk.scripting.targets.EffectTarget
 
 /**
  * Great Unclean One — The Ruinous Powers.
@@ -29,7 +30,7 @@ val GreatUncleanOne = card("Great Unclean One") {
         trigger = Triggers.you.beginningOf(Step.END)
         effect = Effects.ForEachPlayer(
             players = Player.EachOpponent,
-            effect = Effects.LoseLife(2),
+            effect = Effects.LoseLife(2, target = EffectTarget.Controller),
         ) then
             Effects.CreateToken(
                 count = DynamicAmounts.countPlayersWith(
