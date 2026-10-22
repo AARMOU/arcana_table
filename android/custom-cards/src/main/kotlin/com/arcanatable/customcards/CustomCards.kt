@@ -223,6 +223,8 @@ object CustomCards {
         Entry(SoulOfNewPhyrexia, "CMM", "Six WotC precons"),
         Entry(InquisitorGreyfax, "40K", "Six WotC precons"),
         Entry(SzarekhTheSilentKing, "40K", "Six WotC precons"),
+        Entry(BastionProtector, "40K", "Six WotC precons"),
+        Entry(Reverberate, "40K", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
