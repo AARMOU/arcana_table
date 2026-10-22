@@ -10,6 +10,9 @@ Upstream target: `61e71e586b100faa661f86cac827ac3c3bbb5a78`.
 - `Build97Test.treasuresShowAsSacrificeForMana` expects `Sacrifice for mana`; baseline and candidate use `Sacrifice this source for mana`. `ManaReliability128Test` explicitly requires this distinction from Goose/Food. Update the stale exact expectation, retain classification and visibility checks.
 - `CustomDecksOfflineTest` expects exactly 15 custom implementations. The upgrade deliberately prefers upstream definitions and removes redundant custom entries. Assert the registry contains all 15 previously custom cards, only Goblin Welder is unsupported, and the notice matches the actual custom-only set. This catches loss of implementations while allowing upstream ownership.
 
+- Once server startup is reached, the resilience test deliberately injects malformed messages but never dismisses their recovery dialog before testing menus. Explicitly assert and acknowledge that recovery dialog.
+- A local JVM thread dump proves the same test then spins inside Compose `performScrollTo` with the test clock paused. Permit Compose clock advancement only around that scroll, then restore manual stepping. This is a test harness hang, not a rules-engine stall. The focused workflow step has a 10-minute timeout so a future harness hang fails with retained reports instead of occupying the whole job indefinitely.
+
 ## Verification
 
 The focused CI workflow runs identical tests with two runtimes: shipped JARs/assets restored from the pinned baseline, and matching rebuilt replacement JARs/exports. Its replacement job then runs the entire app test suite, lint and debug compilation. Evidence artifacts include XML and HTML reports. Runtime binaries and APKs are not committed or published.

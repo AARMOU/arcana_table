@@ -150,6 +150,7 @@ jobs:
       # Custom-card suite passed at 1a42f808; omit it for focused iteration.
 
       - name: Focused Android failures (two assertions + UI resilience and layout)
+        timeout-minutes: 10
         working-directory: android
         run: |
           ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
@@ -162,6 +163,7 @@ jobs:
             --tests 'com.arcanatable.ui.QuickUiTipsTest'
 
       - name: Run complete Android suite after focused replacement tests pass
+        timeout-minutes: 30
         if: matrix.runtime == 'replacement'
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest

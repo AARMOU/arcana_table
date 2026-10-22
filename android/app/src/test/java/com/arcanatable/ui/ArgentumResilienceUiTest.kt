@@ -139,6 +139,14 @@ class ArgentumResilienceUiTest {
         fake.send(JSONObject().put("type", "someFutureMessageType").put("x", 1))
         UiTestSupport.awaitReal(rule, 10_000, "unreadable message logged as an error") { diagnostics().contains("could not read") }
         assertTrue("app still shows the game", tableShown())
+        // Malformed data deliberately opens a recovery dialog. Acknowledge it before testing
+        // lifecycle and menu actions, otherwise those gestures hit the modal instead of the board.
+        UiTestSupport.awaitReal(rule, 5_000, "malformed-message recovery dialog") {
+            shown("Argentum sent a message Arcana could not read.")
+        }
+        rule.onNodeWithText("OK").performClick()
+        UiTestSupport.settle(rule, 300)
+        assertFalse("recovery dialog dismissed", shown("Argentum sent a message Arcana could not read."))
 
         // Backgrounded drop: Arcana pauses instead of reconnecting (Argentum would auto-resume).
         val connectionsBefore = fake.connections.get()
@@ -173,7 +181,14 @@ class ArgentumResilienceUiTest {
         rule.onNodeWithText("Options").performClick()
         UiTestSupport.settle(rule, 500)
         // Options → Help & diagnostics (the page scrolls; bring the row into view first).
-        rule.onNodeWithText("Diagnostic log").performScrollTo()
+        // performScrollTo repeatedly checks bounds; with the manual game clock paused its scroll
+        // coroutine never gets a frame and that loop cannot finish. Let Compose drive this action.
+        rule.mainClock.autoAdvance = true
+        try {
+            rule.onNodeWithText("Diagnostic log").performScrollTo()
+        } finally {
+            rule.mainClock.autoAdvance = false
+        }
         rule.onNodeWithText("Diagnostic log").performClick()
         UiTestSupport.settle(rule, 500)
         rule.onNode(hasTestTag("diagnostic-search")).performTextInput("needs handling")
