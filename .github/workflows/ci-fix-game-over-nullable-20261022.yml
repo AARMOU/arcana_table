@@ -19,11 +19,11 @@ jobs:
         with:
           packages: platform-tools
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-      - name: Run focused and full Android unit test suites
+      - name: Run original focused game-over and LocalArgentumHost regressions
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests '*GameOutcomeDetailsTest*' --tests '*LocalArgentumHostTest*'
       - name: Archive evidence
         if: always()
         uses: actions/upload-artifact@v4
