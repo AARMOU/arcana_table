@@ -811,7 +811,7 @@ class LocalArgentumHost(
     }
 
     private fun gameOverMessage(current: GameState, seat: EntityId) =
-        GameOutcomeDetails.toMessage(current, seat, { seatOf(it).name }, lastGameOutcomeEvents)
+        GameOutcomeDetails.toMessage(current, seat, { seatOf(it).name }, lastGameOutcomeEvents) { registry.getCard(it) != null }
 
     private var peopleOutSent = false
 
