@@ -198,6 +198,14 @@ object CustomCards {
         Entry(MoltenSlagheap, "40K", "Six WotC precons"),
         Entry(RuinsOfOranRief, "CMM", "Six WotC precons"),
         Entry(ShrineOfTheForsakenGods, "CMM", "Six WotC precons"),
+        Entry(BileBlight, "BNG", "Six WotC precons"),
+        Entry(Exterminatus, "40K", "Six WotC precons"),
+        Entry(EndlessAtlas, "CMM", "Six WotC precons"),
+        Entry(PortTown, "MSC", "Six WotC precons"),
+        Entry(Cryptothrall, "40K", "Six WotC precons"),
+        Entry(NightScythe, "40K", "Six WotC precons"),
+        Entry(SautekhImmortal, "40K", "Six WotC precons"),
+        Entry(SkorpekhLord, "40K", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
