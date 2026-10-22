@@ -56,6 +56,23 @@ This is a durable, append-only notebook for development team handoffs and any ve
 - This scheduled monitor is **not** a coding agent, and none of the 42 coding roles has a verified launch/task ID.
 - No source changes, merges, signing operations or releases were performed as part of the monitoring setup.
 
+
+### 2026-10-21 ~23:00 (America/Denver) — Attempted actual GitHub coding-agent launch
+
+**Direct request from user:** Start workers immediately; no further handoffs or only preparing assignments.
+
+**Verified attempts / outcomes:**
+- Opened draft parent PR [#26](https://github.com/AARMOU/arcana_table/pull/26) for Team 09 (Table view) from `gpt/table-manual-expand-pinch-zoom`, with base `gpt/build128-mana-reliability`. Posted explicit `@copilot` task comment, GitHub comment ID `6333111061`. At check time, no Copilot 👀 reaction, child PR or confirmed agent session.
+- Opened draft parent PR [#27](https://github.com/AARMOU/arcana_table/pull/27) for Team 14 (graveyard/exile) from `gpt/zone-casting-graveyard-exile`, with base `gpt/table-manual-expand-pinch-zoom`. Posted explicit `@copilot` task comment, GitHub comment ID `6333120119`. At check time, no Copilot 👀 reaction, child PR or confirmed session.
+- Attempted `mcp__GitHub__add_issue_assignees` for Team 07 issue [#18](https://github.com/AARMOU/arcana_table/issues/18) with assignee `copilot-swe-agent[bot]`. GitHub returned **HTTP 403 Forbidden**. Assignment was not confirmed; no agent launched.
+- GitHub's Copilot issue-assignment API supports specifying the base branch via `agent_assignment.base_branch`, but the presently available typed GitHub connector action has no such parameter. Creating assignment without it would risk starting the wrong branch. The separate GitHub Agents Tasks API requires its own user-level agent authorization not exposed here.
+- **Observed running agents: ZERO.** GitHub issues are ready; draft PRs are not an execution result. Keep monitoring for concrete sessions/child PRs before changing the status.
+- There were **no production merges/releases**, no APK/AAB creation, no signing changes. Feature code was unchanged during launch attempts.
+
+**Actual launch blocker:** Insufficient permission to assign Copilot (403), and no accessible agent-tasks POST action with a base-ref option. If GitHub web browser or a properly authorized coding-agent account becomes available, launch based on each existing development branch, following the A/B/C role plan.
+
+**Next:** Confirm authorizations, start an actual worker session using GitHub's Agents UI or an authorized agent tasks API, and record task ID + real base branch + first commits. Do not substitute GitHub issue comments for proof of agent execution.
+
 ### Update format to use for future work
 
 ```text
