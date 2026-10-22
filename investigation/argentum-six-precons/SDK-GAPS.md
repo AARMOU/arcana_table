@@ -13,6 +13,37 @@ Readable SDK/engine source inspected at upstream commit
 `7a9663d8e4df4ce7db223023ae7714f0028e08a9`. Its surface is not necessarily
 identical to the pinned Android JARs; verify binary availability as well as source.
 
+
+## Experimental engine-patch progress (not shipped)
+
+Three independent enhancements are now staged on the isolated six-precon branch:
+
+- `engine-patches/0001-granted-cascade.patch`: synthesizes each *granted*
+  cascade instance as a spell-sourced trigger. Includes mana-value-qualified
+  grants (including cast X), and retains the existing printed cascade path.
+  Executable tests: `engine-patches/GrantedCascadeEngineTest.kt`.
+- `staged-engine/0002-commander-casts.patch`: a serialized
+  `DynamicAmount.CommanderCasts` and resolver that sums the owner's
+  commander-zone cast history across partner commanders. Executable tests:
+  `staged-engine/CommanderCastHistoryEngineTest.kt`.
+- `staged-engine/0003-opponents-must-attack-someone.patch`: distinct combat
+  requirement for each opponent to attack with at least one creature *against
+  any legal defender* if able, including AI plan repair. Executable tests:
+  `staged-engine/OpponentsMustAttackWithCreatureTest.kt`.
+
+The actions `argentum-engine-enhancements.yml` and
+`argentum-combat-enhancements.yml` each check out pinned upstream source in
+an ephemeral runner, apply the patches, and run JVM scenario tests. Their
+results must be explicitly reviewed before calling the enhancements verified;
+JVM-only success does **not** establish Java-17/Android runtime compatibility.
+The pinned app jars in `android/app/libs` have not been replaced. No blocked
+precon card has been added to the live custom-card registry.
+
+The remaining Ulalek stack-copying feature and Port Town collection-entry
+continuation are still unimplemented: neither is safe to approximate.
+The Swarmlord history amount was **not** present in either the pinned JAR or
+the inspected upstream source, correcting the older note below.
+
 ## Granted cascade — Zhulodok, Abaddon, Sloppity Bilepiper
 
 Existing cards such as `NoiseMarine.kt` explicitly author a self-cast trigger
@@ -37,9 +68,9 @@ rules interactions and are not a substitute.
 
 ## The Swarmlord — commander casting history
 
-The pinned SDK JAR does not contain `DynamicAmount.CommanderCasts`, although the
-readable upstream `scripting/values/DynamicAmount.kt` and engine
-`handlers/DynamicAmountEvaluator.kt` contain a newer implementation. Its
+The pinned SDK JAR does not contain `DynamicAmount.CommanderCasts`, and the inspected upstream source also lacks it. The experimental
+`staged-engine/0002-commander-casts.patch` introduces the amount and its evaluator,
+but cannot be shipped until tested and rebuilt for the pinned Android runtime. Its
 commander-zone cast history must be available in the deployed runtime before
 The Swarmlord's entry counters can be implemented completely.
 
