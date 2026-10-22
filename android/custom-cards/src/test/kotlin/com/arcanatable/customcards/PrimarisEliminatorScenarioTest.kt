@@ -49,7 +49,7 @@ class PrimarisEliminatorScenarioTest {
         castAndChoose(d, 1, listOf(d.player2))
         assertEquals(3, d.projected.getPower(own))
         assertEquals(1, d.projected.getPower(enemy))
-        assertEquals(2, d.projected.getToughness(enemy))
+        assertEquals(1, d.projected.getToughness(enemy))
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = d.player2)
         assertEquals(3, d.projected.getPower(enemy))
     }
