@@ -28,13 +28,13 @@ class WarpingWailScenarioTest {
         val wail = d.putCardInHand(p, "Warping Wail")
         d.giveColorlessMana(p, 2)
         assertNotNull(d.submit(CastSpell(
-            playerId = p, cardId = wail, chosenMode = 0,
-            targets = listOf(ChosenTarget.Permanent(invalid)),
+            playerId = p, cardId = wail, chosenModes = listOf(0),
+            modeTargetsOrdered = listOf(listOf(ChosenTarget.Permanent(invalid))),
             paymentStrategy = PaymentStrategy.FromPool,
         )).error)
         assertNull(d.submit(CastSpell(
-            playerId = p, cardId = wail, chosenMode = 0,
-            targets = listOf(ChosenTarget.Permanent(valid)),
+            playerId = p, cardId = wail, chosenModes = listOf(0),
+            modeTargetsOrdered = listOf(listOf(ChosenTarget.Permanent(valid))),
             paymentStrategy = PaymentStrategy.FromPool,
         )).error)
         d.resolveAll()
@@ -57,8 +57,8 @@ class WarpingWailScenarioTest {
         d.giveColorlessMana(p, 3)
         assertNull(d.castSpell(p, original).error)
         assertNull(d.submit(CastSpell(
-            playerId = p, cardId = wail, chosenMode = 1,
-            targets = listOf(ChosenTarget.Spell(original)),
+            playerId = p, cardId = wail, chosenModes = listOf(1),
+            modeTargetsOrdered = listOf(listOf(ChosenTarget.Spell(original))),
             paymentStrategy = PaymentStrategy.FromPool,
         )).error)
         d.resolveAll()
@@ -73,7 +73,8 @@ class WarpingWailScenarioTest {
         val wail = d.putCardInHand(p, "Warping Wail")
         d.giveColorlessMana(p, 2)
         assertNull(d.submit(CastSpell(
-            playerId = p, cardId = wail, chosenMode = 2,
+            playerId = p, cardId = wail, chosenModes = listOf(2),
+            modeTargetsOrdered = listOf(emptyList()),
             paymentStrategy = PaymentStrategy.FromPool,
         )).error)
         d.resolveAll()
