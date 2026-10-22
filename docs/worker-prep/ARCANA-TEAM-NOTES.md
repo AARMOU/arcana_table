@@ -103,6 +103,13 @@ Real CI workflows were created and automatically executed on each isolated devel
 - **Team 14 graveyard/exile:** [Run 39727726145](https://github.com/AARMOU/arcana_table/actions/runs/39727726145); checks `ZonePlaySourceTest`, `GraveyardExileLegalActionsTest`, `ZoneCardActionsUiTest`; **running at this note entry**, no result yet.
 - These are **focused CI unit/UI JVM tests**, not an all-project regression suite or on-device test. No autonomous Copilot agent was launched.
 
+### 2026-10-21 ~23:32 (America/Denver) — Table/zone test failure investigation and reruns
+
+Both initial tests compiled far enough to reveal test-harness defects. This is not evidence of actual gameplay failures.
+- Table [run 39727721906](https://github.com/AARMOU/arcana_table/actions/runs/39727721906) failed **compiling the unit tests** due to non-existent top-level Compose assertion imports `assertExists`/`assertDoesNotExist`. Removed imports, next [run 39728090839](https://github.com/AARMOU/arcana_table/actions/runs/39728090839) compiled and executed, then failed at `TableOverviewInteractionTest initializationError` (`RobolectricTestRunner DefaultSdkPicker`); fixed by adding `@Config(sdk = [34])`. Latest branch commit `9d676256` and [run 39728537192](https://github.com/AARMOU/arcana_table/actions/runs/39728537192) **pending**.
+- Graveyard/exile [run 39727726145](https://github.com/AARMOU/arcana_table/actions/runs/39727726145) and subsequent [run 39728096272](https://github.com/AARMOU/arcana_table/actions/runs/39728096272) failed unit-test compilation because the derived branch still had outdated TableOverview test assertion imports. Fixed inherited imports and class Robolectric config. Latest commit `8c62a3f0`, [run 39728542228](https://github.com/AARMOU/arcana_table/actions/runs/39728542228) **pending**.
+- Both corrections were test-harness-only; feature source was not merged or changed. **Do not call either branch passing until green.**
+
 ### Update format to use for future work
 
 ```text
