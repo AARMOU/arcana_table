@@ -48,7 +48,7 @@ jobs:
           f=Path('b131/argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/multiplayer/MyriadDefenderChoiceTest.kt')
           s=f.read_text()
           key='withClue("each exiled copy triggers the copied leaves ability exactly once") {'
-          debug='val spawnCountAfterCombat = d.getCreatures(p1).count { d.getCardName(it) == "Eldrazi Spawn" }\\n        withClue("end-combat step=${d.state.step} pending=${d.pendingDecision?.javaClass?.simpleName} stack=${d.stackSize} creatures=${d.getCreatures(p1).map(d::getCardName)} spawns=$spawnCountAfterCombat") {'
+          debug='val spawnCountAfterCombat = d.getCreatures(p1).count { d.getCardName(it) == "Eldrazi Spawn" }' + chr(10) + '        withClue("end-combat step=${d.state.step} pending=${d.pendingDecision?.javaClass?.simpleName} stack=${d.stackSize} creatures=${d.getCreatures(p1).map(d::getCardName)} spawns=$spawnCountAfterCombat") {'
           assert s.count(key)==1
           f.write_text(s.replace(key,debug))
           PY
