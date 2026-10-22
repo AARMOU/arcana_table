@@ -25,7 +25,7 @@ class GameOutcomeDetailsTest {
             PlayerLostEvent(loser, GameEndReason.CARD_EFFECT, engineMessage),
             GameEndedEvent(winner, GameEndReason.CARD_EFFECT)
         )
-        val packet = GameOutcomeDetails.toMessage(state, winner, names, events)
+        val packet = GameOutcomeDetails.toMessage(state, winner, names, events) { it == "Mechanized Production" }
         assertEquals("OPPONENT_LOST", packet.getString("reason"))
         assertEquals("CARD_EFFECT", packet.getString("engineReason"))
         assertEquals("offline-you", packet.getString("winnerId"))
