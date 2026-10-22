@@ -137,6 +137,12 @@ import androidx.compose.ui.hapticfeedback.HapticFeedback
 import androidx.compose.ui.unit.Density
 import kotlinx.coroutines.CoroutineScope
 
+/** A turn change can follow the active player only while the user is already in Player view.
+ * Selecting Table view opts out of automatic view changes until the user opens a board.
+ */
+internal fun shouldFollowActivePlayerToBoard(followEnabled: Boolean, showingTable: Boolean, active: Int, playerCount: Int): Boolean =
+    followEnabled && !showingTable && active in 0 until playerCount
+
 /** All of the main screen's effects (LaunchedEffect / SideEffect / DisposableEffect). */
 @Composable
 internal fun TableController.TableEffects(darkMode: Boolean) {
@@ -215,14 +221,12 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
             }
         }
     }
-    // Follow whose turn it is: on each new turn, show the active player's board. A tab the player
-    // picks mid-turn sticks until the next turn change.
+    // Following turns navigates only between player boards. Table view is sticky.
     LaunchedEffect(selectedPlayer, localSeat) { if (selectedPlayer != localSeat) lastOpponentViewed = selectedPlayer }
     LaunchedEffect(argentumTurnKey) {
         val active = argentumTurnKey?.second ?: return@LaunchedEffect
-        if (!followActivePlayer || active !in players.indices) return@LaunchedEffect
+        if (!shouldFollowActivePlayerToBoard(followActivePlayer, showOverview, active, players.size)) return@LaunchedEffect
         selectedPlayer = active
-        showOverview = false
     }
 
     LaunchedEffect(roomHost, roomClient, cloudRoomClient, argentumEnabled) {
