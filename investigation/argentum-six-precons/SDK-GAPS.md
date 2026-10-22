@@ -36,6 +36,25 @@ and identity, floating-pool matching, restricted mana, auto-tapping, and payment
 Rewriting those symbols as generic mana would be incorrect. Ulalek remains missing until both
 engine features are integrated into the Java-17 Android runtime and full custom-card scenarios pass.
 
+## October 22 follow-up: mana candidate tests and gates
+
+- The isolated SDK colorless-hybrid patch, including all five typed symbols, passed its full
+  SDK validation in [Actions 39822886599](https://github.com/AARMOU/arcana_table/actions/runs/39822886599).
+- The revised stack-object-copy patch passed full upstream rules-engine and card-scenario
+  CI in [Actions 39802451380](https://github.com/AARMOU/arcana_table/actions/runs/39802451380).
+  A further uncached guard and regression run is in
+  [Actions 39822307344](https://github.com/AARMOU/arcana_table/actions/runs/39822307344).
+- `staged-engine/0006-colorless-hybrid-floating-payment.patch` adds exact floating-pool
+  matching, strict-pip reservation, restriction-aware allocation, and color reduction handling.
+  `staged-engine/0007-colorless-hybrid-auto-tap.patch` extends the mana solver to allocate
+  actual colorless or the printed color, with scenario tests for cast payment and source choice.
+  These patches are experimental until the combined
+  [Actions 39825762548](https://github.com/AARMOU/arcana_table/actions/runs/39825762548)
+  completes successfully.
+- No new cards are registered or exported on the basis of staged SDK or rules changes.
+  Every Android/JDK 17 consumer, asset export, AI payment path, and full six-deck playtest
+  remains a separate release-blocking validation gate.
+
 ## Experimental engine-patch progress (not shipped)
 
 Four independent enhancements are now staged on the isolated six-precon branch:
