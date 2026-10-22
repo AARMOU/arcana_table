@@ -1,0 +1,37 @@
+name: Arcana feature regression graveyard-exile-play
+on:
+  push:
+    branches: [gpt/zone-casting-graveyard-exile]
+permissions:
+  contents: read
+concurrency:
+  group: arcana-feature-test-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  focused-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Compile and run targeted Android tests
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew --no-daemon --stacktrace --max-workers=2 :app:testDebugUnitTest --tests '*ZonePlaySourceTest*' --tests '*GraveyardExileLegalActionsTest*' --tests '*ZoneCardActionsUiTest*'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arcana-graveyard-exile-play-test-results
+          path: |
+            android/app/build/test-results/testDebugUnitTest/
+            android/app/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: warn
+          retention-days: 14
