@@ -105,6 +105,19 @@ class GameOutcomeDetailsTest {
         assertFalse(ArgentumOutcomeLog.banner(packet, "offline-you", emptyMap()).contains("Reason: opponent lost"))
     }
 
+    @Test fun nullableViewerNeverClaimsAnUnidentifiedViewerWon() {
+        val packet = JSONObject().put("winnerId", "offline-you")
+            .put("winnerName", "Tails").put("reason", "OPPONENT_LOST")
+        val unknownViewer = ArgentumOutcomeLog.banner(packet, null, emptyMap())
+        assertTrue(unknownViewer.contains("Tails won."))
+        assertFalse(unknownViewer.contains("You won."))
+        assertTrue(ArgentumOutcomeLog.banner(packet, "offline-you", emptyMap()).contains("You won."))
+        assertTrue(ArgentumOutcomeLog.banner(packet, "offline-ai", emptyMap()).contains("Tails won."))
+
+        val noWinner = JSONObject().put("reason", "DRAW")
+        assertTrue(ArgentumOutcomeLog.banner(noWinner, null, emptyMap()).contains("No winner."))
+    }
+
     @Test fun legacyOnlinePacketStillProvidesAnEndMessage() {
         val packet = JSONObject().put("winnerId", "seat-2").put("reason", "YOU_LOST")
         assertTrue(ArgentumOutcomeLog.banner(packet, "seat-1", mapOf("seat-2" to "Opponent")).contains("Opponent won."))
