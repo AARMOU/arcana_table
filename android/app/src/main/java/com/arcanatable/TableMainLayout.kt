@@ -317,7 +317,11 @@ internal fun TableController.TableMainLayout() {
                 screenWidthDp >= 700 -> 2
                 else -> 1
             }
-            val overviewGridState = rememberLazyGridState()
+            // Shared across all overview player panels; independent of the full board zoom.
+             val tableZoom = rememberTableZoom()
+             val tableZoomContext = LocalContext.current
+             val tableZoomConfig = LocalConfiguration.current
+             val overviewGridState = rememberLazyGridState()
             LaunchedEffect(activePlayer, players.size) {
                 if (activePlayer in players.indices) {
                     if (reducedSwipeMotion) overviewGridState.scrollToItem(activePlayer)
@@ -346,6 +350,8 @@ internal fun TableController.TableMainLayout() {
                         onToggleTimer = { if (!onlineMode || localSeat == 0) turnTimerVisible = !turnTimerVisible },
                         onMoveUp = { if (!onlineMode) movePlayerCard(index, -1) }, onMoveDown = { if (!onlineMode) movePlayerCard(index, 1) },
                         canReorder = !onlineMode,
+                         tableZoom = tableZoom,
+                         onTableZoomEnd = { saveTableZoom(tableZoomContext, tableZoomConfig.screenWidthDp, tableZoomConfig.screenHeightDp, it) },
                         onOpen = { run { selectedPlayer = index; showOverview = false } },
                         onZone = { zoneDialog = index to it },
                         onPreview = { preview = CardPreview(index, it, fromHand = false, canManipulate = gameInProgress && (!onlineMode || index == localSeat) && !gameEndedOnline) },
