@@ -402,6 +402,8 @@ internal class TableController(
     // Not saveable: after a relaunch/recreation the player chooses Resume (Argentum resumes on reconnect).
     var argentumResumeAvailable by run { mutableStateOf(optionPrefs.getBoolean("argentum_game_active", false)) }
     var argentumResumeRequested by run { mutableStateOf(false) }
+    var offlineResumeAvailable by run { mutableStateOf(OfflineCheckpointStore.available(context)) }
+    var offlineRestoreRequested by run { mutableStateOf(false) }
     var argentumEndPreviousRequested by run { mutableStateOf(false) }
     var argentumLastStateJson by run { mutableStateOf<JSONObject?>(null) }
     var argentumAttackPlan by run { mutableStateOf<ArgentumAttackPlan?>(null) }
@@ -1597,6 +1599,74 @@ internal class TableController(
         }
 
     fun offlineLibrary() = com.arcanatable.engine.OfflineCardLibrary({ path -> runCatching { context.assets.open(path) }.getOrNull() })
+
+    /** Request a full, unmasked engine checkpoint at the next action boundary. */
+    fun saveOfflineGame() {
+        if (!argentumOffline || wifiRole != null || argentumSocket.runningLocalHost == null ||
+            argentumSnapshot?.gameOver != false) {
+            message = "Only active offline vs AI games can be saved."
+            return
+        }
+        if (!argentumSocket.send("arcanaSaveOffline")) {
+            message = "Couldn't queue the offline save. Try again."
+        } else message = "Saving the full Argentum game after the current engine action…"
+    }
+
+    /** Start a brand-new local engine from the saved *full* GameState and original decks.
+     * A missing/incompatible checkpoint never silently starts a fresh game.
+     */
+    fun resumeOfflineGame() {
+        if (argentumEnabled || offlineStarting) return
+        offlineStarting = true
+        scope.launch {
+            try {
+                val checkpoint = withContext(Dispatchers.IO) {
+                    OfflineCheckpointStore.load(context) ?: error("No saved offline game exists.")
+                }
+                val savedSeats = OfflineCheckpointStore.savedSeats(checkpoint)
+                val library = offlineLibrary()
+                // Build a registry from the original seats, not from today's random AI deck selection.
+                val registry = withContext(Dispatchers.IO) {
+                    val required = savedSeats.flatMap { it.deck + listOfNotNull(it.commander) }.toSet()
+                    val definitions = if (savedSeats.all { it.commander == null }) library.portalOnly().loadAll()
+                        else library.load(required)
+                    com.wingedsheep.engine.registry.CardRegistry().apply { register(definitions) }
+                }
+                argentumSocket.localHostFactory = { emit ->
+                    com.arcanatable.engine.LocalArgentumHost(
+                        registry, savedSeats[0], savedSeats[1], emit = emit,
+                        extraOpponents = savedSeats.drop(2), resumeCheckpoint = checkpoint.toString()
+                    )
+                }
+                offlineRestoreRequested = true
+                argentumOffline = true
+                argentumDeckForLobby = null
+                argentumCommanderForLobby = null
+                argentumLobbySubmitted = true
+                argentumLocalPlayersBackup = players.toList()
+                argentumEnabled = true
+                homeOpen = false
+                lobbyOpen = false
+                argentumSocket.connect(savedSeats[0].name)
+                var waitCount = 0
+                while (argentumStatus != ArgentumConnectionStatus.CONNECTED && waitCount++ < 20) delay(100)
+                if (argentumStatus != ArgentumConnectionStatus.CONNECTED ||
+                    !argentumSocket.createCommanderPracticeLobby(vsAi = true)) {
+                    error("Couldn't reconnect to the offline engine.")
+                }
+            } catch (failure: Throwable) {
+                argentumSocket.close()
+                argentumSocket.localHostFactory = null
+                argentumEnabled = false
+                argentumOffline = false
+                offlineRestoreRequested = false
+                homeOpen = true
+                message = "Unable to resume: ${failure.message ?: failure.javaClass.simpleName}. The save was preserved."
+                recordDiagnostic("Offline resume failed: ${failure.javaClass.simpleName}: ${failure.message}", DiagnosticCategory.ERROR)
+            } finally { offlineStarting = false }
+        }
+    }
+
 
     /**
      * Offline game: Argentum's engine and AI run inside the app (engine/LocalArgentumHost). Your
