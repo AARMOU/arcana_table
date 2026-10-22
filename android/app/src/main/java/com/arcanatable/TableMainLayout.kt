@@ -242,6 +242,12 @@ internal fun TableController.TableMainLayout() {
                                 DropdownMenuItem(text = { Text("MTG rules") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; rulesOpen = true } })
                             }
                             "game" -> {
+                                if (argentumOffline && wifiRole == null && argentumSnapshot != null && !gameEndedOnline)
+                                    DropdownMenuItem(text = { Text("Save full offline game") }, onClick = {
+                                        topMenuExpanded = false
+                                        topMenuSection = null
+                                        saveOfflineGame()
+                                    })
                                 DropdownMenuItem(text = { Text("Room home") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; homeOpen = true; showOverview = true; showHand = false } })
                                 // Argentum server play parked for now (Build 113); plumbing kept.
                                 if (!onlineMode && !localGameStarted) DropdownMenuItem(text = { Text("Start Argentum game", color = Muted.copy(alpha = .6f)) }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; android.widget.Toast.makeText(context, "Not yet available", android.widget.Toast.LENGTH_SHORT).show() } })
