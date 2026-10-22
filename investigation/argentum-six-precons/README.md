@@ -59,9 +59,19 @@ scenarios, 8 existing ability-copy scenarios, 3 continuation-coverage checks, an
 checks. The 14-case class was rebuilt without the build cache, and its new case was confirmed in
 the compiled artifact and JUnit report. Evidence: `validation/2026-10-22-stack-copy.json`.
 
-Isolated CI passed the targeted stage on the preceding revision. The latest broader regression
-run remains pending: https://github.com/AARMOU/arcana_table/actions/runs/39793999697.
-No full-suite, APK/device, or complete-deck verification is claimed.
+The revised stack-copy patch passed full upstream rules-engine and card-scenario CI at
+https://github.com/AARMOU/arcana_table/actions/runs/39802451380, after the earlier
+revision's two failures were addressed. An additional noncached regression guard was
+committed to the isolated workflow (commit `eb3ae95e`) and its run is
+https://github.com/AARMOU/arcana_table/actions/runs/39822307344.
+No APK/device, runtime-JAR integration, or complete-deck verification is claimed.
+
+Colorless-hybrid SDK source support is staged in `0005-colorless-hybrid-sdk.patch`: seven
+new targeted SDK tests passed, but an earlier complete SDK run failed the generated-index
+and sealed-type-baseline checks. Both accompanying SDK surface records were added to the
+experimental patch (commit `45279a2c`); the current validation run is
+https://github.com/AARMOU/arcana_table/actions/runs/39822886599. Neither the entire SDK
+suite nor the engine payment / AI behavior is marked verified until the gates pass.
 
 The exact unregistered card candidate and an executed reproduction of the missing colorless-hybrid
 mana parser are in `blocked/ulalek/`. Ulalek still needs true `{C/color}` casting-cost support and
