@@ -11,7 +11,7 @@ class EngineProcessingInfoTest {
         val result = processingInfo(true, true, false, 12500, 342)!!
         assertEquals("Argentum is resolving your action", result.label)
         assertEquals(12, result.elapsedSeconds)
-        assertEquals(342, result.lastCompletedMs)
+        assertEquals(342L, result.lastCompletedMs)
     }
     @Test fun backgroundEngineUpdateAndNetworkWaitAreDifferent() {
         assertEquals("Argentum is advancing the game", processingInfo(true, false, true, 500, null)!!.label)
