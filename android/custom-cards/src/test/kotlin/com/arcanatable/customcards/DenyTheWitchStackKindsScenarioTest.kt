@@ -1,8 +1,6 @@
 package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.DenyTheWitch
-import com.arcanatable.customcards.cards.CompanyCommander
-import com.arcanatable.customcards.cards.SpawningBed
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.CastSpell
 import com.wingedsheep.engine.core.PaymentStrategy
@@ -28,7 +26,7 @@ class DenyTheWitchStackKindsScenarioTest {
     }
 
     @Test fun counteringCreatureEtbTriggerLeavesCreatureButPreventsTokens() {
-        val d = customScenario(DenyTheWitch, CompanyCommander)
+        val d = customScenario(DenyTheWitch, "Company Commander")
         val p = d.player1
         val opp = d.player2
         d.putCreatureOnBattlefield(p, "Company Commander")
@@ -48,7 +46,7 @@ class DenyTheWitchStackKindsScenarioTest {
     }
 
     @Test fun counteringActivatedNonmanaAbilityPreventsSpawnProduction() {
-        val d = customScenario(DenyTheWitch, SpawningBed, "Grizzly Bears")
+        val d = customScenario(DenyTheWitch, "Spawning Bed", "Grizzly Bears")
         val p = d.player1
         val opp = d.player2
         d.putCreatureOnBattlefield(p, "Grizzly Bears")
