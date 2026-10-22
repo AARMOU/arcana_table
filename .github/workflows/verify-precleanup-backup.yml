@@ -1,0 +1,55 @@
+name: Verify and package pre-cleanup Git backup
+on:
+  push:
+    branches:
+      - backup/precleanup-20261022/index
+    paths:
+      - .github/workflows/verify-precleanup-backup.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  backup-restore-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch saved backup references
+        run: |
+          git fetch --no-tags origin '+refs/heads/backup/precleanup-20261022/*:refs/remotes/origin/backup/precleanup-20261022/*'
+      - name: Verify exact heads, create Git bundle, restore, verify again
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, subprocess
+          text = pathlib.Path("PRE_CLEANUP_SNAPSHOT.md").read_text()
+          records = re.findall(r'^\| `([^`]+)` \| `([0-9a-f]{40})` \| `(backup/precleanup-20261022/[^`]+)` \|$', text, re.M)
+          assert len(records) == 74, f"Expected 74 snapshot refs; found {len(records)}"
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+          refs = ["refs/remotes/origin/" + b for _, _, b in records]
+          for name, sha, backup in records:
+              got = git("rev-parse", "refs/remotes/origin/" + backup)
+              assert got == sha, f"Source snapshot mismatch {name}: {got} vs {sha}"
+          bundle = "arcana-precleanup-20261022.bundle"
+          subprocess.run(["git", "bundle", "create", bundle, *refs], check=True)
+          subprocess.run(["git", "bundle", "verify", bundle], check=True)
+          subprocess.run(["git", "clone", "--mirror", bundle, "precleanup-restored.git"], check=True)
+          for name, sha, backup in records:
+              got = git("--git-dir=precleanup-restored.git", "rev-parse", "refs/remotes/origin/" + backup)
+              assert got == sha, f"Restored snapshot mismatch {name}: {got} vs {sha}"
+          pathlib.Path("PRE_CLEANUP_VERIFIED.txt").write_text(
+              f"PASS: {len(records)} source SHA checks, git bundle verify, fresh mirror restore, and {len(records)} restored SHA checks.\n"
+          )
+          print("PASS: all 74 snapshot branches round-trip through the backup bundle")
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: arcana-precleanup-20261022-bundle
+          path: |
+            arcana-precleanup-20261022.bundle
+            PRE_CLEANUP_SNAPSHOT.md
+            PRE_CLEANUP_VERIFIED.txt
+          retention-days: 90
