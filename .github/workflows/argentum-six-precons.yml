@@ -29,16 +29,20 @@ jobs:
       - name: Generate card data and run full custom-card regressions
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test
-      - name: Validate generated data has each imported card exactly once
+      - name: Validate all exported cards and audit both indexes
         run: |
-          python3 - <<'PY'
+          python3 - <<'PYTHON'
+          import json
           from pathlib import Path
-          index = Path('android/app/src/main/assets/argentum/custom-cards.index.tsv').read_text()
-          names = [line.split('\t')[0] for line in index.splitlines() if line.strip()]
-          for name in ['Spatial Contortion', 'Skittering Invasion', 'Blight Grenade']:
-              assert names.count(name) == 1, (name, names.count(name))
-          print('Three staged definitions exported without duplicates')
-          PY
+          root = Path('android/app/src/main/assets/argentum')
+          index_names = [line.split('\t')[0] for line in (root / 'custom-cards.index.tsv').read_text().splitlines() if line.strip()]
+          data_names = [json.loads(line)['name'] for line in (root / 'custom-cards.jsonl').read_text().splitlines() if line.strip()]
+          assert len(index_names) == len(set(name.casefold() for name in index_names)), 'Duplicate index names'
+          assert len(data_names) == len(set(name.casefold() for name in data_names)), 'Duplicate data names'
+          assert index_names == data_names, 'Exported data and index disagree'
+          print(f'{len(data_names)} definitions exported exactly once; index matches data')
+          PYTHON
+          python3 investigation/argentum-six-precons/coverage-audit.py
       - name: Detect whitespace errors in generated card data
         run: git diff --check
       - name: Commit successfully tested card exports to isolated branch

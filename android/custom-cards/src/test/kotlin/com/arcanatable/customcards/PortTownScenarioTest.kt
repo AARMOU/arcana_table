@@ -49,4 +49,24 @@ class PortTownScenarioTest {
         d.resolveAll()
         assertTrue(d.isTapped(d.findPermanent(p, "Port Town")!!))
     }
+
+    @Test
+    fun growthSpiralPuttingTheLandOntoBattlefieldStillRequiresAReveal() {
+        val d = CardPool.driver("Growth Spiral").apply {
+            initMirrorMatch(com.wingedsheep.sdk.model.Deck.of("Forest" to 40))
+            passPriorityUntil(Step.PRECOMBAT_MAIN)
+        }
+        val p = d.player1
+        d.putCardInHand(p, "Port Town")
+        val spiral = d.putCardInHand(p, "Growth Spiral")
+        d.giveMana(p, Color.GREEN)
+        d.giveMana(p, Color.BLUE)
+        assertNull(d.castSpell(p, spiral).error)
+        d.resolveAll(Choices(pick = listOf("Port Town")))
+
+        val land = d.findPermanent(p, "Port Town")!!
+        assertFalse(d.zoneNames(p, Zone.HAND).contains("Port Town"))
+        // The draw is another Forest, so there is no Plains or Island to reveal.
+        assertTrue("Putting Port Town onto the battlefield must still apply its entry replacement", d.isTapped(land))
+    }
 }
