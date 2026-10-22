@@ -1,0 +1,60 @@
+name: Isolated Argentum colorless-hybrid mana-payment validation
+on:
+  push:
+    branches: [gpt/argentum-six-precons]
+    paths:
+      - investigation/argentum-six-precons/staged-engine/0005-colorless-hybrid-sdk.patch
+      - investigation/argentum-six-precons/staged-engine/0006-colorless-hybrid-floating-payment.patch
+      - .github/workflows/argentum-colorless-hybrid-mana.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: argentum-colorless-hybrid-mana-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  floating-mana:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      ORG_GRADLE_PROJECT_kotlinCompileParallelism: '1'
+      GRADLE_OPTS: '-Dorg.gradle.workers.max=2 -Dorg.gradle.configuration-cache=false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 7a9663d8e4df4ce7db223023ae7714f0028e08a9
+          path: upstream-engine
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Verify and apply staged SDK plus floating-payment patches
+        working-directory: upstream-engine
+        run: |
+          git apply --check ../investigation/argentum-six-precons/staged-engine/0005-colorless-hybrid-sdk.patch
+          git apply ../investigation/argentum-six-precons/staged-engine/0005-colorless-hybrid-sdk.patch
+          git apply --check ../investigation/argentum-six-precons/staged-engine/0006-colorless-hybrid-floating-payment.patch
+          git apply ../investigation/argentum-six-precons/staged-engine/0006-colorless-hybrid-floating-payment.patch
+          git diff --check
+      - name: Verify exact colorless-hybrid mana payment and existing hybrid payments
+        working-directory: upstream-engine
+        run: |
+          ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
+            -Dorg.gradle.configuration-cache=false :rules-engine:test \
+            --tests '*ColorlessHybridManaPaymentTest' \
+            --tests '*MonocolorHybridManaPaymentTest'
+      - name: Verify full engine regression
+        working-directory: upstream-engine
+        run: |
+          ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
+            -Dorg.gradle.configuration-cache=false :rules-engine:test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolated-colorless-hybrid-mana-results
+          path: |
+            upstream-engine/mtg-sdk/build/test-results/
+            upstream-engine/rules-engine/build/test-results/
+          retention-days: 14
