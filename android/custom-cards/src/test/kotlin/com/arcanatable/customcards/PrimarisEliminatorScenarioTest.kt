@@ -2,6 +2,8 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.PrimarisEliminator
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.ChooseOptionDecision
+import com.wingedsheep.engine.core.OptionChosenResponse
 import com.wingedsheep.engine.core.ChooseModeDecision
 import com.wingedsheep.engine.core.ModesChosenResponse
 import com.wingedsheep.sdk.core.*
@@ -20,6 +22,8 @@ class PrimarisEliminatorScenarioTest {
             when {
                 decision is ChooseModeDecision ->
                     assertNull(d.submitDecision(decision.playerId, ModesChosenResponse(decision.id, listOf(mode))).error)
+                decision is ChooseOptionDecision ->
+                    assertNull(d.submitDecision(decision.playerId, OptionChosenResponse(decision.id, mode)).error)
                 decision != null -> d.decide(Choices(targets = targets))
                 d.state.stack.isNotEmpty() -> d.bothPass()
                 else -> return
