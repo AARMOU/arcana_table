@@ -936,7 +936,8 @@ internal fun TableController.TableOverlaysB() {
         val life = players.getOrNull(prompt.playerIndex)?.life ?: 0
         fun placeLand(enterTapped: Boolean, payTwoLife: Boolean = false) {
             val playerIndex = prompt.playerIndex
-            if (playerIndex in players.indices) {
+            if (playerIndex in players.indices &&
+                players[playerIndex].cardsInPlaySource(prompt.sourceZone).any { it.id == prompt.card.id }) {
                 updatePlayer(playerIndex) { player ->
                     val withoutCard = player.removeFromPlaySource(prompt.sourceZone, prompt.card.id) ?: return@updatePlayer player
                     withoutCard.copy(
