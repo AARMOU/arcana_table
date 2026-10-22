@@ -1,5 +1,14 @@
 # Arcana Table — integration control board
 
+## Latest verified integration checkpoint — 2026-10-22 (supersedes historical red statuses below)
+
+- **PR #45 merged** to game-over source at `dca22b4bfc3e453ebbb849c846859bcdffda5d54`. Destination CI [#39872381961](https://github.com/AARMOU/arcana_table/actions/runs/39872381961) green; pinned B131 replacement-engine CI [#39872674003](https://github.com/AARMOU/arcana_table/actions/runs/39872674003) green, including full Android tests, lint, and debug assembly.
+- **PR #46 merged** to six-precon worker integration at `93eaeebf85e0f60cecad5a8f134a6163d7fab5cd`. Destination full-card CI [#39872389748](https://github.com/AARMOU/arcana_table/actions/runs/39872389748) green; generated custom card export then committed on that same branch at `959b8d980bdf7e43537671a5651db8619c5c9cd6` (asset files only). Pinned B131 engine and Android consumer CI [#39872589479](https://github.com/AARMOU/arcana_table/actions/runs/39872589479) green with 211 definitions and zero upstream name collisions.
+- Workflows and evidence: [post-merge report](POST_MERGE_VALIDATION_2026-10-22.md). The compatibility workflows were staged on isolated `gpt/b131-post-merge-compatibility-20261022`, not the production branch.
+- **Not yet done:** Do not claim parent feature PRs #42 / #43 integrated into the B131 preview or `main`. They remain separate workstreams; these successful checks authorize no release.
+
+---
+
 **As-of:** 2026-10-22; source: actual branch refs, GitHub PRs, CI logs, and verified backup inventory. This is a **tracking document**, not authorization for a merge, code modification or release.
 
 ## Repositories / baselines
