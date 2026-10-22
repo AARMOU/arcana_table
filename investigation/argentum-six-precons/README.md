@@ -48,17 +48,26 @@ Source definitions are written using the existing Argentum SDK under
 `android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/`, registered
 in `CustomCards.kt`, and only become Android assets after
 `:custom-cards:exportCards`. Each new behavior gets its own scenario test.
+
 ## Active hardest-first work — October 22, 2026
 
 The resumed work starts with **Ulalek, Fused Atrocity**, ahead of simpler card definitions.
 Its stack-copy engine patch and executable scenarios are in
-`staged-engine/0004-stack-object-copying.patch`; the exact unregistered card candidate and
-an executed reproduction of the missing colorless-hybrid mana parser are in `blocked/ulalek/`.
-The 12 existing spell-copy retargeting regressions passed locally. New SDK/batch-copy validation
-and the dedicated stack-copy CI workflow are still in progress; they are not reported as passed.
-No pinned app JAR, live registry, exported asset, release or APK changed. The verified card
-count below therefore remains **80**, with **196 distinct cards / 201 deck slots missing**.
-See `SDK-GAPS.md` for the remaining engine and Android integration gates.
+`staged-engine/0004-stack-object-copying.patch`. **39 distinct targeted JVM tests passed**:
+14 batch-copy scenarios (including independent optional consent), 12 existing spell-retargeting
+scenarios, 8 existing ability-copy scenarios, 3 continuation-coverage checks, and 2 SDK serialization
+checks. The 14-case class was rebuilt without the build cache, and its new case was confirmed in
+the compiled artifact and JUnit report. Evidence: `validation/2026-10-22-stack-copy.json`.
+
+Isolated CI passed the targeted stage on the preceding revision. The latest broader regression
+run remains pending: https://github.com/AARMOU/arcana_table/actions/runs/39793999697.
+No full-suite, APK/device, or complete-deck verification is claimed.
+
+The exact unregistered card candidate and an executed reproduction of the missing colorless-hybrid
+mana parser are in `blocked/ulalek/`. Ulalek still needs true `{C/color}` casting-cost support and
+Java-17 Android integration of all SDK consumers. No pinned app JAR, live registry, exported asset,
+release or APK changed. The verified card count below remains **80**, with
+**196 distinct cards / 201 deck slots missing**. See `SDK-GAPS.md` for the remaining gates.
 
 ## Verified implementation progress — October 21, 2026
 

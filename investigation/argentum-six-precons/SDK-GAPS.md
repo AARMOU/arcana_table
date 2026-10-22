@@ -25,8 +25,9 @@ the existing batch spell copier into a serializable chosen/controlled stack-obje
 allows ordering and independent retargeting, and composes spells-first / abilities-second.
 Ability copies preserve their original source, modes, X and target object identities and emit
 `AbilityCopiedEvent` rather than pretending to trigger or activate again. Scenario and SDK
-regressions are included in the patch. Validation is pending; see the dedicated
-`argentum-stack-copy-enhancements.yml` workflow. No app JARs or live card registry changed.
+regressions are included in the patch. Targeted local validation passed 39 distinct JVM tests,
+including the independent optional-consent case. Evidence is in `validation/2026-10-22-stack-copy.json`; full regression CI remains pending.
+See the dedicated `argentum-stack-copy-enhancements.yml` workflow. No app JARs or live card registry changed.
 
 The exact Ulalek definition is in `blocked/ulalek/`. A newly confirmed independent blocker is
 its true colorless-hybrid casting cost: the pinned `ManaCost.parse` does not recognize `{C/W}`
@@ -37,7 +38,7 @@ engine features are integrated into the Java-17 Android runtime and full custom-
 
 ## Experimental engine-patch progress (not shipped)
 
-Three independent enhancements are now staged on the isolated six-precon branch:
+Four independent enhancements are now staged on the isolated six-precon branch:
 
 - `engine-patches/0001-granted-cascade.patch`: synthesizes each *granted*
   cascade instance as a spell-sourced trigger. Includes mana-value-qualified
@@ -52,16 +53,21 @@ Three independent enhancements are now staged on the isolated six-precon branch:
   any legal defender* if able, including AI plan repair. Executable tests:
   `staged-engine/OpponentsMustAttackWithCreatureTest.kt`.
 
-The actions `argentum-engine-enhancements.yml` and
-`argentum-combat-enhancements.yml` each check out pinned upstream source in
+- `staged-engine/0004-stack-object-copying.patch`: controlled stack snapshots, batch ordering,
+  independent retargeting, source and target identity preservation, and independent resolution
+  consent on copied optional triggers. Its engine and SDK scenario tests are included in the patch.
+
+The actions `argentum-engine-enhancements.yml`, `argentum-combat-enhancements.yml`, and
+`argentum-stack-copy-enhancements.yml` check out pinned upstream source in
 an ephemeral runner, apply the patches, and run JVM scenario tests. Their
 results must be explicitly reviewed before calling the enhancements verified;
 JVM-only success does **not** establish Java-17/Android runtime compatibility.
 The pinned app jars in `android/app/libs` have not been replaced. No blocked
 precon card has been added to the live custom-card registry.
 
-The remaining Ulalek stack-copying feature and Port Town collection-entry
-continuation are still unimplemented: neither is safe to approximate.
+Port Town's collection-entry continuation is still unimplemented. Ulalek's stack-copy operation
+has a tested source-side candidate in `0004-stack-object-copying.patch`; the pinned app runtime
+does not include it, and true colorless-hybrid casting costs remain unsupported.
 The Swarmlord history amount was **not** present in either the pinned JAR or
 the inspected upstream source, correcting the older note below.
 
@@ -96,6 +102,9 @@ commander-zone cast history must be available in the deployed runtime before
 The Swarmlord's entry counters can be implemented completely.
 
 ## Ulalek — copying a controlled stack snapshot
+
+The pinned runtime still has the gap below. Experimental patch `0004-stack-object-copying.patch`
+implements a source-side candidate; targeted JVM validation does not establish Android support.
 
 `CardSource` in `scripting/effects/PipelineEffects.kt` has no source collecting
 controlled spell and ability objects from the shared stack. `FromZone(STACK)`
