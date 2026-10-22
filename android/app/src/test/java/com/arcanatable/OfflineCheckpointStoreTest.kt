@@ -38,7 +38,7 @@ class OfflineCheckpointStoreTest {
 
     @Test(expected = IllegalArgumentException::class)
     fun rejectsMaskedOrIncompleteSnapshots() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+        val context = org.robolectric.RuntimeEnvironment.getApplication()
         OfflineCheckpointStore.save(context, JSONObject().put("schema", 1)
             .put("mode", "local-ai").put("seats", JSONArray()).toString())
     }
