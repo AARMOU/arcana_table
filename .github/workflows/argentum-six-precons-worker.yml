@@ -1,0 +1,56 @@
+name: Argentum six-precon isolated worker regression
+on:
+  push:
+    branches:
+      - gpt/six-precon-worker-**
+    paths:
+      - android/custom-cards/src/**
+      - .github/workflows/argentum-six-precons-worker.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: six-precon-worker-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  cards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export card data and run every existing and worker card scenario
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test
+      - name: Validate exported custom card definitions and six-precon coverage
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root = Path('android/app/src/main/assets/argentum')
+          index_names = [line.split('\t')[0] for line in (root / 'custom-cards.index.tsv').read_text().splitlines() if line.strip()]
+          data_names = [json.loads(line)['name'] for line in (root / 'custom-cards.jsonl').read_text().splitlines() if line.strip()]
+          assert index_names == data_names, 'Index and JSONL card names differ'
+          assert len(index_names) == len(set(s.casefold() for s in index_names)), 'Duplicate custom card names'
+          print(f'{len(index_names)} exact custom-card definitions exported')
+          PY
+          python3 investigation/argentum-six-precons/coverage-audit.py
+      - name: Verify clean patch formatting
+        run: git diff --check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: six-precon-worker-results
+          path: |
+            android/custom-cards/build/test-results/
+            android/custom-cards/build/reports/tests/
+            android/app/src/main/assets/argentum/custom-cards.index.tsv
+            android/app/src/main/assets/argentum/custom-cards.jsonl
+          retention-days: 14
