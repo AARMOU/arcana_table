@@ -51,8 +51,11 @@ def main() -> int:
         "mandatory_blocker": None,
         "experiment": EXPERIMENTAL,
     }
+    forward_ports = {
+        "0004-token-copy-triggered-abilities.patch": ROOT / "engine-upgrade" / "forward-ports" / "0004-token-copy-triggered-abilities.patch",
+    }
     for patch_name in MANDATORY:
-        patch = PATCHES / patch_name
+        patch = forward_ports.get(patch_name, PATCHES / patch_name)
         if not patch.is_file():
             outcome = "missing"
             diagnostics = "Patch file not found"
