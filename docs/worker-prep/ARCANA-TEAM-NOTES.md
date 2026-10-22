@@ -11,19 +11,19 @@ This is a durable, append-only notebook for development team handoffs and any ve
 | Team | Goal | GitHub issue | Integration branch | Wave | Observed status |
 |---|---|---|---|---|---|
 | 01 | Action failure explanations | [#12](https://github.com/AARMOU/arcana_table/issues/12) | `gpt/work-log-events` | B | Queued; agent unverified |
-| 02 | Engine processing progress | [#13](https://github.com/AARMOU/arcana_table/issues/13) | `gpt/work-engine-progress` | C | Queued; agent unverified |
+| 02 | Engine processing progress | [#13](https://github.com/AARMOU/arcana_table/issues/13) | `gpt/work-engine-progress` | C | Implemented in B130; focused CI passed; no agent |
 | 03 | Token grouping | [#14](https://github.com/AARMOU/arcana_table/issues/14) | `gpt/work-token-groups` | C | Queued; agent unverified |
-| 04 | Offline save/resume | [#15](https://github.com/AARMOU/arcana_table/issues/15) | `gpt/work-local-resume` | C | Queued; agent unverified |
+| 04 | Offline save/resume | [#15](https://github.com/AARMOU/arcana_table/issues/15) | `gpt/work-local-resume` | C | Explicit offline save/resume in B130; round-trip CI passed; device test pending; no agent |
 | 05 | Turn recap | [#16](https://github.com/AARMOU/arcana_table/issues/16) | `gpt/work-turn-recap` | B | Queued; agent unverified |
 | 06 | Priority stops | [#17](https://github.com/AARMOU/arcana_table/issues/17) | `gpt/work-priority-stops` | C | Queued; agent unverified |
 | 07 | Reproducible bug reports | [#18](https://github.com/AARMOU/arcana_table/issues/18) | `gpt/work-repro-reports` | A | Queued; agent unverified |
 | 08 | Deck support report | [#19](https://github.com/AARMOU/arcana_table/issues/19) | `gpt/work-deck-support` | A | Queued; agent unverified |
-| 09 | Table UI verification | [#20](https://github.com/AARMOU/arcana_table/issues/20) | `gpt/table-manual-expand-pinch-zoom` | A | Queued; agent unverified |
-| 10 | Menu layout cleanup | [#21](https://github.com/AARMOU/arcana_table/issues/21) | `gpt/work-menu-layout` | A | Queued; agent unverified |
-| 11 | Game-log event counters | [#22](https://github.com/AARMOU/arcana_table/issues/22) | `gpt/work-log-grouping` | B | Queued; agent unverified |
-| 12 | Popup readability | [#23](https://github.com/AARMOU/arcana_table/issues/23) | `gpt/work-popup-notifications` | A | Queued; agent unverified |
-| 13 | Targeting warning | [#24](https://github.com/AARMOU/arcana_table/issues/24) | `gpt/work-targeting-alerts` | B | Queued; agent unverified |
-| 14 | Graveyard/exile casts | [#25](https://github.com/AARMOU/arcana_table/issues/25) | `gpt/zone-casting-graveyard-exile` | A | Queued; agent unverified |
+| 09 | Table UI verification | [#20](https://github.com/AARMOU/arcana_table/issues/20) | `gpt/table-manual-expand-pinch-zoom` | A | Implemented in B129; focused CI passed; device test pending; no agent |
+| 10 | Menu layout cleanup | [#21](https://github.com/AARMOU/arcana_table/issues/21) | `gpt/work-menu-layout` | A | Partially implemented B129; focused CI passed; no agent |
+| 11 | Game-log event counters | [#22](https://github.com/AARMOU/arcana_table/issues/22) | `gpt/work-log-grouping` | B | Implemented B129; focused CI passed; no agent |
+| 12 | Popup readability | [#23](https://github.com/AARMOU/arcana_table/issues/23) | `gpt/work-popup-notifications` | A | Partially implemented B129; focused CI passed; no agent |
+| 13 | Targeting warning | [#24](https://github.com/AARMOU/arcana_table/issues/24) | `gpt/work-targeting-alerts` | B | Implemented B130; focused CI passed; device test pending; no agent |
+| 14 | Graveyard/exile casts | [#25](https://github.com/AARMOU/arcana_table/issues/25) | `gpt/zone-casting-graveyard-exile` | A | Partially implemented B129; focused CI passed; engine card coverage pending; no agent |
 
 ### Sequencing
 - **Wave A:** 07, 08, 09, 10, 12, 14 — relatively separate work, including verification of existing Table UI and graveyard/exile implementation.
@@ -178,6 +178,28 @@ The user authorized implementing: **persistent targeting alerts, engine processi
 - Manifest package `com.arcanatable.argentum`, versionCode `130`, versionName `0.33.8-build130-targeting-progress-resume`, debug signer `CN=Android Debug`, signing certificate SHA-256 `79934dc7be84780b3a1a47a94f0c2f26e92f8feb96f4928a337d835cd3068ba2`. Different debug certificate from previous preview, so Android may require uninstalling **only the old preview**.
 - All 3 newly implemented feature families compiled/passed the selected regression suite, including `OfflineEngineResumeTest` host-to-host full state checkpoint roundtrip. This does not represent on-device testing or official Play Store production signing.
 - **No production merge**, no original `com.arcanatable` overwrite, no release to Play Store.
+
+### 2026-10-22 — Build 130 field-testing handoff and next development priorities
+
+**Latest combined preview:** Build 130, `0.33.8-build130-targeting-progress-resume`, from `gpt/arcana-b130-priority-three-preview` at `43b27a89f01e850ec651f85f9be775d7804cb0bd`. Debug-signed installable APK from [successful Actions run 39800587691](https://github.com/AARMOU/arcana_table/actions/runs/39800587691) ([artifact 12434979010](https://github.com/AARMOU/arcana_table/actions/runs/39800587691/artifacts/12434979010)). The delivered file was `ArcanaTable-B130-Targeting-Progress-Resume-debug.apk`. APK checksum and package/version validation are recorded in the preceding entry. This is **not** a Play Store/update build: package `com.arcanatable.argentum`, not `com.arcanatable`; debug signing certificate differs from earlier preview; install side by side, and possibly uninstall the **prior preview only** first.
+
+**Eight integrated feature groups:** Table view manual expansion/navigation, graveyard/exile *engine-authorized* actions, menu decision label/layout cleanup, counted expandable game-log events, readable scrollable transient notices (B129), plus persistent enemy-targeting alerts, honest engine-processing elapsed status, and manual full-state offline save/resume (B130).
+
+**Verified:** Combined Android JVM/Robolectric focused tests passed in GitHub CI, including exact offline host-to-host GameState serialization/restore, along with APK assembly and package/signature checks. **Not verified:** physical Android device installation, realistic gameplay, full engine or card-coverage regressions, long-duration/performance stress, actual killed-process save/resume, LAN/server multiplayer behavior, Play Store compatibility/signing, and all screen configurations.
+
+**Concrete B130 device acceptance checklist (not marked done):**
+1. Confirm home screen shows **Build 130**, and preview app remains separate from `com.arcanatable`; avoid uninstalling production.
+2. Cast an opponent-targeted spell at **YOU**, then at one of **YOUR permanents**; confirm persistent warning, accurate source/target, Inspect Stack navigation, and clearing when the stack item leaves. Verify targeting opponents does not warn you; verify trigger/ability targets and mixed/multiple targets.
+3. Trigger lengthy offline engine work, inspect elapsed timer and history (no fake percent/ETA), ensure indicator eventually clears without blocking legal responses or freezing UI.
+4. Start a local **offline vs AI** game; change board state, create a nonempty stack and pending decision where possible, use **Game tools → Save full offline game**; force-stop/relaunch the app; **Resume Offline Game**; confirm private zones, game turn/phase, pending prompt, mana, stack, AI/seat ownership, logs and undo eligibility exactly match the saved state and that play continues.
+5. Save again later; verify atomic replacement, and verify confirmation before discarding. Start a fresh offline game only after explicitly clearing the prior save. Check that saving Wi-Fi/server games is not falsely offered.
+6. Exercise old B129 behavior (table navigation, logs, popup readability, graveyard/exile legal-action filtering) to detect interaction regressions.
+
+**Important known scope and risks:** Save is **user-initiated** and covers a finished host action boundary, not continuous autosave or recovery from unsaved changes. It is restricted to offline vs AI—not a full network game. A serialization round-trip passing does not guarantee UI lifecycle reattachment or a real-device force-stop resume. Processing feedback is elapsed-time, **not** a determinate engine progress percentage. Target alerts depend on the stack's exposed exact target IDs; card abilities without that data may need further support. Graveyard/exile cast legality still depends on Argentum support for each particular mechanic/card.
+
+**Remaining backlog not part of B130:** action failure explanations (#12); advanced token stacking (#14); turn recaps (#16); configurable priority stops (#17); replayable diagnostic reports (#18); deck support audit (#19). Also finish notification queuing/deduplication, menu layout audit and full graveyard/exile mechanic coverage. Separate high-volume engine-performance changes and Warhammer/Eldrazi six-precon card implementation have **not** been newly integrated into this B130 build.
+
+**Next gate:** collect real-device Build 130 diagnostics and test results, correct any reproducible issues on an isolated branch, then run comprehensive engine and app regressions before proposing a production-signed `com.arcanatable` build. No merge, release, or signing-key use without explicit user authorization. **No autonomous Copilot workers were confirmed active**; these implementations were direct source edits via connected GitHub.
 
 ### Update format to use for future work
 
