@@ -694,9 +694,25 @@ internal fun TableController.TableOverlaysB() {
             "Exile" -> players[index].exile
             else -> players[index].revealed
         }
+        val legalZoneCardIds = if (argentumEnabled && zone in setOf("Graveyard", "Exile")) {
+            val snapshot = argentumSnapshot
+            cards.filter { card -> snapshot != null &&
+                ArgentumActions.forCardServerId(snapshot.legalActions, snapshot.serverCardIds[card.id]).isNotEmpty()
+            }.map { it.id }.toSet()
+        } else emptySet()
         CardZoneDialog(
             zone, players[index].name, cards, onDismiss = { zoneDialog = null },
             onPreview = { preview = CardPreview(index, it, fromHand = false, canManipulate = false) },
+            manualPlayAllowed = !argentumEnabled && zone in setOf("Graveyard", "Exile") &&
+                (!onlineMode || index == localSeat && !gameEndedOnline),
+            argentumPlayableIds = legalZoneCardIds,
+            onPlayCard = { card ->
+                if (argentumEnabled && card.id in legalZoneCardIds) {
+                    // Close the zone dialog before opening Argentum's legal-action sheet.
+                    zoneDialog = null
+                    scope.launch { delay(120); openArgentumActions(card) }
+                } else if (!argentumEnabled) beginManualPlayFromZone(index, zone, card)
+            },
             // Argentum owns every zone change in its games; Arcana only shows them.
             canMoveCards = !argentumEnabled && zone in listOf("Graveyard", "Exile") && (!onlineMode || index == localSeat && !gameEndedOnline),
             onMoveCard = { card, destination ->
@@ -922,13 +938,13 @@ internal fun TableController.TableOverlaysB() {
             val playerIndex = prompt.playerIndex
             if (playerIndex in players.indices) {
                 updatePlayer(playerIndex) { player ->
-                    player.copy(
+                    val withoutCard = player.removeFromPlaySource(prompt.sourceZone, prompt.card.id) ?: return@updatePlayer player
+                    withoutCard.copy(
                         life = if (payTwoLife) player.life - 2 else player.life,
-                        hand = player.hand.filterNot { it.id == prompt.card.id },
-                        battlefield = player.battlefield + prompt.card.copy(tapped = enterTapped)
+                        battlefield = withoutCard.battlefield + prompt.card.copy(tapped = enterTapped)
                     )
                 }
-                logAction(playerIndex, "played ${prompt.card.name}${if (payTwoLife) " and paid 2 life" else if (enterTapped) " tapped" else " untapped"}")
+                logAction(playerIndex, "played ${prompt.card.name} from ${prompt.sourceZone.lowercase()}${if (payTwoLife) " and paid 2 life" else if (enterTapped) " tapped" else " untapped"}")
                 if (needsCreatureTypeChoice(prompt.card)) creatureTypeChoicePrompt = CreatureTypeChoicePrompt(playerIndex, prompt.card.id, prompt.card.name)
             }
             landEntryPrompt = null
@@ -964,8 +980,8 @@ internal fun TableController.TableOverlaysB() {
         val payable = paySimpleManaCost(players.getOrNull(owner)?.manaPool.orEmpty(), card.manaCost, tax)
         val costKnown = card.manaCost != null
         AlertDialog(
-            onDismissRequest = { paymentCard = null; handActionCard = null },
-            title = { Text(if (commanderCast) "Cast commander?" else "Cast ${if (card.isFaceDown) "face down" else card.name}?") },
+            onDismissRequest = { paymentCard = null; paymentSourceZone = null; handActionCard = null },
+            title = { Text(if (commanderCast) "Cast commander?" else "Cast ${if (card.isFaceDown) "face down" else card.name} from ${paymentSourceZone ?: "Hand"}?") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -985,7 +1001,7 @@ internal fun TableController.TableOverlaysB() {
                     TextButton(onClick = { castFromPayment(owner, card, commanderCast, manualPayment = true) }) { Text("I PAID MANUALLY", color = CounterGold) }
                 }
             },
-            dismissButton = { TextButton(onClick = { paymentCard = null; handActionCard = null }) { Text("CANCEL") } },
+            dismissButton = { TextButton(onClick = { paymentCard = null; paymentSourceZone = null; handActionCard = null }) { Text("CANCEL") } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = SoftWhite
         )
     }
