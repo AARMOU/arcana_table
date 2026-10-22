@@ -895,7 +895,7 @@ internal fun TableController.TableOverlays() {
                             val commander = players.getOrNull(handSeat)?.commanderCard
                             if (argentumEnabled && commander != null) openArgentumActions(commander)
                             else if (commander == null) message = "Set a commander from your deck or battlefield first."
-                            else { paymentSourceZone = null; paymentCard = selectedPlayer to commander }
+                            else { paymentSourceZone = "Command Zone"; paymentCard = selectedPlayer to commander }
                         },
                         onCombat = { run { if (argentumEnabled) run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } else if (canControlSelectedPlayer && selectedPlayer == activePlayer) combatDialogOpen = true } },
                         onMoreAction = { action ->
