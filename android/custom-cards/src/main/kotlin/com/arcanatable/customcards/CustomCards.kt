@@ -231,6 +231,8 @@ object CustomCards {
         Entry(ThunderwolfCavalry, "40K", "Six WotC precons"),
         Entry(VanguardSuppressor, "40K", "Six WotC precons"),
         Entry(CompanyCommander, "40K", "Six WotC precons"),
+        Entry(FellTheMighty, "40K", "Six WotC precons"),
+        Entry(SkorpekhDestroyer, "40K", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
