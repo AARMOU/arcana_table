@@ -1,0 +1,60 @@
+name: Build 131 — isolated Myriad port-viability gate
+on:
+  push:
+    branches: [gpt/b131-card-compatibility-20261022]
+    paths: [.github/workflows/b131-myriad-port-check.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pin-and-validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: b131
+      - uses: actions/checkout@v4
+        with:
+          ref: 09ffe470283cc54caeca1372fdf8f1a1c89e8746
+          path: myriad-worker
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: b131/argentum-engine
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - name: Apply the eight already-required Build 131 engine patches
+        run: python3 b131/engine-upgrade/audit_patches.py
+      - name: Check new Myriad defender-choice patch on exact Build 131 baseline
+        shell: bash
+        run: |
+          PATCH="${GITHUB_WORKSPACE}/myriad-worker/investigation/argentum-six-precons/staged-engine/0008-myriad-defender-choice.patch"
+          test -s "$PATCH"
+          git -C b131/argentum-engine apply --check "$PATCH"
+          git -C b131/argentum-engine apply "$PATCH"
+          git -C b131/argentum-engine diff --check
+      - name: Recompile and run full core SDK, rules, cards and AI tests
+        working-directory: b131/argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :mtg-sdk:test :rules-engine:test :mtg-sets:scenarioTest :ai:test
+      - name: Upload exact patch applicability and executable scenario reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b131-myriad-port-viability
+          path: |
+            b131/engine-upgrade/patch-report.json
+            b131/argentum-engine/mtg-sdk/build/test-results/
+            b131/argentum-engine/rules-engine/build/test-results/
+            b131/argentum-engine/mtg-sets/**/build/test-results/
+            b131/argentum-engine/ai/build/test-results/
+          if-no-files-found: warn
+          retention-days: 30
