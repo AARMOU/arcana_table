@@ -33,13 +33,13 @@ internal object ArgentumOutcomeLog {
         return parts.joinToString("; ")
     }
 
-    fun banner(packet: JSONObject, viewerId: String, names: Map<String, String>): String {
+    fun banner(packet: JSONObject, viewerId: String?, names: Map<String, String>): String {
         val explicitMessage = known(packet.optString("message"))
         if (explicitMessage != null) return explicitMessage
         val winnerId = known(packet.optString("winnerId"))
         val title = when {
             winnerId == null -> "No winner."
-            winnerId == viewerId -> "You won."
+            viewerId != null && winnerId == viewerId -> "You won."
             else -> "${known(packet.optString("winnerName")) ?: names[winnerId] ?: "Your opponent"} won."
         }
         val evidence = known(packet.optString("winCondition"))
