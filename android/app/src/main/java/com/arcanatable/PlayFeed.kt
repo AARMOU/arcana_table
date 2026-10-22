@@ -16,6 +16,9 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -41,6 +44,17 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
+
+/** Keep transient notices readable at normal reading speed, including long engine messages.
+ * Base duration remains user-controlled, but never forces long text offscreen after a second.
+ * This affects informational notices only; mandatory decisions use their own persistent panels.
+ */
+internal fun readableNotificationDurationMs(text: String, requestedSeconds: Float): Long {
+    val words = text.trim().split(Regex("\\s+")).count { it.isNotBlank() }
+    val estimatedSeconds = maxOf(5f, words / 2.3f, text.length / 18f)
+    return (maxOf(requestedSeconds.coerceIn(1f, 30f), estimatedSeconds)
+        .coerceAtMost(30f) * 1000).toLong()
+}
 
 /** One thing someone played: a spell cast, a land played, or an ability. */
 data class PlayedCard(val key: Int, val name: String, val imageUrl: String?, val byYou: Boolean, val kind: Kind, val detail: String) {
@@ -154,7 +168,12 @@ fun BoxScope.PlayFeedOverlay(popup: PlayedCard?, feed: List<PlayedCard>, banner:
     feedOpen: Boolean = true, onToggleFeed: () -> Unit = {}, popupDurationSeconds: Float = 1.5f,
     onDismissBanner: () -> Unit = {}, onDismissRecap: () -> Unit = {}) {
     var holding by remember { mutableStateOf(false) }
-    LaunchedEffect(popup?.key, holding, popupDurationSeconds) { if (popup != null && !holding) { delay((popupDurationSeconds.coerceIn(1f, 8f) * 1000).toLong()); onDismissPopup() } }
+    LaunchedEffect(popup?.key, holding, popupDurationSeconds) {
+        if (popup != null && !holding) {
+            delay(readableNotificationDurationMs("${popup.name}: ${popup.detail}", popupDurationSeconds))
+            onDismissPopup()
+        }
+    }
     AnimatedVisibility(visible = popup != null, enter = fadeIn(tween(140)) + scaleIn(initialScale = 0.85f, animationSpec = tween(200)), exit = fadeOut(tween(250)),
         modifier = Modifier.align(Alignment.Center).testTag("played-card-popup")) {
         val shown = popup ?: return@AnimatedVisibility
@@ -166,7 +185,9 @@ fun BoxScope.PlayFeedOverlay(popup: PlayedCard?, feed: List<PlayedCard>, banner:
                 if (shown.imageUrl != null) CardArt(shown.imageUrl, Modifier.fillMaxWidth().aspectRatio(0.716f), contentScale = ContentScale.Crop, fallbackName = shown.name)
                 else Text(shown.name, color = SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.Center).padding(12.dp))
             }
-            Text(shown.detail, color = SoftWhite, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp).clip(RoundedCornerShape(6.dp)).background(Color(0xCC101615)).padding(horizontal = 8.dp, vertical = 3.dp))
+            Text(shown.detail, color = SoftWhite, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp)
+                .heightIn(max = 132.dp).verticalScroll(rememberScrollState())
+                .clip(RoundedCornerShape(6.dp)).background(Color(0xCC101615)).padding(horizontal = 8.dp, vertical = 3.dp))
         }
     }
     // The strip can be folded into a small tab at the screen edge, and opened again from there.
@@ -187,11 +208,16 @@ fun BoxScope.PlayFeedOverlay(popup: PlayedCard?, feed: List<PlayedCard>, banner:
     }
     AnimatedVisibility(visible = banner != null, enter = fadeIn(tween(120)), exit = fadeOut(tween(300)), modifier = Modifier.align(Alignment.TopCenter).padding(top = 64.dp).testTag("ability-banner")) {
         val shown = banner ?: return@AnimatedVisibility
-        Text("${shown.name}: ${shown.detail}", color = SoftWhite, fontSize = 12.sp, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 340.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xEE101615)).border(1.dp, TurnColors.forSeat(shown.byYou), RoundedCornerShape(10.dp)).combinedClickable(onClick = onDismissBanner).padding(horizontal = 12.dp, vertical = 6.dp))
+        Text("${shown.name}: ${shown.detail}", color = SoftWhite, fontSize = 12.sp,
+            modifier = Modifier.widthIn(max = 340.dp).heightIn(max = 180.dp).verticalScroll(rememberScrollState())
+                .clip(RoundedCornerShape(10.dp)).background(Color(0xEE101615)).border(1.dp, TurnColors.forSeat(shown.byYou), RoundedCornerShape(10.dp))
+                .combinedClickable(onClick = onDismissBanner).padding(horizontal = 12.dp, vertical = 6.dp))
     }
     AnimatedVisibility(visible = recap != null, enter = fadeIn(tween(160)), exit = fadeOut(tween(400)), modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 120.dp).testTag("turn-recap")) {
-        Text(recap.orEmpty(), color = SoftWhite, fontSize = 13.sp, maxLines = 4, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.widthIn(max = 380.dp).padding(horizontal = 16.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xF0101615)).border(1.dp, TurnColors.forSeat(false), RoundedCornerShape(12.dp)).combinedClickable(onClick = onDismissRecap).padding(horizontal = 14.dp, vertical = 8.dp))
+        Text(recap.orEmpty(), color = SoftWhite, fontSize = 13.sp,
+            modifier = Modifier.widthIn(max = 380.dp).heightIn(max = 180.dp).verticalScroll(rememberScrollState())
+                .padding(horizontal = 16.dp).clip(RoundedCornerShape(12.dp)).background(Color(0xF0101615))
+                .border(1.dp, TurnColors.forSeat(false), RoundedCornerShape(12.dp))
+                .combinedClickable(onClick = onDismissRecap).padding(horizontal = 14.dp, vertical = 8.dp))
     }
 }
