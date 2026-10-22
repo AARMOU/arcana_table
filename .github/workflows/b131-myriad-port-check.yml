@@ -43,6 +43,15 @@ jobs:
         run: |
           cp myriad-worker/investigation/argentum-six-precons/staged-engine/MyriadDefenderChoiceTest.kt \
              b131/argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/multiplayer/MyriadDefenderChoiceTest.kt
+          python3 - <<'PY'
+          from pathlib import Path
+          f=Path('b131/argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/multiplayer/MyriadDefenderChoiceTest.kt')
+          s=f.read_text()
+          key='withClue("each exiled copy triggers the copied leaves ability exactly once") {'
+          debug='withClue("end-combat step=${d.state.step} pending=${d.pendingDecision?.javaClass?.simpleName} stack=${d.stackSize} creatures=${d.getCreatures(p1).map(d::getCardName)} spawns=${d.getCreatures(p1).count { d.getCardName(it) == \\"Eldrazi Spawn\\" }}") {'
+          assert s.count(key)==1
+          f.write_text(s.replace(key,debug))
+          PY
           cd b131/argentum-engine
           ./scripts/gradle-locked --no-daemon --max-workers=2 \
             -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
