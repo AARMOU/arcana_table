@@ -1,0 +1,130 @@
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaSolver.kt
+@@ -710,10 +710,13 @@
+             return colors.any { payColoredPipFromAuraBonus(it) }
+         }
+         // Preserve scarce, un-substitutable colors for their strict pips.
+-        val paymentSymbols = if (!substitutes) cost.symbols else cost.symbols.sortedBy { symbol ->
++        val hasColorlessHybrid = cost.symbols.any { it is ManaSymbol.ColorlessHybrid }
++        val paymentSymbols = if (!substitutes && !hasColorlessHybrid) cost.symbols else cost.symbols.sortedBy { symbol ->
+             when (symbol) {
+-                is ManaSymbol.Colored -> payableColors(listOf(symbol.color)).size
+-                is ManaSymbol.Phyrexian -> payableColors(listOf(symbol.color)).size
++                is ManaSymbol.Colorless -> 1
++                is ManaSymbol.Colored -> payableColors(listOf(symbol.color)).size
++                is ManaSymbol.Phyrexian -> payableColors(listOf(symbol.color)).size
++                is ManaSymbol.ColorlessHybrid -> payableColors(listOf(symbol.color)).size + 1
+                 is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian -> payableColors(listOf(symbol.color1, symbol.color2)).size
+                 else -> 6
+             }
+@@ -728,13 +731,15 @@
+             when (symbol) {
+                 is ManaSymbol.Colored -> payableColors(listOf(symbol.color))
+                 is ManaSymbol.Phyrexian -> payableColors(listOf(symbol.color))
+-                is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian -> payableColors(listOf(symbol.color1, symbol.color2))
+-                else -> emptyList()
++                is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian -> payableColors(listOf(symbol.color1, symbol.color2))
++                is ManaSymbol.ColorlessHybrid -> payableColors(listOf(symbol.color))
++                else -> emptyList()
+             }
+         }.toSet()
+-        val needsColorless = paymentSymbols.any { it is ManaSymbol.Colorless } ||
+-            (colorlessAsAnyColor && strictColors.isNotEmpty())
+-        val matchingSources = if (!substitutes) emptyList() else availableSources.filter { source ->
++        val needsColorless = paymentSymbols.any { it is ManaSymbol.Colorless || it is ManaSymbol.ColorlessHybrid } ||
++            (colorlessAsAnyColor && strictColors.isNotEmpty())
++        val useSourceMatching = substitutes || hasColorlessHybrid
++        val matchingSources = if (!useSourceMatching) emptyList() else availableSources.filter { source ->
+             val relevant = source.availableColorsFor(spellContext).any { it in strictColors } ||
+                 (needsColorless && source.producesColorless)
+             relevant && source.bonusManaPerTap == 0 && source.bonusManaColorlessPerTap == 0 &&
+@@ -743,14 +748,14 @@
+                 source.producesColors.all { source.amountFor(it) == 1 } &&
+                 (!source.producesColorless || source.amountFor(null) == 1)
+         }
+-        val useSourceMatching = substitutes
+-        if (useSourceMatching) {
++        if (useSourceMatching) {
+             val choices = paymentSymbols.map { symbol ->
+                 val required = when (symbol) {
+                     is ManaSymbol.Colored -> listOf(symbol.color)
+                     is ManaSymbol.Phyrexian -> listOf(symbol.color)
+-                    is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian -> listOf(symbol.color1, symbol.color2)
+-                    else -> emptyList()
++                    is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian -> listOf(symbol.color1, symbol.color2)
++                    is ManaSymbol.ColorlessHybrid -> listOf(symbol.color)
++                    else -> emptyList()
+                 }
+                 val allowed = payableColors(required)
+                 matchingSources.flatMap { source ->
+@@ -758,7 +763,7 @@
+                         if (source.producesColorless) listOf(PlannedPip(source, null)) else emptyList()
+                     } else source.availableColorsFor(spellContext).filter { it in allowed }
+                         .map { PlannedPip(source, it) } +
+-                        if (colorlessAsAnyColor && required.isNotEmpty() && source.producesColorless)
++                        if ((colorlessAsAnyColor && required.isNotEmpty() || symbol is ManaSymbol.ColorlessHybrid) && source.producesColorless)
+                             listOf(PlannedPip(source, null)) else emptyList()
+                 }.sortedWith(compareBy<PlannedPip>(
+                     // Native color first, then a substitute color, then colorless standing in.
+@@ -783,7 +788,8 @@
+             val strict = paymentSymbols.indices.filter { index ->
+                 when (paymentSymbols[index]) {
+                     is ManaSymbol.Colored, is ManaSymbol.Phyrexian,
+-                    is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian, is ManaSymbol.Colorless -> true
++                    is ManaSymbol.Hybrid, is ManaSymbol.HybridPhyrexian, is ManaSymbol.Colorless,
++                    is ManaSymbol.ColorlessHybrid -> true
+                     else -> false
+                 }
+             }
+@@ -903,8 +909,35 @@
+                     manaProduced[source.entityId] = ManaProduction(colorless = source.amountFor(null))
+                     useSource(source, null)
+                 }
+-                is ManaSymbol.MonocolorHybrid -> {
+-                    // Handle in pass 1a below, after all strict colored pips have claimed sources.
++                is ManaSymbol.ColorlessHybrid -> {
++                    // Actual {C} or the printed color, never an arbitrary generic mana.
++                    // The matching pass above reserves scarcer strict pips first for ordinary lands;
++                    // this fallback handles multi-mana and aura-enhanced sources.
++                    val allowedColors = payableColors(listOf(symbol.color))
++                    if (allowedColors.any { spendBonusMana(it) } || spendColorlessBonusMana()) continue
++                    val candidates = mutableListOf<Pair<ManaSource, Color?>>()
++                    for (color in allowedColors) {
++                        findBestSourceForColor(remainingSources, color, handRequirements, availableSourcesByColor, spellContext)
++                            ?.let { candidates.add(it to color) }
++                    }
++                    remainingSources.filter { it.producesColorless }.forEach { candidates.add(it to null) }
++                    val choice = candidates.minWithOrNull(compareBy<Pair<ManaSource, Color?>>(
++                        { (source, color) -> calculateTapPriority(source, handRequirements, availableSourcesByColor) +
++                            painPenalty(source, if (color == null) source.colorlessPainCost else source.colorPainCost[color] ?: 0) },
++                        { (_, color) -> when (color) { symbol.color -> 0; null -> 1; else -> 2 } },
++                    ))
++                    if (choice == null) {
++                        if (allowedColors.any { payColoredPipFromAuraBonus(it) }) continue
++                        return null
++                    }
++                    val (source, color) = choice
++                    manaProduced[source.entityId] = if (color == null)
++                        ManaProduction(colorless = source.amountFor(null))
++                    else ManaProduction(color = color, amount = source.amountFor(color))
++                    useSource(source, color)
++                }
++                is ManaSymbol.MonocolorHybrid -> {
++                    // Handle in pass 1a below, after all strict colored pips have claimed sources.
+                 }
+                 is ManaSymbol.Generic, is ManaSymbol.X -> {
+                     // Handle in the generic pass below
+@@ -3497,8 +3530,10 @@
+                     colorNeeds[symbol.color1] = (colorNeeds[symbol.color1] ?: 0) + 1
+                     colorNeeds[symbol.color2] = (colorNeeds[symbol.color2] ?: 0) + 1
+                 }
+-                is ManaSymbol.MonocolorHybrid ->
+-                    colorNeeds[symbol.color] = (colorNeeds[symbol.color] ?: 0) + 1
++                is ManaSymbol.MonocolorHybrid ->
++                    colorNeeds[symbol.color] = (colorNeeds[symbol.color] ?: 0) + 1
++                is ManaSymbol.ColorlessHybrid ->
++                    colorNeeds[symbol.color] = (colorNeeds[symbol.color] ?: 0) + 1
+                 else -> {}
+             }
+         }
