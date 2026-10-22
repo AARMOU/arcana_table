@@ -158,8 +158,8 @@ diff --git a/docs/sdk-index.md b/docs/sdk-index.md
  ## ManaSymbol
  
  - `ManaSymbol.Colored(color: Color)`
-+- `ManaSymbol.ColorlessHybrid(color: Color)` — A hybrid mana symbol payable with one actual colorless mana or one mana of color.
  - `ManaSymbol.Colorless`
++- `ManaSymbol.ColorlessHybrid(color: Color)` — A hybrid mana symbol payable with one actual colorless mana or one mana of color.
  - `ManaSymbol.Generic(amount: Int)`
  - `ManaSymbol.Hybrid(color1: Color, color2: Color)` — Hybrid mana symbol - can be paid with either of two colors.
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
