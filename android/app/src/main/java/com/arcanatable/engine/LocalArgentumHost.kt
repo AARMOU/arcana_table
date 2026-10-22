@@ -2,6 +2,7 @@ package com.arcanatable.engine
 
 import com.wingedsheep.ai.engine.AIPlayer
 import com.arcanatable.engine.ai.OfflineAiPolicy
+import com.arcanatable.OfflineCheckpointStore
 import com.arcanatable.engine.priority.OfflineHumanAutoPass
 import com.wingedsheep.engine.core.ActionProcessor
 import com.wingedsheep.engine.core.ActivateAbility
@@ -95,6 +96,7 @@ class LocalArgentumHost(
     private val paceMs: Long = 600,
     extraOpponents: List<LocalSeat> = emptyList(),
     private val emit: (JSONObject) -> Unit,
+    private val resumeCheckpoint: String? = null,
 ) {
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(null, r, "argentum-local", 256L shl 20) }
     private val services = EngineServices(registry)
@@ -205,7 +207,10 @@ class LocalArgentumHost(
         if (from != humanId && !isPerson(from)) return
         when (message.optString("type")) {
             "connect" -> emitTo(from, JSONObject().put("type", "connected").put("playerId", from.value).put("token", "offline"))
-            "createQuickGameLobby" -> if (from == humanId) startGame()
+            "createQuickGameLobby" -> if (from == humanId) {
+                if (resumeCheckpoint != null) restoreSavedGame(resumeCheckpoint) else startGame()
+            }
+            "arcanaSaveOffline" -> if (from == humanId) saveCheckpoint()
             "requestResync" -> if (state != null) resync(from)
             "refineMaxX" -> refineMaxX(message.optString("cardId"), from)
             "submitAction" -> submitAction(message, from)
@@ -279,6 +284,99 @@ class LocalArgentumHost(
         queueShockOffers(events)
         drive(events)
         sendState(events)
+    }
+
+    /** Save only at a completed engine action boundary on this serialized worker thread.
+     * Includes all hidden cards, stack continuations, per-seat logs and undo checkpoints.
+     * Never send this full state to a remote/Wi-Fi participant.
+     */
+    private fun saveCheckpoint() {
+        val current = state ?: return sendError(humanId, "No offline game is running.")
+        if (isWifi || current.gameOver) return sendError(humanId, "Only an active local AI game can be saved.")
+        fun saveUndo(checkpoint: Checkpoint?): JSONObject? = checkpoint?.let { point ->
+            JSONObject().put("state", JSONObject(json.encodeToString(GameState.serializer(), point.state)))
+                .put("owner", point.owner.value)
+                .put("logSizes", JSONObject().also { sizes -> point.logSizes.forEach { (id, size) -> sizes.put(id.value, size) } })
+        }
+        val checkpoint = JSONObject()
+            .put("schema", OfflineCheckpointStore.FORMAT)
+            .put("mode", "local-ai")
+            .put("seats", org.json.JSONArray(allSeats.map { OfflineCheckpointStore.seatToJson(seatOf(it)) }))
+            .put("gameState", JSONObject(json.encodeToString(GameState.serializer(), current)))
+            .put("version", version)
+            .put("mulliganPhase", mulliganPhase)
+            .put("quietOpponentTurns", quietOpponentTurns)
+            .put("peopleOutSent", peopleOutSent)
+            .put("gameLogs", JSONObject().also { logs ->
+                gameLogs.forEach { (seat, events) ->
+                    logs.put(seat.value, org.json.JSONArray(json.encodeToString(ListSerializer(ClientEvent.serializer()), events)))
+                }
+            })
+            .put("undoCheckpoint", saveUndo(undoCheckpoint) ?: JSONObject.NULL)
+            .put("preCombatCheckpoint", saveUndo(preCombatCheckpoint) ?: JSONObject.NULL)
+            .put("shockOffers", org.json.JSONArray(shockOffers.map { offer ->
+                JSONObject().put("land", offer.land.value).put("name", offer.name)
+                    .put("life", offer.life).put("player", offer.player.value)
+            }))
+        emitTo(humanId, JSONObject().put("type", "offlineCheckpoint").put("checkpoint", checkpoint))
+    }
+
+    /** Restore an exact unmasked engine snapshot, never a projected ClientGameState. */
+    private fun restoreSavedGame(raw: String) {
+        require(!isWifi) { "Wi-Fi games are hosted by their original device." }
+        val record = JSONObject(raw)
+        require(record.optInt("schema") == OfflineCheckpointStore.FORMAT &&
+            record.optString("mode") == "local-ai") { "Unsupported checkpoint format." }
+        val savedSeats = OfflineCheckpointStore.savedSeats(record)
+        require(savedSeats == allSeats.map(::seatOf)) { "Checkpoint seats or decks differ from the saved game." }
+        val restored = json.decodeFromString(GameState.serializer(), record.getJSONObject("gameState").toString())
+        require(!restored.gameOver) { "Completed games cannot be resumed." }
+        fun decodeUndo(field: String): Checkpoint? = record.optJSONObject(field)?.let { jsonObject ->
+            val sizes = jsonObject.optJSONObject("logSizes") ?: JSONObject()
+            val logSizes = sizes.keys().asSequence().associate { id -> EntityId(id) to sizes.getInt(id) }
+            Checkpoint(json.decodeFromString(GameState.serializer(), jsonObject.getJSONObject("state").toString()),
+                logSizes, EntityId(jsonObject.getString("owner")))
+        }
+        val restoredLogs = mutableMapOf<EntityId, MutableList<ClientEvent>>()
+        val logs = record.optJSONObject("gameLogs") ?: JSONObject()
+        logs.keys().forEach { seat ->
+            restoredLogs[EntityId(seat)] = json.decodeFromString(
+                ListSerializer(ClientEvent.serializer()), logs.getJSONArray(seat).toString()
+            ).toMutableList()
+        }
+        val restoredShock = ArrayDeque<ShockOffer>()
+        val offers = record.optJSONArray("shockOffers") ?: org.json.JSONArray()
+        for (i in 0 until offers.length()) {
+            val offer = offers.getJSONObject(i)
+            restoredShock.addLast(ShockOffer(EntityId(offer.getString("land")),
+                offer.getString("name"), offer.getInt("life"), EntityId(offer.getString("player"))))
+        }
+        // Only commit reconstructed state after all formats have decoded successfully.
+        state = restored
+        gameLogs.clear(); gameLogs.putAll(restoredLogs)
+        shockOffers.clear(); shockOffers.addAll(restoredShock)
+        version = record.getLong("version")
+        mulliganPhase = record.getBoolean("mulliganPhase")
+        quietOpponentTurns = record.optBoolean("quietOpponentTurns")
+        peopleOutSent = record.optBoolean("peopleOutSent")
+        undoCheckpoint = decodeUndo("undoCheckpoint")
+        preCombatCheckpoint = decodeUndo("preCombatCheckpoint")
+        legalCache.clear()
+        logSnapshots.clear()
+        interactiveEpochs.clear()
+        ais = allSeats.filterNot(::isPerson).associateWith { OfflineAiPolicy.create(registry, it) }
+        for (seat in people()) {
+            emitTo(seat, JSONObject().put("type", "quickGameLobbyState").put("lobbyId", "offline")
+                .put("youPlayerId", seat.value).put("vsAi", true)
+                .put("players", org.json.JSONArray(allSeats.map {
+                    JSONObject().put("playerId", it.value).put("name", seatOf(it).name)
+                })))
+            emitTo(seat, JSONObject().put("type", "gameStarted")
+                .put("players", org.json.JSONArray(allSeats.map {
+                    JSONObject().put("playerId", it.value).put("isYou", seat == it)
+                })))
+        }
+        for (seat in people()) resync(seat)
     }
 
     private fun startGame() {
