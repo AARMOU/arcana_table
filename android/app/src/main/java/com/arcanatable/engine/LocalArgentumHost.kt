@@ -112,7 +112,7 @@ class LocalArgentumHost(
     private val visibility = Visibility(registry, conditionEvaluator = services.conditionEvaluator)
     private val masker = DecisionMasker(visibility)
     private val autoPass = AutoPassManager(registry)
-    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; classDiscriminator = "type"; serializersModule = engineSerializersModule }
+    private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; allowStructuredMapKeys = true; classDiscriminator = "type"; serializersModule = engineSerializersModule }
 
     private var opponent: LocalSeat = opponent
     private var state: GameState? = null
