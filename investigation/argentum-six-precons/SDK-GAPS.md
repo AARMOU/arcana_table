@@ -14,6 +14,27 @@ Readable SDK/engine source inspected at upstream commit
 identical to the pinned Android JARs; verify binary availability as well as source.
 
 
+## Hardest-first work queue — October 22, 2026
+
+The resumed import now prioritizes engine-blocked cards before cards expressible with existing
+primitives: Ulalek first, then the granted-cascade commanders (Zhulodok and Abaddon), The Swarmlord,
+Seeker of Slaanesh, and the Port Town collection-entry continuation.
+
+Ulalek has a fourth experimental patch, `staged-engine/0004-stack-object-copying.patch`. It widens
+the existing batch spell copier into a serializable chosen/controlled stack-object snapshot,
+allows ordering and independent retargeting, and composes spells-first / abilities-second.
+Ability copies preserve their original source, modes, X and target object identities and emit
+`AbilityCopiedEvent` rather than pretending to trigger or activate again. Scenario and SDK
+regressions are included in the patch. Validation is pending; see the dedicated
+`argentum-stack-copy-enhancements.yml` workflow. No app JARs or live card registry changed.
+
+The exact Ulalek definition is in `blocked/ulalek/`. A newly confirmed independent blocker is
+its true colorless-hybrid casting cost: the pinned `ManaCost.parse` does not recognize `{C/W}`
+(and the other four colorless/color symbols). Support must include parser/serialization, devotion
+and identity, floating-pool matching, restricted mana, auto-tapping, and payment/AI behavior.
+Rewriting those symbols as generic mana would be incorrect. Ulalek remains missing until both
+engine features are integrated into the Java-17 Android runtime and full custom-card scenarios pass.
+
 ## Experimental engine-patch progress (not shipped)
 
 Three independent enhancements are now staged on the isolated six-precon branch:
