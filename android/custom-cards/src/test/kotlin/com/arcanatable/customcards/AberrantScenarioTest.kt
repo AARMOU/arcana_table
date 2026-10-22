@@ -35,7 +35,18 @@ class AberrantScenarioTest {
         d.removeSummoningSickness(attacker)
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
         assertNull(d.declareAttackers(p, listOf(attacker), d.player2).error)
-        d.passPriorityUntil(Step.POSTCOMBAT_MAIN)
+        // The combat-damage trigger requires a target while the engine is in
+        // the damage step. Choose it explicitly rather than relying on a fixture
+        // helper that cannot auto-answer mandatory ChooseTargetsDecision prompts.
+        d.passPriorityUntil(Step.COMBAT_DAMAGE)
+        repeat(60) {
+            when {
+                d.state.pendingDecision != null ->
+                    d.decide(Choices(targets = listOf(opponent)))
+                d.state.step == Step.POSTCOMBAT_MAIN && d.state.stack.isEmpty() -> return@repeat
+                else -> d.bothPass()
+            }
+        }
         d.resolveAll()
         assertEquals(17, d.getLifeTotal(d.player2))
         assertTrue(own in d.getPermanents(p))
