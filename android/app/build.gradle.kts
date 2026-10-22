@@ -17,8 +17,8 @@ android {
         applicationId = "com.arcanatable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 124
-        versionName = "0.33.2-build124-preview"
+        versionCode = 129
+        versionName = "0.33.7-build129-five-feature-preview"
         buildConfigField("int", "BASE_BUILD", "120")
         buildConfigField("String", "BASE_SOURCE", "\"3e17b24\"")
         manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build $versionCode"
@@ -29,7 +29,7 @@ android {
             // Separate package so this build installs beside the experimental/targeting test build.
             applicationIdSuffix = ".argentum"
             // The build number follows versionCode, so the installer never shows a stale one.
-            manifestPlaceholders["appLabel"] = "Arcana · Argentum B${defaultConfig.versionCode}"
+            manifestPlaceholders["appLabel"] = "Arcana Preview · B${defaultConfig.versionCode}"
         }
     }
 
