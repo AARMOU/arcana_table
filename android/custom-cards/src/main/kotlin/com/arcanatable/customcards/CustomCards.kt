@@ -228,6 +228,8 @@ object CustomCards {
         Entry(WarpingWail, "CMM", "Six WotC precons"),
         Entry(StonecoilSerpent, "CMM", "Six WotC precons"),
         Entry(ReturnOfTheWildspeaker, "M3C", "Six WotC precons"),
+        Entry(ThunderwolfCavalry, "40K", "Six WotC precons"),
+        Entry(VanguardSuppressor, "40K", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
