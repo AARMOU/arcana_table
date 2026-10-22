@@ -1101,7 +1101,11 @@ internal class TableController(
         if (card.type.contains("Land", ignoreCase = true)) {
             val condition = landEntryCondition(card)
             if (shockLandChoiceRequired(card) || condition != null) {
-                landEntryPrompt = LandEntryPrompt(index, card, shockLandChoiceRequired(card), condition.orEmpty(), zone)
+                // Dismiss the zone Dialog before opening a new payment/entry Dialog.
+                scope.launch {
+                    delay(120)
+                    landEntryPrompt = LandEntryPrompt(index, card, shockLandChoiceRequired(card), condition.orEmpty(), zone)
+                }
             } else {
                 val entersTapped = landAlwaysEntersTapped(card)
                 updatePlayer(index) { p ->
@@ -1112,8 +1116,12 @@ internal class TableController(
                 if (needsCreatureTypeChoice(card)) creatureTypeChoicePrompt = CreatureTypeChoicePrompt(index, card.id, card.name)
             }
         } else {
-            paymentSourceZone = zone
-            paymentCard = index to card
+            // Compose Dialog windows must not be replaced in the same frame.
+            scope.launch {
+                delay(120)
+                paymentSourceZone = zone
+                paymentCard = index to card
+            }
         }
     }
 
