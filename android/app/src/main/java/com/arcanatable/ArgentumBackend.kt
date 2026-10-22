@@ -116,12 +116,20 @@ data class ArgentumTargetRef(val id: String, val name: String, val type: String,
 data class ArgentumStackItem(val id: String, val name: String, val controllerName: String, val isYours: Boolean, val imageUrl: String?, val targetNames: List<String>)
 
 /** One line of Argentum's own game log (ClientEvent.description). */
-data class ArgentumLogLine(val description: String, val type: String, val isYours: Boolean?) {
+data class ArgentumLogLine(val description: String, val type: String, val isYours: Boolean?, val groupingKey: String? = null) {
     /** Argentum's "--- Turn N ---" separators. */
     val isTurnMarker: Boolean get() = type == "turnChanged" || type == "gameRestarted"
 
     companion object {
         private val OWNER_KEYS = listOf("controllerId", "casterId", "playerId", "ownerId")
+
+        /** Conservatively distinguish different targets, sources and results. Exclude only
+         * delivery metadata, not any card or player identities. No source event is discarded.
+         */
+        private val DELIVERY_FIELDS = setOf("eventId", "eventIndex", "sequence", "timestamp", "timestampMs")
+        private fun semanticEventKey(e: JSONObject): String = e.keys().asSequence()
+            .filterNot { it in DELIVERY_FIELDS }.sorted()
+            .joinToString(separator = "\u001F") { key -> "${key}=${e.opt(key)}" }
 
         /**
          * Parses `state.gameLog` (oldest first). Ownership comes from Argentum's own `isYours`
@@ -137,7 +145,7 @@ data class ArgentumLogLine(val description: String, val type: String, val isYour
                     viewerId.isNullOrBlank() -> null
                     else -> OWNER_KEYS.firstNotNullOfOrNull { key -> e.optString(key).takeIf { it.isNotBlank() && it != "null" } }?.let { it == viewerId }
                 }
-                ArgentumLogLine(text, type, yours)
+                ArgentumLogLine(text, type, yours, semanticEventKey(e))
             }
     }
 }

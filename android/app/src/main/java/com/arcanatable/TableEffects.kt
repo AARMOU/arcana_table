@@ -283,8 +283,16 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
             argentumActionChoices.isEmpty() && !gameEndedOnline) showHand = true
     }
     // One "Notice time" setting (Adjust UI) for banners, the played-card pop-up and the recap (twice as long: more to read).
-    LaunchedEffect(playBanner?.key) { if (playBanner != null) { delay((playedPopupSeconds * 1000).toLong()); playBanner = null } }
-    LaunchedEffect(recapText) { if (recapText != null) { delay((playedPopupSeconds * 2000).toLong().coerceAtLeast(4000)); recapText = null } }
+    LaunchedEffect(playBanner?.key, playedPopupSeconds) {
+        val banner = playBanner ?: return@LaunchedEffect
+        delay(readableNotificationDurationMs("${banner.name}: ${banner.detail}", playedPopupSeconds))
+        if (playBanner?.key == banner.key) playBanner = null
+    }
+    LaunchedEffect(recapText, playedPopupSeconds) {
+        val recap = recapText ?: return@LaunchedEffect
+        delay(readableNotificationDurationMs(recap, playedPopupSeconds * 2f))
+        if (recapText == recap) recapText = null
+    }
     LaunchedEffect(argentumLastError) {
         // Socket-level problems (unreadable messages, failed connects) reach the searchable log too.
         argentumLastError?.let { recordDiagnostic("Argentum problem: $it", DiagnosticCategory.ERROR) }
