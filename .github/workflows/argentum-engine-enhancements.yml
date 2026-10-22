@@ -32,21 +32,25 @@ jobs:
         run: |
           git apply --check ../investigation/argentum-six-precons/engine-patches/0001-granted-cascade.patch
           git apply ../investigation/argentum-six-precons/engine-patches/0001-granted-cascade.patch
+          git apply --check ../investigation/argentum-six-precons/staged-engine/0002-commander-casts.patch
+          git apply ../investigation/argentum-six-precons/staged-engine/0002-commander-casts.patch
           cp ../investigation/argentum-six-precons/engine-patches/GrantedCascadeEngineTest.kt \
             rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/GrantedCascadeEngineTest.kt
+          cp ../investigation/argentum-six-precons/staged-engine/CommanderCastHistoryEngineTest.kt \
+            rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastHistoryEngineTest.kt
           git diff --check
       - name: Compile and run new engine-level cascade regressions
         working-directory: upstream-engine
         run: |
           ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
             -Dorg.gradle.configuration-cache=false \
-            :rules-engine:test --tests '*GrantedCascadeEngineTest'
+            :rules-engine:test --tests '*GrantedCascadeEngineTest' --tests '*CommanderCastHistoryEngineTest'
       - name: Build experimental SDK and rules-engine jars
         working-directory: upstream-engine
         run: |
           ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
             -Dorg.gradle.configuration-cache=false \
-            :mtg-sdk:jar :rules-engine:jar
+            :mtg-sdk:jar :rules-engine:jar :ai:jar
       - uses: actions/upload-artifact@v4
         if: always()
         with:
