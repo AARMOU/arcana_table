@@ -1843,7 +1843,7 @@ internal fun CombatDialog(players: List<TablePlayer>, attackerIndex: Int, onDism
 }
 
 @Composable
-internal fun CardZoneDialog(zone: String, player: String, cards: List<GameCard>, onDismiss: () -> Unit, onPreview: (GameCard) -> Unit, canMoveCards: Boolean = false, onMoveCard: (GameCard, String) -> Unit = { _, _ -> }, commanderId: Int? = null, canMoveCommander: Boolean = false) {
+internal fun CardZoneDialog(zone: String, player: String, cards: List<GameCard>, onDismiss: () -> Unit, onPreview: (GameCard) -> Unit, canMoveCards: Boolean = false, onMoveCard: (GameCard, String) -> Unit = { _, _ -> }, commanderId: Int? = null, canMoveCommander: Boolean = false, manualPlayAllowed: Boolean = false, argentumPlayableIds: Set<Int> = emptySet(), onPlayCard: (GameCard) -> Unit = {}) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.88f), shape = RoundedCornerShape(14.dp), color = Panel) {
             Column(Modifier.padding(12.dp)) {
@@ -1856,8 +1856,10 @@ internal fun CardZoneDialog(zone: String, player: String, cards: List<GameCard>,
                     items(cards.size, key = { cards[it].id }) { index ->
                         val card = cards[index]
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            val hasEngineAction = card.id in argentumPlayableIds
+                            val canPlay = manualPlayAllowed || hasEngineAction
                             Box(Modifier.fillMaxWidth()) {
-                                CardFace(card, Modifier.fillMaxWidth(), onClick = { onPreview(card) }, onLongClick = { onPreview(card) })
+                                CardFace(card, Modifier.fillMaxWidth(), onClick = { if (canPlay) onPlayCard(card) else onPreview(card) }, onLongClick = { onPreview(card) })
                                 if (canMoveCards) {
                                     var menuOpen by remember(card.id) { mutableStateOf(false) }
                                     Box(Modifier.align(Alignment.TopEnd).padding(1.dp), contentAlignment = Alignment.Center) {
@@ -1882,6 +1884,12 @@ internal fun CardZoneDialog(zone: String, player: String, cards: List<GameCard>,
                                         )
                                     }
                                 }
+                            }
+                            if (canPlay) TextButton(
+                                onClick = { onPlayCard(card) },
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)
+                            ) {
+                                Text(if (hasEngineAction) "LEGAL ACTIONS" else "PLAY / CAST · MANUAL", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

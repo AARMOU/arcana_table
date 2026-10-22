@@ -281,6 +281,18 @@ object ArgentumActions {
     /** Types not tied to a single card; surfaced from the "Argentum actions" list. */
     val PLAYER_LEVEL_TYPES = setOf("DeclareAttackers", "DeclareBlockers", "PassPriority", "Concede")
 
+    /** A card in ANY public zone is actionable only when Argentum itself supplied an action
+     * referencing its stable server id. This also covers effects that let you play an opponent's card.
+     * Never infer permission from flashback/escape/exile keywords in the Android client.
+     */
+    fun forCardServerId(legalActions: List<JSONObject>, serverId: String?): List<JSONObject> {
+        if (serverId.isNullOrBlank()) return emptyList()
+        return legalActions.filter { info ->
+            val action = info.optJSONObject("action") ?: return@filter false
+            listOf("cardId", "sourceId", "permanentId", "entityId").any { key -> action.optString(key) == serverId }
+        }
+    }
+
     /**
      * Returns a reason when a legal action needs input Arcana cannot collect yet. Such actions are
      * shown as "needs handling" and are not submitted. Null means Arcana can submit it, possibly

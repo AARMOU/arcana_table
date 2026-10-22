@@ -895,11 +895,17 @@ internal fun TableController.TableOverlays() {
                             val commander = players.getOrNull(handSeat)?.commanderCard
                             if (argentumEnabled && commander != null) openArgentumActions(commander)
                             else if (commander == null) message = "Set a commander from your deck or battlefield first."
-                            else paymentCard = selectedPlayer to commander
+                            else { paymentSourceZone = "Command Zone"; paymentCard = selectedPlayer to commander }
                         },
                         onCombat = { run { if (argentumEnabled) run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } else if (canControlSelectedPlayer && selectedPlayer == activePlayer) combatDialogOpen = true } },
                         onMoreAction = { action ->
-                            if (argentumEnabled) { if (action == "LOG") logOpen = true else run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } }
+                            if (argentumEnabled) when (action) {
+                                "LOG" -> logOpen = true
+                                "GRAVEYARD" -> zoneDialog = handSeat to "Graveyard"
+                                "EXILE" -> zoneDialog = handSeat to "Exile"
+                                "REVEALED" -> zoneDialog = handSeat to "Revealed"
+                                else -> run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } }
+                            }
                             else if (action in setOf("LOG", "CHAT") || canControlSelectedPlayer) when (action) {
                                 "TOKEN" -> { tokenTarget = selectedPlayer; tokenPickerOpen = true }
                                 "REVEAL" -> {

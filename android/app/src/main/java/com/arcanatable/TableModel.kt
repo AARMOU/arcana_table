@@ -200,7 +200,28 @@ data class GameCard(
     val summoningSick: Boolean = false,
 )
 
-internal data class LandEntryPrompt(val playerIndex: Int, val card: GameCard, val isShockLand: Boolean, val conditionText: String)
+/** Sandbox only: the originating zone matters when a land is played from outside the hand. */
+internal data class LandEntryPrompt(val playerIndex: Int, val card: GameCard, val isShockLand: Boolean, val conditionText: String, val sourceZone: String = "Hand")
+
+/** Locate and remove the *actual* card from the chosen source when manually casting or playing.
+ * Argentum games must use the rules engine's own zone transitions instead.
+ */
+internal fun TablePlayer.cardsInPlaySource(zone: String): List<GameCard> = when (zone) {
+    "Hand" -> hand
+    "Graveyard" -> graveyard
+    "Exile" -> exile
+    else -> emptyList()
+}
+
+internal fun TablePlayer.removeFromPlaySource(zone: String, cardId: Int): TablePlayer? {
+    if (cardsInPlaySource(zone).none { it.id == cardId }) return null
+    return when (zone) {
+        "Hand" -> copy(hand = hand.filterNot { it.id == cardId })
+        "Graveyard" -> copy(graveyard = graveyard.filterNot { it.id == cardId })
+        "Exile" -> copy(exile = exile.filterNot { it.id == cardId })
+        else -> null
+    }
+}
 
 internal fun shockLandChoiceRequired(card: GameCard): Boolean {
     val text = card.oracleText.orEmpty().lowercase()

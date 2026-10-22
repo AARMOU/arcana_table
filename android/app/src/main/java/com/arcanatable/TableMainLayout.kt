@@ -440,7 +440,7 @@ internal fun TableController.TableMainLayout() {
                         if (boardCanControl) {
                             val commander = players[boardIndex].commanderCard
                             if (commander == null) message = "Set a commander from your deck or battlefield first."
-                            else paymentCard = boardIndex to commander
+                            else { paymentSourceZone = "Command Zone"; paymentCard = boardIndex to commander }
                         } else if (argentumEnabled && boardIndex == localSeat) players[boardIndex].commanderCard?.let(::openArgentumActions)
                     } },
                     onConcede = { if (boardCanControl) concedePlayer = boardIndex },
