@@ -117,6 +117,22 @@ Both initial tests compiled far enough to reveal test-harness defects. This is n
 - Team 09 Table overview [Actions run 39728537192](https://github.com/AARMOU/arcana_table/actions/runs/39728537192): **5 tests executed, 1 failed**; `TableOverviewInteractionTest.playerPanelsOnlyExpandWhenTappedAndStayOpenAcrossTurnChanges` failed on line 66 checking the expanded card grid's `testTag`. The element is nested inside an ancestor `combinedClickable` that merges semantics; altered test query to use `useUnmergedTree = true` (commit `929dedf5`), without changing app code. [Rerun 39729020743](https://github.com/AARMOU/arcana_table/actions/runs/39729020743) **pending**. Do not claim Table view behavior confirmed until passing.
 - Focused JVM/Robolectric tests are distinct from release build, all-project regressions or real-device tests. No APK, no signing and no production merge.
 
+### 2026-10-21 ~23:40 (America/Denver) — Five tested branches all GREEN
+
+**Verification complete for focused tests:** All five GitHub Actions runs returned `status=completed`, `conclusion=success` with actual Android Gradle compilation and JVM unit/Robolectric execution.
+
+| Team | Branch and tested head | Executed filter(s) | CI result |
+|---|---|---|---|
+| 10 Menu formatting | `gpt/work-menu-layout` — `5b2669b3` | `*DecisionDisplayTextTest*` | [39727464475](https://github.com/AARMOU/arcana_table/actions/runs/39727464475) — SUCCESS |
+| 11 Log grouping | `gpt/work-log-grouping` — `74fe1e2e` | `*GameLogGroupingTest*` | [39727467578](https://github.com/AARMOU/arcana_table/actions/runs/39727467578) — SUCCESS |
+| 12 Popup readability | `gpt/work-popup-notifications` — `88b8894e` | `*ReadableNotificationDurationTest*` | [39727471127](https://github.com/AARMOU/arcana_table/actions/runs/39727471127) — SUCCESS |
+| 09 Table view | `gpt/table-manual-expand-pinch-zoom` — `929dedf5` | `*TableViewNavigationTest*`, `*TableOverviewInteractionTest*` | [39729020743](https://github.com/AARMOU/arcana_table/actions/runs/39729020743) — SUCCESS |
+| 14 Graveyard/exile | `gpt/zone-casting-graveyard-exile` — `8c62a3f0` | `*ZonePlaySourceTest*`, `*GraveyardExileLegalActionsTest*`, `*ZoneCardActionsUiTest*` | [39728542228](https://github.com/AARMOU/arcana_table/actions/runs/39728542228) — SUCCESS |
+
+**Failure-and-fix trace:** Earlier Table/zone CI attempts failed on invalid test imports, an unsupported Robolectric automatic SDK selection and a merged accessibility semantics query. These were diagnosed from CI logs, corrected by commits on the isolated branches and re-executed. The final five runs above are all green.
+
+**Explicit scope limits:** These are **targeted** app test suites, not full application/engine/custom-card regressions, not real-device testing, and not a release APK/AAB build. Passing these does not prove all game rules mechanics, complex exile permissions or all screen layouts. No changes were merged into production, and no signing keys were touched.
+
 ### Update format to use for future work
 
 ```text
