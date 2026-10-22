@@ -4,6 +4,7 @@ import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Zone
 import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.model.Rarity
+import com.wingedsheep.sdk.scripting.targets.EffectTarget
 
 /** Only actual graveyard -> battlefield ETBs draw; casting from a graveyard does not. */
 val TriarchPraetorian = card("Triarch Praetorian") {
@@ -20,7 +21,7 @@ val TriarchPraetorian = card("Triarch Praetorian") {
 
     triggeredAbility {
         trigger = Triggers.self.enters(from = Zone.GRAVEYARD)
-        effect = Effects.DrawCards(2) then Effects.LoseLife(2)
+        effect = Effects.DrawCards(2) then Effects.LoseLife(2, EffectTarget.Controller)
     }
 
     metadata {
