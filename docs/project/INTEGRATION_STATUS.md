@@ -74,3 +74,15 @@ Every promotion needs exact SHA and associated evidence. **Never call something 
 ## Protected-scope notice
 
 No deletion, rebasing, force-pushing, main changes, integration merges, APK publishing, production release or unrequested active-worker source modifications are authorized by this control board.
+
+
+## 2026-10-22 fix gate update
+
+| Original blocker | Isolated fix | Verification | Integration state |
+|---|---|---|---|
+| Forge of Heroes planeswalker loyalty fixture in six-precon PR #43 | [draft PR #46](https://github.com/AARMOU/arcana_table/pull/46) at `bcad87db5bc8` | [Custom-card run #39869532383](https://github.com/AARMOU/arcana_table/actions/runs/39869532383) **PASS** | **Tested, not merged** into worker integration branch |
+| Game-over PR #42 nullable viewer ID | [draft PR #45](https://github.com/AARMOU/arcana_table/pull/45) at `2387c2a088a4` | [Focused run #39870136310](https://github.com/AARMOU/arcana_table/actions/runs/39870136310) **PASS** | **Tested, not merged** into game-over worker branch |
+| Full Android application unit suite | [Run #39869508501](https://github.com/AARMOU/arcana_table/actions/runs/39869508501) | **FAIL** — `CustomDecksOfflineTest` has two failing cases (217 run, 2 failed, 4 skipped) | Separate blocker — no suite-wide green claim |
+
+Do not erase the historical failing-run evidence above. Review the new passing fix branches and reconcile any new commits by the existing workers before a future authorized merge. No APK build/release or production `main` update was made as part of these fixes.
+
