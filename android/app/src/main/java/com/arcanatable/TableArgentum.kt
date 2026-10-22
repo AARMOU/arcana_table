@@ -305,6 +305,24 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
     // Outside an Argentum session, never let pushed game messages take over the table.
     if (!argentumEnabled && incoming.optString("type") !in setOf("connected", "reconnected", "error", "sessionReplaced")) return
     when (incoming.optString("type")) {
+        "offlineCheckpoint" -> {
+            if (argentumOffline && wifiRole == null) {
+                val data = incoming.optJSONObject("checkpoint")
+                if (data != null) scope.launch {
+                    val outcome = withContext(Dispatchers.IO) {
+                        runCatching { OfflineCheckpointStore.save(context, data.toString()) }
+                    }
+                    if (outcome.isSuccess) {
+                        offlineResumeAvailable = true
+                        message = "Complete offline game saved. Use Resume Offline Game on the home screen."
+                        recordDiagnostic("Saved full local Argentum engine checkpoint", DiagnosticCategory.ENGINE)
+                    } else {
+                        message = "Offline save failed: ${outcome.exceptionOrNull()?.message ?: "unknown error"}"
+                        recordDiagnostic("Failed to persist offline checkpoint", DiagnosticCategory.ERROR)
+                    }
+                }
+            }
+        }
         "connected", "reconnected" -> {
             argentumPlayerId = incoming.optString("playerId").takeUnless { it.isBlank() || it == "null" }
             val inGame = incoming.optString("context") == "game"
@@ -342,6 +360,11 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             }
         }
         "gameStarted" -> {
+            if (argentumOffline && !offlineRestoreRequested && wifiRole == null) {
+                OfflineCheckpointStore.clear(context)
+                offlineResumeAvailable = false
+            }
+            offlineRestoreRequested = false
             val roster = incoming.optJSONArray("players") ?: JSONArray()
             localSeat = (0 until roster.length()).firstOrNull { roster.optJSONObject(it)?.optBoolean("isYou") == true } ?: 0
             gameStartedOnline = true
@@ -407,6 +430,10 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 phaseIndex = phaseSteps.indexOfFirst { it.equals(snapshot.stepName, true) }.takeIf { it >= 0 }
                     ?: phaseSteps.indexOfFirst { it.equals(snapshot.phaseName, true) }.takeIf { it >= 0 } ?: 3
                 gameEndedOnline = snapshot.gameOver
+                if (snapshot.gameOver && argentumOffline && wifiRole == null) {
+                    OfflineCheckpointStore.clear(context)
+                    offlineResumeAvailable = false
+                }
                 if (snapshot.gameOver) setArgentumGameActive(false) else if (!argentumResumeAvailable) setArgentumGameActive(true)
                 gameStartedOnline = true
                 homeOpen = false
