@@ -143,6 +143,14 @@ internal fun TableController.TableOverlays() {
             Box(Modifier.fillMaxSize()) {
         if (argentumEnabled && !homeOpen && gameInProgress && showStackPile) StackPile(argentumSnapshot?.stack.orEmpty(), onOpenStack = { stackOpen = true })
         if (argentumEnabled && !homeOpen && showTurnBanner) TurnBanner(turnBanner, onDismiss = { turnBanner = null })
+        // Distinct from fading play notifications: this remains until Argentum removes
+        // the targeting spell/ability from the stack. Never dismiss on a timer.
+        if (argentumEnabled && !homeOpen) {
+            argentumSnapshot?.incomingAlerts()?.firstOrNull()?.let { alert ->
+                TargetingAlertPanel(alert, onInspect = { stackOpen = true },
+                    modifier = Modifier.align(Alignment.TopCenter).padding(top = 118.dp))
+            }
+        }
         if (argentumEnabled && !homeOpen) PlayFeedOverlay(if (showPlayedPopup) playPopup else null, if (showRecentPlays) playFeed else emptyList(), if (showAbilityBanners) playBanner else null, if (showAiRecap) recapText else null,
             onDismissPopup = { playPopup = null }, onPreview = { playPopup = it },
             feedOpen = playFeedOpen, onToggleFeed = { playFeedOpen = !playFeedOpen; runCatching { context.getSharedPreferences("arcana-table-ui", Context.MODE_PRIVATE).edit().putBoolean("playFeedOpen", playFeedOpen).apply() } },
