@@ -14,7 +14,8 @@ import org.junit.Test
 class RoccoCabarettiCatererScenarioTest {
     @Test
     fun castWithXFindsACreatureWithManaValueXOrLess() {
-        val d = scenario("Grizzly Bears", "Craw Wurm")
+        // Load the upstream Rocco definition from the same generated card corpus the app uses.
+        val d = scenario("Grizzly Bears", "Craw Wurm", "Rocco, Cabaretti Caterer")
         val p = d.player1
         d.putCardOnTopOfLibrary(p, "Craw Wurm")
         d.putCardOnTopOfLibrary(p, "Grizzly Bears")
