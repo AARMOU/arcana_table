@@ -58,6 +58,25 @@ class GameOutcomeDetailsTest {
         assertTrue(unknownSource.isNull("sourceCard"))
     }
 
+    @Test fun earlierMultiplayerCardEffectIsNotMisreportedAsTheFinalWin() {
+        val previousLoser = EntityId("offline-ai-2")
+        val state = GameState(
+            turnOrder = listOf(winner, previousLoser, loser),
+            winnerId = winner,
+            gameOver = true
+        )
+        val events = listOf(
+            PlayerLostEvent(previousLoser, GameEndReason.CARD_EFFECT, "An earlier card's effect."),
+            PlayerLostEvent(loser, GameEndReason.LIFE_ZERO),
+            GameEndedEvent(winner, GameEndReason.LIFE_ZERO)
+        )
+        val packet = GameOutcomeDetails.toMessage(state, winner, names, events)
+        assertEquals("LIFE_ZERO", packet.getString("engineReason"))
+        assertTrue(packet.isNull("winCondition"))
+        assertTrue(packet.isNull("sourceCard"))
+        assertEquals(2, packet.getJSONArray("losers").length())
+    }
+
     @Test fun drawnGameHasNoInventedWinner() {
         val state = GameState(turnOrder = listOf(winner, loser), winnerId = null, gameOver = true)
         val packet = GameOutcomeDetails.toMessage(state, winner, names,
