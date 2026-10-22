@@ -170,6 +170,15 @@ The user authorized implementing: **persistent targeting alerts, engine processi
 - Tests: `OfflineCheckpointStoreTest.kt` and `OfflineEngineResumeTest.kt`, alongside inherited suites. The first run [39798357167](https://github.com/AARMOU/arcana_table/actions/runs/39798357167) failed on test compilation due to lingering `ApplicationProvider`; fixed. The next [39799506276](https://github.com/AARMOU/arcana_table/actions/runs/39799506276) executed actual tests; targeting/checkpoint-store and inherited tests passed, but full host-to-host restore exposed an actual `JsonEncodingException` for complex `ZoneKey` map keys and processing test an Int-vs-Long assertion. Fixed Json config `allowStructuredMapKeys = true` and assertion `342L` on both branches. Reruns [39800531341](https://github.com/AARMOU/arcana_table/actions/runs/39800531341) (source tests) and [39800587691](https://github.com/AARMOU/arcana_table/actions/runs/39800587691) (Build 130 tests + preview APK) **had not reached a final success when this note was made**.
 - **Do not report a verified Build 130 APK until the latest CI actually completes success, produces APK artifact, and its package/build code and SHA256 are verified**. This also does not prove physical-device behavior. GitHub issue evidence comments added on #24, #13, #15.
 
+### 2026-10-22 — Build 130 completed and APK verified
+
+- Source regression [39800531341](https://github.com/AARMOU/arcana_table/actions/runs/39800531341): `completed / success`.
+- Combined Build 130 [39800587691](https://github.com/AARMOU/arcana_table/actions/runs/39800587691) on `gpt/arcana-b130-priority-three-preview`, commit `43b27a89f01e850ec651f85f9be775d7804cb0bd`: `completed / success`. Actual Android JVM/Robolectric tests, `:app:assembleDebug`, metadata/signature verification and artifact upload succeeded.
+- Downloaded [ArcanaTable-B130-Preview-APK artifact ID 12434979010](https://github.com/AARMOU/arcana_table/actions/runs/39800587691/artifacts/12434979010), extracted APK and checked SHA-256 locally against artifact `SHA256SUMS.txt`: `fdcc84a6d768627fb495658df677729652d9e26c6cc0a75bae625b0de98b83d7`. Delivered as `/mnt/data/ArcanaTable-B130-Targeting-Progress-Resume-debug.apk`.
+- Manifest package `com.arcanatable.argentum`, versionCode `130`, versionName `0.33.8-build130-targeting-progress-resume`, debug signer `CN=Android Debug`, signing certificate SHA-256 `79934dc7be84780b3a1a47a94f0c2f26e92f8feb96f4928a337d835cd3068ba2`. Different debug certificate from previous preview, so Android may require uninstalling **only the old preview**.
+- All 3 newly implemented feature families compiled/passed the selected regression suite, including `OfflineEngineResumeTest` host-to-host full state checkpoint roundtrip. This does not represent on-device testing or official Play Store production signing.
+- **No production merge**, no original `com.arcanatable` overwrite, no release to Play Store.
+
 ### Update format to use for future work
 
 ```text
