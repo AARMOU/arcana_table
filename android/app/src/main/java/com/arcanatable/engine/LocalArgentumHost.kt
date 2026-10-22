@@ -649,7 +649,14 @@ class LocalArgentumHost(
         // the source itself for Treasure). canPay can count such abilities even
         // when the actual automatic payment path cannot execute them. Verify
         // real casting only when these sources are present.
-        val hasManualMana = actions.any { it.isManaAbility && it.description.contains("Sacrifice", ignoreCase = true) }
+        // Self-sacrificing Treasures are handled on demand in submitAction. Do not
+        // trial-cast every card on every state update merely because a large board
+        // has hundreds of Treasures; that recreates the very performance problem
+        // Build 127 is supposed to address. Only sources with an explicit OTHER
+        // permanent as an extra cost need this preflight (e.g. Goose + Food).
+        val hasManualMana = actions.any {
+            it.isManaAbility && it.additionalCostInfo?.validSacrificeTargets?.isNotEmpty() == true
+        }
         if (!hasManualMana) return enriched
         return enriched.map { info ->
             val cast = info.action as? CastSpell
