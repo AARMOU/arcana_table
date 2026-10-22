@@ -764,6 +764,8 @@ class LocalArgentumHost(
             put("undoAvailable", interactive && undoAvailable(seat))
             put("priorityMode", "auto")
             put("stateVersion", stateVersion)
+            // Measured progress only: the previous update is a real, completed state.
+            put("interactive", interactive)
             put("engineMs", (System.nanoTime() - handleStartNanos) / 1_000_000)
             put("engineTimingsMs", buildJsonObject {
                 phaseNanos.forEach { (phase, nanos) -> put(phase, nanos / 1_000_000) }
