@@ -150,6 +150,16 @@ Both initial tests compiled far enough to reveal test-harness defects. This is n
 - The artifact was downloaded into the active conversation working container, extracted, hash-verified and copied to `/mnt/data/ArcanaTable-5-Feature-Preview-debug.apk` for delivery.
 - Included five tested feature groups: Table overview/navigation, graveyard and exile play controls, menu decision cleanup, game-log event counting, notification readability. The remaining unimplemented teams are excluded. No production signing, merge or Play Store release. Real-device validation still outstanding.
 
+### 2026-10-22 (America/Denver) — Corrected combined preview to Build 129
+
+- User reported previous five-feature APK displayed **Build 124**. Verified source Android Gradle file actually had `versionCode = 124` and `versionName = 0.33.2-build124-preview` even though the integration branch contained newer changes.
+- Fixed Android preview metadata on isolated branch `gpt/arcana-five-feature-preview`: `versionCode = 129`, `versionName = 0.33.7-build129-five-feature-preview`, app label `Arcana Preview · B129`. Commit `995bb9ad15275577e596bf8c7b95b58769b91f0e`.
+- Updated CI so artifact filename includes B129 and package-verification step rejects incorrect version code/name. Head commit `97c6142203de00b5cc0742f2795d2279b5cc5239`.
+- [GitHub Actions run 39782165961](https://github.com/AARMOU/arcana_table/actions/runs/39782165961): **completed SUCCESS**. Combined tests and debug APK assembly both succeeded; verification output reports `package=com.arcanatable.argentum`, `versionCode=129`, `versionName=0.33.7-build129-five-feature-preview`.
+- [Installable APK artifact 12428305214](https://github.com/AARMOU/arcana_table/actions/runs/39782165961/artifacts/12428305214) downloaded and extracted to `/mnt/data/ArcanaTable-B129-Five-Feature-Preview-debug.apk`; checked APK SHA-256 against artifact's `SHA256SUMS.txt`: `c31626c649e91d6ef547d366ebad40304c2b48749addd77200506eed20939e71`.
+- APK is Android **debug-signed**, certificate SHA256 `1f0b65a1dce435b188bbca2c8bd00922b64a1f755202a41f616090c31efddb0b`. This differs from earlier preview's debug cert, so Android may require uninstalling the **previous preview** before reinstalling the new one; production app `com.arcanatable` is untouched.
+- Version 129 here identifies the combined **preview package metadata**, not a newly compiled updated Argentum rules-engine release. No production merge or Play Store upload.
+
 ### Update format to use for future work
 
 ```text
