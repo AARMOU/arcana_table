@@ -23,8 +23,7 @@ object CustomCards {
     private const val POOL = "Card pool 10/26"
 
     val entries: List<Entry> = listOf(
-        // Tokens Win 9/26 (Rocco, Cabaretti Caterer)
-        Entry(RoccoCabarettiCaterer, "SNC", TOKENS_WIN),
+        // Tokens Win 9/26 (Rocco, Cabaretti Caterer is supplied by upstream Argentum)
         Entry(AncientCopperDragon, "CLB", TOKENS_WIN),
         Entry(DisplacedDinosaurs, "WHO", TOKENS_WIN),
         Entry(JaheiraFriendOfTheForest, "CLB", TOKENS_WIN),
@@ -95,7 +94,6 @@ object CustomCards {
         // Other cards from the submitted collection. Unsupported mechanics remain listed in
         // android/docs/CUSTOM_CARDS_HANDOFF.md rather than being approximated silently.
         Entry(ConstrictingSliver, "CMM", POOL),
-        Entry(KodamaOfTheWestTree, "NEO", POOL),
         Entry(AllosaurusShepherd, "2X2", POOL),
         Entry(BarretAvalancheLeader, "FIC", POOL),
         Entry(KratosGodOfWar, "SLD", POOL),
@@ -118,7 +116,6 @@ object CustomCards {
         Entry(RampagingFerocidon, "XLN", POOL),
         Entry(SpittingDilophosaurus, "REX", POOL),
         Entry(DescendantsPath, "TLE", POOL),
-        Entry(RaffineSchemingSeer, "SNC", POOL),
         Entry(CloudExSoldier, "FIC", POOL),
         Entry(LeonardoTheBalance, "TMC", POOL),
         Entry(WakkaDevotedGuardian, "FIC", POOL),
