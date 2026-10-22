@@ -357,6 +357,8 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             val state = incoming.optJSONObject("state")
             if (state != null) {
                 argentumAwaitingUpdate = false
+                argentumEngineAdvancing = argentumOffline && incoming.has("interactive") && !incoming.optBoolean("interactive", true)
+                argentumLastCompletedEngineMs = incoming.optLong("engineMs", -1).takeIf { it >= 0 }
                 if (argentumLocalPlayersBackup == null) argentumLocalPlayersBackup = loadSavedPlayers(context) ?: players.toList()
                 val snapshot = ArgentumTableSnapshot.parse(state, incoming.optJSONArray("legalActions") ?: JSONArray(), incoming.optString("interactionEpoch").takeUnless { it.isBlank() || it == "null" })
                 val nextDecision = incoming.optJSONObject("pendingDecision")
@@ -692,6 +694,8 @@ internal fun TableController.closeArgentumSession(concede: Boolean) {
     if (concede) { if (argentumSnapshot == null) argentumSocket.leaveQuickGameLobby() else if (!gameEndedOnline) argentumSocket.concede() }
     argentumSocket.close()
     stopWifi()
+    argentumEngineAdvancing = false
+    argentumLastCompletedEngineMs = null
     argentumEnabled = false
     argentumOffline = false
     setArgentumGameActive(false)
