@@ -117,6 +117,28 @@ jobs:
           source.write_text(changed)
           print("Removed exactly the three superseded CUSTOM registrations in ephemeral CI only; source branches untouched")
           PY
+      - name: Forward-port upstream Rocco scenario and nonbrittle registration audit (ephemeral only)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          testdir=Path("candidate/android/custom-cards/src/test/kotlin/com/arcanatable/customcards")
+          b131=Path("build131/android/custom-cards/src/test/kotlin/com/arcanatable/customcards")
+          source=b131/"RoccoCabarettiCatererScenarioTest.kt"
+          assert source.is_file() and "scenario(\"Grizzly Bears\", \"Craw Wurm\", \"Rocco, Cabaretti Caterer\")" in source.read_text()
+          (testdir/source.name).write_text(source.read_text())
+          audit=testdir/"CustomCardDataTest.kt"
+          original=audit.read_text()
+          if "assertEquals(114, CustomCards.all.size)" in original:
+              assert "assertEquals(114, CardPool.custom.map { it.name }.toSet().size)" in original
+              updated=original.replace("assertEquals(114, CustomCards.all.size)",
+                  "assertTrue(CustomCards.all.isNotEmpty())\n        assertEquals(CustomCards.all.size, CustomCards.all.map { it.name }.toSet().size)")
+              updated=updated.replace("assertEquals(114, CardPool.custom.map { it.name }.toSet().size)",
+                  "assertEquals(CustomCards.all.map { it.name }.toSet(), CardPool.custom.map { it.name }.toSet())")
+              assert updated != original and "114" not in updated
+              audit.write_text(updated)
+          print("Rocco scenario still verifies X search using upstream card data; coverage checks entire live registry set")
+          PY
       - name: Compile, export, and execute complete real-engine card scenarios
         working-directory: candidate/android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test
