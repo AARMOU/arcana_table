@@ -26,6 +26,7 @@ internal object GameOutcomeDetails {
         viewer: EntityId,
         nameFor: (EntityId) -> String,
         events: List<GameEvent>,
+        cardExists: (String) -> Boolean = { false },
     ): JSONObject {
         val winner = state.winnerId
         val lossEvents = events.filterIsInstance<PlayerLostEvent>()
@@ -39,7 +40,7 @@ internal object GameOutcomeDetails {
         val engineReason = ended?.reason ?: latestLoss?.reason
         val winCondition = detailedLoss?.message?.takeIf(String::isNotBlank)
         val sourceCard = winCondition?.substringBefore(':')?.takeIf {
-            it != winCondition && it.isNotBlank() && it.length <= 100
+            it != winCondition && it.isNotBlank() && it.length <= 100 && cardExists(it)
         }
 
         // Only report an artifact group for the specific condition described by the engine.
