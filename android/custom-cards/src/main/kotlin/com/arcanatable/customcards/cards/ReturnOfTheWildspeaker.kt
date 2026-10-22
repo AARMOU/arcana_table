@@ -19,7 +19,7 @@ val ReturnOfTheWildspeaker = card("Return of the Wildspeaker") {
         "• Draw cards equal to the greatest power among non-Human creatures you control.\n" +
         "• Non-Human creatures you control get +3/+3 until end of turn."
 
-    val nonHumans = GameObjectFilter.Creature.youControl().notSubtype("Human")
+    val nonHumans = GameObjectFilter.Creature.youControl().notSubtype(Subtype.HUMAN)
     spell {
         effect = ModalEffect.chooseOne(
             Mode.noTarget(

@@ -24,7 +24,7 @@ val StonecoilSerpent = card("Stonecoil Serpent") {
 
     metadata {
         rarity = Rarity.RARE
-        collectorNumber = "949"
+        collectorNumber = "976"
         artist = "Mark Poole"
     }
 }
