@@ -18,7 +18,7 @@ diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaSymbol.kt b/mt
      }
  
 -    /**
--     * A symbol payable with one mana of either of two colors — [Hybrid]
+-     * A symbol payable with one mana of either of two colors — [Hybrid] `{G/U}` and, when paid with
 +    /**
 +     * A hybrid mana symbol payable with one actual colorless mana or one mana of [color].
 +     * It is a colored mana symbol of [color], but colorless is not a color; mana value is one.
@@ -31,7 +31,7 @@ diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaSymbol.kt b/mt
 +    }
 +
 +    /**
-+     * A symbol payable with one mana of either of two colors — [Hybrid]
++     * A symbol payable with one mana of either of two colors — [Hybrid] `{G/U}` and, when paid with
       * mana rather than life, [HybridPhyrexian] `{G/U/P}`. Mana-payment code matches
       * `is Hybrid, is HybridPhyrexian ->` and reads [color1]/[color2] off this shared shape.
       */
