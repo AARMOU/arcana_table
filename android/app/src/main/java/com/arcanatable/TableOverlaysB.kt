@@ -746,6 +746,7 @@ internal fun TableController.TableOverlaysB() {
         entries = if (argentumEnabled && argentumSnapshot != null) argentumSnapshot!!.fullLog.map { it.description } else gameLog,
         ownership = if (argentumEnabled && argentumSnapshot != null) argentumSnapshot!!.fullLog.map { if (it.isTurnMarker) null else it.isYours } else null,
         turnMarkers = if (argentumEnabled && argentumSnapshot != null) argentumSnapshot!!.fullLog.map { it.isTurnMarker } else null,
+        groupingKeys = if (argentumEnabled && argentumSnapshot != null) argentumSnapshot!!.fullLog.map { it.groupingKey } else null,
         previewableCards = players.flatMapIndexed { index, player ->
             (player.battlefield + player.graveyard + player.exile + player.revealed.filterNot { it.isFaceDown } + listOfNotNull(player.commanderCard))
                 .filterNot { it.isFaceDown }.map { index to it }
