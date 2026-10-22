@@ -133,6 +133,14 @@ Both initial tests compiled far enough to reveal test-harness defects. This is n
 
 **Explicit scope limits:** These are **targeted** app test suites, not full application/engine/custom-card regressions, not real-device testing, and not a release APK/AAB build. Passing these does not prove all game rules mechanics, complex exile permissions or all screen layouts. No changes were merged into production, and no signing keys were touched.
 
+### 2026-10-21 ~23:48 (America/Denver) — Five-feature APK integration build requested
+
+- User authorized creation of **one combined APK**. Created isolated integration branch `gpt/arcana-five-feature-preview` at source commit `dc0cac32e07e40905794919f8b539d319a7a6472`, based on tested `gpt/zone-casting-graveyard-exile` plus tested Table UI changes.
+- Integrated source/test changes from `gpt/work-menu-layout`, `gpt/work-log-grouping` and `gpt/work-popup-notifications`. Resolves overlapping files `ArgentumInteraction.kt`, `TableOverlays.kt`, `TableDialogs.kt`, `TableOverlaysB.kt`, `TableEffects.kt` without overwriting zone/Table changes; preserved the latest Table UI regression test.
+- CI: [GitHub Actions run 39730056278](https://github.com/AARMOU/arcana_table/actions/runs/39730056278), executing all eight five-feature test filters plus existing `ArgentumInteractionTest` and `GameRulesTest` before compiling `:app:assembleDebug`.
+- Build targets **debug-signed, separately installable `com.arcanatable.argentum`**, not the production app id/signing key. APK artifact should be `ArcanaTable-Five-Feature-Debug-APK` with SHA256 and signing provenance. No main merge, Play Store release or original key use.
+- This entry documents *started* build, not a successful artifact until CI concludes. Remaining 9 of 14 feature teams have not been silently included; only five implemented/tested workstreams are part of this preview.
+
 ### Update format to use for future work
 
 ```text
