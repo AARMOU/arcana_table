@@ -141,6 +141,13 @@ class MyriadDefenderChoiceTest : FunSpec({
         copies.forEach { d.state.getEntity(it)!!.has<TappedComponent>() shouldBe true }
 
         d.passPriorityUntil(Step.POSTCOMBAT_MAIN)
+        // Diagnostic output is deliberately emitted before either assertion: discriminate
+        // a missing leave trigger from an unresolved stack, wrong controller, or wrong token name.
+        println("MYRIAD_TRACE phase=${d.state.step} stack=${d.stackSize} pending=${d.pendingDecision?.javaClass?.simpleName} " +
+            "p1Creatures=${d.getCreatures(p1).map(d::getCardName)} " +
+            "p2Creatures=${d.getCreatures(p2).map(d::getCardName)} " +
+            "p3Creatures=${d.getCreatures(p3).map(d::getCardName)} " +
+            "p4Creatures=${d.getCreatures(p4).map(d::getCardName)}")
         withClue("myriad exiles the copies but not the original") {
             d.getCreatures(p1).count { d.getCardName(it) == "Scenario Myriad Drone" } shouldBe 1
         }
