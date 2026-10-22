@@ -73,6 +73,16 @@ This is a durable, append-only notebook for development team handoffs and any ve
 
 **Next:** Confirm authorizations, start an actual worker session using GitHub's Agents UI or an authorized agent tasks API, and record task ID + real base branch + first commits. Do not substitute GitHub issue comments for proof of agent execution.
 
+### 2026-10-21 — Copilot activation constrained; direct implementation began on two isolated branches
+
+- Verified GitHub's official agent assignment API accepts `agent_assignment.base_branch` only when invoking the complete REST or GraphQL mutation. The available connector's typed issue-assignment call does not expose this field; prior attempted Copilot assignment returned **403 Forbidden**. The command-line GitHub client and a separate authenticated Copilot agent runner are not available in this workspace. No attempts to bypass authorization or switch the default branch.
+- PR [#26](https://github.com/AARMOU/arcana_table/pull/26) and [#27](https://github.com/AARMOU/arcana_table/pull/27) have `@copilot` comments but no observed agent response, no 👀 reactions and no Copilot-authored child PR as of this check. **0 actual Copilot workers confirmed launched.**
+- Started **direct source implementation** (not running workers) on the independently owned feature branches:
+  - [Team 10 issue #21](https://github.com/AARMOU/arcana_table/issues/21), `gpt/work-menu-layout`: fixed missing/JSON-null/blank decision labels, stacked cramped BatchYesNo buttons vertically and added `DecisionDisplayTextTest.kt`. Commits: `ceb51dc0`, `c3cb6e9b`, `75717412`. Regression tests created, **not executed**; UI/layout audit still open.
+  - [Team 11 issue #22](https://github.com/AARMOU/arcana_table/issues/22), `gpt/work-log-grouping`: added conservative semantic identities to existing Argentum log records, immutable consecutive display grouping, counted/expandable game log UI (paginated for heavy trigger floods), and `GameLogGroupingTest.kt`. Commits `6c926d57`, `43e473ea`, `3d9dc5c6`, `0b5b64ac`, `123927b9`. Original events retained; no sandbox grouping without event identity. Tests **not executed**.
+- Issues #21/#22 now have evidence comments distinguishing source commits from actual agent execution. No merge, APK/AAB, signing change or production deployment.
+- **Next:** Obtain an authorized coding-agent session tool that can supply per-issue `base_branch`, or continue directly implementing feature work in current turns with test verification. Do not claim agent concurrency without verified task IDs.
+
 ### Update format to use for future work
 
 ```text
