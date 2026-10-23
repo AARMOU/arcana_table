@@ -308,14 +308,10 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerIn
 index 893aa8d33f..eab7f9c992 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerIndex.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerIndex.kt
-@@ -477,6 +477,7 @@ class TriggerIndex(
-             is com.wingedsheep.engine.core.TurnEndedByEffectEvent,
-             is com.wingedsheep.engine.core.GameRestartedEvent,
+@@ -479,2 +479,3 @@ class TriggerIndex(
              is com.wingedsheep.engine.core.TurnSkippedEvent,
 +            is com.wingedsheep.engine.core.AbilityCopiedEvent,
              is com.wingedsheep.engine.core.AbilityAutoAnsweredEvent,
-             is com.wingedsheep.engine.core.AbilityCounteredEvent,
-             is com.wingedsheep.engine.core.AbilityFizzledEvent,
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/ContinuationHandler.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/ContinuationHandler.kt
 index f8129fcfd2..a5b11f3644 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/ContinuationHandler.kt
@@ -336,15 +332,9 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/contin
 index 1a2476a80d..c62c00fa33 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/MiscContinuationResumer.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/MiscContinuationResumer.kt
-@@ -46,7 +46,7 @@ class MiscContinuationResumer(
-         resumer(CoinFlipChoiceContinuation::class, ::resumeCoinFlipChoice),
-         resumer(StormCopyTargetContinuation::class, ::resumeStormCopyTarget),
-         resumer(StormCopyModalTargetContinuation::class, ::resumeStormCopyModalTarget),
+@@ -50 +50 @@ class MiscContinuationResumer(
 -        resumer(CopyEachSpellContinuation::class, ::resumeCopyEachSpell),
 +        resumer(CopyStackObjectsOrderContinuation::class, ::resumeCopyStackObjectsOrder),
-         resumer(CopyTriggeredAbilityTargetContinuation::class, ::resumeCopyTriggeredAbilityTarget),
-         resumer(CopyActivatedAbilityTargetContinuation::class, ::resumeCopyActivatedAbilityTarget),
-         resumer(CopyAbilityTargetContinuation::class, ::resumeCopyAbilityTarget),
 @@ -154,11 +154,9 @@ class MiscContinuationResumer(
              return ExecutionResult.error(state, "Expected target selection response for ability copy")
          }
@@ -457,15 +447,9 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effect
 index 812935c27b..bc01b26c55 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt
-@@ -78,7 +78,7 @@ class EffectExecutorRegistry(
-         registerModule(
-             LibraryExecutors(::recurse, zones, cardRegistry, castSpellHandler, playLandHandler, targetFinder, legalActionEnumerator)
-         )
+@@ -78 +78 @@ class EffectExecutorRegistry(
 -        registerModule(StackExecutors(zones, amountEvaluator, cardRegistry, spellCounterer, targetFinder = targetFinder))
 +        registerModule(StackExecutors(zones, amountEvaluator, cardRegistry, spellCounterer, targetFinder = targetFinder, effectExecutor = ::recurse))
-         registerModule(InformationExecutors())
-         registerModule(CombatExecutors(amountEvaluator, cardRegistry))
-         registerModule(ZonesExecutors(::recurse, zones, cardRegistry, targetFinder = targetFinder))
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyEachTargetSpellExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyEachTargetSpellExecutor.kt
 deleted file mode 100644
 index 502fcf5dc7..0000000000
@@ -955,12 +939,9 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effect
 index b41d899272..9e500a1490 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/SpellCopyTargets.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/SpellCopyTargets.kt
-@@ -51,7 +51,10 @@ internal object SpellCopyTargets {
-         } else null
-         val byRequirement = if (tables == null) legalTargets(state, finder, sourceId, controllerId, requirements, exceptions)
-             else tables.mapIndexed { index, table -> index to table.values.flatten().distinct() }.toMap()
--        val distribution = state.getEntity(sourceId)?.get<SpellOnStackComponent>()?.damageDistribution.orEmpty()
-+        val entity = state.getEntity(sourceId)
+@@ -54,4 +54,7 @@ internal object SpellCopyTargets {
+-        val distribution = state.spellOrLastKnown(sourceId)?.get<SpellOnStackComponent>()?.damageDistribution.orEmpty()
++        val entity = state.spellOrLastKnown(sourceId)
 +        val distribution = (entity?.get<SpellOnStackComponent>()?.damageDistribution
 +            ?: entity?.get<ActivatedAbilityOnStackComponent>()?.damageDistribution
 +            ?: entity?.get<TriggeredAbilityOnStackComponent>()?.damageDistribution).orEmpty()
