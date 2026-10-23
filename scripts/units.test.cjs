@@ -50,3 +50,28 @@ test('explicit Unit lines win over other references', () => {
   assert.equal(unitOf('see #54 and #68', new Set([54, 68])), 54);
   assert.equal(unitOf('Unit: #12', new Set([54])), null);
 });
+
+test('a PR connected to two units is ambiguous: counted against both, flagged, unless a Unit line decides', async () => {
+  const g = fake();
+  const orig = g.rest.issues.listEventsForTimeline;
+  g.rest.issues.listEventsForTimeline = a => a.issue_number === 68
+    ? [{ event: 'connected', created_at: T(100), subject: { type: 'pull_request', number: 59 } }] : orig(a);
+  const d = await loadUnits({ github: g, owner: 'o', repo: 'r' });
+  for (const n of [54, 68]) {
+    const u = d.units.find(x => x.raw.number === n);
+    assert.deepEqual(u.prs.map(p => p.number), [59], '#' + n); assert.equal(u.derived.ambiguousLink, true, '#' + n);
+  }
+  const h = fake({ prBody: 'Unit: #54' }); h.rest.issues.listEventsForTimeline = g.rest.issues.listEventsForTimeline;
+  const e = await loadUnits({ github: h, owner: 'o', repo: 'r' });
+  assert.equal(e.units.find(x => x.raw.number === 54).derived.ambiguousLink, false);
+  assert.equal(e.units.find(x => x.raw.number === 68).prs.length, 0);
+});
+
+test('a disconnected link no longer counts', async () => {
+  const g = fake();
+  const orig = g.rest.issues.listEventsForTimeline;
+  g.rest.issues.listEventsForTimeline = a => a.issue_number === 54
+    ? [...orig(a), { event: 'disconnected', created_at: T(50), subject: { type: 'pull_request', number: 59 } }] : orig(a);
+  const u = (await loadUnits({ github: g, owner: 'o', repo: 'r' })).units.find(x => x.raw.number === 54);
+  assert.equal(u.prs.length, 0);
+});

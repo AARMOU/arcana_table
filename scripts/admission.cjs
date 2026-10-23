@@ -126,25 +126,48 @@ function deriveUnit(unit, now = Date.now()) {
 //   "## Cards" with at least one bullet, or "## Discovery" naming a script path;
 //   "## Acceptance" mentioning Oracle behavior and executable tests;
 //   a "Base: <branch>" line equal to the dispatcher's integration base.
+// Template defaults that must be replaced before a unit is actionable. Kept in sync with
+// .github/ISSUE_TEMPLATE/arcana-queue-unit.md (a test asserts the untouched template fails).
+const TEMPLATE_DEFAULTS = new Set([
+  'card name',
+  'exact current oracle behavior (cost, types, every ability, targeting and timing), checked against authoritative card records',
+  'executable regression scenarios for positive and negative behavior, registration and deterministic asset export',
+  'no placeholders, approximations or weakened tests; report exact commands and run ids',
+]);
+const PLACEHOLDER = /^(?:tbd|todo|tba|n\/a|none|\.{2,}|card(?: name)?|name|\?+|-+)$/i;
+const stripComments = body => String(body || '').replace(/<!--[\s\S]*?(?:-->|$)/g, '');
+const bulletText = l => (l.match(/^\s*[-*]\s+(.*?)\s*$/) || [])[1];
+const norm = t => t.replace(/[`*_]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+const isPlaceholder = t => !t || PLACEHOLDER.test(norm(t)) || TEMPLATE_DEFAULTS.has(norm(t)) || /<[^>]*>/.test(t);
+
 function sections(body) {
   const out = {};
   let cur = null;
-  for (const line of String(body || '').split(/\r?\n/)) {
+  for (const line of stripComments(body).split(/\r?\n/)) {
     const h = line.match(/^#{2,3}\s+(.+?)\s*$/);
     if (h) { cur = h[1].toLowerCase(); out[cur] = out[cur] || []; continue; }
     if (cur) out[cur].push(line);
   }
   return out;
 }
+
+// A discovery step must be a runnable command naming a script, not just a filename.
+const SCRIPT = /[\w./-]+\.(?:py|cjs|mjs|js|sh|kts?)\b/;
+const isCommand = l => [...l.matchAll(/`([^`]+)`/g)].some(m => SCRIPT.test(m[1]) && /\s/.test(m[1].trim())) ||
+  /^\s*(?:\$\s*)?(?:python3?|node|bash|sh|\.\/)\S*\s+\S*/.test(l) && SCRIPT.test(l);
+
 function unitActionable(body, base) {
   const sec = sections(body);
   const missing = [];
-  const cards = (sec.cards || []).some(l => /^\s*[-*]\s+\S/.test(l));
-  const discovery = (sec.discovery || []).some(l => /[\w./-]+\.(?:py|cjs|mjs|js|sh|kts?)\b/.test(l));
-  if (!cards && !discovery) missing.push('cards-or-discovery');
-  const acceptance = (sec.acceptance || []).join('\n');
-  if (!/oracle/i.test(acceptance) || !/\b(tests?|regressions?|scenarios?)\b/i.test(acceptance)) missing.push('acceptance');
-  const line = String(body || '').match(/^Base:\s*`?([^`\s]+)`?\s*$/m);
+  const cards = (sec.cards || []).map(bulletText).filter(t => t !== undefined && !isPlaceholder(t));
+  const discovery = (sec.discovery || []).some(isCommand);
+  if (!cards.length && !discovery) missing.push('cards-or-discovery');
+  const acc = (sec.acceptance || []).map(l => l.trim()).filter(Boolean);
+  const accText = acc.join('\n');
+  // Generic criteria alone don't describe the work: at least one line must be unit-specific.
+  const specific = acc.some(l => bulletText(l) !== undefined && !isPlaceholder(bulletText(l)));
+  if (!/oracle/i.test(accText) || !/\b(tests?|regressions?|scenarios?)\b/i.test(accText) || !specific) missing.push('acceptance');
+  const line = stripComments(body).match(/^Base:\s*`?([^`\s]+)`?\s*$/m);
   if (!line) missing.push('base-missing');
   else if (!base || line[1] !== base) missing.push('base-mismatch');
   return { ok: missing.length === 0, missing };
@@ -171,6 +194,7 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
   if (op === 'repair' && ready.repair !== 'request') return deny('readiness: repair mode ' + ready.repair);
   if (units.some(u => u.blocksAll)) return deny('interrupted attempt needs owner review');
   if (!unit) return deny('no work unit');
+  if (unit.ambiguousLink) return deny('ambiguous PR link: a PR is connected to more than one unit');
   if (op === 'assign') {
     if (ready.dispatch === 'authorize-once' && (labeledCount !== 1 || !unit.labeled))
       return deny('authorize-once requires exactly one labeled issue');

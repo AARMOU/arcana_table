@@ -39,15 +39,21 @@ async function loadUnits({ github, owner, repo, now = Date.now() }) {
   const events = new Map();
   for (const issue of unitIssues) events.set(issue.number, await timeline(github, owner, repo, issue.number));
   // Each PR belongs to exactly one unit: explicit "Unit: #N" line, else GitHub's connected link,
-  // else the lowest referenced unit issue (conservative fallback).
+  // else the lowest referenced unit issue (conservative fallback). A PR connected to several units
+  // is ambiguous: it counts against every one of them and blocks their admission until fixed.
   const connectedTo = new Map();
-  for (const [n, evs] of events) for (const pr of connectedPrs(evs)) if (!connectedTo.has(pr)) connectedTo.set(pr, n);
+  for (const [n, evs] of events) for (const pr of connectedPrs(evs)) connectedTo.set(pr, [...(connectedTo.get(pr) || []), n]);
   const prsByUnit = new Map();
+  const ambiguous = new Set();
   for (const pr of prs) {
     const explicit = String(pr.body || '').match(/^Unit:\s*#(\d+)\s*$/m);
-    const n = explicit && numbers.has(Number(explicit[1])) ? Number(explicit[1])
-      : connectedTo.get(pr.number) ?? unitOf(pr.body, numbers);
-    if (n) prsByUnit.set(n, [...(prsByUnit.get(n) || []), pr]);
+    const connected = connectedTo.get(pr.number) || [];
+    let targets;
+    if (explicit && numbers.has(Number(explicit[1]))) targets = [Number(explicit[1])];
+    else if (connected.length > 1) { targets = connected; connected.forEach(n => ambiguous.add(n)); }
+    else if (connected.length === 1) targets = connected;
+    else { const n = unitOf(pr.body, numbers); targets = n ? [n] : []; }
+    for (const n of targets) prsByUnit.set(n, [...(prsByUnit.get(n) || []), pr]);
   }
   const units = [];
   for (const issue of unitIssues) {
@@ -58,7 +64,7 @@ async function loadUnits({ github, owner, repo, now = Date.now() }) {
     for (const pr of linked) sessions.push(...sessionsOf(await timeline(github, owner, repo, pr.number)));
     const raw = { number: issue.number, title: issue.title, body: issue.body || '', labels: (issue.labels || []).map(l => l.name || l),
       assignedToCopilot: (issue.assignees || []).some(isCopilot), ledger: parseLedger(comments), sessions };
-    units.push({ raw, derived: deriveUnit(raw, now), prs: linked });
+    units.push({ raw, derived: { ...deriveUnit(raw, now), ambiguousLink: ambiguous.has(issue.number) }, prs: linked });
   }
   return { units, prsByUnit, numbers };
 }
