@@ -5,6 +5,7 @@
 function decideBudget({ used, allowance, measuredAt, now = Date.now(), maxAgeMs = 60 * 60 * 1000 }) {
   if (!Number.isFinite(used) || !Number.isFinite(allowance) ||
       used < 0 || allowance <= 0 || !Number.isFinite(measuredAt) ||
+      !Number.isFinite(now) || !Number.isFinite(maxAgeMs) || maxAgeMs <= 0 ||
       measuredAt > now || now - measuredAt > maxAgeMs) {
     return { level: 'unknown', maxNewAssignments: 0, warn: true, reason: 'Missing, invalid, or stale usage data' };
   }

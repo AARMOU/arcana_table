@@ -4,7 +4,10 @@ const { test } = require('node:test');
 const g = require('./usage-gate.cjs');
 const now = Date.UTC(2026, 9, 23, 16);
 const snap = (used, at = new Date(now).toISOString()) =>
-  JSON.stringify({ used, allowance: 1500, measuredAt: at });
+  JSON.stringify({ used, allowance: 1500, measuredAt: at, account: 'AARMOU',
+    metric: 'premium_requests', source: 'github-billing-api', period: '2026-10',
+    allowanceSource: 'owner-configured-budget',
+    sourceUrl: 'https://api.github.com/users/AARMOU/settings/billing/premium_request/usage' });
 const b = (used) => g.budgetFromEnv(snap(used), now);
 
 test('missing or garbage snapshot fails closed', () => {
@@ -35,3 +38,24 @@ test('repair retries respect levels', () => {
   assert.equal(g.repairAllowed(b(1350), 0), false);
 });
 test('describe reports level', () => assert.match(g.describe(b(750)), /warn.*50\.0%/));
+
+test('legacy or wrong-metric snapshots cannot authorize spend', () => {
+  for (const change of [{metric:'cloud_agent_dollars'}, {period:'2026-09'},
+    {account:'someone-else'}, {source:'screenshot'}, {sourceUrl:'https://example.com'},
+    {allowanceSource:'guessed'}]) {
+    assert.equal(g.budgetFromEnv(JSON.stringify({...JSON.parse(snap(1)), ...change}), now).level, 'unknown');
+  }
+  assert.equal(g.budgetFromEnv(JSON.stringify({used:1, allowance:1500, measuredAt:new Date(now).toISOString()}), now).level, 'unknown');
+});
+test('AI credits use their own endpoint and denominator', () => {
+  const x={...JSON.parse(snap(750)), metric:'ai_credits',
+    sourceUrl:'https://api.github.com/users/AARMOU/settings/billing/ai_credit/usage'};
+  assert.equal(g.budgetFromEnv(JSON.stringify(x), now).level, 'warn');
+});
+test('malformed caps and retry counts fail closed', () => {
+  for (const requested of [NaN, undefined, -1, 1.5, '2']) {
+    if (requested === undefined) continue;
+    assert.equal(g.dispatchLimit(b(1), {requested}), 0);
+  }
+  for (const n of [-1, 3, 4, NaN, '1']) assert.equal(g.repairAllowed(b(1), n), false);
+});

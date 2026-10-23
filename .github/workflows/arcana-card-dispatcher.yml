@@ -1,69 +1,66 @@
 name: Arcana Card Worker Dispatcher
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/30 * * * *'
   workflow_dispatch:
     inputs:
       test_issue:
-        description: 'Optional one-issue controlled dispatch test (e.g. 63); bypasses capacity count'
+        description: 'Optional single eligible issue; never bypasses readiness, budget or claims'
         required: false
         type: string
 permissions:
   contents: read
-  issues: write
+  actions: read
+  issues: read
   pull-requests: read
 concurrency:
-  group: arcana-card-dispatcher
+  group: arcana-copilot-control
   cancel-in-progress: false
 jobs:
   dispatch:
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Verify user-authenticated Copilot API token
-        env:
-          COPILOT_DISPATCH_TOKEN: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
-        run: |
-          if [ -z "$COPILOT_DISPATCH_TOKEN" ]; then
-            echo 'Copilot assignment requires a user-authenticated token; GITHUB_TOKEN is insufficient.' >&2
-            exit 1
-          fi
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
       - uses: actions/github-script@v7
+        env:
+          ARCANA_AUTOMATION_READY: ${{ vars.ARCANA_AUTOMATION_READY }}
+          COPILOT_USAGE_SNAPSHOT: ${{ vars.COPILOT_USAGE_SNAPSHOT }}
         with:
           github-token: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
           script: |
-            const owner = context.repo.owner, repo = context.repo.repo;
-            // Bound NEW dispatches per invocation; do not treat draft PRs as live sessions.
-            const maxNewAssignments = 2;
-            const testIssue = context.payload.inputs?.test_issue?.trim();
-            if (testIssue && !/^\d+$/.test(testIssue)) { core.setFailed('Invalid test issue number'); return; }
-            const available = testIssue ? 1 : maxNewAssignments;
-            core.info('New assignment budget: ' + available);
-            const issues = await github.paginate(github.rest.issues.listForRepo, {
-              owner, repo, state: 'open', per_page: 100
-            });
-            const queued = issues.filter(i => (!testIssue || String(i.number) === testIssue) && !i.pull_request &&
-              i.title.startsWith('[Arcana Queue]') &&
-              !(i.assignees || []).length).sort((a,b) => a.number - b.number);
-            if (testIssue && queued.length !== 1) { core.setFailed('Test issue not found or not eligible: ' + testIssue); return; }
-            for (const issue of queued.slice(0, available)) {
-              try {
-                const response = await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees', {
-                  owner, repo, issue_number: issue.number, assignees: ['copilot-swe-agent[bot]'],
-                  agent_assignment: {
-                    target_repo: owner + '/' + repo,
-                    base_branch: 'gpt/six-precon-worker-integration-20261022',
-                    custom_instructions: '', custom_agent: '', model: ''
-                  }
-                });
-                const assigned = response.data.assignees?.some(a => ['copilot','copilot-swe-agent[bot]'].includes(a.login.toLowerCase()));
-                if (!assigned) {
-                  core.setFailed('Copilot assignment not confirmed on issue #' + issue.number);
-                  return;
-                }
-                core.info('Assigned queue issue #' + issue.number + ' to Copilot. Agent start must be verified separately.');
-              } catch (e) {
-                core.setFailed('Assignment failed on #' + issue.number + ': ' + e.message);
-                return;
+            const {owner,repo}=context.repo;
+            const gate=require('./scripts/usage-gate.cjs');
+            const {planDispatch}=require('./scripts/worker-dispatch.cjs');
+            const ready=process.env.ARCANA_AUTOMATION_READY==='true';
+            if(!ready){core.info('Readiness gate closed; no assignment API called.');return;}
+            const budget=gate.budgetFromEnv(process.env.COPILOT_USAGE_SNAPSHOT);
+            if(!budget.maxNewAssignments){core.info(gate.describe(budget));return;}
+            const base='gpt/six-precon-worker-integration-20261022';
+            const branch=await github.rest.repos.getBranch({owner,repo,branch:base});
+            const baseSha=branch.data.commit.sha;
+            const runs=await github.paginate(github.rest.actions.listWorkflowRunsForRepo,{
+              owner,repo,head_sha:baseSha,status:'success',per_page:100});
+            const ciReady=runs.some(r=>r.head_sha===baseSha && r.name==='Arcana Development CI' && r.conclusion==='success');
+            const issues=await github.paginate(github.rest.issues.listForRepo,{owner,repo,state:'open',per_page:100});
+            const prs=await github.paginate(github.rest.pulls.list,{owner,repo,state:'open',per_page:100});
+            const plan=planDispatch({budget,ready,ciReady,issues,prs,testIssue:context.payload.inputs?.test_issue||''});
+            core.info(JSON.stringify({baseSha,...plan}));
+            for(const issue_number of plan.issues){
+              const fresh=await github.rest.issues.get({owner,repo,issue_number});
+              if(fresh.data.state!=='open'||fresh.data.assignees?.length){core.warning('Claim changed; stopping.');return;}
+              const response=await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees',{
+                owner,repo,issue_number,assignees:['copilot-swe-agent[bot]'],
+                agent_assignment:{target_repo:owner+'/'+repo,base_branch:base,
+                  custom_instructions:'Read issue #81. Claim distinct cards before coding. Exact Oracle behavior and executable regressions required. Isolated draft PR only. No merge/main/production/release/signing changes.',
+                  custom_agent:'',model:''}
+              });
+              if(!response.data.assignees?.some(a=>['copilot','copilot-swe-agent[bot]'].includes(a.login.toLowerCase()))){
+                core.setFailed('Assignment not confirmed; no retry.');return;
               }
+              core.info('Assignment confirmed for #'+issue_number+'; live session pickup remains unverified.');
             }
