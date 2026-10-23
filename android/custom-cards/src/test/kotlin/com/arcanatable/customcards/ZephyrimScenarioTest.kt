@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.Zephyrim
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.AlternativeCostType
 import com.wingedsheep.engine.core.CastSpell
 import com.wingedsheep.engine.core.PaymentStrategy
 import com.wingedsheep.engine.state.components.identity.TokenComponent
@@ -53,13 +54,18 @@ class ZephyrimScenarioTest {
             typeLine = "Instant"
             spell { effect = Effects.DrawCards(1) }
         })
-        d.putCardOnTopOfLibrary(p, "Zephyrim")
+        val zephyrimCard = d.putCardOnTopOfLibrary(p, "Zephyrim")
         val drawSpell = d.putCardInHand(p, "Zephyrim Miracle Draw Test")
         d.giveMana(p, Color.BLUE)
         d.giveMana(p, Color.WHITE)
         d.giveColorlessMana(p, 1)
 
         assertNull(d.castSpell(p, drawSpell).error)
+        d.resolveAll()
+
+        val miracleCast = d.legalActions(p).mapNotNull { it.action as? CastSpell }
+            .single { it.cardId == zephyrimCard && it.alternativeCostType == AlternativeCostType.MIRACLE }
+        assertNull(d.submit(miracleCast).error)
         d.resolveAll()
 
         assertNotNull(d.findPermanent(p, "Zephyrim"))
@@ -75,7 +81,7 @@ class ZephyrimScenarioTest {
             typeLine = "Instant"
             spell { effect = Effects.DrawCards(1) }
         })
-        d.putCardOnTopOfLibrary(p, "Zephyrim")
+        val zephyrimCard = d.putCardOnTopOfLibrary(p, "Zephyrim")
         d.putCardOnTopOfLibrary(p, "Plains")
         val firstDraw = d.putCardInHand(p, "Zephyrim Miracle Draw Test")
         val secondDraw = d.putCardInHand(p, "Zephyrim Miracle Draw Test")
@@ -88,5 +94,9 @@ class ZephyrimScenarioTest {
 
         assertNull(d.findPermanent(p, "Zephyrim"))
         assertTrue(d.getHand(p).any { d.getCardName(it) == "Zephyrim" })
+        assertTrue(
+            d.legalActions(p).mapNotNull { it.action as? CastSpell }
+                .none { it.cardId == zephyrimCard && it.alternativeCostType == AlternativeCostType.MIRACLE },
+        )
     }
 }
