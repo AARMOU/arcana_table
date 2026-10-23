@@ -19,6 +19,7 @@ class RiseOfTheEldraziScenarioTest {
         val hollow = d.putPermanentOnBattlefield(d.player2, "Yavimaya Hollow")
         d.giveMana(d.player2, Color.GREEN)
         val regenerate = d.cardRegistry.getCard("Yavimaya Hollow")!!.script.activatedAbilities[1]
+        assertNull(d.passPriority(p).error)
         assertNull(
             d.submit(
                 ActivateAbility(

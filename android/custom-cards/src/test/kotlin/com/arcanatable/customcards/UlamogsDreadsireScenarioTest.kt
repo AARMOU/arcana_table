@@ -25,6 +25,23 @@ class UlamogsDreadsireScenarioTest {
     }
 
     @Test
+    fun tapAbilityRequiresSummoningSicknessToEndAndWorksAtOpponentPriority() {
+        val d = customScenario(UlamogsDreadsire)
+        val opponent = d.player2
+        val dreadsire = d.putCreatureOnBattlefield(opponent, "Ulamog's Dreadsire")
+
+        assertNull(d.passPriority(d.player1).error)
+        assertNotNull(d.activate(opponent, dreadsire).error)
+        d.removeSummoningSickness(dreadsire)
+        assertNull(d.activate(opponent, dreadsire).error)
+        d.resolveAll()
+
+        val token = d.permanentsNamed(opponent, "Eldrazi").single()
+        assertEquals(10, d.projected.getPower(token))
+        assertEquals(10, d.projected.getToughness(token))
+    }
+
+    @Test
     fun wardSacrificesAnEligiblePermanentBeforeTheTargetedSpellResolves() {
         val d = customScenario(UlamogsDreadsire, "Murder", "Grizzly Bears")
         val p = d.player1
