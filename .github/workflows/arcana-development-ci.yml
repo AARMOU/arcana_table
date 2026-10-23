@@ -23,6 +23,8 @@ jobs:
           java-version: '17'
       - name: Set up Android SDK command-line tools
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
       - name: Install Android SDK
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - name: Verify custom-card module exists
@@ -68,6 +70,8 @@ jobs:
           java-version: '17'
       - name: Set up Android SDK command-line tools
         uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools'
       - name: Install Android SDK
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - name: Run Android unit tests
