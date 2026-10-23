@@ -1,0 +1,74 @@
+name: Investigate Build 122 end-step backlog
+on:
+  push:
+    branches: [gpt/investigate-endstep-122]
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: endstep-profile-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: small, tokens: 40, prides: 2, haliya: true, panharmonicon: true, elspeth: true, spellskite: true}
+          - {name: large, tokens: 200, prides: 4, haliya: true, panharmonicon: true, elspeth: true, spellskite: true}
+          - {name: no-spellskite, tokens: 200, prides: 4, haliya: true, panharmonicon: true, elspeth: true, spellskite: false}
+          - {name: no-haliya, tokens: 200, prides: 4, haliya: false, panharmonicon: true, elspeth: true, spellskite: true}
+          - {name: no-panharmonicon, tokens: 200, prides: 4, haliya: true, panharmonicon: false, elspeth: true, spellskite: true}
+          - {name: no-elspeth, tokens: 200, prides: 4, haliya: true, panharmonicon: true, elspeth: false, spellskite: true}
+    env:
+      REPRO_CASE: ${{ matrix.name }}
+      REPRO_OLD_TOKENS: ${{ matrix.tokens }}
+      REPRO_PRIDES: ${{ matrix.prides }}
+      REPRO_RECENT_PRIDES: '1'
+      REPRO_HALIYA: ${{ matrix.haliya }}
+      REPRO_PANHARMONICON: ${{ matrix.panharmonicon }}
+      REPRO_ELSPETH: ${{ matrix.elspeth }}
+      REPRO_SPELLSKITE: ${{ matrix.spellskite }}
+      REPRO_OUTPUT: ${{ github.workspace }}/profile-output
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: Build122-runtime
+          run-id: 39550283604
+          github-token: ${{ github.token }}
+          path: android/app/libs/
+      - name: Verify exact Build 122 runtime
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          from pathlib import Path
+          p = Path('android/app/libs')
+          for line in (p/'SHA256SUMS').read_text().splitlines():
+              expected, name = line.split()
+              name = Path(name).name
+              actual = hashlib.sha256((p/name).read_bytes()).hexdigest()
+              assert actual == expected, name
+              print(actual, name)
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - run: sudo apt-get update && sudo apt-get install -y just
+      - name: Run controlled pass-only and mobile-AI comparisons
+        run: just --justfile investigation/reproduce.just profile
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: endstep-${{ matrix.name }}
+          path: |
+            profile-output/
+            android/custom-cards/build/test-results/

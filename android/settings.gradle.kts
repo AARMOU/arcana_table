@@ -16,3 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "ArcanaTable"
 include(":app")
+// Custom cards: written in Argentum's card language, exported to app/src/main/assets/argentum/custom-cards.jsonl
+include(":custom-cards")

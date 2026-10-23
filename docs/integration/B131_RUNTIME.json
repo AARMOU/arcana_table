@@ -1,0 +1,14 @@
+{
+  "upstream": "61e71e586b100faa661f86cac827ac3c3bbb5a78",
+  "bundle_run": 39844575500,
+  "base_source": "83aa342e3fcd200710fb9188192189fc7cea7abf",
+  "files": {
+    "assets/all-cards.index.tsv": "f5b6c3028d27f272811a9e43966c1af08551bcc5a40cd3eefba757109a9cc819",
+    "assets/all-cards.jsonl": "998efe9c48827065c1a89f9b758ac0913c9214baaaaf4d063def15d15d4d236a",
+    "assets/por-cards.jsonl": "0b366901f2485c779d482fa19805d68e180c62459db77ee1c5d253a132140fe0",
+    "libs/argentum-ai.jar": "10321247e9d3b052547123bdab6dab8f720882a2dd8a2782c8a8a74714eb5757",
+    "libs/argentum-mtg-sdk-tooling.jar": "b2849dfc2f95412a415a0cacb786333c3232dd73291670583f6396c81033694d",
+    "libs/argentum-mtg-sdk.jar": "13260c1dab801c1151c4237aa25f86db9d50691d50a6bd8b97c0e9b4f695c01f",
+    "libs/argentum-rules-engine.jar": "255f8bb44235f2bef1a7f65390d3d14f1fa87ec3ea1a77e856ea80168618b6a4"
+  }
+}

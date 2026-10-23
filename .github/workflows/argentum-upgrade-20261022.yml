@@ -1,0 +1,181 @@
+name: Pinned Argentum engine upgrade verification
+on:
+  push:
+    branches:
+      - gpt/argentum-upgrade-20261022
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: argentum-upgrade-20261022
+  cancel-in-progress: true
+
+jobs:
+  compile-and-verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Check out exact Arcana integration candidate
+        uses: actions/checkout@v4
+
+      - name: Check out pinned upstream engine (not moving main)
+        uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: argentum-engine
+          persist-credentials: false
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Audit all patch files against pinned source (stop on conflicts)
+        run: python3 engine-upgrade/audit_patches.py
+
+      - name: Always retain conflict report, including failures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: argentum-upgrade-patch-applicability
+          path: engine-upgrade/patch-report.json
+          if-no-files-found: warn
+          retention-days: 30
+
+      # These steps run ONLY if the entire mandatory series applies cleanly.
+      # Failure must not silently result in a mixed engine or an upgraded APK.
+      - name: Compile all four matching Java 17 runtime modules
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar
+
+      - name: Run complete upstream rules regression suite
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :rules-engine:test
+
+      - name: Run complete upstream card scenario suite
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sets:scenarioTest
+
+      - name: Run complete upstream AI regression suite
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :ai:test
+
+      - name: Regenerate full card corpus from matching new SDK
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :arcana-export:run
+
+      - name: Validate new card index and stage new engine binaries in CI only
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import shutil
+          import struct
+          import zipfile
+          from pathlib import Path
+
+          out = Path("android/app/libs")
+          manifest = {"upstream": "61e71e586b100faa661f86cac827ac3c3bbb5a78", "jars": {}}
+          modules = {
+              "mtg-sdk": "com/wingedsheep/sdk/model/CardDefinition.class",
+              "mtg-sdk-tooling": "com/wingedsheep/sdk/tooling/CardLoader.class",
+              "rules-engine": "com/wingedsheep/engine/core/GameAction.class",
+              "ai": "com/wingedsheep/ai/engine/AIPlayer.class",
+          }
+          for module, required in modules.items():
+              jars = sorted(Path(f"argentum-engine/{module}/build/libs").glob("*.jar"))
+              jars = [p for p in jars if not any(s in p.name for s in ("sources", "javadoc"))]
+              eligible = []
+              for path in jars:
+                  with zipfile.ZipFile(path) as z:
+                      if required in z.namelist():
+                          eligible.append(path)
+              assert len(eligible) == 1, (module, "expected exactly one production jar", [str(p) for p in eligible])
+              src = eligible[0]
+              dest = out / f"argentum-{module}.jar"
+              shutil.copyfile(src, dest)
+              with zipfile.ZipFile(dest) as z:
+                  versions = [struct.unpack(">H", z.read(n)[6:8])[0]
+                              for n in z.namelist() if n.endswith(".class")]
+                  assert versions and max(versions) <= 61, (module, max(versions))
+              manifest["jars"][dest.name] = {"sha256": hashlib.sha256(dest.read_bytes()).hexdigest(),
+                                             "bytes": dest.stat().st_size}
+          exported = Path("argentum-engine/arcana-export-out")
+          dest_assets = Path("android/app/src/main/assets/argentum")
+          for stem in ("all-cards", "por-cards"):
+              f = exported / f"{stem}.jsonl"
+              assert f.is_file() and f.stat().st_size > 0, f
+              shutil.copyfile(f, dest_assets / f.name)
+          for stem in ("all-cards",):
+              f = exported / f"{stem}.index.tsv"
+              assert f.is_file() and f.stat().st_size > 0, f
+              shutil.copyfile(f, dest_assets / f.name)
+              jsonl = (dest_assets / f"{stem}.jsonl").read_text().splitlines()
+              index = (dest_assets / f"{stem}.index.tsv").read_text().splitlines()
+              assert len(jsonl) == len(index) and len(jsonl) > 1000, (len(jsonl),len(index))
+              for n, (row, key) in enumerate(zip(jsonl, index), 1):
+                  assert row and key and "\t" in key, n
+                  json.loads(row)
+              manifest["exported_cards"] = len(jsonl)
+          Path("engine-upgrade/candidate-manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+          print(json.dumps(manifest, indent=2))
+          PY
+
+      - name: Configure Android test environment
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+
+      - name: Run all Arcana custom-card tests with replacement runtime
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test
+
+      - name: Run all Arcana app unit and Robolectric tests with replacement runtime
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+
+      - name: Run Android lint and build unsigned experimental debug APK (CI only)
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:lintDebug :app:assembleDebug
+
+      - name: Retain upgrade evidence, never publish or push generated binaries
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: argentum-upgrade-validation-evidence
+          if-no-files-found: warn
+          retention-days: 30
+          path: |
+            engine-upgrade/patch-report.json
+            engine-upgrade/candidate-manifest.json
+            argentum-engine/rules-engine/build/test-results/
+            argentum-engine/mtg-sets/**/build/test-results/
+            argentum-engine/ai/build/test-results/
+            android/custom-cards/build/test-results/
+            android/app/build/test-results/
+            android/app/build/reports/lint-results-debug.*
+            android/app/build/outputs/apk/debug/

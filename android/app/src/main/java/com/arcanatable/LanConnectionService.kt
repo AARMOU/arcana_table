@@ -13,7 +13,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 
-/** Keeps a user-started LAN game connection alive while the player switches apps. */
+/** Keeps a user-started LAN or Argentum game connection alive while the player switches apps. */
 class LanConnectionService : Service() {
     private var cpuLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
@@ -32,7 +32,7 @@ class LanConnectionService : Service() {
         }
         acquireConnectionLocks()
         // Ask Android to restore the foreground connection guard after a
-        // reclaim. The room sockets are held by the app process and are not
+        // reclaim. The game sockets are held by the app process and are not
         // reconstructed here if the process itself is killed.
         return START_STICKY
     }
@@ -60,7 +60,7 @@ class LanConnectionService : Service() {
         return Notification.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_notify_sync_noanim)
             .setContentTitle("Arcana Table game connection active")
-            .setContentText("Your local multiplayer room stays connected while you switch apps.")
+            .setContentText("Your multiplayer game stays connected while you switch apps.")
             .setCategory(Notification.CATEGORY_SERVICE)
             .setOngoing(true)
             .setContentIntent(openApp)
@@ -88,7 +88,7 @@ class LanConnectionService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
-        private const val CHANNEL_ID = "arcana_lan_connection"
+        private const val CHANNEL_ID = "arcana_game_connection"
         private const val NOTIFICATION_ID = 38471
 
         fun start(context: Context) {

@@ -1,0 +1,91 @@
+1 Rocco, Cabaretti Caterer
+1 Elspeth, Storm Slayer
+1 Academy Manufactor
+1 Ancient Adamantoise
+1 Ancient Copper Dragon
+1 Atog
+1 Avacyn, Angel of Hope
+1 Badgermole Cub
+1 Biotech Specialist
+1 Birds of Paradise
+1 Craterhoof Behemoth
+1 Displaced Dinosaurs
+1 Exalted Sunborn
+1 Formidable Speaker
+1 Generous Plunderer
+1 Gilded Goose
+1 Goblin Welder
+1 Haliya, Guided by Light
+1 Jaheira, Friend of the Forest
+1 Jaws, Relentless Predator
+1 Kiki-Jiki, Mirror Breaker
+1 Krark-Clan Shaman
+1 Luminous Broodmoth
+1 Mother of Runes
+1 Ocelot Pride
+1 Ojer Axonil, Deepest Might // Temple of Power
+1 Peregrin Took
+1 Professional Face-Breaker
+1 Prosperous Innkeeper
+1 Reckless Fireweaver
+1 Samwise Gamgee
+1 Smaug the Magnificent
+1 Tataru Taru
+1 The Cabbage Merchant
+1 The Jolly Balloon Man
+1 The Walls of Ba Sing Se
+1 Vigor
+1 Weftstalker Ardent
+1 Wirewood Symbiote
+1 Arcane Signet
+1 Bag End Banquet
+1 Krark-Clan Ironworks
+1 Lightning Greaves
+1 Nuka-Cola Vending Machine
+1 Panharmonicon
+1 Relic of Legends
+1 Sol Ring
+1 Eladamri's Call
+1 Enlightened Tutor
+1 Second Harvest
+1 Swords to Plowshares
+1 Teferi's Protection
+1 Natural Order
+1 Nature's Rhythm
+1 Strike It Rich
+1 Anointed Procession
+1 Defense of the Heart
+1 Food Chain
+1 Ghostly Prison
+1 Gleaming Splendor
+1 Ninja Pizza
+1 Quest for Renewal
+1 Sneak Attack
+1 There and Back Again
+1 Abandoned Air Temple
+1 Arid Mesa
+1 Boseiju, Who Endures
+1 Command Tower
+1 Commercial District
+1 Elegant Parlor
+1 Forest
+1 Jetmir's Garden
+1 Mana Confluence
+6 Mountain
+1 Multiversal Passage
+5 Plains
+1 Plateau
+1 Prismatic Vista
+1 Reflecting Pool
+1 Sacred Foundry
+1 Savannah
+1 Shifting Woodland
+1 Spectator Seating
+1 Spire Garden
+1 Stomping Ground
+1 Sunbillow Verge
+1 Taiga
+1 Temple Garden
+1 Thornspire Verge
+1 Windswept Heath
+1 Wooded Foothills

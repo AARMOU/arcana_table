@@ -1,0 +1,1543 @@
+// Copied from Argentum (MIT, github.com/wingedsheep/argentum-engine) rules-engine testFixtures at 7a9663d8,
+// so custom-card scenario tests drive the same engine Arcana ships. Package changed; otherwise unchanged.
+package com.arcanatable.customcards.support
+
+import com.wingedsheep.engine.core.*
+import com.wingedsheep.engine.core.ChooseTargetsDecision
+import com.wingedsheep.engine.core.TargetsResponse
+import com.wingedsheep.engine.registry.CardRegistry
+import com.wingedsheep.engine.state.GameState
+import com.wingedsheep.engine.state.ZoneKey
+import com.wingedsheep.engine.state.components.battlefield.TappedComponent
+import com.wingedsheep.engine.state.components.identity.CardComponent
+import com.wingedsheep.engine.state.components.combat.AttackersDeclaredThisCombatComponent
+import com.wingedsheep.engine.state.components.combat.BlockersDeclaredThisCombatComponent
+import com.wingedsheep.engine.state.components.identity.ControllerComponent
+import com.wingedsheep.engine.state.components.identity.FaceDownComponent
+import com.wingedsheep.engine.state.components.identity.LifeTotalComponent
+import com.wingedsheep.engine.state.components.identity.OwnerComponent
+import com.wingedsheep.engine.state.components.identity.PlayerComponent
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
+import com.wingedsheep.sdk.core.Phase
+import com.wingedsheep.sdk.core.Step
+import com.wingedsheep.sdk.core.Zone
+import com.wingedsheep.sdk.model.CardDefinition
+import com.wingedsheep.sdk.model.Deck
+import com.wingedsheep.sdk.model.EntityId
+
+/**
+ * Test driver for the rules engine.
+ *
+ * The GameTestDriver provides a higher-level interface for testing the engine.
+ * It wraps the ActionProcessor and provides convenient methods for:
+ * - Initializing games with specific configurations
+ * - Submitting actions on behalf of players
+ * - Querying game state
+ * - Advancing the game through phases automatically
+ *
+ * ## Philosophy
+ * Tests use the "driver model" - they submit GameAction objects to ActionProcessor
+ * and verify the resulting GameState. Tests never manipulate state directly.
+ *
+ * ## Usage
+ * ```kotlin
+ * val driver = GameTestDriver()
+ * driver.registerCard(GrizzlyBears)
+ * driver.initGame(
+ *     deck1 = Deck.of("Grizzly Bears" to 20, "Forest" to 20),
+ *     deck2 = Deck.of("Grizzly Bears" to 20, "Forest" to 20)
+ * )
+ *
+ * // Play a land
+ * val forest = driver.findCardInHand(driver.player1, "Forest")!!
+ * driver.playLand(driver.player1, forest)
+ *
+ * // Advance to combat
+ * driver.passPriorityUntil(Step.DECLARE_ATTACKERS)
+ * ```
+ */
+class GameTestDriver {
+    val cardRegistry: CardRegistry = CardRegistry()
+    /** This driver's engine graph — reach for its services instead of constructing new ones. */
+    val services = com.wingedsheep.engine.core.EngineServices(cardRegistry)
+    private val processor: ActionProcessor = ActionProcessor(services)
+
+    /** The engine's zone service — for tests that move a card the way an effect would. */
+    val zones get() = services.zones
+    private var _state: GameState = GameState()
+    private val _events = mutableListOf<GameEvent>()
+
+    // Player IDs set during initialization (nullable until init is called)
+    private var _player1: EntityId? = null
+    private var _player2: EntityId? = null
+
+    /** First player ID - throws if game not initialized */
+    val player1: EntityId get() = _player1 ?: throw IllegalStateException("Game not initialized")
+
+    /** Second player ID - throws if game not initialized */
+    val player2: EntityId get() = _player2 ?: throw IllegalStateException("Game not initialized")
+
+    /** Current game state */
+    val state: GameState get() = _state
+
+    /** Replace the game state directly (test helper for edge cases like empty library). */
+    fun replaceState(newState: GameState) {
+        _state = newState
+    }
+
+    /** All events since game start */
+    val events: List<GameEvent> get() = _events.toList()
+
+    /** Active player ID */
+    val activePlayer: EntityId? get() = _state.activePlayerId
+
+    /** Player with priority */
+    val priorityPlayer: EntityId? get() = _state.priorityPlayerId
+
+    /** Current step */
+    val currentStep: Step get() = _state.step
+
+    /** Current phase */
+    val currentPhase: Phase get() = _state.phase
+
+    // =========================================================================
+    // Setup
+    // =========================================================================
+
+    /**
+     * Register a card definition for use in tests.
+     */
+    fun registerCard(card: CardDefinition) {
+        cardRegistry.register(card)
+    }
+
+    /**
+     * Register multiple card definitions.
+     */
+    fun registerCards(cards: Iterable<CardDefinition>) {
+        cardRegistry.register(cards)
+    }
+
+    /**
+     * Initialize a two-player game.
+     *
+     * @param deck1 Deck for player 1
+     * @param deck2 Deck for player 2
+     * @param skipMulligans Whether to skip the mulligan phase (default: true for tests)
+     * @param startingLife Starting life total for both players (default: 20)
+     */
+    fun initGame(
+        deck1: Deck,
+        deck2: Deck,
+        skipMulligans: Boolean = true,
+        startingLife: Int = 20,
+        startingPlayer: Int = 0
+    ) {
+        val initializer = GameInitializer(cardRegistry)
+        val result = initializer.initializeGame(
+            GameConfig(
+                preserveGraveyardOrder = false,
+                players = listOf(
+                    PlayerConfig("Player 1", deck1, startingLife),
+                    PlayerConfig("Player 2", deck2, startingLife)
+                ),
+                skipMulligans = skipMulligans,
+                startingPlayerIndex = startingPlayer
+            )
+        )
+
+        _state = result.state
+        _events.clear()
+        _events.addAll(result.events)
+
+        _player1 = result.playerIds[0]
+        _player2 = result.playerIds[1]
+    }
+
+    /**
+     * Initialize a game with both players using the same deck.
+     */
+    fun initMirrorMatch(deck: Deck, skipMulligans: Boolean = true, startingLife: Int = 20, startingPlayer: Int = 0) {
+        initGame(deck, deck, skipMulligans, startingLife, startingPlayer)
+    }
+
+    /**
+     * Initialize a game with any number of players and return their IDs in turn order.
+     *
+     * @param format Runtime rules configuration. Pass a [com.wingedsheep.sdk.core.Format.Commander]
+     *   (with one [commanders] entry per seat) to set up a Commander pod — the format's own
+     *   `startingLife` then wins over [startingLife], as it does in a real game.
+     * @param commanders Commander card name per seat, positionally matched to [decks]. Empty for a
+     *   non-commander game. As in a real game the commander is *not* part of its deck list —
+     *   `GameInitializer` instantiates it separately into that seat's command zone.
+     * @param partners Optional second commander per seat (a partner pair, CR 702.124), positionally
+     *   matched to [commanders]; a null or missing entry leaves that seat with one commander.
+     * @param teams Seat indices per team (`listOf(listOf(0, 1), listOf(2, 3))` with
+     *   `Format.TwoHeadedGiant`); null for a free-for-all.
+     */
+    fun initMultiplayer(
+        decks: List<Deck>,
+        skipMulligans: Boolean = true,
+        startingLife: Int = 20,
+        startingPlayer: Int = 0,
+        format: com.wingedsheep.sdk.core.Format = com.wingedsheep.sdk.core.Format.Standard,
+        commanders: List<String> = emptyList(),
+        teams: List<List<Int>>? = null,
+        partners: List<String?> = emptyList(),
+        attackMode: com.wingedsheep.sdk.core.AttackMode = com.wingedsheep.sdk.core.AttackMode.MULTIPLE,
+    ): List<EntityId> {
+        val initializer = GameInitializer(cardRegistry)
+        val result = initializer.initializeGame(
+            GameConfig(
+                preserveGraveyardOrder = false,
+                format = format,
+                players = decks.mapIndexed { index, deck ->
+                    PlayerConfig(
+                        "Player ${index + 1}", deck, startingLife,
+                        commanderCardNames = listOfNotNull(
+                            commanders.getOrNull(index),
+                            partners.getOrNull(index),
+                        ),
+                    )
+                },
+                skipMulligans = skipMulligans,
+                startingPlayerIndex = startingPlayer,
+                teams = teams,
+                attackMode = attackMode,
+            )
+        )
+
+        _state = result.state
+        _events.clear()
+        _events.addAll(result.events)
+        _player1 = result.playerIds.getOrNull(0)
+        _player2 = result.playerIds.getOrNull(1)
+        return result.playerIds
+    }
+
+    // =========================================================================
+    // Action Submission
+    // =========================================================================
+
+    /**
+     * Submit an action and update state.
+     *
+     * @throws IllegalStateException if the action fails
+     */
+    fun submit(action: GameAction): ExecutionResult {
+        val result = processor.process(_state, action).result
+        if (result.outcome is Outcome.Done || result.outcome is Outcome.Paused) {
+            _state = result.newState
+            _events.addAll(result.events)
+        }
+        return result
+    }
+
+    /**
+     * Submit an action and assert it succeeds.
+     */
+    fun submitSuccess(action: GameAction): ExecutionResult {
+        val result = submit(action)
+        if (result.outcome !is Outcome.Done) {
+            throw AssertionError("Expected action to succeed but got: ${result.error}")
+        }
+        return result
+    }
+
+    // Lazily-built enumerator; stateless (takes current state), shared across calls.
+    private val legalActionEnumerator by lazy {
+        com.wingedsheep.engine.legalactions.LegalActionEnumerator(
+            services.cardRegistry, services.manaSolver, services.costCalculator,
+            services.predicateEvaluator, services.conditionEvaluator, services.turnManager
+        )
+    }
+
+    /**
+     * Enumerate the raw engine legal actions available to [playerId] right now — the same
+     * computation the server offers the client. Use to assert what a player is (or isn't)
+     * offered, distinct from [submitSuccess] which drives the handler directly.
+     */
+    fun legalActions(playerId: EntityId): List<com.wingedsheep.engine.legalactions.LegalAction> =
+        legalActionEnumerator.enumerate(_state, playerId)
+
+    /**
+     * Submit an action and expect it to fail.
+     */
+    fun submitExpectFailure(action: GameAction): ExecutionResult {
+        val result = processor.process(_state, action).result
+        if (result.outcome is Outcome.Done) {
+            throw AssertionError("Expected action to fail but it succeeded")
+        }
+        return result
+    }
+
+    // =========================================================================
+    // Common Actions
+    // =========================================================================
+
+    /**
+     * Player passes priority.
+     */
+    fun passPriority(playerId: EntityId): ExecutionResult {
+        return submit(PassPriority(playerId))
+    }
+
+    /**
+     * Both players pass priority (for stack resolution or phase advancement).
+     */
+    fun bothPass(): ExecutionResult {
+        autoSubmitCombatDeclarationIfNeeded()
+        var result = passPriority(state.priorityPlayerId ?: player1)
+        if (result.outcome is Outcome.Done && state.priorityPlayerId != null) {
+            autoSubmitCombatDeclarationIfNeeded()
+            result = passPriority(state.priorityPlayerId!!)
+        }
+        return result
+    }
+
+    /**
+     * Pass priority until reaching the specified step.
+     * This automates the common pattern of skipping through phases.
+     *
+     * @param targetStep The step to advance to
+     * @param maxPasses Safety limit to prevent infinite loops (default: 100)
+     */
+    fun passPriorityUntil(targetStep: Step, maxPasses: Int = 100) =
+        passPriorityWhile("step $targetStep", maxPasses) { state.step != targetStep }
+
+    /**
+     * Pass priority until [activePlayer]'s turn reaches [targetStep], walking through other
+     * players' turns (and through [targetStep] on their turns) on the way. A no-op when already
+     * there.
+     *
+     * Prefer this over [passPriorityUntil] whenever the test cares whose turn it lands on: every
+     * turn has a declare attackers step (CR 508.8 skips only blockers and damage), so
+     * "pass until DECLARE_ATTACKERS" stops on the current turn even when nothing can attack.
+     */
+    fun passPriorityUntil(targetStep: Step, activePlayer: EntityId, maxPasses: Int = 200) =
+        passPriorityWhile("$activePlayer's $targetStep", maxPasses) {
+            state.step != targetStep || state.activePlayerId != activePlayer
+        }
+
+    private fun passPriorityWhile(target: String, maxPasses: Int, notThereYet: () -> Boolean) {
+        var passes = 0
+        var lastStep = state.step
+        var stuckCount = 0
+
+        while (notThereYet() && passes < maxPasses) {
+            if (state.gameOver) {
+                throw AssertionError("Game ended while advancing to $target")
+            }
+            if (state.pendingDecision != null) {
+                // Auto-resolve pending decisions (e.g., discard to hand size at cleanup)
+                autoResolveDecision()
+                stuckCount = 0
+            } else if (state.priorityPlayerId != null) {
+                // During combat declaration steps, submit empty declarations before passing
+                autoSubmitCombatDeclarationIfNeeded()
+                passPriority(state.priorityPlayerId!!)
+                stuckCount = 0
+            } else {
+                // No priority - check if we're stuck
+                stuckCount++
+                if (stuckCount > 10) {
+                    throw AssertionError(
+                        "Stuck at step ${state.step} with no priority while trying to reach $target"
+                    )
+                }
+            }
+
+            // Detect if we're making progress
+            if (state.step != lastStep) {
+                lastStep = state.step
+                stuckCount = 0
+            }
+
+            passes++
+        }
+
+        if (passes >= maxPasses) {
+            throw AssertionError("Failed to reach $target after $maxPasses passes (current: ${state.step})")
+        }
+    }
+
+    /**
+     * Pass priority until reaching the specified phase.
+     */
+    fun passPriorityUntil(targetPhase: Phase, maxPasses: Int = 100) {
+        var passes = 0
+        while (state.phase != targetPhase && passes < maxPasses) {
+            if (state.gameOver) {
+                throw AssertionError("Game ended while advancing to $targetPhase")
+            }
+            if (state.pendingDecision != null) {
+                autoResolveDecision()
+            } else if (state.priorityPlayerId != null) {
+                autoSubmitCombatDeclarationIfNeeded()
+                passPriority(state.priorityPlayerId!!)
+            }
+            passes++
+        }
+
+        if (passes >= maxPasses) {
+            throw AssertionError("Failed to reach phase $targetPhase after $maxPasses passes (current: ${state.phase})")
+        }
+    }
+
+    /**
+     * Play a land.
+     */
+    fun playLand(playerId: EntityId, cardId: EntityId): ExecutionResult {
+        return submit(PlayLand(playerId, cardId))
+    }
+
+    /**
+     * Cast a spell with smart mana payment.
+     * - Uses FromPool if player has mana in pool
+     * - Falls back to AutoPay (tapping lands) otherwise
+     * Targets can be players or permanents - the method auto-detects which type each is.
+     */
+    fun castSpell(
+        playerId: EntityId,
+        cardId: EntityId,
+        targets: List<EntityId> = emptyList()
+    ): ExecutionResult {
+        // Check if player has mana in pool
+        val pool = state.getEntity(playerId)
+            ?.get<com.wingedsheep.engine.state.components.player.ManaPoolComponent>()
+        val hasManaInPool = pool != null &&
+            (pool.white > 0 || pool.blue > 0 || pool.black > 0 ||
+             pool.red > 0 || pool.green > 0 || pool.colorless > 0)
+
+        val paymentStrategy = if (hasManaInPool) {
+            PaymentStrategy.FromPool
+        } else {
+            PaymentStrategy.AutoPay
+        }
+
+        return submit(
+            CastSpell(
+                playerId = playerId,
+                cardId = cardId,
+                targets = targets.map { targetId ->
+                    // Detect if target is a player or a permanent
+                    val entity = state.getEntity(targetId)
+                    if (entity?.get<PlayerComponent>() != null) {
+                        ChosenTarget.Player(targetId)
+                    } else {
+                        ChosenTarget.Permanent(targetId)
+                    }
+                },
+                paymentStrategy = paymentStrategy
+            )
+        )
+    }
+
+    /**
+     * Cast a spell using pre-built ChosenTarget list with smart payment.
+     */
+    fun castSpellWithTargets(
+        playerId: EntityId,
+        cardId: EntityId,
+        targets: List<ChosenTarget>
+    ): ExecutionResult {
+        // Check if player has mana in pool
+        val pool = state.getEntity(playerId)
+            ?.get<com.wingedsheep.engine.state.components.player.ManaPoolComponent>()
+        val hasManaInPool = pool != null &&
+            (pool.white > 0 || pool.blue > 0 || pool.black > 0 ||
+             pool.red > 0 || pool.green > 0 || pool.colorless > 0)
+
+        val paymentStrategy = if (hasManaInPool) {
+            PaymentStrategy.FromPool
+        } else {
+            PaymentStrategy.AutoPay
+        }
+
+        return submit(
+            CastSpell(
+                playerId = playerId,
+                cardId = cardId,
+                targets = targets,
+                paymentStrategy = paymentStrategy
+            )
+        )
+    }
+
+    /**
+     * Cast a spell with an X value (for X-cost spells like Hurricane).
+     */
+    fun castXSpell(
+        playerId: EntityId,
+        cardId: EntityId,
+        xValue: Int,
+        targets: List<EntityId> = emptyList()
+    ): ExecutionResult {
+        // Check if player has mana in pool
+        val pool = state.getEntity(playerId)
+            ?.get<com.wingedsheep.engine.state.components.player.ManaPoolComponent>()
+        val hasManaInPool = pool != null &&
+            (pool.white > 0 || pool.blue > 0 || pool.black > 0 ||
+             pool.red > 0 || pool.green > 0 || pool.colorless > 0)
+
+        val paymentStrategy = if (hasManaInPool) {
+            PaymentStrategy.FromPool
+        } else {
+            PaymentStrategy.AutoPay
+        }
+
+        return submit(
+            CastSpell(
+                playerId = playerId,
+                cardId = cardId,
+                targets = targets.map { targetId ->
+                    val entity = state.getEntity(targetId)
+                    if (entity?.get<PlayerComponent>() != null) {
+                        ChosenTarget.Player(targetId)
+                    } else {
+                        ChosenTarget.Permanent(targetId)
+                    }
+                },
+                xValue = xValue,
+                paymentStrategy = paymentStrategy
+            )
+        )
+    }
+
+    /**
+     * Declare attackers.
+     */
+    fun declareAttackers(playerId: EntityId, attackers: Map<EntityId, EntityId>): ExecutionResult {
+        return submit(DeclareAttackers(playerId, attackers))
+    }
+
+    /**
+     * Declare attackers (all attacking the same player).
+     */
+    fun declareAttackers(playerId: EntityId, attackers: List<EntityId>, defendingPlayer: EntityId): ExecutionResult {
+        return declareAttackers(playerId, attackers.associateWith { defendingPlayer })
+    }
+
+    /**
+     * Declare attackers as a single band (CR 702.22), all attacking the same defender.
+     */
+    fun declareAttackingBand(playerId: EntityId, band: List<EntityId>, defendingPlayer: EntityId): ExecutionResult {
+        return submit(
+            DeclareAttackers(playerId, band.associateWith { defendingPlayer }, bands = listOf(band.toSet()))
+        )
+    }
+
+    /**
+     * Declare blockers.
+     */
+    fun declareBlockers(playerId: EntityId, blockers: Map<EntityId, List<EntityId>>): ExecutionResult {
+        return submit(DeclareBlockers(playerId, blockers))
+    }
+
+    /**
+     * Declare no blockers.
+     */
+    fun declareNoBlockers(playerId: EntityId): ExecutionResult {
+        return declareBlockers(playerId, emptyMap())
+    }
+
+    /**
+     * Confirm the pending [CombatResolutionDecision] with the engine's default edge amounts,
+     * looping through every chooser (the two-actor banding case re-pauses for each). This is the
+     * "just resolve combat with defaults" path most combat scenarios want.
+     */
+    fun confirmCombatDamage(): ExecutionResult {
+        var result: ExecutionResult? = null
+        while (true) {
+            val decision = _state.pendingDecision as? CombatResolutionDecision ?: break
+            val edges = decision.edges.map { DamageEdgeAmount(it.id, it.amount) }
+            result = submitDecision(decision.playerId, CombatResolutionResponse(decision.id, edges))
+        }
+        return result ?: error("No pending CombatResolutionDecision to confirm (have ${_state.pendingDecision})")
+    }
+
+    /**
+     * Submit a custom combat-damage assignment to the pending [CombatResolutionDecision] for the
+     * current chooser. [plan] maps (sourceId, targetId) to the damage on that edge; any edge not
+     * named keeps its engine-computed default.
+     */
+    fun submitCombatDamage(plan: Map<Pair<EntityId, EntityId>, Int>): ExecutionResult {
+        val decision = _state.pendingDecision as? CombatResolutionDecision
+            ?: error("No pending CombatResolutionDecision (have ${_state.pendingDecision})")
+        val edges = decision.edges.map { edge ->
+            DamageEdgeAmount(edge.id, plan[edge.sourceId to edge.targetId] ?: edge.amount)
+        }
+        return submitDecision(decision.playerId, CombatResolutionResponse(decision.id, edges))
+    }
+
+    /**
+     * Concede the game.
+     */
+    fun concede(playerId: EntityId): ExecutionResult {
+        return submit(Concede(playerId))
+    }
+
+    // =========================================================================
+    // State Queries
+    // =========================================================================
+
+    /**
+     * Find a card by name in a player's hand.
+     */
+    fun findCardInHand(playerId: EntityId, cardName: String): EntityId? {
+        val handZone = ZoneKey(playerId, Zone.HAND)
+        return state.getZone(handZone).find { entityId ->
+            state.getEntity(entityId)?.get<CardComponent>()?.name == cardName
+        }
+    }
+
+    /**
+     * Find all cards by name in a player's hand.
+     */
+    fun findCardsInHand(playerId: EntityId, cardName: String): List<EntityId> {
+        val handZone = ZoneKey(playerId, Zone.HAND)
+        return state.getZone(handZone).filter { entityId ->
+            state.getEntity(entityId)?.get<CardComponent>()?.name == cardName
+        }
+    }
+
+    /**
+     * Find a card by name on a player's battlefield.
+     *
+     * Face-down permanents (morph/manifest) are skipped: per CR 708.2 a face-down permanent has
+     * no name, so a name lookup must not match one even though its hidden [CardComponent] still
+     * carries the underlying card's name. (Without this, a card shuffled away and then re-manifested
+     * face-down — e.g. via manifest dread off the top of the library — would spuriously match.)
+     */
+    fun findPermanent(playerId: EntityId, cardName: String): EntityId? {
+        val battlefieldZone = ZoneKey(playerId, Zone.BATTLEFIELD)
+        return state.getZone(battlefieldZone).find { entityId ->
+            val entity = state.getEntity(entityId) ?: return@find false
+            !entity.has<FaceDownComponent>() && entity.get<CardComponent>()?.name == cardName
+        }
+    }
+
+    /**
+     * Find all permanents controlled by a player.
+     */
+    fun getPermanents(playerId: EntityId): List<EntityId> {
+        val battlefieldZone = ZoneKey(playerId, Zone.BATTLEFIELD)
+        return state.getZone(battlefieldZone)
+    }
+
+    /**
+     * Find all creatures controlled by a player.
+     */
+    fun getCreatures(playerId: EntityId): List<EntityId> {
+        return getPermanents(playerId).filter { entityId ->
+            state.getEntity(entityId)?.get<CardComponent>()?.typeLine?.isCreature == true
+        }
+    }
+
+    /**
+     * Find all lands controlled by a player.
+     */
+    fun getLands(playerId: EntityId): List<EntityId> {
+        return getPermanents(playerId).filter { entityId ->
+            state.getEntity(entityId)?.get<CardComponent>()?.typeLine?.isLand == true
+        }
+    }
+
+    /**
+     * Give a player mana directly (test helper).
+     */
+    fun giveMana(playerId: EntityId, color: com.wingedsheep.sdk.core.Color, amount: Int = 1) {
+        _state = _state.updateEntity(playerId) { container ->
+            val pool = container.get<com.wingedsheep.engine.state.components.player.ManaPoolComponent>()
+                ?: com.wingedsheep.engine.state.components.player.ManaPoolComponent()
+            container.with(pool.add(color, amount))
+        }
+    }
+
+    /**
+     * Give a player colorless mana directly (test helper).
+     */
+    fun giveColorlessMana(playerId: EntityId, amount: Int) {
+        _state = _state.updateEntity(playerId) { container ->
+            val pool = container.get<com.wingedsheep.engine.state.components.player.ManaPoolComponent>()
+                ?: com.wingedsheep.engine.state.components.player.ManaPoolComponent()
+            container.with(pool.addColorless(amount))
+        }
+    }
+
+    /**
+     * Give a player restricted mana directly (test helper).
+     */
+    fun giveRestrictedMana(
+        playerId: EntityId,
+        color: com.wingedsheep.sdk.core.Color?,
+        amount: Int,
+        restriction: com.wingedsheep.sdk.scripting.effects.ManaRestriction,
+        expiry: com.wingedsheep.sdk.scripting.effects.ManaExpiry =
+            com.wingedsheep.sdk.scripting.effects.ManaExpiry.END_OF_TURN
+    ) {
+        _state = _state.updateEntity(playerId) { container ->
+            val pool = container.get<com.wingedsheep.engine.state.components.player.ManaPoolComponent>()
+                ?: com.wingedsheep.engine.state.components.player.ManaPoolComponent()
+            container.with(pool.addRestricted(color, amount, restriction, expiry = expiry))
+        }
+    }
+
+    /**
+     * Put a specific card directly into a player's hand (test helper).
+     * Creates a new card entity from the registry and adds it to hand.
+     * This is deterministic - always succeeds if the card is registered.
+     */
+    fun putCardInHand(playerId: EntityId, cardName: String): EntityId {
+        val cardDef = cardRegistry.requireCard(cardName)
+        val cardId = EntityId.generate()
+
+        // Create card entity
+        val cardComponent = CardComponent(
+            cardDefinitionId = cardDef.name,
+            name = cardDef.name,
+            manaCost = cardDef.manaCost,
+            typeLine = cardDef.typeLine,
+            oracleText = cardDef.oracleText,
+            baseStats = cardDef.creatureStats,
+            baseKeywords = cardDef.keywords,
+            baseFlags = cardDef.flags,
+            colors = cardDef.colors,
+            ownerId = playerId,
+            spellEffect = cardDef.spellEffect,
+            hasNonManaActivatedAbility = cardDef.hasNonManaActivatedAbility,
+            hasActivatedAbility = cardDef.hasActivatedAbility,
+            hasCycling = cardDef.hasCycling,
+            // Keep driver-minted cards in step with CardEntityFactory: precomputed printed
+            // characteristics other code reads back (SpellCastPredicate.CastAsAdventure,
+            // CardPredicate.HasAdventure / OriginallyPrintedInSet).
+            hasAdventure = cardDef.isAdventure,
+            isDoubleFaced = cardDef.isDoubleFaced,
+            originalSetCode = cardDef.setCode,
+        )
+
+        var container = com.wingedsheep.engine.state.ComponentContainer.of(
+            cardComponent,
+            OwnerComponent(playerId),
+            ControllerComponent(playerId)
+        )
+        // Every component derived from the printed definition (can't-be-countered/copied, morph,
+        // protection, self-redirects, hexproof-from, Toxic) — shared with the real CardEntityFactory
+        // so a driver-minted card never quietly loses one.
+        container = com.wingedsheep.engine.core.CardEntityFactory.applyDefinitionDecorations(container, cardDef)
+
+        _state = _state.withEntity(cardId, container)
+
+        // Add to hand
+        val handZone = ZoneKey(playerId, Zone.HAND)
+        _state = _state.addToZone(handZone, cardId)
+
+        return cardId
+    }
+
+    /**
+     * Mint a fresh card entity for [cardName] owned and controlled by [playerId], register it in
+     * the state, and return its id — *without* placing it in any zone.
+     *
+     * One place builds the hand-rolled [CardComponent] that the zone-placement helpers below all
+     * need, so a newly precomputed printed characteristic added to `CardEntityFactory` has a single
+     * spot to be mirrored into rather than four that silently keep defaulting.
+     *
+     * [decorate] applies `CardEntityFactory.applyDefinitionDecorations`. It is off for the exile
+     * helper only, preserving that helper's long-standing behavior.
+     */
+    private fun mintCardEntity(
+        playerId: EntityId,
+        cardName: String,
+        decorate: Boolean = true
+    ): EntityId {
+        val cardDef = cardRegistry.requireCard(cardName)
+        val cardId = EntityId.generate()
+
+        val cardComponent = CardComponent(
+            cardDefinitionId = cardDef.name,
+            name = cardDef.name,
+            manaCost = cardDef.manaCost,
+            typeLine = cardDef.typeLine,
+            oracleText = cardDef.oracleText,
+            baseStats = cardDef.creatureStats,
+            baseKeywords = cardDef.keywords,
+            baseFlags = cardDef.flags,
+            colors = cardDef.colors,
+            ownerId = playerId,
+            spellEffect = cardDef.spellEffect,
+            hasNonManaActivatedAbility = cardDef.hasNonManaActivatedAbility,
+            hasActivatedAbility = cardDef.hasActivatedAbility,
+            hasCycling = cardDef.hasCycling,
+            // Keep driver-minted cards in step with CardEntityFactory: precomputed printed
+            // characteristics other code reads back (SpellCastPredicate.CastAsAdventure,
+            // CardPredicate.HasAdventure / OriginallyPrintedInSet).
+            hasAdventure = cardDef.isAdventure,
+            isDoubleFaced = cardDef.isDoubleFaced,
+            originalSetCode = cardDef.setCode,
+        )
+
+        var container = com.wingedsheep.engine.state.ComponentContainer.of(
+            cardComponent,
+            OwnerComponent(playerId),
+            ControllerComponent(playerId)
+        )
+        if (decorate) {
+            container = com.wingedsheep.engine.core.CardEntityFactory.applyDefinitionDecorations(container, cardDef)
+        }
+
+        _state = _state.withEntity(cardId, container)
+        return cardId
+    }
+
+    /**
+     * Put a specific card directly into a player's graveyard (test helper).
+     * Creates a new card entity from the registry and adds it to graveyard.
+     */
+    fun putCardInGraveyard(playerId: EntityId, cardName: String): EntityId {
+        val cardId = mintCardEntity(playerId, cardName)
+        _state = _state.addToZone(ZoneKey(playerId, Zone.GRAVEYARD), cardId)
+        return cardId
+    }
+
+    /**
+     * Put a specific card face-up into a player's exile zone (test helper).
+     * Creates a new card entity from the registry, owned by [playerId], and adds it to
+     * that player's exile zone with no [com.wingedsheep.engine.state.components.identity.FaceDownComponent]
+     * (so it reads as face-up). Used to set up "a face-up exiled card they own" scenarios.
+     */
+    fun putCardInExile(playerId: EntityId, cardName: String): EntityId {
+        val cardId = mintCardEntity(playerId, cardName, decorate = false)
+        _state = _state.addToZone(ZoneKey(playerId, Zone.EXILE), cardId)
+        return cardId
+    }
+
+    /**
+     * Put a specific card into a player's command zone (test helper).
+     *
+     * Stands in for the commander a real Commander game starts with, for the abilities that
+     * function from there (CR 113.6b) — an *eminence* trigger such as Edgar Markov's. It only
+     * places the card; tag it with
+     * [com.wingedsheep.engine.state.components.identity.CommanderComponent] and set
+     * `Format.Commander()` as well when the test also needs the commander state-based actions.
+     */
+    fun putCardInCommandZone(playerId: EntityId, cardName: String): EntityId {
+        val cardId = mintCardEntity(playerId, cardName)
+        _state = _state.addToZone(ZoneKey(playerId, Zone.COMMAND), cardId)
+        return cardId
+    }
+
+    /**
+     * Put a specific card on top of a player's library (test helper).
+     * Creates a new card entity from the registry and prepends it to the library.
+     */
+    fun putCardOnTopOfLibrary(playerId: EntityId, cardName: String): EntityId {
+        val cardId = mintCardEntity(playerId, cardName)
+
+        // Prepend to library (top = index 0)
+        val libraryZone = ZoneKey(playerId, Zone.LIBRARY)
+        _state = _state.insertIntoZone(libraryZone, cardId, 0)
+
+        return cardId
+    }
+
+    /**
+     * Put a creature directly onto the battlefield (test helper).
+     * Creates a new card entity from the registry and adds it to battlefield.
+     * Also adds ContinuousEffectSourceComponent for static abilities.
+     */
+    fun putCreatureOnBattlefield(playerId: EntityId, cardName: String): EntityId {
+        val cardDef = cardRegistry.requireCard(cardName)
+        val cardId = EntityId.generate()
+
+        // Create card entity
+        val cardComponent = CardComponent(
+            cardDefinitionId = cardDef.name,
+            name = cardDef.name,
+            manaCost = cardDef.manaCost,
+            typeLine = cardDef.typeLine,
+            oracleText = cardDef.oracleText,
+            baseStats = cardDef.creatureStats,
+            baseKeywords = cardDef.keywords,
+            baseFlags = cardDef.flags,
+            colors = cardDef.colors,
+            ownerId = playerId,
+            spellEffect = cardDef.spellEffect,
+            hasNonManaActivatedAbility = cardDef.hasNonManaActivatedAbility,
+            hasActivatedAbility = cardDef.hasActivatedAbility,
+            hasCycling = cardDef.hasCycling,
+            // Keep driver-minted cards in step with CardEntityFactory: precomputed printed
+            // characteristics other code reads back (SpellCastPredicate.CastAsAdventure,
+            // CardPredicate.HasAdventure / OriginallyPrintedInSet).
+            hasAdventure = cardDef.isAdventure,
+            isDoubleFaced = cardDef.isDoubleFaced,
+            originalSetCode = cardDef.setCode,
+        )
+
+        var container = com.wingedsheep.engine.state.ComponentContainer.of(
+            cardComponent,
+            OwnerComponent(playerId),
+            ControllerComponent(playerId),
+            com.wingedsheep.engine.state.components.battlefield.SummoningSicknessComponent
+        )
+        // Every component derived from the printed definition (can't-be-countered/copied, morph,
+        // protection, self-redirects, hexproof-from, Toxic) — shared with the real CardEntityFactory
+        // so a driver-minted card never quietly loses one.
+        container = com.wingedsheep.engine.core.CardEntityFactory.applyDefinitionDecorations(container, cardDef)
+        // Attach DoubleFacedComponent so transforms work (Rule 712).
+        if (cardDef.isDoubleFaced) {
+            container = container.with(
+                com.wingedsheep.engine.state.components.identity.DoubleFacedComponent(
+                    frontCardDefinitionId = cardDef.name,
+                    backCardDefinitionId = cardDef.backFace!!.name,
+                    currentFace = com.wingedsheep.engine.state.components.identity.DoubleFacedComponent.Face.FRONT
+                )
+            )
+        }
+
+        // Add continuous effects from static abilities
+        val staticAbilityHandler = com.wingedsheep.engine.mechanics.layers.StaticAbilityHandler(cardRegistry)
+        container = staticAbilityHandler.addContinuousEffectComponent(container, cardDef)
+        container = staticAbilityHandler.addReplacementEffectComponent(container, cardDef)
+
+        _state = _state.withEntity(cardId, container)
+
+        // Add to battlefield
+        val battlefieldZone = ZoneKey(playerId, Zone.BATTLEFIELD)
+        _state = _state.addToZone(battlefieldZone, cardId)
+
+        return cardId
+    }
+
+    /**
+     * Put a non-creature permanent directly onto the battlefield (test helper).
+     * Works for enchantments, artifacts, and other non-creature permanents.
+     */
+    fun putPermanentOnBattlefield(playerId: EntityId, cardName: String, classLevel: Int? = null): EntityId {
+        val cardDef = cardRegistry.requireCard(cardName)
+        val cardId = EntityId.generate()
+
+        val cardComponent = CardComponent(
+            cardDefinitionId = cardDef.name,
+            name = cardDef.name,
+            manaCost = cardDef.manaCost,
+            typeLine = cardDef.typeLine,
+            oracleText = cardDef.oracleText,
+            baseStats = cardDef.creatureStats,
+            baseKeywords = cardDef.keywords,
+            baseFlags = cardDef.flags,
+            colors = cardDef.colors,
+            ownerId = playerId,
+            spellEffect = cardDef.spellEffect,
+            hasNonManaActivatedAbility = cardDef.hasNonManaActivatedAbility,
+            hasActivatedAbility = cardDef.hasActivatedAbility,
+            hasCycling = cardDef.hasCycling,
+            // Keep driver-minted cards in step with CardEntityFactory: precomputed printed
+            // characteristics other code reads back (SpellCastPredicate.CastAsAdventure,
+            // CardPredicate.HasAdventure / OriginallyPrintedInSet).
+            hasAdventure = cardDef.isAdventure,
+            isDoubleFaced = cardDef.isDoubleFaced,
+            originalSetCode = cardDef.setCode,
+        )
+
+        var container = com.wingedsheep.engine.state.ComponentContainer.of(
+            cardComponent,
+            OwnerComponent(playerId),
+            ControllerComponent(playerId)
+        )
+        container = com.wingedsheep.engine.core.CardEntityFactory.applyDefinitionDecorations(container, cardDef)
+        // Attach DoubleFacedComponent so transforms work (Rule 712) — mirrors the DFC wiring
+        // in putCreatureOnBattlefield so non-creature DFC artifacts (Saheeli's Lattice etc.)
+        // can also be exercised in scenario tests.
+        if (cardDef.isDoubleFaced) {
+            container = container.with(
+                com.wingedsheep.engine.state.components.identity.DoubleFacedComponent(
+                    frontCardDefinitionId = cardDef.name,
+                    backCardDefinitionId = cardDef.backFace!!.name,
+                    currentFace = com.wingedsheep.engine.state.components.identity.DoubleFacedComponent.Face.FRONT
+                )
+            )
+        }
+
+        // Class enchantments: set the level BEFORE static/replacement effects so level-gated
+        // statics (e.g. Ninja Teen level 3) are active.
+        if (classLevel != null) {
+            container = container.with(
+                com.wingedsheep.engine.state.components.battlefield.ClassLevelComponent(currentLevel = classLevel)
+            )
+        }
+
+        // Add continuous effects and replacement effects from static abilities
+        val staticAbilityHandler = com.wingedsheep.engine.mechanics.layers.StaticAbilityHandler(cardRegistry)
+        container = staticAbilityHandler.addContinuousEffectComponent(container, cardDef)
+        container = staticAbilityHandler.addReplacementEffectComponent(container, cardDef)
+
+        _state = _state.withEntity(cardId, container)
+
+        val battlefieldZone = ZoneKey(playerId, Zone.BATTLEFIELD)
+        _state = _state.addToZone(battlefieldZone, cardId)
+
+        return cardId
+    }
+
+    /**
+     * Tap a permanent (test helper).
+     */
+    fun tapPermanent(entityId: EntityId) {
+        _state = _state.updateEntity(entityId) { container ->
+            container.with(TappedComponent)
+        }
+    }
+
+    /**
+     * Untap a permanent (test helper).
+     */
+    fun untapPermanent(entityId: EntityId) {
+        _state = _state.updateEntity(entityId) { container ->
+            container.without<TappedComponent>()
+        }
+    }
+
+    /**
+     * Move a card or permanent to its owner's graveyard (test helper). Strips its membership from
+     * whatever zone it currently occupies (battlefield, hand, …) without running dies/leaves
+     * triggers — a blunt removal for setting up "the card is in the graveyard now" states, and
+     * usable as a "discard from hand" helper. Returns silently if the entity has no owner.
+     */
+    fun moveToGraveyard(entityId: EntityId) {
+        val ownerId = _state.getEntity(entityId)
+            ?.get<OwnerComponent>()?.playerId
+            ?: return
+        // Remove from every zone the entity currently occupies rather than assuming battlefield;
+        // otherwise discarding a hand card here is a no-op and any "while in hand" setup loop spins
+        // forever (it never leaves the hand) while endlessly re-adding it to the graveyard.
+        val occupiedZones = _state.zones.keys.filter { entityId in _state.getZone(it) }
+        occupiedZones.forEach { _state = _state.removeFromZone(it, entityId) }
+        _state = _state.addToZone(ZoneKey(ownerId, Zone.GRAVEYARD), entityId)
+    }
+
+    /**
+     * Remove summoning sickness from a creature (test helper).
+     * This allows the creature to attack/tap immediately.
+     */
+    fun removeSummoningSickness(entityId: EntityId) {
+        _state = _state.updateEntity(entityId) { container ->
+            container.without<com.wingedsheep.engine.state.components.battlefield.SummoningSicknessComponent>()
+        }
+    }
+
+    /**
+     * Put a land directly onto the battlefield (test helper).
+     * Creates a new card entity from the registry and adds it to battlefield.
+     */
+    fun putLandOnBattlefield(playerId: EntityId, cardName: String): EntityId {
+        val cardDef = cardRegistry.requireCard(cardName)
+        val cardId = EntityId.generate()
+
+        // Create card entity
+        val cardComponent = CardComponent(
+            cardDefinitionId = cardDef.name,
+            name = cardDef.name,
+            manaCost = cardDef.manaCost,
+            typeLine = cardDef.typeLine,
+            oracleText = cardDef.oracleText,
+            baseStats = cardDef.creatureStats,
+            baseKeywords = cardDef.keywords,
+            baseFlags = cardDef.flags,
+            colors = cardDef.colors,
+            ownerId = playerId,
+            spellEffect = cardDef.spellEffect,
+            hasNonManaActivatedAbility = cardDef.hasNonManaActivatedAbility,
+            hasActivatedAbility = cardDef.hasActivatedAbility,
+            hasCycling = cardDef.hasCycling,
+            // Keep driver-minted cards in step with CardEntityFactory: precomputed printed
+            // characteristics other code reads back (SpellCastPredicate.CastAsAdventure,
+            // CardPredicate.HasAdventure / OriginallyPrintedInSet).
+            hasAdventure = cardDef.isAdventure,
+            isDoubleFaced = cardDef.isDoubleFaced,
+            originalSetCode = cardDef.setCode,
+        )
+
+        var container = com.wingedsheep.engine.state.ComponentContainer.of(
+            cardComponent,
+            OwnerComponent(playerId),
+            ControllerComponent(playerId)
+        )
+        container = com.wingedsheep.engine.core.CardEntityFactory.applyDefinitionDecorations(container, cardDef)
+
+        // Bake continuous + replacement effects from the land's static abilities, mirroring
+        // putPermanentOnBattlefield/putCreatureOnBattlefield (and the real ETB path in
+        // ZoneTransitionService). Without this, a land with a printed static (e.g. Secret Tunnel's
+        // "this land can't be blocked", man-land/Urborg statics) contributes zero continuous effects
+        // and the projector never sees the ability — a silent false negative.
+        val staticAbilityHandler = com.wingedsheep.engine.mechanics.layers.StaticAbilityHandler(cardRegistry)
+        container = staticAbilityHandler.addContinuousEffectComponent(container, cardDef)
+        container = staticAbilityHandler.addReplacementEffectComponent(container, cardDef)
+
+        _state = _state.withEntity(cardId, container)
+
+        // Add to battlefield
+        val battlefieldZone = ZoneKey(playerId, Zone.BATTLEFIELD)
+        _state = _state.addToZone(battlefieldZone, cardId)
+
+        return cardId
+    }
+
+    /**
+     * Get a player's hand.
+     */
+    fun getHand(playerId: EntityId): List<EntityId> {
+        return state.getHand(playerId)
+    }
+
+    /**
+     * Get a player's life total.
+     */
+    fun getLifeTotal(playerId: EntityId): Int {
+        return state.getEntity(playerId)?.get<LifeTotalComponent>()?.life ?: 0
+    }
+
+    /**
+     * Set a player's life total directly (test helper).
+     */
+    fun setLifeTotal(playerId: EntityId, life: Int) {
+        _state = _state.updateEntity(playerId) { container ->
+            container.with(LifeTotalComponent(life))
+        }
+    }
+
+    /**
+     * Get a card's name.
+     */
+    fun getCardName(entityId: EntityId): String? {
+        return state.getEntity(entityId)?.get<CardComponent>()?.name
+    }
+
+    /**
+     * Check if a permanent is tapped.
+     */
+    fun isTapped(entityId: EntityId): Boolean {
+        return state.getEntity(entityId)?.has<TappedComponent>() == true
+    }
+
+    /**
+     * Get the controller of a permanent.
+     */
+    fun getController(entityId: EntityId): EntityId? {
+        return state.getEntity(entityId)?.get<ControllerComponent>()?.playerId
+    }
+
+    /**
+     * Get the opponent of a player (for 2-player games).
+     */
+    fun getOpponent(playerId: EntityId): EntityId {
+        return if (playerId == player1) player2 else player1
+    }
+
+    // =========================================================================
+    // Assertions
+    // =========================================================================
+
+    /**
+     * Assert a player's life total.
+     */
+    fun assertLifeTotal(playerId: EntityId, expected: Int, message: String? = null) {
+        val actual = getLifeTotal(playerId)
+        if (actual != expected) {
+            val msg = message ?: "Life total mismatch"
+            throw AssertionError("$msg: expected $expected but was $actual")
+        }
+    }
+
+    /**
+     * Assert the current step.
+     */
+    fun assertStep(expected: Step, message: String? = null) {
+        if (state.step != expected) {
+            val msg = message ?: "Step mismatch"
+            throw AssertionError("$msg: expected $expected but was ${state.step}")
+        }
+    }
+
+    /**
+     * Assert the current phase.
+     */
+    fun assertPhase(expected: Phase, message: String? = null) {
+        if (state.phase != expected) {
+            val msg = message ?: "Phase mismatch"
+            throw AssertionError("$msg: expected $expected but was ${state.phase}")
+        }
+    }
+
+    /**
+     * Assert who has priority.
+     */
+    fun assertPriority(expected: EntityId, message: String? = null) {
+        if (state.priorityPlayerId != expected) {
+            val msg = message ?: "Priority mismatch"
+            throw AssertionError("$msg: expected $expected but was ${state.priorityPlayerId}")
+        }
+    }
+
+    /**
+     * Assert the game is over.
+     */
+    fun assertGameOver(expectedWinner: EntityId? = null, message: String? = null) {
+        if (!state.gameOver) {
+            throw AssertionError(message ?: "Expected game to be over")
+        }
+        if (expectedWinner != null && state.winnerId != expectedWinner) {
+            val msg = message ?: "Winner mismatch"
+            throw AssertionError("$msg: expected $expectedWinner but was ${state.winnerId}")
+        }
+    }
+
+    /**
+     * Assert a permanent exists on the battlefield.
+     */
+    fun assertPermanentExists(playerId: EntityId, cardName: String, message: String? = null) {
+        if (findPermanent(playerId, cardName) == null) {
+            throw AssertionError(message ?: "Expected $cardName on ${playerId}'s battlefield")
+        }
+    }
+
+    /**
+     * Assert a card is in a player's graveyard.
+     */
+    fun assertInGraveyard(playerId: EntityId, cardName: String, message: String? = null) {
+        val inGraveyard = state.getGraveyard(playerId).any { entityId ->
+            state.getEntity(entityId)?.get<CardComponent>()?.name == cardName
+        }
+        if (!inGraveyard) {
+            throw AssertionError(message ?: "Expected $cardName in ${playerId}'s graveyard")
+        }
+    }
+
+    /**
+     * Assert the stack has the expected size.
+     */
+    fun assertStackSize(expected: Int, message: String? = null) {
+        val actual = state.stack.size
+        if (actual != expected) {
+            val msg = message ?: "Stack size mismatch"
+            throw AssertionError("$msg: expected $expected but was $actual")
+        }
+    }
+
+    // =========================================================================
+    // Stack Queries
+    // =========================================================================
+
+    /**
+     * Get the stack size.
+     */
+    val stackSize: Int get() = state.stack.size
+
+    /**
+     * Get spell names on the stack (top to bottom).
+     */
+    fun getStackSpellNames(): List<String> {
+        return state.stack.reversed().mapNotNull { entityId ->
+            state.getEntity(entityId)?.get<CardComponent>()?.name
+        }
+    }
+
+    /**
+     * Get the top spell on the stack.
+     */
+    fun getTopOfStack(): EntityId? = state.getTopOfStack()
+
+    /**
+     * Get the name of the top spell on the stack.
+     */
+    fun getTopOfStackName(): String? {
+        val topId = state.getTopOfStack() ?: return null
+        return state.getEntity(topId)?.get<CardComponent>()?.name
+    }
+
+    // =========================================================================
+    // Setup Helpers
+    // =========================================================================
+
+    /**
+     * Play multiple lands for a player (advances to main phase, plays lands).
+     * Useful for setting up mana in tests.
+     *
+     * @param playerId The player to play lands for
+     * @param landName The name of the land to play
+     * @param count How many lands to play (across multiple turns if needed)
+     */
+    fun setupLands(playerId: EntityId, landName: String, count: Int) {
+        repeat(count) { i ->
+            // If not active player's turn, advance until it is
+            while (activePlayer != playerId) {
+                passPriorityUntil(Step.END)
+                bothPass()
+            }
+
+            // Advance to main phase
+            passPriorityUntil(Step.PRECOMBAT_MAIN)
+
+            // Find and play the land
+            val land = findCardInHand(playerId, landName)
+            if (land != null) {
+                val result = playLand(playerId, land)
+                if (result.outcome !is Outcome.Done) {
+                    // May have already played a land this turn - advance to next turn
+                    passPriorityUntil(Step.END)
+                    bothPass()
+                    // Retry on next turn
+                    while (activePlayer != playerId) {
+                        passPriorityUntil(Step.END)
+                        bothPass()
+                    }
+                    passPriorityUntil(Step.PRECOMBAT_MAIN)
+                    val retryLand = findCardInHand(playerId, landName)
+                    if (retryLand != null) {
+                        playLand(playerId, retryLand)
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Get untapped lands controlled by a player.
+     */
+    fun getUntappedLands(playerId: EntityId): List<EntityId> {
+        return getLands(playerId).filter { !isTapped(it) }
+    }
+
+    // =========================================================================
+    // Decision Handling
+    // =========================================================================
+
+    /**
+     * Get the pending decision (if any).
+     */
+    val pendingDecision: PendingDecision? get() = state.pendingDecision
+
+    /**
+     * Check if the engine is paused awaiting a decision.
+     */
+    val isPaused: Boolean get() = state.isPaused()
+
+    /**
+     * Auto-resolve a pending decision by picking the first valid option.
+     * Used by passPriorityUntil to handle cleanup discard and similar automatic decisions.
+     */
+    /**
+     * During combat declaration steps, auto-submit empty declarations so that
+     * PassPriority can proceed. This mirrors what the game server's auto-pass does.
+     *
+     * Public rather than `internal`: a dozen scenario tests call it directly to skip past a combat
+     * they don't care about, and they now live in the `:mtg-sets:<era>:tests` modules rather than
+     * alongside these fixtures, where `internal` would not reach them.
+     */
+    fun autoSubmitCombatDeclarationIfNeeded() {
+        val priorityPlayer = state.priorityPlayerId ?: return
+        if (state.step == Step.DECLARE_ATTACKERS && priorityPlayer == state.activePlayerId) {
+            val attackersDeclared = state.getEntity(priorityPlayer)
+                ?.get<AttackersDeclaredThisCombatComponent>() != null
+            if (!attackersDeclared) {
+                submit(DeclareAttackers(priorityPlayer, emptyMap()))
+            }
+        }
+        if (state.step == Step.DECLARE_BLOCKERS && priorityPlayer != state.activePlayerId) {
+            val blockersDeclared = state.getEntity(priorityPlayer)
+                ?.get<BlockersDeclaredThisCombatComponent>() != null
+            if (!blockersDeclared) {
+                submit(DeclareBlockers(priorityPlayer, emptyMap()))
+            }
+        }
+    }
+
+    fun autoResolveDecision() {
+        val decision = state.pendingDecision
+            ?: throw IllegalStateException("No pending decision to auto-resolve")
+        when (decision) {
+            is SelectCardsDecision -> {
+                // Pick the first N options (e.g., discard to hand size)
+                val selected = decision.options.take(decision.minSelections)
+                submitCardSelection(decision.playerId, selected)
+            }
+            is YesNoDecision -> {
+                submitYesNo(decision.playerId, false)
+            }
+            is ReorderLibraryDecision -> {
+                submitOrderedResponse(decision.playerId, decision.cards)
+            }
+            is DistributeDecision -> {
+                // Auto-resolve: assign all to the first target
+                val distribution = decision.targets.associateWith { 0 }.toMutableMap()
+                distribution[decision.targets.first()] = decision.totalAmount
+                submitDecision(
+                    decision.playerId,
+                    DistributionResponse(decision.id, distribution)
+                )
+            }
+            is AssignDamageDecision -> {
+                // Auto-resolve: use the pre-computed default assignments
+                submitDecision(
+                    decision.playerId,
+                    DamageAssignmentResponse(decision.id, decision.defaultAssignments)
+                )
+            }
+            is CombatResolutionDecision -> {
+                // Auto-resolve the combat damage board with the engine-computed default edge
+                // amounts (one chooser per call; passPriorityUntil loops over the rest).
+                val edges = decision.edges.map { DamageEdgeAmount(it.id, it.amount) }
+                submitDecision(decision.playerId, CombatResolutionResponse(decision.id, edges))
+            }
+            is SelectManaSourcesDecision -> {
+                // Auto-resolve: decline the mana source selection (e.g., Words of Wind prompt)
+                submitManaAutoPayOrDecline(decision.playerId, autoPay = false)
+            }
+            else -> throw IllegalStateException(
+                "Cannot auto-resolve decision of type ${decision::class.simpleName}"
+            )
+        }
+    }
+
+    /**
+     * Submit a decision response.
+     */
+    fun submitDecision(playerId: EntityId, response: DecisionResponse): ExecutionResult {
+        return submit(SubmitDecision(playerId, response))
+    }
+
+    /**
+     * Submit a card selection response (for discard, sacrifice, etc.).
+     */
+    fun submitCardSelection(playerId: EntityId, selectedCards: List<EntityId>): ExecutionResult {
+        val decision = pendingDecision as? SelectCardsDecision
+            ?: throw IllegalStateException("No pending SelectCardsDecision")
+        return submitDecision(
+            playerId,
+            CardsSelectedResponse(decision.id, selectedCards)
+        )
+    }
+
+    /**
+     * Submit a yes/no response.
+     */
+    fun submitYesNo(playerId: EntityId, choice: Boolean): ExecutionResult {
+        val decision = pendingDecision as? YesNoDecision
+            ?: throw IllegalStateException("No pending YesNoDecision")
+        return submitDecision(
+            playerId,
+            YesNoResponse(decision.id, choice)
+        )
+    }
+
+    /**
+     * Submit a response to a batched may-question ([BatchYesNoDecision]). [applyToAll] resolves the
+     * whole run with [choice]; otherwise it peels one instance and the batch re-raises for the rest.
+     */
+    fun submitBatchYesNo(playerId: EntityId, choice: Boolean, applyToAll: Boolean): ExecutionResult {
+        val decision = pendingDecision as? BatchYesNoDecision
+            ?: throw IllegalStateException("No pending BatchYesNoDecision")
+        return submitDecision(
+            playerId,
+            BatchYesNoResponse(decision.id, choice = choice, applyToAll = applyToAll)
+        )
+    }
+
+    /**
+     * Submit a target selection response (for targeted spells/abilities).
+     */
+    fun submitTargetSelection(playerId: EntityId, targets: List<EntityId>): ExecutionResult {
+        val decision = pendingDecision as? ChooseTargetsDecision
+            ?: throw IllegalStateException("No pending ChooseTargetsDecision")
+        // Most abilities have a single target requirement at index 0
+        return submitDecision(
+            playerId,
+            TargetsResponse(decision.id, mapOf(0 to targets))
+        )
+    }
+
+    /**
+     * Submit a multi-target selection response (for spells with multiple target requirements).
+     * @param targetsPerRequirement Map of requirement index to list of targets for that requirement
+     */
+    fun submitMultiTargetSelection(playerId: EntityId, targetsPerRequirement: Map<Int, List<EntityId>>): ExecutionResult {
+        val decision = pendingDecision as? ChooseTargetsDecision
+            ?: throw IllegalStateException("No pending ChooseTargetsDecision")
+        return submitDecision(
+            playerId,
+            TargetsResponse(decision.id, targetsPerRequirement)
+        )
+    }
+
+    /**
+     * Submit an ordered response (for reorder effects like look at top N and reorder).
+     */
+    fun submitOrderedResponse(playerId: EntityId, orderedObjects: List<EntityId>): ExecutionResult {
+        val decision = pendingDecision as? ReorderLibraryDecision
+            ?: throw IllegalStateException("No pending ReorderLibraryDecision")
+        return submitDecision(
+            playerId,
+            OrderedResponse(decision.id, orderedObjects)
+        )
+    }
+
+    /**
+     * Submit an auto-pay response for a mana source selection decision.
+     */
+    fun submitManaAutoPayOrDecline(playerId: EntityId, autoPay: Boolean): ExecutionResult {
+        val decision = pendingDecision as? SelectManaSourcesDecision
+            ?: throw IllegalStateException("No pending SelectManaSourcesDecision")
+        return submitDecision(
+            playerId,
+            ManaSourcesSelectedResponse(decision.id, emptyList(), autoPay)
+        )
+    }
+
+    /**
+     * Get a player's graveyard.
+     */
+    fun getGraveyard(playerId: EntityId): List<EntityId> {
+        return state.getGraveyard(playerId)
+    }
+
+    /**
+     * Get the card names in a player's graveyard.
+     */
+    fun getGraveyardCardNames(playerId: EntityId): List<String> {
+        return getGraveyard(playerId).mapNotNull { entityId ->
+            state.getEntity(entityId)?.get<CardComponent>()?.name
+        }
+    }
+
+    /**
+     * Get the entity IDs of cards in a player's exile zone.
+     */
+    fun getExile(playerId: EntityId): List<EntityId> {
+        return state.getZone(ZoneKey(playerId, Zone.EXILE))
+    }
+
+    /**
+     * Get the card names in a player's exile zone.
+     */
+    fun getExileCardNames(playerId: EntityId): List<String> {
+        return getExile(playerId).mapNotNull { entityId ->
+            state.getEntity(entityId)?.get<CardComponent>()?.name
+        }
+    }
+
+    /**
+     * Get hand size for a player.
+     */
+    fun getHandSize(playerId: EntityId): Int {
+        return getHand(playerId).size
+    }
+
+    /**
+     * Attach (or replace) a component on an entity (test helper). Useful for setting up
+     * state that would normally be produced by an entry choice, e.g. a
+     * [com.wingedsheep.engine.state.components.battlefield.CastChoicesComponent].
+     */
+    fun addComponent(entityId: EntityId, component: com.wingedsheep.engine.state.Component) {
+        _state = _state.updateEntity(entityId) { it.withComponent(component) }
+    }
+}
