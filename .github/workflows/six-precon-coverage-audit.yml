@@ -1,0 +1,42 @@
+name: Six-precon coverage audit (isolated)
+on:
+  push:
+    branches:
+      - gpt/six-precon-coverage-audit-20261022
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate audit script syntax
+        run: python3 -m py_compile investigation/argentum-six-precons/coverage-audit.py
+      - name: Generate six-deck coverage report
+        run: python3 investigation/argentum-six-precons/coverage-audit.py --json-output six-precon-coverage.json --markdown-output six-precon-worklist.md
+      - name: Validate report schema and all six deck slot counts
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path("six-precon-coverage.json").read_text())
+          assert len(report["decks"]) == 6
+          assert report["totalSlots"] == 600
+          assert sum(d["supportedSlots"] + d["missingSlots"] for d in report["decks"]) == 600
+          assert sum(d["missingSlots"] for d in report["decks"]) == report["missingSlots"]
+          assert len(report["missingCardNames"]) == report["distinctMissingCards"]
+          assert len(report["prioritizedMissingCards"]) == report["distinctMissingCards"]
+          assert sum(c["slots"] for c in report["prioritizedMissingCards"]) >= report["missingSlots"]
+          assert Path("six-precon-worklist.md").read_text().count("|") > 100
+          print("PASS: six decks, 600 slots, consistent missing-card counts")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: six-precon-coverage-report
+          path: |
+            six-precon-coverage.json
+            six-precon-worklist.md
+          if-no-files-found: warn
