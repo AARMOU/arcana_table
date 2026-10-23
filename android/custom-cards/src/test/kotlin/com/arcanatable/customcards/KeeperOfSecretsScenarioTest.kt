@@ -24,7 +24,8 @@ class KeeperOfSecretsScenarioTest {
         assertTrue(d.projected.hasKeyword(permanent, Keyword.HASTE))
 
         val bear = d.putCardInHand(p, "Grizzly Bears")
-        d.giveColorlessMana(p, 2)
+        d.giveMana(p, Color.GREEN)
+        d.giveColorlessMana(p, 1)
         assertNull(d.castSpell(p, bear).error)
         d.resolveAll()
 
@@ -66,6 +67,7 @@ class KeeperOfSecretsScenarioTest {
         d.resolveAll()
 
         d.putCardOnTopOfLibrary(d.player2, "Grizzly Bears")
+        d.passPriority(d.player1)
         val heralds = d.putCardInHand(d.player2, "Heralds of Tzeentch")
         d.giveMana(d.player2, Color.BLUE)
         d.giveColorlessMana(d.player2, 4)

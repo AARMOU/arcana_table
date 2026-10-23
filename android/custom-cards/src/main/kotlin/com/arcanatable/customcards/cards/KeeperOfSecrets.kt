@@ -1,9 +1,11 @@
 package com.arcanatable.customcards.cards
 
 import com.wingedsheep.sdk.core.Keyword
+import com.wingedsheep.sdk.core.Zone
 import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.model.Rarity
 import com.wingedsheep.sdk.scripting.GameObjectFilter
+import com.wingedsheep.sdk.scripting.events.SpellCastPredicate
 
 val KeeperOfSecrets = card("Keeper of Secrets") {
     manaCost = "{5}{R}"
@@ -17,8 +19,10 @@ val KeeperOfSecrets = card("Keeper of Secrets") {
     keywords(Keyword.FIRST_STRIKE, Keyword.HASTE)
 
     triggeredAbility {
-        trigger = Triggers.you.casts(GameObjectFilter.Any)
-        interveningIf = Conditions.Not(Conditions.WasCastFromHand)
+        trigger = Triggers.you.casts(
+            GameObjectFilter.Any,
+            setOf(SpellCastPredicate.CastFromZoneOtherThan(Zone.HAND)),
+        )
         val opponent = target(Targets.Opponent)
         effect = Effects.DealDamage(DynamicAmounts.triggeringSpellManaValue(), opponent)
     }
