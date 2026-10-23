@@ -26,7 +26,8 @@ function usageQuantity(report,now){
   if(!Number.isFinite(sum))throw Error('overflow');
  }
  // Missing SKU might indicate organization billing, not zero personal usage.
- if(!found)throw Error('no-personal-ai-credit-usage');
+ if(!found)throw Error(report.usageItems.length===0?'empty-billing-usage-items':
+  report.usageItems.some(x=>/copilot/i.test(String(x.product||'')))?'unrecognized-copilot-sku':'no-copilot-usage-items');
  return sum;
 }
 async function collect({token,budget:raw,reserveCredits,now=new Date(),fetchImpl=fetch}){
@@ -56,7 +57,7 @@ async function readBudget(env=process.env,opts={}){
   return {...x,error:null};
  }catch(e){
   // Never include HTTP response bodies, request headers or tokens in public logs.
-  const reason=/^(invalid-owner-budget|invalid-reservation|missing-token|billing-http-\d{3}|invalid-billing-response|wrong-account|wrong-period|wrong-unit-or-quantity|overflow|no-personal-ai-credit-usage|unverified-snapshot)$/.test(e.message)?e.message:'billing-unavailable';
+  const reason=/^(invalid-owner-budget|invalid-reservation|missing-token|billing-http-\d{3}|invalid-billing-response|wrong-account|wrong-period|wrong-unit-or-quantity|overflow|empty-billing-usage-items|unrecognized-copilot-sku|no-copilot-usage-items|unverified-snapshot)$/.test(e.message)?e.message:'billing-unavailable';
   return {snapshot:null,status:{level:'unknown',maxNewAssignments:0,warn:true,reason},error:reason};
  }
 }

@@ -78,3 +78,26 @@ test('non numeric and wrong-unit credit quantities still fail closed',()=>{
  assert.throws(()=>m.usageQuantity(report([{product:'Copilot',sku:'Copilot AI Credits',
    unitType:'requests',grossQuantity:470}]),now));
 });
+
+test('empty GitHub billing response provides safe, specific diagnostic',async()=>{
+ const x=await m.readBudget({COPILOT_BILLING_READ_TOKEN:'dummy',ARCANA_AI_CREDIT_BUDGET:'1500'},
+ {now,fetchImpl:async()=>({ok:true,json:async()=>report([])})});
+ assert.equal(x.error,'empty-billing-usage-items');
+ assert.equal(x.status.maxNewAssignments,0);
+});
+test('unrecognized Copilot SKU is distinguished without exposing usage',async()=>{
+ const x=await m.readBudget({COPILOT_BILLING_READ_TOKEN:'dummy',ARCANA_AI_CREDIT_BUDGET:'1500'},
+ {now,fetchImpl:async()=>({ok:true,json:async()=>report([
+  {product:'Copilot',sku:'Future SKU',unitType:'ai-credits',grossQuantity:471}
+ ])})});
+ assert.equal(x.error,'unrecognized-copilot-sku');
+ assert.equal(x.status.maxNewAssignments,0);
+});
+test('no Copilot item is distinguished from an empty report',async()=>{
+ const x=await m.readBudget({COPILOT_BILLING_READ_TOKEN:'dummy',ARCANA_AI_CREDIT_BUDGET:'1500'},
+ {now,fetchImpl:async()=>({ok:true,json:async()=>report([
+  {product:'Actions',sku:'Actions Linux',unitType:'minutes',grossQuantity:471}
+ ])})});
+ assert.equal(x.error,'no-copilot-usage-items');
+ assert.equal(x.status.maxNewAssignments,0);
+});
