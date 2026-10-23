@@ -251,6 +251,8 @@ object CustomCards {
         Entry(HexmarkDestroyer, "40K", "Six WotC precons"),
         Entry(TriarchPraetorian, "40K", "Six WotC precons"),
         Entry(Zoanthrope, "40K", "Six WotC precons"),
+        Entry(BoneSabres, "40K", "Six WotC precons"),
+        Entry(Tervigon, "40K", "Six WotC precons"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
