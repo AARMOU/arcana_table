@@ -56,3 +56,25 @@ test('no matching AI credit SKU fails closed',async()=>{
  {now,fetchImpl:async()=>({ok:true,json:async()=>report([])})});
  assert.equal(x.status.maxNewAssignments,0);
 });
+
+test('GitHub Copilot SKU variation and fractional credit quantities are accepted',()=>{
+ const actual=report([
+   {product:'Copilot',sku:'Copilot AI Credits',unitType:'ai-credits',grossQuantity:135.625},
+   {product:'Copilot',sku:'Copilot AI Credits',unitType:'ai-credits',grossQuantity:100.125}
+ ]);
+ assert.equal(m.usageQuantity(actual,now),235.75);
+});
+test('real API decimal totals meet snapshot gate at requested budget',async()=>{
+ const x=await m.collect({token:'dummy',budget:'1500',now,fetchImpl:async()=>({
+  ok:true,json:async()=>report([{product:'Copilot',sku:'Copilot AI Credits',
+   unitType:'ai-credits',grossQuantity:471.245}])
+ })});
+ assert.equal(x.snapshot.reportedUsed,471.245);
+ assert.equal(x.status.level,'normal');
+});
+test('non numeric and wrong-unit credit quantities still fail closed',()=>{
+ assert.throws(()=>m.usageQuantity(report([{product:'Copilot',sku:'Copilot AI Credits',
+   unitType:'ai-credits',grossQuantity:'470'}]),now));
+ assert.throws(()=>m.usageQuantity(report([{product:'Copilot',sku:'Copilot AI Credits',
+   unitType:'requests',grossQuantity:470}]),now));
+});
