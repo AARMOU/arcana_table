@@ -23,11 +23,11 @@ val SufferThePast = card("Suffer the Past") {
         )
         effect = Effects.Pipeline {
             val chosenCards = gather(CardSource.ChosenTargets, name = "sufferThePastTargets")
-            move(
+            val exiledCards = moveTracked(
                 chosenCards,
                 CardDestination.ToZone(Zone.EXILE, Player.TargetPlayer),
             )
-            val exiledCount = DynamicAmounts.distinctEntitiesIn(chosenCards)
+            val exiledCount = DynamicAmounts.distinctEntitiesIn(exiledCards)
             run(Effects.LoseLife(exiledCount, player))
             run(Effects.GainLife(exiledCount))
         }
