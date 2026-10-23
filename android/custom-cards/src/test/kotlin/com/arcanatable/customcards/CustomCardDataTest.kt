@@ -34,6 +34,24 @@ class CustomCardDataTest {
     }
 
     @Test
+    fun build131UpstreamOwnedCardsAreNotRegisteredAsCustomCards() {
+        val upstreamOwned = setOf(
+            "rocco, cabaretti caterer",
+            "kodama of the west tree",
+            "raffine, scheming seer",
+        )
+        val library = File(assets, "all-cards.index.tsv").readLines()
+            .filter(String::isNotBlank)
+            .map { it.substringBefore('\t').lowercase() }
+            .toSet()
+        val custom = CustomCards.all.map { it.name.lowercase() }.toSet()
+
+        val duplicates = custom.intersect(upstreamOwned)
+        assertTrue("Build 131 library is missing expected upstream cards", library.containsAll(upstreamOwned))
+        assertTrue("Upstream-owned cards were re-registered: $duplicates", duplicates.isEmpty())
+    }
+
+    @Test
     fun registeredDecksAreCovered() {
         // The registry grows as missing precon cards are implemented. Test completeness
         // and uniqueness rather than pinning a number that changes with each batch.
