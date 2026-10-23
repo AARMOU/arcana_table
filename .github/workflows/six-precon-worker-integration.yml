@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - gpt/six-precon-worker-integration-20261022
+      - copilot/gptsix-precon-worker-integration-20261022-eldrazi
     paths:
       - android/custom-cards/src/**
       - .github/workflows/six-precon-worker-integration.yml
@@ -26,9 +27,15 @@ jobs:
         with:
           packages: platform-tools
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-      - name: Generate card data and run full custom-card regressions
+      - name: Export card data and run focused scenarios
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test --tests '*MatterReshaperScenarioTest' --tests '*ScaretillerScenarioTest'
+      - name: Run full custom-card regressions
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test
+      - name: Run Android compatibility checks
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
       - name: Validate all exported cards and audit both indexes
         run: |
           python3 - <<'PYTHON'
@@ -54,7 +61,7 @@ jobs:
           git add android/app/src/main/assets/argentum/custom-cards.jsonl
           if ! git diff --cached --quiet; then
             git commit -m "data: export verified six-precon card batch"
-            git push origin HEAD:gpt/six-precon-worker-integration-20261022
+            git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
       - uses: actions/upload-artifact@v4
         if: always()
