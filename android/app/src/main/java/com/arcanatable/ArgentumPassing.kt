@@ -38,10 +38,12 @@ object ArgentumPassing {
             .replace('_', ' ').replace(Regex("\\s+"), " ")
         val phase = normalized(phaseName)
         val step = normalized(stepName)
-        if (stopAtPrecombat && phase in setOf("PRECOMBAT MAIN", "PRECOMBAT MAIN PHASE") &&
-            step in setOf("MAIN", "PRECOMBAT MAIN", "MAIN PHASE")) return "Opponent's precombat main phase"
-        if (stopAtEndStep && phase in setOf("ENDING", "ENDING PHASE", "END") &&
-            step in setOf("END", "END STEP")) return "Opponent's end step"
+        // Argentum 61e71e SDK: Phase.PRECOMBAT_MAIN + Step.PRECOMBAT_MAIN,
+        // and Phase.ENDING + Step.END. The Android protocol normalizes underscores.
+        if (stopAtPrecombat && phase == "PRECOMBAT MAIN" && step == "PRECOMBAT MAIN")
+            return "Opponent's precombat main phase"
+        if (stopAtEndStep && phase == "ENDING" && step == "END")
+            return "Opponent's end step"
         return null
     }
 
