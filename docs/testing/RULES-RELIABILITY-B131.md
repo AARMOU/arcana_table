@@ -27,3 +27,11 @@ This branch is isolated from main. No source fixes, merges, releases, signing ch
 
 ## Reporting
 For every case record: source commit, test command, observed failure, change commit, passing test evidence, and remaining device-only checks.
+
+## Verified repository baseline (inspection only)
+- Source inspection: `android/app/build.gradle.kts` on this working branch declares `versionCode = 131`, `versionName = "0.33.9-build131-argentum-upgrade"`, and a debug application ID suffix `.argentum`.
+- The Android Gradle root is `android/`, not the repository root. `android/settings.gradle.kts` includes `:app` and `:custom-cards`.
+- Existing JVM test configuration uses JUnit 4, Robolectric, Compose UI tests, and `testDebugUnitTest`; a live Argentum test is opt-in with `-Pargentum.live=true`.
+- The Android app loads `argentum-*.jar` from `android/app/libs`. Exact engine artifact provenance still needs pinning from the build workflow and jars.
+- The root README and `android/README.md` describe older builds (72 and 91 respectively); **do not use their version descriptions as the Build 131 source of truth**.
+- No local or new CI test was executed during this inspection. The matrix remains **Not run**.
