@@ -36,7 +36,7 @@ jobs:
             // Bound NEW dispatches per invocation; do not treat draft PRs as live sessions.
             const maxNewAssignments = 2;
             const testIssue = context.payload.inputs?.test_issue?.trim();
-            if (testIssue && !/^\\d+$/.test(testIssue)) { core.setFailed('Invalid test issue number'); return; }
+            if (testIssue && !/^\d+$/.test(testIssue)) { core.setFailed('Invalid test issue number'); return; }
             const available = testIssue ? 1 : maxNewAssignments;
             core.info('New assignment budget: ' + available);
             const issues = await github.paginate(github.rest.issues.listForRepo, {
