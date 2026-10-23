@@ -16,7 +16,7 @@ val SufferThePast = card("Suffer the Past") {
     oracleText = "Exile X target cards from target player's graveyard. That player loses 1 life and you gain 1 life for each card exiled this way."
 
     spell {
-        val player = target(Targets.Opponent)
+        val player = target(Targets.Player)
         targets(
             TargetFilter(GameObjectFilter.Any.ownedByTargetPlayer(), zone = Zone.GRAVEYARD),
             exactly = DynamicAmounts.castX(),
