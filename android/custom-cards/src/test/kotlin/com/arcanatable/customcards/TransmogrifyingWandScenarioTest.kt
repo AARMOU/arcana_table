@@ -3,10 +3,10 @@ package com.arcanatable.customcards
 import com.arcanatable.customcards.cards.TransmogrifyingWand
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.ActivateAbility
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.engine.state.components.battlefield.CountersComponent
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.CounterType
-import com.wingedsheep.sdk.model.ChosenTarget
 import org.junit.Assert.*
 import org.junit.Test
 
