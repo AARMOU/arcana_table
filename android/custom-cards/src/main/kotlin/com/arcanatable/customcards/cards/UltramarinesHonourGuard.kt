@@ -4,6 +4,7 @@ import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.dsl.mechanics.squad
 import com.wingedsheep.sdk.model.Rarity
 import com.wingedsheep.sdk.scripting.GameObjectFilter
+import com.wingedsheep.sdk.scripting.ModifyStats
 import com.wingedsheep.sdk.scripting.filters.unified.GroupFilter
 
 val UltramarinesHonourGuard = card("Ultramarines Honour Guard") {
