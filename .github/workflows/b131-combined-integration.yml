@@ -1,0 +1,178 @@
+name: B131 combined six-precon cards plus outcome logging
+on:
+  push:
+    branches: [gpt/b131-combined-integration-20261022]
+    paths: [.github/workflows/b131-combined-integration.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/checkout@v4
+        with:
+          ref: 959b8d980bdf7e43537671a5651db8619c5c9cd6
+          path: card-source
+          persist-credentials: false
+      - name: Stage only new cards into Build 131 + merged logging
+        shell: bash
+        run: |
+          git merge-base --is-ancestor dca22b4bfc3e453ebbb849c846859bcdffda5d54 HEAD
+          test "$(git -C card-source rev-parse HEAD)" = "959b8d980bdf7e43537671a5651db8619c5c9cd6"
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,re,shutil
+          dest=Path("android/custom-cards/src")
+          src=Path("card-source/android/custom-cards/src")
+          d=dest/"main/kotlin/com/arcanatable/customcards/CustomCards.kt"
+          s=src/"main/kotlin/com/arcanatable/customcards/CustomCards.kt"
+          original=re.findall(r'^\s*Entry\((\w+),\s*"[^"]+",',d.read_text(),re.M)
+          original_count=len(original)
+          text=s.read_text()
+          superseded=("RoccoCabarettiCaterer","KodamaOfTheWestTree","RaffineSchemingSeer")
+          for name in superseded:
+              key="Entry("+name+","
+              lines=text.splitlines(keepends=True)
+              assert sum(key in line for line in lines)==1,name
+              text="".join(line for line in lines if key not in line)
+          names=re.findall(r'^\s*Entry\((\w+),\s*"[^"]+",',text,re.M)
+          assert original_count==111 and len(names)==211 and len(names)==len(set(names))
+          assert set(original).issubset(names)
+          card_src=src/"main/kotlin/com/arcanatable/customcards/cards"
+          card_dest=dest/"main/kotlin/com/arcanatable/customcards/cards"
+          imported=[]
+          for name in names:
+              old=card_dest/(name+".kt")
+              new=card_src/(name+".kt")
+              assert new.is_file(),name
+              if not old.exists():
+                  shutil.copy2(new,old)
+                  imported.append(name)
+          helper_source=card_src/"EldraziScionFactory.kt"
+          helper_target=card_dest/"EldraziScionFactory.kt"
+          assert helper_source.is_file() and not helper_target.exists()
+          shutil.copy2(helper_source, helper_target)
+          test_src=src/"test/kotlin/com/arcanatable/customcards"
+          test_dest=dest/"test/kotlin/com/arcanatable/customcards"
+          count=0
+          for new in test_src.glob("**/*Test.kt"):
+              old=test_dest/new.relative_to(test_src)
+              if not old.exists():
+                  old.parent.mkdir(parents=True,exist_ok=True)
+                  shutil.copy2(new,old)
+                  count+=1
+          shutil.copy2(test_src/"CustomCardDataTest.kt",test_dest/"CustomCardDataTest.kt")
+          d.write_text(text)
+          assert len(imported)>=90,(len(imported),imported)
+          Path("b131-import-record.json").write_text(json.dumps({
+              "base":"dca22b4bfc3e453ebbb849c846859bcdffda5d54",
+              "cards":"959b8d980bdf7e43537671a5651db8619c5c9cd6",
+              "base_count":original_count,"integrated_count":len(names),
+              "imported_definitions":imported,"imported_test_files":count,
+              "upstream_owned":superseded},indent=2)+"\n")
+          print("New card files:",len(imported),"new scenario tests:",count)
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: Argentum-Verified-Runtime
+          run-id: 39844575500
+          github-token: ${{ github.token }}
+          path: verified-runtime
+      - name: Verify exact Build 131 runtime and install into integrated candidate
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,shutil,struct,zipfile
+          from pathlib import Path
+          root=Path("verified-runtime")
+          manifests=[p for p in root.rglob("manifest.json") if p.parent.name=="runtime-bundle"]
+          validated=list(root.rglob("validated-runtime.json"))
+          assert len(manifests)==1 and len(validated)==1
+          bundle=manifests[0].parent
+          m=json.loads(manifests[0].read_text())
+          v=json.loads(validated[0].read_text())
+          assert v["upstream"]=="61e71e586b100faa661f86cac827ac3c3bbb5a78"
+          modules=("mtg-sdk","mtg-sdk-tooling","rules-engine","ai")
+          expect={f"libs/argentum-{n}.jar" for n in modules}|{"assets/all-cards.jsonl","assets/all-cards.index.tsv","assets/por-cards.jsonl"}
+          assert set(m["files"])==expect
+          for name,hash in m["files"].items():
+              f=bundle/name
+              assert f.is_file() and hashlib.sha256(f.read_bytes()).hexdigest()==hash,name
+          for n in modules:
+              name="argentum-"+n+".jar"
+              f=bundle/"libs"/name
+              assert hashlib.sha256(f.read_bytes()).hexdigest()==v["jars"][name]["sha256"]
+              with zipfile.ZipFile(f) as z:
+                  versions=[struct.unpack(">H",z.read(p)[6:8])[0] for p in z.namelist() if p.endswith(".class")]
+                  assert versions and max(versions)<=61
+              shutil.copy2(f,Path("android/app/libs")/name)
+          for name in ("all-cards.jsonl","all-cards.index.tsv","por-cards.jsonl"):
+              shutil.copy2(bundle/"assets"/name,Path("android/app/src/main/assets/argentum")/name)
+          Path("b131-runtime-record.json").write_text(json.dumps({
+              "upstream":v["upstream"],"bundle_run":39844575500,
+              "base_source":"83aa342e3fcd200710fb9188192189fc7cea7abf",
+              "files":m["files"]},indent=2)+"\n")
+          print("All four B131 engine binaries, exact hashes and stock assets verified")
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Execute full custom-card tests and regenerate data
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test
+      - name: Assert 211 definitions and no B131 upstream collision
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path("android/app/src/main/assets/argentum")
+          names=lambda p:[l.split("\t")[0] for l in (root/p).read_text().splitlines() if l.strip()]
+          cards=names("custom-cards.index.tsv")
+          exported=[json.loads(line)["name"] for line in (root/"custom-cards.jsonl").read_text().splitlines() if line.strip()]
+          stock={name.casefold() for name in names("all-cards.index.tsv")}
+          assert len(cards)==211 and cards==exported
+          assert len({n.casefold() for n in cards})==211
+          assert not [n for n in cards if n.casefold() in stock]
+          print("PASS: 211 distinct custom definitions, zero collisions")
+          PY
+      - name: Execute full B131 Android tests, lint and unsigned debug build
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      - name: Commit validated integrated code, custom card data and exact B131 engine
+        run: |
+          set -euo pipefail
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p docs/integration
+          cp b131-import-record.json docs/integration/B131_CARDS.json
+          cp b131-runtime-record.json docs/integration/B131_RUNTIME.json
+          git add android/custom-cards/src android/app/libs/argentum-*.jar android/app/src/main/assets/argentum docs/integration/
+          git diff --cached --check
+          git commit -m "Integrate merged game-over logging and tested six-precon cards on B131"
+          git push origin HEAD:gpt/b131-combined-integration-20261022
+      - name: Upload validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b131-combined-validation
+          retention-days: 30
+          path: |
+            b131-import-record.json
+            b131-runtime-record.json
+            android/custom-cards/build/test-results/
+            android/custom-cards/build/reports/tests/
+            android/app/build/test-results/
+            android/app/build/reports/tests/
+            android/app/build/reports/lint-results-debug.*

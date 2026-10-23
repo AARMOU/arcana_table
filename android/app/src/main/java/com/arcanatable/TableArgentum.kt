@@ -513,10 +513,11 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             val winner = incoming.optString("winnerId").takeIf { it.isNotBlank() && it != "null" }
             val won = winner != null && winner == argentumPlayerId
             argentumWon = if (winner == null) null else won
-            val reason = incoming.optString("reason").lowercase().replace('_', ' ')
-            argentumGameOverText = incoming.optString("message").takeIf { it.isNotBlank() && it != "null" }
-                ?: listOfNotNull(if (winner == null) "No winner." else if (won) "You won." else "${players.firstOrNull { it.id == winner }?.name ?: "Your opponent"} won.", reason.takeIf { it.isNotBlank() }?.let { "Reason: $it." }).joinToString(" ")
-            recordDiagnostic("Argentum game over (${incoming.optString("reason")})", DiagnosticCategory.ENGINE)
+            val namesById = players.associate { it.id to it.name }
+            argentumGameOverText = ArgentumOutcomeLog.banner(incoming, argentumPlayerId, namesById)
+            val gameOverLine = "Game over — ${argentumGameOverText.orEmpty()}"
+            if (gameLog.lastOrNull() != gameOverLine) gameLog = (gameLog + gameOverLine).takeLast(250)
+            recordDiagnostic(ArgentumOutcomeLog.diagnostic(incoming, namesById), DiagnosticCategory.ENGINE)
         }
         "sessionReplaced" -> recordDiagnostic("Argentum session replaced by another connection", DiagnosticCategory.CONNECTION)
         "error" -> if (incoming.optString("code") == ArgentumCloudGuest.LINK_NOTE) {
