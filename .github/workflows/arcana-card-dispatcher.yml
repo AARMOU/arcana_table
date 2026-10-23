@@ -3,6 +3,11 @@ on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
+    inputs:
+      test_issue:
+        description: 'Optional one-issue controlled dispatch test (e.g. 63); bypasses capacity count'
+        required: false
+        type: string
 permissions:
   contents: read
   issues: write
@@ -15,39 +20,50 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Verify user-authenticated Copilot API token
+        env:
+          COPILOT_DISPATCH_TOKEN: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$COPILOT_DISPATCH_TOKEN" ]; then
+            echo 'Copilot assignment requires a user-authenticated token; GITHUB_TOKEN is insufficient.' >&2
+            exit 1
+          fi
       - uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
           script: |
             const owner = context.repo.owner, repo = context.repo.repo;
-            const maxWorkers = 6;
-            const prs = await github.paginate(github.rest.pulls.list, {
-              owner, repo, state: 'open', per_page: 100
-            });
-            const active = prs.filter(p => p.draft &&
-              p.head.repo?.full_name === owner + '/' + repo &&
-              p.head.ref.startsWith('copilot/'));
-            const available = Math.max(0, maxWorkers - active.length);
-            core.info('Draft Copilot PRs: ' + active.length + '; open slots: ' + available);
-            if (!available) return;
+            // Bound NEW dispatches per invocation; do not treat draft PRs as live sessions.
+            const maxNewAssignments = 2;
+            const testIssue = context.payload.inputs?.test_issue?.trim();
+            if (testIssue && !/^\d+$/.test(testIssue)) { core.setFailed('Invalid test issue number'); return; }
+            const available = testIssue ? 1 : maxNewAssignments;
+            core.info('New assignment budget: ' + available);
             const issues = await github.paginate(github.rest.issues.listForRepo, {
               owner, repo, state: 'open', per_page: 100
             });
-            const queued = issues.filter(i => !i.pull_request &&
+            const queued = issues.filter(i => (!testIssue || String(i.number) === testIssue) && !i.pull_request &&
               i.title.startsWith('[Arcana Queue]') &&
               !(i.assignees || []).length).sort((a,b) => a.number - b.number);
+            if (testIssue && queued.length !== 1) { core.setFailed('Test issue not found or not eligible: ' + testIssue); return; }
             for (const issue of queued.slice(0, available)) {
               try {
-                const response = await github.rest.issues.addAssignees({
-                  owner, repo, issue_number: issue.number, assignees: ['copilot']
+                const response = await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees', {
+                  owner, repo, issue_number: issue.number, assignees: ['copilot-swe-agent[bot]'],
+                  agent_assignment: {
+                    target_repo: owner + '/' + repo,
+                    base_branch: 'gpt/six-precon-worker-integration-20261022',
+                    custom_instructions: '', custom_agent: '', model: ''
+                  }
                 });
-                const assigned = response.data.assignees?.some(a => a.login.toLowerCase() === 'copilot');
+                const assigned = response.data.assignees?.some(a => ['copilot','copilot-swe-agent[bot]'].includes(a.login.toLowerCase()));
                 if (!assigned) {
-                  core.warning('Copilot assignment not confirmed on issue #' + issue.number);
-                  continue;
+                  core.setFailed('Copilot assignment not confirmed on issue #' + issue.number);
+                  return;
                 }
                 core.info('Assigned queue issue #' + issue.number + ' to Copilot. Agent start must be verified separately.');
               } catch (e) {
-                core.warning('Assignment failed on #' + issue.number + ': ' + e.message);
-                break;
+                core.setFailed('Assignment failed on #' + issue.number + ': ' + e.message);
+                return;
               }
             }
