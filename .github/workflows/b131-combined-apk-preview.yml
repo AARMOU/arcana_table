@@ -1,0 +1,117 @@
+name: Build 131 combined — installable isolated test APK
+on:
+  push:
+    branches:
+      - gpt/b131-combined-apk-preview-20261022
+    paths:
+      - android/app/build.gradle.kts
+      - .github/workflows/b131-combined-apk-preview.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: b131-combined-apk-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify this APK is derived from the exact tested combined source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin 98626c7709023346d5f45756bceb864bc3041766
+          git merge-base --is-ancestor 98626c7709023346d5f45756bceb864bc3041766 HEAD
+          test "$(grep -c 'versionCode = 131' android/app/build.gradle.kts)" -eq 1
+          grep -F 'versionName = "0.33.9-build131-combined-preview"' android/app/build.gradle.kts
+          grep -F 'applicationIdSuffix = ".b131combined"' android/app/build.gradle.kts
+          test -f docs/integration/B131_CARDS.json
+          test -f docs/integration/B131_RUNTIME.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Verify merged source, exact engine binaries and custom-card assets
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib,json
+          from pathlib import Path
+          c=json.loads(Path("docs/integration/B131_CARDS.json").read_text())
+          r=json.loads(Path("docs/integration/B131_RUNTIME.json").read_text())
+          assert c["base"]=="dca22b4bfc3e453ebbb849c846859bcdffda5d54"
+          assert c["cards"]=="959b8d980bdf7e43537671a5651db8619c5c9cd6"
+          assert c["integrated_count"]==211
+          assert r["upstream"]=="61e71e586b100faa661f86cac827ac3c3bbb5a78"
+          for f,sha in r["files"].items():
+              path=Path("android/app/libs")/Path(f).name if f.startswith("libs/") else Path("android/app/src/main/assets/argentum")/Path(f).name
+              assert path.is_file() and hashlib.sha256(path.read_bytes()).hexdigest()==sha, str(path)
+          assets=Path("android/app/src/main/assets/argentum")
+          names=[s.split("\t")[0] for s in (assets/"custom-cards.index.tsv").read_text().splitlines() if s.strip()]
+          cards=[json.loads(s)["name"] for s in (assets/"custom-cards.jsonl").read_text().splitlines() if s.strip()]
+          stock={s.split("\t")[0].casefold() for s in (assets/"all-cards.index.tsv").read_text().splitlines() if s.strip()}
+          assert len(names)==211 and names==cards and len({n.casefold() for n in names})==211
+          assert all(n.casefold() not in stock for n in names)
+          print("PASS: exact Build 131 engine and 211 unique, non-shadowing custom-card definitions")
+          PY
+      - name: Run real card scenarios, Android unit tests, lint, and build debug-signed APK
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      - name: Verify APK is installable and signed, record identity and checksum
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          apk="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          name="ArcanaTable-B131-Combined-Preview-debug.apk"
+          cp "$apk" "dist/$name"
+          aapt="$ANDROID_HOME/build-tools/36.0.0/aapt"
+          apksigner="$ANDROID_HOME/build-tools/36.0.0/apksigner"
+          zipalign="$ANDROID_HOME/build-tools/36.0.0/zipalign"
+          "$aapt" dump badging "dist/$name" > dist/package-info.txt
+          grep -F "package: name='com.arcanatable.b131combined' versionCode='131' versionName='0.33.9-build131-combined-preview'" dist/package-info.txt
+          "$apksigner" verify --verbose --print-certs "dist/$name" > dist/signing-info.txt
+          grep -F 'Verified using v2 scheme (APK Signature Scheme v2): true' dist/signing-info.txt
+          "$zipalign" -c -v 4 "dist/$name" > dist/zipalign-info.txt
+          sha256sum "dist/$name" > dist/SHA256SUMS.txt
+          {
+            echo "branch=$GITHUB_REF_NAME"
+            echo "source_commit=$GITHUB_SHA"
+            echo "tested_combined_source=98626c7709023346d5f45756bceb864bc3041766"
+            echo "app_id=com.arcanatable.b131combined"
+            echo "versionCode=131"
+            echo "versionName=0.33.9-build131-combined-preview"
+            echo "signing=Android ephemeral debug key; NOT production/original key"
+            echo "install=side-by-side; does not replace existing Arcana Table"
+            echo "engine_upstream=61e71e586b100faa661f86cac827ac3c3bbb5a78"
+            echo "custom_cards=211"
+            echo "released=false"
+          } > dist/PROVENANCE.txt
+          cp docs/integration/B131_CARDS.json docs/integration/B131_RUNTIME.json dist/
+      - name: Upload source-specific test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: B131-Combined-APK-Test-Evidence
+          path: |
+            android/custom-cards/build/test-results/
+            android/custom-cards/build/reports/tests/
+            android/app/build/test-results/
+            android/app/build/reports/tests/
+            android/app/build/reports/lint-results-debug.*
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Upload actual APK and verified signing/provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArcanaTable-B131-Combined-Preview-APK
+          path: dist/
+          if-no-files-found: error
+          retention-days: 30
