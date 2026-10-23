@@ -1,0 +1,37 @@
+name: Validate Arcana Dispatcher
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/arcana-card-dispatcher.yml'
+      - '.github/workflows/arcana-dispatcher-validation.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate dispatcher configuration without tokens or API mutations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('.github/workflows/arcana-card-dispatcher.yml')
+          s = p.read_text()
+          required = [
+            'copilot-swe-agent[bot]',
+            'COPILOT_DISPATCH_TOKEN',
+            'gpt/six-precon-worker-integration-20261022',
+            'core.setFailed',
+            "github.event_name == 'workflow_dispatch'",
+            "p.head.ref.startsWith('copilot/')",
+          ]
+          for token in required:
+            assert token in s, f'Missing safety/dispatch requirement: {token}'
+          assert "assignees: ['copilot']" not in s, 'Unsupported assignee remains'
+          assert 'secrets.GITHUB_TOKEN' not in s, 'Must not substitute Actions token'
+          print('PASS: dispatcher static safety checks; NO live assignment attempted')
+          PY
