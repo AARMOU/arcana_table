@@ -1,8 +1,56 @@
 # Arcana Table workspace status
 
+## Build 89 · Arcana × Argentum (polished) (branch `experimental/arcana-argentum-integration`)
+
+Branched from `experimental/targeting` at `c97da64` (Build 86); `main`, `experimental/targeting` and the other branches are untouched. Debug application ID `com.arcanatable.argentum`. See `README.md` (What's new, how to play) and `docs/ARGENTUM_INTEGRATION.md` (design, protocol, adapter files).
+
+Build 89 adds the game HUD (phase tracker, life chips, stack, game-log feed), playable-card glow, the card action sheet, board badges, the action composer (multi-target, divided damage, X, mana colour) and the remaining decision editors, the opening-hand screen, the game-over screen and your-move alerts. Build 88 added the combat damage board (`CombatResolutionDecision`), found from a device diagnostic log in which combat damage stopped at Needs handling. Verification on this build: 87 JVM/Robolectric tests pass, including live games through the Arcana UI against `magic.wingedsheep.com`. `assembleDebug` and `lintDebug` succeed with 0 lint errors. Not verified: installation on a physical device or emulator (no hardware acceleration was available) and card art loading (Scryfall image hosts were blocked in the build environment).
+
+
 ## Canonical project
 
-This is the complete Arcana Table **Build 72 source tree** (`0.15.53`, version code `72`). It contains the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. Build 72 adds commander artwork player tabs, automatic active-player expansion, and automatic scrolling to the active player in the full-table view.
+This branch is the separate Arcana Table **Targeting Experimental Build 81** (`0.15.62-targeting`, version code `81`) source tree. It branches from stable Build 72 source and includes the Android app, Gradle wrapper, Cloudflare room Worker, and dependency lockfiles. The debug APK uses package `com.arcanatable.targeting`, so it installs beside the stable app. Keep this work on `experimental/targeting` until the targeting flow is accepted.
+
+## Changes in Build 81
+
+- Replaces the library/zone strip with a configurable Quick Actions bar. Adjust UI can add, remove, and reorder zone shortcuts and actions such as Draw, Stack, Token, Combat, and Cast Commander; empty zones remain visible with a count of 0.
+- Fixes the missing live Mana Pool section, enlarges mana pips throughout the app, and makes card three-dot menus visually smaller while keeping a 40 dp tap target.
+- Advances the TURN counter once every eligible player has completed a turn; the display remains labeled TURN.
+- Carries forward Build 80’s player battlefield height fix.
+
+Build 81 `testDebugUnitTest` passed (36 tests, 0 failures), and `assembleDebug` completed successfully. The APK is `app/build/outputs/apk/debug/app-debug.apk`, package `com.arcanatable.targeting`, version `0.15.62-targeting`, version code `81`, app label `Arcana Table Targeting 0.15.62 · Build 81`; APK signature verification passed with APK Signature Scheme v2. SHA-256: `4ff4d1b4f83a152bac3c8c9922fd1b261681f758540e311307cf4101a22055d1`.
+
+Build 73 adds a target picker for targeted spells, Auras, activated abilities, and recognized targeted triggers. It records chosen targets on stack items and syncs them in room snapshots. The picker presents visible objects from battlefield, stack, graveyard, exile, revealed zones, and eligible hands, plus a manual-entry field. It estimates target count from card text, but does not certify Magic target legality; users must check the card text and game state. Hidden library cards are not listed.
+
+## Changes in Build 74
+
+- Enlarges opening-hand card faces and scales hand-tray cards as the drawer height changes.
+- Moves Draw, Combat, Stack, turn flow, and secondary game commands into the hand tray; keeps the view selector focused on player/table navigation.
+- Pins the player-screen footer to the bottom and removes the outdated drag-to-play hint.
+- Displays colored mana symbols as colored pips in mana controls and cost displays.
+- Prompts for a creature type after a matching permanent resolves, shows the chosen type on the permanent, and synchronizes that choice with online game state.
+- Adds a small game-log card preview button when a logged card is still present in a public zone.
+
+## Changes in Build 79
+
+- Automatically attempts close Scryfall name matches during import; the review menu appears only for unresolved card names or deck-limit issues, and successful corrections are reported.
+- Table overview cards adapt to player-panel width instead of staying in two narrow fixed columns.
+- The player battlefield window fills available space above the footer, and switching boards opens the battlefield list at its top.
+- Library browsing randomizes the displayed card order and omits stack position numbers while leaving actual deck order unchanged.
+- The Adjust UI editor highlights its selected list item when the matching sample element is tapped or dragged.
+- Larger Cards and Compact presets now make visible changes to card dimensions and footer controls, with separate sliders covering wider ranges.
+- Mana pool is a separate removable/reorderable player-screen element. Tapping the health/activity bar opens Player Status with life controls, commander damage, player counters, and turn/phase details.
+
+Build 79 `testDebugUnitTest` passed (34 tests, 0 failures), and `assembleDebug` completed successfully. The APK is `app/build/outputs/apk/debug/app-debug.apk`, package `com.arcanatable.targeting`, version `0.15.60-targeting`, version code `79`; APK signature verification passed with APK Signature Scheme v2. SHA-256: `05d7014f166a091ce2b926adc60f73033ecfbb2ed054993e1498df11fc043168`.
+
+## Changes in Build 78
+
+- The UI editor's sample layout supports long-press drag reordering for player sections and hand-tray buttons. The moving element lifts and follows the gesture while the surrounding items animate into their new positions.
+- The player footer stays aligned to the bottom edge, with a taller hand control than the two side buttons.
+- The battlefield takes up the available player-screen height and resizes automatically; excess cards remain scrollable.
+- Removed the obsolete Large View toggle from the table view.
+
+Build 78 source is on `experimental/targeting`. `testDebugUnitTest` passed (34 tests, 0 failures), and `assembleDebug` completed successfully. The installable APK is `app/build/outputs/apk/debug/app-debug.apk`, package `com.arcanatable.targeting`, version `0.15.59-targeting`, version code `78`; APK signature verification passed with APK Signature Scheme v2. SHA-256: `74f69e2fa5f335d8efc0fa28e2bd38c661d0a88831ffd642a7412e81671ce4fa`.
 
 The separate `ArcanaTable-build52-source/` folder is stale and should not be used as the project source. Its Gradle metadata still labels it Build 52 and its code is materially different.
 
@@ -92,12 +140,12 @@ These fixes are retained in the Build 62 source and APK.
 
 - The import review now reports unmatched or unverifiable cards, closes after Auto Fix matches every flagged card, and offers the editor when manual correction is still needed.
 - Supported fixed life, draw, and token effects from resolving spells are applied automatically, along with simple creature-entry life triggers. Each automatic action is announced and logged; unsupported effects prompt the player to resolve them manually.
-- A persistent Stack button beside the view tabs shows the stack count and highlights while items are waiting. The hand tray also has a Stack shortcut.
+- A persistent Stack button in the hand tray shows the stack count; the view tabs are reserved for table/player navigation.
 - The What's New dialog now contains confirmed release notes for Builds 60–64 and the Build 65 changes, in a scrollable panel.
 
 ## Build status
 
-Build 72 (`0.15.53`, version code `72`) is the current local source. Build 69 (`0.15.50`, version code `69`) is the latest compiled debug APK. Build 72 has not been compiled.
+Targeting Experimental Build 81 (`0.15.62-targeting`, version code `81`) is the current source on `experimental/targeting`. Its debug package ID is `com.arcanatable.targeting`. Stable Build 72 remains on `main`; the Worker was not deployed for this build.
 
 Build 62 gives every tutorial step a `NEXT` button, explains that the Join Game action needs a room code and password, and lets the tutorial continue without connecting.
 

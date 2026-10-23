@@ -1,0 +1,65 @@
+name: Isolated Argentum engine enhancement validation
+on:
+  push:
+    branches:
+      - gpt/argentum-six-precons
+    paths:
+      - investigation/argentum-six-precons/engine-patches/**
+      - investigation/argentum-six-precons/staged-engine/0002-commander-casts.patch
+      - investigation/argentum-six-precons/staged-engine/CommanderCastHistoryEngineTest.kt
+      - .github/workflows/argentum-engine-enhancements.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: argentum-engine-enhancements-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 7a9663d8e4df4ce7db223023ae7714f0028e08a9
+          path: upstream-engine
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Patch ephemeral upstream engine source (never modify upstream)
+        working-directory: upstream-engine
+        run: |
+          git apply --check ../investigation/argentum-six-precons/engine-patches/0001-granted-cascade.patch
+          git apply ../investigation/argentum-six-precons/engine-patches/0001-granted-cascade.patch
+          git apply --check ../investigation/argentum-six-precons/staged-engine/0002-commander-casts.patch
+          git apply ../investigation/argentum-six-precons/staged-engine/0002-commander-casts.patch
+          cp ../investigation/argentum-six-precons/engine-patches/GrantedCascadeEngineTest.kt \
+            rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/GrantedCascadeEngineTest.kt
+          cp ../investigation/argentum-six-precons/staged-engine/CommanderCastHistoryEngineTest.kt \
+            rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastHistoryEngineTest.kt
+          git diff --check
+      - name: Compile and run new engine-level cascade regressions
+        working-directory: upstream-engine
+        run: |
+          ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
+            -Dorg.gradle.configuration-cache=false \
+            :rules-engine:test --tests '*GrantedCascadeEngineTest' --tests '*CommanderCastHistoryEngineTest'
+      - name: Build experimental SDK and rules-engine jars
+        working-directory: upstream-engine
+        run: |
+          ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
+            -Dorg.gradle.configuration-cache=false \
+            :mtg-sdk:jar :rules-engine:jar :ai:jar
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolated-argentum-engine-enhancement-results
+          path: |
+            upstream-engine/rules-engine/build/test-results/
+            upstream-engine/rules-engine/build/reports/tests/
+            upstream-engine/mtg-sdk/build/libs/*.jar
+            upstream-engine/rules-engine/build/libs/*.jar
+          retention-days: 7

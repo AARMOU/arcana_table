@@ -2,9 +2,20 @@ package com.arcanatable
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class GameRulesTest {
+    @Test
+    fun detectsAsEntersCreatureTypeChoicesButIgnoresFaceDownCards() {
+        val choosingPermanent = GameCard(1, "Type Picker", "Artifact", androidx.compose.ui.graphics.Color.Black, oracleText = "As this enters, choose a creature type.")
+        assertTrue(needsCreatureTypeChoice(choosingPermanent))
+        assertTrue(needsCreatureTypeChoice(choosingPermanent.copy(oracleText = "As this enters the battlefield, choose a creature type.")))
+        assertFalse(needsCreatureTypeChoice(choosingPermanent.copy(isFaceDown = true)))
+        assertFalse(needsCreatureTypeChoice(choosingPermanent.copy(oracleText = "Choose a creature type.")))
+    }
+
     @Test
     fun onlySpellResolutionMovesItsCardOutOfTheStack() {
         assertEquals(true, stackResolutionMovesCardToZone("SPELL"))
@@ -12,6 +23,35 @@ class GameRulesTest {
         assertEquals(false, stackResolutionMovesCardToZone("ACTIVATED ABILITY"))
         assertEquals(false, stackResolutionMovesCardToZone("LOYALTY ABILITY"))
         assertEquals(false, stackResolutionMovesCardToZone("TRIGGER"))
+    }
+
+    @Test
+    fun estimatesRequiredAndOptionalTargetCounts() {
+        assertEquals(TargetCountRange(2, 2), parseTargetCountRange("Destroy target creature and exile target artifact."))
+        assertEquals(TargetCountRange(0, 3), parseTargetCountRange("Choose up to three target creatures."))
+        assertEquals(TargetCountRange(0, 99), parseTargetCountRange("Divide among any number of target creatures."))
+        assertNull(parseTargetCountRange("Draw a card."))
+    }
+
+    @Test
+    fun targetPickerCandidatesIncludeGameObjectsAndRespectHiddenHands() {
+        val ownCreature = GameCard(11, "Own Creature", "Creature", androidx.compose.ui.graphics.Color.Black)
+        val hiddenCard = GameCard(12, "Hidden Card", "Creature", androidx.compose.ui.graphics.Color.Black)
+        val graveCard = GameCard(13, "Grave Card", "Instant", androidx.compose.ui.graphics.Color.Black)
+        val otherHand = GameCard(14, "Opponent Hand", "Sorcery", androidx.compose.ui.graphics.Color.Black)
+        val source = StackAction(id = "source", title = "Source spell", controllerId = "p1", card = GameCard(20, "Source", "Instant", androidx.compose.ui.graphics.Color.Black, oracleText = "Target creature."))
+        val counterspell = StackAction(id = "response", title = "Counterspell", controllerId = "p2", kind = "SPELL", card = GameCard(21, "Counterspell", "Instant", androidx.compose.ui.graphics.Color.Black))
+        val players = listOf(
+            TablePlayer("P1", id = "p1", hand = listOf(hiddenCard), battlefield = listOf(ownCreature)),
+            TablePlayer("P2", id = "p2", hand = listOf(otherHand), graveyard = listOf(graveCard))
+        )
+        val candidates = buildTargetCandidates(players, listOf(source, counterspell), "source", "p1")
+        assertEquals(true, candidates.any { it.key == "player:p1" })
+        assertEquals(true, candidates.any { it.key == "battlefield:p1:11" })
+        assertEquals(true, candidates.any { it.key == "graveyard:p2:13" })
+        assertEquals(true, candidates.any { it.key == "stack:response" })
+        assertEquals(false, candidates.any { it.key == "stack:source" })
+        assertEquals(false, candidates.any { it.key == "hand:p2:14" })
     }
 
     @Test
@@ -125,6 +165,27 @@ class GameRulesTest {
     }
 
     @Test
+    fun carriesChosenTargetsOnStackAcrossOnlineSnapshots() {
+        val player = TablePlayer("YOU", id = "p1")
+        val action = StackAction(
+            id = "targeted-spell",
+            title = "Murder",
+            controllerId = "p1",
+            kind = "SPELL",
+            card = GameCard(71, "Murder", "Instant", androidx.compose.ui.graphics.Color.Black, oracleText = "Destroy target creature."),
+            targetText = "Destroy target creature.",
+            targets = listOf(StackTarget("battlefield:p2:40", "Example Creature", "BATTLEFIELD · Creature", "p2")),
+            targetsConfirmed = true
+        )
+        val state = OnlineGameState(
+            players = listOf(player, TablePlayer("P2", id = "p2")), activePlayer = 0, turnNumber = 1, phaseIndex = 3,
+            elapsedGameSeconds = 0, elapsedTurnSeconds = 0, turnOrder = listOf(0, 1), readyPlayers = emptySet(),
+            gameLog = emptyList(), chat = emptyList(), gameStarted = true, stackActions = listOf(action)
+        )
+        assertEquals(action, parseOnlineGameState(state.toJson())?.stackActions?.single())
+    }
+
+    @Test
     fun spendsColorlessBeforeColoredMana() {
         assertEquals(mapOf("R" to 1, "G" to 1), spendGenericMana(mapOf("C" to 2, "R" to 1, "G" to 1), 2))
     }
@@ -159,8 +220,23 @@ class GameRulesTest {
     }
 
     @Test
-    fun wrapsFinalPhaseToNextPlayerAndTurn() {
-        assertEquals(TurnProgression(0, 0, 5, true), advanceTurnProgression(10, 10, 1, 4, listOf(1, 0), 2))
+    fun wrapsFinalPhaseToNextPlayerWithoutAdvancingRoundUntilOrderCompletes() {
+        assertEquals(TurnProgression(0, 0, 4, true), advanceTurnProgression(10, 10, 1, 4, listOf(1, 0), 2))
+    }
+
+    @Test
+    fun turnCounterChangesAfterEveryEligiblePlayerHasTakenATurn() {
+        val order = listOf(2, 0, 1)
+        val eligible = setOf(0, 1, 2)
+        assertEquals(TurnProgression(0, 0, 8, true), advanceTurnProgression(10, 10, 2, 8, order, 3, eligible))
+        assertEquals(TurnProgression(0, 1, 8, true), advanceTurnProgression(10, 10, 0, 8, order, 3, eligible))
+        assertEquals(TurnProgression(0, 2, 9, true), advanceTurnProgression(10, 10, 1, 8, order, 3, eligible))
+    }
+
+    @Test
+    fun eliminatedSeatsDoNotDelayRoundCounter() {
+        assertEquals(true, isLastEligibleTurnInRound(2, listOf(0, 1, 2, 3), 4, setOf(0, 1, 2)))
+        assertEquals(false, isLastEligibleTurnInRound(1, listOf(0, 1, 2, 3), 4, setOf(0, 1, 2)))
     }
 
     @Test

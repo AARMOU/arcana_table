@@ -1,0 +1,57 @@
+name: Isolated Argentum combat enhancement validation
+on:
+  push:
+    branches: [gpt/argentum-six-precons]
+    paths:
+      - investigation/argentum-six-precons/staged-engine/0003-opponents-must-attack-someone.patch
+      - investigation/argentum-six-precons/staged-engine/OpponentsMustAttackWithCreatureTest.kt
+      - .github/workflows/argentum-combat-enhancements.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: argentum-combat-enhancements-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  combat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 7a9663d8e4df4ce7db223023ae7714f0028e08a9
+          path: upstream-engine
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Patch throwaway engine source with combat requirement
+        working-directory: upstream-engine
+        run: |
+          git apply --check ../investigation/argentum-six-precons/staged-engine/0003-opponents-must-attack-someone.patch
+          git apply ../investigation/argentum-six-precons/staged-engine/0003-opponents-must-attack-someone.patch
+          cp ../investigation/argentum-six-precons/staged-engine/OpponentsMustAttackWithCreatureTest.kt \
+            rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/OpponentsMustAttackWithCreatureTest.kt
+          git diff --check
+      - name: Run mandatory attack and existing Trove regression tests
+        working-directory: upstream-engine
+        run: |
+          ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
+            -Dorg.gradle.configuration-cache=false \
+            :rules-engine:test --tests '*OpponentsMustAttackWithCreatureTest' \
+            --tests '*OpponentsMustAttackYouTest'
+      - name: Compile AI attack decisions against patched combat engine
+        working-directory: upstream-engine
+        run: |
+          ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
+            -Dorg.gradle.configuration-cache=false :ai:compileKotlin
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolated-argentum-combat-test-results
+          path: |
+            upstream-engine/rules-engine/build/test-results/
+            upstream-engine/rules-engine/build/reports/tests/
+          retention-days: 7
