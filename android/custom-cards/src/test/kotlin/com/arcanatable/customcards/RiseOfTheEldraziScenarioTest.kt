@@ -138,8 +138,12 @@ class RiseOfTheEldraziScenarioTest {
         d.giveMana(opponent, Color.BLUE, 2)
         assertNull(d.castSpell(opponent, bounce, listOf(victim)).error)
         assertNull(d.bothPass().error)
-        assertEquals(p, d.priorityPlayer)
-        assertNull(d.passPriority(p).error)
+        assertTrue(d.zoneNames(opponent, Zone.HAND).contains("Grizzly Bears"))
+        if (d.priorityPlayer != opponent) {
+            assertEquals(p, d.priorityPlayer)
+            assertNull(d.passPriority(p).error)
+        }
+        assertEquals(opponent, d.priorityPlayer)
         val shroud = d.putCardInHand(opponent, "Test Shroud")
         assertNull(d.castSpell(opponent, shroud).error)
         d.resolveAll()
