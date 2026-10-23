@@ -1,0 +1,53 @@
+name: Arcana Card Worker Dispatcher
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+concurrency:
+  group: arcana-card-dispatcher
+  cancel-in-progress: false
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner, repo = context.repo.repo;
+            const maxWorkers = 6;
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner, repo, state: 'open', per_page: 100
+            });
+            const active = prs.filter(p => p.draft &&
+              p.head.repo?.full_name === owner + '/' + repo &&
+              p.head.ref.startsWith('copilot/'));
+            const available = Math.max(0, maxWorkers - active.length);
+            core.info('Draft Copilot PRs: ' + active.length + '; open slots: ' + available);
+            if (!available) return;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner, repo, state: 'open', per_page: 100
+            });
+            const queued = issues.filter(i => !i.pull_request &&
+              i.title.startsWith('[Arcana Queue]') &&
+              !(i.assignees || []).length).sort((a,b) => a.number - b.number);
+            for (const issue of queued.slice(0, available)) {
+              try {
+                const response = await github.rest.issues.addAssignees({
+                  owner, repo, issue_number: issue.number, assignees: ['copilot']
+                });
+                const assigned = response.data.assignees?.some(a => a.login.toLowerCase() === 'copilot');
+                if (!assigned) {
+                  core.warning('Copilot assignment not confirmed on issue #' + issue.number);
+                  continue;
+                }
+                core.info('Assigned queue issue #' + issue.number + ' to Copilot. Agent start must be verified separately.');
+              } catch (e) {
+                core.warning('Assignment failed on #' + issue.number + ': ' + e.message);
+                break;
+              }
+            }
