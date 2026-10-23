@@ -1,5 +1,11 @@
 name: Arcana Copilot Billing Watch
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/arcana-copilot-billing-watch.yml'
+      - 'scripts/billing-monitor.cjs'
+      - 'scripts/usage-gate.cjs'
   schedule:
     - cron: '11,41 * * * *'
   workflow_dispatch:
