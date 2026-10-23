@@ -10,7 +10,7 @@ on:
       - .github/workflows/arcana-development-ci.yml
   workflow_dispatch:
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: arcana-development-${{ github.ref }}
   cancel-in-progress: true
@@ -50,6 +50,19 @@ jobs:
           PY
       - name: Check formatting
         run: git diff --check
+      - name: Commit regenerated card assets when changed
+        if: github.event_name == 'push' && github.ref == 'refs/heads/gpt/arcana-integration-next'
+        run: |
+          set -euo pipefail
+          git add android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv
+          if ! git diff --cached --quiet; then
+            git config user.name 'github-actions[bot]'
+            git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+            git commit -m 'Regenerate B131 integrated custom-card assets'
+            git push origin HEAD:gpt/arcana-integration-next
+          else
+            echo 'Card assets already match source definitions'
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:
