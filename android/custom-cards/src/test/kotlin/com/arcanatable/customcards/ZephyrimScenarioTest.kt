@@ -8,6 +8,7 @@ import com.wingedsheep.engine.core.PaymentStrategy
 import com.wingedsheep.engine.state.components.identity.MiracleWindowComponent
 import com.wingedsheep.engine.state.components.identity.TokenComponent
 import com.wingedsheep.engine.state.components.player.CardsDrawnThisTurnComponent
+import com.wingedsheep.engine.state.components.player.ManaPoolComponent
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
@@ -70,8 +71,16 @@ class ZephyrimScenarioTest {
             d.state.getEntity(zephyrimCard)?.has<MiracleWindowComponent>() == true,
         )
 
-        val miracleCast = d.legalActions(p).mapNotNull { it.action as? CastSpell }
-            .single { it.cardId == zephyrimCard && it.alternativeCostType == AlternativeCostType.MIRACLE }
+        val casts = d.legalActions(p).mapNotNull { it.action as? CastSpell }
+        val miracleCasts = casts.filter {
+            it.cardId == zephyrimCard && it.alternativeCostType == AlternativeCostType.MIRACLE
+        }
+        assertTrue(
+            "Miracle action missing (active=${d.activePlayer}, priority=${d.priorityPlayer}, " +
+                "step=${d.currentStep}, mana=${d.state.getEntity(p)?.get<ManaPoolComponent>()}, casts=$casts)",
+            miracleCasts.isNotEmpty(),
+        )
+        val miracleCast = miracleCasts.single()
         assertNull(d.submit(miracleCast).error)
         d.resolveAll()
 
