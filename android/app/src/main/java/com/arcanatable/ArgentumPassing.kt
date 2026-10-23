@@ -27,6 +27,26 @@ object ArgentumPassing {
 
     data class Outcome(val step: Step, val reason: String? = null)
 
+    /** Only the engine's explicit phase/step labels qualify. Unknown labels do not invent a stop. */
+    internal fun selectedOpponentWindow(
+        phaseName: String?,
+        stepName: String?,
+        stopAtPrecombat: Boolean,
+        stopAtEndStep: Boolean,
+    ): String? {
+        fun normalized(value: String?): String = value.orEmpty().trim().uppercase()
+            .replace('_', ' ').replace(Regex("\\s+"), " ")
+        val phase = normalized(phaseName)
+        val step = normalized(stepName)
+        // Argentum 61e71e SDK: Phase.PRECOMBAT_MAIN + Step.PRECOMBAT_MAIN,
+        // and Phase.ENDING + Step.END. The Android protocol normalizes underscores.
+        if (stopAtPrecombat && phase == "PRECOMBAT MAIN" && step == "PRECOMBAT MAIN")
+            return "Opponent's precombat main phase"
+        if (stopAtEndStep && phase == "ENDING" && step == "END")
+            return "Opponent's end step"
+        return null
+    }
+
     /**
      * One tick of "Pass to my turn". Stops for any decision, for being attacked (a block
      * declaration), for an attack declaration, for an opponent's spell or ability on the stack,
@@ -43,6 +63,10 @@ object ArgentumPassing {
         opponentStackItem: String?,
         gameOver: Boolean,
         awaitingUpdate: Boolean,
+        currentPhaseName: String? = null,
+        currentStepName: String? = null,
+        stopAtOpponentPrecombat: Boolean = false,
+        stopAtOpponentEndStep: Boolean = false,
     ): Outcome = when {
         gameOver -> Outcome(Step.INTERRUPTED, "The game is over.")
         activePlayer == localSeat && turnNumber > startTurn -> Outcome(Step.REACHED_YOUR_TURN)
@@ -51,6 +75,9 @@ object ArgentumPassing {
         "DeclareBlockers" in legalActionTypes -> Outcome(Step.INTERRUPTED, "You're being attacked. Declare blockers.")
         "DeclareAttackers" in legalActionTypes -> Outcome(Step.INTERRUPTED, "You can declare attackers.")
         opponentStackItem != null -> Outcome(Step.INTERRUPTED, "$opponentStackItem is on the stack. You can respond.")
+        activePlayer != localSeat && priorityPlayer == localSeat && "PassPriority" in legalActionTypes &&
+            selectedOpponentWindow(currentPhaseName, currentStepName, stopAtOpponentPrecombat, stopAtOpponentEndStep) != null ->
+                Outcome(Step.INTERRUPTED, selectedOpponentWindow(currentPhaseName, currentStepName, stopAtOpponentPrecombat, stopAtOpponentEndStep))
         "PassPriority" in legalActionTypes && priorityPlayer == localSeat -> Outcome(Step.PASS)
         "PassPriority" in legalActionTypes && priorityPlayer < 0 -> Outcome(Step.PASS)
         else -> Outcome(Step.WAIT)

@@ -1,0 +1,63 @@
+name: B131 worker 06 — selected priority-stop validation
+on:
+  push:
+    branches: [gpt/b131-worker06-priority-stop-prefs-20261022]
+    paths:
+      - .github/workflows/b131-worker06-priority-stops.yml
+      - android/app/src/main/java/com/arcanatable/ArgentumPassing.kt
+      - android/app/src/main/java/com/arcanatable/TableEffects.kt
+      - android/app/src/main/java/com/arcanatable/TableController.kt
+      - android/app/src/main/java/com/arcanatable/TableDialogs.kt
+      - android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
+      - android/app/src/test/java/com/arcanatable/ArgentumOpponentStopTest.kt
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-stop-settings:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify B131 ancestry and engine/card hashes
+        shell: bash
+        run: |
+          git merge-base --is-ancestor af6bad65f67c5c2fc5acffd9b14de7d5d1b0527b HEAD
+          git diff --check af6bad65f67c5c2fc5acffd9b14de7d5d1b0527b HEAD
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          m=json.loads(Path("docs/integration/B131_RUNTIME.json").read_text())
+          assert m["upstream"]=="61e71e586b100faa661f86cac827ac3c3bbb5a78"
+          for n,sha in m["files"].items():
+              p=(Path("android/app/libs")/Path(n).name) if n.startswith("libs/") else (Path("android/app/src/main/assets/argentum")/Path(n).name)
+              assert hashlib.sha256(p.read_bytes()).hexdigest()==sha,n
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Test optional real-priority stopping decisions
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests com.arcanatable.ArgentumOpponentStopTest
+      - name: Run full B131 card and Android regression, lint and assemble
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      - name: Archive test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b131-worker06-priority-stop-evidence
+          retention-days: 30
+          path: |
+            android/app/build/test-results/
+            android/app/build/reports/tests/
+            android/app/build/reports/lint-results-debug.*
+            android/custom-cards/build/test-results/
+          if-no-files-found: warn

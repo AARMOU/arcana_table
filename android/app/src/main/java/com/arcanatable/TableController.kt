@@ -486,6 +486,9 @@ internal class TableController(
     var argentumUndoAvailable by run { mutableStateOf(false) }
     /** Turn number when "Pass to my turn" was switched on; null when it is off. */
     var passToMyTurnFrom by run { mutableStateOf<Int?>(null) }
+    /** Optional stops only affect the client pass-to-my-turn loop, not engine priority. */
+    var stopAtOpponentPrecombat by run { mutableStateOf(optionPrefs.getBoolean("stop_opponent_precombat", false)) }
+    var stopAtOpponentEndStep by run { mutableStateOf(optionPrefs.getBoolean("stop_opponent_end_step", false)) }
     var followActivePlayer by run { mutableStateOf(optionPrefs.getBoolean("follow_active_player", true)) }
     var quietOpponentTurns by run { mutableStateOf(optionPrefs.getBoolean("quiet_opponent_turns", false)) }
     /** Offline games: how many AI opponents (1 = a duel, 3 = a four-player game). */
