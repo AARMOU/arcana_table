@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - gpt/six-precon-worker-**
+      - copilot/gptsix-precon-worker-eldrazi-missing-cards
     paths:
       - android/custom-cards/src/**
       - .github/workflows/argentum-six-precons-worker.yml
