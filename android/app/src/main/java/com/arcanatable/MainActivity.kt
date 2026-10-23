@@ -131,6 +131,10 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 class MainActivity : ComponentActivity() {
+    /** Current screen controller, also used by integration tests of the parked server transport. */
+    internal var tableController: TableController? = null
+        private set
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
@@ -144,15 +148,20 @@ class MainActivity : ComponentActivity() {
             }
             previousHandler?.uncaughtException(thread, error)
         }
-        setContent { TableScreen() }
+        setContent { TableScreen(onControllerReady = { tableController = it }) }
     }
 
     override fun onResume() { super.onResume(); appInForeground = true }
     override fun onPause() { appInForeground = false; super.onPause() }
+    override fun onDestroy() { tableController = null; super.onDestroy() }
 }
 
 @Composable
-fun TableScreen() {
+fun TableScreen() = TableScreen(onControllerReady = {})
+
+/** Lets integration tests start the retained server transport without enabling its parked menu. */
+@Composable
+internal fun TableScreen(onControllerReady: (TableController) -> Unit) {
     val context = LocalContext.current
     val optionPrefs = remember { context.getSharedPreferences("arcana_options", Context.MODE_PRIVATE) }
     var darkMode by rememberSaveable { mutableStateOf(optionPrefs.getBoolean("dark_mode", true)) }
@@ -165,7 +174,7 @@ fun TableScreen() {
             TableScreenContent(darkMode, onToggleTheme = {
                 darkMode = !darkMode
                 optionPrefs.edit().putBoolean("dark_mode", darkMode).apply()
-            })
+            }, onControllerReady = onControllerReady)
             CardZoomOverlay(cardZoom)
         }
     }
@@ -173,11 +182,12 @@ fun TableScreen() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
+internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, onControllerReady: (TableController) -> Unit = {}) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val cardZoom = LocalCardZoom.current
     val t = remember { TableController(context, scope, cardZoom) }
+    SideEffect { onControllerReady(t) }
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
     t.configuration = configuration

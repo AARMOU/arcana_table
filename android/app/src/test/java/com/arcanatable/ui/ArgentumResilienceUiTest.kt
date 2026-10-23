@@ -93,7 +93,7 @@ class ArgentumResilienceUiTest {
         useServer("http://127.0.0.1:9") // nothing listens on the discard port
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        UiTestSupport.playWithArgentum(rule)
+        UiTestSupport.playWithArgentum(rule, scenario)
         UiTestSupport.awaitReal(rule, 40_000, "deck-check error dialog") { shown("Argentum deck check") }
         shot(scenario, "01-unreachable")
         assertFalse("must not be stuck in a loading state", shown("CHECKING DECK WITH ARGENTUM"))
@@ -115,7 +115,7 @@ class ArgentumResilienceUiTest {
         UiTestSupport.settle(rule)
 
         // Start: real app flow against the fake server.
-        UiTestSupport.playWithArgentum(rule)
+        UiTestSupport.playWithArgentum(rule, scenario)
         UiTestSupport.awaitReal(rule, 30_000, "needs-handling decision panel") { shown("NEEDS HANDLING") && shown("REFRESH") }
         shot(scenario, "02-needs-handling-dialog")
         assertTrue(shown("time travel"))
@@ -139,6 +139,14 @@ class ArgentumResilienceUiTest {
         fake.send(JSONObject().put("type", "someFutureMessageType").put("x", 1))
         UiTestSupport.awaitReal(rule, 10_000, "unreadable message logged as an error") { diagnostics().contains("could not read") }
         assertTrue("app still shows the game", tableShown())
+        // Malformed data deliberately opens a recovery dialog. Acknowledge it before testing
+        // lifecycle and menu actions, otherwise those gestures hit the modal instead of the board.
+        UiTestSupport.awaitReal(rule, 5_000, "malformed-message recovery dialog") {
+            shown("Argentum sent a message Arcana could not read.")
+        }
+        rule.onNodeWithText("OK").performClick()
+        UiTestSupport.settle(rule, 300)
+        assertFalse("recovery dialog dismissed", shown("Argentum sent a message Arcana could not read."))
 
         // Backgrounded drop: Arcana pauses instead of reconnecting (Argentum would auto-resume).
         val connectionsBefore = fake.connections.get()
@@ -173,7 +181,14 @@ class ArgentumResilienceUiTest {
         rule.onNodeWithText("Options").performClick()
         UiTestSupport.settle(rule, 500)
         // Options → Help & diagnostics (the page scrolls; bring the row into view first).
-        rule.onNodeWithText("Diagnostic log").performScrollTo()
+        // performScrollTo repeatedly checks bounds; with the manual game clock paused its scroll
+        // coroutine never gets a frame and that loop cannot finish. Let Compose drive this action.
+        rule.mainClock.autoAdvance = true
+        try {
+            rule.onNodeWithText("Diagnostic log").performScrollTo()
+        } finally {
+            rule.mainClock.autoAdvance = false
+        }
         rule.onNodeWithText("Diagnostic log").performClick()
         UiTestSupport.settle(rule, 500)
         rule.onNode(hasTestTag("diagnostic-search")).performTextInput("needs handling")
@@ -200,7 +215,7 @@ class ArgentumResilienceUiTest {
         useServer(fake.origin)
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        UiTestSupport.playWithArgentum(rule)
+        UiTestSupport.playWithArgentum(rule, scenario)
         UiTestSupport.awaitReal(rule, 30_000, "primary button offers the declaration") { shown("DECLARE ATTACKERS") }
         rule.onAllNodesWithText("DECLARE ATTACKERS")[0].performSemanticsAction(SemanticsActions.OnClick)
         UiTestSupport.awaitReal(rule, 5_000, "attack board") { rule.onAllNodes(hasTestTag("combat-board"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() && shown("NO ATTACK") }
@@ -239,7 +254,7 @@ class ArgentumResilienceUiTest {
         useServer(fake.origin)
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        UiTestSupport.playWithArgentum(rule)
+        UiTestSupport.playWithArgentum(rule, scenario)
         UiTestSupport.awaitReal(rule, 30_000, "combat damage board") { shown("CONFIRM DAMAGE") }
         assertFalse("combat damage is no longer a needs-handling case", shown("NEEDS HANDLING"))
         assertTrue(shown("Stone Wall") && shown("lethal 3"))
@@ -268,7 +283,7 @@ class ArgentumResilienceUiTest {
         useServer(fake.origin)
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        UiTestSupport.playWithArgentum(rule)
+        UiTestSupport.playWithArgentum(rule, scenario)
         UiTestSupport.awaitReal(rule, 30_000, "table") { tableShown() }
         rule.onNode(hasTestTag("player-tab-you")).performClick()
         UiTestSupport.settle(rule, 800)
@@ -280,7 +295,9 @@ class ArgentumResilienceUiTest {
         UiTestSupport.settle(rule, 1_200)
         scenario.onActivity { UiTestSupport.screenshot(it, "resilience-12-no-mana-abilities") }
         assertFalse("mana ability must not be offered", shown("Add {G}"))
-        assertTrue("sheet explains that mana is automatic", shown("Mana is paid automatically"))
+        // Build 128 also supports explicitly floating mana from a source's own sheet, so the
+        // global action list no longer claims that all mana use is automatic.
+        assertFalse("global actions do not show the retired automatic-only mana hint", shown("Mana is paid automatically"))
         assertTrue("nothing was sent", fake.received.none { it.optString("type") == "submitAction" })
         scenario.close()
     }
@@ -303,7 +320,7 @@ class ArgentumResilienceUiTest {
         useServer(fake.origin)
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        UiTestSupport.playWithArgentum(rule)
+        UiTestSupport.playWithArgentum(rule, scenario)
         UiTestSupport.awaitReal(rule, 30_000, "table") { tableShown() }
         // Open Argentum's actions from the hand drawer and pick the spell.
         rule.onNode(hasTestTag("player-tab-you")).performClick()
