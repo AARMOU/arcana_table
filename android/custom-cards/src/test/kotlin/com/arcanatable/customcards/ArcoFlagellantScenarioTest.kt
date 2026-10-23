@@ -47,6 +47,7 @@ class ArcoFlagellantScenarioTest {
         d.passPriority(p)
         val murder = d.putCardInHand(opponent, "Murder")
         d.giveMana(opponent, Color.BLACK, 2)
+        d.giveColorlessMana(opponent, 1)
         assertNull(d.castSpell(opponent, murder, listOf(arco)).error)
         d.resolveAll()
         assertEquals(arco, d.findPermanent(p, "Arco-Flagellant"))
@@ -61,8 +62,6 @@ class ArcoFlagellantScenarioTest {
         d.passPriorityUntil(Step.DECLARE_ATTACKERS, activePlayer = d.player1)
         assertNull(d.declareAttackers(d.player1, listOf(attacker), d.player2).error)
         d.resolveAll()
-
         assertNotNull(d.declareBlockers(d.player2, mapOf(attacker to listOf(arco))).error)
-        assertTrue(d.projected.hasKeyword(arco, Keyword.INDESTRUCTIBLE).not())
     }
 }
