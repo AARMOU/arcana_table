@@ -47,11 +47,12 @@ jobs:
               !(i.assignees || []).length).sort((a,b) => a.number - b.number);
             for (const issue of queued.slice(0, available)) {
               try {
-                const response = await github.rest.issues.addAssignees({
+                const response = await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees', {
                   owner, repo, issue_number: issue.number, assignees: ['copilot-swe-agent[bot]'],
                   agent_assignment: {
                     target_repo: owner + '/' + repo,
-                    base_branch: 'gpt/six-precon-worker-integration-20261022'
+                    base_branch: 'gpt/six-precon-worker-integration-20261022',
+                    custom_instructions: '', custom_agent: '', model: ''
                   }
                 });
                 const assigned = response.data.assignees?.some(a => a.login.toLowerCase().startsWith('copilot-swe-agent'));
