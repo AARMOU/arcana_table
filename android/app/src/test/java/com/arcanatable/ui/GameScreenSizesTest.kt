@@ -71,7 +71,7 @@ class GameScreenSizesTest {
         fake.dealOpeningHand = true
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        UiTestSupport.playWithArgentum(rule)
+        UiTestSupport.playWithArgentum(rule, scenario)
         UiTestSupport.awaitReal(rule, 30_000, "opening hand screen") { shown("Opening hand") && shown("MULLIGAN") }
         UiTestSupport.settle(rule, 600)
         scenario.onActivity { UiTestSupport.screenshot(it, "game-$name-0-opening-hand") }
@@ -82,7 +82,7 @@ class GameScreenSizesTest {
         scenario.onActivity { UiTestSupport.screenshot(it, "game-$name-1-table") }
 
         // Own board and hand drawer.
-        rule.onNode(androidx.compose.ui.test.hasTestTag("player-tab-you")).performClick()
+        UiTestSupport.clickTag(rule, "player-tab-you")
         UiTestSupport.settle(rule, 800)
         scenario.onActivity { UiTestSupport.screenshot(it, "game-$name-2-board") }
         listOf("DRAW", "TOKEN", "SHUFFLE", "NEXT STEP  ›", "MANA POOL ·").forEach {
@@ -103,7 +103,9 @@ class GameScreenSizesTest {
         rule.onNode(hasTestTag("bottom-bar-pass-button")).performTouchInput { down(center); advanceEventTime(1_000); up() }
         UiTestSupport.awaitReal(rule, 5_000, "adjacent pass button enables auto-pass") { shown("AUTO-PASSING · STOP", substring = false) }
         rule.onNode(hasTestTag("bottom-bar-pass-button")).performClick()
-        UiTestSupport.awaitReal(rule, 5_000, "adjacent pass button stops auto-pass") { shown("PASS →", substring = false) }
+        UiTestSupport.awaitReal(rule, 5_000, "adjacent pass button stops auto-pass") {
+            shown("PASS → TO ATTACKERS", substring = false) && !shown("AUTO-PASSING · STOP", substring = false)
+        }
 
         // Button audit: every visible clickable node is enabled with a label, or explicitly disabled.
         val unlabeledClickable = rule.onAllNodes(androidx.compose.ui.test.hasClickAction(), useUnmergedTree = false).fetchSemanticsNodes()

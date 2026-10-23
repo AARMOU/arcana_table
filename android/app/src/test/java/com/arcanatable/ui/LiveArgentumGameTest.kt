@@ -96,7 +96,7 @@ class LiveArgentumGameTest {
         shot(scenario, "01-home-with-deck")
 
         // 1. Start: Argentum validates the deck, opens a vs-AI Commander lobby and starts the game.
-        UiTestSupport.playWithArgentum(rule)
+        UiTestSupport.playWithArgentum(rule, scenario)
         var kept = false
         UiTestSupport.awaitReal(rule, 120_000, "Argentum mulligan, then the first authoritative state on the table") {
             if (!kept && textShown("MULLIGAN") && textShown("KEEP ")) {
@@ -193,7 +193,7 @@ class LiveArgentumGameTest {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         current = scenario
         UiTestSupport.settle(rule)
-        UiTestSupport.playWithArgentum(rule)
+        UiTestSupport.playWithArgentum(rule, scenario)
         UiTestSupport.awaitReal(rule, 60_000, "needs-handling review from Argentum's validator") { textShown("Cards need handling") }
         assertTrue(textShown("Arcana Test Card That Does Not Exist"))
         assertTrue("nothing changed before the player chooses", textShown("Nothing has been changed"))

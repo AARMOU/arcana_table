@@ -6,8 +6,6 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTouchInput
-import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
@@ -102,31 +100,34 @@ class DesignPreviewTest {
     private fun run(name: String) {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        UiTestSupport.playWithArgentum(rule)
+        UiTestSupport.playWithArgentum(rule, scenario)
         runCatching { UiTestSupport.awaitReal(rule, 30_000, "Argentum table") { rule.onAllNodes(hasTestTag("phase-tracker"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() || shown("Game active") } }
             .onFailure { scenario.onActivity { a -> UiTestSupport.screenshot(a, "design-$name-0-timeout") }; throw it }
         UiTestSupport.settle(rule, 1_000)
-        rule.onNode(hasTestTag("player-tab-you")).performClick()
+        UiTestSupport.clickTag(rule, "player-tab-you")
         UiTestSupport.settle(rule, 1_000)
         scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-1-your-board") }
         assertTrue(shown("PASS → TO COMBAT"))
-        // Tap-and-hold shows the card large; letting go without moving keeps it up until a tap.
+        // The card's long-click accessibility action opens the same preview as a physical hold.
+        // Physical hold/release and tap dismissal are also covered by ArgentumGestureUiTest.
         // A card shows its name as text until its art loads, then as the art's description (PC builds load art).
-        rule.onAllNodes(androidx.compose.ui.test.hasText("Rain of Riches", substring = true) or androidx.compose.ui.test.hasContentDescription("Rain of Riches", substring = true))[0]
-            .performTouchInput { longClick() }
+        val namedCard = androidx.compose.ui.test.hasText("Rain of Riches", substring = true) or
+            androidx.compose.ui.test.hasContentDescription("Rain of Riches", substring = true)
+        rule.onAllNodes(namedCard and androidx.compose.ui.test.SemanticsMatcher.keyIsDefined(androidx.compose.ui.semantics.SemanticsActions.OnLongClick))[0]
+            .performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnLongClick)
         UiTestSupport.settle(rule, 800)
         assertTrue("hold-to-preview opened", rule.onAllNodes(hasTestTag("card-zoom"), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-1b-hold-preview") }
-        rule.onNode(hasTestTag("card-zoom")).performClick()
+        UiTestSupport.clickTag(rule, "card-zoom")
         UiTestSupport.settle(rule, 600)
         assertTrue("tap closes the preview", rule.onAllNodes(hasTestTag("card-zoom"), useUnmergedTree = true).fetchSemanticsNodes().isEmpty())
-        rule.onNode(hasTestTag("player-tab-0")).performClick()
+        UiTestSupport.clickTag(rule, "player-tab-0")
         UiTestSupport.settle(rule, 1_000)
         scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-2-opponent-board") }
         rule.onAllNodesWithText("TABLE", substring = false)[0].performClick()
         UiTestSupport.settle(rule, 1_000)
         scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-3-table") }
-        rule.onNode(hasTestTag("player-tab-you")).performClick()
+        UiTestSupport.clickTag(rule, "player-tab-you")
         UiTestSupport.settle(rule, 1_500)
         runCatching { rule.onNode(hasTestTag("hand-peek")).performClick() }
             .onFailure { scenario.onActivity { a -> UiTestSupport.screenshot(a, "design-$name-x-no-hand-peek") }; throw it }
@@ -161,7 +162,7 @@ class DesignPreviewTest {
         state.put("activePlayerId", state.getJSONArray("players").getJSONObject(0).getString("playerId")).put("currentStep", "DECLARE_BLOCKERS")
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         UiTestSupport.settle(rule)
-        UiTestSupport.playWithArgentum(rule)
+        UiTestSupport.playWithArgentum(rule, scenario)
         UiTestSupport.awaitReal(rule, 30_000, "declare blockers offered") { shown("DECLARE BLOCKERS") }
         UiTestSupport.settle(rule, 800)
         rule.onAllNodesWithText("DECLARE BLOCKERS")[0].performSemanticsAction(androidx.compose.ui.semantics.SemanticsActions.OnClick)

@@ -1,0 +1,81 @@
+name: Arcana Development CI
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: arcana-development-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+jobs:
+  cards:
+    name: Custom-card export and scenarios
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Execute every scenario and regenerate exports
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :custom-cards:exportCards
+      - name: Verify committed export parity and absence of drift
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          root=Path('android/app/src/main/assets/argentum')
+          names=[s.split('\t')[0] for s in (root/'custom-cards.index.tsv').read_text().splitlines() if s.strip()]
+          data=[json.loads(s)['name'] for s in (root/'custom-cards.jsonl').read_text().splitlines() if s.strip()]
+          assert names==data and len(names)==len(set(n.casefold() for n in names))
+          PY
+          git diff --exit-code -- android/app/src/main/assets/argentum/custom-cards.index.tsv android/app/src/main/assets/argentum/custom-cards.jsonl
+          git diff --check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: custom-card-regression-${{ github.run_id }}
+          path: |
+            android/custom-cards/build/test-results/
+            android/custom-cards/build/reports/tests/
+          if-no-files-found: error
+  android:
+    name: Android JVM, lint and compilation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Execute complete Android JVM suite
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+      - name: Lint and compile without publishing a binary
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:lintDebug :app:compileDebugKotlin
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-regression-${{ github.run_id }}
+          path: |
+            android/app/build/test-results/
+            android/app/build/reports/tests/
+            android/app/build/reports/lint-results-debug.*
+          if-no-files-found: error
