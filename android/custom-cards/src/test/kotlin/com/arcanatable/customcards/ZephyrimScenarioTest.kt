@@ -5,13 +5,16 @@ import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.AlternativeCostType
 import com.wingedsheep.engine.core.CastSpell
 import com.wingedsheep.engine.core.PaymentStrategy
+import com.wingedsheep.engine.state.components.identity.MiracleWindowComponent
 import com.wingedsheep.engine.state.components.identity.TokenComponent
+import com.wingedsheep.engine.state.components.player.CardsDrawnThisTurnComponent
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.dsl.Effects
 import com.wingedsheep.sdk.dsl.card
 import com.wingedsheep.sdk.scripting.ChoiceSlot
+import com.wingedsheep.sdk.scripting.KeywordAbility
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -54,6 +57,18 @@ class ZephyrimScenarioTest {
         d.passPriorityUntil(Step.DRAW, activePlayer = p)
         d.giveMana(p, Color.WHITE)
         d.giveColorlessMana(p, 1)
+
+        val definition = d.cardRegistry.requireCard("Zephyrim")
+        assertTrue(
+            "Miracle must survive the custom-card data round trip",
+            definition.keywordAbilities.any { it is KeywordAbility.Miracle },
+        )
+        assertTrue("Zephyrim must be in hand after the draw", zephyrimCard in d.getHand(p))
+        assertEquals(1, d.state.getEntity(p)?.get<CardsDrawnThisTurnComponent>()?.count)
+        assertTrue(
+            "The first-draw Miracle window must be open",
+            d.state.getEntity(zephyrimCard)?.has<MiracleWindowComponent>() == true,
+        )
 
         val miracleCast = d.legalActions(p).mapNotNull { it.action as? CastSpell }
             .single { it.cardId == zephyrimCard && it.alternativeCostType == AlternativeCostType.MIRACLE }
