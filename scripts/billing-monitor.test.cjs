@@ -85,13 +85,14 @@ test('empty GitHub billing response provides safe, specific diagnostic',async()=
  assert.equal(x.error,'empty-billing-usage-items');
  assert.equal(x.status.maxNewAssignments,0);
 });
-test('unrecognized Copilot SKU is distinguished without exposing usage',async()=>{
+test('new Copilot SKU is accepted only with verified AI-credit unit',async()=>{
  const x=await m.readBudget({COPILOT_BILLING_READ_TOKEN:'dummy',ARCANA_AI_CREDIT_BUDGET:'1500'},
  {now,fetchImpl:async()=>({ok:true,json:async()=>report([
   {product:'Copilot',sku:'Future SKU',unitType:'ai-credits',grossQuantity:471}
  ])})});
- assert.equal(x.error,'unrecognized-copilot-sku');
- assert.equal(x.status.maxNewAssignments,0);
+ assert.equal(x.error,null);
+ assert.equal(x.snapshot.reportedUsed,471);
+ assert.equal(x.status.level,'normal');
 });
 test('no Copilot item is distinguished from an empty report',async()=>{
  const x=await m.readBudget({COPILOT_BILLING_READ_TOKEN:'dummy',ARCANA_AI_CREDIT_BUDGET:'1500'},
@@ -100,4 +101,19 @@ test('no Copilot item is distinguished from an empty report',async()=>{
  ])})});
  assert.equal(x.error,'no-copilot-usage-items');
  assert.equal(x.status.maxNewAssignments,0);
+});
+
+test('new SKU with wrong units never authorizes spending',async()=>{
+ const x=await m.readBudget({COPILOT_BILLING_READ_TOKEN:'dummy',ARCANA_AI_CREDIT_BUDGET:'1500'},
+ {now,fetchImpl:async()=>({ok:true,json:async()=>report([
+  {product:'Copilot',sku:'Future SKU',unitType:'requests',grossQuantity:471}
+ ])})});
+ assert.equal(x.error,'wrong-unit-or-quantity');
+ assert.equal(x.status.maxNewAssignments,0);
+});
+test('mixed unrelated Actions usage excluded by Copilot product',()=>{
+ assert.equal(m.usageQuantity(report([
+  {product:'Actions',sku:'Compute',unitType:'ai-credits',grossQuantity:999999},
+  {product:'Copilot',sku:'Unrecognized AI Credit SKU',unitType:'ai-credits',grossQuantity:471.4}
+ ]),now),471.4);
 });
