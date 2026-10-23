@@ -48,4 +48,24 @@ class SufferThePastScenarioTest {
         assertTrue(d.zoneNames(opponent, Zone.GRAVEYARD).isEmpty())
         assertTrue(d.zoneNames(p, Zone.GRAVEYARD).containsAll(listOf("Grizzly Bears", "Suffer the Past")))
     }
+    @Test
+    fun canTargetYourOwnGraveyard() {
+        val d = customScenario(SufferThePast, "Grizzly Bears")
+        val caster = d.player1
+        val bear = d.putCardInGraveyard(caster, "Grizzly Bears")
+        val spell = d.putCardInHand(caster, "Suffer the Past")
+        d.giveMana(caster, Color.BLACK)
+        d.giveColorlessMana(caster, 1)
+        val result = d.submit(CastSpell(
+            playerId = caster,
+            cardId = spell,
+            targets = listOf(ChosenTarget.Player(caster), ChosenTarget.Card(bear, caster, Zone.GRAVEYARD)),
+            xValue = 1,
+            paymentStrategy = PaymentStrategy.FromPool,
+        ))
+        assertNull("Oracle permits targeting yourself", result.error)
+        d.resolveAll()
+        assertEquals(20, d.getLifeTotal(caster))
+        assertTrue(d.zoneNames(caster, Zone.EXILE).contains("Grizzly Bears"))
+    }
 }
