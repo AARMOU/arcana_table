@@ -62,6 +62,7 @@ class ArcoFlagellantScenarioTest {
         d.passPriorityUntil(Step.DECLARE_ATTACKERS, activePlayer = d.player1)
         assertNull(d.declareAttackers(d.player1, listOf(attacker), d.player2).error)
         d.resolveAll()
+        d.passPriorityUntil(Step.DECLARE_BLOCKERS, activePlayer = d.player1)
         assertNotNull(d.declareBlockers(d.player2, mapOf(attacker to listOf(arco))).error)
     }
 }
