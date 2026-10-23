@@ -36,6 +36,11 @@ class RiseOfTheEldraziScenarioTest {
         val handSizeBeforeCast = d.getHand(p).size
         d.giveColorlessMana(p, 11)
 
+        assertEquals(d.player2, d.priorityPlayer)
+        assertNull(d.passPriority(d.player2).error)
+        assertEquals(p, d.priorityPlayer)
+        assertEquals(p, d.activePlayer)
+        assertEquals(Step.PRECOMBAT_MAIN, d.currentStep)
         assertTrue(RiseOfTheEldrazi.script.cantBeCountered)
         assertNull(d.castSpell(p, spell).error)
         d.resolveAll()
