@@ -31,7 +31,7 @@ class ArgentumOpponentStopTest {
         assertEquals(ArgentumPassing.Step.INTERRUPTED, actual.step)
         assertEquals("Opponent's end step", actual.reason)
         assertEquals(ArgentumPassing.Step.WAIT, outcome("ENDING", "END", endStep = true, localPriority = false).step)
-        assertEquals(ArgentumPassing.Step.PASS, outcome("ENDING", "END", endStep = true, localTurn = true).step)
+        assertEquals(ArgentumPassing.Step.REACHED_YOUR_TURN, outcome("ENDING", "END", endStep = true, localTurn = true).step)
         assertEquals(ArgentumPassing.Step.WAIT, outcome("ENDING", "END", endStep = true, legal = emptySet()).step)
         assertEquals(ArgentumPassing.Step.PASS, outcome("ENDING", "CLEANUP", endStep = true).step)
     }
