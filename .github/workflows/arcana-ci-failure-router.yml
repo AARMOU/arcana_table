@@ -49,7 +49,8 @@ jobs:
               core.info('Run already routed'); return;
             }
             // Never loop indefinitely: three automated repair requests per PR.
-            if (routed.length >= 3) {\n              if (comments.some(c => c.body?.includes('<!-- arcana-ci-repair-escalation -->'))) return;
+            if (routed.length >= 3) {
+              if (comments.some(c => c.body?.includes('<!-- arcana-ci-repair-escalation -->'))) return;
               core.warning('Automated repair limit reached for PR #' + pr.number);
               await github.rest.issues.createComment({
                 owner, repo, issue_number: pr.number,
