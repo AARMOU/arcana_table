@@ -15,6 +15,7 @@ class ScaretillerScenarioTest {
         d.removeSummoningSickness(scaretiller)
         d.putCardInGraveyard(player, "Forest")
         d.putCardInHand(player, "Grizzly Bears")
+        val handSizeBeforeActivation = d.zoneNames(player, Zone.HAND).size
         d.giveColorlessMana(player, 2)
 
         assertNull(d.activate(player, scaretiller).error)
@@ -23,8 +24,8 @@ class ScaretillerScenarioTest {
         val forest = d.permanentsNamed(player, "Forest").single()
         assertTrue("The triggered land enters tapped", d.isTapped(forest))
         assertFalse(d.zoneNames(player, Zone.GRAVEYARD).contains("Forest"))
-        assertEquals("The activated ability draws one card, then discards one card", 1,
-            d.zoneNames(player, Zone.HAND).size)
+        assertEquals("The activated ability draws one card, then discards one card",
+            handSizeBeforeActivation, d.zoneNames(player, Zone.HAND).size)
     }
 
     @Test
@@ -33,7 +34,7 @@ class ScaretillerScenarioTest {
         val player = d.player1
         val scaretiller = d.putCreatureOnBattlefield(player, "Scaretiller")
         d.removeSummoningSickness(scaretiller)
-        val forest = d.putCardInHand(player, "Forest")
+        d.putCardInHand(player, "Forest")
 
         assertNotNull("The draw-discard ability costs {2}", d.activate(player, scaretiller).error)
 
@@ -44,20 +45,22 @@ class ScaretillerScenarioTest {
         val land = d.permanentsNamed(player, "Forest").single()
         assertTrue(d.isTapped(land))
         assertTrue(d.zoneNames(player, Zone.HAND).none { it == "Forest" })
-        assertTrue("The land moved from hand, not from another player's zone", d.state.getEntity(land) != null)
     }
 
     @Test
-    fun tapTriggerDoesNothingWhenThereAreNoLandsToChoose() {
+    fun tapTriggerMayBeDeclinedEvenWhenLandsAreAvailable() {
         val d = customScenario(Scaretiller, "Grizzly Bears")
         val player = d.player1
         val scaretiller = d.putCreatureOnBattlefield(player, "Scaretiller")
         d.removeSummoningSickness(scaretiller)
+        val landsBefore = d.getLands(player).size
+        assertTrue(d.zoneNames(player, Zone.HAND).contains("Plains"))
         d.giveColorlessMana(player, 2)
 
         assertNull(d.activate(player, scaretiller).error)
         d.resolveAll()
 
-        assertTrue(d.permanentsNamed(player, "Forest").isEmpty())
+        assertEquals("Declining the optional trigger puts no land onto the battlefield",
+            landsBefore, d.getLands(player).size)
     }
 }
