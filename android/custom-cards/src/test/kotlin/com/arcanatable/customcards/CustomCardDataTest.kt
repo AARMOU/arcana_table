@@ -35,7 +35,13 @@ class CustomCardDataTest {
 
     @Test
     fun registeredDecksAreCovered() {
-        assertEquals(111, CustomCards.all.size)
-        assertEquals(111, CardPool.custom.map { it.name }.toSet().size)
+        // The registry grows as missing precon cards are implemented. Test completeness
+        // and uniqueness rather than pinning a number that changes with each batch.
+        val registeredNames = CustomCards.all.map { it.name }
+        val scenarioNames = CardPool.custom.map { it.name }
+        assertTrue("No custom card definitions registered", registeredNames.isNotEmpty())
+        assertEquals("Duplicate custom-card names", registeredNames.size, registeredNames.toSet().size)
+        assertEquals("Scenario card pool differs from exported registry",
+            registeredNames.toSet(), scenarioNames.toSet())
     }
 }
