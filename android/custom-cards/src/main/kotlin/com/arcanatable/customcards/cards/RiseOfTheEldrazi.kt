@@ -1,25 +1,31 @@
 package com.arcanatable.customcards.cards
 
-import com.wingedsheep.sdk.dsl.Effects
-import com.wingedsheep.sdk.dsl.card
+import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.model.Rarity
-import com.wingedsheep.sdk.scripting.GameObjectFilter
+import com.wingedsheep.sdk.scripting.filters.unified.TargetFilter
+import com.wingedsheep.sdk.scripting.references.Player
+import com.wingedsheep.sdk.scripting.targets.EffectTarget
 
 val RiseOfTheEldrazi = card("Rise of the Eldrazi") {
-    manaCost = "{8}{C}{C}{C}"
+    manaCost = "{9}{C}{C}{C}"
     colorIdentity = ""
     typeLine = "Sorcery"
     cantBeCountered = true
-    oracleText = "This spell can't be countered.\nDestroy all creatures. They can't be regenerated.\nDraw three cards."
+    oracleText = "This spell can't be countered.\nDestroy target permanent.\n" +
+        "Target player draws four cards.\nTake an extra turn after this one.\nExile Rise of the Eldrazi."
 
     spell {
-        effect = Effects.DestroyAll(GameObjectFilter.Creature, noRegenerate = true) then
-            Effects.DrawCards(3)
+        selfExile()
+        val permanent = target(TargetFilter.Permanent)
+        val player = target(Targets.Player)
+        effect = Effects.Destroy(permanent) then
+            Effects.DrawCards(4, player) then
+            Effects.TakeExtraTurn(EffectTarget.PlayerRef(Player.You))
     }
 
     metadata {
-        rarity = Rarity.MYTHIC
+        rarity = Rarity.RARE
         collectorNumber = "716"
-        artist = "Jason Felix"
+        artist = "Eli Minaya"
     }
 }
