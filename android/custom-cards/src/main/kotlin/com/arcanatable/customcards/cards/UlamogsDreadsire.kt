@@ -31,7 +31,7 @@ val UlamogsDreadsire = card("Ulamog's Dreadsire") {
 
     metadata {
         rarity = Rarity.MYTHIC
-        collectorNumber = "38"
+        collectorNumber = "32"
         artist = "Chris Rahn"
     }
 }

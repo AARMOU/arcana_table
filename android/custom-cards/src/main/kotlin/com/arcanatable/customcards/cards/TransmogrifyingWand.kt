@@ -39,7 +39,7 @@ val TransmogrifyingWand = card("Transmogrifying Wand") {
 
     metadata {
         rarity = Rarity.RARE
-        collectorNumber = "227"
-        artist = "Daniel Ljunggren"
+        collectorNumber = "981"
+        artist = "Aaron Miller"
     }
 }

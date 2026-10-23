@@ -240,7 +240,6 @@ object CustomCards {
         Entry(MandateOfAbaddon, "40K", "Six WotC precons"),
         Entry(PrimarisEliminator, "40K", "Six WotC precons"),
         Entry(ChitteringDispatcher, "M3C", "Six WotC precons"),
-        Entry(CorruptedCrossroads, "M3C", "Six WotC precons"),
         Entry(RiseOfTheEldrazi, "CMM", "Six WotC precons"),
         Entry(TransmogrifyingWand, "CMM", "Six WotC precons"),
         Entry(UlamogsDreadsire, "M3C", "Six WotC precons"),

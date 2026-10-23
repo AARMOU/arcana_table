@@ -19,7 +19,7 @@ val RiseOfTheEldrazi = card("Rise of the Eldrazi") {
 
     metadata {
         rarity = Rarity.MYTHIC
-        collectorNumber = "1"
+        collectorNumber = "716"
         artist = "Jason Felix"
     }
 }
