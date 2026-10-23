@@ -1,8 +1,68 @@
-# Arcana Table 0.15.53 — Build 72 source update
+# Arcana Table × Argentum — Build 91
 
-Arcana Table is a native Android Magic tabletop prototype. Build 72 adds player view tabs with cropped commander artwork, automatically expands and scrolls to the active player's card on the full table, and reorganizes the player footer into full-width PASS TURN, HAND, and BACK TO TABLE buttons with a larger centered HAND button. Mana-pool access is in the player status header; ADD TOKEN is in MORE, the footer library count is removed, and the command-zone strip is condensed without removing its controls or status. Build 71 makes table-chat message text selectable and adds a PASTE control for clipboard text in the draft. Build 70's fix for duplicate permanents on ability resolution, Build 69's trigger prompts and Activity Log updates, and Build 68's card-face mulligan screen with tap-to-enlarge previews are included.
+This branch (`experimental/arcana-argentum-integration`) is Arcana Table's mobile table and customization UI running games on the **Argentum Engine**. Argentum owns the game state, rules, legal actions, decisions, turns and the AI opponent, and Arcana renders that state and sends the player's choices. How it fits together: [docs/ARGENTUM_INTEGRATION.md](docs/ARGENTUM_INTEGRATION.md). Build steps: [BUILD_AND_TOOLS.md](BUILD_AND_TOOLS.md).
+
+## Play a real Argentum game
+
+1. Install `app-debug.apk`. It appears as **Arcana · Argentum B91** next to any other Arcana build.
+2. Tap **IMPORT PLAYER DECK → ARGENTUM DECKS**, pick a list such as *Animated Army* (Bello), then tap **IMPORT**. Any Commander deck works; Argentum validates it.
+3. Tap **PLAY WITH ARGENTUM**. Argentum checks the deck, opens a practice table against its AI and deals. Choose **KEEP HAND** or **MULLIGAN**.
+4. Play from Arcana's table:
+   - The strip at the top shows the engine connection, whether the game is active, and the turn and step.
+   - The primary button always names what it will do: **PASS PRIORITY**, **DECLARE ATTACKERS** or **DECLARE BLOCKERS**.
+   - Open your board with the **YOU** tab, then **HAND**. Tap a card, or **ACTIONS**, to see the legal actions Argentum offers.
+   - Argentum's choices (targets, modes, discard, library search, ordering, damage assignment) open as Arcana dialogs.
+5. If anything shows **NEEDS HANDLING**, Arcana has no control for that Argentum prompt yet. Nothing was chosen for you, and the event is in **⋮ → Game tools → Diagnostic log (search)**.
+6. To leave, use **⋮ → Room & game → Leave game…**, which concedes the game on Argentum.
+
+## What's new in Build 91
+
+- **Card art is named:** once card art loads, each picture is labelled with the card's name instead of a generic "Magic card art", so screen readers can tell cards apart. Commander art in the seat tabs and player panels is named too. Found when the UI tests ran on a PC where Scryfall art loads; those tests now accept a card's name as text or as its art's label.
+
+## What's new in Build 90
+
+- **No manual mana abilities:** tapping a land no longer offers "{T}: Add {G}" and similar mana abilities. Argentum pays costs itself by tapping your lands and mana sources, and in Build 89 these buttons were rejected (`INVALID_ACTION: This permanent is already tapped`) on a land that entered tapped. The card sheet now says that mana is paid automatically, and the **ACTIONS** count no longer includes mana abilities. Playable glow already ignored them.
+
+## What's new in Build 89 — polished Argentum table
+
+- **Game HUD:** a phase tracker (Begin · Main 1 · Combat · Main 2 · End), life totals that flash red or green when they change, a ring around whoever holds priority, the live stack (top first, with targets), and the latest two lines of Argentum's own game log, so you can see what the opponent just did. Tap the log lines for the full game log.
+- **Playable glow and card sheet:** cards Argentum lets you play or activate right now glow. Tapping a card opens a sheet with large art, mana cost, type, power/toughness and rules text, plus every action Argentum allows for it. Actions you can't afford are labelled, not hidden.
+- **Board badges:** ⚔ attacking, 🛡 blocking, power/toughness with remaining toughness after damage, and a dimmed "NEW" tag for summoning-sick creatures.
+- **Every Argentum choice has a control:** spells with several targets or target groups, divided damage (split evenly to start), X, mana colour, pile splits, replacement-effect choices and mode budgets all go through Arcana dialogs, built only from Argentum's offered choices. *Needs handling* now appears only for decision types Argentum adds in the future.
+- **Opening hand:** a full-screen opening hand with real cards, play/draw and mulligan info; the bottom-of-library step uses the same grid with tap-to-select.
+- **Endings:** a Victory / Defeat / Game over screen with the reason, game length, **PLAY AGAIN**, **VIEW BOARD** and **HOME**.
+- **Your move:** a short vibration when Argentum hands you priority or a choice. With Background alerts on, you get a notification instead while Arcana is in the background.
+- **Fixes:** card targets in graveyards and other zones now use Argentum's zone names (they were rejected before). An open action sheet refreshes on every new state instead of offering stale actions. Arcana's old room "game ended" dialog no longer covers the Argentum result. Seat MOVE buttons are hidden where they can't work.
+
+## What's new in Build 88
+
+- **Combat damage:** combat damage no longer stops the game at *Needs handling*. Argentum's combat damage board (`CombatResolutionDecision`) opens with the engine's own default split, so **CONFIRM DAMAGE** applies it in one tap. You can also move damage between blockers and trample targets; lethal amounts are marked, and Arcana only allows a split Argentum will accept. This was found from a diagnostic log of a real game on a Galaxy Z Fold6.
+
+## What's new in Build 87
+
+- **Combat:** attack and block declarations come from Argentum's legal actions. Before, Arcana could not attack or block, and the game stalled at declare attackers.
+- **More of Argentum's choices in Arcana's dialogs:** modes, library search, ordering, mana auto-pay, damage assignment and distribution. Other prompts show a **Needs handling** panel with Cancel (when Argentum allows it), Refresh, or View table, instead of a dialog that could not be closed.
+- **Unsupported deck cards:** these open a review instead of being swapped out silently. You can play without them for this game, play the full deck in Arcana's sandbox, or edit the deck. Your saved deck is never changed.
+- **No automatic resume:** after a relaunch, Arcana offers **Resume game** or **End that game**. If the connection drops while the app is in the background, Arcana shows **Paused** and waits for **Resume**. In the foreground it reconnects automatically.
+- **Status:** an engine/game status strip with recovery actions, plus clear messages when Argentum can't be reached.
+- **Diagnostic log:** searchable, with category filters and redacted export. Server addresses, IPs, tokens, credentials, IDs and room codes are removed, and private card details are left out of exports.
+- **Hand drawer:** cards wrap into rows and resize as the drawer is dragged. The tray never gets too short to show cards, even on landscape phones. **Adjust UI → Hand** sets the largest card size and the arrangement (fit to tray or single row). **Adjust UI → Status** toggles the strip. **Reset** restores defaults.
+- **Buttons:** in Argentum games, manual-only Arcana controls (draw, token, shuffle, life +/−, local chat) are hidden instead of doing nothing.
+- **Fixes:** server messages were sometimes lost when several arrived together (for example, the game start). Duplicate connections could appear after a manual reconnect. Card names now show while card art loads.
+
+---
+
+# Arcana Table Targeting 0.15.62 — Experimental Build 81
+
+Arcana Table is a native Android Magic tabletop prototype. Experimental Build 81 carries forward the targeting experiment, adds a configurable Quick Actions bar with zone counts, fixes the live Mana Pool section, enlarges mana pips, reduces card-menu visuals, and advances the TURN counter once per full table cycle. It also keeps Build 80’s player-screen height fix. Build 79's table-view cards expand to use the available panel width; the separate player mana-pool element and tap-to-open Player Status panel can be customized in Adjust UI; library browsing hides stack order; and deck imports automatically attempt close-match corrections before showing any review prompt. The editor highlights the selected list item when you select or drag it in the sample layout. The targeting experiment lives on the `experimental/targeting` branch and installs as a separate app so it cannot replace the stable Arcana Table install.
+
+Target legality still depends on the card's full wording, game state, and rules interactions. The picker estimates how many targets to select, but players must verify restrictions such as controller, color, type, shroud, hexproof, and protection. Hidden library cards are not listed; use manual target entry only when the card text makes an unlisted target legal and known to the choosing player.
 
 ## Included
+
+- Choose targets while a spell or ability is on the stack; the selector includes visible players and game objects and allows a manual target entry
+- Show chosen targets on the stack and in the game log, and synchronize them in internet/LAN rooms
+- Keep priority passing and resolution unavailable until the responsible player confirms target choices
 
 - Landscape and portrait layouts with taskbar/system-bar safe spacing
 - Adaptive room home and player layouts for narrow phones, wide phones, tablets, and foldable screen changes; keeps game state through orientation and screen-size changes
@@ -32,9 +92,9 @@ Arcana Table is a native Android Magic tabletop prototype. Build 72 adds player 
 - Long-press a card to inspect only the card, without covering the rest of the table
 - Manual life total changes, draw, reveal top card, shuffle, and tap/untap
 - Move permanents to the graveyard or exile
-- Draw opens the hand; Reveal Top and confirmed Shuffle are in the board menu
+- Draw, Combat, Stack, turn flow, and additional game commands are available from the hand tray; Shuffle still asks for confirmation
 - A game action log, elapsed session/turn timers, and a room-synchronized text chat panel
-- Table view shows each player's status, life, hand/library counts, commander art, current phase, turn timer, and public-zone counts; expanded cards show battlefield and public cards, with compact or large views and seat controls
+- Table view shows each player's status, life, hand/library counts, commander art, current phase, turn timer, and public-zone counts; expanded cards show battlefield and public cards, with seat controls
 - Swipe between table and player views with a more pronounced animated transition; Next Step remains available from the table view
 - Start, stop, and reset controls for the game and turn timers live in the timer menu; the turn timer can also be hidden
 - Reset Game in the app menu reshuffles non-token cards, deals new hands, and resets life, board, timers, and log while keeping players, decks, and commanders
@@ -77,7 +137,7 @@ Arcana Table is a native Android Magic tabletop prototype. Build 72 adds player 
 
 ## Build status
 
-The source is labeled version 0.15.53, build 72. No Build 72 APK has been compiled. The optional full visual guide starts with the welcome message and follows the app screens with dimmed/blurred backgrounds, highlighted controls, and straight red arrows with solid arrowheads. It is available from the home screen and app menu and never launches automatically.
+The source is labeled version 0.15.60-targeting, build 79. This experimental branch builds a separate debug app package `com.arcanatable.targeting`. The optional full visual guide remains available from the home screen and app menu and never launches automatically.
 
 Build 66 adds a resizable hand panel, automatic stack-window closing after all resolutions, tighter player-view spacing, and stronger import/movement/sync diagnostics. It also includes the Build 65 import review, supported automatic life/draw/token effects with manual-resolution notices, quick Stack access, and earlier tutorial, card movement, privacy, and navigation updates.
 

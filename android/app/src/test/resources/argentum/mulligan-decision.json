@@ -1,0 +1,80 @@
+{
+  "cards": {
+    "e75": {
+      "imageUri": "https://cards.scryfall.io/normal/front/6/6/66ae703d-b133-4749-9d38-216abe6c6647.jpg",
+      "typeLine": "Creature \u2014 Beast",
+      "oracleText": "Trample\nLandfall \u2014 Whenever a land you control enters, create a 4/4 green Beast creature token.",
+      "name": "Rampaging Baloths",
+      "power": 6,
+      "manaCost": "{4}{G}{G}",
+      "toughness": 6
+    },
+    "e24": {
+      "imageUri": "https://cards.scryfall.io/normal/front/2/1/21cb5950-adaa-438d-998b-3a64bd4a2b3e.jpg?1576385553",
+      "typeLine": "Land",
+      "oracleText": "As this land enters, you may reveal a Mountain or Forest card from your hand. If you don't, this land enters tapped.\n{T}: Add {R} or {G}.",
+      "name": "Game Trail",
+      "power": null,
+      "manaCost": "",
+      "toughness": null
+    },
+    "e45": {
+      "imageUri": "https://cards.scryfall.io/normal/front/a/0/a0d12fc5-c7bd-4734-9259-98fe65241f60.jpg?1788878373",
+      "typeLine": "Basic Land \u2014 Forest",
+      "oracleText": "({T}: Add {G}.)",
+      "name": "Forest",
+      "power": null,
+      "manaCost": "",
+      "toughness": null
+    },
+    "e12": {
+      "imageUri": "https://cards.scryfall.io/normal/front/a/4/a49ae3b7-4b1f-41b6-8c05-cbdc44f070cb.jpg?1788878371",
+      "typeLine": "Basic Land \u2014 Mountain",
+      "oracleText": "({T}: Add {R}.)",
+      "name": "Mountain",
+      "power": null,
+      "manaCost": "",
+      "toughness": null
+    },
+    "e48": {
+      "imageUri": "https://cards.scryfall.io/normal/front/a/4/a49ae3b7-4b1f-41b6-8c05-cbdc44f070cb.jpg?1788878371",
+      "typeLine": "Basic Land \u2014 Mountain",
+      "oracleText": "({T}: Add {R}.)",
+      "name": "Mountain",
+      "power": null,
+      "manaCost": "",
+      "toughness": null
+    },
+    "e29": {
+      "imageUri": "https://cards.scryfall.io/normal/front/1/c/1c5241c1-ffe9-4490-b4df-7e91c372c27c.jpg?1673482136",
+      "typeLine": "Enchantment",
+      "oracleText": "When this enchantment enters, create two Treasure tokens.\nThe first spell you cast each turn that mana from a Treasure was spent to cast has cascade. (When you cast the spell, exile cards from the top of your library until you exile a nonland card that costs less. You may cast it without paying its mana cost. Put the exiled cards on the bottom in a random order.)",
+      "name": "Rain of Riches",
+      "power": null,
+      "manaCost": "{3}{R}{R}",
+      "toughness": null
+    },
+    "e81": {
+      "imageUri": "https://cards.scryfall.io/normal/front/3/9/39d1578f-e2cf-4b93-8204-ed5434feb183.jpg?1783923123",
+      "typeLine": "Instant",
+      "oracleText": "As an additional cost to cast this spell, discard a card.\nDraw two cards and create two Treasure tokens. (They're artifacts with \"{T}, Sacrifice this token: Add one mana of any color.\")",
+      "name": "Big Score",
+      "power": null,
+      "manaCost": "{3}{R}",
+      "toughness": null
+    }
+  },
+  "cardsToPutOnBottom": 0,
+  "type": "mulliganDecision",
+  "mulliganCount": 0,
+  "hand": [
+    "e45",
+    "e12",
+    "e81",
+    "e29",
+    "e75",
+    "e48",
+    "e24"
+  ],
+  "isOnThePlay": false
+}

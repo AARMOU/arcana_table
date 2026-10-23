@@ -1,0 +1,68 @@
+name: Argentum six-precon card regression
+on:
+  push:
+    branches:
+      - gpt/argentum-six-precons
+    paths:
+      - android/custom-cards/src/**
+      - .github/workflows/argentum-six-precons.yml
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: argentum-six-precons-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  cards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Generate card data and run full custom-card regressions
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test
+      - name: Validate all exported cards and audit both indexes
+        run: |
+          python3 - <<'PYTHON'
+          import json
+          from pathlib import Path
+          root = Path('android/app/src/main/assets/argentum')
+          index_names = [line.split('\t')[0] for line in (root / 'custom-cards.index.tsv').read_text().splitlines() if line.strip()]
+          data_names = [json.loads(line)['name'] for line in (root / 'custom-cards.jsonl').read_text().splitlines() if line.strip()]
+          assert len(index_names) == len(set(name.casefold() for name in index_names)), 'Duplicate index names'
+          assert len(data_names) == len(set(name.casefold() for name in data_names)), 'Duplicate data names'
+          assert index_names == data_names, 'Exported data and index disagree'
+          print(f'{len(data_names)} definitions exported exactly once; index matches data')
+          PYTHON
+          python3 investigation/argentum-six-precons/coverage-audit.py
+      - name: Detect whitespace errors in generated card data
+        run: git diff --check
+      - name: Commit successfully tested card exports to isolated branch
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add android/app/src/main/assets/argentum/custom-cards.index.tsv
+          git add android/app/src/main/assets/argentum/custom-cards.jsonl
+          if ! git diff --cached --quiet; then
+            git commit -m "data: export verified six-precon card batch"
+            git push origin HEAD:gpt/argentum-six-precons
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: argentum-six-precons-card-results
+          path: |
+            android/custom-cards/build/test-results/
+            android/custom-cards/build/reports/tests/
+            android/app/src/main/assets/argentum/custom-cards.index.tsv
+            android/app/src/main/assets/argentum/custom-cards.jsonl
+          retention-days: 14

@@ -1,0 +1,74 @@
+name: Build 123 engine-delay isolated proof
+on:
+  push:
+    branches:
+      - gpt/engine-delay-test-only
+      - gpt/engine-delay-autopass-candidate
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: engine-delay-proof-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: food-40, token: Food, count: 40 }
+          - { label: food-200, token: Food, count: 200 }
+          - { label: food-600, token: Food, count: 600 }
+          - { label: clue-200, token: Clue, count: 200 }
+          - { label: treasure-200, token: Treasure, count: 200 }
+    env:
+      PROBE_TOKENS: ${{ matrix.count }}
+      PROBE_TOKEN_NAME: ${{ matrix.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Measure enumeration and enrichment with pinned Build 123 runtime
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests '*LegalActionSplitProbeTest' --info 2>&1 | tee ../probe.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: profiling-${{ matrix.label }}
+          path: |
+            probe.log
+            android/custom-cards/build/test-results/
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Existing AI and action parity coverage (no source modifications)
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests '*OfflineAiLargeBoardTest' --tests '*AiRetargetingSearchTest' --tests '*OfflineHumanAutoPassParityTest' --info
+      - name: Offline Android host smoke test
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests '*LocalArgentumHostTest'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: engine-delay-regression
+          path: |
+            android/custom-cards/build/test-results/
+            android/app/build/test-results/

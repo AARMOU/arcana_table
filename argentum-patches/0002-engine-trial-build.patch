@@ -1,0 +1,109 @@
+From 0043d114095e46356aa14611352a485ab6d25e06 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 17 Oct 2026 06:40:34 -0600
+Subject: [PATCH] Arcana engine trial: Java 17 API target and Portal card-data
+ exporter
+
+---
+ arcana-export/build.gradle.kts                | 20 ++++++++++++++
+ .../com/arcanatable/export/ArcanaExport.kt    | 26 +++++++++++++++++++
+ .../src/main/kotlin/kotlin-jvm.gradle.kts     |  7 +++++
+ settings.gradle.kts                           |  2 ++
+ 4 files changed, 55 insertions(+)
+ create mode 100644 arcana-export/build.gradle.kts
+ create mode 100644 arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt
+
+diff --git a/arcana-export/build.gradle.kts b/arcana-export/build.gradle.kts
+new file mode 100644
+index 0000000000..e137c4484f
+--- /dev/null
++++ b/arcana-export/build.gradle.kts
+@@ -0,0 +1,20 @@
++// Arcana local-only module: exports card definitions as data (JSON lines) for the in-app engine trial.
++plugins {
++    id("buildsrc.convention.kotlin-jvm")
++    application
++}
++
++dependencies {
++    implementation(project(":mtg-sdk"))
++    implementation(project(":mtg-sdk-tooling"))
++    implementation(project(":mtg-sets:core"))
++    implementation(project(":mtg-sets:1993-1999"))
++    implementation(libs.bundles.kotlinxEcosystem)
++    implementation(libs.classgraph)
++}
++
++application { mainClass.set("com.arcanatable.export.ArcanaExportKt") }
++
++tasks.named<JavaExec>("run") {
++    args(rootProject.layout.projectDirectory.dir("arcana-export-out").asFile.absolutePath)
++}
+diff --git a/arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt b/arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt
+new file mode 100644
+index 0000000000..3b9b6fa91d
+--- /dev/null
++++ b/arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt
+@@ -0,0 +1,26 @@
++package com.arcanatable.export
++
++import com.wingedsheep.mtg.sets.definitions.por.PortalSet
++import com.wingedsheep.sdk.tooling.CardExporter
++import com.wingedsheep.sdk.tooling.CardLoader
++import java.io.File
++
++/**
++ * Writes Portal (POR) as card DATA for Arcana's in-app engine trial: one compact JSON definition
++ * per line, exactly as Argentum's own CardExporter produces it, then reloads every line with
++ * CardLoader.fromJsonPreservingIds to prove the round trip before anything ships.
++ */
++fun main(args: Array<String>) {
++    val outDir = File(args.firstOrNull() ?: "arcana-export-out").apply { mkdirs() }
++    val cards = (PortalSet.cards + PortalSet.basicLands).distinctBy { it.name }
++    val lines = cards.map { CardExporter.exportToCompactJson(it).replace("\n", "") }
++    var failures = 0
++    lines.zip(cards).forEach { (line, card) ->
++        val back = runCatching { CardLoader.fromJsonPreservingIds(line) }.getOrNull()
++        if (back == null || back.name != card.name) { failures++; System.err.println("Round trip failed: ${card.name}") }
++    }
++    val out = File(outDir, "por-cards.jsonl")
++    out.writeText(lines.joinToString("\n") + "\n")
++    println("ARCANA-EXPORT cards=${cards.size} bytes=${out.length()} roundTripFailures=$failures file=${out.absolutePath}")
++    if (failures > 0) kotlin.system.exitProcess(2)
++}
+diff --git a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
+index 19839403b9..e189c8dd6f 100644
+--- a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
++++ b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
+@@ -17,8 +17,15 @@ plugins {
+ kotlin {
+     // Use a specific Java version to make it easier to work in different environments.
+     jvmToolchain(21)
++    // Arcana: compile against the Java 17 API so the jars run on Android (no Java 21-only calls).
++    compilerOptions {
++        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
++        freeCompilerArgs.add("-Xjdk-release=17")
++    }
+ }
+ 
++tasks.withType<JavaCompile>().configureEach { options.release.set(17) }
++
+ // Bound concurrent Kotlin compilations build-wide — they all share one compile-daemon heap, so
+ // without this the peak is workers.max × the largest source set. See KotlinCompileThrottle.
+ val kotlinCompileThrottle =
+diff --git a/settings.gradle.kts b/settings.gradle.kts
+index 2c0b79f053..5c26424105 100644
+--- a/settings.gradle.kts
++++ b/settings.gradle.kts
+@@ -44,6 +44,8 @@ include(":mtg-sdk")
+ include(":mtg-sdk-tooling")
+ include(":mtg-sets")
+ include(":mtg-search")
++// Arcana local-only: card data export for the in-app engine trial.
++include(":arcana-export")
+ 
+ // The card corpus, split out of :mtg-sets and nested underneath it. `:mtg-sets` still re-exports
+ // all of it, so every existing `project(":mtg-sets")` dependency is unchanged — the split only
+-- 
+2.43.0
+

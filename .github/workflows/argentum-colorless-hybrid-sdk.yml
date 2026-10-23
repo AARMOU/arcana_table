@@ -1,0 +1,55 @@
+name: Isolated Argentum colorless-hybrid SDK validation
+on:
+  push:
+    branches: [gpt/argentum-six-precons]
+    paths:
+      - investigation/argentum-six-precons/staged-engine/0005-colorless-hybrid-sdk.patch
+      - .github/workflows/argentum-colorless-hybrid-sdk.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: argentum-colorless-hybrid-sdk-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  sdk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      ORG_GRADLE_PROJECT_kotlinCompileParallelism: '1'
+      GRADLE_OPTS: '-Dorg.gradle.workers.max=2 -Dorg.gradle.configuration-cache=false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 7a9663d8e4df4ce7db223023ae7714f0028e08a9
+          path: upstream-engine
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Apply isolated SDK patch to pinned source
+        working-directory: upstream-engine
+        run: |
+          git apply --check ../investigation/argentum-six-precons/staged-engine/0005-colorless-hybrid-sdk.patch
+          git apply ../investigation/argentum-six-precons/staged-engine/0005-colorless-hybrid-sdk.patch
+          git diff --check
+      - name: Execute new colorless hybrid SDK scenarios
+        working-directory: upstream-engine
+        run: |
+          ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
+            -Dorg.gradle.configuration-cache=false :mtg-sdk:test --tests '*ColorlessHybridManaSdkTest'
+      - name: Execute complete existing SDK test suite
+        working-directory: upstream-engine
+        run: |
+          ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
+            -Dorg.gradle.configuration-cache=false :mtg-sdk:test --rerun-tasks
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: colorless-hybrid-sdk-regression-results
+          path: |
+            upstream-engine/mtg-sdk/build/test-results/
+            upstream-engine/mtg-sdk/build/reports/tests/
+          retention-days: 14

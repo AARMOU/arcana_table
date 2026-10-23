@@ -1,0 +1,102 @@
+{
+  "recorded_at": "2026-10-22T14:26:52.828003+00:00",
+  "source_patch_commit": "d56e7706f190be64742bba96f48b5b55e16eaecc",
+  "upstream_base": "7a9663d8e4df4ce7db223023ae7714f0028e08a9",
+  "patch_sha256": "221e3b27181d99a131c6446242ddd0788fe5ca148bfad3f33b403a7aba2202aa",
+  "validation_kind": "Executed local JUnit/Kotest JVM scenarios; not APK/device or full-deck testing",
+  "unique_tests_passed": 39,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "classes": [
+    {
+      "name": "com.wingedsheep.engine.hygiene.ContinuationResumerCoverageTest",
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "4.461"
+    },
+    {
+      "name": "com.wingedsheep.engine.stack.CopyAbilityForEachPossibleTargetTest",
+      "tests": "8",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "0.478"
+    },
+    {
+      "name": "com.wingedsheep.engine.scenarios.SpellCopyRetargetingTest",
+      "tests": "12",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "49.65"
+    },
+    {
+      "name": "com.wingedsheep.engine.scenarios.StackObjectCopyEngineTest",
+      "tests": "14",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "60.218",
+      "case_names": [
+        "spells are copied before abilities, and each group may be freely ordered",
+        "a frozen batch includes existing spell copies exactly once and supports order save and resume",
+        "opponents' stack objects and the currently resolving ability are excluded",
+        "other pending batch-copy triggers can be copied without copying the resolving one",
+        "empty stacks and uncopyable objects create no copies",
+        "ability copies emit copy events without triggering or activating again",
+        "an ability's new targets use its original source's color, not the copier's color",
+        "keeping an ability target retains its old battlefield visit, while explicit reselection captures the new visit",
+        "targetless permanent spell copies resolve into token permanents",
+        "optional colorless payment may be declined and colored mana cannot substitute for it",
+        "paying the optional cost consumes two colorless mana and copies the spell",
+        "a departed ability source keeps its last known color when choosing new targets",
+        "a copied optional trigger does not inherit a resolution consent choice",
+        "ordering answers cannot omit, duplicate, or invent objects"
+      ]
+    },
+    {
+      "name": "com.wingedsheep.sdk.scripting.StackObjectCopySdkTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0",
+      "time": "1.768",
+      "case_names": [
+        "existing targeted-copy JSON still decodes and uses the same wire name",
+        "controlled stack copies round-trip with player and ability kinds"
+      ]
+    }
+  ],
+  "commands": [
+    "just test-class StackObjectCopySdkTest",
+    "just test-class StackObjectCopyEngineTest --tests *SpellCopyRetargetingTest --tests *CopyAbilityForEachPossibleTargetTest --tests *ContinuationResumerCoverageTest",
+    "just test-class StackObjectCopyEngineTest --no-build-cache"
+  ],
+  "cache_note": "The combined run covered 13 batch cases. The final uncached run compiled and executed all 14, including independent consent on a copied optional trigger. This supersedes the earlier batch result; cases are not counted twice.",
+  "local_engine_additional_patches": [
+    "0001-granted-cascade",
+    "0002-commander-casts",
+    "0003-opponents-must-attack-someone"
+  ],
+  "ci": {
+    "earlier_isolated_targeted_pass": "https://github.com/AARMOU/arcana_table/actions/runs/39792482087",
+    "earlier_full_regressions": "Cancelled when superseded by the optional-consent fix",
+    "latest_run": "https://github.com/AARMOU/arcana_table/actions/runs/39793999697",
+    "latest_full_regressions": "Pending; no full-suite success claimed",
+    "latest_observed_status": "in_progress"
+  },
+  "card_status": {
+    "verified_imported_distinct": 80,
+    "missing_distinct": 196,
+    "missing_deck_slots": 201,
+    "ulalek_registered": false,
+    "app_runtime_jars_replaced": false,
+    "apk_built": false
+  },
+  "pinned_android_sdk_sha256": "cf519e0622a553d6f5586b43a286c0c99d78a85b5b679e1517b36afbc4f51b03",
+  "pinned_android_rules_sha256": "88cf6f8523375a0064ce39f1575defe130435567bf7fc147da851d1ec1875a7e",
+  "compiled_optional_case_verified": true
+}
