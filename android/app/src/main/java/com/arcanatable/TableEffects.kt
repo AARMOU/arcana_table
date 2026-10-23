@@ -193,7 +193,7 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
         if (!submitArgentumAction(action, epoch)) argentumStackUse = null
     }
     // "Pass to my turn": press Argentum's own PassPriority until your next turn or until you're needed.
-    LaunchedEffect(passToMyTurnFrom, argentumSnapshot, argentumPendingDecision, argentumAwaitingUpdate, argentumStatus) {
+    LaunchedEffect(passToMyTurnFrom, argentumSnapshot, argentumPendingDecision, argentumAwaitingUpdate, argentumStatus, stopAtOpponentPrecombat, stopAtOpponentEndStep) {
         val start = passToMyTurnFrom ?: return@LaunchedEffect
         val snapshot = argentumSnapshot ?: return@LaunchedEffect
         if (!argentumEnabled || argentumStatus != ArgentumConnectionStatus.CONNECTED) { passToMyTurnFrom = null; return@LaunchedEffect }
@@ -205,6 +205,9 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
             hasPendingDecision = argentumPendingDecision != null,
             opponentStackItem = snapshot.stack.firstOrNull { !it.isYours }?.name,
             gameOver = gameEndedOnline || snapshot.gameOver, awaitingUpdate = argentumAwaitingUpdate,
+            currentPhaseName = snapshot.phaseName, currentStepName = snapshot.stepName,
+            stopAtOpponentPrecombat = stopAtOpponentPrecombat,
+            stopAtOpponentEndStep = stopAtOpponentEndStep,
         )
         when (outcome.step) {
             ArgentumPassing.Step.PASS -> sendArgentumPriority()
