@@ -1,0 +1,62 @@
+name: Arcana Development CI
+on:
+  push:
+    branches:
+      - gpt/arcana-integration-next
+  pull_request:
+    paths:
+      - android/custom-cards/**
+      - android/app/src/main/assets/argentum/custom-cards.*
+      - .github/workflows/arcana-development-ci.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: arcana-development-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  cards-and-android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Regenerate custom-card assets
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+      - name: Run custom-card scenario tests and Build 131 Android unit tests
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
+      - name: Check exported index consistency
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          root=Path('android/app/src/main/assets/argentum')
+          index=[x.split('\t')[0] for x in (root/'custom-cards.index.tsv').read_text().splitlines() if x.strip()]
+          data=[json.loads(x)['name'] for x in (root/'custom-cards.jsonl').read_text().splitlines() if x.strip()]
+          assert index==data, 'custom-card index differs from data'
+          assert len(index)==len({x.casefold() for x in index}), 'duplicate custom card names'
+          for name in ('Rise of the Eldrazi','Transmogrifying Wand',"Ulamog's Dreadsire"):
+              assert name in index, f'missing {name}'
+          print('PASS:',len(index),'custom card definitions, including three PR #59 cards')
+          PY
+      - name: Check formatting
+        run: git diff --check
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arcana-development-validation
+          retention-days: 14
+          path: |
+            android/custom-cards/build/test-results/
+            android/app/build/test-results/
+            android/app/src/main/assets/argentum/custom-cards.index.tsv
+            android/app/src/main/assets/argentum/custom-cards.jsonl
