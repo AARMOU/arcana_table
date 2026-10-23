@@ -1,5 +1,5 @@
 name: Arcana CI Failure Router
-# Install only after review. Execute trusted workflow source, never failed-PR code.
+# Execute trusted default-branch code, never failed-PR code.
 on:
   workflow_run:
     workflows:
@@ -28,16 +28,18 @@ jobs:
           persist-credentials: false
       - uses: actions/github-script@v7
         env:
-          COPILOT_USAGE_SNAPSHOT: ${{ vars.COPILOT_USAGE_SNAPSHOT }}
+          COPILOT_BILLING_READ_TOKEN: ${{ secrets.COPILOT_BILLING_READ_TOKEN }}
+          ARCANA_PREMIUM_REQUEST_BUDGET: ${{ vars.ARCANA_PREMIUM_REQUEST_BUDGET }}
+          ARCANA_REQUEST_RESERVE: ${{ vars.ARCANA_REQUEST_RESERVE }}
           ARCANA_AUTOMATION_READY: ${{ vars.ARCANA_AUTOMATION_READY }}
         with:
           script: |
-            const gate = require('./scripts/usage-gate.cjs');
-            const { routeFailure } = require('./scripts/failure-routing.cjs');
-            const budget = process.env.ARCANA_AUTOMATION_READY === 'true'
-              ? gate.budgetFromEnv(process.env.COPILOT_USAGE_SNAPSHOT)
-              : { level: 'unknown', maxNewAssignments: 0 };
-            const result = await routeFailure({ github, context, budget });
+            const {readBudget}=require('./scripts/billing-monitor.cjs');
+            const {routeFailure}=require('./scripts/failure-routing.cjs');
+            const budget=process.env.ARCANA_AUTOMATION_READY==='true'
+              ? (await readBudget(process.env)).status
+              : {level:'unknown',maxNewAssignments:0};
+            const result=await routeFailure({github,context,budget});
             core.info(JSON.stringify(result));
             await core.summary.addHeading('Failure routing evidence').addCodeBlock(JSON.stringify(result)).write();
-            if (result.state === 'permission-blocked') core.setFailed('PR comment requires pull-requests: write; no retry issued.');
+            if(result.state==='permission-blocked')core.setFailed('PR comment permission missing; no retry issued.');
