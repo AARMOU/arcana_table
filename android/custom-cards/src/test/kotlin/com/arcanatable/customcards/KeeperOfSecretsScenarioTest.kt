@@ -4,6 +4,7 @@ import com.arcanatable.customcards.cards.KeeperOfSecrets
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
+import com.wingedsheep.sdk.core.Step
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -66,8 +67,8 @@ class KeeperOfSecretsScenarioTest {
         assertNull(d.castSpell(p, keeper).error)
         d.resolveAll()
 
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, d.player2)
         d.putCardOnTopOfLibrary(d.player2, "Grizzly Bears")
-        d.passPriority(d.player1)
         val heralds = d.putCardInHand(d.player2, "Heralds of Tzeentch")
         d.giveMana(d.player2, Color.BLUE)
         d.giveColorlessMana(d.player2, 4)
