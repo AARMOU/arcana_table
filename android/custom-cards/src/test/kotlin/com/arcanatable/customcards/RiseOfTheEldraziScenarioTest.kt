@@ -5,6 +5,7 @@ import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
+import com.wingedsheep.sdk.core.Step
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -13,6 +14,7 @@ class RiseOfTheEldraziScenarioTest {
     fun uncounterableSorceryDestroysCreaturesWithoutRegenerationAndDrawsThree() {
         val d = customScenario(RiseOfTheEldrazi, "Grizzly Bears")
         val p = d.player1
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = p)
         val spell = d.putCardInHand(p, "Rise of the Eldrazi")
         d.putCreatureOnBattlefield(p, "Grizzly Bears")
         val opposingCreature = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")

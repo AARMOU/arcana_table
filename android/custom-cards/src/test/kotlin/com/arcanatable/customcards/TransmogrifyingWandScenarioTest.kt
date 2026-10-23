@@ -80,7 +80,7 @@ class TransmogrifyingWandScenarioTest {
         assertNull(d.castSpell(opponent, controlSpell, listOf(victim)).error)
         d.bothPass()
 
-        assertEquals(opponent, d.getController(victim))
+        assertEquals(opponent, d.projected.getController(victim))
         d.resolveAll()
 
         assertTrue(d.zoneNames(p, Zone.GRAVEYARD).contains("Grizzly Bears"))
