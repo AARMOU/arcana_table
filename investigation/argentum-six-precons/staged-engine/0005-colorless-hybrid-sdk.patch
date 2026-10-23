@@ -165,11 +165,8 @@ diff --git a/docs/sdk-index.md b/docs/sdk-index.md
 diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 --- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
 +++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
-@@ -1667,6 +1667,7 @@
- KeywordAbility.CompanionAbility — KeywordAbility — Zirda, the Dawnwaker — KeywordAbility.Partner, KeywordAbility.Simple — a companion carries its deck-building condition (CompanionCondition), which Simple(Keyword) can't; and like Partner it functions outside the game (CR 702.139a), read by deck validation and game setup, so no client-mirrored Keyword value is needed
- KeywordAbility.Mutate — KeywordAbility — Gemrazer — KeywordAbility.Bestow, KeywordAbility.Evoke — both are alternative costs, but bestow's spell becomes an Aura that enters attached and evoke's creature enters and is sacrificed; a mutating spell targets a non-Human creature and merges with it without entering (CR 702.140c), so a mode axis on either would fork every engine read
- KeywordAbility.Partner — KeywordAbility — Kodama of the East Tree — KeywordAbility.Simple, KeywordAbility.Conspire — partner abilities are parameterized (partner—[text] names a text, partner with names a card), which Simple(Keyword) can't carry; and they are deck-construction rules CommanderEligibility reads before the game, not a play-time keyword, so a Keyword enum value would add a client-mirrored constant nothing at the table reads
-+ManaSymbol.ColorlessHybrid — ManaSymbol — Ulalek, Fused Atrocity — ManaSymbol.MonocolorHybrid, ManaSymbol.Hybrid — MonocolorHybrid permits two generic mana rather than requiring actual colorless mana; Hybrid permits either of two colors and neither can represent the colorless-or-one-specific-color choice at mana value one.
- MarkMustAttackEffect — Effect — Sizzling Soloist — MarkMustAttackThisTurnEffect (renamed into this), MarkMustBlockThisTurnEffect — renames MarkMustAttackThisTurnEffect and gives it a window axis (this turn / its controller's next combat phase), no net new type; the blocking mirror is a floating effect with its own blocker-side semantics and no cross-turn window
- MeldEffect — Effect — Titania, Voice of Gaea — ExileAndReturnTransformedEffect, ReturnSelfFromZoneTransformedEffect — both move one double-faced object and return it on a face of its own card; meld exiles two separate cards and returns them as one object whose characteristics come from a third definition (the meld result), with a pair check (CR 701.42b/c) neither has an axis for
- ModifyKeywordActionAmount — ReplacementEffect — Enhanced Surveillance — ModifyKeywordAction, ModifyDrawAmount — replaces and deletes ModifyMillAmount + ModifyScryAmount, one type whose appliesTo names the action (mill/scry/surveil) instead of one per action; ModifyKeywordAction inserts a prefix effect rather than resizing a count, and a draw is not a keyword action and has its own "N or more" announcement site
+@@ -1138,3 +1138,4 @@
+ ManaSymbol.Colored — ManaSymbol
+ ManaSymbol.Colorless — ManaSymbol
++ManaSymbol.ColorlessHybrid — ManaSymbol
+ ManaSymbol.Generic — ManaSymbol
