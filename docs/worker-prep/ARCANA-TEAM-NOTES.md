@@ -214,3 +214,13 @@ Production: untouched unless specifically authorized
 ```
 
 **Do not erase prior entries; append verified developments and update board statuses only with evidence.**
+
+
+### 2026-10-22 ~19:55 (America/Denver) — Build 131 and Team 01 PR #48 CI verification
+
+- **Build 131:** [Actions run 39879225111](https://github.com/AARMOU/arcana_table/actions/runs/39879225111), job `test-and-build`, is **completed / success**. GitHub job steps show successful exact combined-source/engine/card provenance checks, real card scenarios, Android unit tests, lint, debug APK assembly, APK identity/signature/checksum verification, and uploads of test results and APK provenance. Individual test counts and commands are not available from the job summary; do not infer device testing or production signing.
+- **Team 01 / issue [#12](https://github.com/AARMOU/arcana_table/issues/12):** owned branch `gpt/work-log-events`; associated [draft PR #48](https://github.com/AARMOU/arcana_table/pull/48) was previously reported to contain persistent game-log explanations for actions not submitted, with implementation/test/reconciliation commits. Exact PR head SHA and five individual commit SHAs were **not independently recovered in this check**; verify against PR before integration.
+- **New verified CI result:** [Actions run 39885194229](https://github.com/AARMOU/arcana_table/actions/runs/39885194229), job `verify-action-log`, is now **completed / success** (previous report said in progress). Successful job steps: pin B131 ancestry/audit diff/engine-card provenance; test local action-log non-submission reasons; run full B131 card and Android regression, lint and compilation; retain test diagnostics. Exact Gradle commands, test counts and logs were not exposed by the job-list response. This is CI evidence, **not** a real-device or independent human-review result.
+- **Worker activity:** no actual coding-agent task/session ID independently established. PR and commits alone do not prove agent launches. Other teams (#13–#25) are not newly marked complete by these two runs.
+- **Open risks:** review PR #48 diff and exact head/base SHAs; check action-rejection reason accuracy and concealed-information boundaries; confirm review approvals and Build 131 integration compatibility. Passing PR CI does not establish merge readiness or device behavior. Token grouping, turn recap, priority stops, diagnostic replay and deck support reporting remain separately tracked.
+- **Scope of this update:** documentation-only append to `gpt/work-multiworker-handoff`; no feature code, merge, APK publication or signing change.
