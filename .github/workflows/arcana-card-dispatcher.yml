@@ -15,8 +15,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Verify user-authenticated Copilot API token
+        env:
+          COPILOT_DISPATCH_TOKEN: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
+        run: |
+          if [ -z "$COPILOT_DISPATCH_TOKEN" ]; then
+            echo 'Copilot assignment requires a user-authenticated token; GITHUB_TOKEN is insufficient.' >&2
+            exit 1
+          fi
       - uses: actions/github-script@v7
         with:
+          github-token: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
           script: |
             const owner = context.repo.owner, repo = context.repo.repo;
             const maxWorkers = 6;
@@ -38,9 +47,13 @@ jobs:
             for (const issue of queued.slice(0, available)) {
               try {
                 const response = await github.rest.issues.addAssignees({
-                  owner, repo, issue_number: issue.number, assignees: ['copilot']
+                  owner, repo, issue_number: issue.number, assignees: ['copilot-swe-agent[bot]'],
+                  agent_assignment: {
+                    target_repo: owner + '/' + repo,
+                    base_branch: 'gpt/six-precon-worker-integration-20261022'
+                  }
                 });
-                const assigned = response.data.assignees?.some(a => a.login.toLowerCase() === 'copilot');
+                const assigned = response.data.assignees?.some(a => a.login.toLowerCase().startsWith('copilot-swe-agent'));
                 if (!assigned) {
                   core.warning('Copilot assignment not confirmed on issue #' + issue.number);
                   continue;
