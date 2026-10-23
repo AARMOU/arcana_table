@@ -19,7 +19,7 @@ val OblivionSower = card("Oblivion Sower") {
         "then you may put any number of land cards that player owns from exile onto the battlefield under your control."
 
     triggeredAbility {
-        trigger = Triggers.you.casts(GameObjectFilter.Creature.named("Oblivion Sower"))
+        trigger = Triggers.self.isCast()
         val opponent = target(Targets.Opponent)
         effect = Effects.Pipeline {
             val topFour = gather(CardSource.TopOfLibrary(4, Player.TargetPlayer), name = "oblivionSowerTopFour")

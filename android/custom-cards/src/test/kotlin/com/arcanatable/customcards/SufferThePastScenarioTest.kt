@@ -2,6 +2,9 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.SufferThePast
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.CastSpell
+import com.wingedsheep.engine.core.PaymentStrategy
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Zone
 import org.junit.Assert.*
@@ -19,9 +22,24 @@ class SufferThePastScenarioTest {
         val spell = d.putCardInHand(p, "Suffer the Past")
         d.giveMana(p, Color.BLACK)
         d.giveColorlessMana(p, 2)
+        val playerTarget = ChosenTarget.Player(opponent)
+        val cardTargets = listOf(
+            ChosenTarget.Card(bear, opponent, Zone.GRAVEYARD),
+            ChosenTarget.Card(forest, opponent, Zone.GRAVEYARD),
+        )
 
-        assertNotNull("X cards must be selected as targets", d.castXSpell(p, spell, 2, listOf(opponent, bear)).error)
-        assertNull(d.castXSpell(p, spell, 2, listOf(opponent, bear, forest)).error)
+        fun cast(targets: List<ChosenTarget>) = d.submit(
+            CastSpell(
+                playerId = p,
+                cardId = spell,
+                targets = targets,
+                xValue = 2,
+                paymentStrategy = PaymentStrategy.FromPool,
+            ),
+        )
+
+        assertNotNull("X cards must be selected as targets", cast(listOf(playerTarget, cardTargets.first())).error)
+        assertNull(cast(listOf(playerTarget) + cardTargets).error)
         d.resolveAll()
 
         assertEquals(18, d.getLifeTotal(opponent))
