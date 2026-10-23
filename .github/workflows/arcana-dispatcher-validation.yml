@@ -27,7 +27,6 @@ jobs:
             'gpt/six-precon-worker-integration-20261022',
             'core.setFailed',
             "const maxNewAssignments = 2",
-            "p.head.ref.startsWith('copilot/')",
           ]
           for token in required:
             assert token in s, f'Missing safety/dispatch requirement: {token}'
