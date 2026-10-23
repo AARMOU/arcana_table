@@ -1,5 +1,8 @@
 name: Arcana CI Failure Router
 # Execute trusted default-branch code, never failed-PR code.
+# Repair requests need ARCANA_AUTOMATION_READY=true AND ARCANA_REPAIR_MODE=request,
+# plus shared admission (work unit, capacity, ceilings, budget). ARCANA_REPAIR_MODE=off disables
+# the router entirely; unset/observe records observations only.
 on:
   workflow_run:
     workflows:
@@ -8,6 +11,9 @@ on:
       - Isolated B131 shared-mechanics compatibility
       - Six-precon worker integration — full custom card regressions
     types: [completed]
+  schedule:
+    # Backfill observations for failures whose router run was dropped from the queue.
+    - cron: '23 */2 * * *'
 permissions:
   actions: read
   contents: read
@@ -18,7 +24,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   route-failure:
-    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    if: ${{ github.event_name == 'schedule' || github.event.workflow_run.conclusion == 'failure' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -32,14 +38,26 @@ jobs:
           ARCANA_AI_CREDIT_BUDGET: ${{ vars.ARCANA_AI_CREDIT_BUDGET }}
           ARCANA_AI_CREDIT_RESERVE: ${{ vars.ARCANA_AI_CREDIT_RESERVE }}
           ARCANA_AUTOMATION_READY: ${{ vars.ARCANA_AUTOMATION_READY }}
+          ARCANA_DISPATCH_MODE: ${{ vars.ARCANA_DISPATCH_MODE }}
+          ARCANA_REPAIR_MODE: ${{ vars.ARCANA_REPAIR_MODE }}
+          ARCANA_MAX_ACTIVE_UNITS: ${{ vars.ARCANA_MAX_ACTIVE_UNITS }}
+          ARCANA_EST_CREDITS_PER_SESSION: ${{ vars.ARCANA_EST_CREDITS_PER_SESSION }}
+          ARCANA_EST_CREDITS_PER_REPAIR: ${{ vars.ARCANA_EST_CREDITS_PER_REPAIR }}
         with:
           script: |
             const {readBudget}=require('./scripts/billing-monitor.cjs');
-            const {routeFailure}=require('./scripts/failure-routing.cjs');
-            const budget=process.env.ARCANA_AUTOMATION_READY==='true'
-              ? (await readBudget(process.env)).status
-              : {level:'unknown',maxNewAssignments:0};
-            const result=await routeFailure({github,context,budget});
+            const {routeFailure,reconcileFailures,createAuthorizer}=require('./scripts/failure-routing.cjs');
+            const {readiness}=require('./scripts/admission.cjs');
+            const ready=readiness(process.env);
+            if(ready.repair==='off'){core.info('Repair mode off; router disabled.');return;}
+            let result;
+            if(context.eventName==='schedule'){
+              result=await reconcileFailures({github,context});
+            }else{
+              const {owner,repo}=context.repo;
+              const authorize=createAuthorizer({github,owner,repo,env:process.env,readBudget});
+              result=await routeFailure({github,context,authorize});
+            }
             core.info(JSON.stringify(result));
             await core.summary.addHeading('Failure routing evidence').addCodeBlock(JSON.stringify(result)).write();
             if(result.state==='permission-blocked')core.setFailed('PR comment permission missing; no retry issued.');

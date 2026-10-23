@@ -1,17 +1,15 @@
 name: Arcana Card Worker Dispatcher
+# Admission control: docs/automation/ADMISSION-CONTROL-DESIGN.md.
+# Paid work needs ARCANA_AUTOMATION_READY=true AND ARCANA_DISPATCH_MODE=authorize-once|normal.
+# Defaults (unset) make no GitHub API calls at all.
 on:
   schedule:
     - cron: '*/30 * * * *'
   workflow_dispatch:
-    inputs:
-      test_issue:
-        description: 'Optional single issue; never bypasses budget, readiness or claims'
-        required: false
-        type: string
 permissions:
   contents: read
   actions: read
-  issues: read
+  issues: write
   pull-requests: read
 concurrency:
   group: arcana-copilot-control
@@ -29,44 +27,19 @@ jobs:
       - uses: actions/github-script@v7
         env:
           ARCANA_AUTOMATION_READY: ${{ vars.ARCANA_AUTOMATION_READY }}
+          ARCANA_DISPATCH_MODE: ${{ vars.ARCANA_DISPATCH_MODE }}
+          ARCANA_REPAIR_MODE: ${{ vars.ARCANA_REPAIR_MODE }}
+          ARCANA_MAX_ACTIVE_UNITS: ${{ vars.ARCANA_MAX_ACTIVE_UNITS }}
+          ARCANA_EST_CREDITS_PER_SESSION: ${{ vars.ARCANA_EST_CREDITS_PER_SESSION }}
+          ARCANA_EST_CREDITS_PER_REPAIR: ${{ vars.ARCANA_EST_CREDITS_PER_REPAIR }}
+          ARCANA_INTEGRATION_BASE: ${{ vars.ARCANA_INTEGRATION_BASE }}
           COPILOT_BILLING_READ_TOKEN: ${{ secrets.COPILOT_BILLING_READ_TOKEN }}
           ARCANA_AI_CREDIT_BUDGET: ${{ vars.ARCANA_AI_CREDIT_BUDGET }}
           ARCANA_AI_CREDIT_RESERVE: ${{ vars.ARCANA_AI_CREDIT_RESERVE }}
+          # Used only for the Copilot assignment call; all reads and ledger writes use GITHUB_TOKEN.
+          COPILOT_DISPATCH_TOKEN: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
         with:
-          github-token: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
           script: |
-            const {owner,repo}=context.repo;
             const {readBudget}=require('./scripts/billing-monitor.cjs');
-            const {planDispatch}=require('./scripts/worker-dispatch.cjs');
-            const ready=process.env.ARCANA_AUTOMATION_READY==='true';
-            if(!ready){core.info('Readiness gate closed; no assignment API called.');return;}
-            const {status:budget}=await readBudget(process.env);
-            core.info('Verified usage budget state: '+budget.level);
-            if(!budget.maxNewAssignments)return;
-            const base='gpt/six-precon-worker-integration-20261022';
-            const branch=await github.rest.repos.getBranch({owner,repo,branch:base});
-            const baseSha=branch.data.commit.sha;
-            const runs=await github.paginate(github.rest.actions.listWorkflowRunsForRepo,{
-              owner,repo,head_sha:baseSha,status:'success',per_page:100});
-            const ciReady=runs.some(r=>r.head_sha===baseSha && r.name==='Arcana Development CI' && r.conclusion==='success');
-            const issues=await github.paginate(github.rest.issues.listForRepo,{owner,repo,state:'open',per_page:100});
-            const prs=await github.paginate(github.rest.pulls.list,{owner,repo,state:'open',per_page:100});
-            const plan=planDispatch({budget,ready,ciReady,issues,prs,testIssue:context.payload.inputs?.test_issue||''});
-            core.info(JSON.stringify({baseSha,...plan}));
-            for(const issue_number of plan.issues){
-              // Consume a fresh sample; another dispatched task may be using allowance.
-              const current=await readBudget(process.env);
-              if(!current.status.maxNewAssignments){core.warning('Usage data unavailable/paused; no more assignments.');return;}
-              const fresh=await github.rest.issues.get({owner,repo,issue_number});
-              if(fresh.data.state!=='open'||fresh.data.assignees?.length){core.warning('Claim changed; stopping.');return;}
-              const response=await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees',{
-                owner,repo,issue_number,assignees:['copilot-swe-agent[bot]'],
-                agent_assignment:{target_repo:owner+'/'+repo,base_branch:base,
-                  custom_instructions:'Read issue #81. Claim distinct cards before coding. Exact Oracle behavior and executable regressions required. Isolated draft PR only. No merge/main/production/release/signing changes.',
-                  custom_agent:'',model:''}
-              });
-              if(!response.data.assignees?.some(a=>['copilot','copilot-swe-agent[bot]'].includes(a.login.toLowerCase()))){
-                core.setFailed('Assignment not confirmed; no retry.');return;
-              }
-              core.info('Assignment confirmed for #'+issue_number+'; live session pickup remains unverified.');
-            }
+            const {runDispatch}=require('./scripts/dispatch-runner.cjs');
+            await runDispatch({github,context,core,env:process.env,readBudget});

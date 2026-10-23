@@ -1,3 +1,5 @@
+> **Superseded** by `docs/automation/ADMISSION-CONTROL-DESIGN.md`. Kept for history; parts below no longer match the code.
+
 # Usage-aware dispatcher rollout
 
 The existing card dispatcher runs every five minutes and can assign two new issues per invocation. Its test_issue option bypasses normal capacity counting. The CI failure router may separately request up to three Copilot repairs per draft PR.

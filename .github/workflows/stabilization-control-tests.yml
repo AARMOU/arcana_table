@@ -1,7 +1,8 @@
 name: Stabilization control regressions
+# Runs on every PR (no path filter) so it can be a required check without blocking
+# unrelated docs/website PRs. The Node suite takes seconds.
 on:
   pull_request:
-    paths: ['scripts/**', '.github/workflows/stabilization-control-tests.yml', '.github/workflows/arcana-ci-failure-router.yml', '.github/workflows/arcana-card-dispatcher.yml']
   workflow_dispatch:
 permissions:
   contents: read
