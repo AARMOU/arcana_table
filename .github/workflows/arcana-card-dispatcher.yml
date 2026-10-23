@@ -19,7 +19,6 @@ jobs:
   dispatch:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: github.event_name == 'workflow_dispatch'
     steps:
       - name: Verify user-authenticated Copilot API token
         env:
@@ -34,18 +33,12 @@ jobs:
           github-token: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
           script: |
             const owner = context.repo.owner, repo = context.repo.repo;
-            const maxWorkers = 6;
-            const prs = await github.paginate(github.rest.pulls.list, {
-              owner, repo, state: 'open', per_page: 100
-            });
-            const active = prs.filter(p => p.draft &&
-              p.head.repo?.full_name === owner + '/' + repo &&
-              p.head.ref.startsWith('copilot/'));
+            // Bound NEW dispatches per invocation; do not treat draft PRs as live sessions.
+            const maxNewAssignments = 2;
             const testIssue = context.payload.inputs?.test_issue?.trim();
-            if (testIssue && !/^\d+$/.test(testIssue)) { core.setFailed('Invalid test issue number'); return; }
-            const available = testIssue ? 1 : Math.max(0, maxWorkers - active.length);
-            core.info('Draft Copilot PRs: ' + active.length + '; open slots: ' + available);
-            if (!available) return;
+            if (testIssue && !/^\\d+$/.test(testIssue)) { core.setFailed('Invalid test issue number'); return; }
+            const available = testIssue ? 1 : maxNewAssignments;
+            core.info('New assignment budget: ' + available);
             const issues = await github.paginate(github.rest.issues.listForRepo, {
               owner, repo, state: 'open', per_page: 100
             });
