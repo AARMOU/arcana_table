@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - gpt/six-precon-worker-integration-20261022
+      - copilot/gptsix-precon-worker-integration-20261022-necron-d
     paths:
       - android/custom-cards/src/**
       - .github/workflows/six-precon-worker-integration.yml
@@ -54,7 +55,7 @@ jobs:
           git add android/app/src/main/assets/argentum/custom-cards.jsonl
           if ! git diff --cached --quiet; then
             git commit -m "data: export verified six-precon card batch"
-            git push origin HEAD:gpt/six-precon-worker-integration-20261022
+            git push origin "HEAD:${GITHUB_REF_NAME}"
           fi
       - uses: actions/upload-artifact@v4
         if: always()
