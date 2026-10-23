@@ -7,7 +7,17 @@ const { loadUnits, isCopilot } = require('./units.cjs');
 
 const REPORT_ISSUE = 81;
 const INTERRUPT_MARKER = '<!-- arcana-interrupted-attempt-v1 -->';
-const DEFAULT_BASE = 'gpt/six-precon-worker-integration-20261022';
+
+function unitInstructions(n, base) {
+  return [
+    `Follow the procedure and acceptance criteria in issue #${n}; it is your complete task.`,
+    'Before editing, confirm each card is not already implemented or claimed in open work, then claim the specific cards on the issue.',
+    'Implement exact current Oracle behavior with executable regression scenarios, registration and deterministic asset export. No placeholders or weakened tests.',
+    `If no card can be identified or implemented exactly, comment on issue #${n} explaining why and do NOT open an empty pull request.`,
+    `Open one isolated draft pull request against ${base} with "Unit: #${n}" in its body.`,
+    'Never merge, and never change main, production, release or signing configuration.',
+  ].join(' ');
+}
 
 async function assignCopilot({ token, owner, repo, issue_number, base, fetchImpl = fetch }) {
   if (!token) return 'error';
@@ -16,7 +26,7 @@ async function assignCopilot({ token, owner, repo, issue_number, base, fetchImpl
     headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ assignees: ['copilot-swe-agent[bot]'], agent_assignment: {
       target_repo: owner + '/' + repo, base_branch: base,
-      custom_instructions: 'Read issue #81. Claim distinct cards before coding. Exact Oracle behavior and executable regressions required. Isolated draft PR only. Put "Unit: #' + issue_number + '" in the PR body. No merge/main/production/release/signing changes.',
+      custom_instructions: unitInstructions(issue_number, base),
       custom_agent: '', model: '' } }),
     signal: AbortSignal.timeout(20000),
   });
@@ -84,7 +94,8 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
       { issues: interrupted.map(u => u.raw.number), resolved });
   }
 
-  const base = env.ARCANA_INTEGRATION_BASE || DEFAULT_BASE;
+  const base = env.ARCANA_INTEGRATION_BASE;
+  if (!base || !/^[A-Za-z0-9._\/-]+$/.test(base)) return done('base-not-configured');
   const baseSha = (await github.rest.repos.getBranch({ owner, repo, branch: base })).data.commit.sha;
   const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo,
     { owner, repo, head_sha: baseSha, status: 'success', per_page: 100 });
@@ -104,7 +115,8 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
 
   const { snapshot } = await readBudget(env);
   const n = candidate.raw.number;
-  const decision = A.admit({ op: 'assign', unit: { ...candidate.derived, labeled: labeled.includes(candidate) },
+  const decision = A.admit({ op: 'assign', unit: { ...candidate.derived, labeled: labeled.includes(candidate),
+    actionable: A.unitActionable(candidate.raw.body, base) },
     units, labeledCount: labeled.length, ready, snapshot, now: Math.max(now, Date.now()) });
   await core.summary.addHeading('Admission decision').addCodeBlock(JSON.stringify({ issue: n, ...decision })).write();
   if (!decision.allowed) return done(decision.dryRun ? 'dry-run' : 'denied', { issue: n, reason: decision.reason });
@@ -134,4 +146,4 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   return done('attempted', { issue: n, result });
 }
 
-module.exports = { runDispatch, assignCopilot, reportInterrupted, resolveInterrupted, INTERRUPT_MARKER, DEFAULT_BASE };
+module.exports = { runDispatch, assignCopilot, unitInstructions, reportInterrupted, resolveInterrupted, INTERRUPT_MARKER };
