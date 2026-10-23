@@ -32,4 +32,4 @@ jobs:
             const alert=await alertChange({github,level:result.status.level,period,reason:result.error});
             core.info('Alert state: '+alert);
             await core.summary.addHeading('Arcana budget status').addRaw(result.status.level).write();
-            if(result.status.level==='unknown')core.warning('Billing unavailable: new assignments stay blocked.');
+            if(result.status.level==='unknown')core.warning('Billing unavailable ('+result.error+'): new assignments stay blocked.');

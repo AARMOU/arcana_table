@@ -19,11 +19,11 @@ function usageQuantity(report,now){
  (report.timePeriod.month!==undefined&&report.timePeriod.month!==period.month)))throw Error('wrong-period');
  let sum=0,found=0;
  for(const x of report.usageItems){
-  if(!/copilot/i.test(String(x.product||''))||!/\bAI Credits?\b/i.test(String(x.sku||'')))continue;
+  if(!/copilot/i.test(String(x.product||''))||!/^(AI Credit|AI Credits|Copilot AI Credits)$/i.test(String(x.sku||'')))continue;
   found++;
-  if(x.unitType!=='ai-credits'||!Number.isSafeInteger(x.grossQuantity)||x.grossQuantity<0)throw Error('wrong-unit-or-quantity');
+  if(x.unitType!=='ai-credits'||!Number.isFinite(x.grossQuantity)||x.grossQuantity<0)throw Error('wrong-unit-or-quantity');
   sum+=x.grossQuantity;
-  if(!Number.isSafeInteger(sum))throw Error('overflow');
+  if(!Number.isFinite(sum))throw Error('overflow');
  }
  // Missing SKU might indicate organization billing, not zero personal usage.
  if(!found)throw Error('no-personal-ai-credit-usage');
