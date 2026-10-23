@@ -1,0 +1,41 @@
+name: Rules reliability baseline (Build 131)
+
+on:
+  push:
+    branches:
+      - gpt/rules-reliability-b131-20261022
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  regression-baseline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out exact branch revision
+        uses: actions/checkout@v4
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android SDK 36
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      - name: Execute real regression baseline
+        run: bash scripts/run-rules-reliability-baseline.sh
+      - name: Upload test reports even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rules-reliability-baseline-${{ github.run_id }}
+          path: |
+            android/app/build/test-results/
+            android/app/build/reports/tests/
+            android/app/build/reports/lint-results-*
+            android/custom-cards/build/test-results/
+            android/custom-cards/build/reports/tests/
+          if-no-files-found: warn
