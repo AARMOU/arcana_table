@@ -63,7 +63,7 @@ jobs:
                     custom_instructions: '', custom_agent: '', model: ''
                   }
                 });
-                const assigned = response.data.assignees?.some(a => a.login.toLowerCase().startsWith('copilot-swe-agent'));
+                const assigned = response.data.assignees?.some(a => ['copilot','copilot-swe-agent[bot]'].includes(a.login.toLowerCase()));
                 if (!assigned) {
                   core.setFailed('Copilot assignment not confirmed on issue #' + issue.number);
                   return;
