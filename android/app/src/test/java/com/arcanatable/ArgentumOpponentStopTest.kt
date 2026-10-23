@@ -27,17 +27,19 @@ class ArgentumOpponentStopTest {
     }
 
     @Test fun enabledEndStepStopsOnlyAtRealOfferedPriorityWindow() {
-        val actual = outcome("ENDING", "END_STEP", endStep = true)
+        val actual = outcome("ENDING", "END", endStep = true)
         assertEquals(ArgentumPassing.Step.INTERRUPTED, actual.step)
         assertEquals("Opponent's end step", actual.reason)
         assertEquals(ArgentumPassing.Step.WAIT, outcome("ENDING", "END", endStep = true, localPriority = false).step)
         assertEquals(ArgentumPassing.Step.REACHED_YOUR_TURN, outcome("ENDING", "END", endStep = true, localTurn = true).step)
         assertEquals(ArgentumPassing.Step.WAIT, outcome("ENDING", "END", endStep = true, legal = emptySet()).step)
         assertEquals(ArgentumPassing.Step.PASS, outcome("ENDING", "CLEANUP", endStep = true).step)
+        assertEquals(ArgentumPassing.Step.PASS, outcome("ENDING", "END_STEP", endStep = true).step)
     }
 
     @Test fun precombatOptionOnlyStopsOnMatchingPhaseAndStep() {
-        assertEquals(ArgentumPassing.Step.INTERRUPTED, outcome("PRECOMBAT_MAIN", "MAIN", precombat = true).step)
+        assertEquals(ArgentumPassing.Step.INTERRUPTED, outcome("PRECOMBAT_MAIN", "PRECOMBAT_MAIN", precombat = true).step)
+        assertEquals(ArgentumPassing.Step.PASS, outcome("PRECOMBAT_MAIN", "MAIN", precombat = true).step)
         assertEquals(ArgentumPassing.Step.PASS, outcome("POSTCOMBAT_MAIN", "MAIN", precombat = true).step)
         assertEquals(ArgentumPassing.Step.PASS, outcome("COMBAT", "DECLARE_ATTACKERS", precombat = true).step)
         assertEquals(ArgentumPassing.Step.PASS, outcome(null, null, precombat = true, endStep = true).step)
