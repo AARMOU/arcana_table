@@ -1,0 +1,80 @@
+name: B131 combined candidate — verify committed source and engine
+on:
+  push:
+    branches: [gpt/b131-combined-integration-20261022]
+    paths:
+      - .github/workflows/b131-combined-verify-commit.yml
+      - android/custom-cards/src/**
+      - android/app/libs/argentum-*.jar
+      - android/app/src/main/assets/argentum/**
+      - docs/integration/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-committed-b131:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify committed Build 131 runtime, card records and Git source lineage
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib,re
+          root=Path("android/app")
+          m=json.loads(Path("docs/integration/B131_RUNTIME.json").read_text())
+          c=json.loads(Path("docs/integration/B131_CARDS.json").read_text())
+          assert m["upstream"]=="61e71e586b100faa661f86cac827ac3c3bbb5a78"
+          assert m["base_source"]=="83aa342e3fcd200710fb9188192189fc7cea7abf"
+          assert c["base"]=="dca22b4bfc3e453ebbb849c846859bcdffda5d54"
+          assert c["cards"]=="959b8d980bdf7e43537671a5651db8619c5c9cd6"
+          assert c["base_count"]==111 and c["integrated_count"]==211
+          assert len(c["imported_definitions"])>=90
+          for name,sha in m["files"].items():
+              p=(root/"libs"/Path(name).name) if name.startswith("libs/") else (root/"src/main/assets/argentum"/Path(name).name)
+              assert p.is_file() and hashlib.sha256(p.read_bytes()).hexdigest()==sha,(name,p)
+          index=(root/"src/main/assets/argentum/custom-cards.index.tsv").read_text().splitlines()
+          lines=(root/"src/main/assets/argentum/custom-cards.jsonl").read_text().splitlines()
+          names=[s.split("\t")[0] for s in index if s.strip()]
+          data=[json.loads(s)["name"] for s in lines if s.strip()]
+          stock={s.split("\t")[0].casefold() for s in (root/"src/main/assets/argentum/all-cards.index.tsv").read_text().splitlines() if s.strip()}
+          assert len(names)==211 and names==data and len({n.casefold() for n in names})==211
+          assert not [n for n in names if n.casefold() in stock]
+          registry=Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt").read_text()
+          symbols=re.findall(r'^\s*Entry\((\w+),\s*"[^"]+",',registry,re.M)
+          assert len(symbols)==211 and len(set(symbols))==211
+          assert "fun banner(packet: JSONObject, viewerId: String?" in Path("android/app/src/main/java/com/arcanatable/ArgentumOutcomeLog.kt").read_text()
+          assert Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziScionFactory.kt").is_file()
+          print("PASS: committed exact B131 upstream binaries, custom data, lineage, and logging integration")
+          PY
+          git diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Verify committed integrated custom-card scenarios without regeneration
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test
+      - name: Verify committed combined Android regression, lint and compile
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      - name: Archive full exact-commit test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b131-combined-exact-commit-evidence
+          retention-days: 30
+          path: |
+            docs/integration/
+            android/custom-cards/build/test-results/
+            android/custom-cards/build/reports/tests/
+            android/app/build/test-results/
+            android/app/build/reports/tests/
+            android/app/build/reports/lint-results-debug.*
+          if-no-files-found: warn
