@@ -1,5 +1,12 @@
 # Arcana Table — integration control board
 
+### Combined Build 131 candidate — new reviewed workstream
+
+- [Draft PR #47](https://github.com/AARMOU/arcana_table/pull/47) targets `gpt/argentum-upgrade-preview-20261022` from isolated `gpt/b131-combined-integration-20261022@98626c7709023346d5f45756bceb864bc3041766`, **not** `main`.
+- Combines merged nullable game-over logging, 211 custom-card registrations with source/tests (100 beyond the B131 baseline), and byte-verified actual Build 131 Argentum replacement jars; excludes three upstream-owned duplicate card registrations.
+- [Staging and combined build CI](https://github.com/AARMOU/arcana_table/actions/runs/39874812474) **SUCCESS**; [exact committed-source validation](https://github.com/AARMOU/arcana_table/actions/runs/39875693567) **SUCCESS** for full custom-card regressions, Android tests, lint, and debug assembly.
+- [Detailed integration and rollback evidence](B131_COMBINED_CANDIDATE_2026-10-22.md). **No release, production merge, physical-device gameplay proof or upgrade of `main` is implied.**
+
 ## Latest verified integration checkpoint — 2026-10-22 (supersedes historical red statuses below)
 
 - **PR #45 merged** to game-over source at `dca22b4bfc3e453ebbb849c846859bcdffda5d54`. Destination CI [#39872381961](https://github.com/AARMOU/arcana_table/actions/runs/39872381961) green; pinned B131 replacement-engine CI [#39872674003](https://github.com/AARMOU/arcana_table/actions/runs/39872674003) green, including full Android tests, lint, and debug assembly.
