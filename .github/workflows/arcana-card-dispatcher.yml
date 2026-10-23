@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       test_issue:
-        description: 'Optional single eligible issue; never bypasses readiness, budget or claims'
+        description: 'Optional single issue; never bypasses budget, readiness or claims'
         required: false
         type: string
 permissions:
@@ -29,17 +29,20 @@ jobs:
       - uses: actions/github-script@v7
         env:
           ARCANA_AUTOMATION_READY: ${{ vars.ARCANA_AUTOMATION_READY }}
-          COPILOT_USAGE_SNAPSHOT: ${{ vars.COPILOT_USAGE_SNAPSHOT }}
+          COPILOT_BILLING_READ_TOKEN: ${{ secrets.COPILOT_BILLING_READ_TOKEN }}
+          ARCANA_PREMIUM_REQUEST_BUDGET: ${{ vars.ARCANA_PREMIUM_REQUEST_BUDGET }}
+          ARCANA_REQUEST_RESERVE: ${{ vars.ARCANA_REQUEST_RESERVE }}
         with:
           github-token: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
           script: |
             const {owner,repo}=context.repo;
-            const gate=require('./scripts/usage-gate.cjs');
+            const {readBudget}=require('./scripts/billing-monitor.cjs');
             const {planDispatch}=require('./scripts/worker-dispatch.cjs');
             const ready=process.env.ARCANA_AUTOMATION_READY==='true';
             if(!ready){core.info('Readiness gate closed; no assignment API called.');return;}
-            const budget=gate.budgetFromEnv(process.env.COPILOT_USAGE_SNAPSHOT);
-            if(!budget.maxNewAssignments){core.info(gate.describe(budget));return;}
+            const {status:budget}=await readBudget(process.env);
+            core.info('Verified usage budget state: '+budget.level);
+            if(!budget.maxNewAssignments)return;
             const base='gpt/six-precon-worker-integration-20261022';
             const branch=await github.rest.repos.getBranch({owner,repo,branch:base});
             const baseSha=branch.data.commit.sha;
@@ -51,6 +54,9 @@ jobs:
             const plan=planDispatch({budget,ready,ciReady,issues,prs,testIssue:context.payload.inputs?.test_issue||''});
             core.info(JSON.stringify({baseSha,...plan}));
             for(const issue_number of plan.issues){
+              // Consume a fresh sample; another dispatched task may be using allowance.
+              const current=await readBudget(process.env);
+              if(!current.status.maxNewAssignments){core.warning('Usage data unavailable/paused; no more assignments.');return;}
               const fresh=await github.rest.issues.get({owner,repo,issue_number});
               if(fresh.data.state!=='open'||fresh.data.assignees?.length){core.warning('Claim changed; stopping.');return;}
               const response=await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees',{

@@ -1,0 +1,35 @@
+name: Arcana Copilot Billing Watch
+on:
+  schedule:
+    - cron: '11,41 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: arcana-billing-watch
+  cancel-in-progress: false
+jobs:
+  billing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        env:
+          COPILOT_BILLING_READ_TOKEN: ${{ secrets.COPILOT_BILLING_READ_TOKEN }}
+          ARCANA_PREMIUM_REQUEST_BUDGET: ${{ vars.ARCANA_PREMIUM_REQUEST_BUDGET }}
+          ARCANA_REQUEST_RESERVE: ${{ vars.ARCANA_REQUEST_RESERVE }}
+        with:
+          script: |
+            const {readBudget,alertChange}=require('./scripts/billing-monitor.cjs');
+            const result=await readBudget(process.env);
+            core.info('Arcana premium usage state: '+result.status.level);
+            const period=new Date().toISOString().slice(0,7);
+            const alert=await alertChange({github,level:result.status.level,period,reason:result.error});
+            core.info('Alert state: '+alert);
+            await core.summary.addHeading('Arcana budget status').addRaw(result.status.level).write();
+            if(result.status.level==='unknown')core.warning('Billing unavailable: new assignments stay blocked.');
