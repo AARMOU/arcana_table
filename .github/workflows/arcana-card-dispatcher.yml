@@ -3,6 +3,11 @@ on:
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
+    inputs:
+      test_issue:
+        description: 'Optional one-issue controlled dispatch test (e.g. 63); bypasses capacity count'
+        required: false
+        type: string
 permissions:
   contents: read
   issues: write
@@ -36,15 +41,18 @@ jobs:
             const active = prs.filter(p => p.draft &&
               p.head.repo?.full_name === owner + '/' + repo &&
               p.head.ref.startsWith('copilot/'));
-            const available = Math.max(0, maxWorkers - active.length);
+            const testIssue = context.payload.inputs?.test_issue?.trim();
+            if (testIssue && !/^\d+$/.test(testIssue)) { core.setFailed('Invalid test issue number'); return; }
+            const available = testIssue ? 1 : Math.max(0, maxWorkers - active.length);
             core.info('Draft Copilot PRs: ' + active.length + '; open slots: ' + available);
             if (!available) return;
             const issues = await github.paginate(github.rest.issues.listForRepo, {
               owner, repo, state: 'open', per_page: 100
             });
-            const queued = issues.filter(i => !i.pull_request &&
+            const queued = issues.filter(i => (!testIssue || String(i.number) === testIssue) && !i.pull_request &&
               i.title.startsWith('[Arcana Queue]') &&
               !(i.assignees || []).length).sort((a,b) => a.number - b.number);
+            if (testIssue && queued.length !== 1) { core.setFailed('Test issue not found or not eligible: ' + testIssue); return; }
             for (const issue of queued.slice(0, available)) {
               try {
                 const response = await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assignees', {
