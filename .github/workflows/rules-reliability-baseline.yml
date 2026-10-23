@@ -21,10 +21,13 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      # Ubuntu GitHub runners already provide the Android SDK command-line tools.
+      # Avoid android-actions/setup-android@v3: it attempts to install the
+      # removed SDK package "tools" and fails before tests start.
       - name: Install Android SDK 36
-        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0"
       - name: Execute real regression baseline
         run: bash scripts/run-rules-reliability-baseline.sh
       - name: Upload test reports even on failure
