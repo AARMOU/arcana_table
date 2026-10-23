@@ -47,14 +47,15 @@ class ArgentumOpponentStopTest {
         assertEquals("Argentum needs a choice from you.", outcome("ENDING", "END", endStep = true, decision = true).reason)
         assertEquals(ArgentumPassing.Step.WAIT, outcome("ENDING", "END", endStep = true, waiting = true).step)
         assertTrue(outcome("ENDING", "END", endStep = true, stack = "Removal").reason!!.contains("stack"))
-        assertEquals(ArgentumPassing.Step.INTERRUPTED,
+        // Existing safety rule: the player's next turn always ends the pass loop.
+        assertEquals(ArgentumPassing.Step.REACHED_YOUR_TURN,
             ArgentumPassing.next(
                 startTurn = 2, turnNumber = 4, activePlayer = 0, localSeat = 0,
                 priorityPlayer = 0, legalActionTypes = setOf("DeclareBlockers"),
                 hasPendingDecision = false, opponentStackItem = null, gameOver = false, awaitingUpdate = false,
                 currentPhaseName = "ENDING", currentStepName = "END",
                 stopAtOpponentPrecombat = true, stopAtOpponentEndStep = true,
-            ).step.let { if (it == ArgentumPassing.Step.REACHED_YOUR_TURN) ArgentumPassing.Step.INTERRUPTED else it })
+            ).step)
     }
 
     @Test fun selectedWindowLabelsDoNotGuessFromUnrecognizedPhases() {
