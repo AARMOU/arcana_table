@@ -30,8 +30,8 @@ jobs:
         env:
           ARCANA_AUTOMATION_READY: ${{ vars.ARCANA_AUTOMATION_READY }}
           COPILOT_BILLING_READ_TOKEN: ${{ secrets.COPILOT_BILLING_READ_TOKEN }}
-          ARCANA_PREMIUM_REQUEST_BUDGET: ${{ vars.ARCANA_PREMIUM_REQUEST_BUDGET }}
-          ARCANA_REQUEST_RESERVE: ${{ vars.ARCANA_REQUEST_RESERVE }}
+          ARCANA_AI_CREDIT_BUDGET: ${{ vars.ARCANA_AI_CREDIT_BUDGET }}
+          ARCANA_AI_CREDIT_RESERVE: ${{ vars.ARCANA_AI_CREDIT_RESERVE }}
         with:
           github-token: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
           script: |
