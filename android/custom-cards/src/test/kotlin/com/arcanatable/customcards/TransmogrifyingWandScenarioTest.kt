@@ -8,6 +8,7 @@ import com.wingedsheep.engine.state.components.battlefield.CountersComponent
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.CounterType
 import com.wingedsheep.sdk.core.Keyword
+import com.wingedsheep.sdk.core.Zone
 import com.wingedsheep.sdk.dsl.*
 import org.junit.Assert.*
 import org.junit.Test
@@ -77,9 +78,12 @@ class TransmogrifyingWandScenarioTest {
         val controlSpell = d.putCardInHand(opponent, "Borrowed Control")
         d.giveMana(opponent, Color.BLUE)
         assertNull(d.castSpell(opponent, controlSpell, listOf(victim)).error)
-        d.resolveAll()
+        d.bothPass()
 
         assertEquals(opponent, d.getController(victim))
+        d.resolveAll()
+
+        assertTrue(d.zoneNames(p, Zone.GRAVEYARD).contains("Grizzly Bears"))
         assertTrue(d.permanentsNamed(p, "Grizzly Bears").isEmpty())
         assertTrue(d.permanentsNamed(opponent, "Grizzly Bears").isEmpty())
         assertEquals(1, d.permanentsNamed(opponent, "Ox").size)
