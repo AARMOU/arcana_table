@@ -1,4 +1,5 @@
 name: Arcana Development CI
+# Build 131 integration: exact-head checks after generated assets are committed.
 on:
   push:
     branches:
