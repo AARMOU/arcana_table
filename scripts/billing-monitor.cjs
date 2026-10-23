@@ -19,7 +19,8 @@ function usageQuantity(report,now){
  (report.timePeriod.month!==undefined&&report.timePeriod.month!==period.month)))throw Error('wrong-period');
  let sum=0,found=0;
  for(const x of report.usageItems){
-  if(!/copilot/i.test(String(x.product||''))||!/^(AI Credit|AI Credits|Copilot AI Credits)$/i.test(String(x.sku||'')))continue;
+  // AI credit API and account/period/unit are the authority; SKU labels can vary by model.
+  if(!/^(copilot|copilot ai credits)$/i.test(String(x.product||'').trim()))continue;
   found++;
   if(x.unitType!=='ai-credits'||!Number.isFinite(x.grossQuantity)||x.grossQuantity<0)throw Error('wrong-unit-or-quantity');
   sum+=x.grossQuantity;
