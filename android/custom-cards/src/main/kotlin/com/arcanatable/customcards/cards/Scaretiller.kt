@@ -35,7 +35,7 @@ val Scaretiller = card("Scaretiller") {
             )
             val chosenLand = chooseUpTo(
                 1,
-                from = lands.key,
+                from = lands,
                 prompt = "Choose a land card from your hand or graveyard to put onto the battlefield tapped.",
             )
             move(
