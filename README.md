@@ -1,5 +1,3 @@
-<p align="center"><img src="assets/arcana-logo.png" alt="Arcana Table logo" width="180"></p>
-
 # Arcana Table
 
 Arcana Table is a mobile-first digital tabletop for multiplayer **Magic: The Gathering**, designed with Commander games in mind.
