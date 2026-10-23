@@ -7,12 +7,13 @@ const { decideBudget } = require('./usage-budget-policy.cjs');
 const LEDGER = '<!-- arcana-wu-ledger-v1 -->';
 const ONE_SHOT_LABEL = 'arcana:authorize-once';
 const HALTED_LABEL = 'wu:halted';
+const RESOLVE_LABEL = 'wu:resolve-interrupted';
 const HARD_MAX_UNITS = 2;
 const CEILING = { assign: 1, repair: 2 };
 const PICKUP_TIMEOUT_MS = 30 * 60 * 1000;
 const DISPATCH_MODES = ['off', 'dry-run', 'authorize-once', 'normal'];
 const REPAIR_MODES = ['off', 'observe', 'request'];
-const LEDGER_OPS = ['authorizing', 'attempt-result', 'repair-request', 'halt', 'observation'];
+const LEDGER_OPS = ['authorizing', 'attempt-result', 'resolution', 'repair-request', 'halt', 'observation'];
 const isBot = c => c?.user?.type === 'Bot' && c?.user?.login === 'github-actions[bot]';
 
 function positiveInt(raw, fallback) {
@@ -77,37 +78,46 @@ function parseLedger(comments = []) {
 const latest = (xs, pred) => xs.filter(pred).reduce((m, x) => Math.max(m, x.at), -Infinity);
 
 // unit: {number, labels:[], assignedToCopilot, ledger:[parsed], sessions:[{event:'started'|'finished', at}]}
+// Accounting rules (conservative):
+// - Every `authorizing` record consumes the unit's single assignment, whatever happened next.
+// - An authorization with neither an `attempt-result` nor an owner `resolution` is interrupted.
+// - `confirmed`, `error` and `not-confirmed` results may have started paid work, so they are
+//   treated as an assignment that is pending pickup (and keep their slot after a timeout).
 function deriveUnit(unit, now = Date.now()) {
   const ledger = unit.ledger || [];
   const sessions = unit.sessions || [];
-  const results = new Set(ledger.filter(r => r.op === 'attempt-result').map(r => r.run));
-  const interrupted = ledger.some(r => r.op === 'authorizing' && !results.has(r.run));
-  const attempts = ledger.filter(r => r.op === 'attempt-result');
+  const authorized = new Set(ledger.filter(r => r.op === 'authorizing').map(r => r.run));
+  const closed = new Set(ledger.filter(r => r.op === 'attempt-result' || r.op === 'resolution').map(r => r.run));
+  const interrupted = [...authorized].some(run => !closed.has(run));
   // A Copilot assignment with no ledger record predates this system and counts as used.
-  const assignments = attempts.length || (unit.assignedToCopilot ? 1 : 0);
+  const assignments = Math.max(authorized.size, unit.assignedToCopilot ? 1 : 0);
   const repairs = ledger.filter(r => r.op === 'repair-request').length;
   const base = { number: unit.number, assignments, repairs, interrupted, blocksAll: false };
   if (interrupted) return { ...base, state: 'halted', reason: 'interrupted', holdsSlot: true, blocksAll: true };
   const started = latest(sessions, s => s.event === 'started');
   const finished = latest(sessions, s => s.event === 'finished');
   const repairAt = latest(ledger, r => r.op === 'repair-request');
-  const confirmedAt = latest(attempts, r => r.result === 'confirmed');
   if (started > -Infinity && started > finished) return { ...base, state: 'working', holdsSlot: true };
   if (repairAt > -Infinity && !(finished > repairAt)) {
     const late = now - repairAt > PICKUP_TIMEOUT_MS && !(started > repairAt);
     return late ? { ...base, state: 'halted', reason: 'pickup-timeout', holdsSlot: true }
       : { ...base, state: 'repairing', holdsSlot: true };
   }
-  const assigned = unit.assignedToCopilot || confirmedAt > -Infinity;
-  if (assigned && !(started > -Infinity && started >= (confirmedAt > -Infinity ? confirmedAt : -Infinity))) {
+  const maybePaid = ['confirmed', 'error', 'not-confirmed'];
+  const paidAt = Math.max(latest(ledger, r => r.op === 'attempt-result' && maybePaid.includes(r.result)),
+    latest(ledger, r => r.op === 'resolution' && r.result === 'assigned'));
+  const assigned = unit.assignedToCopilot || paidAt > -Infinity;
+  if (assigned && !(started > -Infinity && (paidAt === -Infinity || started >= paidAt))) {
     // Never picked up. A timed-out pickup keeps its slot until the owner reviews it.
-    const late = confirmedAt > -Infinity ? now - confirmedAt > PICKUP_TIMEOUT_MS : true;
+    const late = paidAt > -Infinity ? now - paidAt > PICKUP_TIMEOUT_MS : true;
     return late ? { ...base, state: 'halted', reason: 'pickup-timeout', holdsSlot: true }
       : { ...base, state: 'pending-pickup', holdsSlot: true };
   }
   if (ledger.some(r => r.op === 'halt') || (unit.labels || []).includes(HALTED_LABEL))
     return { ...base, state: 'halted', reason: 'owner-review', holdsSlot: false };
   if (assigned) return { ...base, state: 'review', holdsSlot: false };
+  // Authorization used but no assignment happened (claim changed, or resolved as not assigned).
+  if (assignments) return { ...base, state: 'halted', reason: 'assignment-consumed', holdsSlot: false };
   return { ...base, state: 'queued', holdsSlot: false };
 }
 
@@ -151,5 +161,5 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
     : { allowed: true, reason: 'admitted', budget };
 }
 
-module.exports = { LEDGER, ONE_SHOT_LABEL, HALTED_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
+module.exports = { LEDGER, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
   readiness, formatLedger, parseLedger, deriveUnit, budgetWithReservations, admit, isBot };

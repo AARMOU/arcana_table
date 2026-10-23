@@ -120,3 +120,57 @@ test('budget includes in-flight reservations and the candidate itself', () => {
   assert.match(A.admit({ op: 'assign', unit: queued(68), ready, snapshot: stale, now: NOW }).reason, /unknown/);
   assert.match(A.admit({ op: 'assign', unit: queued(68), ready, snapshot: null, now: NOW }).reason, /unknown/);
 });
+
+// --- Accounting for failed/unknown outcomes and owner resolution (GPT review on #93) ---
+const rec = (fields, at) => bot(A.formatLedger({ ...fields, at: iso(at) }), at);
+const attempt = (result, at = NOW - 5 * MIN) => [rec({ op: 'authorizing', issue: 68, run: 1 }, at - MIN),
+  rec({ op: 'attempt-result', issue: 68, run: 1, result }, at)];
+const assignDenied = u => assert.equal(A.admit({ op: 'assign', unit: u, units: [u], ready: A.readiness(env({ ARCANA_MAX_ACTIVE_UNITS: '2' })), snapshot: snap(), now: NOW }).allowed, false);
+
+test('error and not-confirmed outcomes are treated as possibly paid: slot held, no second assignment', () => {
+  for (const result of ['error', 'not-confirmed', 'confirmed']) {
+    const fresh = A.deriveUnit({ number: 68, ledger: A.parseLedger(attempt(result)) }, NOW);
+    assert.deepEqual([fresh.state, fresh.holdsSlot, fresh.assignments], ['pending-pickup', true, 1], result);
+    assignDenied(fresh);
+    const late = A.deriveUnit({ number: 68, ledger: A.parseLedger(attempt(result, NOW - 90 * MIN)) }, NOW);
+    assert.deepEqual([late.state, late.reason, late.holdsSlot], ['halted', 'pickup-timeout', true], result);
+    assignDenied(late);
+    const picked = A.deriveUnit({ number: 68, ledger: A.parseLedger(attempt(result, NOW - 90 * MIN)),
+      sessions: [{ event: 'started', at: NOW - 80 * MIN }, { event: 'finished', at: NOW - 40 * MIN }] }, NOW);
+    assert.equal(picked.state, 'review', result); assignDenied(picked);
+  }
+});
+
+test('not-attempted consumes the authorization without holding a slot', () => {
+  const u = A.deriveUnit({ number: 68, ledger: A.parseLedger(attempt('not-attempted')) }, NOW);
+  assert.deepEqual([u.state, u.reason, u.holdsSlot, u.assignments], ['halted', 'assignment-consumed', false, 1]);
+  assignDenied(u);
+});
+
+test('an unknown or missing result value never reopens the unit', () => {
+  const u = A.deriveUnit({ number: 68, ledger: A.parseLedger(attempt('weird')) }, NOW);
+  assert.equal(u.assignments, 1); assert.notEqual(u.state, 'queued'); assignDenied(u);
+});
+
+test('owner resolution is append-only, clears the block, and never authorizes a second assignment', () => {
+  const auth = rec({ op: 'authorizing', issue: 68, run: 7 }, NOW - 10 * MIN);
+  for (const [observed, assigned, state] of [['assigned', true, 'pending-pickup'], ['not-assigned', false, 'halted']]) {
+    const res = rec({ op: 'resolution', issue: 68, run: 7, result: observed, reason: 'owner-label by AARMOU in run 9' }, NOW - 2 * MIN);
+    const u = A.deriveUnit({ number: 68, assignedToCopilot: assigned, ledger: A.parseLedger([auth, res]) }, NOW);
+    assert.equal(u.blocksAll, false); assert.equal(u.interrupted, false); assert.equal(u.assignments, 1);
+    assert.equal(u.state, state, observed); assignDenied(u);
+  }
+  // Resolution "assigned" is treated as possibly paid even if the issue no longer shows the assignee.
+  const r = A.deriveUnit({ number: 68, ledger: A.parseLedger([auth,
+    rec({ op: 'resolution', issue: 68, run: 7, result: 'assigned' }, NOW - 2 * MIN)]) }, NOW);
+  assert.deepEqual([r.state, r.holdsSlot], ['pending-pickup', true]);
+});
+
+test('resolution only closes its own run and must come from github-actions[bot]', () => {
+  const ledger = [rec({ op: 'authorizing', issue: 68, run: 7 }, NOW - 9 * MIN), rec({ op: 'authorizing', issue: 68, run: 8 }, NOW - 8 * MIN),
+    rec({ op: 'resolution', issue: 68, run: 7, result: 'not-assigned' }, NOW - 2 * MIN)];
+  assert.equal(A.deriveUnit({ number: 68, ledger: A.parseLedger(ledger) }, NOW).blocksAll, true);
+  const forged = { ...rec({ op: 'resolution', issue: 68, run: 8, result: 'not-assigned' }, NOW), user: { type: 'User', login: 'AARMOU' } };
+  assert.equal(A.deriveUnit({ number: 68, ledger: A.parseLedger([...ledger, forged]) }, NOW).blocksAll, true);
+  assert.equal(A.deriveUnit({ number: 68, ledger: A.parseLedger([...ledger, rec({ op: 'resolution', issue: 68, run: 8, result: 'not-assigned' }, NOW)]) }, NOW).blocksAll, false);
+});

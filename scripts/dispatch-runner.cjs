@@ -34,8 +34,30 @@ async function reportInterrupted({ github, owner, repo, unit, dry }) {
   await github.rest.issues.createComment({ owner, repo, issue_number: REPORT_ISSUE, body: [INTERRUPT_MARKER, key,
     `**Interrupted dispatch attempt on #${unit.raw.number}.** All dispatch is refused until the owner reviews it.`,
     `Observed now: Copilot ${unit.raw.assignedToCopilot ? 'IS' : 'is NOT'} assigned (observation only; never retried automatically).`,
-    `To clear (owner): confirm what happened, then delete the \`authorizing\` ledger comment on #${unit.raw.number}. This report stays as the audit record. A Copilot assignment that did happen keeps counting as the unit's one assignment.`].join('\n\n') });
+    `To resolve (owner): confirm what happened, then add the label \`${A.RESOLVE_LABEL}\` to #${unit.raw.number}. The next dispatcher run in \`authorize-once\` or \`normal\` mode appends a resolution record; all original records are kept. The unit's single assignment stays used either way, so resolving can never authorize a second assignment. To retry the card, open a new queue issue.`].join('\n\n') });
   return 'reported';
+}
+
+// Owner-authorized, append-only resolution. Records who applied the label and what is observed
+// now; never deletes or edits earlier ledger records, never retries the assignment.
+async function resolveInterrupted({ github, owner, repo, unit, runId }) {
+  const n = unit.raw.number;
+  const events = await github.paginate(github.rest.issues.listEventsForTimeline, { owner, repo, issue_number: n, per_page: 100 });
+  const labeled = events.filter(e => e.event === 'labeled' && e.label?.name === A.RESOLVE_LABEL).pop();
+  const actor = String(labeled?.actor?.login || 'unknown').replace(/[^A-Za-z0-9_.\-[\]]/g, '');
+  const closed = new Set(unit.raw.ledger.filter(r => r.op === 'attempt-result' || r.op === 'resolution').map(r => r.run));
+  const open = [...new Set(unit.raw.ledger.filter(r => r.op === 'authorizing' && !closed.has(r.run)).map(r => r.run))];
+  const observed = unit.raw.assignedToCopilot ? 'assigned' : 'not-assigned';
+  for (const run of open) {
+    await github.rest.issues.createComment({ owner, repo, issue_number: n, body: A.formatLedger({ op: 'resolution',
+      issue: n, run, result: observed, reason: `owner-label by ${actor} in run ${runId}`, at: new Date().toISOString() }) });
+  }
+  await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: A.RESOLVE_LABEL });
+  await github.rest.issues.createComment({ owner, repo, issue_number: REPORT_ISSUE, body: [INTERRUPT_MARKER,
+    `resolved issue:${n} runs:${open.join(',')}`,
+    `**Interrupted attempt on #${n} resolved** (label applied by ${actor}). Observed: Copilot ${observed === 'assigned' ? 'IS' : 'is NOT'} assigned.`,
+    'Original ledger records are preserved. The unit\'s assignment remains used; no retry was made.'].join('\n\n') });
+  return { issue: n, runs: open, observed, actor };
 }
 
 async function runDispatch({ github, context, core, env, readBudget, now = Date.now(), fetchImpl }) {
@@ -51,8 +73,15 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   const units = data.units.map(u => u.derived);
   const interrupted = data.units.filter(u => u.derived.blocksAll);
   if (interrupted.length) {
-    for (const u of interrupted) await reportInterrupted({ github, owner, repo, unit: u, dry });
-    return done('interrupted-attempt', { issues: interrupted.map(u => u.raw.number) });
+    const resolved = [];
+    for (const u of interrupted) {
+      if (!dry && u.raw.labels.includes(A.RESOLVE_LABEL)) {
+        resolved.push(await resolveInterrupted({ github, owner, repo, unit: u, runId: String(context.runId) }));
+      } else await reportInterrupted({ github, owner, repo, unit: u, dry });
+    }
+    // Never dispatch in the same run that resolved or reported an interruption.
+    return done(resolved.length ? 'interruption-resolved' : 'interrupted-attempt',
+      { issues: interrupted.map(u => u.raw.number), resolved });
   }
 
   const base = env.ARCANA_INTEGRATION_BASE || DEFAULT_BASE;
@@ -105,4 +134,4 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   return done('attempted', { issue: n, result });
 }
 
-module.exports = { runDispatch, assignCopilot, reportInterrupted, INTERRUPT_MARKER, DEFAULT_BASE };
+module.exports = { runDispatch, assignCopilot, reportInterrupted, resolveInterrupted, INTERRUPT_MARKER, DEFAULT_BASE };

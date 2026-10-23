@@ -106,3 +106,30 @@ test('unknown budget denies without writes', async () => {
   const r = await runDispatch({ github: f.github, context: ctx, core: core(), env: env(), readBudget: async () => ({ snapshot: null }), fetchImpl: fetchOk(calls) });
   assert.equal(r.state, 'denied'); assert.match(r.reason, /budget/); assert.equal(f.writes.length, 0); assert.equal(calls.length, 0);
 });
+
+test('owner resolution label appends a resolution record, keeps originals, and dispatches nothing that run', async () => {
+  const ledger = { 68: [bot(A.formatLedger({ op: 'authorizing', issue: 68, run: 554 }))] };
+  const f = fake({ issues: [queue(68, [A.RESOLVE_LABEL])], ledger }); const calls = [];
+  f.github.rest.issues.listEventsForTimeline = () => [{ event: 'labeled', label: { name: A.RESOLVE_LABEL }, actor: { login: 'AARMOU' } }];
+  const r = await run(f, {}, { fetchImpl: fetchOk(calls) });
+  assert.equal(r.state, 'interruption-resolved'); assert.equal(calls.length, 0);
+  assert.deepEqual(f.writes.map(w => [w[0], w[1]]), [['comment', 68], ['removeLabel', 68], ['comment', 81]]);
+  assert.match(f.writes[0][2], /op:resolution\nissue:68\nrun:554\nresult:not-assigned\nreason:owner-label by AARMOU in run 555/);
+  assert.ok(!f.writes.some(w => w[0] === 'deleteComment'));
+  assert.ok(!f.writes[2][2].includes('@'));
+});
+
+test('resolution label is ignored in dry-run (no writes)', async () => {
+  const ledger = { 68: [bot(A.formatLedger({ op: 'authorizing', issue: 68, run: 554 }))] };
+  const f = fake({ issues: [queue(68, [A.RESOLVE_LABEL])], ledger });
+  const r = await run(f, { ARCANA_DISPATCH_MODE: 'dry-run' });
+  assert.equal(r.state, 'interrupted-attempt'); assert.equal(f.writes.length, 0);
+});
+
+test('after resolution the unit stays non-assignable and dispatch moves on to other work', async () => {
+  const ledger = { 68: [bot(A.formatLedger({ op: 'authorizing', issue: 68, run: 554 })),
+    bot(A.formatLedger({ op: 'resolution', issue: 68, run: 554, result: 'not-assigned' }))] };
+  const f = fake({ issues: [queue(66), queue(68)], ledger }); const calls = [];
+  const r = await run(f, { ARCANA_DISPATCH_MODE: 'normal' }, { fetchImpl: fetchOk(calls) });
+  assert.equal(r.issue, 66); assert.equal(calls.length, 1);
+});
