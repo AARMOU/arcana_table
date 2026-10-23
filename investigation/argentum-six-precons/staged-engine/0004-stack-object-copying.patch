@@ -332,9 +332,14 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/contin
 index 1a2476a80d..c62c00fa33 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/MiscContinuationResumer.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/MiscContinuationResumer.kt
-@@ -50 +50 @@ class MiscContinuationResumer(
+@@ -47,6 +47,6 @@ class MiscContinuationResumer(
+         resumer(FlipOntoBattlefieldContinuation::class, ::resumeFlipOntoBattlefield),
+         resumer(StormCopyTargetContinuation::class, ::resumeStormCopyTarget),
+         resumer(StormCopyModalTargetContinuation::class, ::resumeStormCopyModalTarget),
 -        resumer(CopyEachSpellContinuation::class, ::resumeCopyEachSpell),
 +        resumer(CopyStackObjectsOrderContinuation::class, ::resumeCopyStackObjectsOrder),
+         resumer(CopyTriggeredAbilityTargetContinuation::class, ::resumeCopyTriggeredAbilityTarget),
+         resumer(CopyActivatedAbilityTargetContinuation::class, ::resumeCopyActivatedAbilityTarget),
 @@ -154,11 +154,9 @@ class MiscContinuationResumer(
              return ExecutionResult.error(state, "Expected target selection response for ability copy")
          }
@@ -361,7 +366,7 @@ index 1a2476a80d..c62c00fa33 100644
          if (push.outcome !is Outcome.Done) return push
  
 @@ -601,53 +600,19 @@ class MiscContinuationResumer(
-         return checkForMore(result.state, flipEvents + result.events)
+         return checkForMore(result.stateWithOutputsHandedOn(), flipEvents + result.events)
      }
  
 -    private fun resumeCopyEachSpell(
@@ -447,9 +452,13 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effect
 index 812935c27b..bc01b26c55 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt
-@@ -78 +78 @@ class EffectExecutorRegistry(
+@@ -78,5 +78,5 @@ class EffectExecutorRegistry(
+         registerModule(
+             LibraryExecutors(::recurse, zones, cardRegistry, castSpellHandler, playLandHandler, targetFinder, legalActionEnumerator)
+         )
 -        registerModule(StackExecutors(zones, amountEvaluator, cardRegistry, spellCounterer, targetFinder = targetFinder))
 +        registerModule(StackExecutors(zones, amountEvaluator, cardRegistry, spellCounterer, targetFinder = targetFinder, effectExecutor = ::recurse))
+         registerModule(InformationExecutors(cardRegistry))
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyEachTargetSpellExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyEachTargetSpellExecutor.kt
 deleted file mode 100644
 index 502fcf5dc7..0000000000
@@ -939,16 +948,32 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effect
 index b41d899272..9e500a1490 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/SpellCopyTargets.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/SpellCopyTargets.kt
-@@ -54,4 +54,7 @@ internal object SpellCopyTargets {
+@@ -31,5 +31,9 @@
+-    fun originals(state: GameState, sourceId: EntityId, ordinal: Int? = null): List<ChosenTarget> =
+-        if (ordinal == null) state.spellOrLastKnown(sourceId)?.get<TargetsComponent>()?.targets.orEmpty()
+-        else state.spellOrLastKnown(sourceId)?.get<SpellOnStackComponent>()?.modeTargetsOrdered?.getOrNull(ordinal).orEmpty()
++    fun originals(state: GameState, sourceId: EntityId, ordinal: Int? = null): List<ChosenTarget> {
++        val source = state.getEntity(sourceId)?.takeIf {
++            it.has<ActivatedAbilityOnStackComponent>() || it.has<TriggeredAbilityOnStackComponent>()
++        } ?: state.spellOrLastKnown(sourceId)
++        return if (ordinal == null) source?.get<TargetsComponent>()?.targets.orEmpty()
++        else source?.get<SpellOnStackComponent>()?.modeTargetsOrdered?.getOrNull(ordinal).orEmpty()
++    }
+-
++
+     fun selection(state: GameState, sourceId: EntityId, response: TargetsResponse, ordinal: Int? = null): Selection {
+@@ -54,4 +58,9 @@ internal object SpellCopyTargets {
 -        val distribution = state.spellOrLastKnown(sourceId)?.get<SpellOnStackComponent>()?.damageDistribution.orEmpty()
-+        val entity = state.spellOrLastKnown(sourceId)
++        val entity = state.getEntity(sourceId)?.takeIf {
++            it.has<ActivatedAbilityOnStackComponent>() || it.has<TriggeredAbilityOnStackComponent>()
++        } ?: state.spellOrLastKnown(sourceId)
 +        val distribution = (entity?.get<SpellOnStackComponent>()?.damageDistribution
 +            ?: entity?.get<ActivatedAbilityOnStackComponent>()?.damageDistribution
 +            ?: entity?.get<TriggeredAbilityOnStackComponent>()?.damageDistribution).orEmpty()
          val infos = mutableListOf<TargetRequirementInfo>()
          val legal = mutableMapOf<Int, List<EntityId>>()
          var slot = 0
-@@ -61,7 +64,9 @@ internal object SpellCopyTargets {
+@@ -61,7 +70,9 @@ internal object SpellCopyTargets {
                  infos += TargetRequirementInfo(index = slot, minTargets = 0, maxTargets = 1,
                      description = "${req.description} — target ${slot + 1}" +
                          (amount?.let { ": $it to this target" } ?: ""), emptyChoiceLabel = "Keep original target",
@@ -959,7 +984,7 @@ index b41d899272..9e500a1490 100644
                      prefixLength = index.takeIf { tables != null && index > 0 })
                  legal[slot] = byRequirement[index].orEmpty()
                  slot++
-@@ -105,12 +110,13 @@ internal object SpellCopyTargets {
+@@ -105,12 +116,13 @@ internal object SpellCopyTargets {
  
      /** The prospective copy, on a scratch state, so legality reads its colors and controller. */
      private class Preview(val state: GameState, val copyId: EntityId, val card: CardComponent,
@@ -975,7 +1000,7 @@ index b41d899272..9e500a1490 100644
                  pipelineContext = if (prefix.isEmpty()) null else PredicateContext(controllerId = controllerId,
                      sourceId = copyId, xValue = xValue, targets = prefix, namedTargets = named),
              ).filter { candidate ->
-@@ -124,7 +130,7 @@ internal object SpellCopyTargets {
+@@ -124,7 +136,7 @@ internal object SpellCopyTargets {
                      sourceId = copyId,
                      xValue = xValue,
                      allTargets = prefix,
@@ -984,10 +1009,13 @@ index b41d899272..9e500a1490 100644
                      namedTargets = named,
                  ) == null
              }
-@@ -132,12 +138,30 @@ internal object SpellCopyTargets {
+@@ -132,12 +144,32 @@ internal object SpellCopyTargets {
  
      private fun preview(state: GameState, sourceId: EntityId, controllerId: EntityId, exceptions: CopyExceptions): Preview? {
-         val source = state.getEntity(sourceId) ?: return null
+-        val source = state.spellOrLastKnown(sourceId) ?: return null
++        val source = state.getEntity(sourceId)?.takeIf {
++            it.has<ActivatedAbilityOnStackComponent>() || it.has<TriggeredAbilityOnStackComponent>()
++        } ?: state.spellOrLastKnown(sourceId) ?: return null
 -        val card = source.get<CardComponent>() ?: return null
 -        val spell = source.get<SpellOnStackComponent>() ?: return null
 -        val (copyId, scratch) = state.newEntity()
