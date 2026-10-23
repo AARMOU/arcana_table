@@ -1,7 +1,7 @@
 'use strict';
 const { decideBudget } = require('./usage-budget-policy.cjs');
 
-// Parses a premium-request snapshot ({used, allowance, measuredAt}) supplied by
+// Parses a AI-credit snapshot ({used, allowance, measuredAt}) supplied by
 // the COPILOT_USAGE_SNAPSHOT repository variable. Anything unparsable is "unknown".
 function parseSnapshot(raw, now = Date.now()) {
   try {
@@ -40,7 +40,7 @@ function repairAllowed(budget, priorAttempts) {
 
 function describe(budget) {
   const pct = budget.ratio === undefined ? 'n/a' : (budget.ratio * 100).toFixed(1) + '%';
-  return 'Copilot premium-request budget: ' + budget.level + ' (' + pct + ')' +
+  return 'Copilot usage budget: ' + budget.level + ' (' + pct + ')' +
     (budget.reason ? ' - ' + budget.reason : '');
 }
 

@@ -1,28 +1,28 @@
 'use strict';
 const {test}=require('node:test'),assert=require('node:assert/strict');
 const m=require('./billing-monitor.cjs'),now=new Date('2026-10-23T18:00:00Z');
-const item=q=>({product:'Copilot',sku:'Copilot Premium Request',unitType:'requests',grossQuantity:q});
+const item=q=>({product:'Copilot AI Credits',sku:'AI Credit',unitType:'ai-credits',grossQuantity:q});
 const report=items=>({user:'AARMOU',timePeriod:{year:2026,month:10},usageItems:items});
 const fetchImpl=async()=>({ok:true,json:async()=>report([item(670),{product:'Actions',sku:'Actions',grossQuantity:5}])});
-test('verified monthly premium usage plus safety reserve controls throttling',async()=>{
+test('verified monthly AI credit usage plus safety reserve controls throttling',async()=>{
  const x=await m.collect({token:'dummy',budget:'1000',now,fetchImpl});
  assert.equal(x.snapshot.reportedUsed,670);assert.equal(x.snapshot.reserved,100);
  assert.equal(x.status.level,'slow');
 });
 test('explicit reserve can be customized',async()=>{
- const x=await m.collect({token:'dummy',budget:'1000',reserveRequests:'0',now,fetchImpl});
+ const x=await m.collect({token:'dummy',budget:'1000',reserveCredits:'0',now,fetchImpl});
  assert.equal(x.status.level,'warn');
 });
-test('reject credits, wrong account, stale period, invalid quantities',()=>{
- assert.throws(()=>m.usageQuantity(report([{...item(5),unitType:'ai-credits'}]),now));
- assert.throws(()=>m.usageQuantity(report([{product:'Copilot',sku:'AI Credits',grossQuantity:2}]),now));
+test('reject requests, wrong account, stale period, invalid quantities',()=>{
+ assert.throws(()=>m.usageQuantity(report([{...item(5),unitType:'requests'}]),now));
+ assert.throws(()=>m.usageQuantity(report([{product:'Copilot',sku:'Copilot Premium Request',unitType:'requests',grossQuantity:2}]),now));
  assert.throws(()=>m.usageQuantity({...report([item(1)]),user:'other'},now));
  assert.throws(()=>m.usageQuantity({...report([item(1)]),timePeriod:{year:2026,month:9}},now));
  assert.throws(()=>m.usageQuantity(report([item(-1)]),now));
 });
 test('missing access/budget or HTTP403 fail closed',async()=>{
- for(const e of [{},{COPILOT_BILLING_READ_TOKEN:'x',ARCANA_PREMIUM_REQUEST_BUDGET:'0'},
- {COPILOT_BILLING_READ_TOKEN:'x',ARCANA_PREMIUM_REQUEST_BUDGET:'1000'}]){
+ for(const e of [{},{COPILOT_BILLING_READ_TOKEN:'x',ARCANA_AI_CREDIT_BUDGET:'0'},
+ {COPILOT_BILLING_READ_TOKEN:'x',ARCANA_AI_CREDIT_BUDGET:'1000'}]){
   const x=await m.readBudget(e,{now,fetchImpl:async()=>({ok:false,status:403})});
   assert.equal(x.status.level,'unknown');assert.equal(x.status.maxNewAssignments,0);
  }
@@ -42,4 +42,17 @@ test('alert only once per threshold and not on initially healthy reading',async(
  const prior=[{user:{login:'github-actions[bot]',type:'Bot'},body:posted[0].body}];
  assert.equal(await m.alertChange({github:fake(prior),level:'slow',period:'2026-10'}),'unchanged');
  assert.equal(posted.length,1);
+});
+
+test('current 471/1500 credits snapshot below warning with reserve',async()=>{
+ const x=await m.collect({token:'dummy',budget:'1500',now,fetchImpl:async()=>({ok:true,json:async()=>report([item(471)])})});
+ assert.equal(x.snapshot.reportedUsed,471);
+ assert.equal(x.snapshot.reserved,150);
+ assert.equal(x.snapshot.metric,'ai_credits');
+ assert.equal(x.status.level,'normal');
+});
+test('no matching AI credit SKU fails closed',async()=>{
+ const x=await m.readBudget({COPILOT_BILLING_READ_TOKEN:'x',ARCANA_AI_CREDIT_BUDGET:'1500'},
+ {now,fetchImpl:async()=>({ok:true,json:async()=>report([])})});
+ assert.equal(x.status.maxNewAssignments,0);
 });

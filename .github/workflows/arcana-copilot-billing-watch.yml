@@ -21,13 +21,13 @@ jobs:
       - uses: actions/github-script@v7
         env:
           COPILOT_BILLING_READ_TOKEN: ${{ secrets.COPILOT_BILLING_READ_TOKEN }}
-          ARCANA_PREMIUM_REQUEST_BUDGET: ${{ vars.ARCANA_PREMIUM_REQUEST_BUDGET }}
-          ARCANA_REQUEST_RESERVE: ${{ vars.ARCANA_REQUEST_RESERVE }}
+          ARCANA_AI_CREDIT_BUDGET: ${{ vars.ARCANA_AI_CREDIT_BUDGET }}
+          ARCANA_AI_CREDIT_RESERVE: ${{ vars.ARCANA_AI_CREDIT_RESERVE }}
         with:
           script: |
             const {readBudget,alertChange}=require('./scripts/billing-monitor.cjs');
             const result=await readBudget(process.env);
-            core.info('Arcana premium usage state: '+result.status.level);
+            core.info('Arcana AI credit usage state: '+result.status.level);
             const period=new Date().toISOString().slice(0,7);
             const alert=await alertChange({github,level:result.status.level,period,reason:result.error});
             core.info('Alert state: '+alert);
