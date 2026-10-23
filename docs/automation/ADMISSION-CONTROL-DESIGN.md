@@ -1,6 +1,6 @@
 # Arcana Table — Copilot Admission Control Design
 
-**Status:** Proposal, revised after GPT review (PR #92). Awaiting owner approval. No code, workflow, setting or label changes are part of this document.
+**Status:** Approved by the owner 2026-10-23; implemented on `claude/admission-control-impl` (draft PR). Nothing is enabled: all new variables default to off.
 **Author:** Claude · **Date:** 2026-10-23 · **Baseline:** `main` at `8b4ec05`
 **Supersedes when approved:** `docs/usage-controller-design.md` (describes an earlier 5-minute dispatcher and a snapshot variable that no longer match the code).
 **Coordination:** issue #81.
@@ -179,3 +179,15 @@ All of it ships as one draft PR to `main`. No merge without owner approval.
 2. Per-unit ceiling: 1 assignment + 2 repair requests.
 3. Provisional reservations: 60 AI credits per session, 30 per repair; replaced by calibrated values from actual readings.
 4. Per-unit observations are logged immediately. A weekly #81 summary only if it proves useful and low-noise.
+
+## 13. Implementation notes (deviations and decisions made while building)
+
+- **Files:** `scripts/admission.cjs` (pure policy), `scripts/units.cjs` (GitHub reads), `scripts/dispatch-runner.cjs` (dispatcher), `scripts/failure-routing.cjs` (router + scheduled reconcile). `scripts/worker-dispatch.cjs` is removed; its manual `test_issue` input is replaced by `authorize-once`.
+- **Defaults after merge:** dispatcher unset → `off`, makes no API calls. Router unset → `observe`: records failure observations (as today) and, every 2 hours, backfills observations for failures from the last 6 hours. `ARCANA_REPAIR_MODE=off` silences the router entirely.
+- **More conservative than §4:** a pickup timeout keeps its slot (`halted`, `holdsSlot`) until the owner reviews it, because a late session could still start. A legacy Copilot assignment with no observed session is treated the same way.
+- **Clearing an interrupted attempt:** the owner deletes the `authorizing` ledger comment on the issue; the #81 report remains as the audit record.
+- **Tokens:** ledger, label and report writes use the workflow's `GITHUB_TOKEN` (`github-actions[bot]`), the only author the ledger trusts. `COPILOT_DISPATCH_TOKEN` is used solely for the assignment call.
+- **PR linkage:** the assignment instructions ask Copilot to put `Unit: #N` in its PR body; without it, the lowest referenced unit issue is used.
+- **Fixed during testing:** admission is evaluated after the billing read. Evaluating it with a timestamp taken earlier made every fresh reading look future-dated, so live runs would have denied everything as `unknown`.
+- **Deferred:** `queue: max` is not added yet (syntax still to be verified in a non-paid workflow). The reconcile pass covers dropped router runs in the meantime.
+- **Control tests** now run on every PR (path filter removed) so the check can be required.
