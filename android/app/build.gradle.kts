@@ -18,7 +18,7 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 131
-        versionName = "0.33.9-build131-argentum-upgrade"
+        versionName = "0.33.9-build131-combined-preview"
         buildConfigField("int", "BASE_BUILD", "120")
         buildConfigField("String", "BASE_SOURCE", "\"3e17b24\"")
         manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build $versionCode"
@@ -27,9 +27,9 @@ android {
     buildTypes {
         debug {
             // Separate package so this build installs beside the experimental/targeting test build.
-            applicationIdSuffix = ".argentum"
+            applicationIdSuffix = ".b131combined"
             // The build number follows versionCode, so the installer never shows a stale one.
-            manifestPlaceholders["appLabel"] = "Arcana Preview · B${defaultConfig.versionCode}"
+            manifestPlaceholders["appLabel"] = "Arcana B131 Combined Preview"
         }
     }
 
