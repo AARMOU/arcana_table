@@ -50,7 +50,7 @@ class RiseOfTheEldraziScenarioTest {
         val permanent = d.putCreatureOnBattlefield(opponent, "Grizzly Bears")
         d.giveMana(p, Color.WHITE, 12)
 
-        assertEquals("{9}{C}{C}{C}", RiseOfTheEldrazi.manaCost)
+        assertEquals("{9}{C}{C}{C}", RiseOfTheEldrazi.manaCost.toString())
         assertNotNull(d.castSpell(p, spell, listOf(permanent, opponent)).error)
 
         d.giveColorlessMana(p, 3)
@@ -137,6 +137,8 @@ class RiseOfTheEldraziScenarioTest {
         val bounce = d.putCardInHand(opponent, "Test Permanent Bounce")
         d.giveMana(opponent, Color.BLUE, 2)
         assertNull(d.castSpell(opponent, bounce, listOf(victim)).error)
+        assertNull(d.bothPass().error)
+        assertEquals(p, d.priorityPlayer)
         assertNull(d.passPriority(p).error)
         val shroud = d.putCardInHand(opponent, "Test Shroud")
         assertNull(d.castSpell(opponent, shroud).error)
