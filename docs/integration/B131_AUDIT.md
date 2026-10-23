@@ -27,4 +27,4 @@ The website, branding, privacy, closed-testing, README, and Pages-workflow chang
 - `android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CustomCardDataTest.kt`
 - `docs/integration/B131_AUDIT.md`
 
-PR #61 remains draft. No merge, APK publication, or production release was performed.
+PR #61 remains draft and has not been merged. No APK was published and no production release was performed.
