@@ -1,6 +1,6 @@
 # Arcana Table — Copilot Admission Control Design
 
-**Status:** Proposal for review by the owner and GPT. No code, workflow, setting or label changes are part of this document.
+**Status:** Proposal, revised after GPT review (PR #92). Awaiting owner approval. No code, workflow, setting or label changes are part of this document.
 **Author:** Claude · **Date:** 2026-10-23 · **Baseline:** `main` at `8b4ec05`
 **Supersedes when approved:** `docs/usage-controller-design.md` (describes an earlier 5-minute dispatcher and a snapshot variable that no longer match the code).
 **Coordination:** issue #81.
@@ -115,10 +115,17 @@ admit({operation, unit, readiness, units, budget, now}) ->
 **Dispatcher behavior in `authorize-once`:**
 1. Only issues carrying the label are eligible. Scheduled and manual runs behave identically.
 2. If more than one issue carries the label → refuse everything, report in #81.
-3. **Remove the label first.** If removal fails → stop. The removal is the record that the authorization was consumed.
-4. Write the `authorized` ledger comment.
-5. Attempt the assignment **once**. Success or failure, no retry.
-6. On any later run, no label means nothing to do.
+3. **Interrupted-attempt check first** (see below). Any unresolved attempt anywhere → refuse everything.
+4. Write an `authorizing` ledger comment (run ID, issue, timestamp). If the write fails → stop; the label is still present and nothing was spent.
+5. **Remove the label.** If removal fails → stop and mark the unit `halted:interrupted`.
+6. Attempt the assignment **once**. Success or failure, no retry.
+7. Write the `attempt-result` ledger comment (confirmed / not confirmed / error).
+8. On any later run, no label means nothing to do.
+
+**Interrupted attempts (crash between steps 4 and 7).** An `authorizing` record with no matching `attempt-result` is an *interrupted attempt*. Every dispatcher run checks for one before doing anything else:
+- Read the issue's current assignees and record what is observed (Copilot assigned or not) as an observation, never as a new attempt.
+- Mark the unit `halted:interrupted`, post the evidence to #81, and **refuse all dispatch** until the owner reviews it and clears the state.
+- Never retry the assignment automatically, even if the observation shows it did not happen.
 
 **Observation:** record the billing reading before, confirm `copilot_work_started` and `copilot_work_finished`, record the billing reading after the next scheduled billing run, and confirm no other issue was assigned and no repair comment was posted.
 
@@ -148,7 +155,7 @@ admit({operation, unit, readiness, units, budget, now}) ->
 ## 10. Proposed `main` ruleset (owner applies)
 
 - Require a pull request before merging; no direct pushes.
-- Require status check `controls` (workflow "Stabilization control regressions", `stabilization-control-tests.yml`) on the PR head. **Caveat:** that workflow only runs when `scripts/**` or the control workflows change, so as a required check it would leave other PRs (docs, website) waiting forever. Before requiring it, either remove its path filter or add a lightweight always-run job that passes when no control files changed.
+- **Every required check must run on every PR.** Today `controls` (workflow "Stabilization control regressions") is path-filtered to `scripts/**` and the control workflows, so requiring it as-is would block docs and website PRs forever. Before enabling the ruleset, add a lightweight job that runs on every PR: it executes the control tests when control files changed and passes immediately otherwise. Require that job.
 - Block force pushes and branch deletion.
 - Owner bypass: the owner's choice. Recommend allowing bypass only for the owner, used rarely and noted in #81.
 
@@ -166,9 +173,9 @@ admit({operation, unit, readiness, units, budget, now}) ->
 
 All of it ships as one draft PR to `main`. No merge without owner approval.
 
-## 12. Open questions
+## 12. Decisions (agreed with GPT review on PR #92; owner may override)
 
-1. Default `ARCANA_MAX_ACTIVE_UNITS`: 1 until calibrated, then 2?
-2. Per-unit ceiling of 1 assignment + 2 repairs — acceptable?
-3. Starting values for `est_credits_per_session` / `est_credits_per_repair` before calibration (proposal: 60 / 30, deliberately high).
-4. Should the reconcile pass also post a weekly summary to #81, or only record per-unit observations?
+1. `ARCANA_MAX_ACTIVE_UNITS=1`. Consider 2 only after a verified controlled test.
+2. Per-unit ceiling: 1 assignment + 2 repair requests.
+3. Provisional reservations: 60 AI credits per session, 30 per repair; replaced by calibrated values from actual readings.
+4. Per-unit observations are logged immediately. A weekly #81 summary only if it proves useful and low-noise.
