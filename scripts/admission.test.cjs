@@ -10,7 +10,7 @@ const env = (x = {}) => ({ ARCANA_AUTOMATION_READY: 'true', ARCANA_DISPATCH_MODE
   ARCANA_REPAIR_MODE: 'request', ...x });
 const snap = (used = 300) => ({ used, allowance: 1500, measuredAt: iso(NOW - 5 * MIN) });
 const bot = (body, at = NOW) => ({ body, created_at: iso(at), user: { type: 'Bot', login: 'github-actions[bot]' } });
-const queued = n => A.deriveUnit({ number: n }, NOW);
+const queued = n => ({ ...A.deriveUnit({ number: n }, NOW), actionable: { ok: true, missing: [] } });
 const working = n => A.deriveUnit({ number: n, assignedToCopilot: true,
   sessions: [{ event: 'started', at: NOW - 10 * MIN }] }, NOW);
 const review = (n, extra = {}) => A.deriveUnit({ number: n, assignedToCopilot: true,
@@ -173,4 +173,35 @@ test('resolution only closes its own run and must come from github-actions[bot]'
   const forged = { ...rec({ op: 'resolution', issue: 68, run: 8, result: 'not-assigned' }, NOW), user: { type: 'User', login: 'AARMOU' } };
   assert.equal(A.deriveUnit({ number: 68, ledger: A.parseLedger([...ledger, forged]) }, NOW).blocksAll, true);
   assert.equal(A.deriveUnit({ number: 68, ledger: A.parseLedger([...ledger, rec({ op: 'resolution', issue: 68, run: 8, result: 'not-assigned' }, NOW)]) }, NOW).blocksAll, false);
+});
+
+// --- Unit readiness: the dispatcher refuses vague work items (zero-diff #95 follow-up) ---
+const BASE = 'gpt/arcana-integration-next';
+const GOOD = ['## Cards', '- Eldrazi Monument', '- Oblivion Sower', '', '## Acceptance',
+  '- Exact current Oracle behavior', '- Executable regression scenarios and deterministic export', '', 'Base: `' + BASE + '`'].join('\n');
+test('a complete unit body is actionable; discovery with a script path also qualifies', () => {
+  assert.deepEqual(A.unitActionable(GOOD, BASE), { ok: true, missing: [] });
+  const discovery = GOOD.replace('## Cards\n- Eldrazi Monument\n- Oblivion Sower', '## Discovery\nRun `investigation/argentum-six-precons/coverage-audit.py --json-output`');
+  assert.equal(A.unitActionable(discovery, BASE).ok, true);
+});
+test('each missing section is reported and blocks assignment', () => {
+  const cases = [[GOOD.replace(/## Cards[\s\S]*?\n\n/, ''), 'cards-or-discovery'],
+    [GOOD.replace('## Discovery', '').replace(/- Eldrazi Monument\n- Oblivion Sower/, 'TBD'), 'cards-or-discovery'],
+    [GOOD.replace(/## Acceptance[\s\S]*?\n\n/, ''), 'acceptance'],
+    [GOOD.replace('Exact current Oracle behavior', 'Make it work'), 'acceptance'],
+    [GOOD.replace(/Base:.*$/m, ''), 'base-missing'],
+    [GOOD, 'base-mismatch', 'gpt/six-precon-worker-integration-20261022'],
+    ['', 'cards-or-discovery']];
+  for (const [body, reason, base = BASE] of cases) {
+    const a = A.unitActionable(body, base);
+    assert.equal(a.ok, false, reason); assert.ok(a.missing.includes(reason), reason + ' got ' + a.missing);
+    const unit = { ...A.deriveUnit({ number: 68 }, NOW), actionable: a };
+    assert.match(A.admit({ op: 'assign', unit, ready: A.readiness(env()), snapshot: snap(), now: NOW }).reason, /unit-not-actionable/);
+  }
+});
+test('an unchecked unit is refused (fail closed) and dry-run reports the reason', () => {
+  const unit = A.deriveUnit({ number: 68 }, NOW);
+  assert.match(A.admit({ op: 'assign', unit, ready: A.readiness(env()), snapshot: snap(), now: NOW }).reason, /unit-not-actionable: unchecked/);
+  const d = A.admit({ op: 'assign', unit: { ...unit, actionable: A.unitActionable('vague', BASE) }, ready: A.readiness({ ARCANA_DISPATCH_MODE: 'dry-run' }), snapshot: snap(), now: NOW });
+  assert.equal(d.wouldAllow, undefined); assert.match(d.reason, /unit-not-actionable/);
 });

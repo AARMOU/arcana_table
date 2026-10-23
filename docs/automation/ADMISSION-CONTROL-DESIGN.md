@@ -192,3 +192,12 @@ All of it ships as one draft PR to `main`. No merge without owner approval.
 - **Fixed during testing:** admission is evaluated after the billing read. Evaluating it with a timestamp taken earlier made every fresh reading look future-dated, so live runs would have denied everything as `unknown`.
 - **Deferred:** `queue: max` is not added yet (syntax still to be verified in a non-paid workflow). The reconcile pass covers dropped router runs in the meantime.
 - **Control tests** now run on every PR (path filter removed) so the check can be required.
+
+## 14. Unit readiness (added after the first one-shot)
+
+The first controlled one-shot (#68, run 40030804598) worked exactly as designed: one assignment, a complete ledger, the label consumed, nothing else started. But Copilot opened a zero-diff PR (#95). The gates checked *whether* to spend, not *whether the work item was usable*. Changes:
+
+- **Unit-readiness gate** (`unitActionable` in `scripts/admission.cjs`). `authorize-once`, `normal` and `dry-run` deny with `unit-not-actionable: <missing>` unless the issue body has: a `## Cards` section with bullets, or a `## Discovery` section naming a script path; a `## Acceptance` section mentioning Oracle behavior and executable tests; and a `Base:` line equal to `ARCANA_INTEGRATION_BASE`. Template: `.github/ISSUE_TEMPLATE/arcana-queue-unit.md`.
+- **Per-unit worker instructions.** The assignment no longer says "Read issue #81". It points the worker at the unit issue's procedure, requires claiming specific cards, and says to comment on the issue instead of opening an empty PR.
+- **Base must be configured.** The stale default branch is removed; an unset or malformed `ARCANA_INTEGRATION_BASE` returns `base-not-configured` before any GitHub call that could spend.
+- **PR linking:** each PR belongs to exactly one unit. An explicit `Unit: #N` line wins, then GitHub's `connected` development link (the #54 → #59 case, where the PR body never named the unit), then the lowest referenced unit issue. Plain cross-references are ignored because worker PRs mention many queue issues.

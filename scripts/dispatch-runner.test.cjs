@@ -8,7 +8,9 @@ const BASE_SHA = 'c'.repeat(40);
 const core = () => { const log = []; return { log, info: m => log.push(m), warning: m => log.push('W:' + m),
   setFailed: m => log.push('F:' + m), summary: { addHeading() { return this; }, addCodeBlock() { return this; }, async write() {} } }; };
 const bot = body => ({ body, created_at: new Date().toISOString(), user: { type: 'Bot', login: 'github-actions[bot]' } });
-const queue = (n, labels = []) => ({ number: n, title: '[Arcana Queue] deck ' + n, labels: labels.map(name => ({ name })), assignees: [], state: 'open' });
+const BASE = 'gpt/arcana-integration-next';
+const BODY = ['## Cards', '- Eldrazi Monument', '', '## Acceptance', '- Exact Oracle behavior with executable regression tests', '', 'Base: ' + BASE].join('\n');
+const queue = (n, labels = [], body = BODY) => ({ number: n, title: '[Arcana Queue] deck ' + n, body, labels: labels.map(name => ({ name })), assignees: [], state: 'open' });
 
 function fake({ issues = [queue(68, [A.ONE_SHOT_LABEL])], ledger = {}, ci = true, removeFails = false, freshAssignees = [], report81 = [] } = {}) {
   const writes = [];
@@ -30,7 +32,7 @@ function fake({ issues = [queue(68, [A.ONE_SHOT_LABEL])], ledger = {}, ci = true
   return { github, writes };
 }
 const ctx = { repo: { owner: 'AARMOU', repo: 'arcana_table' }, runId: 555 };
-const env = x => ({ ARCANA_AUTOMATION_READY: 'true', ARCANA_DISPATCH_MODE: 'authorize-once', ARCANA_REPAIR_MODE: 'off', COPILOT_DISPATCH_TOKEN: 't', ...x });
+const env = x => ({ ARCANA_AUTOMATION_READY: 'true', ARCANA_DISPATCH_MODE: 'authorize-once', ARCANA_REPAIR_MODE: 'off', ARCANA_INTEGRATION_BASE: BASE, COPILOT_DISPATCH_TOKEN: 't', ...x });
 const readBudget = async () => ({ snapshot: { used: 300, allowance: 1500, measuredAt: new Date().toISOString() } });
 const fetchOk = calls => async (url, init) => { calls.push([url, JSON.parse(init.body)]); return { ok: true, json: async () => ({ assignees: [{ login: 'Copilot' }] }) }; };
 const run = (f, e, extra = {}) => runDispatch({ github: f.github, context: ctx, core: core(), env: env(e), readBudget, ...extra });
@@ -45,7 +47,9 @@ test('authorize-once: record, consume label, assign once, close record — in th
   const f = fake(); const calls = [];
   const r = await run(f, {}, { fetchImpl: fetchOk(calls) });
   assert.deepEqual(r, { state: 'attempted', issue: 68, result: 'confirmed' });
-  assert.equal(calls.length, 1); assert.match(calls[0][1].agent_assignment.custom_instructions, /Unit: #68/);
+  assert.equal(calls.length, 1); const ins = calls[0][1].agent_assignment.custom_instructions;
+  assert.match(ins, /Unit: #68/); assert.match(ins, /issue #68/); assert.match(ins, /do NOT open an empty pull request/);
+  assert.ok(!/#81/.test(ins)); assert.equal(calls[0][1].agent_assignment.base_branch, BASE);
   assert.deepEqual(f.writes.map(w => w[0]), ['comment', 'removeLabel', 'comment']);
   assert.match(f.writes[0][2], /op:authorizing\nissue:68\nrun:555/);
   assert.match(f.writes[2][2], /op:attempt-result\nissue:68\nrun:555\nresult:confirmed/);
@@ -132,4 +136,26 @@ test('after resolution the unit stays non-assignable and dispatch moves on to ot
   const f = fake({ issues: [queue(66), queue(68)], ledger }); const calls = [];
   const r = await run(f, { ARCANA_DISPATCH_MODE: 'normal' }, { fetchImpl: fetchOk(calls) });
   assert.equal(r.issue, 66); assert.equal(calls.length, 1);
+});
+
+test('integration base must be configured explicitly (no stale default)', async () => {
+  for (const b of ['', undefined, 'bad branch;rm']) {
+    const f = fake(); const calls = [];
+    assert.equal((await run(f, { ARCANA_INTEGRATION_BASE: b }, { fetchImpl: fetchOk(calls) })).state, 'base-not-configured');
+    assert.equal(calls.length, 0); assert.equal(f.writes.length, 0);
+  }
+});
+
+test('a vague unit is denied before any write or assignment, in every mode', async () => {
+  for (const mode of ['authorize-once', 'normal', 'dry-run']) {
+    const f = fake({ issues: [queue(68, [A.ONE_SHOT_LABEL], 'Please do the next batch.')] }); const calls = [];
+    const r = await run(f, { ARCANA_DISPATCH_MODE: mode }, { fetchImpl: fetchOk(calls) });
+    assert.equal(r.state, 'denied', mode); assert.match(r.reason, /unit-not-actionable/);
+    assert.equal(calls.length, 0); assert.equal(f.writes.length, 0);
+  }
+});
+
+test('a unit whose Base line names another branch is denied', async () => {
+  const f = fake({ issues: [queue(68, [A.ONE_SHOT_LABEL], BODY.replace(BASE, 'gpt/six-precon-worker-integration-20261022'))] });
+  assert.match((await run(f, {})).reason, /base-mismatch/);
 });

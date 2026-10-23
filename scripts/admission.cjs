@@ -121,6 +121,35 @@ function deriveUnit(unit, now = Date.now()) {
   return { ...base, state: 'queued', holdsSlot: false };
 }
 
+// A unit must tell the worker exactly what to do before credits are spent on it.
+// Required sections (see .github/ISSUE_TEMPLATE/arcana-queue-unit.md):
+//   "## Cards" with at least one bullet, or "## Discovery" naming a script path;
+//   "## Acceptance" mentioning Oracle behavior and executable tests;
+//   a "Base: <branch>" line equal to the dispatcher's integration base.
+function sections(body) {
+  const out = {};
+  let cur = null;
+  for (const line of String(body || '').split(/\r?\n/)) {
+    const h = line.match(/^#{2,3}\s+(.+?)\s*$/);
+    if (h) { cur = h[1].toLowerCase(); out[cur] = out[cur] || []; continue; }
+    if (cur) out[cur].push(line);
+  }
+  return out;
+}
+function unitActionable(body, base) {
+  const sec = sections(body);
+  const missing = [];
+  const cards = (sec.cards || []).some(l => /^\s*[-*]\s+\S/.test(l));
+  const discovery = (sec.discovery || []).some(l => /[\w./-]+\.(?:py|cjs|mjs|js|sh|kts?)\b/.test(l));
+  if (!cards && !discovery) missing.push('cards-or-discovery');
+  const acceptance = (sec.acceptance || []).join('\n');
+  if (!/oracle/i.test(acceptance) || !/\b(tests?|regressions?|scenarios?)\b/i.test(acceptance)) missing.push('acceptance');
+  const line = String(body || '').match(/^Base:\s*`?([^`\s]+)`?\s*$/m);
+  if (!line) missing.push('base-missing');
+  else if (!base || line[1] !== base) missing.push('base-mismatch');
+  return { ok: missing.length === 0, missing };
+}
+
 function budgetWithReservations({ snapshot, active, pendingRepairs, candidate, ready, now = Date.now() }) {
   if (!snapshot || !Number.isFinite(snapshot.used) || ready.estSession === null || ready.estRepair === null)
     return { level: 'unknown', maxNewAssignments: 0, reason: 'no verified usage snapshot' };
@@ -147,6 +176,7 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
       return deny('authorize-once requires exactly one labeled issue');
     if (unit.state !== 'queued') return deny('unit state ' + unit.state);
     if (unit.assignments >= CEILING.assign) return deny('assignment ceiling reached');
+    if (!unit.actionable?.ok) return deny('unit-not-actionable: ' + (unit.actionable?.missing || ['unchecked']).join(', '));
   } else {
     if (unit.state !== 'review') return deny('unit state ' + unit.state);
     if (unit.repairs >= CEILING.repair) return deny('repair ceiling reached');
@@ -162,4 +192,4 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
 }
 
 module.exports = { LEDGER, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
-  readiness, formatLedger, parseLedger, deriveUnit, budgetWithReservations, admit, isBot };
+  readiness, formatLedger, parseLedger, deriveUnit, unitActionable, budgetWithReservations, admit, isBot };
