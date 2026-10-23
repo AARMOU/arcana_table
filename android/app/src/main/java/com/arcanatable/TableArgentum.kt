@@ -245,11 +245,13 @@ internal fun TableController.chooseArgentumLegalAction(info: JSONObject) {
     val type = action.optString("type")
     if (type == "DeclareAttackers" || type == "DeclareBlockers") { if (!openArgentumCombat()) message = "Argentum's combat declaration is no longer available."; return }
     if (!info.optBoolean("isAffordable", true)) {
+        logBlockedArgentumAction(type, BlockedArgentumActionReason.MARKED_UNAFFORDABLE)
         message = "Not enough spendable mana yet. Activate Treasure, Goose/Food, or other conditional mana sources first."
         return
     }
     ArgentumActions.needsHandlingReason(info)?.let { reason ->
         reportArgentumUnsupported("action:${info.optString("description")}:$type", "${info.optString("description", type)} — $reason")
+        logBlockedArgentumAction(type, BlockedArgentumActionReason.CLIENT_INPUT_UNSUPPORTED)
         message = "Needs handling: $reason Nothing was sent to Argentum."
         return
     }
@@ -265,8 +267,13 @@ internal fun TableController.chooseArgentumLegalAction(info: JSONObject) {
         return
     }
     val epoch = ArgentumActions.epochFor(info, argentumSnapshot?.interactionEpoch)
-    if (epoch == null || !submitArgentumAction(action, epoch)) message = "This Argentum action is stale or the connection is unavailable. Refresh and try again."
-    else recordDiagnostic("Sent ${type} (${info.optString("description")})", DiagnosticCategory.ACTION)
+    if (epoch == null) {
+        logBlockedArgentumAction(type, BlockedArgentumActionReason.MISSING_INTERACTION_EPOCH)
+        message = "This Argentum action is stale or the connection is unavailable. Refresh and try again."
+    } else if (!submitArgentumAction(action, epoch)) {
+        logBlockedArgentumAction(type, BlockedArgentumActionReason.SUBMISSION_NOT_CONFIRMED)
+        message = "This Argentum action is stale or the connection is unavailable. Refresh and try again."
+    } else recordDiagnostic("Sent ${type} (${info.optString("description")})", DiagnosticCategory.ACTION)
 }
 
 internal fun TableController.argentumPrimary() {
