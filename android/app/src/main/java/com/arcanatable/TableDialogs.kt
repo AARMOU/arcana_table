@@ -711,6 +711,8 @@ internal fun OptionsPage(
     onToggleTheme: () -> Unit, onToggleTimerVisibility: () -> Unit, onToggleBackgroundAlerts: (Boolean) -> Unit,
     onFollowActivePlayer: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, onCardSizeScale: (Float) -> Unit,
     quietOpponentTurns: Boolean = false, onQuietOpponentTurns: (Boolean) -> Unit = {},
+    stopAtOpponentPrecombat: Boolean = false, onStopAtOpponentPrecombat: (Boolean) -> Unit = {},
+    stopAtOpponentEndStep: Boolean = false, onStopAtOpponentEndStep: (Boolean) -> Unit = {},
     onTestConnection: () -> Unit, onReconnect: (() -> Unit)?, onViewDiagnostics: () -> Unit, onExportDiagnostics: () -> Unit,
     onWhatsNew: () -> Unit,
     engineTrialResult: String? = null, onEngineSelfTest: (() -> Unit)? = null,
@@ -750,6 +752,8 @@ internal fun OptionsPage(
                 Section("GAMEPLAY")
                 SettingsToggle("Follow the active player", "Show the player whose turn it is. Your selected tab stays until the next turn.", followActivePlayer, onFollowActivePlayer, Modifier)
                 SettingsToggle("Skip AI actions unless needed", "Offline games: pass over AI spells and abilities unless they affect you. Prompts and blocks still stop the game.", quietOpponentTurns, onQuietOpponentTurns, Modifier)
+                SettingsToggle("Stop at opponent precombat main", "During Pass to my turn, pause when Argentum gives you priority in an opponent's precombat main phase.", stopAtOpponentPrecombat, onStopAtOpponentPrecombat, Modifier)
+                SettingsToggle("Stop at opponent end step", "During Pass to my turn, pause when Argentum gives you priority in an opponent's end step.", stopAtOpponentEndStep, onStopAtOpponentEndStep, Modifier)
                 SettingsToggle("Show turn timer", "Show the time spent on the current turn.", timerVisible, { onToggleTimerVisibility() }, Modifier)
                 Section("NOTIFICATIONS")
                 Row(Modifier.fillMaxWidth().heightIn(min = 54.dp), verticalAlignment = Alignment.CenterVertically) {
