@@ -36,6 +36,9 @@ class RiseOfTheEldraziScenarioTest {
         d.passPriorityUntil(Step.UPKEEP, activePlayer = p)
         assertEquals(p, d.activePlayer)
         assertEquals(turnBefore + 1, d.state.turnNumber)
+        d.passPriorityUntil(Step.UPKEEP, activePlayer = opponent)
+        assertEquals(opponent, d.activePlayer)
+        assertEquals(turnBefore + 2, d.state.turnNumber)
     }
 
     @Test
