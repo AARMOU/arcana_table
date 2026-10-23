@@ -14,6 +14,7 @@ jobs:
   dispatch:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    if: github.event_name == 'workflow_dispatch'
     steps:
       - name: Verify user-authenticated Copilot API token
         env:
@@ -55,12 +56,12 @@ jobs:
                 });
                 const assigned = response.data.assignees?.some(a => a.login.toLowerCase().startsWith('copilot-swe-agent'));
                 if (!assigned) {
-                  core.warning('Copilot assignment not confirmed on issue #' + issue.number);
-                  continue;
+                  core.setFailed('Copilot assignment not confirmed on issue #' + issue.number);
+                  return;
                 }
                 core.info('Assigned queue issue #' + issue.number + ' to Copilot. Agent start must be verified separately.');
               } catch (e) {
-                core.warning('Assignment failed on #' + issue.number + ': ' + e.message);
-                break;
+                core.setFailed('Assignment failed on #' + issue.number + ': ' + e.message);
+                return;
               }
             }
