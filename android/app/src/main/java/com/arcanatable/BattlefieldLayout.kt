@@ -51,17 +51,31 @@ data class CardStack(val cards: List<GameCard>) {
 }
 
 /**
- * Groups identical cards: same name and state (tapped, counters, power/toughness, damage, combat role,
- * summoning sickness, keywords), keeping the board's order. Face-down cards and commanders never stack,
+ * Conservatively groups only cards with matching exposed identity, rules text and state.
+ * Differences in type, rules text, mana cost, color, art or imported-card review status
+ * must prevent grouping even when names, counters, and power/toughness match.
+ * This is presentation-only: the engine's separate permanent IDs are unchanged.
+ * Face-down cards and commanders never stack,
  * because they must stay individually recognisable.
  */
 fun stackIdentical(cards: List<GameCard>): List<CardStack> {
-    data class Key(val name: String, val tapped: Boolean, val token: Boolean, val counters: Map<String, Int>, val power: String?, val toughness: String?,
-        val damage: Int, val role: String?, val sick: Boolean, val keywords: List<String>, val chosenType: String?, val image: String?)
+    data class Key(
+        val name: String, val type: String, val color: Color,
+        val tapped: Boolean, val token: Boolean, val counters: Map<String, Int>,
+        val power: String?, val toughness: String?, val damage: Int, val role: String?,
+        val sick: Boolean, val keywords: List<String>, val chosenType: String?,
+        val image: String?, val crop: String?, val oracle: String?, val manaCost: String?,
+        val manaValue: Double?, val importIssue: String?,
+    )
     val groups = LinkedHashMap<Any, MutableList<GameCard>>()
     for (card in cards) {
         val key: Any = if (card.isFaceDown || card.isCommander) card.id
-            else Key(card.name, card.tapped, card.isToken, card.counters, card.power, card.toughness, card.damage, card.combatRole, card.summoningSick, card.keywords.sorted(), card.chosenCreatureType, card.imageUrl)
+            else Key(
+                card.name, card.type, card.color, card.tapped, card.isToken, card.counters,
+                card.power, card.toughness, card.damage, card.combatRole, card.summoningSick,
+                card.keywords.sorted(), card.chosenCreatureType, card.imageUrl, card.artCropUrl,
+                card.oracleText, card.manaCost, card.manaValue, card.importIssue,
+            )
         groups.getOrPut(key) { mutableListOf() }.add(card)
     }
     return groups.values.map { CardStack(it) }
