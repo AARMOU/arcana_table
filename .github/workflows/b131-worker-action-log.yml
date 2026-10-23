@@ -1,0 +1,63 @@
+name: B131 worker 01 — action log verification
+on:
+  push:
+    branches: [gpt/b131-worker-gap-action-log-20261022]
+    paths:
+      - .github/workflows/b131-worker-action-log.yml
+      - android/app/src/main/java/com/arcanatable/ArgentumActionFeedback.kt
+      - android/app/src/main/java/com/arcanatable/TableArgentum.kt
+      - android/app/src/test/java/com/arcanatable/ArgentumActionFeedbackTest.kt
+      - docs/project/B131_WORKER_RECONCILIATION_2026-10-22.md
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-action-log:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Pin Build 131 preview ancestry, audit diff and engine/card provenance
+        shell: bash
+        run: |
+          git merge-base --is-ancestor af6bad65f67c5c2fc5acffd9b14de7d5d1b0527b HEAD
+          git diff --check af6bad65f67c5c2fc5acffd9b14de7d5d1b0527b HEAD
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, hashlib
+          manifest=json.loads(Path("docs/integration/B131_RUNTIME.json").read_text())
+          assert manifest["upstream"]=="61e71e586b100faa661f86cac827ac3c3bbb5a78"
+          root=Path("android/app")
+          for name,sha in manifest["files"].items():
+              f=(root/"libs"/Path(name).name) if name.startswith("libs/") else (root/"src/main/assets/argentum"/Path(name).name)
+              assert f.is_file() and hashlib.sha256(f.read_bytes()).hexdigest()==sha, name
+          print("PASS: pinned B131 runtime and assets unchanged")
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Test local action-log non-submission reasons
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests com.arcanatable.ArgentumActionFeedbackTest
+      - name: Run full B131 card and Android regression, lint, compilation
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      - name: Retain tests and diagnostics for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b131-action-log-test-evidence
+          retention-days: 30
+          path: |
+            android/app/build/test-results/
+            android/app/build/reports/tests/
+            android/app/build/reports/lint-results-debug.*
+            android/custom-cards/build/test-results/
+          if-no-files-found: warn
