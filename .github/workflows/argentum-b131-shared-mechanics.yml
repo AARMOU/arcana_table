@@ -1,0 +1,107 @@
+name: Isolated B131 shared-mechanics compatibility
+on:
+  push:
+    branches: [copilot/investigate-colorless-hybrid-blockers]
+    paths:
+      - .github/workflows/argentum-b131-shared-mechanics.yml
+      - investigation/argentum-six-precons/staged-engine/0004-stack-object-copying.patch
+      - investigation/argentum-six-precons/staged-engine/0005-colorless-hybrid-sdk.patch
+      - investigation/argentum-six-precons/staged-engine/0006-colorless-hybrid-floating-payment.patch
+      - investigation/argentum-six-precons/staged-engine/0007-colorless-hybrid-auto-tap.patch
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: argentum-b131-shared-mechanics-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  shared-mechanics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      ORG_GRADLE_PROJECT_kotlinCompileParallelism: '1'
+      GRADLE_OPTS: '-Dorg.gradle.workers.max=2 -Dorg.gradle.configuration-cache=false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: 89536604a175af241e45321f68ead6f1da633c1e
+          path: b131-harness
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: b131-harness/argentum-engine
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 1f42233980370c5f79caf61bc61f46b37217ee17
+          path: myriad-worker
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Apply the pinned B131 baseline patches
+        run: python3 b131-harness/engine-upgrade/audit_patches.py
+      - name: Apply staged shared-mechanics patches to B131
+        shell: bash
+        run: |
+          set -euo pipefail
+          engine="$GITHUB_WORKSPACE/b131-harness/argentum-engine"
+          for patch in \
+            0004-stack-object-copying \
+            0005-colorless-hybrid-sdk \
+            0006-colorless-hybrid-floating-payment \
+            0007-colorless-hybrid-auto-tap; do
+            file="$GITHUB_WORKSPACE/investigation/argentum-six-precons/staged-engine/$patch.patch"
+            git -C "$engine" apply --check "$file"
+            git -C "$engine" apply "$file"
+          done
+          patch="$GITHUB_WORKSPACE/myriad-worker/investigation/argentum-six-precons/staged-engine/0008-myriad-defender-choice.patch"
+          git -C "$engine" apply --check "$patch"
+          git -C "$engine" apply "$patch"
+          cp myriad-worker/investigation/argentum-six-precons/staged-engine/MyriadDefenderChoiceTest.kt \
+            "$engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/multiplayer/MyriadDefenderChoiceTest.kt"
+          git -C "$engine" diff --check
+      - name: Run focused stack-copy, hybrid-mana and Myriad scenarios
+        working-directory: b131-harness/argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :mtg-sdk:test \
+            --tests '*StackObjectCopySdkTest' \
+            --tests '*ColorlessHybridManaSdkTest'
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :rules-engine:test \
+            --tests '*StackObjectCopyEngineTest' \
+            --tests '*ColorlessHybridManaPaymentTest' \
+            --tests '*MonocolorHybridManaPaymentTest' \
+            --tests '*ColorlessHybridManaSolverTest' \
+            --tests '*MonocolorHybridManaSolverTest' \
+            --tests '*MyriadDefenderChoiceTest' \
+            --tests '*MyriadTest' \
+            --tests '*EnteringAttackDefenderChoiceTest'
+      - name: Run full SDK, rules, card-scenario and AI regressions
+        working-directory: b131-harness/argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :mtg-sdk:test :rules-engine:test :mtg-sets:scenarioTest :ai:test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b131-shared-mechanics-regressions
+          path: |
+            b131-harness/engine-upgrade/patch-report.json
+            b131-harness/argentum-engine/mtg-sdk/build/test-results/
+            b131-harness/argentum-engine/rules-engine/build/test-results/
+            b131-harness/argentum-engine/mtg-sets/**/build/test-results/
+            b131-harness/argentum-engine/ai/build/test-results/
+          if-no-files-found: warn
+          retention-days: 30
