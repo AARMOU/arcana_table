@@ -1,0 +1,60 @@
+name: B131 worker 03 — stack identity verification
+on:
+  push:
+    branches: [gpt/b131-worker03-stack-identity-20261022]
+    paths:
+      - .github/workflows/b131-worker03-stack-identity.yml
+      - android/app/src/main/java/com/arcanatable/BattlefieldLayout.kt
+      - android/app/src/test/java/com/arcanatable/StackIdentityRegressionTest.kt
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-stack-identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check B131 ancestry, no whitespace errors and exact engine assets
+        shell: bash
+        run: |
+          git merge-base --is-ancestor af6bad65f67c5c2fc5acffd9b14de7d5d1b0527b HEAD
+          git diff --check af6bad65f67c5c2fc5acffd9b14de7d5d1b0527b HEAD
+          python3 - <<'PY'
+          from pathlib import Path
+          import json,hashlib
+          m=json.loads(Path("docs/integration/B131_RUNTIME.json").read_text())
+          assert m["upstream"]=="61e71e586b100faa661f86cac827ac3c3bbb5a78"
+          for n,sha in m["files"].items():
+              p=(Path("android/app/libs")/Path(n).name) if n.startswith("libs/") else (Path("android/app/src/main/assets/argentum")/Path(n).name)
+              assert hashlib.sha256(p.read_bytes()).hexdigest()==sha,n
+          print("PASS pinned B131 runtime")
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Check 1000-token and non-equivalent stack regressions
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests com.arcanatable.StackIdentityRegressionTest
+      - name: Run full B131 card and Android regressions, lint and compilation
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+      - name: Publish regression evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b131-team03-stack-evidence
+          retention-days: 30
+          path: |
+            android/app/build/test-results/
+            android/app/build/reports/tests/
+            android/app/build/reports/lint-results-debug.*
+            android/custom-cards/build/test-results/
+          if-no-files-found: warn
