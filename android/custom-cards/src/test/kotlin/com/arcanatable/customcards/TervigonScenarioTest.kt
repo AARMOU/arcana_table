@@ -49,7 +49,7 @@ class TervigonScenarioTest {
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
         assertNull(d.declareAttackers(p, listOf(tervigon), d.player2).error)
         d.passPriorityUntil(Step.DECLARE_BLOCKERS)
-        assertNull(d.declareBlockers(d.player2, mapOf(tervigon to listOf(blocker))).error)
+        assertNull(d.declareBlockers(d.player2, mapOf(blocker to listOf(tervigon))).error)
         d.passPriorityUntil(Step.POSTCOMBAT_MAIN)
         d.resolveAll()
 
