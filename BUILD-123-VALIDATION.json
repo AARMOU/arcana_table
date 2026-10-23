@@ -1,0 +1,22 @@
+{
+  "build": 123,
+  "baseBuild": 120,
+  "baseGameSource": "3e17b24e620590e4170bd4c2de2abaa4d18d9e87",
+  "validatedSourceCommit": "8ee10494f564bc8946b2bad09fc6ab308ebe534e",
+  "validationRun": "39600386219",
+  "runtimeSha256": {
+    "argentum-ai.jar": "bd18c7a9a3242ae0f110fe2ebc836eb3ec8277e2b0c985efbcd42b2ec2a12fdc",
+    "argentum-mtg-sdk-tooling.jar": "8fc7be1936c14e2d9e80bae2a6b745d17b256698df702fca74a44f4ad333f2c3",
+    "argentum-mtg-sdk.jar": "cf519e0622a553d6f5586b43a286c0c99d78a85b5b679e1517b36afbc4f51b03",
+    "argentum-rules-engine.jar": "88cf6f8523375a0064ce39f1575defe130435567bf7fc147da851d1ec1875a7e"
+  },
+  "requiredJobs": [
+    "runtime",
+    "android",
+    "upstream",
+    "profile (all six comparisons)"
+  ],
+  "rulesCardValidationRun": 39594609254,
+  "rulesCardSource": "7bb5de7d649e244a54208ceed8f7ead81956fe7f",
+  "deviceValidation": "Not yet performed"
+}

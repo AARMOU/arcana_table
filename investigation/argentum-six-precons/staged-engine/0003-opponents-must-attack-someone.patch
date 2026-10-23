@@ -1,0 +1,213 @@
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/CombatStaticAbilities.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/CombatStaticAbilities.kt
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/CombatStaticAbilities.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/CombatStaticAbilities.kt
+@@ -712,6 +712,18 @@
+ }
+ 
+ /**
++ * A defender-independent attack requirement (Seeker of Slaanesh). Each opponent must
++ * attack with at least one creature if one can attack ANY legal defender without
++ * paying a cost. Unlike OpponentsMustAttackYou, the defender is unrestricted.
++ */
++@SerialName("OpponentsMustAttackWithCreature")
++@Serializable
++data object OpponentsMustAttackWithCreature : StaticAbility {
++    override val description: String =
++        "Each opponent must attack with at least one creature each combat if able"
++}
++
++/**
+  * Sentence-subject rendering of an attacker filter: "creature with flying" → "Creatures with
+  * flying". This string is user-visible — it is the attack-rejection message and the label of a
+  * granted static — and the clause it heads is always plural ("Creatures without flying can't
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/StaticAbilityHandler.kt
+@@ -1129,6 +1129,7 @@
+             is com.wingedsheep.sdk.scripting.Goaded,
+             is CantBeAttackedWhileAttached,
+             is com.wingedsheep.sdk.scripting.OpponentsMustAttackYou,
++            is com.wingedsheep.sdk.scripting.OpponentsMustAttackWithCreature,
+             is CantBeBlockedBy,
+             is CantBeBlockedByCreaturesWithLessPower,
+             is CantBeBlockedByMoreThan,
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/AttackPhaseManager.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/AttackPhaseManager.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/AttackPhaseManager.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/AttackPhaseManager.kt
+@@ -179,6 +179,15 @@
+             return ExecutionResult.error(state, attackYouValidation)
+         }
+ 
++        // Seeker of Slaanesh: one creature must attack SOME legal defender, not
++        // necessarily the source's controller. A planeswalker or battle counts.
++        val attackSomeoneValidation = validateOpponentsMustAttackWithCreature(
++            state, attackingPlayer, attackers, projected, opponents
++        )
++        if (attackSomeoneValidation != null) {
++            return ExecutionResult.error(state, attackSomeoneValidation)
++        }
++
+         // Declaration taps precede optional attack costs. Keep an immutable checkpoint so a
+         // cancelled attack-tax question can roll back the declaration without leaving tap triggers.
+         var tappedState = state
+@@ -1104,6 +1113,49 @@
+     }
+ 
+     /**
++     * The defender-independent "attack with at least one creature if able" requirement.
++     * If any valid creature can attack any allowed defender without paying attack costs,
++     * the attacking player may not declare an empty attack. Existing directed/goad/taunt
++     * requirements still constrain the choices; this imposes no preferred defender.
++     */
++    private fun validateOpponentsMustAttackWithCreature(
++        state: GameState,
++        attackingPlayer: EntityId,
++        attackers: Map<EntityId, EntityId>,
++        projected: ProjectedState,
++        opponents: List<EntityId>,
++    ): String? {
++        if (attackers.isNotEmpty()) return null
++        if (!OpponentsMustAttackWithCreatureRequirement.isRequired(
++                state, cardRegistry, predicateEvaluator, attackingPlayer)) return null
++        val legalPlayers = CombatDefenders.legalDefendingPlayers(state, attackingPlayer)
++        val targets = legalPlayers.flatMap { player ->
++            OpponentsMustAttackYouRequirement.defendersOf(state, projected, player)
++        } + state.getBattlefield().filter { id ->
++            projected.isBattle(id) &&
++                Battles.canBeAttackedBy(state, id, attackingPlayer, opponents.toSet())
++        }
++        if (targets.isEmpty()) return null
++        val validAttackers = getValidAttackers(state, attackingPlayer)
++        if (validAttackers.isEmpty()) return null
++        val goad = GoadRules(state, cardRegistry, predicateEvaluator)
++        val directed = boundAttackDefenders(state, attackingPlayer, projected, opponents, goad)
++        val taunt = activeTaunt(state, attackingPlayer)
++        for (attackerId in validAttackers) {
++            for (defenderId in targets) {
++                val player = CombatDefenders.defendingPlayerOf(state, defenderId)
++                if (taunt != null && taunt.defenderId != defenderId) continue
++                if (directed[attackerId].let { it != null && player !in it }) continue
++                if (canAttackFreely(
++                        state, projected, attackingPlayer, attackerId,
++                        listOf(defenderId), player, opponents, validAttackers, goad,
++                    )) return "At least one creature must attack this combat if able"
++            }
++        }
++        return null
++    }
++
++    /**
+      * Whether [attackerId] could attack one of [defenders] (all belonging to [player]) at no cost
+      * and without breaking its goad requirement — the "if able" of
+      * [validateOpponentsMustAttackYou]. A creature that can't attack unless another creature
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AttackRequirementRepair.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AttackRequirementRepair.kt
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AttackRequirementRepair.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AttackRequirementRepair.kt
+@@ -2,6 +2,9 @@
+ 
+ import com.wingedsheep.engine.handlers.PredicateEvaluator
+ import com.wingedsheep.engine.mechanics.combat.OpponentsMustAttackYouRequirement
++import com.wingedsheep.engine.mechanics.combat.OpponentsMustAttackWithCreatureRequirement
++import com.wingedsheep.engine.mechanics.combat.CombatDefenders
++import com.wingedsheep.engine.mechanics.battle.Battles
+ import com.wingedsheep.engine.registry.CardRegistry
+ import com.wingedsheep.engine.state.GameState
+ import com.wingedsheep.sdk.model.EntityId
+@@ -42,7 +45,11 @@
+         canAttack: (EntityId, EntityId) -> Boolean = { _, _ -> true },
+     ): Map<EntityId, EntityId> {
+         val required = requiredPlayers(state, cardRegistry, playerId)
+-        if (required.isEmpty()) return plan
++        val freeAttackRequired = cardRegistry != null &&
++            OpponentsMustAttackWithCreatureRequirement.isRequired(
++                state, cardRegistry, PredicateEvaluator(cardRegistry), playerId
++            )
++        if (required.isEmpty() && !freeAttackRequired) return plan
+         val projected = state.projectedState
+         val repaired = plan.toMutableMap()
+         for (player in required) {
+@@ -58,6 +65,20 @@
+             val pick = spare.firstOrNull() ?: redirectable.firstOrNull() ?: continue
+             repaired[pick] = player
+         }
++        if (freeAttackRequired && repaired.isEmpty()) {
++            val players = CombatDefenders.legalDefendingPlayers(state, playerId)
++            val defenders = players.flatMap { player ->
++                OpponentsMustAttackYouRequirement.defendersOf(state, projected, player)
++            } + state.getBattlefield().filter { id ->
++                projected.isBattle(id) && Battles.canBeAttackedBy(
++                    state, id, playerId, state.getOpponents(playerId).toSet())
++            }
++            for (attacker in candidateOrder(state, validAttackers)) {
++                val defender = defenders.firstOrNull { canAttack(attacker, it) } ?: continue
++                repaired[attacker] = defender
++                break
++            }
++        }
+         return repaired
+     }
+ }
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/OpponentsMustAttackWithCreatureRequirement.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/OpponentsMustAttackWithCreatureRequirement.kt
+new file mode 100644
+--- /dev/null
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/combat/OpponentsMustAttackWithCreatureRequirement.kt
+@@ -0,0 +1,59 @@
++package com.wingedsheep.engine.mechanics.combat
++
++import com.wingedsheep.engine.handlers.EffectContext
++import com.wingedsheep.engine.handlers.PredicateEvaluator
++import com.wingedsheep.engine.registry.CardRegistry
++import com.wingedsheep.engine.state.GameState
++import com.wingedsheep.engine.state.components.identity.CardComponent
++import com.wingedsheep.engine.state.components.identity.FaceDownComponent
++import com.wingedsheep.engine.state.components.identity.RoomFaceStatics
++import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.CompositeStaticAbility
++import com.wingedsheep.sdk.scripting.ConditionalStaticAbility
++import com.wingedsheep.sdk.scripting.OpponentsMustAttackWithCreature
++import com.wingedsheep.sdk.scripting.StaticAbility
++
++/**
++ * Reads every relevant static ability controlled by an opponent of the active
++ * attacker. Unlike Trove of Temptation, the source's controller need not be
++ * one of the legal defenders for this combat (three-player/range games).
++ */
++object OpponentsMustAttackWithCreatureRequirement {
++    fun isRequired(
++        state: GameState,
++        cardRegistry: CardRegistry,
++        predicateEvaluator: PredicateEvaluator,
++        attackingPlayer: EntityId,
++    ): Boolean {
++        val opponents = state.getOpponents(attackingPlayer).toSet()
++        val projected = state.projectedState
++        return state.getBattlefield().any { permanentId ->
++            val controller = projected.getController(permanentId)
++            if (controller !in opponents) return@any false
++            val container = state.getEntity(permanentId) ?: return@any false
++            if (container.has<FaceDownComponent>() || projected.hasLostAllAbilities(permanentId)) return@any false
++            val definition = container.get<CardComponent>()
++                ?.let { cardRegistry.getCard(it.cardDefinitionId) } ?: return@any false
++            RoomFaceStatics.activeStaticAbilities(container, definition).any { ability ->
++                imposes(state, predicateEvaluator, ability, permanentId, controller!!)
++            }
++        }
++    }
++
++    private fun imposes(
++        state: GameState,
++        evaluator: PredicateEvaluator,
++        ability: StaticAbility,
++        sourceId: EntityId,
++        controllerId: EntityId,
++    ): Boolean = when (ability) {
++        is OpponentsMustAttackWithCreature -> true
++        is ConditionalStaticAbility ->
++            evaluator.conditions.evaluate(
++                state, ability.condition, EffectContext(sourceId = sourceId, controllerId = controllerId)
++            ) && imposes(state, evaluator, ability.ability, sourceId, controllerId)
++        is CompositeStaticAbility ->
++            ability.abilities.any { imposes(state, evaluator, it, sourceId, controllerId) }
++        else -> false
++    }
++}

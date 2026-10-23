@@ -11,7 +11,6 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Locale
 import java.net.URLEncoder
-import kotlin.random.Random
 
 data class DeckEntry(val name: String, val count: Int, val setCode: String? = null, val collectorNumber: String? = null, val commander: Boolean = false)
 data class RepeatedDeckEntry(val name: String, val quantity: Int)
@@ -42,7 +41,7 @@ data class ScryfallCard(
     val keywords: List<String> = emptyList()
 )
 
-private val deckSectionHeadings = setOf("creatures", "instants", "sorceries", "artifacts", "enchantments", "lands", "planeswalkers", "battles", "other", "others", "tokens", "noncreatures")
+private val deckSectionHeadings = setOf("creatures", "instants", "sorceries", "artifacts", "enchantments", "lands", "planeswalkers", "battles", "other", "others", "other spells", "tokens", "noncreatures")
 
 fun isDeckSectionHeading(name: String): Boolean = name.trim().trim('[', ']', ':', ' ').lowercase(Locale.ROOT) in deckSectionHeadings
 
@@ -92,7 +91,7 @@ fun parseDeckList(raw: String): List<DeckEntry> {
         }
         // Some exports include bracketed/category headings. They are structure,
         // not cards (e.g. the literal "[INSTANTS]" should never become a card).
-        if (normalizedLine in deckSectionHeadings) return@forEach
+        if (normalizedLine in deckSectionHeadings) { commanderSection = false; return@forEach }
         if (normalizedLine in setOf("mainboard", "main", "deck")) {
             sideboard = false
             commanderSection = false
@@ -325,82 +324,5 @@ object CardBitmapCache {
     fun put(url: String, bitmap: Bitmap) = cache.put(url, bitmap)
 }
 
-suspend fun downloadCardBitmap(url: String): Bitmap? = withContext(Dispatchers.IO) {
-    CardBitmapCache.get(url)?.let { return@withContext it }
-    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-        connectTimeout = 15_000
-        readTimeout = 20_000
-        setRequestProperty("User-Agent", "ArcanaTable/0.7.0 (Android)")
-    }
-    try {
-        if (connection.responseCode !in 200..299) return@withContext null
-        val bitmap = connection.inputStream.use { BitmapFactory.decodeStream(it) }
-        if (bitmap != null) CardBitmapCache.put(url, bitmap)
-        bitmap
-    } finally {
-        connection.disconnect()
-    }
-}
-
-/** Fetches a random popular public Commander list from Archidekt and converts it
- * to the text format accepted by the existing deck importer. */
-suspend fun fetchRandomCommanderDecklist(): String = withContext(Dispatchers.IO) {
-    fun getJson(url: String): JSONObject {
-        val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 12_000
-            readTimeout = 18_000
-            setRequestProperty("Accept", "application/json")
-            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) ArcanaTable/0.15")
-        }
-        return try {
-            val code = connection.responseCode
-            val stream = if (code in 200..299) connection.inputStream else connection.errorStream
-            val body = stream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            if (code !in 200..299) error("Deck source returned HTTP $code")
-            JSONObject(body)
-        } finally {
-            connection.disconnect()
-        }
-    }
-
-    val page = Random.nextInt(1, 6)
-    val search = getJson("https://archidekt.com/api/decks/v3/?deckFormat=3&orderBy=-viewCount&pageSize=100&page=$page")
-    val results = search.optJSONArray("results") ?: JSONArray()
-    val candidates = (0 until results.length()).mapNotNull { results.optJSONObject(it) }
-        .filter { it.optLong("id", 0L) > 0L }.shuffled()
-    if (candidates.isEmpty()) error("No public Commander decks were returned. Try again later.")
-
-    var lastFailure: Exception? = null
-    for (candidate in candidates.take(8)) {
-        try {
-            val deck = getJson("https://archidekt.com/api/decks/${candidate.optLong("id")}/")
-            val cards = deck.optJSONArray("cards") ?: continue
-            val commanders = mutableListOf<String>()
-            val mainboard = mutableListOf<String>()
-            for (index in 0 until cards.length()) {
-                val row = cards.optJSONObject(index) ?: continue
-                val card = row.optJSONObject("card") ?: continue
-                val name = (card.optJSONObject("oracleCard") ?: card).optString("name").trim()
-                if (name.isBlank()) continue
-                val categories = row.optJSONArray("categories")
-                val categoryNames = (0 until (categories?.length() ?: 0))
-                    .mapNotNull { categories?.optString(it)?.lowercase(Locale.ROOT) }
-                if (categoryNames.any { it.contains("sideboard") || it.contains("maybeboard") }) continue
-                val line = "${row.optInt("quantity", 1).coerceAtLeast(1)} $name"
-                if (categoryNames.any { it.contains("commander") }) commanders += line else mainboard += line
-            }
-            if (commanders.isNotEmpty() && mainboard.isNotEmpty()) {
-                return@withContext buildString {
-                    appendLine("[Commander]")
-                    commanders.forEach(::appendLine)
-                    appendLine("[Mainboard]")
-                    mainboard.forEach(::appendLine)
-                }
-            }
-        } catch (exception: Exception) {
-            lastFailure = exception
-        }
-    }
-    throw IllegalStateException("Could not load a complete public Commander deck. Try again later.", lastFailure)
-}
+/** Card picture by link; see [CardImages] (phone cache, Scryfall link resolving, name fallback). */
+suspend fun downloadCardBitmap(url: String, fallbackName: String? = null): Bitmap? = CardImages.load(url, fallbackName)

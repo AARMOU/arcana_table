@@ -17,16 +17,19 @@ android {
         applicationId = "com.arcanatable"
         minSdk = 26
         targetSdk = 36
-        versionCode = 72
-        versionName = "0.15.53"
-        manifestPlaceholders["appLabel"] = "Arcana Table"
+        versionCode = 124
+        versionName = "0.33.2-build124-preview"
+        buildConfigField("int", "BASE_BUILD", "120")
+        buildConfigField("String", "BASE_SOURCE", "\"3e17b24\"")
+        manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build $versionCode"
     }
 
     buildTypes {
         debug {
-            // Keep the installable test build separate from earlier debug APKs.
-            applicationIdSuffix = ".build52test2"
-        manifestPlaceholders["appLabel"] = "Arcana Table 0.15.53 Build 72"
+            // Separate package so this build installs beside the experimental/targeting test build.
+            applicationIdSuffix = ".argentum"
+            // The build number follows versionCode, so the installer never shows a stale one.
+            manifestPlaceholders["appLabel"] = "Arcana · Argentum B${defaultConfig.versionCode}"
         }
     }
 
@@ -34,6 +37,26 @@ android {
         compose = true
         buildConfig = true
     }
+
+    testOptions {
+        unitTests {
+            // Robolectric UI tests render real resources and Compose screens on the JVM.
+            isIncludeAndroidResources = true
+            all { test ->
+                test.maxHeapSize = "3g"
+                // Opt-in live test against Argentum's server: ./gradlew testDebugUnitTest -Pargentum.live=true
+                test.systemProperty("argentum.live", (project.findProperty("argentum.live") ?: "false").toString())
+                // Robolectric fetches android-all jars itself; use the Maven Central mirror Gradle already uses.
+                test.systemProperty("robolectric.dependency.repo.url", "https://repo.maven.apache.org/maven2")
+                test.systemProperty("arcana.screenshots", layout.buildDirectory.dir("screenshots").get().asFile.absolutePath)
+            }
+        }
+    }
+}
+
+kotlin {
+    // Match compileOptions so the build works on JDK 17 and JDK 21 hosts alike.
+    compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
 }
 
 dependencies {
@@ -48,6 +71,22 @@ dependencies {
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Chunk 3 trial: Argentum's engine, SDK, tooling and AI, built from source on Arcana's PC build
+    // (Java 17 API, Android regex fixes; see argentum-patches/). Cards ship as data in assets.
+    implementation(fileTree("libs") { include("argentum-*.jar") })
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    implementation("org.slf4j:slf4j-api:2.0.18")
     testImplementation("junit:junit:4.13.2")
+    testImplementation(composeBom)
+    testImplementation("androidx.compose.ui:ui-test-junit4")
+    testImplementation("org.robolectric:robolectric:4.14.1")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
+    // JVM unit tests exercise online snapshot JSON. Android's org.json stubs
+    // throw "Method ... not mocked" outside an emulator, so use the JVM port.
+    testImplementation("org.json:json:20240303")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
+

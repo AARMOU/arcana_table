@@ -1,0 +1,21 @@
+diff --git a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
+--- a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
++++ b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
+@@ -20,7 +20,6 @@
+     // Arcana: compile against the Java 17 API so the jars run on Android (no Java 21-only calls).
+     compilerOptions {
+         jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+-        freeCompilerArgs.add("-Xjdk-release=17")
+     }
+ }
+ 
+@@ -37,6 +36,9 @@
+ 
+ tasks.withType<KotlinCompile>().configureEach {
+     usesService(kotlinCompileThrottle)
++    // Android runtime sources use Java 17. JVM-only tests run on the Java 21 toolchain
++    // and include existing benchmark utilities that use Thread.threadId().
++    if (!name.contains("Test")) compilerOptions.freeCompilerArgs.add("-Xjdk-release=17")
+ }
+ 
+ tasks.withType<Test>().configureEach {

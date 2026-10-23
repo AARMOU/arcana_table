@@ -1,0 +1,57 @@
+name: Play release bundle - com.arcanatable (source 3e17b24)
+
+on:
+  push:
+    branches:
+      - gpt/play-com-arcanatable-3e17b24
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pinned Arcana source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android 36 SDK
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+
+      - name: Build release AAB with com.arcanatable
+        working-directory: android
+        run: |
+          set -euo pipefail
+          grep -F 'applicationId = "com.arcanatable"' app/build.gradle.kts
+          grep -F 'versionCode = 112' app/build.gradle.kts
+          # Same game code, new upload version code, release build has no .argentum debug suffix.
+          sed -i 's/versionCode = 112/versionCode = 113/' app/build.gradle.kts
+          ./gradlew :app:bundleRelease --no-daemon --stacktrace
+
+      - name: Check bundle exists
+        run: |
+          test -s android/app/build/outputs/bundle/release/app-release.aab
+          unzip -t android/app/build/outputs/bundle/release/app-release.aab | tail -1
+          sha256sum android/app/build/outputs/bundle/release/app-release.aab
+
+      - name: Upload unsigned release bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArcanaTable-3e17b24-com.arcanatable-113-unsigned-AAB
+          path: android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 30

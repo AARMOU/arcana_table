@@ -38,6 +38,67 @@ internal data class TargetedAutomaticEffect(
     val effectText: String
 )
 
+data class TargetCountRange(val minimum: Int, val maximum: Int)
+
+/**
+ * Estimates the number of target choices from card text. This deliberately
+ * does not attempt to decide whether any particular object is legal; players
+ * confirm legality using the card's actual wording in the picker.
+ */
+internal fun parseTargetCountRange(text: String?): TargetCountRange? {
+    val oracle = text.orEmpty()
+    if (!Regex("\\btarget\\b", RegexOption.IGNORE_CASE).containsMatchIn(oracle)) return null
+    val numberWords = mapOf("one" to 1, "two" to 2, "three" to 3, "four" to 4, "five" to 5, "six" to 6, "seven" to 7, "eight" to 8, "nine" to 9, "ten" to 10)
+    val group = Regex("(?i)(?:(up to|any number of)\\s+)?(?:(one|two|three|four|five|six|seven|eight|nine|ten|\\d+)\\s+)?target\\b")
+    var minimum = 0
+    var maximum = 0
+    group.findAll(oracle).forEach { match ->
+        val qualifier = match.groupValues[1].lowercase()
+        val amount = match.groupValues[2].toIntOrNull() ?: numberWords[match.groupValues[2].lowercase()] ?: 1
+        if (qualifier.isBlank()) minimum += amount
+        maximum += if (qualifier == "any number of") 99 else amount
+    }
+    return TargetCountRange(minimum.coerceAtMost(99), maximum.coerceAtMost(99))
+}
+
+data class StackTarget(
+    val key: String,
+    val label: String,
+    val category: String,
+    val ownerId: String? = null
+)
+
+/** Builds the visible game objects that can be reviewed as possible targets. */
+internal fun buildTargetCandidates(
+    players: List<TablePlayer>,
+    stack: List<StackAction>,
+    sourceStackItemId: String,
+    actingPlayerId: String
+): List<StackTarget> = buildList {
+    players.forEach { player ->
+        if (!player.isEliminated) add(StackTarget("player:${player.id}", player.name, "PLAYER", player.id))
+        player.battlefield.filterNot { it.isFaceDown }.forEach { card ->
+            add(StackTarget("battlefield:${player.id}:${card.id}", card.name, "BATTLEFIELD · ${card.type}", player.id))
+        }
+        player.graveyard.forEach { card -> add(StackTarget("graveyard:${player.id}:${card.id}", card.name, "GRAVEYARD", player.id)) }
+        player.exile.forEach { card -> add(StackTarget("exile:${player.id}:${card.id}", card.name, "EXILE", player.id)) }
+        player.revealed.filterNot { it.isFaceDown }.forEach { card -> add(StackTarget("revealed:${player.id}:${card.id}", card.name, "REVEALED", player.id)) }
+        if (player.id == actingPlayerId || player.handRevealedToAll) {
+            player.hand.filterNot { it.isFaceDown }.forEach { card -> add(StackTarget("hand:${player.id}:${card.id}", card.name, "HAND", player.id)) }
+        }
+        player.commanderCard?.let { card ->
+            val alreadyListed = (player.library + player.hand + player.battlefield + player.graveyard + player.exile + player.revealed).any { it.id == card.id }
+            if (!alreadyListed) add(StackTarget("command:${player.id}:${card.id}", card.name, "COMMAND ZONE", player.id))
+        }
+    }
+    stack.filterNot { it.id == sourceStackItemId }.forEach { item ->
+        val ownerName = players.firstOrNull { it.id == item.controllerId }?.name ?: "Unknown player"
+        val isAbility = item.kind.contains("ABILITY", ignoreCase = true) || item.kind == "TRIGGER"
+        val label = if (item.card?.isFaceDown == true) "Face-down ${if (isAbility) "ability" else "spell"} · $ownerName" else "${item.title} · $ownerName"
+        add(StackTarget("stack:${item.id}", label, if (isAbility) "STACK · ABILITY" else "STACK · SPELL", item.controllerId))
+    }
+}
+
 internal data class UntapStepResult(
     val remainsTapped: Boolean,
     val counters: Map<String, Int>,
@@ -382,6 +443,14 @@ internal fun nextTurnIndex(currentIndex: Int, turnOrder: List<Int>, playerCount:
     return eligibleOrder[if (orderIndex < 0) 0 else (orderIndex + 1) % eligibleOrder.size]
 }
 
+internal fun isLastEligibleTurnInRound(currentIndex: Int, turnOrder: List<Int>, playerCount: Int, eligiblePlayers: Set<Int>): Boolean {
+    if (playerCount <= 0) return true
+    val validOrder = turnOrder.takeIf { it.size == playerCount && it.toSet() == (0 until playerCount).toSet() }
+        ?: (0 until playerCount).toList()
+    val turnIndex = validOrder.indexOf(currentIndex)
+    return turnIndex < 0 || validOrder.drop(turnIndex + 1).none { it in eligiblePlayers }
+}
+
 internal data class TurnProgression(
     val phaseIndex: Int,
     val activePlayer: Int,
@@ -399,5 +468,11 @@ internal fun advanceTurnProgression(
     eligiblePlayers: Set<Int> = (0 until playerCount).toSet()
 ): TurnProgression {
     if (phaseIndex < lastPhaseIndex) return TurnProgression(phaseIndex + 1, activePlayer, turnNumber, false)
-    return TurnProgression(0, nextTurnIndex(activePlayer, turnOrder, playerCount, eligiblePlayers), turnNumber + 1, true)
+    val completedRound = isLastEligibleTurnInRound(activePlayer, turnOrder, playerCount, eligiblePlayers)
+    return TurnProgression(
+        0,
+        nextTurnIndex(activePlayer, turnOrder, playerCount, eligiblePlayers),
+        turnNumber + if (completedRound) 1 else 0,
+        true
+    )
 }

@@ -1,0 +1,20 @@
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
+index 300535cbbf..1e254a6247 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
+@@ -1406,6 +1406,15 @@ class TriggerMatcher(
+                             !isFaceDown && typeLine?.hasSubtype(predicate.subtype) == true
+                         }
+                     }
++                    is com.wingedsheep.sdk.scripting.predicates.CardPredicate.NotSubtype -> {
++                        // Match departures against the types the permanent actually left with.
++                        // Its card in the graveyard has already lost granted creature types.
++                        if (event.toZone == Zone.BATTLEFIELD) {
++                            !projected.hasSubtype(event.entityId, predicate.subtype.value)
++                        } else {
++                            isFaceDown || typeLine?.hasSubtype(predicate.subtype) == false
++                        }
++                    }
+                     is com.wingedsheep.sdk.scripting.predicates.CardPredicate.HasAnyOfSubtypes -> {
+                         // Same LKI handling as HasSubtype, for the "any one of these subtypes"
+                         // (OR) form used by the Outlaw subtype group. For dying/leaving creatures

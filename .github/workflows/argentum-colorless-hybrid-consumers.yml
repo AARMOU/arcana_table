@@ -1,0 +1,60 @@
+name: Isolated Argentum hybrid consumer and AI validation
+on:
+  push:
+    branches: [gpt/argentum-six-precons]
+    paths:
+      - investigation/argentum-six-precons/staged-engine/0005-colorless-hybrid-sdk.patch
+      - investigation/argentum-six-precons/staged-engine/0006-colorless-hybrid-floating-payment.patch
+      - investigation/argentum-six-precons/staged-engine/0007-colorless-hybrid-auto-tap.patch
+      - .github/workflows/argentum-colorless-hybrid-consumers.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: argentum-colorless-hybrid-consumers-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ai-and-cards:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      ORG_GRADLE_PROJECT_kotlinCompileParallelism: '1'
+      GRADLE_OPTS: '-Dorg.gradle.workers.max=2 -Dorg.gradle.configuration-cache=false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 7a9663d8e4df4ce7db223023ae7714f0028e08a9
+          path: upstream-engine
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Apply isolated SDK, floating payment and land solver patches
+        working-directory: upstream-engine
+        run: |
+          for patch in 0005-colorless-hybrid-sdk 0006-colorless-hybrid-floating-payment 0007-colorless-hybrid-auto-tap; do
+            file="../investigation/argentum-six-precons/staged-engine/${patch}.patch"
+            git apply --check "$file"
+            git apply "$file"
+          done
+          git diff --check
+      - name: Run all AI tests without disabling searches or reducing budgets
+        working-directory: upstream-engine
+        run: |
+          ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
+            -Dorg.gradle.configuration-cache=false :ai:test
+      - name: Run entire published card-scenario corpus
+        working-directory: upstream-engine
+        run: |
+          ./gradlew --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 \
+            -Dorg.gradle.configuration-cache=false :mtg-sets:scenarioTest
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: colorless-hybrid-ai-and-card-regressions
+          path: |
+            upstream-engine/ai/build/test-results/
+            upstream-engine/mtg-sets/**/build/test-results/
+          retention-days: 14

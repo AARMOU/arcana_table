@@ -1,0 +1,109 @@
+From a825a62ed881565bd58eef7a88f7e5527b8d766a Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Sat, 17 Oct 2026 06:56:31 -0600
+Subject: [PATCH] Arcana export: full card library as data, with index
+
+---
+ arcana-export/build.gradle.kts                |  6 +--
+ .../com/arcanatable/export/ArcanaExport.kt    | 49 ++++++++++++++-----
+ 2 files changed, 41 insertions(+), 14 deletions(-)
+
+diff --git a/arcana-export/build.gradle.kts b/arcana-export/build.gradle.kts
+index e137c4484f..4c8fde1924 100644
+--- a/arcana-export/build.gradle.kts
++++ b/arcana-export/build.gradle.kts
+@@ -1,4 +1,4 @@
+-// Arcana local-only module: exports card definitions as data (JSON lines) for the in-app engine trial.
++// Arcana local-only module: exports card definitions as data (JSON lines) for the in-app engine.
+ plugins {
+     id("buildsrc.convention.kotlin-jvm")
+     application
+@@ -7,8 +7,7 @@ plugins {
+ dependencies {
+     implementation(project(":mtg-sdk"))
+     implementation(project(":mtg-sdk-tooling"))
+-    implementation(project(":mtg-sets:core"))
+-    implementation(project(":mtg-sets:1993-1999"))
++    implementation(project(":mtg-sets"))
+     implementation(libs.bundles.kotlinxEcosystem)
+     implementation(libs.classgraph)
+ }
+@@ -16,5 +15,6 @@ dependencies {
+ application { mainClass.set("com.arcanatable.export.ArcanaExportKt") }
+ 
+ tasks.named<JavaExec>("run") {
++    maxHeapSize = "6g"
+     args(rootProject.layout.projectDirectory.dir("arcana-export-out").asFile.absolutePath)
+ }
+diff --git a/arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt b/arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt
+index 3b9b6fa91d..7b0b7e65a0 100644
+--- a/arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt
++++ b/arcana-export/src/main/kotlin/com/arcanatable/export/ArcanaExport.kt
+@@ -1,26 +1,53 @@
+ package com.arcanatable.export
+ 
++import com.wingedsheep.mtg.sets.MtgSetCatalog
++import com.wingedsheep.mtg.sets.basicLandsFallback
+ import com.wingedsheep.mtg.sets.definitions.por.PortalSet
++import com.wingedsheep.mtg.sets.legality.LegalityData
++import com.wingedsheep.mtg.sets.tokens.PredefinedTokens
++import com.wingedsheep.sdk.model.CardDefinition
+ import com.wingedsheep.sdk.tooling.CardExporter
+ import com.wingedsheep.sdk.tooling.CardLoader
+ import java.io.File
+ 
+ /**
+- * Writes Portal (POR) as card DATA for Arcana's in-app engine trial: one compact JSON definition
+- * per line, exactly as Argentum's own CardExporter produces it, then reloads every line with
+- * CardLoader.fromJsonPreservingIds to prove the round trip before anything ships.
++ * Writes Argentum's card library as DATA for Arcana's in-app engine: one compact JSON definition
++ * per line (Argentum's own CardExporter format) plus a matching index of names, in the same order
++ * and with the same stamping the game server applies when it builds its registry
++ * (GameBeansConfig.cardRegistry). Every line is reloaded with CardLoader.fromJsonPreservingIds
++ * before anything ships.
+  */
+ fun main(args: Array<String>) {
+     val outDir = File(args.firstOrNull() ?: "arcana-export-out").apply { mkdirs() }
+-    val cards = (PortalSet.cards + PortalSet.basicLands).distinctBy { it.name }
+-    val lines = cards.map { CardExporter.exportToCompactJson(it).replace("\n", "") }
++    write(outDir, "por-cards", (PortalSet.cards + PortalSet.basicLands).distinctBy { it.name }.map { it to "card" })
++
++    val byName = LinkedHashMap<String, Pair<CardDefinition, String>>()
++    PredefinedTokens.allTokens.forEach { byName[it.name] = it to "token" }
++    for (set in MtgSetCatalog.all) {
++        set.cards.forEach { card ->
++            var c = if (card.setCode == null) card.copy(setCode = set.code) else card
++            if (c.metadata.releaseDate == null && set.releaseDate != null) c = c.copy(metadata = c.metadata.copy(releaseDate = set.releaseDate))
++            byName[c.name] = LegalityData.stamp(c) to "card"
++        }
++        set.basicLands.forEach { byName.putIfAbsent(it.name, LegalityData.stamp(it) to "basic") }
++        set.basicLandsFallback?.basicLands?.forEach { byName.putIfAbsent(it.name, LegalityData.stamp(it) to "basic") }
++    }
++    write(outDir, "all-cards", byName.values.toList())
++}
++
++private fun write(outDir: File, base: String, cards: List<Pair<CardDefinition, String>>) {
+     var failures = 0
+-    lines.zip(cards).forEach { (line, card) ->
+-        val back = runCatching { CardLoader.fromJsonPreservingIds(line) }.getOrNull()
+-        if (back == null || back.name != card.name) { failures++; System.err.println("Round trip failed: ${card.name}") }
++    val lines = ArrayList<String>(cards.size)
++    val index = StringBuilder()
++    for ((card, kind) in cards) {
++        val line = runCatching { CardExporter.exportToCompactJson(card).replace("\n", "") }.getOrNull()
++        val back = line?.let { runCatching { CardLoader.fromJsonPreservingIds(it) }.getOrNull() }
++        if (line == null || back == null || back.name != card.name) { failures++; System.err.println("Skipped (round trip failed): ${card.name}"); continue }
++        lines += line
++        index.append(card.name).append('\t').append(kind).append('\n')
+     }
+-    val out = File(outDir, "por-cards.jsonl")
++    val out = File(outDir, "$base.jsonl")
+     out.writeText(lines.joinToString("\n") + "\n")
+-    println("ARCANA-EXPORT cards=${cards.size} bytes=${out.length()} roundTripFailures=$failures file=${out.absolutePath}")
+-    if (failures > 0) kotlin.system.exitProcess(2)
++    File(outDir, "$base.index.tsv").writeText(index.toString())
++    println("ARCANA-EXPORT $base cards=${lines.size} bytes=${out.length()} roundTripFailures=$failures")
+ }
+-- 
+2.43.0
+

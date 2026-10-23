@@ -55,7 +55,11 @@ fun OnlineGameState.toJson(): String = JSONObject().apply {
     put("endVotes", JSONObject().apply { endVotes.forEach { (seat, vote) -> put(seat.toString(), vote) } })
     put("gameEnded", gameEnded)
     put("stackActions", JSONArray().apply { stackActions.forEach { action ->
-        put(JSONObject().put("id", action.id).put("title", action.title).put("controllerId", action.controllerId).put("kind", action.kind).put("card", action.card?.toJson() ?: JSONObject.NULL))
+        put(JSONObject().put("id", action.id).put("title", action.title).put("controllerId", action.controllerId).put("kind", action.kind).put("card", action.card?.toJson() ?: JSONObject.NULL)
+            .put("targetText", action.targetText)
+            .put("targetCount", action.targetCount?.let { JSONObject().put("minimum", it.minimum).put("maximum", it.maximum) } ?: JSONObject.NULL)
+            .put("targets", JSONArray().apply { action.targets.forEach { target -> put(JSONObject().put("key", target.key).put("label", target.label).put("category", target.category).put("ownerId", target.ownerId ?: JSONObject.NULL)) } })
+            .put("targetsConfirmed", action.targetsConfirmed))
     } })
     put("priorityPlayer", priorityPlayer)
     put("priorityPassed", JSONArray().apply { priorityPassed.forEach { put(it) } })
@@ -93,7 +97,16 @@ fun parseOnlineGameState(source: String): OnlineGameState? = runCatching {
         endProposalBy = json.optInt("endProposalBy", -1),
         endVotes = json.optJSONObject("endVotes")?.let { votes -> buildMap { votes.keys().forEach { key -> put(key.toIntOrNull() ?: return@forEach, votes.optBoolean(key)) } } }.orEmpty(),
         gameEnded = json.optBoolean("gameEnded"),
-        stackActions = json.optJSONArray("stackActions")?.let { array -> (0 until array.length()).mapNotNull { array.optJSONObject(it)?.let { item -> StackAction(item.optString("id"), item.optString("title"), item.optString("controllerId"), item.optString("kind", "SPELL"), item.optJSONObject("card")?.toGameCard()) } } }.orEmpty(),
+        stackActions = json.optJSONArray("stackActions")?.let { array -> (0 until array.length()).mapNotNull { array.optJSONObject(it)?.let { item ->
+            val card = item.optJSONObject("card")?.toGameCard()
+            val targetText = item.optString("targetText", card?.oracleText.orEmpty())
+            val targetCountJson = item.optJSONObject("targetCount")
+            val targetCount = targetCountJson?.let { TargetCountRange(it.optInt("minimum").coerceAtLeast(0), it.optInt("maximum").coerceAtLeast(0)) } ?: parseTargetCountRange(targetText)
+            val targets = item.optJSONArray("targets")?.let { targetArray -> (0 until targetArray.length()).mapNotNull { index ->
+                targetArray.optJSONObject(index)?.let { target -> StackTarget(target.optString("key"), target.optString("label"), target.optString("category"), target.optString("ownerId").takeUnless { it.isBlank() || it == "null" }) }
+            } }.orEmpty()
+            StackAction(item.optString("id"), item.optString("title"), item.optString("controllerId"), item.optString("kind", "SPELL"), card, targetText, targetCount, targets, item.optBoolean("targetsConfirmed", targetCount == null))
+        } } }.orEmpty(),
         priorityPlayer = json.optInt("priorityPlayer").coerceIn(players.indices),
         priorityPassed = json.optJSONArray("priorityPassed")?.let { array -> (0 until array.length()).map { array.optString(it) }.toSet() }.orEmpty(),
         triggerPrompts = json.optJSONArray("triggerPrompts")?.let { array ->
@@ -183,6 +196,7 @@ private fun GameCard.toJson() = JSONObject().apply {
     put("manaCost", manaCost ?: JSONObject.NULL)
     put("power", power ?: JSONObject.NULL); put("toughness", toughness ?: JSONObject.NULL)
     put("keywords", JSONArray().apply { keywords.forEach { put(it) } })
+    put("chosenCreatureType", chosenCreatureType ?: JSONObject.NULL)
 }
 
 private fun JSONObject.toGameCard(): GameCard {
@@ -199,7 +213,8 @@ private fun JSONObject.toGameCard(): GameCard {
         manaValue = if (isNull("manaValue")) null else optDouble("manaValue"), importIssue = optString("importIssue").nullableString(),
         artCropUrl = optString("artCropUrl").nullableString(), manaCost = if (has("manaCost") && !isNull("manaCost")) optString("manaCost") else null,
         power = optString("power").nullableString(), toughness = optString("toughness").nullableString(),
-        keywords = optJSONArray("keywords")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty()
+        keywords = optJSONArray("keywords")?.let { values -> (0 until values.length()).map { values.optString(it) }.filter { it.isNotBlank() } }.orEmpty(),
+        chosenCreatureType = optString("chosenCreatureType").nullableString()
     )
 }
 

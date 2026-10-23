@@ -1,0 +1,325 @@
+diff --git a/ai/CHANGELOG.md b/ai/CHANGELOG.md
+index c936536..4414bea 100644
+--- a/ai/CHANGELOG.md
++++ b/ai/CHANGELOG.md
+@@ -28,6 +28,8 @@ Format — newest first, one bullet each:
+ 
+ ## Changes
+ 
++- Skips retarget-only activations when every offered stack object has no targets.
++
+ - #3282 Aims an until-end-of-turn pump at a creature that can still fight: when a beneficial target choice ties (a beginning-of-combat +2/+2 on creatures not yet attacking), it no longer gives it to a bigger creature cast this turn over the one that will attack (Ezekiel Sims, Spider-Totem pumps itself, not a summoning-sick Spider-Man). Permanent payoffs like +1/+1 counters are unaffected.
+ - #3274 Landcycles for the land it is missing: stuck short on lands with its land drop unused, a line that puts a land in hand (Plainscycling Noble Templar) is scored as playing that land the same turn, so it cycles and plays the land instead of passing with a hand of uncastable spells.
+ - #3258 Builds limited decks it can cast: basics follow how hard each color's cards press (double and triple pips and early drops count extra, and each color gets at least the sources its most demanding card needs), cards whose pips the mana base can't support are cut, off-color `{2/C}`-heavy cards like Karn, Gilded Guardian stay out, planeswalker tutors and sacrifice-a-planeswalker spells stay out of decks without planeswalkers to find, it runs at least 14 creatures when the pool has them (cutting tricks and Auras first), and no longer splashes a fourth color or a double-pip card.
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
+index bd4f1d8..15c345a 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/AIPlayer.kt
+@@ -51,6 +51,8 @@ class AIPlayer(
+      * [MeaningfulActionFilter.canAutoPassWithoutEnumerating] can decide from the state alone.
+      */
+     private val useMeaningfulFilter: Boolean = false,
++    private val budgetPolicy: com.wingedsheep.ai.engine.budget.BudgetPolicy =
++        com.wingedsheep.ai.engine.budget.LegacyBudgetPolicy,
+ ) {
+     init {
+         responder.forcedPlayPicker = { state, seat ->
+@@ -75,21 +77,29 @@ class AIPlayer(
+             return PassPriority(playerId)
+         }
+         val legalActions = simulator.getLegalActions(state, playerId)
+-        return strategist.chooseAction(state, legalActions, playerId, decisionStartedNanos).action
++        val budget = budgetPolicy.budgetFor(state, playerId, legalActions).withFirstIterationTime().startingAt(decisionStartedNanos)
++        return simulator.withBudget(budget) {
++            strategist.chooseAction(state, legalActions, playerId, decisionStartedNanos).action
++        }
+     }
+ 
+     /**
+      * Choose the best [LegalAction] from the given list.
+      */
+     fun chooseFrom(state: GameState, legalActions: List<LegalAction>): LegalAction {
+-        return strategist.chooseAction(state, legalActions, playerId)
++        val started = System.nanoTime()
++        return simulator.withBudget(budgetPolicy.budgetFor(state, playerId, legalActions).withFirstIterationTime().startingAt(started)) {
++            strategist.chooseAction(state, legalActions, playerId, started)
++        }
+     }
+ 
+     /**
+      * Respond to a pending decision.
+      */
+     fun respondToDecision(state: GameState, decision: PendingDecision): DecisionResponse {
+-        return responder.respond(state, decision, playerId)
++        return simulator.withBudget(budgetPolicy.budgetForDecision(state, playerId).withFirstIterationTime()) {
++            responder.respond(state, decision, playerId)
++        }
+     }
+ 
+     /**
+@@ -380,6 +390,7 @@ class AIPlayer(
+                 ),
+                 responder = responder,
+                 useMeaningfulFilter = profile.useMeaningfulFilter,
++                budgetPolicy = profile.budgetPolicy,
+             )
+         }
+ 
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/GameSimulator.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/GameSimulator.kt
+index 3c02eec..44081d9 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/GameSimulator.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/GameSimulator.kt
+@@ -49,6 +49,7 @@ class GameSimulator(
+      * so a test can reach the guard deterministically instead of building a board that loops.
+      */
+     private val maxAutomaticTransitions: Int = DEFAULT_MAX_AUTOMATIC_TRANSITIONS,
++    private val nanoTime: () -> Long = System::nanoTime,
+ ) {
+     init {
+         require(maxAutomaticTransitions > 0) { "maxAutomaticTransitions must be positive" }
+@@ -69,6 +70,23 @@ class GameSimulator(
+      *  evaluating alternatives) should NOT re-enter the resolver. */
+     private var isResolving = false
+ 
++    // One simulator is confined to one AI worker. Nested decision probes inherit the earlier
++    // deadline; they cannot reopen the clock while answering a hypothetical choice.
++    private var deadlineNanos: Long = Long.MAX_VALUE
++
++    fun <T> withBudget(budget: com.wingedsheep.ai.engine.budget.DecisionBudget, block: () -> T): T {
++        val previous = deadlineNanos
++        deadlineNanos = minOf(previous, budget.deadlineNanos)
++        return try { block() } finally { deadlineNanos = previous }
++    }
++
++    private fun deadlineExpired(): Boolean =
++        deadlineNanos != Long.MAX_VALUE && nanoTime() >= deadlineNanos
++
++    private fun stoppedBeforeAction(state: GameState) = SimulationResult.StoppedAtLimit(
++        state, emptyList(), automaticTransitions = 0, limit = maxAutomaticTransitions,
++    )
++
+     /**
+      * True while the strategic resolver is answering a decision from inside one of this
+      * simulator's own simulations — a resolver can read it to skip work that only pays off for a
+@@ -94,6 +112,7 @@ class GameSimulator(
+      * [SimulationResult.StoppedAtLimit], never as successful completion.
+      */
+     fun simulate(state: GameState, action: GameAction): SimulationResult {
++        if (deadlineExpired()) return stoppedBeforeAction(state)
+         val play = state.pendingDecision as? PlayCardDecision
+         val submission = if (play != null && (action is CastSpell || action is PlayLand)) {
+             SubmitDecision(play.playerId, PlayCardResponse(play.id, action))
+@@ -106,6 +125,7 @@ class GameSimulator(
+      * Simulate a decision response on a paused state.
+      */
+     fun simulateDecision(state: GameState, response: DecisionResponse): SimulationResult {
++        if (deadlineExpired()) return stoppedBeforeAction(state)
+         val pending = state.pendingDecision
+             ?: return SimulationResult.Illegal(state, emptyList(), "No pending decision")
+         val action = SubmitDecision(pending.playerId, response)
+@@ -167,6 +187,10 @@ class GameSimulator(
+                 return SimulationResult.Terminal(current.state, allEvents)
+             }
+ 
++            // Never evaluate an unfinished hypothetical board as a completed leaf. Real game
++            // actions use their own processor and are never interrupted by this search deadline.
++            if (deadlineExpired()) return stoppedAtLimit(current, allEvents, iterations)
++
+             // Auto-resolve trivial decisions; use decisionResolver for non-trivial ones
+             if (current.outcome is Outcome.Paused) {
+                 val decision = current.pendingDecision!!
+@@ -205,6 +229,7 @@ class GameSimulator(
+                             isResolving = false
+                         }
+                     }
++                    if (deadlineExpired()) return stoppedAtLimit(current, allEvents, iterations)
+                     val submitAction = SubmitDecision(decision.playerId, response)
+                     current = processor.process(current.state, submitAction).result
+                     allEvents = allEvents + current.events
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/RetargetingCandidateFilter.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/RetargetingCandidateFilter.kt
+new file mode 100644
+index 0000000..582d3b1
+--- /dev/null
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/RetargetingCandidateFilter.kt
+@@ -0,0 +1,28 @@
++package com.wingedsheep.ai.engine
++
++import com.wingedsheep.engine.core.ActivateAbility
++import com.wingedsheep.engine.legalactions.LegalAction
++import com.wingedsheep.engine.registry.CardRegistry
++import com.wingedsheep.engine.state.GameState
++import com.wingedsheep.engine.state.components.identity.CardComponent
++import com.wingedsheep.engine.state.components.stack.TargetsComponent
++import com.wingedsheep.sdk.scripting.effects.ChangeTargetEffect
++
++/** AI search pruning only. A targetless stack object is still a legal redirect-ability target. */
++object RetargetingCandidateFilter {
++    fun hasPotentialEffect(state: GameState, offer: LegalAction, registry: CardRegistry): Boolean {
++        val activation = offer.action as? ActivateAbility ?: return true
++        val card = state.getEntity(activation.sourceId)?.get<CardComponent>() ?: return true
++        val effect = registry.getCard(card.cardDefinitionId)?.script?.activatedAbilities
++            ?.find { it.id == activation.abilityId }?.effect ?: return true
++        // Composite effects and unreadable/granted abilities may have another payoff. Keep them.
++        if (effect !is ChangeTargetEffect || !offer.requiresTargets ||
++            (offer.targetRequirements?.size ?: 1) > 1) return true
++        val candidates = offer.validTargets ?: return true
++        return candidates.any { id ->
++            // Unknown objects are conservatively retained, rather than silently vetoed.
++            val entity = state.getEntity(id) ?: return@any true
++            !entity.get<TargetsComponent>()?.targets.isNullOrEmpty()
++        }
++    }
++}
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/SimulationResult.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/SimulationResult.kt
+index e4b1775..84f4aa3 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/SimulationResult.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/SimulationResult.kt
+@@ -35,7 +35,7 @@ sealed interface SimulationResult {
+     ) : SimulationResult
+ 
+     /**
+-     * Automatic resolution reached its bounded progress guard while another automatic transition
++     * Automatic resolution reached its transition guard or shared search deadline while another automatic transition
+      * remained. The retained state is unfinished and must not be scored as a completed candidate.
+      *
+      * Two consumers, two answers, and the difference is whether the caller is producing a *move* or
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
+index 2f12c0a..528b099 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt
+@@ -294,7 +294,7 @@ class Strategist(
+         // returns a single DeclareAttackers/DeclareBlockers with an empty default map).
+         val combatAction = legalActions.find { it.actionType == "DeclareAttackers" || it.actionType == "DeclareBlockers" }
+         if (combatAction != null) {
+-            val budget = budgetPolicy.budgetFor(state, playerId, listOf(combatAction)).let {
++            val budget = budgetPolicy.budgetFor(state, playerId, listOf(combatAction)).withFirstIterationTime().let {
+                 if (decisionStartedNanos != null) it.startingAt(decisionStartedNanos) else it
+             }
+             return handleCombatDeclaration(evaluationState, combatAction, playerId, budget, startNanos)
+@@ -313,7 +313,7 @@ class Strategist(
+             } else {
+                 single
+             }
+-            val budget = budgetPolicy.budgetFor(state, playerId, listOf(only)).let {
++            val budget = budgetPolicy.budgetFor(state, playerId, listOf(only)).withFirstIterationTime().let {
+                 if (decisionStartedNanos != null) it.startingAt(decisionStartedNanos) else it
+             }
+             return only.copy(action = chooseCommittedTargets(state, only, playerId, budget))
+@@ -322,7 +322,9 @@ class Strategist(
+         val pass = legalActions.find { it.actionType == "PassPriority" }
+         val candidates = if (forcedPlay) {
+             legalActions.filter { it.affordable && !it.hasUnfillableTargetRequirement }
+-        } else candidatesFrom(legalActions)
++        } else candidatesFrom(legalActions).filter {
++            !useMeaningfulFilter || RetargetingCandidateFilter.hasPotentialEffect(state, it, simulator.cardRegistry)
++        }
+         // A forced play has to play *something*, so nothing is vetoed there.
+         val aimed = if (targetPolarityFromEffect && !forcedPlay) {
+             candidates.filterNot { TargetSelection.aimsOnlyAtTheWrongSide(state, it, playerId, intents) }
+@@ -333,7 +335,7 @@ class Strategist(
+ 
+         if (affordable.isEmpty()) return pass ?: legalActions.first()
+ 
+-        val budget = budgetPolicy.budgetFor(state, playerId, affordable).let {
++        val budget = budgetPolicy.budgetFor(state, playerId, affordable).withFirstIterationTime().let {
+             if (decisionStartedNanos != null) it.startingAt(decisionStartedNanos) else it
+         }
+         if (budget.expired() && pass != null) return pass
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudget.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudget.kt
+index 46ed80f..403bc82 100644
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudget.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudget.kt
+@@ -176,6 +176,15 @@ class DecisionBudget(
+     /** Include work already spent enumerating actions in this decision's deadline. */
+     fun startingAt(nanos: Long): DecisionBudget = DecisionBudget(tier, allowances, millis, nanos)
+ 
++    /**
++     * The zero-search tier still owes one seed choice. Give it a finite window while preserving
++     * the original start; this cannot reopen an old clock. An exhausted NORMAL/CRITICAL mobile
++     * burst never gets this allowance.
++     */
++    fun withFirstIterationTime(): DecisionBudget =
++        if (tier == BudgetTier.TRIVIAL && millis == 0L) DecisionBudget(tier, allowances, 50L, startNanos)
++        else this
++
+     fun remainingMs(): Long =
+         if (deadlineNanos == Long.MAX_VALUE) Long.MAX_VALUE
+         else max(0L, (deadlineNanos - System.nanoTime()) / NANOS_PER_MILLI)
+diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/GameSimulatorTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/GameSimulatorTest.kt
+index c2bf00b..831f9c1 100644
+--- a/ai/src/test/kotlin/com/wingedsheep/ai/engine/GameSimulatorTest.kt
++++ b/ai/src/test/kotlin/com/wingedsheep/ai/engine/GameSimulatorTest.kt
+@@ -75,6 +75,45 @@ private fun boltFixture(opponentLife: Int = 20): BoltFixture {
+ 
+ class GameSimulatorTest : FunSpec({
+ 
++    test("deadline stops an unresolved pass baseline and never scores its partial board") {
++        val fixture = boltFixture()
++        var calls = 0
++        val simulator = GameSimulator(fixture.registry, nanoTime = {
++            if (calls++ == 0) 0L else 2_000_000L
++        })
++        val budget = com.wingedsheep.ai.engine.budget.DecisionBudget(
++            com.wingedsheep.ai.engine.budget.BudgetTier.NORMAL,
++            com.wingedsheep.ai.engine.budget.SearchAllowances.forMillis(1), 1, 0L,
++        )
++        val result = simulator.withBudget(budget) { simulator.simulate(fixture.driver.state, fixture.cast) }
++            .shouldBeInstanceOf<SimulationResult.StoppedAtLimit>()
++        result.state.stack.shouldNotBeEmpty()
++        result.automaticTransitions shouldBe 0
++        result.scoreOrRankLast { error("unfinished state must not be evaluated") } shouldBe Double.NEGATIVE_INFINITY
++        fixture.driver.state.stack.isEmpty().shouldBeTrue()
++    }
++
++    test("nested probes cannot reopen an expired clock and the scope restores after failure") {
++        val fixture = boltFixture()
++        val simulator = GameSimulator(fixture.registry, nanoTime = { 2_000_000L })
++        val expired = com.wingedsheep.ai.engine.budget.DecisionBudget(
++            com.wingedsheep.ai.engine.budget.BudgetTier.NORMAL,
++            com.wingedsheep.ai.engine.budget.SearchAllowances.forMillis(1), 1, 0L,
++        )
++        val unlimited = com.wingedsheep.ai.engine.budget.DecisionBudget.legacy()
++        shouldThrow<IllegalStateException> {
++            simulator.withBudget(expired) {
++                simulator.withBudget(unlimited) {
++                    simulator.simulate(fixture.driver.state, fixture.cast)
++                        .shouldBeInstanceOf<SimulationResult.StoppedAtLimit>().state shouldBe fixture.driver.state
++                }
++                error("scope test")
++            }
++        }
++        simulator.simulate(fixture.driver.state, fixture.cast).shouldBeInstanceOf<SimulationResult.Terminal>()
++    }
++
++
+     test("automatic transition exhaustion is not successful simulation completion") {
+         val fixture = boltFixture()
+         val result = GameSimulator(fixture.registry, maxAutomaticTransitions = 1)
+diff --git a/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt b/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt
+index 1db92ca..ab416e3 100644
+--- a/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt
++++ b/ai/src/test/kotlin/com/wingedsheep/ai/engine/budget/DecisionBudgetTest.kt
+@@ -12,6 +12,23 @@ import io.kotest.matchers.shouldBe
+  */
+ class DecisionBudgetTest : FunSpec({
+ 
++    test("zero-search tier gets a finite first choice without renewing its start") {
++        val start = System.nanoTime()
++        val zero = DecisionBudget(BudgetTier.TRIVIAL, SearchAllowances.TRIVIAL_ALLOWANCES, 0, start)
++        val seed = zero.withFirstIterationTime()
++        seed.deadlineNanos shouldBe start + 50_000_000L
++        seed.allowances shouldBe zero.allowances
++        DecisionBudget(BudgetTier.TRIVIAL, SearchAllowances.TRIVIAL_ALLOWANCES, 0,
++            start - 1_000_000_000L).withFirstIterationTime().expired() shouldBe true
++    }
++
++    test("an exhausted mobile search budget never receives a new first-choice clock") {
++        val normal = DecisionBudget(BudgetTier.NORMAL, SearchAllowances.TRIVIAL_ALLOWANCES, 0)
++        normal.withFirstIterationTime() shouldBe normal
++        normal.withFirstIterationTime().expired() shouldBe true
++    }
++
++
+     test("enumeration time is charged to the same decision deadline") {
+         val start = System.nanoTime() - 1_000_000_000L
+         val opened = DecisionBudget(BudgetTier.NORMAL, SearchAllowances.forMillis(150), 150)

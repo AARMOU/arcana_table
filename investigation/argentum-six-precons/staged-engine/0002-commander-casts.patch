@@ -1,0 +1,88 @@
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
+@@ -1081,6 +1081,18 @@
+     }
+ 
+     /**
++     * Number of times this player's commander card(s) have actually been cast from the
++     * command zone this game. Unlike spellsCastThisTurn, this survives turn boundaries;
++     * unlike commander tax, partner commanders are summed rather than inspected singly.
++     */
++    @SerialName("CommanderCasts")
++    @Serializable
++    data class CommanderCasts(val player: Player = Player.You) : DynamicAmount {
++        override val description: String =
++            "the number of times ${player.possessive} commander has been cast from the command zone this game"
++    }
++
++    /**
+      * Reference to a stored variable by name.
+      * Used for effects that need to reference a previously computed/stored value.
+      * Example: Scapeshift stores "sacrificedCount" and SearchLibrary reads it.
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
+@@ -444,6 +444,10 @@
+     fun commanderColorIdentityCount(player: Player = Player.You): DynamicAmount =
+         DynamicAmount.CommanderColorIdentityCount(player)
+ 
++    /** Commander casts from the command zone across this entire game (The Swarmlord). */
++    fun commanderCasts(player: Player = Player.You): DynamicAmount =
++        DynamicAmount.CommanderCasts(player)
++
+     fun creaturesYouControl(): DynamicAmount =
+         battlefield(Player.You, GameObjectFilter.Creature).count()
+ 
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
+@@ -182,6 +182,7 @@
+         DynamicAmount.CraftedMaterialsTotalPower,
+         DynamicAmount.CreaturesThatCrewedOrSaddledThisTurn,
+         is DynamicAmount.CommanderColorIdentityCount,
++        is DynamicAmount.CommanderCasts,
+         is DynamicAmount.DevotionTo,
+         is DynamicAmount.DistinctCardTypesInCollections,
+         is DynamicAmount.DistinctColorsManaSpent,
+@@ -564,6 +565,17 @@
+                 predicates.commanderColorIdentity(state, playerId)?.size ?: 0
+             }
+ 
++            is DynamicAmount.CommanderCasts ->
++                resolveUnifiedPlayerIds(state, amount.player, context, projectedState).sumOf { playerId ->
++                    state.getEntity(playerId)
++                        ?.get<com.wingedsheep.engine.state.components.identity.CommanderRegistryComponent>()
++                        ?.commanderIds.orEmpty().distinct().sumOf { commanderId ->
++                            val component = state.getEntity(commanderId)
++                                ?.get<com.wingedsheep.engine.state.components.identity.CommanderComponent>()
++                            if (component?.ownerId == playerId) component.castsFromCommandZone else 0
++                        }
++                }
++
+             // Devotion (CR 700.5): the number of mana symbols of the named colors among the mana
+             // costs of permanents the player controls. Hybrid ({W/U}), monocolored hybrid ({2/B}),
+             // and Phyrexian ({B/P}) symbols each count toward their color(s); a symbol matching more
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
+@@ -339,6 +339,7 @@
+         DynamicAmount.CraftedMaterialsTotalPower,
+         DynamicAmount.CreaturesThatCrewedOrSaddledThisTurn,
+         is DynamicAmount.CommanderColorIdentityCount,
++        is DynamicAmount.CommanderCasts,
+         is DynamicAmount.DevotionTo,
+         is DynamicAmount.DistinctColorsManaSpent,
+         is DynamicAmount.EntityProperty,
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
+@@ -87,7 +87,7 @@
+             is DynamicAmount.LastKnownSourceCounters, is DynamicAmount.LastKnownDamageDealtToSource,
+             is DynamicAmount.CastX, is DynamicAmount.CastChoice, is DynamicAmount.TotalManaSpent,
+             is DynamicAmount.ManaSpentOnX, is DynamicAmount.ManaSpentFromSubtype, is DynamicAmount.ManaOfColorSpent,
+-            is DynamicAmount.SnowManaSpent, is DynamicAmount.DistinctColorsManaSpent, is DynamicAmount.DevotionTo, is DynamicAmount.CommanderColorIdentityCount,
++            is DynamicAmount.SnowManaSpent, is DynamicAmount.DistinctColorsManaSpent, is DynamicAmount.DevotionTo, is DynamicAmount.CommanderColorIdentityCount, is DynamicAmount.CommanderCasts,
+             is DynamicAmount.StoredCardManaValue, is DynamicAmount.DistinctEntitiesInCollections,
+             is DynamicAmount.DistinctCardTypesInCollections, is DynamicAmount.ManaValueSumOfCollection,
+             is DynamicAmount.PlayerCount, is DynamicAmount.CountPlayersWith, is DynamicAmount.GraveyardRelativeCount,
