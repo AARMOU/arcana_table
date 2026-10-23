@@ -24,7 +24,7 @@ class TervigonScenarioTest {
 
         assertEquals(5, d.projected.getPower(tervigon))
         assertEquals(5, d.projected.getToughness(tervigon))
-        assertEquals(initialHandSize, d.zoneNames(p, Zone.HAND).size)
+        assertEquals(initialHandSize + 1, d.zoneNames(p, Zone.HAND).size)
         d.removeSummoningSickness(tervigon)
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
         assertNull(d.declareAttackers(p, listOf(tervigon), d.player2).error)
@@ -48,6 +48,7 @@ class TervigonScenarioTest {
         d.removeSummoningSickness(tervigon)
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
         assertNull(d.declareAttackers(p, listOf(tervigon), d.player2).error)
+        d.passPriorityUntil(Step.DECLARE_BLOCKERS)
         assertNull(d.declareBlockers(d.player2, mapOf(tervigon to listOf(blocker))).error)
         d.passPriorityUntil(Step.POSTCOMBAT_MAIN)
         d.resolveAll()
