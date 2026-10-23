@@ -1,0 +1,20 @@
+name: Stabilization control regressions
+on:
+  pull_request:
+    paths: ['scripts/**', '.github/workflows/stabilization-control-tests.yml', '.github/workflows/arcana-ci-failure-router.yml', '.github/workflows/arcana-card-dispatcher.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  controls:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test scripts/*.test.cjs
+      - run: git diff --check
