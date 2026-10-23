@@ -36,10 +36,14 @@ jobs:
             const prs = await github.paginate(github.rest.pulls.list, {
               owner, repo, state: 'open', per_page: 100
             });
-            const pr = prs.find(p => p.head.ref === run.head_branch &&
-              p.head.repo?.id === context.payload.repository.id &&
-              p.head.sha === run.head_sha && p.draft);
-            if (!pr) { core.info('No matching current draft PR for this SHA'); return; }
+            const pr = prs.find(p => {
+              const linked = (run.pull_requests || []).some(link =>
+                link.number === p.number && link.head?.sha === p.head.sha);
+              return p.head.ref === run.head_branch &&
+                p.head.repo?.id === context.payload.repository.id &&
+                (p.head.sha === run.head_sha || linked) && p.draft;
+            });
+            if (!pr) { core.info('No matching current draft PR head'); return; }
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner, repo, issue_number: pr.number, per_page: 100
             });
@@ -48,26 +52,40 @@ jobs:
             if (routed.some(c => c.body.includes('run-id:' + run.id))) {
               core.info('Run already routed'); return;
             }
-            // Never loop indefinitely: three automated repair requests per PR.
-            if (routed.length >= 3) {
-              core.warning('Automated repair limit reached for PR #' + pr.number);
-              await github.rest.issues.createComment({
-                owner, repo, issue_number: pr.number,
-                body: '<!-- arcana-ci-repair-escalation -->\nAutomated repair limit reached (3 attempts). Manual review required. No further automatic Copilot requests.'
-              });
-              return;
-            }
             const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, {
               owner, repo, run_id: run.id, per_page: 100
             });
             const failed = jobs.filter(j => j.conclusion === 'failure');
+            if (!failed.length) { core.info('No failed jobs to route'); return; }
+            const signature = failed.map(j => {
+              const step = (j.steps || []).find(s => s.conclusion === 'failure');
+              return j.name + '/' + (step?.name || 'unknown');
+            }).sort().join(' | ');
+            const key = 'failure-key:' + signature;
+            const same = routed.filter(c => c.body?.includes(key));
+            if (same.some(c => c.body.includes('head-sha:' + pr.head.sha))) {
+              core.info('Same failure already routed for this head'); return;
+            }
+            if (same.length >= 3) {
+              const escalation = '<!-- arcana-ci-repair-escalation -->';
+              if (comments.some(c => c.body?.includes(escalation) && c.body.includes(key))) {
+                core.info('Escalation already recorded'); return;
+              }
+              await github.rest.issues.createComment({
+                owner, repo, issue_number: pr.number,
+                body: [escalation, key, 'Three distinct head revisions failed the same CI job/step.',
+                  'Manual review required; no further automatic Copilot requests.',
+                  'Latest run: ' + run.html_url].join('\n')
+              });
+              return;
+            }
             const details = failed.slice(0, 8).map(j => {
               const step = (j.steps || []).find(s => s.conclusion === 'failure');
               return '- ' + j.name + (step ? ' / ' + step.name : '') +
                 ' (' + j.html_url + ')';
             }).join('\n') || '- Failed job details unavailable; inspect run.';
             const body = [
-              marker, 'run-id:' + run.id,
+              marker, 'run-id:' + run.id, key, 'head-sha:' + pr.head.sha,
               '@copilot CI failed on this isolated development PR.',
               'Run: ' + run.html_url,
               'Commit: \`' + run.head_sha + '\`',
@@ -75,6 +93,6 @@ jobs:
               'Reproduce and fix the underlying problem without weakening tests or rules.',
               'Commit only to this PR branch; rerun the full applicable regression.',
               'Do not merge, publish, release, modify main, or access production secrets.',
-              'Automatic repair request ' + (routed.length + 1) + ' of 3.'
+              'Automatic repair request ' + (same.length + 1) + ' of 3 for this failure signature.'
             ].join('\n\n');
             await github.rest.issues.createComment({owner, repo, issue_number: pr.number, body});
