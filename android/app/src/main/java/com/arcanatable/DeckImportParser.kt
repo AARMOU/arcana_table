@@ -261,3 +261,10 @@ fun parseDeckListDetailed(raw: String, catalog: SupportedCardCatalog? = null): P
         deckName = deckName, diagnostics = errors, partnerPairEligible = eligibility,
     )
 }
+
+/** Bundled definitions supply offline card identity and metadata without claiming a particular printing. */
+fun offlineImportMatches(entries: List<DeckEntry>, catalog: SupportedCardCatalog?): Map<DeckEntry, ScryfallCard> =
+    if (catalog == null) emptyMap()
+    else entries.mapNotNull { entry ->
+        catalog.find(entry.name)?.toScryfallCard()?.let { entry to it }
+    }.toMap()
