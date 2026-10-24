@@ -215,7 +215,17 @@ class TestScenariosTest {
                     asked += decision.optString("type") + ":" + decision.optString("prompt")
                     val response = when (decision.optString("type")) {
                         "ChooseTargetsDecision" -> JSONObject().put("type", "TargetsResponse").put("selectedTargets",
-                            JSONObject().apply { decision.getJSONObject("legalTargets").keys().forEach { put(it, JSONArray()) } })
+                            JSONObject().apply {
+                                val legal = decision.getJSONObject("legalTargets")
+                                val requirements = decision.getJSONArray("targetRequirements").objects()
+                                legal.keys().forEach { key ->
+                                    val minimum = requirements.first { it.optInt("index") == key.toInt() }.optInt("minTargets", 1)
+                                    val candidates = legal.getJSONArray(key).let { a -> (0 until a.length()).map { a.getString(it) } }
+                                    val picks = if (minimum == 0) emptyList() else
+                                        (listOf(LocalArgentumHost.AI_ID.value).filter { it in candidates } + candidates).distinct().take(minimum)
+                                    put(key, JSONArray(picks))
+                                }
+                            })
                         "YesNoDecision" -> JSONObject().put("type", "YesNoResponse").put("choice", pay && "{C}{C}" in decision.optString("prompt"))
                         "SelectManaSourcesDecision" -> ArgentumDecisions.autoPayManaResponse()
                         "OrderObjectsDecision" -> JSONObject().put("type", "OrderedResponse").put("orderedObjects", decision.getJSONArray("objects"))
