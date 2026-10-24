@@ -153,7 +153,7 @@ jobs:
         working-directory: android
         run: |
           set +e
-          tests=$(git status --porcelain -- custom-cards/src/test | awk '{print $2}' | xargs -n1 basename | sed 's/\.kt$//')
+          tests=$(git status --porcelain -- custom-cards/src/test | awk '{print $2}' | xargs -n1 basename | sed 's/\.kt$//' | tr '\n' ' ')
           if [ -z "$tests" ]; then
             if [ -n "${{ steps.pick.outputs.supported }}${{ steps.pick.outputs.other }}" ]; then echo "::error::cards were picked but no scaffold test was generated"; exit 1; fi
             echo "::warning::no missing card with a cached Oracle record to scaffold"; exit 0

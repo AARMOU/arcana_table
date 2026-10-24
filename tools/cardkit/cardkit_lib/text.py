@@ -50,6 +50,7 @@ def normalize_line(line: str, card_name: str = "") -> str:
     s = s.casefold()
     s = _SELF_REFS.sub("~", s)
     s = re.sub(r"\{(\d+)\}", "{n}", s)
+    s = re.sub(r"\{(?:[wubrg]|[wubrg2]/[wubrgp]|[wubrg]/[wubrg]/p)\}", "{m}", s)  # any coloured pip
     s = re.sub(r"\d+", "n", s)
     s = _NUMBER_WORD.sub("n", s)
     s = s.replace("—", " - ")

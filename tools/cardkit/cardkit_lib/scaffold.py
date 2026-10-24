@@ -56,15 +56,21 @@ def render_card(card: dict, val: str) -> tuple[str, list[str]]:
         else:
             todo_lines.append(line)
     ident = "".join(c for c in WUBRG if c in (card.get("color_identity") or []))
-    ix = refs.index()
     ref_notes: list[str] = []
     body_todos: list[str] = []
     for line in todo_lines:
-        matches = ix.search(line, name, k=2, exclude=name)
+        scored = refs.score_line(line, name, k=2, exclude=name)
         body_todos.append(f"    // {repo.TODO_MARK}: {line}")
-        for m in matches:
-            body_todos.append(f"    //   ~{m.score:.2f} {m.ref.card} [{m.ref.source}]: {refs.where(m.ref.card, m.ref.source)}")
-        ref_notes.extend(f"{m.ref.card}" for m in matches)
+        if scored["clauses"] and scored["score"] > scored["wholeScore"]:
+            body_todos.append("    //   combines implemented pieces:")
+            for c in scored["clauses"]:
+                m = c["match"]
+                if m:
+                    body_todos.append(f"    //     ~{c['score']:.2f} \"{c['clause']}\" ← {m['card']} [{m['source']}]: {m['where']}")
+                    ref_notes.append(m["card"])
+        for m in scored["matches"]:
+            body_todos.append(f"    //   ~{m['score']:.2f} {m['card']} [{m['source']}]: {m['where']}")
+            ref_notes.append(m["card"])
     imports = ["com.wingedsheep.sdk.dsl.*", "com.wingedsheep.sdk.model.Rarity"]
     if keyword_calls:
         imports.insert(0, "com.wingedsheep.sdk.core.Keyword")
