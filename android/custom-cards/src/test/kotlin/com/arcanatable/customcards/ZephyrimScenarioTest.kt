@@ -8,7 +8,6 @@ import com.wingedsheep.engine.state.components.battlefield.DamageComponent
 import com.wingedsheep.engine.state.components.battlefield.TappedComponent
 import com.wingedsheep.engine.state.components.identity.ControllerComponent
 import com.wingedsheep.engine.state.components.identity.TokenComponent
-import com.wingedsheep.engine.state.components.player.CardsDrawnThisTurnComponent
 import com.wingedsheep.engine.state.components.player.ManaPoolComponent
 import com.wingedsheep.sdk.core.*
 import com.wingedsheep.sdk.dsl.*
@@ -215,16 +214,11 @@ class ZephyrimScenarioTest {
         d.passPriorityUntil(Step.DRAW, activePlayer = d.player2)
 
         assertTrue(zephyrim in d.getHand(d.player2))
-        val revealed = d.events.any {
-            it is CardRevealedForMiracleEvent && it.cardName == "Zephyrim"
-        }
-        val drawCount = d.state.getEntity(d.player2)?.get<CardsDrawnThisTurnComponent>()?.count
-        assertTrue(
-            "Miracle not offered: registered=${d.cardRegistry.requireCard("Zephyrim").keywordAbilities}, " +
-                "drawCount=$drawCount, pending=${d.state.pendingDecision}, events=${d.events.map { it::class.simpleName }}",
-            revealed,
-        )
         assertTrue(d.state.pendingDecision is YesNoDecision)
+        assertNull(d.submitYesNo(d.player2, true).error)
+        assertTrue(d.events.any {
+            it is CardRevealedForMiracleEvent && it.cardName == "Zephyrim"
+        })
     }
 
     @Test
@@ -243,12 +237,12 @@ class ZephyrimScenarioTest {
             d.bothPass()
             assertTrue("Opponent draw spell must put Zephyrim into its owner's hand",
                 zephyrim in d.getHand(d.player1))
-            assertTrue(d.events.any {
-                it is CardRevealedForMiracleEvent && it.cardName == "Zephyrim"
-            })
             val offer = d.state.pendingDecision as? YesNoDecision
             assertNotNull("First draw on the opponent's turn should offer Miracle", offer)
             assertNull(d.submitYesNo(d.player1, true).error)
+            assertTrue(d.events.any {
+                it is CardRevealedForMiracleEvent && it.cardName == "Zephyrim"
+            })
 
             val cast = d.submit(CastSpell(
                 playerId = d.player1,
