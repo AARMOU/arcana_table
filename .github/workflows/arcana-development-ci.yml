@@ -7,6 +7,9 @@ on:
   pull_request:
     paths:
       - android/custom-cards/**
+      - android/app/src/main/assets/precons/**
+      - android/app/src/test/java/com/arcanatable/OfficialSixPreconDeckListsTest.kt
+      - investigation/argentum-six-precons/**
       - android/app/src/main/assets/argentum/custom-cards.*
       - .github/workflows/arcana-development-ci.yml
   workflow_dispatch:
