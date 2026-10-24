@@ -800,9 +800,9 @@ internal fun TableController.TableOverlays() {
     }
     argentumComposer?.let { plan ->
         ArgentumActionComposer(plan, ::argentumName, busy = argentumAwaitingUpdate || argentumXChecking != null,
-            onConfirm = { picks, x, distribution, color, removal ->
+            onConfirm = { picks, x, distribution, color, removal, crew ->
                 val refs = argentumSnapshot?.targets.orEmpty()
-                val action = plan.build(picks, x, distribution, color, removal) { id -> refs[id]?.let(ArgentumActionPlan::chosenTarget) }
+                val action = plan.build(picks, x, distribution, color, removal, crew) { id -> refs[id]?.let(ArgentumActionPlan::chosenTarget) }
                 val epoch = ArgentumActions.epochFor(plan.info, argentumSnapshot?.interactionEpoch)
                 if (epoch != null && submitArgentumAction(action, epoch)) {
                     recordDiagnostic("Sent ${action.optString("type")} (${plan.description}) with ${plan.chosenTargets(picks).size} target(s)${x?.let { ", X=$it" }.orEmpty()}", DiagnosticCategory.ACTION)
