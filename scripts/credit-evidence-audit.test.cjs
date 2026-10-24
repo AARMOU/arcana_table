@@ -1,0 +1,13 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {verifyEvidence}=require('./credit-evidence-audit.cjs');
+const sha='a'.repeat(40),now=Date.parse('2026-10-24T15:00:00Z');
+const sample=()=>({billing:{metric:'ai_credits',used:100,allowance:1500,reportingLagMinutes:15,requestId:'request-1',measuredAt:'2026-10-24T14:59:00Z'},history:{complete:true,auditCommit:sha,operationIds:[]},sharedCi:{conclusion:'success',headSha:sha,runId:401},serialization:{verified:true,workflowSha:sha},ownership:{verified:true,auditCommit:sha}});
+test('fully supplied audit metadata validates',()=>assert.equal(verifyEvidence(sample(),now).ok,true));
+test('missing numeric usage fails closed',()=>{const e=sample();delete e.billing.used;assert.equal(verifyEvidence(e,now).ok,false)});
+test('unknown reporting lag fails closed',()=>{const e=sample();delete e.billing.reportingLagMinutes;assert.equal(verifyEvidence(e,now).ok,false)});
+test('stale measurement fails closed',()=>{const e=sample();e.billing.measuredAt='2026-10-24T14:00:00Z';assert.equal(verifyEvidence(e,now).ok,false)});
+test('incomplete historical inventory fails closed',()=>{const e=sample();e.history.complete=false;assert.equal(verifyEvidence(e,now).ok,false)});
+test('CI without exact head fails closed',()=>{const e=sample();e.sharedCi.headSha='unknown';assert.equal(verifyEvidence(e,now).ok,false)});
+test('unverified serialization fails closed',()=>{const e=sample();e.serialization.verified=false;assert.equal(verifyEvidence(e,now).ok,false)});
+test('unverified ownership fails closed',()=>{const e=sample();e.ownership.verified=false;assert.equal(verifyEvidence(e,now).ok,false)});
