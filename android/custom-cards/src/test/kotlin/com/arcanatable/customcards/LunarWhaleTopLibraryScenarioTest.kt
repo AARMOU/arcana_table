@@ -106,7 +106,7 @@ class LunarWhaleTopLibraryScenarioTest {
         val p = d.player1
         val card = d.putCardOnTopOfLibrary(p, "Frogmite")
         assertNotNull("library access is not a free-cast permission", d.castSpell(p, card).error)
-        assertTrue(d.state.getLibrary(p).contains(card))
+        assertTrue(d.zoneNames(p, Zone.LIBRARY).contains("Frogmite"))
     }
 
     @Test fun sorceryTimingStillAppliesAfterAttack() {
@@ -114,8 +114,16 @@ class LunarWhaleTopLibraryScenarioTest {
         val p = d.player1
         val card = d.putCardOnTopOfLibrary(p, "Divination")
         d.giveMana(p, Color.BLUE, 3)
-        // The postcombat main phase permits a sorcery, but opponents' priority must not.
+        // The postcombat main phase permits a sorcery with an empty stack.
         assertNull("a sorcery in your postcombat main phase is legal", d.castSpell(p, card).error)
+        d.resolveAll()
+        val next = d.putCardOnTopOfLibrary(p, "Divination")
+        d.giveMana(p, Color.BLUE, 3)
+        assertNull(d.passPriority(p).error)
+        assertEquals(d.player2, d.priorityPlayer)
+        assertFalse("the player without priority has no legal sorcery action",
+            d.legalActions(p).any { (it.action as? CastSpell)?.cardId == next })
+        assertNotNull("the handler also enforces priority", d.castSpell(p, next).error)
     }
 
     @Test fun onlyActualTopCardCanBeCast() {
