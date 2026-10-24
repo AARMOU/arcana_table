@@ -106,4 +106,39 @@ class WifiHostTest {
             }
         }
     }
+    @Test fun closingDuringBindNeverClaimsHostIsReady() {
+        val enteredBind = java.util.concurrent.CountDownLatch(1)
+        val allowBindToFinish = java.util.concurrent.CountDownLatch(1)
+        val finishedBind = java.util.concurrent.CountDownLatch(1)
+        val listener = object : java.net.ServerSocket() {
+            override fun bind(endpoint: java.net.SocketAddress?) {
+                enteredBind.countDown()
+                try {
+                    allowBindToFinish.await(5, TimeUnit.SECONDS)
+                    super.bind(endpoint)
+                } finally {
+                    finishedBind.countDown()
+                }
+            }
+        }
+        val host = ArgentumLanServer("Host", onGuest = {}, onGuestMessage = {}, onGuestLeft = {},
+            createServerSocket = { listener })
+        try {
+            host.start()
+            assertTrue("bind was entered", enteredBind.await(5, TimeUnit.SECONDS))
+            host.close()
+            allowBindToFinish.countDown()
+            assertTrue("bind thread finished", finishedBind.await(5, TimeUnit.SECONDS))
+            assertFalse("a canceled host must not report ready", host.awaitReady(1_000))
+            assertTrue("the in-flight listener was closed", listener.isClosed)
+            java.net.ServerSocket().use { probe ->
+                probe.reuseAddress = true
+                probe.bind(java.net.InetSocketAddress(ArgentumLan.GAME_PORT))
+            }
+        } finally {
+            allowBindToFinish.countDown()
+            host.close()
+        }
+    }
+
 }
