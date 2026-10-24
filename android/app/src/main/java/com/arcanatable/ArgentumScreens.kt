@@ -221,8 +221,13 @@ internal fun ArgentumOpeningHandScreen(
     primaryLabel: String, primaryEnabled: Boolean, onPrimary: () -> Unit,
     secondaryLabel: String?, secondaryEnabled: Boolean, onSecondary: () -> Unit,
 ) {
-    var inspected by remember { mutableStateOf<PickCard?>(null) }
+    // The hand gets its own zoom, drawn inside this dialog, so a preview can never outlive the
+    // opening hand (it used to stay up on the table after Keep Hand).
+    val tableZoom = LocalCardZoom.current
+    LaunchedEffect(tableZoom) { tableZoom.dismiss() } // a table preview would otherwise hide behind the hand
+    val handZoom = remember { CardZoomController().apply { enabled = true } }
     Dialog(onDismissRequest = {}, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false, dismissOnClickOutside = false)) {
+      CompositionLocalProvider(LocalCardZoom provides handZoom) {
         Surface(Modifier.fillMaxSize(), color = Ink) {
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(18.dp)) {
                 Text("ARGENTUM", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
@@ -236,8 +241,8 @@ internal fun ArgentumOpeningHandScreen(
                                 row.forEach { card ->
                                     val chosen = card.id in selection
                                     Box(Modifier.width(grid.cardWidth.dp)) {
-                                        CardFace(card, Modifier.width(grid.cardWidth.dp), onClick = { if (selectable) onToggle(card) },
-                                            onLongClick = { inspected = PickCard(card.id.toString(), card.name, card.imageUrl?.takeIf { !card.isFaceDown }, card.type, group = "Opening hand", groupOrder = 0, isToken = card.isToken) }, showCounters = false, glow = chosen)
+                                        CardFace(card, Modifier.width(grid.cardWidth.dp).testTag("opening-hand-card"), onClick = { if (selectable) onToggle(card) },
+                                            onLongClick = {}, showCounters = false, glow = chosen) // hold → handZoom
                                         if (chosen) Text("BOTTOM", color = Ink, fontSize = 9.sp, fontWeight = FontWeight.Black,
                                             modifier = Modifier.align(Alignment.TopCenter).padding(4.dp).clip(RoundedCornerShape(5.dp)).background(Mint).padding(horizontal = 6.dp, vertical = 2.dp))
                                     }
@@ -254,8 +259,9 @@ internal fun ArgentumOpeningHandScreen(
                 }
             }
         }
+        CardZoomOverlay(handZoom)
+      }
     }
-    inspected?.let { item -> PickZoom(item) { inspected = null } }
 }
 
 
