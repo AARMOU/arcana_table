@@ -97,7 +97,7 @@ class TestScenariosTest {
             assertTrue(bear in legal)
             assertFalse("Another creature excludes Displacer", source in legal)
             val action = plan.build(mapOf(slot.index to listOf(visionary)), null, emptyMap(), null) {
-                snap.targets[it]?.let(ArgentumActionPlan::chosenTarget)
+                snap.targets[it]?.let { ref -> ArgentumActionPlan.chosenTarget(ref) }
             }
             val after = s.submit(msg, action).getJSONObject("state")
             assertEquals("Reentry draws one card", handCount(state) + 1, handCount(after))

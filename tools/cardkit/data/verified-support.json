@@ -2,10 +2,13 @@
   "_about": "Cards whose near-variant wording (a word that differs from the closest implemented card) was checked against the pinned engine source. Each entry names the primitive and where it is used. Source inspection, not execution: the card's own scenario tests remain the proof. Remove an entry if its implementation shows otherwise.",
   "cards": {
     "Eldrazi Displacer": {
-      "summary": "exile-then-return is Effects.Move(→EXILE) then Effects.Move(→BATTLEFIELD) (upstream Emiel the Blessed); Effects.Move takes a tapped flag (sdk-api.md, card-sdk-language-reference 'tapped = true'); {C} in an activation cost is ordinary mana",
-      "verifiedBy": "Claude, source inspection 2026-10-24",
+      "summary": "Effects.Move(target, Zone.EXILE) then Effects.Move(target, Zone.BATTLEFIELD, placement = ZonePlacement.Tapped, fromZone = Zone.EXILE), using TargetFilter.OtherCreature. MoveToZoneEffectExecutor defaults battlefield controller to owner; ZoneTransitionService forbids a token returning after it leaves the battlefield. Costs.Mana(\"{2}{C}\") requires one actual colorless mana plus two generic.",
+      "verifiedBy": "Claude and GPT, pinned-source inspection 2026-10-24; per-card execution evidence belongs to its scenario tests and PR #163",
       "references": [
-        "upstream mtg-sets/2017-2022/.../jmp/cards/EmielTheBlessed.kt"
+        "upstream@61e71e586b100faa661f86cac827ac3c3bbb5a78 mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/jmp/cards/EmielTheBlessed.kt",
+        "upstream@61e71e586b100faa661f86cac827ac3c3bbb5a78 rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/zones/MoveToZoneEffectExecutor.kt",
+        "upstream@61e71e586b100faa661f86cac827ac3c3bbb5a78 rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/ZoneTransitionService.kt",
+        "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldraziDisplacerScenarioTest.kt"
       ]
     },
     "Forsaken Monument": {

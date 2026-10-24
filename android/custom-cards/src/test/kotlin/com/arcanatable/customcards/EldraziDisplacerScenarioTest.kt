@@ -191,6 +191,27 @@ class EldraziDisplacerScenarioTest {
         assertTrue(d.permanentsNamed(d.player2, "Grizzly Bears").isEmpty())
     }
 
+    @Test fun targetBlinkedInResponseIsANewObjectAndIsNotBlinkedAgain() {
+        val d = customScenario(EldraziDisplacer, "Grizzly Bears", "Flicker of Fate")
+        val source = d.putCreatureOnBattlefield(d.player1, "Eldrazi Displacer")
+        val target = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
+        val oldObject = d.state.objectRef(target)
+        d.giveColorlessMana(d.player1, 3)
+        assertNull(d.blink(source, target).error)
+        assertNull(d.passPriority(d.player1).error)
+        val flicker = d.putCardInHand(d.player2, "Flicker of Fate")
+        d.giveMana(d.player2, Color.WHITE, 2)
+        assertNull(d.castSpell(d.player2, flicker, listOf(target)).error)
+        d.bothPass()
+        val returned = d.permanentsNamed(d.player2, "Grizzly Bears").single()
+        val newObject = d.state.objectRef(returned)
+        assertNotEquals(oldObject, newObject)
+        assertFalse(d.isTapped(returned))
+        d.resolveAll()
+        assertEquals("The old activation cannot follow a target across a new zone visit", newObject, d.state.objectRef(returned))
+        assertFalse("Displacer fizzled rather than tapping the new object", d.isTapped(returned))
+    }
+
     @Test fun auraGoesToGraveyardAndEquipmentStaysUnattached() {
         val d = customScenario(EldraziDisplacer, "Grizzly Bears", "Holy Strength", "Bonesplitter")
         val source = d.putCreatureOnBattlefield(d.player1, "Eldrazi Displacer")
