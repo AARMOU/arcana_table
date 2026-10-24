@@ -2,7 +2,7 @@ name: Eldrazi Temple exact mana restriction (source-only)
 # #152 / #150: never persists runtime jars, publishes decks, signs APKs or dispatches Copilot.
 on:
   push:
-    branches: [gpt/eldrazi-temple-exact-mana-source-20261024]
+    branches: [gpt/eldrazi-temple-exact-mana-source-20261024, gpt/eldrazi-temple-card-source-20261024]
     paths:
       - 'engine-upgrade/eldrazi-temple/**'
       - '.github/workflows/eldrazi-temple-source-tests.yml'
@@ -32,7 +32,7 @@ jobs:
           set -euo pipefail
           git -C argentum-engine apply --check "$GITHUB_WORKSPACE/engine-upgrade/eldrazi-temple/patches/0001-colorless-eldrazi-source-mana.patch"
           git -C argentum-engine apply "$GITHUB_WORKSPACE/engine-upgrade/eldrazi-temple/patches/0001-colorless-eldrazi-source-mana.patch"
-          cp engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          cp engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/\n          cp engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/\n          mkdir -p argentum-engine/rules-engine/src/test/kotlin/com/arcanatable/customcards/cards\n          cp engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt argentum-engine/rules-engine/src/test/kotlin/com/arcanatable/customcards/cards/
           git -C argentum-engine diff --check
       - uses: actions/setup-java@v4
         with:
@@ -43,7 +43,7 @@ jobs:
         run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:test
       - name: Exact colorless Eldrazi payment positive and negative engine tests
         working-directory: argentum-engine
-        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :rules-engine:test --tests 'com.wingedsheep.engine.scenarios.EldraziTempleManaRestrictionTest'
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :rules-engine:test --tests 'com.wingedsheep.engine.scenarios.EldraziTemple*'
       - name: Summarize actual test XML
         if: always()
         run: |
@@ -55,7 +55,7 @@ jobs:
           for p in Path('argentum-engine').glob('**/build/test-results/**/TEST-*.xml'):
               r = ET.parse(p).getroot()
               for k in c: c[k] += int(r.get(k, 0))
-              if 'EldraziTempleManaRestrictionTest' in p.name:
+              if 'EldraziTemple' in p.name:
                   names.append(p.name)
           print('Eldrazi Temple source-only CI:', c)
           print('Matching scenario XML:', names)
