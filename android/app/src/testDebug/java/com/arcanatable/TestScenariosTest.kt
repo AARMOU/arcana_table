@@ -44,8 +44,8 @@ class TestScenariosTest {
 
     private fun JSONArray.objects() = (0 until length()).map { getJSONObject(it) }
 
-    @Test fun debugBuildListsExactlyTheFiveScenarios() {
-        assertEquals(listOf(TestScenarios.IRON_SPIDER, TestScenarios.WHALE_JUST_CAST, TestScenarios.WHALE_HELD, TestScenarios.ULALEK, TestScenarios.ULALEK_RESPONSE),
+    @Test fun debugBuildListsExactlyTheSixScenarios() {
+        assertEquals(listOf(TestScenarios.IRON_SPIDER, TestScenarios.WHALE_JUST_CAST, TestScenarios.WHALE_HELD, TestScenarios.ULALEK, TestScenarios.ULALEK_RESPONSE, TestScenarios.DISPLACER_BLINK),
             TestScenarios.available)
     }
 
@@ -162,6 +162,39 @@ class TestScenariosTest {
             assertEquals("3 damage in the air", lifeBefore - 3, after.snapshot().players[ai].life)
         } finally { s.host.shutdown() }
     }
+
+    @Test fun displacerScenarioBlinksThroughTheAppsTargetPickerAndDrawsOnReentry() {
+        val s = start(TestScenarios.DISPLACER_BLINK)
+        try {
+            val msg = s.nextState()
+            val state = msg.getJSONObject("state")
+            val source = cardIdNamed(state, "Eldrazi Displacer")
+            val visionary = cardIdNamed(state, "Elvish Visionary")
+            val bear = cardIdNamed(state, "Grizzly Bears")
+            val snap = msg.snapshot()
+            val blink = snap.legalActions.single {
+                it.actionType() == "ActivateAbility" && it.getJSONObject("action").optString("sourceId") == source
+            }
+            assertTrue(blink.optBoolean("isAffordable"))
+            val plan = ArgentumActionPlan.from(blink)
+            val slot = plan.slots.single()
+            val legal = plan.legalFor(slot, emptyMap())
+            assertTrue(visionary in legal)
+            assertTrue(bear in legal)
+            assertFalse("Another creature excludes Displacer", source in legal)
+            val action = plan.build(mapOf(slot.index to listOf(visionary)), null, emptyMap(), null) {
+                snap.targets[it]?.let { ref -> ArgentumActionPlan.chosenTarget(ref) }
+            }
+            val after = s.submit(msg, action).getJSONObject("state")
+            assertEquals("Reentry draws one card", handCount(state) + 1, handCount(after))
+            val returned = after.getJSONObject("cards").getJSONObject(cardIdNamed(after, "Elvish Visionary"))
+            assertTrue("The returned creature is tapped", returned.getBoolean("isTapped"))
+            assertEquals("Counters did not survive the blink", 0, returned.optJSONObject("counters")?.optInt("PLUS_ONE_PLUS_ONE") ?: 0)
+            assertEquals("Printed power restored", "1", returned.get("power").toString())
+        } finally { s.host.shutdown() }
+    }
+
+    // ---- The Lunar Whale (#108): Crew 1, flying 3/5 ----
 
     // ---- Ulalek, Fused Atrocity: pay {C}{C}, copy your spells and other abilities ----
 
