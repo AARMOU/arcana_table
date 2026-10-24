@@ -15,6 +15,7 @@ tools/cardkit/cardkit <command> --help
 | `newcard NAME [--offline]` | Card file + deliberately failing scenario test; facts filled in, every rules line a `CARDKIT-TODO` with references |
 | `check [--strict-oracle]` | CI rules: no registered scaffolds, every registered card tested, no orphan definitions, Oracle drift warnings |
 | `unit NAME…` | `[Arcana Queue]` issue body (dispatcher format) — printed only, **fails closed**: refuses `ENGINE_BLOCKED`, `IMPLEMENTED_AND_TESTED`, cards without an Oracle record, cards claimed by an open PR, and any run where open PRs can't be read; `NEEDS_REVIEW` only with `--allow-review` (marked "triage required"). One refused card → no body at all |
+| `assay-review --ledger FILE --assay-commit SHA [--card NAME…] [--deck FILE…] [--json-output FILE]` | **Read-only** comparison of upstream Argentum Assay's baked whole-card parser verdicts to Cardkit readiness. Never upgrades readiness, changes a blocker, or grants worker admission. |
 | `blocker NAME --reason … --source … [--verified]` | Records an engine gap in `data/known-blockers.json` and prints a #141 record |
 | `oracle fetch [NAME…] [--deck F] [--missing-only]` / `oracle show NAME` | Refresh / read the offline Scryfall cache (`data/oracle-cache.jsonl`) |
 | `patterns [--check]` | Regenerates `docs/agents/generated/pattern-index.{md,json}` |
