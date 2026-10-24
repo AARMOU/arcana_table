@@ -1,4 +1,4 @@
-# Ulalek engine candidate (Claude lane, #132)
+# Precon engine candidate: Ulalek, Zhulodok, Abaddon (Claude lane, #132 / #81)
 
 Engine support needed by **Ulalek, Fused Atrocity** that the shipped Build 131 runtime lacks:
 
@@ -8,8 +8,13 @@ Engine support needed by **Ulalek, Fused Atrocity** that the shipped Build 131 r
 | `0005-colorless-hybrid-sdk.patch` | `{C/W}`…`{C/G}` mana symbols (`ManaSymbol.ColorlessHybrid`) in the SDK. |
 | `0006-colorless-hybrid-floating-payment.patch` | Paying those halves from floating mana. |
 | `0007-colorless-hybrid-auto-tap.patch` | Auto-tap support for those halves. |
+| `0008-granted-cascade.patch` | A *granted* CASCADE keyword (`GrantKeywordToOwnSpells`) becomes real cast triggers, one per grant instance, with mana value read as cast (X included). Needed by Zhulodok and, with further work, Abaddon. This is PR #60's `engine-patches/0001-granted-cascade.patch`, renamed. |
 
-The patches are PR #60's (`f159dea`), **byte-identical**, with their sha256 values pinned in `apply_patches.py`.
+| `0009-granted-keyword-mana-value-cap.patch` | **New (Claude).** `GrantKeywordToOwnSpells` gains `maxManaValue: DynamicAmount?` and `duringYourTurnOnly`. Granted cascade evaluates the cap for the grant's controller at cast; every other reader of a capped grant fails closed. Both fields default to off and are omitted from JSON, so existing card data is unchanged. Docs and sdk-index were updated in the same patch. Needed by Abaddon the Despoiler. |
+
+`engine-tests/` holds kotest specs that `apply_patches.py` drops into `rules-engine` tests: PR #60's `GrantedCascadeEngineTest` and the new `GrantedCascadeManaValueCapEngineTest`.
+
+Patches 0004–0008 are PR #60's (`f159dea`), **byte-identical**, with their sha256 values pinned in `apply_patches.py`.
 They apply exactly on `wingedsheep/argentum-engine@61e71e5` after the mandatory Arcana baseline
 (`engine-upgrade/audit_patches.py`). GPT's PR #136 established this first.
 

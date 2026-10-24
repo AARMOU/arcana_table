@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -16,6 +17,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 ENGINE = ROOT / "argentum-engine"
 PATCH_DIR = Path(__file__).resolve().parent / "patches"
+# Extra engine scenario specs that travel with the patches (kotest, run by :rules-engine:test).
+ENGINE_TESTS = Path(__file__).resolve().parent / "engine-tests"
+ENGINE_TEST_DEST = ENGINE / "rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios"
 REPORT = Path(__file__).resolve().parent / "apply-report.json"
 UPSTREAM = "61e71e586b100faa661f86cac827ac3c3bbb5a78"
 PATCHES = {
@@ -23,6 +27,10 @@ PATCHES = {
     "0005-colorless-hybrid-sdk.patch": "957ba557b52f504cc55f860d151dc9b0408e13361ba86f90a9678c2fd6ca55ef",
     "0006-colorless-hybrid-floating-payment.patch": "a2630a36d9c88b6664abad5f6356e954e6cbd4f434e71684395fea173da078c0",
     "0007-colorless-hybrid-auto-tap.patch": "838a6e867960cccb7b97e057e3144ec61a067699c8af6158d19f4cbfcc0edbe4",
+    # PR #60 engine-patches/0001-granted-cascade.patch, renamed only (Zhulodok, later Abaddon).
+    "0008-granted-cascade.patch": "1074333a3bb6846655d5d2999debdb8925899dd26888534b1356f5e47ffaf2d1",
+    # Claude: GrantKeywordToOwnSpells.maxManaValue + duringYourTurnOnly, honoured by granted cascade (Abaddon).
+    "0009-granted-keyword-mana-value-cap.patch": "7f5e11c422199a7c5a281f261529fc5c593795f66c1c8abc181ccb11b1bf948b",
 }
 
 
@@ -55,6 +63,14 @@ def main() -> int:
         diff = git("diff", "--check")
         if diff.returncode:
             raise RuntimeError("git diff --check failed: " + (diff.stdout + diff.stderr)[-2000:])
+        added = []
+        for spec in sorted(ENGINE_TESTS.glob("*.kt")):
+            dest = ENGINE_TEST_DEST / spec.name
+            if dest.exists():
+                raise RuntimeError(f"{spec.name} would overwrite an upstream test")
+            shutil.copyfile(spec, dest)
+            added.append(spec.name)
+        report["engine_tests_added"] = added
         report["status"] = "applied"
         report["diff_stat"] = git("diff", "--shortstat").stdout.strip()
     except Exception as exc:  # report every failure, then fail the step

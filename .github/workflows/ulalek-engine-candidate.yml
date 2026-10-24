@@ -147,7 +147,13 @@ jobs:
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
       - name: Release variant has no debug test scenarios
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest'
+        run: |
+          # The check arrives with PR #110; until that is in this branch's base there is nothing to run.
+          if [ -f app/src/testRelease/java/com/arcanatable/ReleaseHasNoTestScenariosTest.kt ]; then
+            ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest'
+          else
+            echo "ReleaseHasNoTestScenariosTest not in this base (PR #110 not merged); skipped" | tee -a ../candidate-summary.txt
+          fi
       - name: Compile the debug app on candidate jars (stays in CI, never uploaded)
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug

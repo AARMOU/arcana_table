@@ -273,6 +273,10 @@ object CustomCards {
         Entry(SufferThePast, "ROE", "Eldrazi Incursion"),
         // Needs the colorless-hybrid and stack-copy engine patches (engine-upgrade/ulalek).
         Entry(UlalekFusedAtrocity, "M3C", "Eldrazi Incursion"),
+        // Eldrazi Unbound. Needs the granted-cascade engine patch (engine-upgrade/ulalek).
+        Entry(ZhulodokVoidGorger, "CMM", "Eldrazi Unbound"),
+        // The Ruinous Powers. Needs engine patches 0008 + 0009 (engine-upgrade/ulalek).
+        Entry(AbaddonTheDespoiler, "40K", "The Ruinous Powers"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
