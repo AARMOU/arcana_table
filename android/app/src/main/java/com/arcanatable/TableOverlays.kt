@@ -984,7 +984,7 @@ internal fun TableController.TableOverlays() {
     if (deckEditorOpen) DeckEditorDialog(
         player = players[selectedPlayer],
         highlightedCardIds = importReviewCardIds,
-        onRename = { card, name -> editDeckCard(selectedPlayer, card.id, name) },
+        onRename = { card, name -> syncSavedDeckSwap(selectedPlayer, card.name, name); editDeckCard(selectedPlayer, card.id, name) },
         onRemove = { card -> editDeckCard(selectedPlayer, card.id, null, remove = true) },
         onAdd = { result -> updatePlayer(selectedPlayer) { p -> p.copy(library = p.library + makeCard(result.name, result.type, result.imageUrl, oracleText = result.oracleText, manaValue = result.manaValue, artCropUrl = result.artCropUrl, manaCost = result.manaCost, power = result.power, toughness = result.toughness, keywords = result.keywords)) } },
         onReplace = { card, result ->
@@ -998,8 +998,10 @@ internal fun TableController.TableOverlays() {
                 p.copy(library = replace(p.library), hand = replace(p.hand), commanderCard = commander, commanderName = commander?.name ?: p.commanderName)
             }
             importReviewCardIds = importReviewCardIds - card.id
+            syncSavedDeckSwap(selectedPlayer, card.name, result.name)
         },
-        onDismiss = { deckEditorOpen = false }
+        onDismiss = { deckEditorOpen = false },
+        loadSupportCatalog = { loadSupportCatalog() }
     )
     if (combatDialogOpen && !showOverview) CombatDialog(
         players = players, attackerIndex = activePlayer,
