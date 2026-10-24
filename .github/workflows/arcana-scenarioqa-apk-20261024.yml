@@ -1,0 +1,108 @@
+name: Arcana B131 debug scenario QA APK
+# Owner-approved: build PR #110 merged development source without modifying production.
+on:
+  push:
+    branches:
+      - gpt/scenarioqa-apk-20261024
+    paths:
+      - .github/workflows/arcana-scenarioqa-apk-20261024.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: arcana-scenarioqa-preview-20261024
+  cancel-in-progress: false
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out exact merged PR 110 development source
+        uses: actions/checkout@v4
+        with:
+          ref: 852b515eb4e60b65a8fd6a12666de9b4acbf2cd2
+          persist-credentials: false
+      - name: Verify immutable source and release-excluded scenarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "852b515eb4e60b65a8fd6a12666de9b4acbf2cd2"
+          test -f android/app/src/debug/java/com/arcanatable/TestScenarios.kt
+          test -f android/app/src/release/java/com/arcanatable/TestScenarios.kt
+          grep -Fq 'val available: List<TestScenario> = emptyList()' android/app/src/release/java/com/arcanatable/TestScenarios.kt
+          grep -Fq 'iron-spider-mixed-counters' android/app/src/debug/java/com/arcanatable/TestScenarios.kt
+          grep -Fq 'lunar-whale-just-cast' android/app/src/debug/java/com/arcanatable/TestScenarios.kt
+          grep -Fq 'lunar-whale-held' android/app/src/debug/java/com/arcanatable/TestScenarios.kt
+      - name: Install Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install API 36 and build tools
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Re-export and run all debug app and custom card JVM tests
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test :app:testDebugUnitTest
+      - name: Prove no test scenarios in release build
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest'
+      - name: Confirm exported card assets match pinned source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv
+      - name: Give this test APK its own installable identity
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/build.gradle.kts")
+          s = p.read_text()
+          original = 'applicationIdSuffix = ".argentum"'
+          assert s.count(original) == 1, "Expected B131 debug package suffix changed"
+          s = s.replace(original, 'applicationIdSuffix = ".scenarioqa"')
+          label = "Arcana Preview · B"
+          assert s.count(label) == 1, "Expected B131 preview app label changed"
+          s = s.replace(label, "Arcana Scenario QA · B")
+          assert 'versionCode = 131' in s
+          p.write_text(s)
+          print("Building independent com.arcanatable.scenarioqa test app (no original installation overwritten)")
+          PY
+      - name: Compile and debug-sign isolated scenario QA APK
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
+      - name: Verify installable APK, debug signature and source provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          apk="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          cp "$apk" "dist/ArcanaTable-B131-ScenarioQA-debug.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "dist/ArcanaTable-B131-ScenarioQA-debug.apk" | head -n 14 > dist/package-info.txt
+          grep -F "package: name='com.arcanatable.scenarioqa' versionCode='131'" dist/package-info.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "dist/ArcanaTable-B131-ScenarioQA-debug.apk" > dist/signing-info.txt
+          test "$(stat -c%s "dist/ArcanaTable-B131-ScenarioQA-debug.apk")" -gt 2000000
+          printf 'source_commit=852b515eb4e60b65a8fd6a12666de9b4acbf2cd2\nsource_branch=gpt/arcana-integration-next\nmerged_pr=110\nsource_engine=Build-131 committed B131 JARs\npackage=com.arcanatable.scenarioqa\nvariant=debug only\nsigning=Android temporary debug certificate (NOT Play Store key)\nproduction_main_modified=false\nWARNING=Manual Save in a scenario can overwrite this test-app package offline saved-game slot\n' > dist/provenance.txt
+          (cd dist && sha256sum ArcanaTable-B131-ScenarioQA-debug.apk > SHA256SUMS.txt)
+      - name: Upload test evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arcana-B131-ScenarioQA-Tests
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            android/custom-cards/build/test-results/
+            android/app/build/test-results/
+      - name: Upload installable scenario QA APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arcana-B131-ScenarioQA-Debug-APK
+          retention-days: 14
+          if-no-files-found: error
+          path: dist/
