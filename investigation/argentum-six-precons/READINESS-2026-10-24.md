@@ -16,6 +16,12 @@
 
 **TOTAL: 426/600 indexed slots, 174 missing slots, 170 distinct missing names.**
 
+## Commander-first readiness
+
+The following four *official face commanders* are missing from the pinned indexes: **The Swarmlord** (Tyranid Swarm), **Abaddon the Despoiler** (The Ruinous Powers), **Zhulodok, Void Gorger** (Eldrazi Unbound), and **Ulalek, Fused Atrocity** (Eldrazi Incursion). Their decks cannot be represented faithfully even at the commander slot until these cards have engine-backed implementations. Inquisitor Greyfax and Szarekh, the Silent King are indexed; that alone does not prove their behaviors are correct.
+
+**Mechanics with known integration risk:** Ulalek's `{C/color}`-hybrid mana and stack-copy fidelity, Zhulodok's chained cascade, and commander-zone recast semantics must be exercised against the exact B131 engine, not merely asserted from static card text.
+
 ## Missing names, by deck
 
 ### Forces of the Imperium — 26
