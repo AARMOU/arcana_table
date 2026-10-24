@@ -251,6 +251,10 @@ object CustomCards {
         Entry(TransmogrifyingWand, "CMM", "Six WotC precons"),
         Entry(UlamogsDreadsire, "M3C", "Six WotC precons"),
         Entry(Zoanthrope, "40K", "Six WotC precons"),
+        // Eldrazi Incursion.
+        Entry(EldraziMonument, "M3C", "Eldrazi Incursion"),
+        Entry(OblivionSower, "M3C", "Eldrazi Incursion"),
+        Entry(SufferThePast, "ROE", "Eldrazi Incursion"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
