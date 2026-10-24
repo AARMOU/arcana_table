@@ -23,12 +23,15 @@ val SireOfStagnation = card("Sire of Stagnation") {
     triggeredAbility {
         trigger = Triggers.a(GameObjectFilter.Land.opponentControls()).enters()
         effect = Effects.Pipeline {
+            // "That player" is the entering LAND'S controller, not necessarily its
+            // owner or the player who caused the zone change. In particular,
+            // Oblivion Sower can put lands owned by us under an opponent's control.
             val topTwo = gather(
-                CardSource.TopOfLibrary(2, Player.TriggeringPlayer),
+                CardSource.TopOfLibrary(2, Player.ControllerOfTriggeringEntity),
                 revealed = true,
                 name = "sireOfStagnationTopTwo",
             )
-            move(topTwo, CardDestination.ToZone(Zone.EXILE, Player.TriggeringPlayer))
+            move(topTwo, CardDestination.ToZone(Zone.EXILE, Player.ControllerOfTriggeringEntity))
             run(Effects.DrawCards(2))
         }
         description = "Whenever a land an opponent controls enters, that player exiles the top two cards of their " +
