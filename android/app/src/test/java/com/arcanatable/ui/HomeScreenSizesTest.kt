@@ -1,5 +1,6 @@
 package com.arcanatable.ui
 
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -19,8 +20,16 @@ import org.robolectric.annotation.GraphicsMode
 class HomeScreenSizesTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
-    private fun homeShows(name: String) {
+    private fun readyHome() {
         UiTestSupport.settle(rule)
+        if (rule.onAllNodesWithTag("quick-ui-tips").fetchSemanticsNodes().isNotEmpty()) {
+            rule.onNodeWithText("Dismiss").performClick()
+            UiTestSupport.settle(rule, 300)
+        }
+    }
+
+    private fun homeShows(name: String) {
+        readyHome()
         rule.onNodeWithTag("home-play").assertIsDisplayed()
         rule.onNodeWithTag("test-scenarios-entry").assertIsDisplayed()
         rule.onNodeWithTag("dev-goose-banner").assertIsDisplayed()
@@ -33,7 +42,7 @@ class HomeScreenSizesTest {
     @Test @Config(sdk = [34], qualifiers = "w673dp-h841dp-port-xhdpi") fun foldableUnfolded() = homeShows("foldable-unfolded")
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi")
     fun scenariosOpenFromHeaderWithoutHuntingBelowDeck() {
-        UiTestSupport.settle(rule)
+        readyHome()
         rule.onNodeWithTag("test-scenarios-entry").assertIsDisplayed().performClick()
         UiTestSupport.settle(rule)
         rule.onNodeWithTag("test-scenario-iron-spider-mixed-counters").assertIsDisplayed()
@@ -41,5 +50,6 @@ class HomeScreenSizesTest {
         rule.onNodeWithTag("test-scenario-lunar-whale-held").assertExists()
         rule.onNodeWithTag("test-scenario-ulalek-copy").assertExists()
         rule.onNodeWithTag("test-scenario-ulalek-own-stack").assertExists()
+        UiTestSupport.screenshot(rule.activity, "home-scenario-chooser")
     }
 }

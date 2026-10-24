@@ -6,13 +6,10 @@ on:
   push:
     branches: [gpt/ulalek-polish-20261024]
     paths:
-      - .github/workflows/ulalek-engine-candidate.yml
       - engine-upgrade/**
       - argentum-patches/**
-      - android/**
-  pull_request:
-    branches: [gpt/arcana-integration-next]
-    paths: [engine-upgrade/ulalek/**, .github/workflows/ulalek-polish.yml]
+# App-only follow-ups use Arcana Development CI on the draft PR with these committed runtimes.
+# Rebuild the source engine when patches change, or by workflow_dispatch for a new QA APK.
   workflow_dispatch:
 permissions:
   contents: read
