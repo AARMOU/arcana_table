@@ -4,6 +4,7 @@ import com.arcanatable.customcards.cards.EldraziTemple
 import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.engine.state.components.player.ManaPoolComponent
 import com.wingedsheep.engine.support.ScenarioTestBase
+import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Phase
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.dsl.*
@@ -28,6 +29,13 @@ class EldraziTempleGameplayScenarioTest : ScenarioTestBase() {
             typeLine = "Creature — Eldrazi"
             power = 2
             toughness = 2
+        }
+        val devoidEldrazi = card("Temple Test Devoid Eldrazi") {
+            manaCost = "{1}{U}"
+            typeLine = "Creature — Eldrazi"
+            power = 2
+            toughness = 2
+            keywords(Keyword.DEVOID)
         }
         val otherColorless = card("Temple Test Colorless Human") {
             manaCost = "{C}{C}"
@@ -55,8 +63,19 @@ class EldraziTempleGameplayScenarioTest : ScenarioTestBase() {
                 effect = Effects.GainLife(1)
             }
         }
-        listOf(EldraziTemple, colorlessEldrazi, coloredEldrazi, otherColorless,
-            colorlessAbility, coloredAbility).forEach(cardRegistry::register)
+        val devoidAbility = card("Temple Test Devoid Ability") {
+            manaCost = "{U}"
+            typeLine = "Creature — Eldrazi"
+            power = 1
+            toughness = 1
+            keywords(Keyword.DEVOID)
+            activatedAbility {
+                cost = Costs.Mana("{C}{C}")
+                effect = Effects.GainLife(1)
+            }
+        }
+        listOf(EldraziTemple, colorlessEldrazi, coloredEldrazi, devoidEldrazi, otherColorless,
+            colorlessAbility, coloredAbility, devoidAbility).forEach { cardRegistry.register(it) }
 
         val unrestricted = EldraziTemple.activatedAbilities[0].id
         val restricted = EldraziTemple.activatedAbilities[1].id
@@ -126,6 +145,38 @@ class EldraziTempleGameplayScenarioTest : ScenarioTestBase() {
             }
             activate("Temple Test Eldrazi Ability") shouldBe Pair(true, 1)
             activate("Temple Test Colored Ability") shouldBe Pair(false, 0)
+        }
+
+        test("Devoid makes a blue-cost Eldrazi spell colorless for Temple restriction") {
+            val game = scenario().withPlayers("Player1", "Player2")
+                .withCardOnBattlefield(1, "Eldrazi Temple")
+                .withLandsOnBattlefield(1, "Island", 1)
+                .withCardInHand(1, "Temple Test Devoid Eldrazi")
+                .withActivePlayer(1)
+                .inPhase(Phase.PRECOMBAT_MAIN, Step.PRECOMBAT_MAIN)
+                .build()
+            val land = game.findPermanent("Eldrazi Temple")!!
+            game.execute(ActivateAbility(game.player1Id, land, restricted)).error shouldBe null
+            game.castSpell(1, "Temple Test Devoid Eldrazi").error shouldBe null
+            game.resolveStack()
+            game.findPermanent("Temple Test Devoid Eldrazi") shouldNotBe null
+        }
+
+        test("Devoid makes a blue-cost Eldrazi ability source colorless for Temple restriction") {
+            val game = scenario().withPlayers("Player1", "Player2")
+                .withCardOnBattlefield(1, "Eldrazi Temple")
+                .withCardOnBattlefield(1, "Temple Test Devoid Ability")
+                .withActivePlayer(1)
+                .inPhase(Phase.PRECOMBAT_MAIN, Step.PRECOMBAT_MAIN)
+                .build()
+            val land = game.findPermanent("Eldrazi Temple")!!
+            val source = game.findPermanent("Temple Test Devoid Ability")!!
+            game.execute(ActivateAbility(game.player1Id, land, restricted)).error shouldBe null
+            val before = game.getLifeTotal(1)
+            game.execute(ActivateAbility(game.player1Id, source,
+                devoidAbility.activatedAbilities.single().id)).error shouldBe null
+            game.resolveStack()
+            game.getLifeTotal(1) shouldBe before + 1
         }
 
         test("first tap ability is unrestricted and one Temple cannot tap twice") {
