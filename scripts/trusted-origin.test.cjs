@@ -15,12 +15,12 @@ const BODY = ['## Cards', '- Eldrazi Monument', '', '## Acceptance',
 const issue = (n, { association = 'OWNER', labels = [] } = {}) => ({ number: n, title: '[Arcana Queue] unit ' + n, body: BODY,
   labels: labels.map(name => ({ name })), assignees: [], state: 'open', author_association: association });
 const comment = (association, login = 'someone', type = 'User') => ({ body: 'hi', created_at: ago(5), author_association: association, user: { login, type } });
-const labeled = m => ({ event: 'labeled', created_at: ago(m), label: { name: A.ONE_SHOT_LABEL }, actor: { login: 'AARMOU' } });
+const labeled = (m, actor = 'AARMOU') => ({ event: 'labeled', created_at: ago(m), label: { name: A.ONE_SHOT_LABEL }, actor: actor === null ? undefined : { login: actor } });
 const renamed = m => ({ event: 'renamed', created_at: ago(m) });
 
 // edited(call) → lastEditedAt for the nth GraphQL read (1 = admission, 2 = pre-assignment check).
 // comments(n, call) likewise for listComments on the unit issue.
-function fake({ issues, events = () => [labeled(10)], edited = () => null, comments = () => [] } = {}) {
+function fake({ issues, events = () => [labeled(10)], edited = () => null, comments = () => [], freshBody } = {}) {
   const writes = [], assigns = [];
   let gq = 0; const cc = {};
   const github = {
@@ -34,7 +34,7 @@ function fake({ issues, events = () => [labeled(10)], edited = () => null, comme
         listEventsForTimeline: a => events(a.issue_number),
         createComment: async a => writes.push(['comment', a.issue_number, a.body]),
         removeLabel: async a => writes.push(['removeLabel', a.issue_number]),
-        get: async a => ({ data: { ...issues.find(i => i.number === a.issue_number), assignees: [] } }),
+        get: async a => ({ data: { ...issues.find(i => i.number === a.issue_number), assignees: [], ...(freshBody ? { body: freshBody } : {}) } }),
       },
       pulls: { list: () => [] },
       repos: { getBranch: async () => ({ data: { commit: { sha: SHA } } }) },
@@ -46,8 +46,8 @@ function fake({ issues, events = () => [labeled(10)], edited = () => null, comme
 }
 const core = { info() {}, warning() {}, setFailed() {}, summary: { addHeading() { return this; }, addCodeBlock() { return this; }, async write() {} } };
 const readBudget = async () => ({ snapshot: { used: 100, allowance: 1500, measuredAt: new Date().toISOString() } });
-const dispatch = (f, mode) => runDispatch({ github: f.github, context: { repo: { owner: 'AARMOU', repo: 'arcana_table' }, runId: 7 }, core,
-  env: { ARCANA_AUTOMATION_READY: 'true', ARCANA_DISPATCH_MODE: mode, ARCANA_INTEGRATION_BASE: BASE, COPILOT_DISPATCH_TOKEN: 't' },
+const dispatch = (f, mode, extraEnv = {}, coreImpl = core) => runDispatch({ github: f.github, context: { repo: { owner: 'AARMOU', repo: 'arcana_table' }, runId: 7 }, core: coreImpl,
+  env: { ARCANA_AUTOMATION_READY: 'true', ARCANA_DISPATCH_MODE: mode, ARCANA_INTEGRATION_BASE: BASE, COPILOT_DISPATCH_TOKEN: 't', ...extraEnv },
   readBudget, fetchImpl: f.fetchImpl });
 
 test('provenance: author must be owner, member or collaborator', () => {
@@ -68,7 +68,8 @@ test('provenance: any untrusted comment blocks; our bots and Copilot are trusted
 
 test('provenance: one-shot approval must be newer than the last edit and rename; missing history fails closed', () => {
   const t = Date.now();
-  const p = approval => A.provenance({ authorAssociation: 'OWNER', commenters: [], approval }, { needApproval: true }).reasons;
+  const p = approval => A.provenance({ authorAssociation: 'OWNER', commenters: [], approval: approval && { actor: 'AARMOU', ...approval } },
+    { needApproval: true, approvers: ['AARMOU'] }).reasons;
   assert.deepEqual(p({ labeledAt: t, contentAt: t - 1000, renamedAfter: false }), []);
   assert.deepEqual(p(null), ['approval-missing']);
   assert.deepEqual(p({ labeledAt: t, contentAt: t + 1000, renamedAfter: false }), ['edited-after-approval']);
@@ -134,7 +135,7 @@ test('an edit made after admission but before the paid call stops it; the attemp
   assert.deepEqual([r.state, r.result], ['attempted', 'not-attempted']); assert.match(r.reason, /edited-after-approval/);
   assert.equal(f.assigns.length, 0);
   assert.deepEqual(f.writes.map(w => w[0]), ['comment', 'removeLabel', 'comment']);
-  assert.match(f.writes[2][2], /result:not-attempted\nreason:untrusted-origin edited-after-approval/);
+  assert.match(f.writes[2][2], /result:not-attempted\nreason:revalidation edited-after-approval/);
 });
 
 test('an untrusted comment posted after admission but before the paid call stops it', async () => {
@@ -168,4 +169,98 @@ test('repairs: an untrusted unit author, PR author or PR comment refuses the pai
   assert.match((await authorize(repairGithub(), { ...copilotPr, user: { login: 'stranger', type: 'User' } })).reason, /pr-author-untrusted/);
   assert.match((await authorize(repairGithub({ prComments: [comment('NONE', 'stranger')] }))).reason, /untrusted-pr-comments/);
   assert.equal((await authorize(repairGithub({ prComments: [comment('OWNER', 'AARMOU')] }))).allowed, true);
+});
+
+// ---- Review of #103 (GPT): approver identity, comments after approval, fresh readiness, preflight ----
+const ledgerComment = m => ({ body: A.formatLedger({ op: 'authorizing', issue: 68, run: 1, at: ago(m) }), created_at: ago(m), updated_at: ago(m),
+  author_association: 'NONE', user: { login: 'github-actions[bot]', type: 'Bot' } });
+const trustedComment = (createdMin, updatedMin = createdMin) => ({ body: 'also do X', created_at: ago(createdMin), updated_at: ago(updatedMin),
+  author_association: 'OWNER', user: { login: 'AARMOU', type: 'User' } });
+
+test('approver: only listed logins approve one-shot spending; missing actor or empty list fails closed', () => {
+  const t = Date.now();
+  const p = (actor, approvers) => A.provenance({ authorAssociation: 'OWNER', commenters: [],
+    approval: { labeledAt: t, contentAt: t - 1000, renamedAfter: false, actor } }, { needApproval: true, approvers }).reasons;
+  assert.deepEqual(p('AARMOU', ['AARMOU']), []);
+  assert.deepEqual(p('aarmou', ['AARMOU']), [], 'logins compare case-insensitively');
+  assert.deepEqual(p('helper', ['AARMOU']), ['approval-actor-unauthorized']);
+  assert.deepEqual(p(null, ['AARMOU']), ['approval-actor-missing']);
+  assert.deepEqual(p('AARMOU', []), ['approvers-unconfigured']);
+  assert.deepEqual(p('AARMOU', undefined), ['approvers-unconfigured']);
+});
+
+test('ARCANA_SPEND_APPROVERS parses a login list; anything malformed is a configuration error', () => {
+  assert.deepEqual(A.readiness({ ARCANA_SPEND_APPROVERS: 'AARMOU, helper-2' }).approvers, ['AARMOU', 'helper-2']);
+  assert.equal(A.readiness({}).approvers, null);
+  for (const bad of ['AARMOU;rm', 'a b', ',', '@AARMOU']) assert.ok(A.readiness({ ARCANA_SPEND_APPROVERS: bad }).errors.length, bad);
+});
+
+test('comments: a trusted comment created or edited after the label voids the approval; only our ledger is exempt', () => {
+  const { commentersOf } = require('./units.cjs');
+  const t = Date.now() - 10 * 60000; // label time
+  const p = comments => A.provenance({ authorAssociation: 'OWNER', commenters: commentersOf(comments),
+    approval: { labeledAt: t, contentAt: t - 60000, renamedAfter: false, actor: 'AARMOU' } }, { needApproval: true, approvers: ['AARMOU'] }).reasons;
+  assert.deepEqual(p([trustedComment(30)]), []);
+  assert.deepEqual(p([trustedComment(5)]), ['comment-after-approval'], 'new comment');
+  assert.deepEqual(p([trustedComment(30, 5)]), ['comment-after-approval'], 'old comment edited later');
+  assert.deepEqual(p([ledgerComment(5)]), [], 'dispatcher ledger record');
+  const botChat = { ...ledgerComment(5), body: 'not a ledger record' };
+  assert.deepEqual(p([botChat]), ['comment-after-approval'], 'other bot content is not exempt');
+  assert.deepEqual(p([{ ...trustedComment(30), created_at: 'garbage' }]), ['comment-history-unavailable']);
+});
+
+test('dispatch: a label applied by someone not on the approver list is refused; adding them to the list allows it', async () => {
+  const f = fake({ issues: [issue(68, { labels: [A.ONE_SHOT_LABEL] })], events: () => [labeled(10, 'helper')] });
+  const r = await dispatch(f, 'authorize-once');
+  assert.equal(r.state, 'denied'); assert.match(r.reason, /approval-actor-unauthorized/);
+  assert.equal(f.writes.length, 0); assert.equal(f.assigns.length, 0);
+  const g = fake({ issues: [issue(68, { labels: [A.ONE_SHOT_LABEL] })], events: () => [labeled(10, 'helper')] });
+  assert.equal((await dispatch(g, 'authorize-once', { ARCANA_SPEND_APPROVERS: 'AARMOU,helper' })).result, 'confirmed');
+  const h = fake({ issues: [issue(68, { labels: [A.ONE_SHOT_LABEL] })], events: () => [labeled(10, null)] });
+  assert.match((await dispatch(h, 'authorize-once')).reason, /approval-actor-missing/);
+});
+
+test('dispatch: the authorization ledger records who approved', async () => {
+  const f = fake({ issues: [issue(68, { labels: [A.ONE_SHOT_LABEL] })] });
+  await dispatch(f, 'authorize-once');
+  assert.match(f.writes[0][2], /op:authorizing\nissue:68\nrun:7\nreason:approved-by AARMOU/);
+});
+
+test('dispatch: a trusted comment added or edited after approval is refused before anything is written', async () => {
+  for (const c of [trustedComment(5), trustedComment(30, 5)]) {
+    const f = fake({ issues: [issue(68, { labels: [A.ONE_SHOT_LABEL] })], comments: () => [c] });
+    const r = await dispatch(f, 'authorize-once');
+    assert.equal(r.state, 'denied'); assert.match(r.reason, /comment-after-approval/);
+    assert.equal(f.writes.length, 0); assert.equal(f.assigns.length, 0);
+  }
+});
+
+test('dispatch: a trusted comment added between admission and the paid call stops it, with zero paid calls', async () => {
+  const f = fake({ issues: [issue(68, { labels: [A.ONE_SHOT_LABEL] })], comments: (n, call) => call === 1 ? [] : [trustedComment(0)] });
+  const r = await dispatch(f, 'authorize-once');
+  assert.deepEqual([r.result], ['not-attempted']); assert.match(r.reason, /comment-after-approval/);
+  assert.equal(f.assigns.length, 0);
+});
+
+test('dispatch: a body that no longer passes the readiness rules at the paid call is not assigned (normal mode)', async () => {
+  const f = fake({ issues: [issue(68)], events: () => [], freshBody: 'please do whatever seems best' });
+  const r = await dispatch(f, 'normal');
+  assert.deepEqual([r.result], ['not-attempted']); assert.match(r.reason, /not-actionable/);
+  assert.equal(f.assigns.length, 0);
+  const g = fake({ issues: [issue(68)], events: () => [], freshBody: BODY.replace('Base: ' + BASE, 'Base: main') });
+  assert.match((await dispatch(g, 'normal')).reason, /base-mismatch/);
+});
+
+test('dry-run reports the edit-history preflight and spends nothing', async () => {
+  const log = [];
+  const c = { ...core, info: m => log.push(m) };
+  const ok = fake({ issues: [issue(68, { labels: [A.ONE_SHOT_LABEL] })] });
+  await dispatch(ok, 'dry-run', {}, c);
+  assert.ok(log.some(m => /"editHistoryPreflight":"ok"/.test(m)));
+  assert.equal(ok.writes.length, 0); assert.equal(ok.assigns.length, 0);
+  log.length = 0;
+  const down = fake({ issues: [issue(68)], events: () => [], edited: () => Error('graphql down') });
+  await dispatch(down, 'dry-run', {}, c);
+  assert.ok(log.some(m => /"editHistoryPreflight":"unavailable"/.test(m)));
+  assert.equal(down.writes.length, 0); assert.equal(down.assigns.length, 0);
 });

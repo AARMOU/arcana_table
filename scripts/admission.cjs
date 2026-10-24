@@ -37,7 +37,17 @@ function readiness(env = {}) {
   const estRepair = positiveInt(env.ARCANA_EST_CREDITS_PER_REPAIR, 30);
   if (estSession === null) errors.push('ARCANA_EST_CREDITS_PER_SESSION invalid');
   if (estRepair === null) errors.push('ARCANA_EST_CREDITS_PER_REPAIR invalid');
+  // Who may approve one-shot spending, as GitHub logins. Unset = the repository owner only
+  // (the caller supplies it). Anything malformed fails closed.
+  let approvers = null;
+  const rawApprovers = env.ARCANA_SPEND_APPROVERS;
+  if (rawApprovers !== undefined && rawApprovers !== null && rawApprovers !== '') {
+    const list = String(rawApprovers).split(',').map(s => s.trim());
+    if (list.every(s => /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$/.test(s))) approvers = list;
+    else errors.push('ARCANA_SPEND_APPROVERS invalid');
+  }
   return {
+    approvers,
     master: env.ARCANA_AUTOMATION_READY === 'true',
     dispatch: mode('ARCANA_DISPATCH_MODE', DISPATCH_MODES, 'off'),
     repair: mode('ARCANA_REPAIR_MODE', REPAIR_MODES, 'observe'),
@@ -181,21 +191,36 @@ const TRUSTED_BOTS = ['github-actions[bot]', 'copilot', 'copilot-swe-agent[bot]'
 const trustedCommenter = c => TRUSTED_ASSOCIATIONS.includes(c?.association) ||
   (c?.type === 'Bot' && TRUSTED_BOTS.includes(String(c?.login || '').toLowerCase()));
 
-// raw: { authorAssociation, commenters: [{association, login, type}],
+// raw: { authorAssociation,
+//        commenters: [{association, login, type, ledger, writtenAt}],
 //        approval: { labeledAt, actor, contentAt, renamedAfter } }  (approval only for one-shot)
 // contentAt = when the issue body was last written (GitHub lastEditedAt, else createdAt).
+// writtenAt = when a comment was created or last edited. ledger = the dispatcher's own
+// append-only record (github-actions[bot] and the ledger marker), the only exempt content.
 // The Copilot worker reads the issue body and its comments, so all of it must come from
-// trusted people, and a one-shot approval covers only the content that existed when it was given.
-function provenance(raw = {}, { needApproval = false } = {}) {
+// trusted people, and a one-shot approval covers only the content that existed when the
+// named approver gave it.
+function provenance(raw = {}, { needApproval = false, approvers } = {}) {
   const reasons = [];
   if (!TRUSTED_ASSOCIATIONS.includes(raw.authorAssociation)) reasons.push('author-untrusted');
   if (!Array.isArray(raw.commenters)) reasons.push('comments-unavailable');
   else if (raw.commenters.some(c => !trustedCommenter(c))) reasons.push('untrusted-comments');
   if (needApproval) {
     const a = raw.approval;
+    const allowed = (Array.isArray(approvers) ? approvers : []).map(s => String(s).toLowerCase());
     if (!a || !Number.isFinite(a.labeledAt)) reasons.push('approval-missing');
-    else if (!Number.isFinite(a.contentAt)) reasons.push('edit-history-unavailable');
-    else if (a.contentAt >= a.labeledAt) reasons.push('edited-after-approval');
+    else {
+      if (!allowed.length) reasons.push('approvers-unconfigured');
+      else if (!a.actor) reasons.push('approval-actor-missing');
+      else if (!allowed.includes(String(a.actor).toLowerCase())) reasons.push('approval-actor-unauthorized');
+      if (!Number.isFinite(a.contentAt)) reasons.push('edit-history-unavailable');
+      else if (a.contentAt >= a.labeledAt) reasons.push('edited-after-approval');
+      if (Array.isArray(raw.commenters)) {
+        const human = raw.commenters.filter(c => !c.ledger);
+        if (human.some(c => !Number.isFinite(c.writtenAt))) reasons.push('comment-history-unavailable');
+        else if (human.some(c => c.writtenAt >= a.labeledAt)) reasons.push('comment-after-approval');
+      }
+    }
     if (a && a.renamedAfter !== false) reasons.push(a.renamedAfter ? 'renamed-after-approval' : 'rename-history-unavailable');
   }
   return { ok: reasons.length === 0, reasons };

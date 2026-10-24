@@ -213,15 +213,26 @@ and reads its comments, so every paid path now requires that all of it comes fro
   `github-actions[bot]` and Copilot's bot account are also trusted. A user account named like a bot is not.
 - **Unit issue:** the author must be trusted, and every comment must be from a trusted person or bot.
   One untrusted comment blocks the unit until it is deleted.
-- **One-shot approval:** the latest application of `arcana:authorize-once` must be newer than the
-  issue body's last edit (GraphQL `lastEditedAt`, else `createdAt`) and than any title change. Editing
-  after approval needs a fresh label. Missing edit or rename history fails closed.
+- **One-shot approval:** the latest application of `arcana:authorize-once` must
+  - be made by an **approver**: a login in `ARCANA_SPEND_APPROVERS` (comma-separated), or the repository
+    owner alone when unset. A missing or unlisted actor is refused. The approver is written to the
+    `authorizing` ledger record (`reason:approved-by <login>`);
+  - be newer than the issue body's last edit (GraphQL `lastEditedAt`, else `createdAt`), any title change,
+    and **every comment's creation or last edit**. Only the dispatcher's own ledger records
+    (`github-actions[bot]` + ledger marker) are exempt; other bot content is not.
+  Editing anything after approval needs a fresh label. Missing edit, rename or comment history fails closed.
 - **Normal mode:** untrusted issues are never candidates, so they can neither spend credits nor hold up
   the queue.
-- **Right before the paid call** the dispatcher re-reads the issue, comments and approval history. A
-  change since admission records `attempt-result: not-attempted` with the reason; there is no retry.
+- **Right before the paid call** the dispatcher re-reads the issue, comments and approval history, and
+  re-checks the fresh body against the readiness rules and `Base:` line. A change since admission records
+  `attempt-result: not-attempted` with the reason; there is no retry.
+- **Dry-run preflight:** `dry-run` reads the candidate's edit history and reports
+  `editHistoryPreflight: ok|unavailable` in the log and job summary, so the GraphQL path is proven from
+  Actions before any one-shot depends on it. Nothing is written or assigned.
 - **Repairs:** the unit, the PR author (Copilot, or a trusted person) and every PR comment must be trusted.
 
 Known limits: direct `@copilot` mentions by people bypass the dispatcher entirely (process rule: GPT and
-Claude never post them); PR review comments are not yet checked on the repair path; branch protection on
-`main` is an owner setting (section 10).
+Claude never post them); a comment *deleted* after approval can't be detected through the REST API; PR
+review comments are not yet checked on the repair path, and the repair gate is not re-run right before its
+agent-triggering comment, so `ARCANA_REPAIR_MODE` stays `off`/`observe` until a follow-up PR covers both;
+branch protection on `main` is an owner setting (section 10).

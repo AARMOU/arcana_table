@@ -1,9 +1,13 @@
 'use strict';
 // Loads work units from GitHub for admission control. All I/O lives here so that
 // admission.cjs stays pure. One unit = one queue (or Copilot-assigned) issue plus its PRs.
-const { parseLedger, deriveUnit, provenance, ONE_SHOT_LABEL } = require('./admission.cjs');
+const { parseLedger, deriveUnit, provenance, ONE_SHOT_LABEL, LEDGER, isBot } = require('./admission.cjs');
 
-const commentersOf = comments => comments.map(c => ({ association: c.author_association, login: c.user?.login, type: c.user?.type }));
+// writtenAt = created or last edited, whichever is later. Only the dispatcher's own ledger records
+// (github-actions[bot] + ledger marker) are exempt from the after-approval rule.
+const commentersOf = comments => comments.map(c => ({ association: c.author_association, login: c.user?.login, type: c.user?.type,
+  ledger: isBot(c) && String(c.body || '').startsWith(LEDGER),
+  writtenAt: Math.max(Date.parse(c.created_at), Date.parse(c.updated_at || c.created_at)) }));
 
 // When the issue body was last written: GitHub's lastEditedAt, or createdAt if never edited.
 // GraphQL is the only API exposing body edit times. Any failure returns NaN, which fails closed.
@@ -52,7 +56,7 @@ function connectedPrs(events) {
   return [...linked];
 }
 
-async function loadUnits({ github, owner, repo, now = Date.now() }) {
+async function loadUnits({ github, owner, repo, now = Date.now(), approvers }) {
   const open = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
   const prs = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', per_page: 100 });
   const unitIssues = open.filter(i => !i.pull_request &&
@@ -91,7 +95,7 @@ async function loadUnits({ github, owner, repo, now = Date.now() }) {
     const oneShot = labels.includes(ONE_SHOT_LABEL);
     if (oneShot) raw.approval = approvalOf(events.get(issue.number), await contentWrittenAt(github, owner, repo, issue.number));
     units.push({ raw, derived: { ...deriveUnit(raw, now), ambiguousLink: ambiguous.has(issue.number),
-      provenance: provenance(raw, { needApproval: oneShot }) }, prs: linked });
+      provenance: provenance(raw, { needApproval: oneShot, approvers }) }, prs: linked });
   }
   return { units, prsByUnit, numbers };
 }

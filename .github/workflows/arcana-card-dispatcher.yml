@@ -33,6 +33,8 @@ jobs:
           ARCANA_EST_CREDITS_PER_SESSION: ${{ vars.ARCANA_EST_CREDITS_PER_SESSION }}
           ARCANA_EST_CREDITS_PER_REPAIR: ${{ vars.ARCANA_EST_CREDITS_PER_REPAIR }}
           ARCANA_INTEGRATION_BASE: ${{ vars.ARCANA_INTEGRATION_BASE }}
+          # Comma-separated GitHub logins allowed to approve one-shot spending; unset = repository owner only.
+          ARCANA_SPEND_APPROVERS: ${{ vars.ARCANA_SPEND_APPROVERS }}
           COPILOT_BILLING_READ_TOKEN: ${{ secrets.COPILOT_BILLING_READ_TOKEN }}
           ARCANA_AI_CREDIT_BUDGET: ${{ vars.ARCANA_AI_CREDIT_BUDGET }}
           ARCANA_AI_CREDIT_RESERVE: ${{ vars.ARCANA_AI_CREDIT_RESERVE }}

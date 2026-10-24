@@ -29,7 +29,7 @@ function fake({ issues = [queue(68, [A.ONE_SHOT_LABEL])], ledger = {}, ci = true
         listForRepo: () => issues, listComments: a => comments(a.issue_number), listEventsForTimeline: a => timeline(a.issue_number),
         createComment: async a => { writes.push(['comment', a.issue_number, a.body]); },
         removeLabel: async a => { if (removeFails) throw { status: 500 }; writes.push(['removeLabel', a.issue_number, a.name]); },
-        get: async a => ({ data: { state: 'open', assignees: freshAssignees, number: a.issue_number, author_association: freshAssociation } }),
+        get: async a => ({ data: { ...issues.find(i => i.number === a.issue_number), state: 'open', assignees: freshAssignees, number: a.issue_number, author_association: freshAssociation } }),
       },
       pulls: { list: () => [] },
       repos: { getBranch: async () => ({ data: { commit: { sha: BASE_SHA } } }) },
