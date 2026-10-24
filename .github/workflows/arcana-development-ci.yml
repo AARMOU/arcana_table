@@ -32,6 +32,8 @@ jobs:
         with:
           packages: platform-tools
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Verify exact official six-precon lists
+        run: python3 investigation/argentum-six-precons/validate-bundled-lists.py
       - name: Regenerate custom-card assets
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
