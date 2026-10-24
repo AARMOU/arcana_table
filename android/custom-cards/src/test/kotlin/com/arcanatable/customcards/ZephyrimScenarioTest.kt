@@ -13,6 +13,7 @@ import com.wingedsheep.engine.state.components.player.ManaPoolComponent
 import com.wingedsheep.sdk.core.*
 import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.model.CardDefinition
+import com.wingedsheep.sdk.model.EntityId
 import com.wingedsheep.sdk.scripting.ChoiceSlot
 import com.wingedsheep.sdk.scripting.KeywordAbility
 import com.wingedsheep.sdk.scripting.references.Player
@@ -68,8 +69,8 @@ class ZephyrimScenarioTest {
             assertEquals(times, copies.count { d.state.getEntity(it)?.has<TokenComponent>() == true })
             copies.forEach { copy ->
                 val entity = d.state.getEntity(copy)!!
-                assertEquals(d.player1, EntityId(entity.get<ControllerComponent>()!!.playerId))
-                assertEquals(d.player1, EntityId(entity.get<OwnerComponent>()!!.playerId))
+                assertEquals(d.player1.value, entity.get<ControllerComponent>()!!.playerId)
+                assertEquals(d.player1.value, entity.get<OwnerComponent>()!!.playerId)
                 assertFalse(entity.has<TappedComponent>())
                 assertTrue(entity.get<CountersComponent>()?.counters.isNullOrEmpty())
                 assertEquals(3, d.projected.getPower(copy))
@@ -185,7 +186,7 @@ class ZephyrimScenarioTest {
         d.putCardOnTopOfLibrary(d.player2, "Plains")
         d.passPriorityUntil(Step.DRAW, activePlayer = d.player2)
         assertNull(d.state.pendingDecision)
-        assertTrue(d.events.none { it is CardRevealedForMiracleEvent && it.cardEntityId == zephyrim.value })
+        assertTrue(d.events.none { it is CardRevealedForMiracleEvent && it.cardName == "Zephyrim" })
 
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = d.player2)
         val divination = d.putCardInHand(d.player2, "Divination")
@@ -194,7 +195,7 @@ class ZephyrimScenarioTest {
         assertNull(d.castSpell(d.player2, divination).error)
         d.resolveAll()
         assertTrue("A later draw must not offer Miracle",
-            d.events.none { it is CardRevealedForMiracleEvent && it.cardEntityId == zephyrim.value })
+            d.events.none { it is CardRevealedForMiracleEvent && it.cardName == "Zephyrim" })
         assertTrue(zephyrim in d.getHand(d.player2))
     }
 
@@ -213,7 +214,7 @@ class ZephyrimScenarioTest {
             assertNull(d.castSpell(d.player2, drawSpell).error)
             d.bothPass()
             assertTrue(d.events.any {
-                it is CardRevealedForMiracleEvent && it.cardEntityId == zephyrim.value
+                it is CardRevealedForMiracleEvent && it.cardName == "Zephyrim"
             })
             val offer = d.state.pendingDecision as? YesNoDecision
             assertNotNull("First draw on the opponent's turn should offer Miracle", offer)
