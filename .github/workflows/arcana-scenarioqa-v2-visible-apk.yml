@@ -6,6 +6,11 @@ on:
       - gpt/scenario-qa-visible-install-20261024
     paths:
       - .github/workflows/arcana-scenarioqa-v2-visible-apk.yml
+      - android/app/src/main/java/com/arcanatable/HomeScreen.kt
+      - android/app/src/debug/java/com/arcanatable/DevBuildGooseBanner.kt
+      - android/app/src/release/java/com/arcanatable/DevBuildGooseBanner.kt
+      - android/app/src/test/java/com/arcanatable/ui/HomeScreenSizesTest.kt
+      - android/app/build.gradle.kts
   workflow_dispatch:
 permissions:
   contents: read
