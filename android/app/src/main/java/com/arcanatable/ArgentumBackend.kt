@@ -163,6 +163,10 @@ data class ArgentumTableSnapshot(
     val interactionEpoch: String?,
     val serverCardIds: Map<Int, String>,
     val targets: Map<String, ArgentumTargetRef>,
+    /** Only the viewer's known position-zero library card, as authorized by Argentum's masked
+     * ClientZone.positions. This is informational even when the viewer lacks priority; it is NOT
+     * a play permission. Never guess from the first item of a partially known library zone. */
+    val topLibraryCard: GameCard? = null,
     val stack: List<ArgentumStackItem> = emptyList(),
     val recentLog: List<ArgentumLogLine> = emptyList(),
     /** Argentum's whole game log for this seat, oldest first. */
@@ -205,6 +209,7 @@ data class ArgentumTableSnapshot(
             }
             val zoneCards = mutableMapOf<Pair<String, String>, MutableList<GameCard>>()
             val zoneSizes = mutableMapOf<Pair<String, String>, Int>()
+            val knownViewerTop = mutableMapOf<String, String>()
             for (i in 0 until zones.length()) {
                 val zone = zones.optJSONObject(i) ?: continue
                 val zoneId = zone.optJSONObject("zoneId") ?: continue
@@ -213,6 +218,18 @@ data class ArgentumTableSnapshot(
                 val key = owner to zoneType
                 zoneSizes[key] = zone.optInt("size", 0)
                 val ids = zone.optJSONArray("cardIds") ?: JSONArray()
+                // Argentum sends only individually visible library cards, with their real
+                // indices in positions. CardIds[0] could be position 5, not the top.
+                // Never accept an absent position list or an opponent's library as a look.
+                if (zoneType == "LIBRARY" && owner == state.optString("viewingPlayerId")) {
+                    val positions = zone.optJSONArray("positions")
+                    if (positions != null) for (j in 0 until minOf(ids.length(), positions.length())) {
+                        if (positions.optInt(j, -1) == 0 && cards.has(ids.optString(j))) {
+                            knownViewerTop[owner] = ids.optString(j)
+                            break
+                        }
+                    }
+                }
                 val output = zoneCards.getOrPut(key) { mutableListOf() }
                 for (j in 0 until ids.length()) {
                     val rawId = ids.optString(j)
@@ -340,6 +357,9 @@ data class ArgentumTableSnapshot(
                 interactionEpoch = interactionEpoch?.takeIf(String::isNotBlank),
                 serverCardIds = displayIds.entries.associate { it.value to it.key },
                 targets = playerTargets + cardTargets,
+                topLibraryCard = knownViewerTop[viewerId]?.let { rawId ->
+                    zoneCards[viewerId to "LIBRARY"]?.firstOrNull { it.id == displayIds[rawId] }
+                },
                 stack = stack,
                 recentLog = recentLog,
                 fullLog = fullLog,
