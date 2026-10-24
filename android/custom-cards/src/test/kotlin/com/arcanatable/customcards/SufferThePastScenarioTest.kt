@@ -5,6 +5,7 @@ import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.CastSpell
 import com.wingedsheep.engine.core.PaymentStrategy
 import com.wingedsheep.engine.state.components.stack.ChosenTarget
+import com.wingedsheep.engine.state.components.player.PlayerHexproofComponent
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
@@ -250,4 +251,39 @@ class SufferThePastScenarioTest {
         assertEquals(20, d.getLifeTotal(opponent))
         assertEquals(2, d.zoneNames(opponent, Zone.GRAVEYARD).size)
     }
+    @Test
+    fun playerBecomingHexproofOnTheStackStillExilesCardsButOnlyGainsLife() {
+        val d = customScenario(SufferThePast, "Grizzly Bears", "Forest")
+        val caster = d.player1
+        val targetPlayer = d.player2
+        val bear = d.putCardInGraveyard(targetPlayer, "Grizzly Bears")
+        val forest = d.putCardInGraveyard(targetPlayer, "Forest")
+        val spell = d.putCardInHand(caster, "Suffer the Past")
+        d.giveMana(caster, Color.BLACK)
+        d.giveColorlessMana(caster, 2)
+
+        val result = d.submit(CastSpell(
+            playerId = caster,
+            cardId = spell,
+            targets = listOf(
+                ChosenTarget.Player(targetPlayer),
+                ChosenTarget.Card(bear, targetPlayer, Zone.GRAVEYARD),
+                ChosenTarget.Card(forest, targetPlayer, Zone.GRAVEYARD),
+            ),
+            xValue = 2,
+            paymentStrategy = PaymentStrategy.FromPool,
+        ))
+        assertNull("All targets are legal when the spell is cast", result.error)
+
+        // The opponent gains hexproof after casting. Only the player target becomes illegal;
+        // the two graveyard card targets remain legal (CR 608.2b and Suffer the Past ruling).
+        d.replaceState(d.state.updateEntity(targetPlayer) { it.with(PlayerHexproofComponent()) })
+        d.resolveAll()
+
+        assertEquals("Caster still gains 2 life for both cards actually exiled", 22, d.getLifeTotal(caster))
+        assertEquals("Illegal player target must not lose life", 20, d.getLifeTotal(targetPlayer))
+        assertTrue(d.zoneNames(targetPlayer, Zone.EXILE).containsAll(listOf("Grizzly Bears", "Forest")))
+        assertTrue(d.zoneNames(targetPlayer, Zone.GRAVEYARD).isEmpty())
+    }
+
 }
