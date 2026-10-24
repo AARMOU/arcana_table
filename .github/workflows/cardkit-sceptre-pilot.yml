@@ -1,0 +1,63 @@
+name: Cardkit Sceptre First Real Pilot
+# Non-spending preflight: generate a real Copilot-ready card work unit using the integrated toolkit.
+on:
+  push:
+    branches: [gpt/cardkit-sceptre-pilot-20261024]
+    paths: [.github/workflows/cardkit-sceptre-pilot.yml]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  plan-one-card:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Run cardkit on real missing Necron card
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p pilot
+          CARD="Sceptre of Eternal Glory"
+          tools/cardkit/cardkit gaps --claims-from-github --json-output pilot/gaps.json --markdown-output pilot/six-deck-coverage.md
+          tools/cardkit/cardkit classify "$CARD" -v | tee pilot/classification.txt
+          tools/cardkit/cardkit classify "$CARD" --json > pilot/classification.json
+          tools/cardkit/cardkit similar "$CARD" > pilot/analogues.txt
+          tools/cardkit/cardkit oracle show "$CARD" > pilot/oracle.json
+          tools/cardkit/cardkit unit "$CARD" > pilot/copilot-queue-body.md
+          tools/cardkit/cardkit check > pilot/check.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          c=json.loads(Path("pilot/classification.json").read_text())[0]
+          o=json.loads(Path("pilot/oracle.json").read_text())
+          r=json.loads(Path("pilot/gaps.json").read_text())
+          name="Sceptre of Eternal Glory"
+          assert c["name"]==name and c["readiness"]=="SUPPORTED", c
+          assert name in r["dispatch"]["copilot"], r["dispatch"]["copilot"]
+          assert r["dispatch"]["claimsVerified"] and r["dispatch"]["dispatchable"], r["dispatch"]
+          assert name in o["name"] and "three or more lands with the same name" in o["oracle_text"]
+          body=Path("pilot/copilot-queue-body.md").read_text()
+          assert "## Cards" in body and name in body and "## Acceptance" in body
+          assert "Base: gpt/arcana-integration-next" in body, body
+          assert "CARDKIT-TODO" not in body, body
+          print("PILOT_PREFLIGHT_PASS: Sceptre SUPPORTED, unclaimed, verified claims, real Oracle, queue body generated")
+          print("----- CARDKIT QUEUE BODY BEGIN -----")
+          print(body)
+          print("----- CARDKIT QUEUE BODY END -----")
+          PY
+          mkdir -p pilot/scaffold/cards pilot/scaffold/tests
+          tools/cardkit/cardkit newcard "$CARD" --offline --out-dir pilot/scaffold/cards --test-dir pilot/scaffold/tests
+          grep -R -q 'CARDKIT-TODO' pilot/scaffold/cards
+          grep -R -q 'fail(' pilot/scaffold/tests
+          git diff --exit-code
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cardkit-sceptre-one-card-pilot
+          retention-days: 14
+          path: pilot/
