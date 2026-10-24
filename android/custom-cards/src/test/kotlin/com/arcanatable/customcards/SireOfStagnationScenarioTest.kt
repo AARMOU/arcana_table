@@ -22,8 +22,8 @@ class SireOfStagnationScenarioTest {
         assertEquals(6, exported.cmc)
         assertEquals(4, exported.manaCost.genericAmount)
         assertEquals(mapOf(Color.BLUE to 1, Color.BLACK to 1), exported.manaCost.colorCount)
-        assertEquals(5, exported.creatureStats!!.power)
-        assertEquals(7, exported.creatureStats!!.toughness)
+        assertEquals(5, exported.creatureStats!!.basePower)
+        assertEquals(7, exported.creatureStats!!.baseToughness)
         assertEquals(setOf(Color.BLUE, Color.BLACK), exported.colorIdentity)
         assertTrue(exported.colors.isEmpty())
         assertTrue(exported.hasKeyword(Keyword.DEVOID))
@@ -54,10 +54,10 @@ class SireOfStagnationScenarioTest {
             val controller = d.player1
             val opponent = d.player2
             d.putCreatureOnBattlefield(controller, "Sire of Stagnation")
-            setLibrary(d, opponent, library)
             val land = d.putCardInHand(opponent, "Forest")
-            val handSizeBeforeDraw = d.zoneNames(controller, Zone.HAND).size
             beginOpponentMain(d)
+            setLibrary(d, opponent, library)
+            val handSizeBeforeDraw = d.zoneNames(controller, Zone.HAND).size
 
             assertNull(d.playLand(opponent, land).error)
             d.resolveAll()
@@ -89,12 +89,12 @@ class SireOfStagnationScenarioTest {
         listOf("Forest", "Island", "Sol Ring", "Grizzly Bears").forEach {
             d.putCardOnTopOfLibrary(controller, it)
         }
+        beginOpponentMain(d)
         setLibrary(
             d,
             opponent,
             listOf("Opt", "Divination", "Sol Ring", "Grizzly Bears", "Opt", "Divination", "Sol Ring", "Grizzly Bears"),
         )
-        beginOpponentMain(d)
         val sower = d.putCardInHand(opponent, "Oblivion Sower")
         d.giveColorlessMana(opponent, 6)
         val handSizeBeforeDraw = d.zoneNames(controller, Zone.HAND).size
@@ -105,8 +105,8 @@ class SireOfStagnationScenarioTest {
         val lands = d.permanentsNamed(opponent, "Forest") + d.permanentsNamed(opponent, "Island")
         assertEquals(2, lands.size)
         lands.forEach { id ->
-            assertEquals(controller.value, d.state.getEntity(id)!!.get<OwnerComponent>()!!.playerId)
-            assertEquals(opponent.value, d.state.getEntity(id)!!.get<ControllerComponent>()!!.playerId)
+            assertEquals(controller, d.state.getEntity(id)!!.get<OwnerComponent>()!!.playerId)
+            assertEquals(opponent, d.state.getEntity(id)!!.get<ControllerComponent>()!!.playerId)
         }
         assertEquals(handSizeBeforeDraw + 4, d.zoneNames(controller, Zone.HAND).size)
         assertEquals(4, d.zoneNames(opponent, Zone.EXILE).size)
@@ -124,7 +124,6 @@ class SireOfStagnationScenarioTest {
         val controller = d.player1
         val opponent = d.player2
         d.putCreatureOnBattlefield(controller, "Sire of Stagnation")
-        setLibrary(d, opponent, listOf("Island", "Swamp"))
         val ownLand = d.putCardInHand(controller, "Forest")
         val handSizeAfterPlayingLand = d.zoneNames(controller, Zone.HAND).size - 1
 
@@ -134,6 +133,7 @@ class SireOfStagnationScenarioTest {
         assertTrue(d.zoneNames(opponent, Zone.EXILE).isEmpty())
 
         beginOpponentMain(d)
+        setLibrary(d, opponent, listOf("Island", "Swamp"))
         val bears = d.putCardInHand(opponent, "Grizzly Bears")
         d.giveMana(opponent, Color.GREEN)
         d.giveColorlessMana(opponent, 1)
@@ -146,15 +146,15 @@ class SireOfStagnationScenarioTest {
     }
 
     @Test
-    fun cardInHandDoesNotTriggerAndAnEmptyControllerLibraryStillCausesTheDrawLoss() {
+    fun sireInGraveyardDoesNotTriggerAndAnEmptyControllerLibraryStillCausesTheDrawLoss() {
         val d = customScenario(SireOfStagnation, "Island", "Swamp")
         val controller = d.player1
         val opponent = d.player2
-        d.putCardInHand(controller, "Sire of Stagnation")
-        setLibrary(d, opponent, listOf("Island", "Swamp"))
+        d.putCardInGraveyard(controller, "Sire of Stagnation")
         val land = d.putCardInHand(opponent, "Forest")
-        val controllerHandSize = d.zoneNames(controller, Zone.HAND).size
         beginOpponentMain(d)
+        setLibrary(d, opponent, listOf("Island", "Swamp"))
+        val controllerHandSize = d.zoneNames(controller, Zone.HAND).size
         assertNull(d.playLand(opponent, land).error)
         d.resolveAll()
         assertEquals(controllerHandSize, d.zoneNames(controller, Zone.HAND).size)
@@ -192,7 +192,7 @@ class SireOfStagnationScenarioTest {
     ) {
         d.state.getZone(owner, Zone.EXILE).forEach { id ->
             val entity = d.state.getEntity(id)!!
-            assertEquals(owner.value, entity.get<OwnerComponent>()!!.playerId)
+            assertEquals(owner, entity.get<OwnerComponent>()!!.playerId)
             assertFalse(entity.has<FaceDownComponent>())
         }
     }
