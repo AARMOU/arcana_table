@@ -62,3 +62,19 @@ Track under [#150](https://github.com/AARMOU/arcana_table/issues/150) and [#81](
 - No claim that a parser decline equals missing engine functionality, or that a parser success equals tested gameplay.
 - Existing `cardkit check`, `patterns --check`, `sdk-index --check`, `docs-check`, code tests and positive/negative engine scenarios remain authoritative.
 - Keep all work off `main`, preserve B131 and the ongoing Ulalek/Lunar Whale/Eldrazi work branches; no paid worker dispatch, JAR swap, merge or release without explicit owner authorization.
+
+## Saved pinned Assay verdicts: evidence, not live execution
+
+The exact pinned upstream tree includes [`game-server/src/main/resources/coverage/assay-verdicts.json`](https://github.com/wingedsheep/argentum-engine/blob/61e71e586b100faa661f86cac827ac3c3bbb5a78/game-server/src/main/resources/coverage/assay-verdicts.json) (blob SHA `40223cfbb9ffe31070298a32f2ac311507c9328b`). Read its JSON records directly: `corpus=34932`, `whole=11129`.
+
+Cross-checked **all 25 exact missing names** from [#150](https://github.com/AARMOU/arcana_table/issues/150) against this saved ledger: **25/25 have `kind=LINE_DECLINED`; 0/25 are saved as whole-card readings.** Examples of the first recorded declined line:
+
+| Card | First decline shown in saved ledger (abridged) | Consequence |
+| --- | --- | --- |
+| Forsaken Monument | `Colorless creatures you control get +2/+2.` | Even this source-inspected candidate is not fully parsed by the *pinned parser*; don't infer SDK absence. |
+| Eldrazi Temple | `{T}: Add {C}{C}. Spend this mana only to cast colorless Eldrazi spells or activate abilities of colorless Eldrazi.` | Continue source/test audit for precisely restricted mana. |
+| Ugin, the Ineffable | `Colorless spells you cast cost {2} less to cast.` | Do not mistake the grammar's first decline for proof the hard linked-exile case is or is not supported. |
+| Eldrazi Displacer | `{2}{C}: Exile another target creature, then return it to the battlefield tapped under its owner's control.` | Cardkit/source and scenario evidence supersede a grammar decline. |
+| Corrupted Crossroads | `{T}, Pay 1 life: Add one mana of any color. Spend this mana only to cast a spell with devoid.` | Restriction is mechanically distinct from general colorless spending. |
+
+The saved ledger does **not** diagnose every line or describe why it declined. It is not a fresh Assay CLI run, proof of a missing engine primitive, or test of Oracle behavior. **Revised prioritization:** use this ledger as a cheap negative screening signal, do *targeted* `assay explain` only when its grammar diagnosis would clarify a concrete card, and focus primary implementation effort on pinned SDK source + Cardkit + executable engine scenarios. Do not build an Assay-dependent auto-approval classifier for this Eldrazi backlog based on the saved verdicts.
