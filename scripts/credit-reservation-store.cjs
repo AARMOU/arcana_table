@@ -34,7 +34,10 @@ async function load({ github, owner, repo, period, expectedOperationIds, ledgerC
   if (!liability.ok) return deny(liability.reason);
   const reserved = new Set(parsed.events.filter(e => e.op === 'reserve').map(e => e.id));
   if (expectedOperationIds.some(id => !reserved.has(id))) return deny('unreserved-historical-operation');
-  return { ok: true, events: parsed.events, outstanding: liability.outstanding, open: liability.open };
+  const commentIds = comments.filter(c => String(c?.body || '').startsWith(require('./credit-reservation-comments.cjs').MARKER))
+    .map(c => c.id);
+  if (commentIds.some(id => !Number.isSafeInteger(id) || id <= 0)) return deny('ledger-comment-id-unavailable');
+  return { ok: true, events: parsed.events, outstanding: liability.outstanding, open: liability.open, commentIds };
 }
 
 // Writer is opt-in for a future separately reviewed admission path, never called by
@@ -65,7 +68,8 @@ async function append({ github, owner, repo, period, expectedOperationIds, ledge
   // Read back complete authenticated bot ledger before returning success.
   const after = await load({ github, owner, repo, period, expectedOperationIds,
     ledgerComplete, issueNumber });
-  if (!after.ok || after.outstanding !== projected.outstanding ||
+  if (!after.ok || !after.commentIds.includes(writtenId) ||
+      after.outstanding !== projected.outstanding ||
       after.events.length !== before.events.length + 1)
     throw Error('reservation-write-unverified');
   return { ok: true, commentId: writtenId, outstanding: after.outstanding };
