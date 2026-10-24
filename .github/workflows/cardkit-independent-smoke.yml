@@ -84,7 +84,7 @@ jobs:
 
               # Read-only output only. No GitHub issue or Copilot worker is created.
               body = run("unit", pick).stdout
-              assert "[Arcana Queue]" in body and "## Cards" in body, body[:1000]
+              assert "## Cards" in body and "## Acceptance" in body and "Base:" in body, body[:1000]
               for names in [("Port Town",), ("Sol Ring",), ("Definitely Not a Real Arcana Card XYZ",),
                             (pick, "Port Town")]:
                   run("unit", *names, "--allow-review", should_pass=False)
