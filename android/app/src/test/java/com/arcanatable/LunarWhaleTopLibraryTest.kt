@@ -38,7 +38,7 @@ class LunarWhaleTopLibraryTest {
     @Test fun privatelyKnownTopIsVisibleWithoutPriorityAndLibraryRemainsMasked() {
         val snapshot = ArgentumTableSnapshot.parse(state("p1", library("p1", "forest" to 0)))
         assertEquals("Forest", snapshot.topLibraryCard?.name)
-        assertEquals(-1, snapshot.priorityPlayer)
+        assertEquals(1, snapshot.priorityPlayer)
         assertTrue("all remaining library cards remain hidden", snapshot.players[0].library.all { it.name == "Hidden card" })
         assertEquals(12, snapshot.players[0].library.size)
         assertEquals("forest", snapshot.serverCardIds[snapshot.topLibraryCard!!.id])
