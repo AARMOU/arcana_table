@@ -1633,28 +1633,7 @@ internal class TableController(
                         else library.load(required)
                     com.wingedsheep.engine.registry.CardRegistry().apply { register(definitions) }
                 }
-                argentumSocket.localHostFactory = { emit ->
-                    com.arcanatable.engine.LocalArgentumHost(
-                        registry, savedSeats[0], savedSeats[1], emit = emit,
-                        extraOpponents = savedSeats.drop(2), resumeCheckpoint = checkpoint.toString()
-                    )
-                }
-                offlineRestoreRequested = true
-                argentumOffline = true
-                argentumDeckForLobby = null
-                argentumCommanderForLobby = null
-                argentumLobbySubmitted = true
-                argentumLocalPlayersBackup = players.toList()
-                argentumEnabled = true
-                homeOpen = false
-                lobbyOpen = false
-                argentumSocket.connect(savedSeats[0].name)
-                var waitCount = 0
-                while (argentumStatus != ArgentumConnectionStatus.CONNECTED && waitCount++ < 20) delay(100)
-                if (argentumStatus != ArgentumConnectionStatus.CONNECTED ||
-                    !argentumSocket.createCommanderPracticeLobby(vsAi = true)) {
-                    error("Couldn't reconnect to the offline engine.")
-                }
+                launchOfflineCheckpoint(savedSeats, registry, checkpoint.toString())
             } catch (failure: Throwable) {
                 argentumSocket.close()
                 argentumSocket.localHostFactory = null
@@ -1668,6 +1647,62 @@ internal class TableController(
         }
     }
 
+
+    /**
+     * Starts a local engine host from a full offline checkpoint and joins it as seat 1. Shared by
+     * "resume offline game" and the debug-only test scenarios. Marked as a restore, so starting it
+     * never clears the player's own saved offline game. Throws if the host can't be reached.
+     */
+    private suspend fun launchOfflineCheckpoint(
+        seats: List<com.arcanatable.engine.LocalSeat>,
+        registry: com.wingedsheep.engine.registry.CardRegistry,
+        checkpoint: String,
+    ) {
+        argentumSocket.localHostFactory = { emit ->
+            com.arcanatable.engine.LocalArgentumHost(
+                registry, seats[0], seats[1], emit = emit,
+                extraOpponents = seats.drop(2), resumeCheckpoint = checkpoint
+            )
+        }
+        offlineRestoreRequested = true
+        argentumOffline = true
+        argentumDeckForLobby = null
+        argentumCommanderForLobby = null
+        argentumLobbySubmitted = true
+        argentumLocalPlayersBackup = players.toList()
+        argentumEnabled = true
+        homeOpen = false
+        lobbyOpen = false
+        argentumSocket.connect(seats[0].name)
+        var waitCount = 0
+        while (argentumStatus != ArgentumConnectionStatus.CONNECTED && waitCount++ < 20) delay(100)
+        if (argentumStatus != ArgentumConnectionStatus.CONNECTED ||
+            !argentumSocket.createCommanderPracticeLobby(vsAi = true)) {
+            error("Couldn't reconnect to the offline engine.")
+        }
+    }
+
+    /** Debug builds only (TestScenarios is empty in release): start a ready-made test board vs the AI. */
+    fun startTestScenario(scenario: TestScenario) {
+        if (argentumEnabled || offlineStarting) return
+        offlineStarting = true
+        scope.launch {
+            try {
+                val game = withContext(Dispatchers.IO) { TestScenarios.build(scenario, offlineLibrary()) }
+                recordDiagnostic("Test scenario: ${scenario.title}", DiagnosticCategory.ENGINE)
+                launchOfflineCheckpoint(game.seats, game.registry, game.checkpoint.toString())
+            } catch (failure: Throwable) {
+                argentumSocket.close()
+                argentumSocket.localHostFactory = null
+                argentumEnabled = false
+                argentumOffline = false
+                offlineRestoreRequested = false
+                homeOpen = true
+                message = "Couldn't start the test scenario: ${failure.message ?: failure.javaClass.simpleName}"
+                recordDiagnostic("Test scenario failed: ${failure.javaClass.simpleName}: ${failure.message}", DiagnosticCategory.ERROR)
+            } finally { offlineStarting = false }
+        }
+    }
 
     /**
      * Offline game: Argentum's engine and AI run inside the app (engine/LocalArgentumHost). Your
