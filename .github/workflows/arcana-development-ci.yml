@@ -35,6 +35,9 @@ jobs:
       - name: Run custom-card scenario tests and Build 131 Android unit tests
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
+      - name: Verify debug-only scenarios are absent from release
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest'
       - name: Check exported index consistency
         run: |
           python3 - <<'PY'
