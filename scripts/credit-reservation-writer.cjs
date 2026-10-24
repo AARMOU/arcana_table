@@ -19,6 +19,14 @@ async function reserveBeforeAttempt({ github, owner, repo, issue, event, loadCom
   try { before=readLiability(await loadComments(), {period:event.period}); }
   catch { return deny('ledger-read-failed'); }
   if (!before.ok) return deny('ledger-unverified:'+before.reason);
+  // Refuse duplicate IDs before any write, including previously settled reservations.
+  const { decode } = require('./credit-reservation-comments.cjs');
+  let inventory;
+  try { inventory = decode(await loadComments()); }
+  catch { return deny('ledger-read-failed'); }
+  if (!inventory.ok) return deny('ledger-unverified:'+inventory.reason);
+  if (inventory.events.some(e => e.op === 'reserve' && e.id === event.id))
+    return deny('reservation-already-exists');
   try {
     await github.rest.issues.createComment({owner,repo,issue_number:issue,body});
   } catch { return deny('reservation-write-uncertain'); }
