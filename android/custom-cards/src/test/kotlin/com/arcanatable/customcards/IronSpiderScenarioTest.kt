@@ -1,6 +1,7 @@
 package com.arcanatable.customcards
 
 import com.arcanatable.customcards.support.*
+import com.arcanatable.engine.costs.CounterRemovalCost
 import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.engine.state.components.battlefield.CountersComponent
 import com.wingedsheep.sdk.core.Color
@@ -78,6 +79,7 @@ class IronSpiderScenarioTest {
         val (d, spider, thopter) = setup()
         d.setCounters(thopter, 2)
         val key = d.counterKey(d.player1, spider)
+        assertEquals("the engine names the counter type \"+1/+1\" (what a client must send)", "+1/+1", key)
         val hand = d.getHandSize(d.player1)
         val r = activateWith(d, spider, listOf(DistributedCounterRemoval(thopter, key, 2)))
         assertNull("activation accepted: ${r.error}", r.error)
@@ -125,5 +127,23 @@ class IronSpiderScenarioTest {
                 d.cardRegistry.getCard(spiderName)!!.script.activatedAbilities[1].id
         }
         assertTrue("one counter isn't enough", la == null || !la.affordable)
+    }
+
+    @Test fun appHostFillsInTheCountOnTheRealLegalAction() {
+        // What Arcana's offline host sends: the engine's enriched legal action, then CounterRemovalCost.fill.
+        val (d, spider, thopter) = setup()
+        d.setCounters(thopter, 2)
+        val enriched = com.wingedsheep.engine.view.LegalActionEnricher(d.services.manaSolver, d.cardRegistry)
+            .enrich(d.legalActions(d.player1), d.state, d.player1)
+        val drawId = d.cardRegistry.getCard(spiderName)!!.script.activatedAbilities[1].id
+        fun draw(list: List<com.wingedsheep.engine.view.LegalActionInfo>) =
+            list.single { (it.action as? ActivateAbility)?.let { a -> a.sourceId == spider && a.abilityId == drawId } == true }
+        assertEquals("engine alone leaves the total at 0", 0, draw(enriched).additionalCostInfo!!.distributedCounterRemovalTotal)
+        val filled = draw(CounterRemovalCost.fill(enriched, d.state, d.cardRegistry))
+        assertEquals(2, filled.additionalCostInfo!!.distributedCounterRemovalTotal)
+        assertTrue(filled.additionalCostInfo!!.counterRemovalCreatures.any { it.entityId == thopter && it.availableCountersByType["+1/+1"] == 2 })
+        // Every other action is passed through unchanged.
+        val others = CounterRemovalCost.fill(enriched, d.state, d.cardRegistry).zip(enriched).filter { (_, before) -> before !== draw(enriched) }
+        assertTrue(others.isNotEmpty() && others.all { (after, before) -> after === before })
     }
 }
