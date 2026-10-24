@@ -193,6 +193,33 @@ class DeckSupportTest {
         assertEquals("Draw a card.", preview.oracleText)
     }
 
+    @Test fun cardsDoNotInheritKeywordLabelsFromCreatedTokensOrAnimationEffects() {
+        val file = File(assets, "argentum/custom-cards.jsonl")
+        assumeTrue("custom-card JSONL present", file.isFile)
+        val names = setOf(
+            "Sai, Master Thopterist", "Celestial Colonnade", "Springleaf Parade",
+            "Black Market Connections", "Tyranid Invasion",
+        )
+        val rows = file.useLines { lines ->
+            lines.mapNotNull { line ->
+                JSONObject(line).optString("name").takeIf { it in names }?.let { it to line }
+            }.toMap()
+        }
+        assertEquals(names, rows.keys)
+        rows.forEach { (name, line) ->
+            val preview = SupportedCardCatalog.parseLibraryLine(line, custom = true, kind = "card")!!.toScryfallCard()
+            assertEquals("$name must not inherit token or animation keyword labels", emptyList<String>(), preview.keywords)
+        }
+    }
+
+    @Test fun nestedEffectStatisticsAreNotOriginalCardStatistics() {
+        val line = """{"name":"Token Creator","manaCost":"{2}{G}","typeLine":"Sorcery","oracleText":"Create a 3/3 token.","script":{"spellEffect":{"type":"CreateToken","creatureStats":{"power":3,"toughness":3},"keywords":["TRAMPLE"]}}}"""
+        val preview = SupportedCardCatalog.parseLibraryLine(line, custom = false, kind = "card")!!.toScryfallCard()
+        assertNull(preview.power)
+        assertNull(preview.toughness)
+        assertEquals(emptyList<String>(), preview.keywords)
+    }
+
     // ---- Saved deck list swaps ----
 
     @Test fun swapRewritesOnlyTheMatchingLineAndKeepsStructure() {
