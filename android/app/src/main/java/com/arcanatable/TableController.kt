@@ -322,6 +322,8 @@ internal class TableController(
     var tokenTarget by run { mutableIntStateOf(0) }
     var counterTarget by run { mutableStateOf<Pair<Int, Int>?>(null) }
     var preview by run { mutableStateOf<CardPreview?>(null) }
+    /** Read-only private top-library look from Argentum's per-seat masked view; no priority needed. */
+    var argentumTopLibraryOpen by run { mutableStateOf(false) }
     var rulesOpen by run { mutableStateOf(false) }
     var battlefieldBounds by run { mutableStateOf<Rect?>(null) }
     var handSheetBounds by run { mutableStateOf<Rect?>(null) }
