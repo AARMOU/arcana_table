@@ -998,12 +998,6 @@ class GameTestDriver {
         }
     }
 
-    /**
-     * Move a card or permanent to its owner's graveyard (test helper). Strips its membership from
-     * whatever zone it currently occupies (battlefield, hand, …) without running dies/leaves
-     * triggers — a blunt removal for setting up "the card is in the graveyard now" states, and
-     * usable as a "discard from hand" helper. Returns silently if the entity has no owner.
-     */
     /** Simulate another effect exiling a card while a spell is on the stack. */
     fun moveToExile(entityId: EntityId) {
         val ownerId = _state.getEntity(entityId)
@@ -1014,6 +1008,12 @@ class GameTestDriver {
         _state = _state.addToZone(ZoneKey(ownerId, Zone.EXILE), entityId)
     }
 
+    /**
+     * Move a card or permanent to its owner's graveyard (test helper). Strips its membership from
+     * whatever zone it currently occupies (battlefield, hand, …) without running dies/leaves
+     * triggers — a blunt removal for setting up "the card is in the graveyard now" states, and
+     * usable as a "discard from hand" helper. Returns silently if the entity has no owner.
+     */
     fun moveToGraveyard(entityId: EntityId) {
         val ownerId = _state.getEntity(entityId)
             ?.get<OwnerComponent>()?.playerId
