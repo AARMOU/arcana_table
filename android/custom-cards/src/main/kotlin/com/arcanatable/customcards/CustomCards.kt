@@ -209,6 +209,7 @@ object CustomCards {
         Entry(PrimarisChaplain, "40K", "Six WotC precons"),
         Entry(SisterOfSilence, "40K", "Six WotC precons"),
         Entry(SpaceMarineDevastator, "40K", "Six WotC precons"),
+        Entry(Zephyrim, "40K", "Six WotC precons"),
         Entry(GreyKnightParagon, "40K", "Six WotC precons"),
         Entry(PlagueDrone, "40K", "Six WotC precons"),
         Entry(HeraldsOfTzeentch, "40K", "Six WotC precons"),
