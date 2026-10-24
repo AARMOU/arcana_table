@@ -68,4 +68,54 @@ class SufferThePastScenarioTest {
         assertEquals(20, d.getLifeTotal(caster))
         assertTrue(d.zoneNames(caster, Zone.EXILE).contains("Grizzly Bears"))
     }
+    @Test
+    fun zeroXExilesNothingAndChangesNoLife() {
+        val d = customScenario(SufferThePast, "Grizzly Bears")
+        val caster = d.player1
+        val opponent = d.player2
+        d.putCardInGraveyard(opponent, "Grizzly Bears")
+        val spell = d.putCardInHand(caster, "Suffer the Past")
+        d.giveMana(caster, Color.BLACK)
+
+        val result = d.submit(CastSpell(
+            playerId = caster,
+            cardId = spell,
+            targets = listOf(ChosenTarget.Player(opponent)),
+            xValue = 0,
+            paymentStrategy = PaymentStrategy.FromPool,
+        ))
+        assertNull("X=0 requires no graveyard card targets", result.error)
+        d.resolveAll()
+        assertEquals(20, d.getLifeTotal(caster))
+        assertEquals(20, d.getLifeTotal(opponent))
+        assertTrue(d.zoneNames(opponent, Zone.EXILE).isEmpty())
+        assertTrue(d.zoneNames(opponent, Zone.GRAVEYARD).contains("Grizzly Bears"))
+    }
+
+    @Test
+    fun cannotCastWithMoreTargetsThanCardsInChosenGraveyard() {
+        val d = customScenario(SufferThePast, "Grizzly Bears")
+        val caster = d.player1
+        val opponent = d.player2
+        val bear = d.putCardInGraveyard(opponent, "Grizzly Bears")
+        val spell = d.putCardInHand(caster, "Suffer the Past")
+        d.giveMana(caster, Color.BLACK)
+        d.giveColorlessMana(caster, 2)
+
+        val result = d.submit(CastSpell(
+            playerId = caster,
+            cardId = spell,
+            targets = listOf(
+                ChosenTarget.Player(opponent),
+                ChosenTarget.Card(bear, opponent, Zone.GRAVEYARD),
+            ),
+            xValue = 2,
+            paymentStrategy = PaymentStrategy.FromPool,
+        ))
+        assertNotNull("X=2 requires two distinct legal graveyard targets", result.error)
+        assertEquals(20, d.getLifeTotal(caster))
+        assertEquals(20, d.getLifeTotal(opponent))
+        assertTrue(d.zoneNames(opponent, Zone.GRAVEYARD).contains("Grizzly Bears"))
+    }
+
 }
