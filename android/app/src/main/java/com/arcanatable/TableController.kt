@@ -127,6 +127,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.sync.withLock
 import org.json.JSONArray
 import org.json.JSONObject
 import android.content.SharedPreferences
@@ -1423,6 +1424,17 @@ internal class TableController(
                     repeated.joinToString { "${it.name} ×${it.quantity}" }.ifBlank { "none" }
                 }
                 recordDiagnostic("Deck import [$importTraceId]: target seat ${selectedPlayer + 1}, parsed entries=${entries.size}, requested main-deck copies=${entries.filterNot { it.commander }.sumOf { it.count }}, commander entries=${entries.count { it.commander }}, built main-deck copies=${deck.size}, duplicate quantities=$duplicateDetail, unresolved entries=${issueDescriptions.size}, over-limit copies=${overflowIds.size}")
+                // Scryfall matching proves a card exists, not that Argentum can run it. Check the
+                // resolved names against the shipped library and tell the player now, not at game start.
+                val supportReport = loadSupportCatalog()?.let { catalog ->
+                    catalog.check(entries.map { entry ->
+                        val resolved = found[entry]?.takeIf { it.name.equals(entry.name, ignoreCase = true) || entry in autoFixedEntries }
+                        if (resolved != null) entry.copy(name = resolved.name) else entry
+                    })
+                }
+                if (supportReport != null) {
+                    recordDiagnostic("Deck import [$importTraceId]: ${supportReport.summary()}", if (supportReport.unsupportedCopies > 0) DiagnosticCategory.UNSUPPORTED else null)
+                }
                 val opening = deck.take(7)
                 if (onlineMode && selectedPlayer == localSeat && localSeat in lobbyReadyPlayers) {
                     lobbyReadyPlayers = lobbyReadyPlayers - localSeat
@@ -1507,6 +1519,17 @@ internal class TableController(
                         append("Import check passed: all ${entries.size} card names matched. ")
                         if (autoFixedNames.isNotEmpty()) append("Automatically corrected ${autoFixedNames.size} ${if (autoFixedNames.size == 1) "card name" else "card names"}. ")
                         append("Imported ${deck.size} cards. Your opening hand is ready.")
+                    }
+                }
+                if (supportReport != null && supportReport.unsupportedCopies > 0) {
+                    val names = supportReport.unsupportedNames
+                    message = buildString {
+                        append("${names.size} card ${if (names.size == 1) "name isn't" else "names aren't"} in Argentum's card library: ")
+                        append(names.take(6).joinToString())
+                        if (names.size > 6) append(", and ${names.size - 6} more")
+                        append(". ")
+                        if (supportReport.commanderUnsupported) append("That includes your commander. ")
+                        append("Argentum games leave them out. The deck editor (Edit imported deck, or Edit deck in the Argentum deck review) shows suggested Argentum swaps. Your deck was imported as written.")
                     }
                 }
                 if (onlineMode && !gameStartedOnline) { showOverview = true; showHand = false; lobbyOpen = true }
@@ -1600,6 +1623,39 @@ internal class TableController(
         }
 
     fun offlineLibrary() = com.arcanatable.engine.OfflineCardLibrary({ path -> runCatching { context.assets.open(path) }.getOrNull() })
+
+    /** Shipped card library for import-time support checks, search and swap suggestions (DeckSupport.kt). */
+    var supportCatalog by run { mutableStateOf<SupportedCardCatalog?>(null) }
+    var supportCatalogFailed by run { mutableStateOf(false) }
+    private val supportCatalogLock = kotlinx.coroutines.sync.Mutex()
+
+    /** Loads the library once, off the main thread; null when this build has no library assets. */
+    suspend fun loadSupportCatalog(): SupportedCardCatalog? = supportCatalog ?: supportCatalogLock.withLock {
+        supportCatalog?.let { return@withLock it }
+        if (supportCatalogFailed) return@withLock null
+        val loaded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching { SupportedCardCatalog.load { path -> runCatching { context.assets.open(path) }.getOrNull() } }
+        }
+        // State and diagnostics are updated back on the caller's (main) thread.
+        loaded.onFailure { supportCatalogFailed = true; recordDiagnostic("Card library check unavailable: ${it.message}") }
+        loaded.getOrNull()?.also { supportCatalog = it }
+    }
+
+    /** Keeps the active saved deck in step with a swap made in the deck editor. */
+    fun syncSavedDeckSwap(playerIndex: Int, oldName: String, newName: String) {
+        if (playerIndex != localSeat || oldName.equals(newName, ignoreCase = true)) return
+        val active = activeDeckId ?: return
+        val saved = savedDecks.firstOrNull { it.name == active } ?: return
+        val text = replaceCardInDeckText(saved.text, oldName, newName)
+        if (text == null) {
+            recordDiagnostic("Deck editor swap $oldName → $newName not written to saved deck ${saved.name} (line not found or CSV list)")
+            return
+        }
+        val commander = if (saved.commander?.equals(oldName, ignoreCase = true) == true) newName else saved.commander
+        val updated = saved.copy(text = text, commander = commander)
+        savedDecks = savedDecks.map { if (it.name == saved.name && it.text == saved.text) updated else it }
+        saveSavedDecks(context, savedDecks)
+    }
 
     /** Request a full, unmasked engine checkpoint at the next action boundary. */
     fun saveOfflineGame() {

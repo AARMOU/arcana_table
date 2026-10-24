@@ -443,6 +443,7 @@ internal fun TableController.TableOverlaysB() {
     )
 
     if (importOpen) {
+        LaunchedEffect(Unit) { loadSupportCatalog() }
         Dialog(onDismissRequest = { if (!importing) cancelDeckImport() }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
             val maxImportDialogHeight = LocalConfiguration.current.screenHeightDp.dp * 0.86f
             Surface(Modifier.fillMaxWidth(0.96f).heightIn(max = maxImportDialogHeight), shape = RoundedCornerShape(18.dp), color = Panel) {
@@ -487,6 +488,15 @@ internal fun TableController.TableOverlaysB() {
                         if (importText.isNotBlank()) {
                             val importedCardCount = remember(importText) { parseDeckList(importText).sumOf { it.count } }
                             Text("${importedCardCount} cards in list · scroll inside the box to review", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
+                            // Offline pre-check against the shipped Argentum library (names as written; typo fixes happen on Import).
+                            val supportReport = remember(importText, supportCatalog) { supportCatalog?.check(parseDeckList(importText)) }
+                            if (supportReport != null) {
+                                Text(supportReport.summary(), color = if (supportReport.unsupportedCopies > 0) CounterGold else Muted, fontSize = 10.sp)
+                                if (supportReport.unsupportedNames.isNotEmpty()) Text(
+                                    "Not in Argentum: ${supportReport.unsupportedNames.take(8).joinToString()}${if (supportReport.unsupportedNames.size > 8) ", +${supportReport.unsupportedNames.size - 8} more" else ""}",
+                                    color = CounterGold, fontSize = 10.sp, maxLines = 3, overflow = TextOverflow.Ellipsis
+                                )
+                            } else Text(if (supportCatalogFailed) "Argentum library check unavailable in this build." else "Checking Argentum's card library…", color = Muted, fontSize = 10.sp)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(checked = importSaveToLibrary, onCheckedChange = { importSaveToLibrary = it }, enabled = !importing)

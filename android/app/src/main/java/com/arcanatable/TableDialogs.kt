@@ -1304,9 +1304,15 @@ internal fun DeckEditorDialog(
     onRemove: (GameCard) -> Unit,
     onAdd: (ScryfallCard) -> Unit,
     onReplace: (GameCard, ScryfallCard) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    loadSupportCatalog: (suspend () -> SupportedCardCatalog?)? = null
 ) {
     var query by remember { mutableStateOf("") }
+    // Shipped Argentum library (DeckSupport.kt): flags, offline search and swap suggestions.
+    var supportCatalog by remember { mutableStateOf<SupportedCardCatalog?>(null) }
+    var argentumOnly by remember { mutableStateOf(true) }
+    var suggestingFor by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(Unit) { supportCatalog = loadSupportCatalog?.invoke() }
     var results by remember { mutableStateOf<List<ScryfallCard>>(emptyList()) }
     var searching by remember { mutableStateOf(false) }
     var menuCard by remember { mutableStateOf<GameCard?>(null) }
@@ -1346,6 +1352,20 @@ internal fun DeckEditorDialog(
         }
     }
     val trackedCards = player.library + player.hand + player.battlefield + player.graveyard + player.exile + player.revealed
+    val catalog = supportCatalog
+    fun suggestSwaps(target: GameCard) {
+        val lib = catalog ?: return
+        val commanderIdentity = player.commanderCard?.let { lib.find(it.name)?.colors ?: colorsOf(it.manaCost.orEmpty()) }
+        val inDeck = (trackedCards.map { it.name } + listOfNotNull(player.commanderCard?.name)).toSet()
+        val suggestions = lib.suggestReplacements(target.type, target.manaValue, colorsOf(target.manaCost.orEmpty()), if (target.id == player.commanderCard?.id) null else commanderIdentity, exclude = inDeck, requireLegendary = target.id == player.commanderCard?.id)
+        replacementTarget = target
+        suggestingFor = target.name
+        query = ""
+        results = suggestions.map { it.toScryfallCard() }
+        autoFixStatus = if (suggestions.isEmpty()) {
+            if (cardTypesOf(target.type).isEmpty()) "Fix ${target.name}'s name first, then ask for swaps." else "No Argentum card of the same type fits this deck's colors. Search to choose one yourself."
+        } else "Suggested by type, mana value and colors from Argentum's library. Indexed, not gameplay-verified; you choose."
+    }
     val cards = trackedCards.filter { it.name.contains(query, ignoreCase = true) }
         .groupBy { it.name }.entries.sortedBy { it.key.lowercase() }
     val commander = player.commanderCard?.takeIf { it.name.contains(query, ignoreCase = true) }
@@ -1357,26 +1377,43 @@ internal fun DeckEditorDialog(
                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close deck editor", tint = Muted) }
                 }
                 Text("Tracked cards: ${trackedCards.size}${if (player.commanderCard != null) " + commander" else ""}  ·  ${cards.size + if (commander != null) 1 else 0} names", color = Muted, fontSize = 10.sp)
-                OutlinedTextField(query, { query = it; results = emptyList() }, Modifier.fillMaxWidth().padding(top = 6.dp), singleLine = true, label = { Text("Find any Magic card") }, trailingIcon = {
+                catalog?.let { lib ->
+                    val report = remember(trackedCards, player.commanderCard, lib) {
+                        lib.check((trackedCards + listOfNotNull(player.commanderCard)).groupBy { it.name }.map { (name, copies) -> DeckEntry(name, copies.size) })
+                    }
+                    Text(report.summary(), color = if (report.unsupportedCopies > 0) CounterGold else Muted, fontSize = 9.sp)
+                }
+                val searchArgentum = argentumOnly && catalog != null
+                OutlinedTextField(query, { query = it; results = emptyList(); suggestingFor = null }, Modifier.fillMaxWidth().padding(top = 6.dp), singleLine = true, label = { Text(if (searchArgentum) "Find an Argentum-supported card" else "Find any Magic card") }, trailingIcon = {
                     TextButton(enabled = query.trim().length >= 2 && !searching, onClick = {
-                        searching = true
-                        scope.launch { results = Scryfall.searchCards(query.trim()); searching = false }
-                    }) { Text(if (searching) "SEARCHING" else "SEARCH ALL", color = Mint, fontSize = 9.sp) }
+                        suggestingFor = null
+                        if (searchArgentum) results = catalog!!.search(query.trim()).map { it.toScryfallCard() }
+                        else {
+                            searching = true
+                            scope.launch { results = Scryfall.searchCards(query.trim()); searching = false }
+                        }
+                    }) { Text(if (searching) "SEARCHING" else if (searchArgentum) "SEARCH ARGENTUM" else "SEARCH ALL", color = Mint, fontSize = 9.sp) }
                 })
+                if (catalog != null) Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = argentumOnly, onCheckedChange = { argentumOnly = it; results = emptyList(); suggestingFor = null })
+                    Text("Argentum-supported cards only (works offline)", color = SoftWhite, fontSize = 10.sp)
+                }
                 LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(top = 7.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (results.isNotEmpty()) {
-                        item { Text(if (replacementTarget != null) "CHOOSE A MATCH · REPLACE FLAGGED CARD" else "SEARCH RESULTS · tap + to add to library", color = CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+                        item { Text(suggestingFor?.let { "SUGGESTED ARGENTUM SWAPS FOR ${it.uppercase()} · tap REPLACE" } ?: if (replacementTarget != null) "CHOOSE A MATCH · REPLACE FLAGGED CARD" else "SEARCH RESULTS · tap + to add to library", color = CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
                         items(results.size) { index ->
                             val result = results[index]
                             Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).padding(horizontal = 10.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f)) {
                                     Text(result.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                                    Text("${result.setCode?.uppercase().orEmpty()} ${result.collectorNumber.orEmpty()}  ·  ${result.type}", color = Muted, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    val resultSupport = catalog?.support(result.name)
+                                    Text(listOfNotNull("${result.setCode?.uppercase().orEmpty()} ${result.collectorNumber.orEmpty()}".trim().ifBlank { null }, result.manaCost, result.type, resultSupport?.label).joinToString("  ·  "), color = if (resultSupport == CardSupport.UNSUPPORTED) CounterGold else Muted, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 }
                                 TextButton(onClick = {
                                     val target = replacementTarget
                                     if (target == null) onAdd(result) else onReplace(target, result)
                                     replacementTarget = null
+                                    suggestingFor = null
                                     results = emptyList()
                                     query = ""
                                 }, modifier = Modifier.heightIn(min = 40.dp)) { Text(if (replacementTarget == null) "+ ADD" else "REPLACE", color = Mint, fontWeight = FontWeight.Bold) }
@@ -1396,6 +1433,10 @@ internal fun DeckEditorDialog(
                                 Column(Modifier.weight(1f)) {
                                     Text(card.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     card.importIssue?.let { Text("NEEDS REVIEW · $it", color = CounterGold, fontSize = 8.sp, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+                                    catalog?.support(card.name)?.takeIf { it != CardSupport.ARGENTUM }?.let { Text(it.label.uppercase(), color = if (it == CardSupport.UNSUPPORTED) CounterGold else Muted, fontSize = 8.sp) }
+                                }
+                                if (catalog?.support(card.name) == CardSupport.UNSUPPORTED && card.importIssue == null) {
+                                    TextButton(onClick = { suggestSwaps(card) }) { Text("SWAPS", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
                                 }
                                 if (card.importIssue != null) {
                                     TextButton(onClick = { autoFix(card, listOf(card)) }, enabled = autoFixingCardId == null) {
@@ -1429,6 +1470,13 @@ internal fun DeckEditorDialog(
                                     val zones = listOf("hand" to player.hand, "library" to player.library, "battlefield" to player.battlefield, "graveyard" to player.graveyard, "exile" to player.exile, "revealed" to player.revealed)
                                     zones.forEach { (zone, zoneCards) -> copies.count { copy -> zoneCards.any { it.id == copy.id } }.takeIf { it > 0 }?.let { add("$it $zone") } }
                                 }.joinToString(" · "), color = Muted, fontSize = 8.sp)
+                                val sampleSupport = catalog?.support(name)
+                                if (sampleSupport != null && sampleSupport != CardSupport.ARGENTUM) {
+                                    Text(sampleSupport.label.uppercase(), color = if (sampleSupport == CardSupport.UNSUPPORTED) CounterGold else Muted, fontSize = 8.sp)
+                                    if (sampleSupport == CardSupport.UNSUPPORTED && sample.importIssue == null) TextButton(onClick = { suggestSwaps(sample) }, modifier = Modifier.heightIn(min = 36.dp)) {
+                                        Text("SUGGEST ARGENTUM SWAPS", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                                    }
+                                }
                                 sample.importIssue?.let {
                                     Text("NEEDS REVIEW · $it", color = CounterGold, fontSize = 8.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                     TextButton(
@@ -1441,7 +1489,8 @@ internal fun DeckEditorDialog(
                             Box {
                                 TextButton(onClick = { menuCard = sample }, modifier = Modifier.heightIn(min = 40.dp)) { Text("⋮", color = Mint, fontSize = 18.sp) }
                                 DropdownMenu(expanded = menuCard?.id == sample.id, onDismissRequest = { menuCard = null }) {
-                                    if (sample.importIssue != null) DropdownMenuItem(text = { Text("Search for correct card") }, onClick = { replacementTarget = sample; query = sample.name; results = emptyList(); menuCard = null })
+                                    if (sample.importIssue != null) DropdownMenuItem(text = { Text("Search for correct card") }, onClick = { replacementTarget = sample; query = sample.name; results = emptyList(); suggestingFor = null; menuCard = null })
+                                    if (catalog != null && sample.importIssue == null) DropdownMenuItem(text = { Text("Replace with an Argentum card") }, onClick = { replacementTarget = sample; query = ""; results = emptyList(); suggestingFor = null; argentumOnly = true; menuCard = null })
                                     DropdownMenuItem(text = { Text("Remove one copy") }, onClick = { onRemove(sample); menuCard = null })
                                     DropdownMenuItem(text = { Text("Rename card") }, onClick = { renameCard = sample; renameValue = sample.name; menuCard = null })
                                 }
