@@ -27,9 +27,9 @@ android {
     buildTypes {
         debug {
             // Separate package so this build installs beside the experimental/targeting test build.
-            applicationIdSuffix = ".argentum"
+            applicationIdSuffix = providers.gradleProperty("arcana.debugApplicationIdSuffix").orElse(".argentum").get()
             // The build number follows versionCode, so the installer never shows a stale one.
-            manifestPlaceholders["appLabel"] = "Arcana Preview · B${defaultConfig.versionCode}"
+            manifestPlaceholders["appLabel"] = providers.gradleProperty("arcana.debugLabel").orElse("Arcana Preview · B${defaultConfig.versionCode}").get()
         }
     }
 

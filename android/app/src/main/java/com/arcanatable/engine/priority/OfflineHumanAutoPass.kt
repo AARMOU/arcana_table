@@ -2,6 +2,7 @@ package com.arcanatable.engine.priority
 
 import com.wingedsheep.engine.legalactions.LegalAction
 import com.wingedsheep.engine.legalactions.MeaningfulActionFilter
+import com.wingedsheep.engine.legalactions.OwnStackStop
 import com.wingedsheep.engine.registry.CardRegistry
 import com.wingedsheep.engine.state.GameState
 import com.wingedsheep.engine.state.components.identity.CardComponent
@@ -39,7 +40,9 @@ object OfflineHumanAutoPass {
         state: GameState,
         player: EntityId,
         registry: CardRegistry,
+        ownStackStops: Set<OwnStackStop> = emptySet(),
     ): Boolean {
+        if (ownStackStops.isNotEmpty()) return false
         if (state.priorityPlayerId != player || state.pendingDecision != null || state.stack.isEmpty()) return false
         val top = state.getEntity(state.stack.last()) ?: return false
         val topController = top.get<TriggeredAbilityOnStackComponent>()?.controllerId
@@ -125,28 +128,36 @@ object OfflineHumanAutoPass {
         enumerateActionsOnly: () -> List<LegalAction>,
         quietOpponentTurn: Boolean = false,
         stackTargetsPlayer: () -> Boolean = { false },
+        ownStackStops: Set<OwnStackStop> = emptySet(),
     ): Boolean {
+        val top = state.stack.lastOrNull()?.let(state::getEntity)
+        val topController = top?.get<TriggeredAbilityOnStackComponent>()?.controllerId
+            ?: top?.get<ActivatedAbilityOnStackComponent>()?.controllerId
+            ?: top?.get<SpellOnStackComponent>()?.casterId
+            ?: top?.get<ControllerComponent>()?.playerId
+        // Quiet opponent turns must not swallow a requested response to our own object.
+        val quiet = quietOpponentTurn && !(topController == player && ownStackStops.isNotEmpty())
         // The engine proves that these few windows pass for every possible action list.
-        // Arcana local play has no stop overrides or FULL_CONTROL setting on this path.
+        // An empty-stack shortcut cannot bypass an own-stack response preference.
         // Non-empty-stack windows never qualify.
         if (MeaningfulActionFilter.canAutoPassWithoutEnumerating(state, player)) return true
 
         // Preserve the preexisting Quiet Opponent Turns path. When the engine is in
         // DECLARE_BLOCKERS, only enumeration can establish whether declaring is due.
         // For all other stacked windows a blockers declaration cannot be offered.
-        if (quietOpponentTurn && !state.isActiveTurnFor(player) && state.stack.isNotEmpty() &&
+        if (quiet && !state.isActiveTurnFor(player) && state.stack.isNotEmpty() &&
             state.step != Step.DECLARE_BLOCKERS && !stackTargetsPlayer()
         ) return true
 
         // The engine's opponent non-spell stack verdict is STOP unless the player
         // opted to yield; no legal action enumeration is needed to establish that.
-        if (canStopOnOpponentNonSpellWithoutEnumerating(state, player, quietOpponentTurn)) return false
+        if (canStopOnOpponentNonSpellWithoutEnumerating(state, player, quiet)) return false
 
         // The own-stack verdict inspects just meaningful holdPriority offers. If no source
         // in this game can create one, its result is unconditionally PASS; this check
         // costs O(permanents) rather than O(permanent x affordability/target search).
         // Fail closed for copied/granted/emblem/class/complex static ability sources.
-        if (canPassOwnedStackWithoutEnumerating(state, player, registry)) return true
+        if (canPassOwnedStackWithoutEnumerating(state, player, registry, ownStackStops)) return true
 
         // Preserve the app's Food Chain-style "Add " filtering from the old DTO path.
         val legal = enumerateActionsOnly().filterNot {
@@ -154,7 +165,7 @@ object OfflineHumanAutoPass {
                 it.description.substringAfter(':', "").trim().startsWith("Add ", ignoreCase = true)
         }
 
-        if (quietOpponentTurn && !state.isActiveTurnFor(player) && state.stack.isNotEmpty() &&
+        if (quiet && !state.isActiveTurnFor(player) && state.stack.isNotEmpty() &&
             legal.none { it.actionType == "DeclareBlockers" } && !stackTargetsPlayer()
         ) return true
 
@@ -165,6 +176,7 @@ object OfflineHumanAutoPass {
             playerId = player,
             legalActions = legal,
             cardRegistry = registry,
+            ownStackStops = ownStackStops,
         )
     }
 }

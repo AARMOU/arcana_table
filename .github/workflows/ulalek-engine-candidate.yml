@@ -1,0 +1,213 @@
+name: Ulalek engine candidate (source build, CI-only runtime)
+# Claude lane for #132. Builds Build 131's engine + Arcana baseline + Ulalek patches from source,
+# runs the engine suites, then runs Arcana's custom-card and Android suites against the rebuilt jars
+# installed ONLY in this workspace. Never commits, uploads to a release, signs or replaces jars.
+on:
+  push:
+    branches: [claude/ulalek-engine-20261024]
+    paths:
+      - .github/workflows/ulalek-engine-candidate.yml
+      - engine-upgrade/**
+      - argentum-patches/**
+      - android/**
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ulalek-engine-candidate
+  cancel-in-progress: true
+
+jobs:
+  engine-tests:
+    name: engine ${{ matrix.suite }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [sdk-rules-ai, set-scenarios]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: argentum-engine
+          persist-credentials: false
+      - name: Apply mandatory Arcana baseline patches
+        run: python3 engine-upgrade/audit_patches.py
+      - name: Apply Ulalek engine patches exactly
+        run: python3 engine-upgrade/ulalek/apply_patches.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: SDK, rules engine and AI suites
+        if: matrix.suite == 'sdk-rules-ai'
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:test :rules-engine:test :ai:test
+      - name: Every set's card scenario suite (copy, mana and Display of Power regressions)
+        if: matrix.suite == 'set-scenarios'
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sets:scenarioTest
+      - name: Count engine test results
+        if: always()
+        run: |
+          python3 - "${{ matrix.suite }}" > engine-summary.txt <<'PY'
+          import sys, xml.etree.ElementTree as ET
+          from pathlib import Path
+          c = dict(tests=0, failures=0, errors=0, skipped=0); failed = []
+          for x in Path("argentum-engine").glob("**/build/test-results/**/TEST-*.xml"):
+              r = ET.parse(x).getroot()
+              for k in c: c[k] += int(r.get(k, "0"))
+              for tc in r.iter("testcase"):
+                  if tc.find("failure") is not None or tc.find("error") is not None:
+                      failed.append(f"{tc.get('classname')}.{tc.get('name')}")
+          print(f"engine {sys.argv[1]}: {c}")
+          for f in failed[:25]: print("  FAILED", f)
+          PY
+          cat engine-summary.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: engine-${{ matrix.suite }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            engine-summary.txt
+            engine-upgrade/patch-report.json
+            engine-upgrade/ulalek/apply-report.json
+            argentum-engine/**/build/test-results/**/TEST-*.xml
+
+  app-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: argentum-engine
+          persist-credentials: false
+      - run: python3 engine-upgrade/audit_patches.py
+      - run: python3 engine-upgrade/ulalek/apply_patches.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build the four Java 17 runtime jars and the card corpus
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar :arcana-export:run
+      - name: Install candidate jars in this workspace only and compare the card corpus
+        run: |
+          python3 - > candidate-summary.txt <<'PY'
+          import hashlib, json, shutil, struct, zipfile
+          from pathlib import Path
+          libs = Path("android/app/libs"); assets = Path("android/app/src/main/assets/argentum")
+          modules = {"mtg-sdk": "com/wingedsheep/sdk/model/CardDefinition.class",
+                     "mtg-sdk-tooling": "com/wingedsheep/sdk/tooling/CardLoader.class",
+                     "rules-engine": "com/wingedsheep/engine/core/GameAction.class",
+                     "ai": "com/wingedsheep/ai/engine/AIPlayer.class"}
+          for module, ident in modules.items():
+              jars = [p for p in Path(f"argentum-engine/{module}/build/libs").glob("*.jar")
+                      if "sources" not in p.name and "javadoc" not in p.name]
+              jars = [p for p in jars if ident in zipfile.ZipFile(p).namelist()]
+              assert len(jars) == 1, (module, jars)
+              dest = libs / f"argentum-{module}.jar"
+              shutil.copyfile(jars[0], dest)
+              with zipfile.ZipFile(dest) as z:
+                  v = max(struct.unpack(">H", z.read(n)[6:8])[0] for n in z.namelist() if n.endswith(".class"))
+              assert v <= 61, (module, v)
+              print(f"jar {dest.name} sha256={hashlib.sha256(dest.read_bytes()).hexdigest()} bytecode<={v}")
+          out = Path("argentum-engine/arcana-export-out")
+          for name in ("all-cards.jsonl", "all-cards.index.tsv", "por-cards.jsonl"):
+              old = (assets / name).read_text().splitlines(); new = (out / name).read_text().splitlines()
+              changed = [i for i, (a, b) in enumerate(zip(old, new)) if a != b]
+              names = [json.loads(new[i])["name"] for i in changed[:20]] if name.endswith(".jsonl") else []
+              print(f"corpus {name}: committed={len(old)} rebuilt={len(new)} changed_lines={len(changed)} {names}")
+              shutil.copyfile(out / name, assets / name)
+          PY
+          cat candidate-summary.txt
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Re-export custom cards with the candidate SDK; committed data must match exactly
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          git diff --exit-code -- app/src/main/assets/argentum/custom-cards.jsonl app/src/main/assets/argentum/custom-cards.index.tsv
+      - name: Custom-card scenarios (incl. Ulalek) and Android debug suite on candidate jars
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
+      - name: Release variant has no debug test scenarios
+        working-directory: android
+        run: |
+          # The check arrives with PR #110; until that is in this branch's base there is nothing to run.
+          if [ -f app/src/testRelease/java/com/arcanatable/ReleaseHasNoTestScenariosTest.kt ]; then
+            ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest'
+          else
+            echo "ReleaseHasNoTestScenariosTest not in this base (PR #110 not merged); skipped" | tee -a ../candidate-summary.txt
+          fi
+      - name: Compile the debug app on candidate jars (stays in CI, never uploaded)
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
+      - name: Count app and custom-card results
+        if: always()
+        run: |
+          python3 - >> candidate-summary.txt <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          for label, pattern in (("custom-cards", "android/custom-cards/build/test-results/**/TEST-*.xml"),
+                                 ("app-debug", "android/app/build/test-results/testDebugUnitTest/TEST-*.xml"),
+                                 ("app-release-check", "android/app/build/test-results/testReleaseUnitTest/TEST-*.xml"),
+                                 ("ulalek", "android/custom-cards/build/test-results/**/TEST-*Ulalek*.xml")):
+              c = dict(tests=0, failures=0, errors=0, skipped=0)
+              for x in Path(".").glob(pattern):
+                  r = ET.parse(x).getroot()
+                  for k in c: c[k] += int(r.get(k, "0"))
+              print(f"{label}: {c}")
+          PY
+          cat candidate-summary.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: app-candidate
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            candidate-summary.txt
+            android/custom-cards/build/test-results/
+            android/app/build/test-results/
+
+  report:
+    needs: [engine-tests, app-candidate]
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+      actions: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: evidence
+      - name: Post the counted results to #132
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULT: ${{ needs.engine-tests.result }} / ${{ needs.app-candidate.result }}
+        run: |
+          {
+            echo "<!-- ulalek-engine-candidate-run -->"
+            echo "### Ulalek engine candidate CI: engine=${{ needs.engine-tests.result }}, app=${{ needs.app-candidate.result }}"
+            echo "Commit \`${{ github.sha }}\`, run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo '```'
+            cat evidence/*/engine-summary.txt evidence/*/candidate-summary.txt 2>/dev/null || echo "no summaries"
+            echo '```'
+            echo "_Automated by the workflow; CI-only runtime, nothing installed or published._"
+          } > body.md
+          gh api repos/${{ github.repository }}/issues/132/comments -F body=@body.md --jq .html_url

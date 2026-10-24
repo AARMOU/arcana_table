@@ -44,8 +44,9 @@ class TestScenariosTest {
 
     private fun JSONArray.objects() = (0 until length()).map { getJSONObject(it) }
 
-    @Test fun debugBuildListsExactlyTheThreeScenarios() {
-        assertEquals(listOf(TestScenarios.IRON_SPIDER, TestScenarios.WHALE_JUST_CAST, TestScenarios.WHALE_HELD), TestScenarios.available)
+    @Test fun debugBuildListsExactlyTheFiveScenarios() {
+        assertEquals(listOf(TestScenarios.IRON_SPIDER, TestScenarios.WHALE_JUST_CAST, TestScenarios.WHALE_HELD, TestScenarios.ULALEK, TestScenarios.ULALEK_RESPONSE),
+            TestScenarios.available)
     }
 
     @Test fun ironSpiderScenarioOpensOnYourMainPhaseWithTheBoardAndDrawsThroughArcanasPicker() {
@@ -159,6 +160,110 @@ class TestScenariosTest {
                 after = s.submit(after, pass.getJSONObject("action"))
             }
             assertEquals("3 damage in the air", lifeBefore - 3, after.snapshot().players[ai].life)
+        } finally { s.host.shutdown() }
+    }
+
+    // ---- Ulalek, Fused Atrocity: pay {C}{C}, copy your spells and other abilities ----
+
+    private fun zoneCards(state: JSONObject, zoneType: String, owner: String): List<String> {
+        val cards = state.getJSONObject("cards")
+        return state.getJSONArray("zones").objects()
+            .filter { it.getJSONObject("zoneId").optString("zoneType").equals(zoneType, true) && it.getJSONObject("zoneId").optString("ownerId") == owner }
+            .flatMap { z -> z.optJSONArray("cardIds")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty() }
+            .map { cards.optJSONObject(it)?.optString("name") ?: it }
+    }
+
+    @Test fun ulalekCopiesTheEldraziSpellAndBeastWhisperersTriggerWhenPaid() = playUlalek(pay = true)
+    @Test fun decliningUlalekPaymentMakesNoCopiesThroughTheHost() = playUlalek(pay = false)
+
+    @Test fun ulalekCopiesBothHumanSpellsThroughOwnStackResponse() = playUlalek(pay = true, ownStack = true)
+
+    private fun playUlalek(pay: Boolean, ownStack: Boolean = false) {
+        val s = start(if (ownStack) TestScenarios.ULALEK_RESPONSE else TestScenarios.ULALEK)
+        val you = LocalArgentumHost.HUMAN_ID.value
+        try {
+            var msg = s.nextState()
+            if (ownStack) {
+                val bolt = cardIdNamed(msg.getJSONObject("state"), "Lightning Bolt")
+                val offer = msg.snapshot().legalActions.single { it.actionType() == "CastSpell" && it.getJSONObject("action").optString("cardId") == bolt }
+                val plan = ArgentumActionPlan.from(offer)
+                msg = s.submit(msg, plan.build(plan.slots.associate { it.index to listOf(LocalArgentumHost.AI_ID.value) }, null, emptyMap(), null) {
+                    JSONObject().put("type", "Player").put("playerId", it)
+                })
+                assertTrue("My Bolt remains on the stack before casting the flash Eldrazi",
+                    zoneCards(msg.getJSONObject("state"), "STACK", you).contains("Lightning Bolt"))
+            }
+            val state = msg.getJSONObject("state")
+            assertEquals(listOf("Beast Whisperer", "Ulalek, Fused Atrocity"), zoneCards(state, "BATTLEFIELD", you).filter { it != "Wastes" && it != "Mountain" })
+            assertEquals(10, zoneCards(state, "BATTLEFIELD", you).count { it == "Wastes" })
+            val fiendCard = cardIdNamed(state, "Elder Deep-Fiend")
+            val handBefore = handCount(state)
+            val cast = msg.snapshot().legalActions.single { it.actionType() == "CastSpell" && it.getJSONObject("action").optString("cardId") == fiendCard }
+            assertTrue("ten Wastes pay {8}", cast.optBoolean("isAffordable"))
+            s.host.receive(JSONObject().put("type", "submitAction").put("action", cast.getJSONObject("action")).put("interactionEpoch", msg.getString("interactionEpoch")))
+
+            // Answer every decision the way a player would: no tap targets, yes to {C}{C}, auto-pay it.
+            val asked = mutableListOf<String>()
+            var done: JSONObject? = null
+            repeat(60) {
+                if (done != null) return@repeat
+                val m = s.inbox.poll(30, TimeUnit.SECONDS) ?: error("Host stopped responding")
+                if (m.optString("type") == "error") error("Host error: ${m.optString("message")}")
+                if (m.optString("type") != "stateUpdate") return@repeat
+                val decision = m.optJSONObject("pendingDecision")
+                if (decision != null) {
+                    asked += decision.optString("type") + ":" + decision.optString("prompt")
+                    val response = when (decision.optString("type")) {
+                        "ChooseTargetsDecision" -> JSONObject().put("type", "TargetsResponse").put("selectedTargets",
+                            JSONObject().apply { decision.getJSONObject("legalTargets").keys().forEach { put(it, JSONArray()) } })
+                        "YesNoDecision" -> JSONObject().put("type", "YesNoResponse").put("choice", pay && "{C}{C}" in decision.optString("prompt"))
+                        "SelectManaSourcesDecision" -> ArgentumDecisions.autoPayManaResponse()
+                        "OrderObjectsDecision" -> JSONObject().put("type", "OrderedResponse").put("orderedObjects", decision.getJSONArray("objects"))
+                        else -> error("Unexpected decision ${decision.optString("type")}")
+                    }
+                    s.host.receive(JSONObject().put("type", "submitAction").put("interactionEpoch", m.optString("interactionEpoch"))
+                        .put("action", JSONObject().put("type", "SubmitDecision").put("playerId", decision.getString("playerId"))
+                            .put("response", response.put("decisionId", decision.getString("id")))))
+                    return@repeat
+                }
+                val st = m.getJSONObject("state")
+                if ((m.optJSONArray("legalActions")?.length() ?: 0) > 0 && zoneCards(st, "STACK", you).isEmpty() &&
+                    zoneCards(st, "BATTLEFIELD", you).count { it == "Elder Deep-Fiend" } > 0) done = m
+            }
+            val end = checkNotNull(done) { "The Fiend never resolved; decisions seen: $asked" }.getJSONObject("state")
+            assertTrue("Ulalek offered its {C}{C}: $asked", asked.any { it.startsWith("YesNoDecision") && "{C}{C}" in it })
+            assertEquals("the Fiend and its token copy", if (pay) 2 else 1, zoneCards(end, "BATTLEFIELD", you).count { it == "Elder Deep-Fiend" })
+            assertEquals("Fiend cast (-1); Beast Whisperer's trigger and its Ulalek copy each drew (+2)", handBefore + (if (pay) 1 else 0), handCount(end))
+            if (ownStack) {
+                val opponent = done!!.snapshot().players.first { it.id != you }
+                assertEquals("Original Bolt and the copy each deal 3", 14, opponent.life)
+            }
+        } finally { s.host.shutdown() }
+    }
+
+
+    @Test fun ownStackScenarioLetsTheHumanCastFlashBeforeTheirBoltResolves() {
+        val s = start(TestScenarios.ULALEK_RESPONSE)
+        try {
+            val msg = s.nextState()
+            val state = msg.getJSONObject("state")
+            val bolt = cardIdNamed(state, "Lightning Bolt")
+            val fiend = cardIdNamed(state, "Elder Deep-Fiend")
+            val offer = msg.snapshot().legalActions.single { it.actionType() == "CastSpell" && it.getJSONObject("action").optString("cardId") == bolt }
+            val plan = ArgentumActionPlan.from(offer)
+            val action = plan.build(plan.slots.associate { it.index to listOf(LocalArgentumHost.AI_ID.value) }, null, emptyMap(), null) {
+                JSONObject().put("type", "Player").put("playerId", it)
+            }
+            val after = s.submit(msg, action)
+            assertTrue("Bolt is still on the stack when the host returns control",
+                zoneCards(after.getJSONObject("state"), "STACK", LocalArgentumHost.HUMAN_ID.value).contains("Lightning Bolt"))
+            assertTrue("Human can now cast Elder Deep-Fiend in response",
+                after.snapshot().legalActions.any { it.actionType() == "CastSpell" && it.getJSONObject("action").optString("cardId") == fiend && it.optBoolean("isAffordable") })
+            s.host.receive(JSONObject().put("type", "setRespondToOwnStack").put("enabled", false))
+            val pass = after.snapshot().legalActions.first { it.actionType() == "PassPriority" }
+            val settled = s.submit(after, pass.getJSONObject("action"))
+            assertFalse("Turning the preference off returns to normal auto-pass",
+                zoneCards(settled.getJSONObject("state"), "STACK", LocalArgentumHost.HUMAN_ID.value).contains("Lightning Bolt"))
         } finally { s.host.shutdown() }
     }
 
