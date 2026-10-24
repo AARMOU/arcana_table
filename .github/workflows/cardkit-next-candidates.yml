@@ -1,0 +1,70 @@
+name: Cardkit next-candidate non-spending queue preflight
+on:
+  push:
+    branches: [gpt/cardkit-next-candidates-20261024]
+    paths: [.github/workflows/cardkit-next-candidates.yml]
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  verify-next:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Select and evidence next safe candidates
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p cardkit-next
+          tools/cardkit/cardkit gaps --claims-from-github --json-output cardkit-next/gaps.json --markdown-output cardkit-next/coverage.md
+          python3 - <<'PY'
+          import json, subprocess
+          from pathlib import Path
+          data=json.loads(Path("cardkit-next/gaps.json").read_text())
+          assert data["dispatch"]["dispatchable"] and data["dispatch"]["claimsVerified"]
+          candidates=["Psychomancer","Resurrection Orb","Poxwalkers","Eldrazi Displacer","Blood for the Blood God!","Celestine, the Living Saint"]
+          lookup={c["name"]:c for c in data["cards"]}
+          selected=[]
+          for name in candidates:
+              v=lookup.get(name)
+              if not v or v["readiness"]!="SUPPORTED" or v.get("claimedBy") or name not in data["dispatch"]["copilot"]:
+                  print(f"SKIP {name}: not current unclaimed SUPPORTED")
+                  continue
+              def ck(*args):
+                  r=subprocess.run(["tools/cardkit/cardkit",*args],text=True,capture_output=True)
+                  if r.returncode: raise RuntimeError(f"{name}: {args}: {r.stderr[:800]}")
+                  return r.stdout
+              details=ck("classify",name,"--json")
+              oracle=ck("oracle","show",name)
+              references=ck("similar",name)
+              body=ck("unit",name)
+              c=json.loads(details)[0]
+              o=json.loads(oracle)
+              assert c["readiness"]=="SUPPORTED" and o["name"]==name
+              assert "## Cards" in body and "## Acceptance" in body and "Base: gpt/arcana-integration-next" in body
+              slug="".join(ch.lower() if ch.isalnum() else "-" for ch in name).strip("-")
+              folder=Path("cardkit-next")/slug
+              folder.mkdir()
+              (folder/"classification.json").write_text(details)
+              (folder/"oracle.json").write_text(oracle)
+              (folder/"similar.txt").write_text(references)
+              (folder/"queue-body.md").write_text(body)
+              selected.append({"name":name,"route":v["route"],"mechanics":v["mechanics"],"oracle_lines":len(o.get("oracle_text","").splitlines()),"claim":"none","classification":"SUPPORTED","folder":str(folder)})
+              print(f"PASS {name}: SUPPORTED, no PR claim, generated offline unit and source refs")
+          assert len(selected)>=3, "Fewer than three unclaimed ready candidate cards; re-evaluate"
+          (Path("cardkit-next")/"shortlist.json").write_text(json.dumps(selected,indent=2)+"\n")
+          print("NEXT_CARDKIT_QUEUE_PREFLIGHT_PASS",json.dumps([x["name"] for x in selected]))
+          PY
+          tools/cardkit/cardkit check
+          git diff --exit-code
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cardkit-next-candidates-evidence
+          path: cardkit-next/
+          retention-days: 14
