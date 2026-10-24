@@ -173,6 +173,34 @@ function unitActionable(body, base) {
   return { ok: missing.length === 0, missing };
 }
 
+// Who may direct paid work. author_association is computed by GitHub from live repository
+// permissions and cannot be set by issue text. The bots are the dispatcher's own ledger writer
+// and Copilot itself.
+const TRUSTED_ASSOCIATIONS = ['OWNER', 'MEMBER', 'COLLABORATOR'];
+const TRUSTED_BOTS = ['github-actions[bot]', 'copilot', 'copilot-swe-agent[bot]'];
+const trustedCommenter = c => TRUSTED_ASSOCIATIONS.includes(c?.association) ||
+  (c?.type === 'Bot' && TRUSTED_BOTS.includes(String(c?.login || '').toLowerCase()));
+
+// raw: { authorAssociation, commenters: [{association, login, type}],
+//        approval: { labeledAt, actor, contentAt, renamedAfter } }  (approval only for one-shot)
+// contentAt = when the issue body was last written (GitHub lastEditedAt, else createdAt).
+// The Copilot worker reads the issue body and its comments, so all of it must come from
+// trusted people, and a one-shot approval covers only the content that existed when it was given.
+function provenance(raw = {}, { needApproval = false } = {}) {
+  const reasons = [];
+  if (!TRUSTED_ASSOCIATIONS.includes(raw.authorAssociation)) reasons.push('author-untrusted');
+  if (!Array.isArray(raw.commenters)) reasons.push('comments-unavailable');
+  else if (raw.commenters.some(c => !trustedCommenter(c))) reasons.push('untrusted-comments');
+  if (needApproval) {
+    const a = raw.approval;
+    if (!a || !Number.isFinite(a.labeledAt)) reasons.push('approval-missing');
+    else if (!Number.isFinite(a.contentAt)) reasons.push('edit-history-unavailable');
+    else if (a.contentAt >= a.labeledAt) reasons.push('edited-after-approval');
+    if (a && a.renamedAfter !== false) reasons.push(a.renamedAfter ? 'renamed-after-approval' : 'rename-history-unavailable');
+  }
+  return { ok: reasons.length === 0, reasons };
+}
+
 function budgetWithReservations({ snapshot, active, pendingRepairs, candidate, ready, now = Date.now() }) {
   if (!snapshot || !Number.isFinite(snapshot.used) || ready.estSession === null || ready.estRepair === null)
     return { level: 'unknown', maxNewAssignments: 0, reason: 'no verified usage snapshot' };
@@ -194,6 +222,8 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
   if (op === 'repair' && ready.repair !== 'request') return deny('readiness: repair mode ' + ready.repair);
   if (units.some(u => u.blocksAll)) return deny('interrupted attempt needs owner review');
   if (!unit) return deny('no work unit');
+  // Every paid path, every mode: the unit must come from trusted people. Unchecked = denied.
+  if (!unit.provenance?.ok) return deny('untrusted-origin: ' + (unit.provenance?.reasons || ['unchecked']).join(', '));
   if (unit.ambiguousLink) return deny('ambiguous PR link: a PR is connected to more than one unit');
   if (op === 'assign') {
     if (ready.dispatch === 'authorize-once' && (labeledCount !== 1 || !unit.labeled))
@@ -216,4 +246,5 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
 }
 
 module.exports = { LEDGER, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
-  readiness, formatLedger, parseLedger, deriveUnit, unitActionable, budgetWithReservations, admit, isBot };
+  readiness, formatLedger, parseLedger, deriveUnit, unitActionable, budgetWithReservations, admit, isBot,
+  provenance, trustedCommenter, TRUSTED_ASSOCIATIONS };

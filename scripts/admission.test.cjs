@@ -10,11 +10,13 @@ const env = (x = {}) => ({ ARCANA_AUTOMATION_READY: 'true', ARCANA_DISPATCH_MODE
   ARCANA_REPAIR_MODE: 'request', ...x });
 const snap = (used = 300) => ({ used, allowance: 1500, measuredAt: iso(NOW - 5 * MIN) });
 const bot = (body, at = NOW) => ({ body, created_at: iso(at), user: { type: 'Bot', login: 'github-actions[bot]' } });
-const queued = n => ({ ...A.deriveUnit({ number: n }, NOW), actionable: { ok: true, missing: [] } });
-const working = n => A.deriveUnit({ number: n, assignedToCopilot: true,
-  sessions: [{ event: 'started', at: NOW - 10 * MIN }] }, NOW);
-const review = (n, extra = {}) => A.deriveUnit({ number: n, assignedToCopilot: true,
-  sessions: [{ event: 'started', at: NOW - 60 * MIN }, { event: 'finished', at: NOW - 30 * MIN }], ...extra }, NOW);
+// Units written by trusted people (the normal case); provenance itself is tested separately below.
+const OK = { provenance: { ok: true, reasons: [] } };
+const queued = n => ({ ...A.deriveUnit({ number: n }, NOW), actionable: { ok: true, missing: [] }, ...OK });
+const working = n => ({ ...A.deriveUnit({ number: n, assignedToCopilot: true,
+  sessions: [{ event: 'started', at: NOW - 10 * MIN }] }, NOW), ...OK });
+const review = (n, extra = {}) => ({ ...A.deriveUnit({ number: n, assignedToCopilot: true,
+  sessions: [{ event: 'started', at: NOW - 60 * MIN }, { event: 'finished', at: NOW - 30 * MIN }], ...extra }, NOW), ...OK });
 
 test('readiness defaults are off and malformed values fail closed', () => {
   const r = A.readiness({});
@@ -195,12 +197,12 @@ test('each missing section is reported and blocks assignment', () => {
   for (const [body, reason, base = BASE] of cases) {
     const a = A.unitActionable(body, base);
     assert.equal(a.ok, false, reason); assert.ok(a.missing.includes(reason), reason + ' got ' + a.missing);
-    const unit = { ...A.deriveUnit({ number: 68 }, NOW), actionable: a };
+    const unit = { ...A.deriveUnit({ number: 68 }, NOW), actionable: a, ...OK };
     assert.match(A.admit({ op: 'assign', unit, ready: A.readiness(env()), snapshot: snap(), now: NOW }).reason, /unit-not-actionable/);
   }
 });
 test('an unchecked unit is refused (fail closed) and dry-run reports the reason', () => {
-  const unit = A.deriveUnit({ number: 68 }, NOW);
+  const unit = { ...A.deriveUnit({ number: 68 }, NOW), ...OK };
   assert.match(A.admit({ op: 'assign', unit, ready: A.readiness(env()), snapshot: snap(), now: NOW }).reason, /unit-not-actionable: unchecked/);
   const d = A.admit({ op: 'assign', unit: { ...unit, actionable: A.unitActionable('vague', BASE) }, ready: A.readiness({ ARCANA_DISPATCH_MODE: 'dry-run' }), snapshot: snap(), now: NOW });
   assert.equal(d.wouldAllow, undefined); assert.match(d.reason, /unit-not-actionable/);

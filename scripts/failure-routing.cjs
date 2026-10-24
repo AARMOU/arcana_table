@@ -20,6 +20,14 @@ function createAuthorizer({ github, owner, repo, env, readBudget, now = Date.now
     const n = unitOf(pr.body, data.numbers);
     const unit = data.units.find(u => u.raw.number === n);
     if (!unit) return { allowed: false, reason: 'no work unit linked to PR' };
+    // A repair worker also reads the PR conversation: it must come from trusted people too.
+    let prComments;
+    try { prComments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: pr.number, per_page: 100 }); }
+    catch { return { allowed: false, reason: 'untrusted-origin: pr-comments-unavailable' }; }
+    if (!A.TRUSTED_ASSOCIATIONS.includes(pr.author_association) && !A.trustedCommenter({ login: pr.user?.login, type: pr.user?.type }))
+      return { allowed: false, reason: 'untrusted-origin: pr-author-untrusted' };
+    if (prComments.some(c => !A.trustedCommenter({ association: c.author_association, login: c.user?.login, type: c.user?.type })))
+      return { allowed: false, reason: 'untrusted-origin: untrusted-pr-comments' };
     const { snapshot } = await readBudget(env);
     // Evaluate after the billing read: a fresh measurement must not look like it came from the future.
     const d = A.admit({ op: 'repair', unit: unit.derived, units: data.units.map(u => u.derived), ready, snapshot, now: Math.max(now, Date.now()) });
