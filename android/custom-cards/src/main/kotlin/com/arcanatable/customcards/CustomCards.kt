@@ -168,6 +168,7 @@ object CustomCards {
         Entry(Mutilate, "TOR", "Six WotC precons"),
         Entry(TheirNameIsDeath, "40K", "Six WotC precons"),
         Entry(Plasmancer, "40K", "Six WotC precons"),
+        Entry(SceptreOfEternalGlory, "40K", "Six WotC precons"),
         Entry(UlamogsCrusher, "ROE", "Six WotC precons"),
         Entry(AssaultIntercessor, "40K", "Six WotC precons"),
         Entry(HeraldOfSlaanesh, "40K", "Six WotC precons"),

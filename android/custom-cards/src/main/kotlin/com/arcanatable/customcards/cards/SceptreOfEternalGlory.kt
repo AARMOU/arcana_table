@@ -6,9 +6,6 @@ import com.wingedsheep.sdk.scripting.*
 import com.wingedsheep.sdk.scripting.conditions.ComparisonOperator
 import com.wingedsheep.sdk.scripting.references.Player
 
-/**
- * CARDKIT-SCAFFOLD: remove after the scenario test passes and before registration.
- */
 val SceptreOfEternalGlory = card("Sceptre of Eternal Glory") {
     manaCost = "{4}"
     colorIdentity = ""

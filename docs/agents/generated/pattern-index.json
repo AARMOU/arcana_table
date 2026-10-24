@@ -18,13 +18,19 @@
    ]
   },
   "Conditions.CompareAmounts": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Endless Atlas",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EndlessAtlas.kt",
      "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EndlessAtlasScenarioTest.kt"
+    },
+    {
+     "card": "Sceptre of Eternal Glory",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SceptreOfEternalGlory.kt",
+     "lines": 45,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SceptreOfEternalGloryScenarioTest.kt"
     },
     {
      "card": "Tallyman of Nurgle",
@@ -49,12 +55,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TectonicEdge.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TectonicEdgeScenarioTest.kt"
-    },
-    {
-     "card": "Great Unclean One",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GreatUncleanOne.kt",
-     "lines": 58,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GreatUncleanOneScenarioTest.kt"
     }
    ]
   },
@@ -582,7 +582,7 @@
    ]
   },
   "Costs.Tap": {
-   "count": 37,
+   "count": 38,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -659,7 +659,7 @@
  },
  "DynamicAmounts": {
   "DynamicAmounts.battlefield": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Defile",
@@ -1023,7 +1023,7 @@
  },
  "Effects": {
   "Effects.AddAnyColorMana": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -1044,6 +1044,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LotusFieldScenarioTest.kt"
     },
     {
+     "card": "Sceptre of Eternal Glory",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SceptreOfEternalGlory.kt",
+     "lines": 45,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SceptreOfEternalGloryScenarioTest.kt"
+    },
+    {
      "card": "Ninja Pizza",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/NinjaPizza.kt",
      "lines": 49,
@@ -1054,12 +1060,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheCabbageMerchant.kt",
      "lines": 52,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheCabbageMerchantScenarioTest.kt"
-    },
-    {
-     "card": "Power Depot",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PowerDepot.kt",
-     "lines": 57,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PowerDepotScenarioTest.kt"
     }
    ]
   },
@@ -4125,7 +4125,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 53,
+   "count": 54,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4699,7 +4699,7 @@
    ]
   },
   "manaAbility": {
-   "count": 24,
+   "count": 25,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4781,7 +4781,7 @@
    ]
   },
   "restrictions": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Sea Gate Wreckage",
@@ -4802,6 +4802,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShrineOfTheForsakenGodsScenarioTest.kt"
     },
     {
+     "card": "Sceptre of Eternal Glory",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SceptreOfEternalGlory.kt",
+     "lines": 45,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SceptreOfEternalGloryScenarioTest.kt"
+    },
+    {
      "card": "Reflecting Pool",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ReflectingPool.kt",
      "lines": 46,
@@ -4812,17 +4818,11 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RaphaelTheMuscle.kt",
      "lines": 48,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RaphaelTheMuscleScenarioTest.kt"
-    },
-    {
-     "card": "Tectonic Edge",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TectonicEdge.kt",
-     "lines": 57,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TectonicEdgeScenarioTest.kt"
     }
    ]
   },
   "timing": {
-   "count": 29,
+   "count": 30,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5335,7 +5335,7 @@
    ]
   },
   "TimingRule.ManaAbility": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -6426,7 +6426,7 @@
    ]
   },
   "GameObjectFilter.Land": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Defile",
@@ -6829,7 +6829,7 @@
    ]
   },
   "Player.You": {
-   "count": 32,
+   "count": 33,
    "examples": [
     {
      "card": "Defile",
