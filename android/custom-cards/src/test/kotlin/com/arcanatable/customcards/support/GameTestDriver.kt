@@ -1004,6 +1004,16 @@ class GameTestDriver {
      * triggers — a blunt removal for setting up "the card is in the graveyard now" states, and
      * usable as a "discard from hand" helper. Returns silently if the entity has no owner.
      */
+    /** Simulate another effect exiling a card while a spell is on the stack. */
+    fun moveToExile(entityId: EntityId) {
+        val ownerId = _state.getEntity(entityId)
+            ?.get<OwnerComponent>()?.playerId
+            ?: return
+        val occupiedZones = _state.zones.keys.filter { entityId in _state.getZone(it) }
+        occupiedZones.forEach { _state = _state.removeFromZone(it, entityId) }
+        _state = _state.addToZone(ZoneKey(ownerId, Zone.EXILE), entityId)
+    }
+
     fun moveToGraveyard(entityId: EntityId) {
         val ownerId = _state.getEntity(entityId)
             ?.get<OwnerComponent>()?.playerId
