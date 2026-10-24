@@ -383,8 +383,58 @@ data class ArgentumTargetSlot(
 )
 
 /**
+ * "Remove N counters from among permanents you control": which permanents give up how many.
+ * [sources] maps each permanent with counters to how many it has; [counterTypes] to the counter
+ * type Argentum named for it. Goes into costPayment.distributedCounterRemovals.
+ */
+data class ArgentumCounterRemoval(val total: Int, val sources: Map<String, Int>, val counterTypes: Map<String, String>) {
+    /** A complete starting split, taking counters from the listed permanents in order. */
+    fun initial(): Map<String, Int> {
+        var left = total
+        return sources.mapValues { (_, have) -> minOf(have, left).also { left -= it } }.filterValues { it > 0 }
+    }
+
+    fun problem(removal: Map<String, Int>): String? = when {
+        removal.any { (id, n) -> n < 0 || n > (sources[id] ?: 0) } -> "A permanent doesn't have that many counters."
+        removal.values.sum() != total -> "Remove exactly $total counter${if (total == 1) "" else "s"}."
+        else -> null
+    }
+
+    fun payment(removal: Map<String, Int>): JSONArray = JSONArray(removal.filterValues { it > 0 }.map { (id, n) ->
+        JSONObject().put("entityId", id).put("counterType", counterTypes[id]).put("count", n)
+    })
+
+    companion object {
+        /**
+         * Fails closed (null: the action goes to Argentum unchanged) unless every listed permanent
+         * names exactly one counter type with counters, and all name the same one. The offline host
+         * narrows the listing to the cost's own type ("+1/+1"); capacity is that type's count only.
+         */
+        fun from(info: JSONObject): ArgentumCounterRemoval? {
+            val cost = info.optJSONObject("additionalCostInfo") ?: return null
+            val total = cost.optInt("distributedCounterRemovalTotal")
+            val list = cost.optJSONArray("counterRemovalCreatures") ?: return null
+            if (total <= 0) return null
+            val sources = linkedMapOf<String, Int>()
+            val types = mutableMapOf<String, String>()
+            for (i in 0 until list.length()) {
+                val c = list.optJSONObject(i) ?: return null
+                val id = c.optString("entityId").takeIf { it.isNotBlank() } ?: return null
+                val byType = c.optJSONObject("availableCountersByType") ?: return null
+                val withCounters = byType.keys().asSequence().filter { byType.optInt(it) > 0 }.toList()
+                if (withCounters.isEmpty()) continue
+                val type = withCounters.singleOrNull() ?: return null
+                sources[id] = byType.optInt(type); types[id] = type
+            }
+            if (types.values.toSet().size != 1 || sources.values.sum() < total) return null
+            return ArgentumCounterRemoval(total, sources, types)
+        }
+    }
+}
+
+/**
  * Everything Arcana must collect before submitting a legal action: X, targets (any number of
- * slots), divided damage and a mana colour. Built from the server's LegalActionInfo; the result
+ * slots), divided damage, counters to remove and a mana colour. Built from the server's LegalActionInfo; the result
  * is the server's own action object with only those player choices filled in.
  */
 data class ArgentumActionPlan(
@@ -394,9 +444,10 @@ data class ArgentumActionPlan(
     val distributeTotal: Int?,
     val distributeMin: Int,
     val manaColors: List<String>,
+    val counterRemoval: ArgentumCounterRemoval? = null,
 ) {
     val description: String get() = info.optString("description", "Argentum action")
-    val needsInput: Boolean get() = slots.isNotEmpty() || xRange != null || distributeTotal != null || manaColors.isNotEmpty()
+    val needsInput: Boolean get() = slots.isNotEmpty() || xRange != null || distributeTotal != null || manaColors.isNotEmpty() || counterRemoval != null
 
     /** Legal choices for a slot given earlier picks (server prefix table first, else the plain list). */
     fun legalFor(slot: ArgentumTargetSlot, picks: Map<Int, List<String>>): List<String> {
@@ -410,7 +461,7 @@ data class ArgentumActionPlan(
 
     fun chosenTargets(picks: Map<Int, List<String>>): List<String> = slots.filter { it.costField == null }.flatMap { picks[it.index].orEmpty() }
 
-    fun problem(picks: Map<Int, List<String>>, distribution: Map<String, Int>, color: String?): String? {
+    fun problem(picks: Map<Int, List<String>>, distribution: Map<String, Int>, color: String?, removal: Map<String, Int> = emptyMap()): String? {
         for (slot in slots) {
             val count = picks[slot.index].orEmpty().size
             if (count < slot.min) return "Choose ${if (slot.min == slot.max) slot.min else "at least ${slot.min}"} for “${slot.description}”."
@@ -423,11 +474,12 @@ data class ArgentumActionPlan(
             if (targets.any { (distribution[it] ?: 0) < distributeMin }) return "Each target needs at least $distributeMin."
         }
         if (manaColors.isNotEmpty() && color == null) return "Choose a mana colour."
+        counterRemoval?.problem(removal)?.let { return it }
         return null
     }
 
     /** The server's action with the player's choices filled in. [ref] turns a target id into ChosenTarget JSON. */
-    fun build(picks: Map<Int, List<String>>, x: Int?, distribution: Map<String, Int>, color: String?, ref: (String) -> JSONObject?): JSONObject {
+    fun build(picks: Map<Int, List<String>>, x: Int?, distribution: Map<String, Int>, color: String?, removal: Map<String, Int> = emptyMap(), ref: (String) -> JSONObject?): JSONObject {
         val action = JSONObject(info.optJSONObject("action")?.toString() ?: "{}")
         val targetSlots = slots.filter { it.costField == null }
         if (targetSlots.isNotEmpty()) {
@@ -442,6 +494,12 @@ data class ArgentumActionPlan(
             val key = if (action.optString("type") == "CastSpell") "additionalCostPayment" else "costPayment"
             val payment = action.optJSONObject(key) ?: JSONObject()
             costSlots.forEach { slot -> payment.put(slot.costField!!, JSONArray(picks[slot.index].orEmpty())) }
+            action.put(key, payment)
+        }
+        counterRemoval?.let { cr ->
+            val key = if (action.optString("type") == "CastSpell") "additionalCostPayment" else "costPayment"
+            val payment = action.optJSONObject(key) ?: JSONObject()
+            payment.put("distributedCounterRemovals", cr.payment(removal))
             action.put(key, payment)
         }
         if (x != null && xRange != null) action.put("xValue", x)
@@ -476,6 +534,7 @@ data class ArgentumActionPlan(
                 xRange = ArgentumActions.xRange(info),
                 distributeTotal = if (info.optBoolean("requiresDamageDistribution")) info.optInt("totalDamageToDistribute").takeIf { it > 0 } else null,
                 distributeMin = info.optInt("minDamagePerTarget", 1),
+                counterRemoval = ArgentumCounterRemoval.from(info),
                 manaColors = if (info.optBoolean("requiresManaColorChoice")) info.optJSONArray("availableManaColors").ids().ifEmpty { listOf("WHITE", "BLUE", "BLACK", "RED", "GREEN") } else emptyList(),
             )
         }
