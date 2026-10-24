@@ -1,0 +1,75 @@
+name: Arcana B131 integrated Fold test APK
+
+on:
+  push:
+    branches:
+      - gpt/b131-integrated-fold-test-20261024
+    paths:
+      - .github/workflows/b131-integrated-fold-test-apk.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arcana-b131-fold-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-debug-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - name: Checkout isolated integrated source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Verify frozen development integration input
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "a8cec668f762eded98f46e01bf56a0d9f95cb26c"
+          git diff --check HEAD^ HEAD
+          test -f android/app/libs/argentum-rules-engine.jar
+          test -f android/app/src/main/assets/argentum/all-cards.index.tsv
+          test -f android/app/src/main/assets/argentum/custom-cards.index.tsv
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+
+      - name: Install Android API 36
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+
+      - name: Assemble separate-package Android debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
+
+      - name: Verify exact debug package, certificate and provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          apk=dist/ArcanaTable-B131-Integrated-Fold-Test-debug.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > dist/package-info.txt
+          grep -F "package: name='com.arcanatable.argentum' versionCode='131' versionName='0.33.9-build131-argentum-upgrade'" dist/package-info.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" > dist/signing-info.txt
+          sha256sum "$apk" > dist/SHA256SUMS.txt
+          printf 'source_branch=%s\nsource_sha=%s\nintegration_sha=a8cec668f762eded98f46e01bf56a0d9f95cb26c\npackage=com.arcanatable.argentum\nversionCode=131\nproduction_signed=false\ndebug_signed=true\nproduction_untouched=true\n' "$GITHUB_REF_NAME" "$GITHUB_SHA" > dist/provenance.txt
+
+      - name: Upload installable development APK and audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArcanaTable-B131-Integrated-Fold-Test-APK
+          retention-days: 14
+          if-no-files-found: error
+          path: dist/
