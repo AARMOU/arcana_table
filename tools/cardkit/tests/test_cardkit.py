@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import io
 import json
 import shutil
 import subprocess
@@ -38,7 +39,14 @@ FAKE_INFECT = {"name": "Cardkit Test Plaguebearer", "mana_cost": "{1}{B}", "type
 FAKE_COMBO = {"name": "Cardkit Test Martyr", "mana_cost": "{1}{W}", "type_line": "Creature \u2014 Human Warrior",
               "oracle_text": "Martyrdom \u2014 When this creature dies, you gain 2 life and draw two cards.",
               "power": "2", "toughness": "2", "color_identity": ["W"], "keywords": ["Martyrdom"], "layout": "normal"}
-FAKES = {repo.normalize_name(c["name"]): c for c in (FAKE_SUPPORTED, FAKE_GAP, FAKE_UNKNOWN_KW, FAKE_INFECT, FAKE_COMBO)}
+FAKE_REVEAL = {"name": "Cardkit Test Harbor", "type_line": "Land", "color_identity": ["W", "U"], "keywords": [],
+               "oracle_text": "As this land enters, you may reveal a Plains or Island card from your hand. If you don't, "
+                              "this land enters tapped.\n{T}: Add {W} or {U}.", "layout": "normal"}
+FAKE_VARIANT = {"name": "Cardkit Test Monument", "mana_cost": "{5}", "type_line": "Artifact", "color_identity": [],
+                "keywords": [], "layout": "normal",
+                "oracle_text": "Whenever you tap a permanent for {C}, add an additional {C}."}
+FAKES = {repo.normalize_name(c["name"]): c for c in (FAKE_SUPPORTED, FAKE_GAP, FAKE_UNKNOWN_KW, FAKE_INFECT, FAKE_COMBO,
+                                                     FAKE_REVEAL, FAKE_VARIANT)}
 
 
 def with_fake_oracle(test):
@@ -160,12 +168,13 @@ class ReadinessTests(unittest.TestCase):
     def test_registered_tested_custom_card(self):
         v = readiness.classify("Space Marine Scout")
         self.assertEqual(v["readiness"], "IMPLEMENTED_AND_TESTED")
-        self.assertEqual(v["source"], "custom")
+        self.assertEqual(v["source"], "custom:custom-card-scenario-test")
 
     def test_argentum_library_card(self):
         v = readiness.classify("Sol Ring")
         self.assertEqual(v["readiness"], "IMPLEMENTED_AND_TESTED")
-        self.assertEqual(v["source"], "argentum-library")
+        self.assertEqual(v["source"], "argentum-indexed")
+        self.assertIn("no Arcana card-specific scenario", v["reasons"][0])
 
     def test_recorded_engine_gap_routes_to_claude(self):
         v = readiness.classify("Port Town")
@@ -195,6 +204,25 @@ class ReadinessTests(unittest.TestCase):
         self.assertEqual(v["keywords"], [])
 
     @with_fake_oracle
+    def test_blocked_mechanic_blocks_every_card_with_that_wording(self):
+        v = readiness.classify("Cardkit Test Harbor")
+        self.assertEqual(v["readiness"], "ENGINE_BLOCKED", v["reasons"])
+        self.assertIn("as-enters reveal", " ".join(v["reasons"]))
+
+    @with_fake_oracle
+    def test_near_variant_wording_is_not_supported_without_verification(self):
+        v = readiness.classify("Cardkit Test Monument")
+        self.assertEqual(v["readiness"], "NEEDS_REVIEW", v["reasons"])
+        self.assertEqual(v["reviewHint"], "near-variant")
+        self.assertIn("permanent", " ".join(v["reasons"]))
+
+    def test_verified_support_and_blockers_never_overlap(self):
+        blocked = {repo.normalize_name(k) for k in readiness.blockers()["cards"]}
+        self.assertFalse(blocked & set(readiness.verified_support()))
+        for name, entry in readiness.verified_support().items():
+            self.assertTrue(entry["summary"] and entry["references"], name)
+
+    @with_fake_oracle
     def test_unmatched_line_is_review_with_gap_hint(self):
         v = readiness.classify("Cardkit Test Oddity")
         self.assertEqual(v["readiness"], "NEEDS_REVIEW")
@@ -211,6 +239,71 @@ class ReadinessTests(unittest.TestCase):
     def test_blocked_keyword(self):
         v = readiness.classify("Cardkit Test Plaguebearer")
         self.assertEqual(v["readiness"], "ENGINE_BLOCKED")
+
+
+class UnitCommandTests(unittest.TestCase):
+    """`cardkit unit` must fail closed: no queue body for anything that is not dispatchable."""
+
+    def _run(self, *args):
+        return subprocess.run([sys.executable, str(HERE.parent / "cardkit.py"), "unit", *args],
+                              capture_output=True, text=True)
+
+    def test_blocked_and_implemented_cards_are_refused_even_with_allow_review(self):
+        for card in ("Port Town", "Sol Ring", "Space Marine Scout"):
+            res = self._run(card, "--allow-review")
+            self.assertNotEqual(res.returncode, 0, card)
+            self.assertNotIn("## Cards", res.stdout, card)
+            self.assertIn("No queue body printed", res.stderr)
+
+    def test_missing_oracle_is_refused(self):
+        res = self._run("Cardkit Definitely Not A Card", "--allow-review")
+        self.assertNotEqual(res.returncode, 0)
+        self.assertEqual(res.stdout, "")
+
+    def test_one_bad_card_refuses_the_whole_unit(self):
+        res = self._run("Port Town", "Mawloc")
+        self.assertNotEqual(res.returncode, 0)
+        self.assertEqual(res.stdout, "")
+
+    @with_fake_oracle
+    def test_unverifiable_claims_refuse_dispatch(self):
+        import cardkit
+        with mock.patch.object(gaps, "open_pr_claims", side_effect=gaps.ClaimsUnavailable("gh missing")):
+            out = io.StringIO()
+            with mock.patch("sys.stdout", out), mock.patch("sys.stderr", io.StringIO()):
+                code = cardkit.main(["unit", "Cardkit Test Scout"])
+        self.assertEqual(code, 1)
+        self.assertEqual(out.getvalue(), "")
+
+    @with_fake_oracle
+    def test_supported_unclaimed_card_prints_body_and_review_needs_flag(self):
+        import cardkit
+        with mock.patch.object(gaps, "open_pr_claims", return_value=[]):
+            out = io.StringIO()
+            with mock.patch("sys.stdout", out), mock.patch("sys.stderr", io.StringIO()):
+                self.assertEqual(cardkit.main(["unit", "Cardkit Test Scout"]), 0)
+            self.assertIn("## Cards", out.getvalue())
+            with mock.patch("sys.stdout", io.StringIO()), mock.patch("sys.stderr", io.StringIO()):
+                self.assertEqual(cardkit.main(["unit", "Cardkit Test Monument"]), 1)
+            out = io.StringIO()
+            with mock.patch("sys.stdout", out), mock.patch("sys.stderr", io.StringIO()):
+                self.assertEqual(cardkit.main(["unit", "Cardkit Test Monument", "--allow-review"]), 0)
+            self.assertIn("Triage required", out.getvalue())
+
+    @with_fake_oracle
+    def test_claimed_card_is_refused(self):
+        import cardkit
+        prs = [{"number": 9, "title": "Add Cardkit Test Scout", "branch": "copilot/x", "body": ""}]
+        with mock.patch.object(gaps, "open_pr_claims", return_value=prs), \
+                mock.patch("sys.stdout", io.StringIO()) as out, mock.patch("sys.stderr", io.StringIO()):
+            self.assertEqual(cardkit.main(["unit", "Cardkit Test Scout"]), 1)
+        self.assertEqual(out.getvalue(), "")
+
+    def test_gaps_without_claims_is_marked_not_dispatchable(self):
+        r = gaps.analyze(gaps.load_decks(), use_refs=False)
+        self.assertFalse(r["dispatch"]["dispatchable"])
+        r = gaps.analyze(gaps.load_decks(), use_refs=False, claims=[])
+        self.assertTrue(r["dispatch"]["dispatchable"])
 
 
 class DecklistTests(unittest.TestCase):
@@ -242,7 +335,7 @@ class GapsTests(unittest.TestCase):
         for d in result["decks"]:
             self.assertIn(f"{d['name']}: {d['playableSlots']}/100 supported", audit)
         self.assertEqual(sum(result["totals"].values()), len(result["cards"]))
-        self.assertEqual(set(result["dispatch"]), {"copilot", "claude", "gpt", "claimed"})
+        self.assertEqual(set(result["dispatch"]), {"copilot", "claude", "gpt", "claimed", "claimsVerified", "dispatchable"})
 
     @with_fake_oracle
     def test_open_pr_claims_keep_cards_out_of_dispatch(self):

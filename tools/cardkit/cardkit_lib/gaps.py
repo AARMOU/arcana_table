@@ -25,17 +25,23 @@ def load_decks(manifest: Path | None = None, deck_files: list[Path] | None = Non
     return decks
 
 
+class ClaimsUnavailable(RuntimeError):
+    """Open-PR claims could not be read; callers that dispatch work must fail closed."""
+
+
 def open_pr_claims(repo_slug: str = "AARMOU/arcana_table") -> list[dict]:
-    """Open PRs (number, title, branch, body) via the GitHub CLI; [] when gh is unavailable."""
+    """Every open PR (number, title, branch, body) via the GitHub CLI, all pages. Raises ClaimsUnavailable."""
     import subprocess
     try:
-        out = subprocess.run(["gh", "api", f"repos/{repo_slug}/pulls?state=open&per_page=100", "--jq",
-                              "[.[] | {number, title, branch: .head.ref, body: (.body // \"\")[0:4000]}]"],
-                             capture_output=True, text=True, timeout=60, check=True).stdout
-        return json.loads(out or "[]")
-    except Exception as exc:  # noqa: BLE001 - optional enrichment
-        print(f"warning: could not read open PRs ({exc}); claims not applied")
-        return []
+        out = subprocess.run(["gh", "api", "--paginate", f"repos/{repo_slug}/pulls?state=open&per_page=100", "--jq",
+                              ".[] | {number, title, branch: .head.ref, body: (.body // \"\")[0:4000]}"],
+                             capture_output=True, text=True, timeout=120, check=True).stdout
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ClaimsUnavailable(f"could not read open PRs via gh: {exc}") from exc
+    try:
+        return [json.loads(l) for l in out.splitlines() if l.strip()]
+    except json.JSONDecodeError as exc:
+        raise ClaimsUnavailable(f"unexpected gh output: {exc}") from exc
 
 
 def _claimed_by(name: str, prs: list[dict]) -> tuple[str | None, list[str]]:
@@ -87,16 +93,21 @@ def analyze(decks: list[dict], use_refs: bool = True, claims: list[dict] | None 
     groups: dict[str, list[str]] = defaultdict(list)
     for c in missing:
         groups[(c["mechanics"] or ["other"])[0]].append(c["name"])
+    claims_verified = claims is not None
     free = [c for c in missing if not c.get("claimedBy")]
     dispatch = {
         "copilot": [c["name"] for c in free if c["route"] == "copilot"],
         "claude": [c["name"] for c in free if c["route"] == "claude"],
         "gpt": [c["name"] for c in free if c["route"] == "gpt"],
         "claimed": {c["name"]: c["claimedBy"] for c in missing if c.get("claimedBy")},
+        "claimsVerified": claims_verified,
+        "dispatchable": claims_verified,
     }
     return {
         "schema": "arcana-cardkit-gaps/1",
-        "note": "Readiness is evidence for routing, not a gameplay certification; every card still needs real scenario tests.",
+        "note": "Readiness is evidence for routing, not a gameplay certification; every card still needs real scenario "
+                "tests. dispatch.dispatchable is false unless open-PR claims were read successfully "
+                "(--claims-from-github); automated dispatch must refuse when it is false.",
         "decks": per_deck,
         "totals": {r: sum(1 for c in cards if c["readiness"] == r) for r in ORDER},
         "missingByMechanic": {k: sorted(v, key=str.casefold) for k, v in sorted(groups.items())},
@@ -129,9 +140,13 @@ def render_md(result: dict, title: str = "Card readiness") -> str:
     return "\n".join(lines) + "\n"
 
 
-def queue_unit(cards: list[dict], base: str = "gpt/arcana-integration-next") -> str:
-    """An `[Arcana Queue]` issue body (dispatcher format) for SUPPORTED cards. Printed, never filed."""
-    out = ["## Cards", ""]
+def queue_unit(cards: list[dict], base: str = "gpt/arcana-integration-next", review: list[str] | None = None) -> str:
+    """An `[Arcana Queue]` issue body (dispatcher format). Printed, never filed. Callers enforce eligibility."""
+    out = []
+    if review:
+        out += [f"> **Triage required:** {', '.join(review)} classified NEEDS_REVIEW; included by explicit --allow-review. "
+                "Not an authorization.", ""]
+    out += ["## Cards", ""]
     out += [f"- {c['name']}" for c in cards]
     out += ["", "## Acceptance", ""]
     for c in cards:

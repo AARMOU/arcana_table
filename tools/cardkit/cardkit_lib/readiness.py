@@ -61,6 +61,22 @@ def _blocked_card(name: str) -> dict | None:
     return cards.get(repo.normalize_name(name))
 
 
+def _blocked_pattern(oracle_text: str) -> dict | None:
+    """A recorded engine gap whose rules wording appears on this card (keeps equivalent cards consistent)."""
+    norm = "\n".join(text.normalize_line(l) for l in text.split_lines(oracle_text))
+    for entry in blockers().get("patterns", []):
+        if re.search(entry["regex"], norm, re.I | re.M):
+            return entry
+    return None
+
+
+@lru_cache(maxsize=1)
+def verified_support() -> dict:
+    path = repo.DATA_DIR / "verified-support.json"
+    data = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
+    return {repo.normalize_name(k): v for k, v in data.get("cards", {}).items()}
+
+
 def _blocked_keyword(keyword: str) -> dict | None:
     kws = {k.casefold(): v for k, v in blockers().get("keywords", {}).items()}
     return kws.get(keyword.casefold())
@@ -123,9 +139,14 @@ def implementation_state(name: str) -> tuple[str | None, list[str], str | None]:
             return "NEEDS_REVIEW", [f"definition exists but is not registered in CustomCards.kt: {repo.rel(custom.path)}"], "custom"
         if not tests:
             return "NEEDS_REVIEW", ["registered custom card without a scenario test"], "custom"
-        return "IMPLEMENTED_AND_TESTED", [f"custom card {repo.rel(custom.path)} with {len(tests)} test file(s)"], "custom"
+        own = repo.own_test(custom.val)
+        level = "custom-card-scenario-test" if own else "custom-shared-test"
+        return "IMPLEMENTED_AND_TESTED", [f"registered custom card {repo.rel(custom.path)}; "
+                                          + (f"card-specific scenario test {repo.rel(own)}" if own else
+                                             f"exercised by {len(tests)} shared test file(s), no card-specific scenario file")], "custom:" + level
     if repo.library_index().get(key) in ("card", "basic"):
-        return "IMPLEMENTED_AND_TESTED", ["Argentum library card (engine-native)"], "argentum-library"
+        return "IMPLEMENTED_AND_TESTED", ["indexed in Argentum's library (implemented upstream; no Arcana card-specific "
+                                          "scenario is implied)"], "argentum-indexed"
     return None, [], None
 
 
@@ -147,8 +168,14 @@ def classify(name: str, use_refs: bool = True) -> dict:
         if card:
             result["mechanics"] += mechanics(card.get("oracle_text", ""), card.get("keywords", []))
         return result
+    pattern = _blocked_pattern(card.get("oracle_text", "")) if card else None
+    if pattern:
+        result.update(readiness="ENGINE_BLOCKED", route="claude", mechanics=["engine-blocked"])
+        result["reasons"].append(f"rules text matches recorded engine gap '{pattern['name']}': {pattern['reason']} "
+                                 f"({pattern['source']})")
+        return result
     if not card:
-        result.update(readiness="NEEDS_REVIEW", route="gpt")
+        result.update(readiness="NEEDS_REVIEW", route="gpt", oracleMissing=True)
         result["reasons"].append("no cached Oracle record: run `tools/cardkit/cardkit oracle fetch` (needs Scryfall access)")
         return result
     otext = card.get("oracle_text", "")
@@ -183,9 +210,24 @@ def classify(name: str, use_refs: bool = True) -> dict:
             result["lines"].append({"text": line, "kind": "rules", **scored})
             if best < GAP_SCORE:
                 gap = True
+    variants = [l for l in result["lines"] if l["kind"] == "rules" and l.get("differences")]
+    verified = verified_support().get(repo.normalize_name(name))
     if not unknown and card.get("layout") not in MULTI_FACE and worst >= SUPPORTED_SCORE and not result["reasons"]:
+        if variants and not verified:
+            result.update(readiness="NEEDS_REVIEW", route="gpt", reviewHint="near-variant")
+            for l in variants:
+                for d in l["differences"]:
+                    result["reasons"].append(
+                        f"wording differs from {d['against']}: card has {d.get('cardOnly') or '-'}, reference has "
+                        f"{d.get('referenceOnly') or '-'} — confirm the engine supports that difference, then record it "
+                        f"in tools/cardkit/data/verified-support.json")
+            return result
         result.update(readiness="SUPPORTED", route="copilot")
-        result["reasons"].append(f"every rules line matches an implemented card at >= {SUPPORTED_SCORE}")
+        result["reasons"].append(f"every rules line matches an implemented card at >= {SUPPORTED_SCORE}"
+                                 + (" with no rules-relevant wording difference" if not variants else ""))
+        if verified:
+            result["verifiedSupport"] = verified
+            result["reasons"].append(f"wording differences verified against engine source: {verified['summary']}")
         return result
     if worst < SUPPORTED_SCORE:
         weak = [l["text"] for l in result["lines"] if l["kind"] == "rules" and l["score"] < SUPPORTED_SCORE]

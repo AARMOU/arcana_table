@@ -1,36 +1,176 @@
 {
-  "_about": "Engine gaps recorded by earlier verified work. cardkit marks matching cards ENGINE_BLOCKED and routes them to Claude. Add an entry only with a source (issue, PR, doc) that reproduced the gap on the pinned engine; remove it when the primitive lands. 'verified': false = reported by a worker but not yet independently reproduced.",
+  "_about": "Engine gaps recorded by earlier verified work. cardkit marks matching cards ENGINE_BLOCKED and routes them to Claude. Add an entry only with a source (issue, PR, doc) that reproduced the gap on the pinned engine; remove it when the primitive lands. 'verified': false = reported by a worker but not yet independently reproduced. 'patterns' match normalized rules text (card name → ~, numbers → n) so every card that needs the same missing primitive is classified the same way.",
   "cards": {
-    "Acolyte Hybrid": {"reason": "needs the outcome of one specific Destroy (did it destroy that artifact?) to give its controller a draw; no effect-local destroy result", "source": "#137 / #138 / #141 Priority A", "verified": false},
-    "Arcane Lighthouse": {"reason": "until end of turn, opponents' creatures lose hexproof and shroud AND can't have either; only hexproof suppression exists", "source": "#134 / #135 / #141 Priority B", "verified": false},
-    "Port Town": {"reason": "as-enters reveal-from-hand replacement (reveal a Plains or Island card or enter tapped)", "source": "#134 / #135 / #141 Priority C", "verified": false},
-    "Fortified Village": {"reason": "as-enters reveal-from-hand replacement", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Furycalm Snarl": {"reason": "as-enters reveal-from-hand replacement", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Alms Collector": {"reason": "replace only the extra cards of a multi-card draw and redistribute them", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Bruvac the Grandiloquent": {"reason": "mill multiplier; the engine's mill modifier only adds a fixed amount", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Heroes in a Half Shell": {"reason": "effect cannot see the whole group of creatures from one damage event", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Locke, Treasure Hunter": {"reason": "cannot gather milled cards from every library and grant casting from that group", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Ratchet, Field Medic": {"reason": "Living metal and convert are not represented", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Vadrok, Apex of Thunder": {"reason": "mutate plus free cast from graveyard combination", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Doubling Cube": {"reason": "doubling the mana already in a mana pool", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Jeweled Lotus": {"reason": "mana spend restriction to casting a commander", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Mox Diamond": {"reason": "enters-the-battlefield replacement that discards a land card", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Ephemerate": {"reason": "immediate exile-and-return of any creature (the SDK version is limited to double-faced cards)", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Determined Iteration": {"reason": "cannot give the populated token haste and schedule its sacrifice", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Lotus Vale": {"reason": "enters-the-battlefield replacement that sacrifices two untapped lands", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Gemstone Caverns": {"reason": "starting-hand / game-start replacement effect", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Tippy-Toe, Terrific Partner": {"reason": "token-copy replacement behavior", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Pulmonic Sliver": {"reason": "optional replacement effect", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Goblin Welder": {"reason": "simultaneous battlefield/graveyard zone swap", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Devil Dinosaur": {"reason": "opponent-only hexproof static is rejected by the pinned SDK at script init", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Zilortha, Strength Incarnate": {"reason": "changes the lethal-damage rule", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Sunfrill Imitator": {"reason": "permanent-copy effect", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true},
-    "Thunderherd Migration": {"reason": "reveal-or-pay additional cost", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md", "verified": true}
+    "Acolyte Hybrid": {
+      "reason": "needs the outcome of one specific Destroy (did it destroy that artifact?) to give its controller a draw; no effect-local destroy result",
+      "source": "#137 / #138 / #141 Priority A",
+      "verified": false
+    },
+    "Arcane Lighthouse": {
+      "reason": "until end of turn, opponents' creatures lose hexproof and shroud AND can't have either; only hexproof suppression exists",
+      "source": "#134 / #135 / #141 Priority B",
+      "verified": false
+    },
+    "Port Town": {
+      "reason": "as-enters reveal-from-hand replacement (reveal a Plains or Island card or enter tapped)",
+      "source": "#134 / #135 / #141 Priority C",
+      "verified": false
+    },
+    "Fortified Village": {
+      "reason": "as-enters reveal-from-hand replacement",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Furycalm Snarl": {
+      "reason": "as-enters reveal-from-hand replacement",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Alms Collector": {
+      "reason": "replace only the extra cards of a multi-card draw and redistribute them",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Bruvac the Grandiloquent": {
+      "reason": "mill multiplier; the engine's mill modifier only adds a fixed amount",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Heroes in a Half Shell": {
+      "reason": "effect cannot see the whole group of creatures from one damage event",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Locke, Treasure Hunter": {
+      "reason": "cannot gather milled cards from every library and grant casting from that group",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Ratchet, Field Medic": {
+      "reason": "Living metal and convert are not represented",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Vadrok, Apex of Thunder": {
+      "reason": "mutate plus free cast from graveyard combination",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Doubling Cube": {
+      "reason": "doubling the mana already in a mana pool",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Jeweled Lotus": {
+      "reason": "mana spend restriction to casting a commander",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Mox Diamond": {
+      "reason": "enters-the-battlefield replacement that discards a land card",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Ephemerate": {
+      "reason": "immediate exile-and-return of any creature plus rebound (recorded as limited to double-faced cards before the 2026-10-22 engine upgrade)",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": false,
+      "recheck": "Pinned upstream Emiel the Blessed implements exile-then-return with Effects.Move(…, Zone.EXILE) then Effects.Move(…, Zone.BATTLEFIELD), so the exile-and-return half appears available now; reproduce before relying on this entry or deleting it."
+    },
+    "Determined Iteration": {
+      "reason": "cannot give the populated token haste and schedule its sacrifice",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Lotus Vale": {
+      "reason": "enters-the-battlefield replacement that sacrifices two untapped lands",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Gemstone Caverns": {
+      "reason": "starting-hand / game-start replacement effect",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Tippy-Toe, Terrific Partner": {
+      "reason": "token-copy replacement behavior",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Pulmonic Sliver": {
+      "reason": "optional replacement effect",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Goblin Welder": {
+      "reason": "simultaneous battlefield/graveyard zone swap",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Devil Dinosaur": {
+      "reason": "opponent-only hexproof static is rejected by the pinned SDK at script init",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Zilortha, Strength Incarnate": {
+      "reason": "changes the lethal-damage rule",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Sunfrill Imitator": {
+      "reason": "permanent-copy effect",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Thunderherd Migration": {
+      "reason": "reveal-or-pay additional cost",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    }
   },
   "keywords": {
-    "Infect": {"reason": "infect is not in the pinned Keyword enum; damage would not become poison/-1/-1 counters", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Blightsteel Colossus)", "verified": true},
-    "Prowl": {"reason": "Prowl's alternative cost is not available", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Hunting Velociraptor)", "verified": true},
-    "Living metal": {"reason": "Living metal is not represented", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Ratchet)", "verified": true},
-    "More Than Meets the Eye": {"reason": "converting is not represented", "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Transformers cards)", "verified": true}
-  }
+    "Infect": {
+      "reason": "infect is not in the pinned Keyword enum; damage would not become poison/-1/-1 counters",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Blightsteel Colossus)",
+      "verified": true
+    },
+    "Prowl": {
+      "reason": "Prowl's alternative cost is not available",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Hunting Velociraptor)",
+      "verified": true
+    },
+    "Living metal": {
+      "reason": "Living metal is not represented",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Ratchet)",
+      "verified": true
+    },
+    "More Than Meets the Eye": {
+      "reason": "converting is not represented",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Transformers cards)",
+      "verified": true
+    }
+  },
+  "patterns": [
+    {
+      "name": "as-enters reveal from hand",
+      "regex": "as ~ enters, you may reveal an? .* card from your hand",
+      "reason": "as-enters reveal-from-hand replacement",
+      "source": "#141 Priority C (Port Town); CUSTOM_CARDS_HANDOFF.md (Fortified Village, Furycalm Snarl)",
+      "verified": false
+    },
+    {
+      "name": "lose and can't have hexproof/shroud",
+      "regex": "lose hexproof and shroud and can't have hexproof or shroud",
+      "reason": "duration effect that removes hexproof/shroud and prevents gaining them",
+      "source": "#141 Priority B (Arcane Lighthouse)",
+      "verified": false
+    },
+    {
+      "name": "outcome of a specific destroy",
+      "regex": "if (that|the) [^.]* (is|was) destroyed this way|if [^.]* destroyed this way, its controller",
+      "reason": "branching on whether one particular Destroy actually destroyed its target",
+      "source": "#141 Priority A (Acolyte Hybrid)",
+      "verified": false
+    }
+  ]
 }

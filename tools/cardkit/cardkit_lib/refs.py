@@ -8,6 +8,7 @@ library card's source in the pinned upstream Argentum commit.
 from __future__ import annotations
 
 import math
+import re
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from difflib import SequenceMatcher
@@ -97,6 +98,34 @@ class Index:
 
 
 COMBINATION_PENALTY = 0.04
+TRIVIAL = {"n", "{n}", "{m}", "{x}", "x", "a", "an", "the", "~", "and", "of", "-", ":", "s", "'s",
+           "white", "blue", "black", "red", "green", "that", "this", "it", "its", "one", "each"}
+
+
+def proper_words(line: str) -> set[str]:
+    """Lower-cased words written capitalized mid-sentence: subtypes and names (Astartes, Plains, Eldrazi)."""
+    out = set()
+    for sent in re.split(r"(?<=[.:\u2014\"])\s+", line):
+        words = re.findall(r"[A-Za-z][\w'\-]*", sent)
+        for w in words[1:]:
+            if w[0].isupper():
+                out.add(w.casefold())
+    return out
+
+
+def differences(query_norm: str, ref_norm: str, trivial: set[str]) -> dict:
+    """Non-trivial words present in only one of two normalized lines (what changes the rules)."""
+    q, r = text.tokens(query_norm), text.tokens(ref_norm)
+    q_only, r_only = [], []
+    for tag, i1, i2, j1, j2 in SequenceMatcher(None, q, r, autojunk=False).get_opcodes():
+        if tag in ("replace", "delete"):
+            q_only += q[i1:i2]
+        if tag in ("replace", "insert"):
+            r_only += r[j1:j2]
+    ok = TRIVIAL | trivial
+    q_only = [t for t in q_only if t not in ok]
+    r_only = [t for t in r_only if t not in ok]
+    return {"cardOnly": q_only, "referenceOnly": r_only} if (q_only or r_only) else {}
 
 
 def score_line(line: str, card_name: str = "", k: int = 3, exclude: str | None = None) -> dict:
@@ -104,6 +133,7 @@ def score_line(line: str, card_name: str = "", k: int = 3, exclude: str | None =
 
     score = max(best whole-line similarity, weakest clause similarity - COMBINATION_PENALTY)."""
     norm = text.normalize_line(line, card_name)
+    trivial = proper_words(line)
     whole = index().search_norm(norm, k, exclude)
     best_whole = whole[0].score if whole else 0.0
     parts = text.clauses(norm)
@@ -112,10 +142,17 @@ def score_line(line: str, card_name: str = "", k: int = 3, exclude: str | None =
         for part in parts:
             ms = clause_index().search_norm(part, 1, exclude)
             clause_info.append({"clause": part, "score": round(ms[0].score, 3) if ms else 0.0,
-                                "match": ms[0].to_json() if ms else None})
+                                "match": ms[0].to_json() if ms else None,
+                                "differences": differences(part, ms[0].ref.norm, trivial) if ms else {}})
     combo = (min(c["score"] for c in clause_info) - COMBINATION_PENALTY) if clause_info else 0.0
+    if combo > best_whole:
+        diffs = [{"clause": c["clause"], "against": c["match"]["card"], **c["differences"]}
+                 for c in clause_info if c["differences"]]
+    else:
+        diffs = ([{"against": whole[0].ref.card, **differences(norm, whole[0].ref.norm, trivial)}]
+                 if whole and differences(norm, whole[0].ref.norm, trivial) else [])
     return {"score": round(max(best_whole, combo), 3), "wholeScore": round(best_whole, 3),
-            "matches": [m.to_json() for m in whole], "clauses": clause_info}
+            "matches": [m.to_json() for m in whole], "clauses": clause_info, "differences": diffs}
 
 
 @lru_cache(maxsize=1)

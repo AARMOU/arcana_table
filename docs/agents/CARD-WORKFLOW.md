@@ -22,14 +22,21 @@ Each card gets one readiness class:
 | Readiness | Meaning | Who |
 |---|---|---|
 | `SUPPORTED` | every rules line matches an already-implemented card; no unknown keyword | Copilot / GPT |
-| `NEEDS_REVIEW` | no cached Oracle text, an unmatched line, an unknown keyword, multi-face, or a scaffold in progress | GPT triage; `reviewHint: possible-engine-gap` → Claude |
+| `NEEDS_REVIEW` | no cached Oracle text, an unmatched line, an unknown keyword, multi-face, a scaffold in progress, or `near-variant` wording (a rules word differs from the closest implemented card) | GPT triage; `reviewHint: possible-engine-gap` → Claude |
 | `ENGINE_BLOCKED` | a recorded engine gap applies (`tools/cardkit/data/known-blockers.json`) | Claude (issue #141) |
-| `IMPLEMENTED_AND_TESTED` | Argentum library card, or registered custom card with a scenario test | nobody |
+| `IMPLEMENTED_AND_TESTED` | indexed in Argentum's library (`source: argentum-indexed` — implemented upstream, no Arcana card-specific scenario implied), or a registered custom card with a test | nobody |
 
 `SUPPORTED` is evidence, not a promise: it means the engine already expresses each sentence somewhere.
-The JSON's `dispatch` block lists names per route. `tools/cardkit/cardkit unit "A" "B"` prints an
-`[Arcana Queue]` issue body (dispatcher format) for SUPPORTED cards; it never files anything — opening a
-queue issue is an owner decision because it can spend Copilot credits.
+The JSON's `dispatch` block lists names per route; `dispatch.dispatchable` is `false` unless open-PR
+claims were read (`--claims-from-github`), and automated dispatch must refuse when it is false.
+`tools/cardkit/cardkit unit "A" "B"` prints an `[Arcana Queue]` issue body (dispatcher format) and fails
+closed (blocked, implemented, uncached or claimed cards, or unreadable claims → no body, exit 1). It never
+files anything — opening a queue issue is an owner decision because it can spend Copilot credits, and the
+dispatcher's own admission controls still apply.
+
+A near-variant can be cleared by inspecting the engine source for the differing word and recording the
+primitive and reference in `tools/cardkit/data/verified-support.json` (source inspection, not proof — the
+card's own tests still are).
 
 ## 2. Classify one card and read its references
 

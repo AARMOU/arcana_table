@@ -67,7 +67,13 @@ def cmd_similar(a) -> int:
 
 def cmd_gaps(a) -> int:
     decks = gaps.load_decks(a.manifest, a.deck)
-    claims = gaps.open_pr_claims() if a.claims_from_github else None
+    claims = None
+    if a.claims_from_github:
+        try:
+            claims = gaps.open_pr_claims()
+        except gaps.ClaimsUnavailable as exc:
+            print(f"ERROR: {exc}; refusing to produce dispatch lists without verified claims", file=sys.stderr)
+            return 4
     result = gaps.analyze(decks, use_refs=not a.no_refs, claims=claims)
     if a.json_output:
         a.json_output.parent.mkdir(parents=True, exist_ok=True)
@@ -82,18 +88,44 @@ def cmd_gaps(a) -> int:
     print(f"DISTINCT: implemented {t['IMPLEMENTED_AND_TESTED']}, supported {t['SUPPORTED']}, "
           f"needs review {t['NEEDS_REVIEW']}, engine-blocked {t['ENGINE_BLOCKED']}")
     print("ROUTES: " + ", ".join(f"{k} {len(v)}" for k, v in result["dispatch"].items())
-          + ("" if claims is not None else " (open-PR claims not checked; add --claims-from-github)"))
+          + ("" if claims is not None else " — NOT DISPATCHABLE: open-PR claims not checked (add --claims-from-github)"))
     return 0
 
 
 def cmd_unit(a) -> int:
+    """Fails closed: prints nothing unless every card is dispatchable and open-PR claims were verified."""
     verdicts = [readiness.classify(n) for n in a.names]
-    bad = [v for v in verdicts if v["readiness"] != "SUPPORTED"]
-    for v in bad:
-        print(f"refusing {v['name']}: {v['readiness']} — " + "; ".join(v["reasons"]), file=sys.stderr)
-    if bad and not a.allow_review:
+    refused, warned = [], []
+    for v in verdicts:
+        r = v["readiness"]
+        if r in ("ENGINE_BLOCKED", "IMPLEMENTED_AND_TESTED"):
+            refused.append((v, f"{r} is never dispatchable"))
+        elif v.get("oracleMissing") or not v.get("oracle"):
+            refused.append((v, "no Oracle record; fail closed"))
+        elif r == "NEEDS_REVIEW":
+            if a.allow_review:
+                warned.append(v)
+            else:
+                refused.append((v, "NEEDS_REVIEW (pass --allow-review only after owner/GPT triage)"))
+    if not refused:
+        try:
+            prs = gaps.open_pr_claims()
+        except gaps.ClaimsUnavailable as exc:
+            print(f"refusing: {exc}. A queue unit needs verified open-PR claims.", file=sys.stderr)
+            return 1
+        for v in verdicts:
+            by, _ = gaps._claimed_by(v["name"], prs)
+            if by:
+                refused.append((v, f"already claimed by {by}"))
+    for v, why in refused:
+        print(f"refusing {v['name']}: {why} — " + "; ".join(v["reasons"]), file=sys.stderr)
+    if refused:
+        print("No queue body printed.", file=sys.stderr)
         return 1
-    print(gaps.queue_unit([v for v in verdicts if v not in bad or a.allow_review]))
+    for v in warned:
+        print(f"WARNING: {v['name']} is NEEDS_REVIEW and included only because of --allow-review. This body is "
+              f"not an authorization; the dispatcher's own admission checks still apply.", file=sys.stderr)
+    print(gaps.queue_unit(verdicts, review=[v["name"] for v in warned]))
     return 0
 
 
@@ -218,7 +250,8 @@ def main(argv: list[str] | None = None) -> int:
 
     s = sub.add_parser("unit", help="[Arcana Queue] issue body for SUPPORTED cards")
     s.add_argument("names", nargs="+")
-    s.add_argument("--allow-review", action="store_true", help="include NEEDS_REVIEW cards (owner-approved only)")
+    s.add_argument("--allow-review", action="store_true",
+                   help="also allow NEEDS_REVIEW cards that have an Oracle record (after triage); never blocked or implemented cards")
     s.set_defaults(func=cmd_unit)
 
     s = sub.add_parser("newcard", help="scaffold a custom card + failing scenario test")
