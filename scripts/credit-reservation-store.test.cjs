@@ -100,3 +100,15 @@ test('incomplete legacy inventory cannot be used to claim readiness', async () =
   const r = await load({ ...f.args, expectedOperationIds: ['assign:old:unknown'] });
   assert.equal(r.ok, false);
 });
+
+test('write acknowledgement must match a trusted read-back comment ID', async () => {
+  const f = fixture();
+  const original = f.github.rest.issues.createComment;
+  f.github.rest.issues.createComment = async args => {
+    await original(args);
+    return { data: { id: 999999 } };
+  };
+  await assert.rejects(append({ ...f.args, event: reservation, expectedOperationIds: [reservation.id],
+    allowWrite: true, serializedControl: true }), /reservation-write-unverified/);
+  assert.equal(f.writes, 1);
+});
