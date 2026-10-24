@@ -1,0 +1,29 @@
+# Arcana Control — mobile dashboard (read-only v0.1)
+
+This is a **public read-only** dashboard for the public `AARMOU/arcana_table` GitHub repository. Designed for an Android Fold and ordinary phone browsers. It is intentionally self-contained with no package installation, backend credentials, third-party assets, cookies or analytics.
+
+## Data and limits
+
+On page load and on **Refresh**, the browser reads the public GitHub REST API:
+
+- `GET /repos/AARMOU/arcana_table/pulls?state=open&sort=updated&direction=desc&per_page=100`
+- `GET /repos/AARMOU/arcana_table/actions/runs?per_page=30`
+- `GET /repos/AARMOU/arcana_table/issues/81/comments?per_page=100&page=1` (also the last page if more than 100 comments)
+
+PRs are displayed as open/draft, not "currently coding". Running workflows refer only to the latest 30 returned runs. The GitHub REST API can rate-limit anonymous visitors (normally 60 requests/hour per IP); the dashboard gracefully shows unavailable/partial data instead of inventing numbers. The user can manually refresh; no background polling is installed.
+
+**Not provided by public GitHub:** live ChatGPT or Claude session presence, actual Copilot worker activity, real-time billing/budget/credit balances, branch protection configuration, actual readiness/repair variable values. These indicators are explicitly unknown and historical notes are labeled as such. Public visitor access is not suitable for viewing private usage data; any future private extension requires authentication, server-side access controls, and explicit authorization.
+
+## Local preview
+
+Open `control/index.html` in any browser, or serve with a static HTTP server. Public GitHub API calls require an internet connection.
+
+## Tests
+
+Run `node --test control/dashboard.test.cjs` from repository root. The 7 no-dependency static checks validate parsing, core views, public GET API endpoints and read-only guardrails.
+
+A separate local browser simulation was executed with mocked GitHub responses at 320px, 393px and 1365px widths: all three views navigated, data populated, no JavaScript exceptions or horizontal overflow. **A successful mock/browser test does not establish real-browser network success**; verify the deployed page against GitHub on a phone.
+
+## Publishing
+
+This folder is only exposed through the existing GitHub Pages site after the website workflow change is merged and GitHub Pages deployment succeeds. Proposed URL: `https://aarmou.github.io/arcana_table/control/` — **do not describe it as live until deployed and checked.** No changes to Android gameplay, billing settings, or paid workers are included.

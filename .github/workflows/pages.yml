@@ -8,6 +8,7 @@ on:
       - "privacy.html"
       - "closed-testing.html"
       - "assets/**"
+      - "control/**"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -31,6 +32,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
+      - name: Validate control dashboard
+        run: node --test control/dashboard.test.cjs
       - name: Stage the landing page
         run: |
           mkdir -p _site
@@ -38,6 +41,8 @@ jobs:
           cp privacy.html _site/privacy.html
           cp closed-testing.html _site/closed-testing.html
           cp -R assets _site/assets
+          mkdir -p _site/control
+          cp control/index.html _site/control/index.html
       - name: Upload site files
         uses: actions/upload-pages-artifact@v3
         with:
