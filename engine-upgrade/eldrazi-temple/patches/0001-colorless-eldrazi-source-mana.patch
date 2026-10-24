@@ -1,0 +1,94 @@
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt
+@@ -90,11 +90,27 @@
+      * [AbilityActivationOnly] for Sage of the Unknowable's "to cast a colorless spell or to
+      * activate an ability".
+      */
+-    @SerialName("ColorlessSpellsOnly")
+-    @Serializable
+-    data object ColorlessSpellsOnly : ManaRestriction {
+-        override val description: String = "Spend this mana only to cast colorless spells"
+-    }
++    @SerialName("ColorlessSpellsOnly")
++    @Serializable
++    data object ColorlessSpellsOnly : ManaRestriction {
++        override val description: String = "Spend this mana only to cast colorless spells"
++    }
++
++    /**
++     * "Spend this mana only to cast colorless [subtype] spells or activate abilities of
++     * colorless [subtype]." Both the spell and the ability's SOURCE must be colorless.
++     *
++     * This cannot be expressed by AllOf(ColorlessSpellsOnly,
++     * SubtypeSpellsOrAbilitiesOnly): ColorlessSpellsOnly rejects every ability activation.
++     * Conversely SubtypeSpellsOrAbilitiesOnly by itself accepts colored sources.
++     * Eldrazi Temple is the motivating card.
++     */
++    @SerialName("ColorlessSubtypeSpellsOrAbilitiesOnly")
++    @Serializable
++    data class ColorlessSubtypeSpellsOrAbilitiesOnly(val subtype: String) : ManaRestriction {
++        override val description: String =
++            "Spend this mana only to cast colorless $subtype spells or activate abilities of colorless $subtype"
++    }
+ 
+     /**
+      * "Spend this mana only on costs that contain {X}." Satisfied by casting a spell whose mana
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
+@@ -57,8 +57,14 @@
+     val cardTypes: Set<com.wingedsheep.sdk.core.CardType> = emptySet(),
+     val isAbilityActivation: Boolean = false,
+     /** Card types of the source whose ability is being activated (empty for spell-cast contexts). */
+-    val abilitySourceCardTypes: Set<com.wingedsheep.sdk.core.CardType> = emptySet(),
+-    /** True when the source whose ability is being activated is a permanent on the battlefield. */
++    val abilitySourceCardTypes: Set<com.wingedsheep.sdk.core.CardType> = emptySet(),
++    /**
++     * True only when the activated ability's SOURCE is colorless in its current zone.
++     * Not interchangeable with [isColorless], which describes a spell being cast.
++     * Defaults to false so omitted source characteristics cannot spend restricted mana.
++     */
++    val isAbilitySourceColorless: Boolean = false,
++    /** True when the source whose ability is being activated is a permanent on the battlefield. */
+     val isAbilitySourceOnBattlefield: Boolean = false,
+     /**
+      * True when the spell is being cast from the caster's hand. Defaults to `true` because most
+@@ -178,8 +178,12 @@
+             (context.manaValue >= minManaValue || (orXInCost && context.hasXInCost))
+     is ManaRestriction.CreatureSpellsOnly -> !context.isAbilityActivation && context.isCreature
+     is ManaRestriction.LegendarySpellsOnly -> !context.isAbilityActivation && context.isLegendary
+-    is ManaRestriction.ColorlessSpellsOnly -> context.isSpellCast && context.isColorless
+-    is ManaRestriction.SpellsWithExactColorCount -> context.isSpellCast && context.colorCount == count
++    is ManaRestriction.ColorlessSpellsOnly -> context.isSpellCast && context.isColorless
++    is ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly ->
++        context.subtypes.any { it.equals(subtype, ignoreCase = true) } &&
++            ((context.isSpellCast && context.isColorless) ||
++                (context.isAbilityActivation && context.isAbilitySourceColorless))
++    is ManaRestriction.SpellsWithExactColorCount -> context.isSpellCast && context.colorCount == count
+     is ManaRestriction.CostsContainingXOnly -> (context.isSpellCast || context.isAbilityActivation) && context.hasXInCost
+     is ManaRestriction.SubtypeSpellsOrAbilitiesOnly ->
+         (!creatureOnly || (!context.isAbilityActivation && context.isCreature)) &&
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
+@@ -40,9 +40,16 @@
+     val subtypes = paymentSubtypesOf(cardComponent) + projected.getSubtypes(sourceId)
+     return SpellPaymentContext(
+         isAbilityActivation = true,
+-        abilitySourceCardTypes = cardTypes,
+-        isAbilitySourceOnBattlefield = sourceId in projected.getBaseState().getBattlefield(),
+-        subtypes = subtypes,
++        abilitySourceCardTypes = cardTypes,
++        // Battlefield color-changing effects are authoritative; other zones use printed
++        // characteristics because the layer projector does not project those entities.
++        isAbilitySourceColorless = if (sourceId in projected.getBaseState().getBattlefield()) {
++            projected.getColors(sourceId).isEmpty()
++        } else {
++            cardComponent.colors.isEmpty()
++        },
++        isAbilitySourceOnBattlefield = sourceId in projected.getBaseState().getBattlefield(),
++        subtypes = subtypes,
+         isEquipAbilityActivation = ability?.isEquipAbility == true,
+         hasXInCost = ability?.cost?.extractManaCost()?.hasX == true,
+     )
