@@ -35,6 +35,12 @@ jobs:
       - name: Run custom-card scenario tests and Build 131 Android unit tests
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
+      # Debug-only test scenarios (PR #110) must never ship: release compiles the empty
+      # src/release stub. Only this test runs in the release variant, because the Compose UI
+      # tests need the debug-only ui-test-manifest and can't launch there.
+      - name: Check release build has no debug test scenarios
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest'
       - name: Check exported index consistency
         run: |
           python3 - <<'PY'
