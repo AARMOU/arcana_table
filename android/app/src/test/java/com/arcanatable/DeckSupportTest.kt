@@ -174,7 +174,7 @@ class DeckSupportTest {
         val library = File(assets, "argentum/custom-cards.jsonl")
         assumeTrue("custom-card JSONL present", library.isFile)
         val raw = library.useLines { lines ->
-            lines.firstOrNull { it.startsWith("{\\"name\\":\\"Ancient Copper Dragon\\"") }
+            lines.firstOrNull { JSONObject(it).optString("name") == "Ancient Copper Dragon" }
         } ?: error("Ancient Copper Dragon missing from custom export")
         val card = SupportedCardCatalog.parseLibraryLine(raw, custom = true, kind = "card")!!
         val preview = card.toScryfallCard()
