@@ -39,13 +39,30 @@ internal object TestScenarios {
             "+1/+1 counter, two Islands untapped. Activate “{2}, Remove two +1/+1 counters…: Draw a card.”",
     )
 
-    // The two Lunar Whale scenarios wait for draft PR #109 (Crew), per GPT's sequencing on #81.
-    val available: List<TestScenario> = listOf(IRON_SPIDER)
+    val WHALE_JUST_CAST = TestScenario(
+        id = "lunar-whale-just-cast",
+        title = "Lunar Whale — just cast, Crew",
+        description = "The Lunar Whale in hand, four Islands and a Llanowar Elves that entered this turn. Cast the " +
+            "Whale, then Crew 1 with the Elves. It can't attack this turn (summoning sick).",
+    )
+
+    val WHALE_HELD = TestScenario(
+        id = "lunar-whale-held",
+        title = "Lunar Whale — held since last turn, Crew then attack",
+        description = "Your turn 3: The Lunar Whale and a Llanowar Elves have been yours since your last turn. " +
+            "Crew 1 with the Elves, then attack with the Whale.",
+    )
+
+    val available: List<TestScenario> = listOf(IRON_SPIDER, WHALE_JUST_CAST, WHALE_HELD)
 
     private const val SPIDER = "Iron Spider, Stark Upgrade"
+    private const val WHALE = "The Lunar Whale"
+    private const val ELVES = "Llanowar Elves"
 
     fun build(scenario: TestScenario, library: OfflineCardLibrary): TestScenarioGame = when (scenario.id) {
         IRON_SPIDER.id -> ironSpider(library)
+        WHALE_JUST_CAST.id -> whaleJustCast(library)
+        WHALE_HELD.id -> whaleHeld(library)
         else -> error("Unknown test scenario ${scenario.id}")
     }
 
@@ -81,12 +98,23 @@ internal object TestScenarios {
             startingPlayerIndex = 0,
             format = Format.Standard,
         )
-        var state = GameInitializer(registry, services.printingRegistry).initializeGame(config).state
+        val state = GameInitializer(registry, services.printingRegistry).initializeGame(config).state
+        return passToYourMainPhase(state, services, afterTurn = 0)
+    }
+
+    /**
+     * Both players pass priority, as the engine runs it, until your precombat main phase of a turn
+     * after [afterTurn] with an empty stack. Nobody plays anything, so turns pass for real: untap,
+     * draw, and summoning sickness wear off exactly as in a game.
+     */
+    private fun passToYourMainPhase(start: GameState, services: EngineServices, afterTurn: Int): GameState {
+        var state = start
         val processor = ActionProcessor(services)
         var guard = 0
-        while (!(state.step == Step.PRECOMBAT_MAIN && state.activePlayerId == LocalArgentumHost.HUMAN_ID &&
+        while (!(state.turnNumber > afterTurn && state.step == Step.PRECOMBAT_MAIN && state.activePlayerId == LocalArgentumHost.HUMAN_ID &&
                 state.priorityPlayerId == LocalArgentumHost.HUMAN_ID && state.stack.isEmpty())) {
-            check(guard++ < 50) { "Scenario setup didn't reach your main phase (at ${state.step})." }
+            check(guard++ < 120) { "Scenario setup didn't reach your main phase (turn ${state.turnNumber}, ${state.step})." }
+            check(state.pendingDecision == null) { "Scenario setup stopped at a decision (turn ${state.turnNumber}, ${state.step})." }
             val priority = checkNotNull(state.priorityPlayerId) { "No player has priority during scenario setup (at ${state.step})." }
             val result = processor.process(state, PassPriority(priority)).result
             check(result.error == null) { "Scenario setup: ${result.error}" }
@@ -95,13 +123,49 @@ internal object TestScenarios {
         return state
     }
 
+    /** Whale in hand, cast for real by the player; the crew entered this turn (summoning sick). */
+    private fun whaleJustCast(library: OfflineCardLibrary): TestScenarioGame {
+        val you = LocalSeat("You", listOf(WHALE, ELVES) + List(38) { "Island" }, null)
+        val ai = LocalSeat("Scenario AI", List(40) { "Island" }, null)
+        val registry = CardRegistry().apply { register(library.load((you.deck + ai.deck).toSet())) }
+        val services = EngineServices(registry)
+        var state = mainPhaseOfYourFirstTurn(registry, services, you, ai)
+        val zones = ZoneTransitionService(registry, services.predicateEvaluator)
+        state = zones.moveToZone(state, yourCard(state, WHALE), Zone.HAND).state
+        state = zones.moveToZone(state, yourCard(state, ELVES), Zone.BATTLEFIELD).state
+        repeat(4) { state = zones.moveToZone(state, yourCard(state, "Island", Zone.LIBRARY), Zone.BATTLEFIELD).state }
+        return TestScenarioGame(listOf(you, ai), registry, checkpoint(state, you, ai))
+    }
+
+    /**
+     * Whale and Elves put onto your battlefield on turn 1, then both players pass through the AI's
+     * turn to your turn 3: they've been under your control continuously since that turn began, so
+     * the engine itself clears summoning sickness. The AI has one Island out (from its hand) so it
+     * doesn't have to discard at its cleanup step.
+     */
+    private fun whaleHeld(library: OfflineCardLibrary): TestScenarioGame {
+        val you = LocalSeat("You", listOf(WHALE, ELVES) + List(38) { "Island" }, null)
+        val ai = LocalSeat("Scenario AI", List(40) { "Island" }, null)
+        val registry = CardRegistry().apply { register(library.load((you.deck + ai.deck).toSet())) }
+        val services = EngineServices(registry)
+        var state = mainPhaseOfYourFirstTurn(registry, services, you, ai)
+        val zones = ZoneTransitionService(registry, services.predicateEvaluator)
+        state = zones.moveToZone(state, yourCard(state, WHALE), Zone.BATTLEFIELD).state
+        state = zones.moveToZone(state, yourCard(state, ELVES), Zone.BATTLEFIELD).state
+        repeat(2) { state = zones.moveToZone(state, yourCard(state, "Island", Zone.LIBRARY), Zone.BATTLEFIELD).state }
+        val aiIsland = state.getZone(LocalArgentumHost.AI_ID, Zone.HAND).first()
+        state = zones.moveToZone(state, aiIsland, Zone.BATTLEFIELD).state
+        state = passToYourMainPhase(state, services, afterTurn = state.turnNumber)
+        return TestScenarioGame(listOf(you, ai), registry, checkpoint(state, you, ai))
+    }
+
     /** One of your cards with this name, from your library first (then your hand). */
-    private fun yourCard(state: GameState, name: String): EntityId {
+    private fun yourCard(state: GameState, name: String, vararg from: Zone = arrayOf(Zone.LIBRARY, Zone.HAND)): EntityId {
         val you = LocalArgentumHost.HUMAN_ID
-        return listOf(Zone.LIBRARY, Zone.HAND).asSequence()
+        return from.asSequence()
             .flatMap { state.getZone(you, it).asSequence() }
             .firstOrNull { state.getEntity(it)?.get<CardComponent>()?.name == name }
-            ?: error("Scenario setup: no $name left in your library or hand.")
+            ?: error("Scenario setup: no $name left in your ${from.joinToString("/") { it.name.lowercase() }}.")
     }
 
     private fun withCounters(state: GameState, id: EntityId, vararg counters: Pair<CounterType, Int>): GameState =
