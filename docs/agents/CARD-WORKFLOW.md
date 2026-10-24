@@ -8,6 +8,8 @@ and in Copilot's environment).
 find → classify → scaffold → implement → test → register + export → check → draft PR
 ```
 
+For upstream first-party Oracle parsing, see [the pinned Argentum Assay compatibility guide](ASSAY-COMPATIBILITY.md). Assay is an **optional, separate-checkout second opinion**, not an automatic dispatch signal or a substitute for this workflow's engine tests and Android export gates.
+
 ## 1. Find work that can actually be finished
 
 ```sh
