@@ -53,7 +53,15 @@ internal object TestScenarios {
             "Crew 1 with the Elves, then attack with the Whale.",
     )
 
-    val available: List<TestScenario> = listOf(IRON_SPIDER, WHALE_JUST_CAST, WHALE_HELD)
+    val DISPLACER_BLINK = TestScenario(
+        id = "eldrazi-displacer-blink",
+        title = "Eldrazi Displacer — blink and reset",
+        description = "Eldrazi Displacer, Elvish Visionary with two +1/+1 counters, six Wastes, and an opposing " +
+            "Grizzly Bears. Pay {2}{C} to blink Visionary: it returns tapped, loses its counters, and draws a card. " +
+            "You can also blink the Bears; it returns tapped to the AI.",
+    )
+
+    val available: List<TestScenario> = listOf(IRON_SPIDER, WHALE_JUST_CAST, WHALE_HELD, DISPLACER_BLINK)
 
     private const val SPIDER = "Iron Spider, Stark Upgrade"
     private const val WHALE = "The Lunar Whale"
@@ -63,6 +71,7 @@ internal object TestScenarios {
         IRON_SPIDER.id -> ironSpider(library)
         WHALE_JUST_CAST.id -> whaleJustCast(library)
         WHALE_HELD.id -> whaleHeld(library)
+        DISPLACER_BLINK.id -> displacerBlink(library)
         else -> error("Unknown test scenario ${scenario.id}")
     }
 
@@ -84,6 +93,25 @@ internal object TestScenarios {
         put("Island"); put("Island")
         state = withCounters(state, thopter, CounterType.PLUS_ONE_PLUS_ONE to 2, CounterType.CHARGE to 3)
         state = withCounters(state, ring, CounterType.PLUS_ONE_PLUS_ONE to 1)
+        return TestScenarioGame(listOf(you, ai), registry, checkpoint(state, you, ai))
+    }
+
+    private fun displacerBlink(library: OfflineCardLibrary): TestScenarioGame {
+        val you = LocalSeat("You", listOf("Eldrazi Displacer", "Elvish Visionary") + List(38) { "Wastes" }, null)
+        val ai = LocalSeat("Scenario AI", listOf("Grizzly Bears") + List(39) { "Island" }, null)
+        val registry = CardRegistry().apply { register(library.load((you.deck + ai.deck).toSet())) }
+        val services = EngineServices(registry)
+        var state = mainPhaseOfYourFirstTurn(registry, services, you, ai)
+        val zones = ZoneTransitionService(registry, services.predicateEvaluator)
+        state = zones.moveToZone(state, yourCard(state, "Eldrazi Displacer"), Zone.BATTLEFIELD).state
+        val visionary = yourCard(state, "Elvish Visionary")
+        state = zones.moveToZone(state, visionary, Zone.BATTLEFIELD).state
+        state = withCounters(state, visionary, CounterType.PLUS_ONE_PLUS_ONE to 2)
+        repeat(6) { state = zones.moveToZone(state, yourCard(state, "Wastes"), Zone.BATTLEFIELD).state }
+        val bear = listOf(Zone.LIBRARY, Zone.HAND).asSequence()
+            .flatMap { state.getZone(LocalArgentumHost.AI_ID, it).asSequence() }
+            .single { state.getEntity(it)?.get<CardComponent>()?.name == "Grizzly Bears" }
+        state = zones.moveToZone(state, bear, Zone.BATTLEFIELD).state
         return TestScenarioGame(listOf(you, ai), registry, checkpoint(state, you, ai))
     }
 
