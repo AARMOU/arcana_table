@@ -1,0 +1,14 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const path=require('node:path');
+const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
+const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+test('self-contained dashboard exists',()=>{assert.ok(html.startsWith('<!doctype html>'));assert.ok(html.includes('<title>Arcana Control'));assert.ok(script);assert.ok(!/<script\s+src=/.test(html));});
+test('inline JavaScript parses',()=>{assert.doesNotThrow(()=>new vm.Script(script));});
+test('all mobile navigation targets exist',()=>{for(const id of ['overview','work','safety']){assert.match(html,new RegExp('id="'+id+'"'));assert.match(html,new RegExp('data-view="'+id+'"'));}});
+test('read only public API data sources',()=>{assert.match(script,/api\.github\.com\/repos/);for(const path of ['/pulls?state=open','/actions/runs?per_page=30','/issues/81/comments?'])assert.ok(script.includes(path),path);assert.ok(!/\b(method:\s*['"](?:POST|PUT|PATCH|DELETE))/.test(script));});
+test('unknown budget and worker presence are explicit',()=>{assert.ok(html.includes('No verified billing feed'));assert.ok(html.includes('Presence unknown'));assert.ok(html.includes('Live session state not exposed'));});
+test('live GitHub response rendered as text, not HTML',()=>{assert.match(script,/node\.textContent\s*=\s*value/);assert.ok(script.includes('a.textContent')===false);assert.ok(!script.includes('innerHTML'));});
+test('public dashboard links limited to this repo',()=>{assert.ok(script.includes("url.startsWith(ROOT + '/')"));});
