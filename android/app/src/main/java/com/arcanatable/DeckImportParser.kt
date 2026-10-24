@@ -148,13 +148,16 @@ fun parseDeckListDetailed(raw: String, catalog: SupportedCardCatalog? = null): P
             .trim().trim('[', ']', ':', ' ')
             .replace(Regex("""\s*\(\d+\)$"""), "").trim().lowercase(Locale.ROOT)
         importerSections[heading]?.let { zone = it; return@forEachIndexed }
-        if (heading in importerCategoryNames) { zone = ImportZone.MAIN; return@forEachIndexed }
+        if (heading in importerCategoryNames) {
+            if (zone == ImportZone.COMMANDER) zone = ImportZone.MAIN
+            return@forEachIndexed
+        }
         if (line.equals("About", true)) return@forEachIndexed
         if (line.startsWith("Name ", true)) { deckName = line.substringAfter(' ').trim().ifBlank { null }; return@forEachIndexed }
         if (Regex("""^(format|created|updated|author|description|source|deckstats)\s*:""", RegexOption.IGNORE_CASE).containsMatchIn(line)) return@forEachIndexed
         if (line.matches(Regex("""^\[[^\]]+]$""")) && !line.matches(Regex("""^\[[A-Za-z0-9]{2,6}#\d+[a-zA-Z]?\]$"""))) {
-            // Archidekt arbitrary category header, not a card. Mark next rows as main.
-            zone = ImportZone.MAIN
+            // Category subheadings must not move a Sideboard or Companion into Main.
+            if (zone == ImportZone.COMMANDER) zone = ImportZone.MAIN
             return@forEachIndexed
         }
         if (line.startsWith("SB:", true)) { line = line.substringAfter(':').trim(); zone = ImportZone.SIDEBOARD }
