@@ -10,19 +10,26 @@ const core = () => { const log = []; return { log, info: m => log.push(m), warni
 const bot = body => ({ body, created_at: new Date().toISOString(), user: { type: 'Bot', login: 'github-actions[bot]' } });
 const BASE = 'gpt/arcana-integration-next';
 const BODY = ['## Cards', '- Eldrazi Monument', '', '## Acceptance', '- Exact Oracle behavior with executable regression tests', '', 'Base: ' + BASE].join('\n');
-const queue = (n, labels = [], body = BODY) => ({ number: n, title: '[Arcana Queue] deck ' + n, body, labels: labels.map(name => ({ name })), assignees: [], state: 'open' });
+const queue = (n, labels = [], body = BODY, association = 'OWNER') => ({ number: n, title: '[Arcana Queue] deck ' + n, body, labels: labels.map(name => ({ name })), assignees: [], state: 'open', author_association: association });
+const ago = m => new Date(Date.now() - m * 60000).toISOString();
+// Default history: issue written 60 min ago, one-shot label applied by the owner 10 min ago.
+const labeledEvent = (m = 10) => ({ event: 'labeled', created_at: ago(m), label: { name: A.ONE_SHOT_LABEL }, actor: { login: 'AARMOU' } });
 
-function fake({ issues = [queue(68, [A.ONE_SHOT_LABEL])], ledger = {}, ci = true, removeFails = false, freshAssignees = [], report81 = [] } = {}) {
+function fake({ issues = [queue(68, [A.ONE_SHOT_LABEL])], ledger = {}, ci = true, removeFails = false, freshAssignees = [], report81 = [],
+  timeline = n => (issues.find(i => i.number === n)?.labels || []).some(l => l.name === A.ONE_SHOT_LABEL) ? [labeledEvent()] : [],
+  editedAt = () => ago(60), freshAssociation = 'OWNER' } = {}) {
   const writes = [];
   const comments = n => n === 81 ? report81 : (ledger[n] || []);
+  let graphqlCalls = 0;
   const github = {
+    graphql: async () => { graphqlCalls++; const at = editedAt(graphqlCalls); if (at instanceof Error) throw at; return { repository: { issue: { createdAt: ago(120), lastEditedAt: at } } }; },
     paginate: async (fn, args) => fn(args),
     rest: {
       issues: {
-        listForRepo: () => issues, listComments: a => comments(a.issue_number), listEventsForTimeline: () => [],
+        listForRepo: () => issues, listComments: a => comments(a.issue_number), listEventsForTimeline: a => timeline(a.issue_number),
         createComment: async a => { writes.push(['comment', a.issue_number, a.body]); },
         removeLabel: async a => { if (removeFails) throw { status: 500 }; writes.push(['removeLabel', a.issue_number, a.name]); },
-        get: async a => ({ data: { state: 'open', assignees: freshAssignees, number: a.issue_number } }),
+        get: async a => ({ data: { ...issues.find(i => i.number === a.issue_number), state: 'open', assignees: freshAssignees, number: a.issue_number, author_association: freshAssociation } }),
       },
       pulls: { list: () => [] },
       repos: { getBranch: async () => ({ data: { commit: { sha: BASE_SHA } } }) },

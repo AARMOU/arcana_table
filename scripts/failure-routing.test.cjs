@@ -92,12 +92,14 @@ function unitsGithub({assigned=true,sessions=true,ledger=[]}={}){
   const now=Date.now();
   const ev=sessions?[{event:'copilot_work_started',created_at:new Date(now-3600e3).toISOString()},
     {event:'copilot_work_finished',created_at:new Date(now-1800e3).toISOString()}]:[];
-  const data={issues:[{number:67,title:'[Arcana Queue] Eldrazi Unbound',labels:[],assignees:assigned?[{login:'Copilot'}]:[]}],
+  const data={issues:[{number:67,title:'[Arcana Queue] Eldrazi Unbound',labels:[],assignees:assigned?[{login:'Copilot'}]:[],author_association:'OWNER'}],
     prs:[{number:85,body:'Unit: #67'}],comments:ledger,timeline:ev};
   return {comments,github:{rest:{issues:{listForRepo:'issues',listComments:'comments',listEventsForTimeline:'timeline',
     createComment:async x=>comments.push(x)},pulls:{list:'prs'}},paginate:async x=>data[x]}};
 }
 const env={ARCANA_AUTOMATION_READY:'true',ARCANA_REPAIR_MODE:'request',ARCANA_DISPATCH_MODE:'off'};
+// The worker PR as GitHub reports it: opened by Copilot.
+const COPILOT_PR={number:85,body:'Unit: #67',author_association:'NONE',user:{login:'Copilot',type:'Bot'}};
 const readBudget=async()=>({snapshot:{used:300,allowance:1500,measuredAt:new Date().toISOString()}});
 test('authorizer: repairs need the master switch and request mode',async()=>{
   const g=unitsGithub();
@@ -108,7 +110,7 @@ test('authorizer: repairs need the master switch and request mode',async()=>{
 });
 test('authorizer: admitted repair writes a repair-request ledger record on the unit',async()=>{
   const g=unitsGithub();
-  const d=await createAuthorizer({github:g.github,owner:'o',repo:'r',env,readBudget})({pr:{body:'Unit: #67'},run:{id:9,head_sha:sha}});
+  const d=await createAuthorizer({github:g.github,owner:'o',repo:'r',env,readBudget})({pr:COPILOT_PR,run:{id:9,head_sha:sha}});
   assert.equal(d.allowed,true,d.reason);assert.equal(d.attempt,1);
   await d.record();assert.equal(g.comments[0].issue_number,67);assert.match(g.comments[0].body,/op:repair-request/);
 });

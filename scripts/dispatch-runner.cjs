@@ -3,7 +3,25 @@
 // Writes (ledger, labels, reports) use the workflow's GITHUB_TOKEN as github-actions[bot];
 // only the Copilot assignment call uses the owner's dispatch token.
 const A = require('./admission.cjs');
-const { loadUnits, isCopilot } = require('./units.cjs');
+const { loadUnits, isCopilot, contentWrittenAt, approvalOf, commentersOf } = require('./units.cjs');
+
+// Re-reads the issue right before the paid call so an edit, rename, new or edited comment, or a
+// body that no longer passes the readiness rules stops the assignment, even if it happened after
+// admission. Returns provenance() for the fresh state, plus the fresh readiness result.
+async function revalidate({ github, owner, repo, n, fresh, needApproval, approvers, base }) {
+  try {
+    const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: n, per_page: 100 });
+    const raw = { authorAssociation: fresh.author_association, commenters: commentersOf(comments) };
+    if (needApproval) {
+      const events = await github.paginate(github.rest.issues.listEventsForTimeline, { owner, repo, issue_number: n, per_page: 100 });
+      raw.approval = approvalOf(events, await contentWrittenAt(github, owner, repo, n));
+    }
+    const p = A.provenance(raw, { needApproval, approvers });
+    const act = A.unitActionable(fresh.body, base);
+    const reasons = [...p.reasons, ...(act.ok ? [] : ['not-actionable-' + act.missing.join('-')])];
+    return { ok: reasons.length === 0, reasons, actor: raw.approval?.actor || null };
+  } catch { return { ok: false, reasons: ['revalidation-unavailable'] }; }
+}
 
 const REPORT_ISSUE = 81;
 const INTERRUPT_MARKER = '<!-- arcana-interrupted-attempt-v1 -->';
@@ -79,7 +97,9 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   const dry = ready.dispatch === 'dry-run';
   if (!dry && !ready.master) return done('readiness-off');
 
-  const data = await loadUnits({ github, owner, repo, now });
+  // One-shot approvers: ARCANA_SPEND_APPROVERS, else the repository owner alone.
+  const approvers = ready.approvers || [owner];
+  const data = await loadUnits({ github, owner, repo, now, approvers });
   const units = data.units.map(u => u.derived);
   const interrupted = data.units.filter(u => u.derived.blocksAll);
   if (interrupted.length) {
@@ -108,13 +128,21 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
     if (labeled.length !== 1) return done('authorize-once-needs-exactly-one-label', { labeled: labeled.map(u => u.raw.number) });
     candidate = labeled[0];
   } else {
+    // Untrusted issues are never candidates, so they can't spend credits or hold up the queue.
     candidate = data.units.filter(u => u.derived.state === 'queued' && u.raw.title.startsWith('[Arcana Queue]') &&
-      !u.prs.length).sort((a, b) => a.raw.number - b.raw.number)[0];
+      !u.prs.length && u.derived.provenance?.ok).sort((a, b) => a.raw.number - b.raw.number)[0];
   }
   if (!candidate) return done('nothing-eligible');
 
-  const { snapshot } = await readBudget(env);
   const n = candidate.raw.number;
+  // Non-spending preflight: dry-run proves the edit-history lookup works from Actions before any
+  // one-shot relies on it (a failure there would refuse every one-shot unit).
+  if (dry) {
+    const edit = await contentWrittenAt(github, owner, repo, n);
+    await core.summary.addHeading('Edit-history preflight').addCodeBlock(JSON.stringify({ issue: n, available: Number.isFinite(edit) })).write();
+    core.info(JSON.stringify({ editHistoryPreflight: Number.isFinite(edit) ? 'ok' : 'unavailable', issue: n }));
+  }
+  const { snapshot } = await readBudget(env);
   const decision = A.admit({ op: 'assign', unit: { ...candidate.derived, labeled: labeled.includes(candidate),
     actionable: A.unitActionable(candidate.raw.body, base) },
     units, labeledCount: labeled.length, ready, snapshot, now: Math.max(now, Date.now()) });
@@ -125,25 +153,30 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   const at = () => new Date().toISOString();
   // 1. Record before spending anything. If this fails, the label is still present and nothing ran.
   await github.rest.issues.createComment({ owner, repo, issue_number: n,
-    body: A.formatLedger({ op: 'authorizing', issue: n, run: runId, at: at() }) });
+    body: A.formatLedger({ op: 'authorizing', issue: n, run: runId,
+      ...(ready.dispatch === 'authorize-once' ? { reason: 'approved-by ' + String(candidate.raw.approval?.actor || 'unknown').replace(/[^A-Za-z0-9-]/g, '') } : {}),
+      at: at() }) });
   // 2. Consume the one-shot authorization. Failure leaves an interrupted attempt for owner review.
   if (ready.dispatch === 'authorize-once') {
     try { await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: A.ONE_SHOT_LABEL }); }
     catch { core.setFailed('Could not consume one-shot label; attempt left for owner review.'); return done('label-removal-failed', { issue: n }); }
   }
-  // 3. Re-check the claim, then attempt exactly once.
+  // 3. Re-check the claim and the content's origin and approval, then attempt exactly once.
   const fresh = (await github.rest.issues.get({ owner, repo, issue_number: n })).data;
-  let result;
-  if (fresh.state !== 'open' || (fresh.assignees || []).length) result = 'not-attempted';
+  let result, reason;
+  const claimed = fresh.state !== 'open' || (fresh.assignees || []).length > 0;
+  const origin = claimed ? null : await revalidate({ github, owner, repo, n, fresh, needApproval: ready.dispatch === 'authorize-once', approvers, base });
+  if (claimed) result = 'not-attempted';
+  else if (!origin.ok) { result = 'not-attempted'; reason = 'revalidation ' + origin.reasons.join(' '); }
   else {
     try { result = await assignCopilot({ token: env.COPILOT_DISPATCH_TOKEN, owner, repo, issue_number: n, base, fetchImpl }); }
     catch { result = 'error'; }
   }
   // 4. Close the record. Missing this step is what the interrupted-attempt check catches.
   await github.rest.issues.createComment({ owner, repo, issue_number: n,
-    body: A.formatLedger({ op: 'attempt-result', issue: n, run: runId, result, at: at() }) });
-  if (result !== 'confirmed') core.warning(`Assignment ${result} for #${n}; no retry.`);
-  return done('attempted', { issue: n, result });
+    body: A.formatLedger({ op: 'attempt-result', issue: n, run: runId, result, reason, at: at() }) });
+  if (result !== 'confirmed') core.warning(`Assignment ${result} for #${n}${reason ? ' (' + reason + ')' : ''}; no retry.`);
+  return done('attempted', { issue: n, result, ...(reason ? { reason } : {}) });
 }
 
-module.exports = { runDispatch, assignCopilot, unitInstructions, reportInterrupted, resolveInterrupted, INTERRUPT_MARKER };
+module.exports = { runDispatch, assignCopilot, unitInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
