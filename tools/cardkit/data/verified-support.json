@@ -1,0 +1,35 @@
+{
+  "_about": "Cards whose near-variant wording (a word that differs from the closest implemented card) was checked against the pinned engine source. Each entry names the primitive and where it is used. Source inspection, not execution: the card's own scenario tests remain the proof. Remove an entry if its implementation shows otherwise.",
+  "cards": {
+    "Eldrazi Displacer": {
+      "summary": "exile-then-return is Effects.Move(→EXILE) then Effects.Move(→BATTLEFIELD) (upstream Emiel the Blessed); Effects.Move takes a tapped flag (sdk-api.md, card-sdk-language-reference 'tapped = true'); {C} in an activation cost is ordinary mana",
+      "verifiedBy": "Claude, source inspection 2026-10-24",
+      "references": [
+        "upstream mtg-sets/2017-2022/.../jmp/cards/EmielTheBlessed.kt"
+      ]
+    },
+    "Forsaken Monument": {
+      "summary": "AdditionalManaOnSourceTap(sourceFilter, whenProducing = TappedForManaType.COLORLESS) takes any GameObjectFilter, so Permanent.youControl() replaces Ultima's Land.youControl(); colorless filter is GameObjectFilter.Any.withCardPredicate(CardPredicate.IsColorless) (tested custom Skittering Cicada)",
+      "verifiedBy": "Claude, source inspection 2026-10-24",
+      "references": [
+        "upstream mtg-sets/2025/.../fin/cards/UltimaOriginOfOblivion.kt",
+        "android/custom-cards/.../cards/SkitteringCicada.kt"
+      ]
+    },
+    "Abstruse Archaic": {
+      "summary": "TargetFilter.ActivatedOrTriggeredAbilityOnStack.youControl().abilitySourceMatches(filter) takes any GameObjectFilter (Echo uses Creature; reference lists Artifact too); colorless via CardPredicate.IsColorless; mana abilities are untargetable by construction",
+      "verifiedBy": "Claude, source inspection 2026-10-24",
+      "references": [
+        "upstream mtg-sets/2026/.../msh/cards/EchoPerceptiveProdigy.kt"
+      ]
+    },
+    "Darksteel Monolith": {
+      "summary": "MayCastWithoutPayingManaCost(controllerOnly, spellFilter, oncePerTurn, fromZones) — Warped Space uses oncePerTurn + fromZones={EXILE}; here spellFilter = colorless (CardPredicate.IsColorless), fromZones = {HAND}. Paying {0} rather than the mana cost is the same alternative cost",
+      "verifiedBy": "Claude, source inspection 2026-10-24",
+      "references": [
+        "upstream mtg-sets/2024/.../dsk/cards/CharredFoyerWarpedSpace.kt",
+        "docs/agents/argentum-upstream/sdk-index.md MayCastWithoutPayingManaCost"
+      ]
+    }
+  }
+}
