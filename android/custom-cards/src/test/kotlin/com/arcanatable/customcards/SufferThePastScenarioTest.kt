@@ -118,4 +118,38 @@ class SufferThePastScenarioTest {
         assertTrue(d.zoneNames(opponent, Zone.GRAVEYARD).contains("Grizzly Bears"))
     }
 
+    @Test
+    fun oneTargetLeavingGraveyardBeforeResolutionOnlyCountsRemainingExile() {
+        val d = customScenario(SufferThePast, "Grizzly Bears", "Forest")
+        val caster = d.player1
+        val opponent = d.player2
+        val bear = d.putCardInGraveyard(opponent, "Grizzly Bears")
+        val forest = d.putCardInGraveyard(opponent, "Forest")
+        val spell = d.putCardInHand(caster, "Suffer the Past")
+        d.giveMana(caster, Color.BLACK)
+        d.giveColorlessMana(caster, 2)
+
+        val result = d.submit(CastSpell(
+            playerId = caster,
+            cardId = spell,
+            targets = listOf(
+                ChosenTarget.Player(opponent),
+                ChosenTarget.Card(bear, opponent, Zone.GRAVEYARD),
+                ChosenTarget.Card(forest, opponent, Zone.GRAVEYARD),
+            ),
+            xValue = 2,
+            paymentStrategy = PaymentStrategy.FromPool,
+        ))
+        assertNull(result.error)
+
+        // Another effect removes one target while Suffer the Past is on the stack.
+        d.moveToExile(bear)
+        d.resolveAll()
+
+        assertEquals(21, d.getLifeTotal(caster))
+        assertEquals(19, d.getLifeTotal(opponent))
+        assertTrue(d.zoneNames(opponent, Zone.EXILE).containsAll(listOf("Grizzly Bears", "Forest")))
+        assertTrue(d.zoneNames(opponent, Zone.GRAVEYARD).isEmpty())
+    }
+
 }
