@@ -63,6 +63,9 @@ jobs:
           grep -Fq 'Arcana Scenario QA TEST' android/app/build.gradle.kts
           grep -Fq 'test-scenarios-entry' android/app/src/main/java/com/arcanatable/HomeScreen.kt
           grep -Fq 'ARCANA QA · B' android/app/src/main/java/com/arcanatable/HomeScreen.kt
+          grep -Fq 'dev-goose-banner' android/app/src/debug/java/com/arcanatable/DevBuildGooseBanner.kt
+          grep -Fq 'DEV BUILD' android/app/src/debug/java/com/arcanatable/DevBuildGooseBanner.kt
+          grep -Fq 'fun DevBuildGooseBanner()' android/app/src/release/java/com/arcanatable/DevBuildGooseBanner.kt
       - name: Compile and debug-sign isolated scenario QA APK
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
