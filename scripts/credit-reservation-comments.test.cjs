@@ -10,5 +10,5 @@ test('edited bot event denies',()=>assert.equal(readLiability([{...bot(encode(re
 test('malformed event denies',()=>assert.equal(readLiability([bot(MARKER+'\n{')]).ok,false));
 test('duplicate event denies',()=>assert.equal(readLiability([bot(encode(reserve)),bot(encode(reserve))]).ok,false));
 test('cross-period liability denies',()=>assert.equal(readLiability([bot(encode(reserve))],{period:'2026-11'}).ok,false));
-test('authorized settlement preserves remainder',()=>assert.equal(readLiability([bot(encode(reserve)),bot(encode({op:'settle',id:reserve.id,credits:25,authorized:true}))]).outstanding,35));
+test('authorized settlement preserves remainder',()=>assert.equal(readLiability([bot(encode(reserve)),bot(encode({op:'settle',id:reserve.id,credits:25,authorized:true,evidence:'billing:invoice-25'}))]).outstanding,35));
 test('unapproved settlement cannot be encoded',()=>assert.throws(()=>encode({op:'settle',id:reserve.id,credits:60})));
