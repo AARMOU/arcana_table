@@ -93,8 +93,8 @@ private fun hasLegalCommanderPair(names: List<String>, catalog: SupportedCardCat
     if (names.size != 2 || names[0].equals(names[1], true)) return false
     val a = catalog.find(names[0])
     val b = catalog.find(names[1])
-    if (!isCommanderCandidate(a)) return false
-    val aText = a!!.oracleText.orEmpty().lowercase(Locale.ROOT)
+    if (a == null) return false
+    val aText = a.oracleText.orEmpty().lowercase(Locale.ROOT)
     val bText = b?.oracleText.orEmpty().lowercase(Locale.ROOT).orEmpty()
     val bType = b?.typeLine.orEmpty().lowercase(Locale.ROOT)
     if (aText.contains("choose a background") &&
@@ -102,7 +102,7 @@ private fun hasLegalCommanderPair(names: List<String>, catalog: SupportedCardCat
     val aType = a.typeLine.lowercase(Locale.ROOT)
     if (bText.contains("choose a background") &&
         aType.contains("legendary") && aType.contains("background")) return true
-    if (!isCommanderCandidate(b)) return false
+    if (!isCommanderCandidate(a) || !isCommanderCandidate(b)) return false
     val partner = Regex("""(?m)^partner(?:\s*\([^\n]*\))?\s*$""", RegexOption.IGNORE_CASE)
     if (partner.containsMatchIn(aText) && partner.containsMatchIn(bText)) return true
     if (aText.contains("friends forever") && bText.contains("friends forever")) return true
@@ -182,7 +182,7 @@ fun parseDeckListDetailed(raw: String, catalog: SupportedCardCatalog? = null): P
         if (lowerCells.any { it in setOf("name", "card name") } &&
             lowerCells.any { it in setOf("count", "quantity", "amount") }) {
             csvColumns = lowerCells.withIndex().associate { it.value to it.index }
-            continue@forEachIndexed
+            return@forEachIndexed
         }
         val mapping = csvColumns
         if (mapping != null) {
@@ -202,9 +202,10 @@ fun parseDeckListDetailed(raw: String, catalog: SupportedCardCatalog? = null): P
         }
 
         val quantity = Regex("""^(?:[xX]\s*)?(\d+)\s*[xX]?\s+(.+)$""").matchEntire(line)
-        val count = quantity?.groupValues?.get(1)?.toIntOrNull() ?: 1
+        var count = quantity?.groupValues?.get(1)?.toIntOrNull() ?: 1
         var cardPart = quantity?.groupValues?.get(2)?.trim() ?: line
         if (quantity == null && cells.size > 1 && cells[0].toIntOrNull() != null) {
+            count = cells[0].toIntOrNull() ?: 0
             cardPart = cells[1].trim()
         }
         if (line.matches(Regex("""^\d+\s*$""")) || line.startsWith("http:", true) ||
