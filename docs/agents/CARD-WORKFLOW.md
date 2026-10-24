@@ -8,6 +8,10 @@ and in Copilot's environment).
 find → classify → scaffold → implement → test → register + export → check → draft PR
 ```
 
+For the full pinned Argentum SDK/Assay compatibility audit and Eldrazi pilot findings, see
+[ASSAY-COMPATIBILITY.md](ASSAY-COMPATIBILITY.md). That guide is complementary to the
+optional read-only `assay-review` command below; neither establishes playable-card coverage.
+
 ## 1. Find work that can actually be finished
 
 ```sh
@@ -53,6 +57,25 @@ compiles against.
 No Oracle text cached? `tools/cardkit/cardkit oracle fetch "Card Name"` (needs api.scryfall.com). If your
 sandbox blocks Scryfall, ask for the cardkit CI job's `oracle-cache` artifact or a teammate with access —
 do not type Oracle text from memory.
+
+### Optional: cross-check upstream Argentum Assay (advisory)
+
+Upstream [Argentum Assay](https://github.com/wingedsheep/argentum-engine/blob/main/oracle-assay/README.md) is a structural Oracle-to-SDK parser, unlike Cardkit's rule-text similarity. Its baked `VerdictLedger` has `corpus`, `whole`, and `cards: [{name, kind?, line?}]`. The source checkout used to generate it must be known. Run this in a **separate upstream checkout**, not on the pinned Arcana Android JARs:
+
+```sh
+cd ../argentum-engine
+just assay-bake --out /tmp/argentum-assay-verdicts.json
+git rev-parse HEAD  # record the full 40-character source SHA for the next command
+cd ../arcana_table
+tools/cardkit/cardkit assay-review --ledger /tmp/argentum-assay-verdicts.json \
+  --assay-commit "<40-character upstream SHA>" \
+  --card "Forsaken Monument" --card "Eldrazi Temple" --card "Ugin, the Ineffable" \
+  --json-output /tmp/arcana-assay-review.json
+```
+
+Without `--card` or `--deck`, it audits missing cards from the six official precons; `--deck` accepts a decklist. The SHA is **declared by the caller, not embedded in or authenticated by the upstream ledger**. The report always marks `pinnedEngineVerified: false`. Even with a matching SHA, a whole-card parser result is **not** proof the pinned engine or Android host supports the mechanic; a decline may simply be missing grammar, **not an engine blocker**. Treat `upstreamReviewCandidate` as an invitation to inspect primitives in the generated pinned SDK index. Neither `assay-review` nor `just assay-bake` changes Cardkit `SUPPORTED`, `NEEDS_REVIEW`, blockers, claims, or Copilot admission.
+
+To use `just assay compile` as an implementation starting point, verify **every** emitted SDK member against `docs/agents/generated/sdk-api.md` (built from the committed Arcana JAR) and run positive **and negative** real-engine scenarios and deterministic export. Never copy new upstream SDK vocabulary into our pinned engine as if already present, modify runtime JARs, or skip the card-specific tests.
 
 ## 3. Scaffold
 

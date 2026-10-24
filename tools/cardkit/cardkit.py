@@ -11,6 +11,7 @@ Run from anywhere in the repository:  tools/cardkit/cardkit <command> --help
   check                 repository rules for card PRs (scaffolds unregistered, tests present, Oracle drift)
   blocker NAME          record an engine gap so the card routes to Claude instead of burning agent runs
   oracle fetch|show     refresh / inspect the offline Scryfall cache
+  assay-review          compare upstream Assay bake verdicts without authorizing cards
   patterns | sdk-index | docs-check   regenerate / verify the agent reference docs
 """
 from __future__ import annotations
@@ -22,7 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from cardkit_lib import (check, decklist, docs_check, gaps, oracle, patterns, readiness, refs,  # noqa: E402
+from cardkit_lib import (assay, check, decklist, docs_check, gaps, oracle, patterns, readiness, refs,  # noqa: E402
                          repo, scaffold, sdk)
 
 
@@ -62,6 +63,37 @@ def cmd_similar(a) -> int:
         print(f"\n{line}")
         for m in ix.search(line, name, k=a.k, exclude=name):
             print(f"  ~{m.score:.2f} {m.ref.card} [{m.ref.source}]\n        {m.ref.line}\n        {refs.where(m.ref.card, m.ref.source)}")
+    return 0
+
+
+
+def cmd_assay_review(a) -> int:
+    """Read-only, source-attributed upstream evidence; never modifies readiness/dispatch."""
+    try:
+        ledger = assay.load_ledger(a.ledger)
+        names = list(a.card or [])
+        if a.deck or not names:
+            names += assay.names_from_decks(gaps.load_decks(deck_files=a.deck), include_implemented=a.all)
+        report = assay.review(ledger, names, a.assay_commit)
+    except (assay.InvalidLedger, ValueError, OSError) as exc:
+        print(f"Assay review refused: {exc}", file=sys.stderr)
+        return 2
+    if a.json_output:
+        a.json_output.parent.mkdir(parents=True, exist_ok=True)
+        a.json_output.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    t = report["totals"]
+    pin = "matches Arcana pin (declared, not authenticated)" if report["sourceCommitMatchesPin"] else "DIFFERENT FROM ARCANA PIN"
+    print(f"Assay source: {report['assayCommitDeclared']} — {pin}")
+    print(f"Advisory only: {t['whole']} whole, {t['declined']} declined, {t['absent']} absent; "
+          f"{t['reviewCandidates']} upstream review candidate(s).")
+    print("No Cardkit readiness or worker admission changes. A whole verdict is NOT pinned-engine proof; "
+          "a decline is NOT an engine blocker.")
+    for c in report["cards"]:
+        if c["upstreamReviewCandidate"] or (c["cardkit"] == "SUPPORTED" and c["assay"] == "declined"):
+            suffix = f" ({c['declineKind']}: {c['declineLine'] or 'no line'})" if c["declineKind"] else ""
+            print(f"  {c['name']}: Cardkit {c['cardkit']}; upstream Assay {c['assay']}{suffix}")
+    if a.json_output:
+        print(f"Full evidence: {a.json_output}")
     return 0
 
 
@@ -237,6 +269,16 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--text", help="match this rules text instead of a card's Oracle text")
     s.add_argument("-k", type=int, default=4)
     s.set_defaults(func=cmd_similar)
+
+
+    s = sub.add_parser("assay-review", help="advisory comparison with upstream Assay bake JSON; NEVER dispatches")
+    s.add_argument("--ledger", type=Path, required=True, help="output of upstream 'just assay-bake --out PATH'")
+    s.add_argument("--assay-commit", required=True, help="full upstream Git commit SHA (caller-declared provenance)")
+    s.add_argument("--card", action="append", help="card name to inspect; repeatable")
+    s.add_argument("--deck", type=Path, action="append", help="ManaBox/Moxfield decklist; repeatable")
+    s.add_argument("--all", action="store_true", help="include already implemented cards when reading decks")
+    s.add_argument("--json-output", type=Path, help="write full advisory comparison as JSON")
+    s.set_defaults(func=cmd_assay_review)
 
     s = sub.add_parser("gaps", help="deck coverage with readiness classification")
     s.add_argument("--manifest", type=Path, help=f"deck manifest JSON (default: {repo.rel(gaps.MANIFEST)})")
