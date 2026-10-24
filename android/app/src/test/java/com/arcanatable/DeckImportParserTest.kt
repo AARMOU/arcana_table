@@ -76,6 +76,16 @@ class DeckImportParserTest {
         assertTrue(parsed.diagnostics.isEmpty())
     }
 
+    @Test fun nestedHeadingsDoNotMoveCompanionOrSideboardCardsIntoMain() {
+        val parsed = parseDeckListDetailed(
+            "Deck\n1 Sol Ring\nSideboard\n[INSTANTS]\n2 Lightning Bolt\nCompanion\n[CREATURES]\n1 Lurrus"
+        )
+        assertEquals(listOf("Sol Ring"), parsed.main.map { it.name })
+        assertEquals("Lightning Bolt", parsed.sideboard.single().name)
+        assertEquals(2, parsed.sideboard.single().count)
+        assertEquals("Lurrus", parsed.companion.single().name)
+    }
+
     @Test fun malformedLinesHaveOneBasedSourceDiagnosticsButBareNamesRemainValid() {
         val parsed = parseDeckListDetailed("1 Sol Ring\n8\nFormat: Commander\nbad:value\nIsland")
         assertEquals(2, parsed.diagnostics.size)
