@@ -78,6 +78,7 @@ data class AppPreconDeck(val id: String, val name: String, val commander: String
  * Home: your deck at the top, one PLAY button, small footer. PLAY opens [PlaySheet] (offline vs AI
  * or online with Argentum). Approved design, Build 97.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArcanaHomeScreen(
     wide: Boolean,
@@ -118,6 +119,7 @@ fun ArcanaHomeScreen(
                     Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = SoftWhite)
                 }
             }
+            DevBuildGooseBanner()
             if (resumeAvailable) Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Panel).padding(14.dp).testTag("resume-card")
             ) {
@@ -151,7 +153,7 @@ fun ArcanaHomeScreen(
                 Column(mod) {
                     Text("YOUR DECK", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.padding(bottom = 6.dp))
                     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).border(1.dp, PanelLight, RoundedCornerShape(20.dp)).background(Panel).testTag("home-deck")) {
-                        Box(Modifier.fillMaxWidth().height(if (short) 120.dp else if (wide) 280.dp else 230.dp).background(Color(0xFF22302C))) {
+                        Box(Modifier.fillMaxWidth().height(if (short) (if (BuildConfig.DEBUG) 70.dp else 120.dp) else if (wide) (if (BuildConfig.DEBUG) 175.dp else 280.dp) else (if (BuildConfig.DEBUG) 120.dp else 230.dp)).background(Color(0xFF22302C))) {
                             if (commanderArt != null) CardArt(commanderArt, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, fallbackName = deck?.commander)
                             Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Color(0xB3101615)).padding(horizontal = 16.dp, vertical = 10.dp)) {
                                 Text(deck?.commander?.let { "COMMANDER · ${it.uppercase()}" } ?: if (deck == null) "NO DECK YET" else "NO COMMANDER", color = TurnColors.You, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
