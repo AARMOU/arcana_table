@@ -30,8 +30,8 @@ class ZephyrimScenarioTest {
             "Miracle {1}{W} (You may cast this card for its miracle cost when you draw it if it's the first card you drew this turn.)"
         assertEquals("{3}{W}", Zephyrim.manaCost.toString())
         assertEquals("Creature — Human Warrior", Zephyrim.typeLine.toString())
-        assertEquals(3, Zephyrim.creatureStats?.power)
-        assertEquals(3, Zephyrim.creatureStats?.toughness)
+        assertEquals(3, Zephyrim.creatureStats?.basePower)
+        assertEquals(3, Zephyrim.creatureStats?.baseToughness)
         assertEquals(expectedOracle, Zephyrim.oracleText)
         assertTrue(Zephyrim.hasKeyword(Keyword.FLYING))
         assertTrue(Zephyrim.hasKeyword(Keyword.VIGILANCE))
@@ -69,8 +69,8 @@ class ZephyrimScenarioTest {
             assertEquals(times, copies.count { d.state.getEntity(it)?.has<TokenComponent>() == true })
             copies.forEach { copy ->
                 val entity = d.state.getEntity(copy)!!
-                assertEquals(d.player1.value, entity.get<ControllerComponent>()!!.playerId)
-                assertEquals(d.player1.value, entity.get<OwnerComponent>()!!.playerId)
+                assertEquals(d.player1, entity.get<ControllerComponent>()!!.playerId)
+                assertEquals(d.player1, entity.get<OwnerComponent>()!!.playerId)
                 assertFalse(entity.has<TappedComponent>())
                 assertTrue(entity.get<CountersComponent>()?.counters.isNullOrEmpty())
                 assertEquals(3, d.projected.getPower(copy))
@@ -206,10 +206,10 @@ class ZephyrimScenarioTest {
             d.registerCard(OpponentDraw)
             val zephyrim = d.putCardOnTopOfLibrary(d.player1, "Zephyrim")
             val drawSpell = d.putCardInHand(d.player2, OpponentDraw.name)
+            d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = d.player2)
             d.giveMana(d.player2, Color.BLUE)
             d.giveMana(d.player1, Color.WHITE)
             d.giveColorlessMana(d.player1, 1 + 2 * times)
-            d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = d.player2)
 
             assertNull(d.castSpell(d.player2, drawSpell).error)
             d.bothPass()
