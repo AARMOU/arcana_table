@@ -92,6 +92,9 @@ fun ArcanaHomeScreen(
     offlineResumeAvailable: Boolean = false,
     onResumeOffline: () -> Unit = {},
     onDiscardOffline: () -> Unit = {},
+    /** Debug builds only; always empty in release, so the card never renders there. */
+    testScenarios: List<TestScenario> = emptyList(),
+    onTestScenario: (TestScenario) -> Unit = {},
     onPlay: () -> Unit,
     onChangeDeck: () -> Unit,
     onImport: () -> Unit,
@@ -134,6 +137,23 @@ fun ArcanaHomeScreen(
                     }
                     OutlinedButton(onClick = onDiscardOffline, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
                         Text("DISCARD SAVE")
+                    }
+                }
+            }
+            if (testScenarios.isNotEmpty() && !argentumActive) Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Panel)
+                    .padding(14.dp).testTag("test-scenarios-card")
+            ) {
+                Text("TEST SCENARIOS · DEBUG BUILD", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                Text("Start an offline game vs the AI from a ready board. The engine plays it normally from there.",
+                    color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                testScenarios.forEach { scenario ->
+                    OutlinedButton(onClick = { onTestScenario(scenario) }, enabled = !working,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 48.dp).testTag("test-scenario-${scenario.id}")) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Text(scenario.title, color = SoftWhite, fontWeight = FontWeight.Bold)
+                            Text(scenario.description, color = Muted, fontSize = 11.sp)
+                        }
                     }
                 }
             }
