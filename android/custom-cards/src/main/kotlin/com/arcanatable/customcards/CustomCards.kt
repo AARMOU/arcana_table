@@ -264,6 +264,8 @@ object CustomCards {
         Entry(NurglesRot, "40K", "Six WotC precons"),
         Entry(MatterReshaper, "OGW", "Six WotC precons"),
         Entry(Scaretiller, "ELD", "Six WotC precons"),
+        Entry(GoliathTruck, "40K", "Six WotC precons"),
+        Entry(EldraziConscription, "M3C", "Six WotC precons"),
         // Eldrazi Incursion.
         Entry(EldraziMonument, "M3C", "Eldrazi Incursion"),
         Entry(OblivionSower, "M3C", "Eldrazi Incursion"),
