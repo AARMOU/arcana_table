@@ -13,7 +13,7 @@ val SufferThePast = card("Suffer the Past") {
     manaCost = "{X}{B}"
     colorIdentity = "B"
     typeLine = "Instant"
-    oracleText = "Exile X target cards from target player's graveyard. That player loses 1 life and you gain 1 life for each card exiled this way."
+    oracleText = "Exile X target cards from target player's graveyard. For each card exiled this way, that player loses 1 life and you gain 1 life."
 
     spell {
         val player = target(Targets.Player)
