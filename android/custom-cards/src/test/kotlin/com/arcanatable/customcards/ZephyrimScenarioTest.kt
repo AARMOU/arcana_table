@@ -8,6 +8,7 @@ import com.wingedsheep.engine.state.components.battlefield.DamageComponent
 import com.wingedsheep.engine.state.components.battlefield.TappedComponent
 import com.wingedsheep.engine.state.components.identity.ControllerComponent
 import com.wingedsheep.engine.state.components.identity.TokenComponent
+import com.wingedsheep.engine.state.components.player.CardsDrawnThisTurnComponent
 import com.wingedsheep.engine.state.components.player.ManaPoolComponent
 import com.wingedsheep.sdk.core.*
 import com.wingedsheep.sdk.dsl.*
@@ -214,9 +215,15 @@ class ZephyrimScenarioTest {
         d.passPriorityUntil(Step.DRAW, activePlayer = d.player2)
 
         assertTrue(zephyrim in d.getHand(d.player2))
-        assertTrue(d.events.any {
+        val revealed = d.events.any {
             it is CardRevealedForMiracleEvent && it.cardName == "Zephyrim"
-        })
+        }
+        val drawCount = d.state.getEntity(d.player2)?.get<CardsDrawnThisTurnComponent>()?.count
+        assertTrue(
+            "Miracle not offered: registered=${d.cardRegistry.requireCard("Zephyrim").keywordAbilities}, " +
+                "drawCount=$drawCount, pending=${d.state.pendingDecision}, events=${d.events.map { it::class.simpleName }}",
+            revealed,
+        )
         assertTrue(d.state.pendingDecision is YesNoDecision)
     }
 
