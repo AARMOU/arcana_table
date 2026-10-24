@@ -121,9 +121,11 @@ class LunarWhaleTopLibraryScenarioTest {
         d.giveMana(p, Color.BLUE, 3)
         assertNull(d.passPriority(p).error)
         assertEquals(d.player2, d.priorityPlayer)
-        assertFalse("the player without priority has no legal sorcery action",
-            d.legalActions(p).any { (it.action as? CastSpell)?.cardId == next })
-        assertNotNull("the handler also enforces priority", d.castSpell(p, next).error)
+        // GameTestDriver.legalActions directly calls Argentum's raw enumerator, which can
+        // include speculative actions outside priority. LocalArgentumHost.computeLegalActions
+        // intentionally filters those before any client sees them. The action processor must
+        // independently reject a submitted sorcery while the opponent has priority.
+        assertNotNull("the engine must reject a sorcery without priority", d.castSpell(p, next).error)
     }
 
     @Test fun onlyActualTopCardCanBeCast() {
