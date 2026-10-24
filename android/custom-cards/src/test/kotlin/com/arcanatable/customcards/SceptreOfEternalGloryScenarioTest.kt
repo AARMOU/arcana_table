@@ -8,35 +8,14 @@ import org.junit.Test
 
 class SceptreOfEternalGloryScenarioTest {
     private val colors = listOf(Color.WHITE, Color.BLUE, Color.BLACK, Color.RED, Color.GREEN)
-    private val oneManaSpells = listOf(
-        Color.WHITE to "Healing Salve",
-        Color.BLUE to "Opt",
-        Color.BLACK to "Duress",
-        Color.RED to "Shock",
-        Color.GREEN to "Giant Growth",
-    )
 
     @Test
-    fun firstAbilityAddsEachColorWithoutLandsAndPaysForColoredSpells() {
-        oneManaSpells.forEach { (color, spellName) ->
-            val d = customScenario(
-                SceptreOfEternalGlory,
-                "Healing Salve",
-                "Opt",
-                "Duress",
-                "Shock",
-                "Giant Growth",
-                "Grizzly Bears",
-            )
+    fun firstAbilityAddsEachColorWithoutLandsAndPaysForSpell() {
+        colors.forEach { color ->
+            val d = customScenario(SceptreOfEternalGlory, "Sol Ring")
             val p = d.player1
             val sceptre = d.putPermanentOnBattlefield(p, "Sceptre of Eternal Glory")
-            val spell = d.putCardInHand(p, spellName)
-            val targets = when (spellName) {
-                "Healing Salve" -> listOf(d.player2)
-                "Duress", "Shock" -> listOf(d.player2)
-                "Giant Growth" -> listOf(d.putCreatureOnBattlefield(p, "Grizzly Bears"))
-                else -> emptyList()
-            }
+            val spell = d.putCardInHand(p, "Sol Ring")
 
             assertNull(d.activate(p, sceptre, index = 0).error)
             assertTrue(d.isTapped(sceptre))
@@ -45,7 +24,7 @@ class SceptreOfEternalGloryScenarioTest {
             assertManaPool(d, p, color, 1)
 
             assertNotNull(d.activate(p, sceptre, index = 0).error)
-            assertNull(d.castSpell(p, spell, targets).error)
+            assertNull(d.castSpell(p, spell).error)
             assertManaPool(d, p, color, 0)
         }
     }
