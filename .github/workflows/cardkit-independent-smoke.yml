@@ -1,0 +1,119 @@
+name: Arcana Cardkit independent CLI smoke
+# GPT non-Copilot acceptance tests for Claude's cardkit. No PR, issue, worker, or release mutation.
+on:
+  push:
+    branches:
+      - gpt/cardkit-independent-smoke-20261024
+    paths:
+      - .github/workflows/cardkit-independent-smoke.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  pull-requests: read
+jobs:
+  verify-cardkit-cli:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check out exact toolkit test branch
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Java 17 for read-only SDK index verification
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Exercise every Cardkit command without dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          import os
+          import subprocess
+          import tempfile
+
+          exe = "tools/cardkit/cardkit"
+          def run(*args, should_pass=True, timeout=180):
+              p = subprocess.run([exe, *map(str, args)], capture_output=True,
+                                 text=True, timeout=timeout, env=os.environ.copy())
+              if should_pass and p.returncode:
+                  raise AssertionError(f"{' '.join(map(str,args))}: exit {p.returncode}\nstdout={p.stdout[-1400:]}\nstderr={p.stderr[-1400:]}")
+              if not should_pass and (p.returncode == 0 or p.stdout.strip()):
+                  raise AssertionError(f"unsafe acceptance: {' '.join(map(str,args))} exit={p.returncode}, stdout={p.stdout[:400]}")
+              print(f"PASS {' '.join(map(str,args))}: exit={p.returncode}; stdout={len(p.stdout)} bytes")
+              return p
+
+          with tempfile.TemporaryDirectory() as tmp:
+              d = Path(tmp)
+              # The default report must never authorize queueing without current claims.
+              unverified = d/"unverified.json"
+              run("gaps", "--no-refs", "--json-output", unverified)
+              unverified_data = json.loads(unverified.read_text())
+              assert not unverified_data["dispatch"]["claimsVerified"]
+              assert not unverified_data["dispatch"]["dispatchable"]
+              assert len(unverified_data["decks"]) == 6
+
+              # Real read-only paginated GitHub PR claim lookup, no tickets or assignments.
+              verified = d/"verified.json"
+              run("gaps", "--claims-from-github", "--json-output", verified, timeout=240)
+              report = json.loads(verified.read_text())
+              assert report["dispatch"]["claimsVerified"] and report["dispatch"]["dispatchable"]
+              assert len(report["decks"]) == 6
+              supported = report["dispatch"]["copilot"]
+              assert supported, "Expected at least one unclaimed, supported card"
+              pick = supported[0]
+
+              # Ensure three materially different classifications.
+              classifications = json.loads(run("classify", "Port Town", "Sol Ring", pick, "--json").stdout)
+              got = {v["name"]: v["readiness"] for v in classifications}
+              assert got["Port Town"] == "ENGINE_BLOCKED", got
+              assert got["Sol Ring"] == "IMPLEMENTED_AND_TESTED", got
+              assert got[pick] == "SUPPORTED", got
+
+              similar = run("similar", "--text", "Draw a card.").stdout
+              assert "Draw a card." in similar and ("[custom]" in similar or "[library]" in similar), similar[:800]
+
+              oracle = json.loads(run("oracle", "show", pick).stdout)
+              assert oracle and oracle["name"].casefold() == pick.casefold()
+              run("oracle", "fetch", pick)  # Cache hit; no network needed.
+
+              # Read-only output only. No GitHub issue or Copilot worker is created.
+              body = run("unit", pick).stdout
+              assert "[Arcana Queue]" in body and "## Cards" in body, body[:1000]
+              for names in [("Port Town",), ("Sol Ring",), ("Definitely Not a Real Arcana Card XYZ",),
+                            (pick, "Port Town")]:
+                  run("unit", *names, "--allow-review", should_pass=False)
+
+              # Scaffolds are honest TODO + failing test, never automatically registered.
+              cards, tests = d/"cards", d/"tests"
+              run("newcard", pick, "--offline", "--out-dir", cards, "--test-dir", tests)
+              cardfiles = list(cards.glob("*.kt"))
+              testfiles = list(tests.glob("*ScenarioTest.kt"))
+              assert len(cardfiles) == len(testfiles) == 1
+              assert "CARDKIT-TODO" in cardfiles[0].read_text()
+              assert "fail(" in testfiles[0].read_text()
+              run("check")
+
+              # Record a blocker on the ephemeral CI checkout ONLY; verify it overrides support,
+              # then discard it so no data file changes survive or get committed.
+              original = Path("tools/cardkit/data/known-blockers.json").read_bytes()
+              try:
+                  run("blocker", pick, "--reason", "independent smoke test only",
+                      "--source", "CI ephemeral #81")
+                  new = json.loads(run("classify", pick, "--json").stdout)[0]
+                  assert new["readiness"] == "ENGINE_BLOCKED", new
+                  run("unit", pick, "--allow-review", should_pass=False)
+              finally:
+                  Path("tools/cardkit/data/known-blockers.json").write_bytes(original)
+
+              run("patterns", "--check")
+              run("sdk-index", "--check", timeout=180)
+              run("docs-check")
+              subprocess.run(["git", "diff", "--exit-code"], check=True)
+              print("CARDKIT_INDEPENDENT_SMOKE_SUCCESS: all commands and fail-closed queue gates verified; zero repository mutations")
+          PY
