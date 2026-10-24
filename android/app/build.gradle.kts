@@ -27,9 +27,9 @@ android {
     buildTypes {
         debug {
             // Separate package so this build installs beside the experimental/targeting test build.
-            applicationIdSuffix = ".argentum"
+            applicationIdSuffix = ".scenarioqav2"
             // The build number follows versionCode, so the installer never shows a stale one.
-            manifestPlaceholders["appLabel"] = "Arcana Preview · B${defaultConfig.versionCode}"
+            manifestPlaceholders["appLabel"] = "Arcana Scenario QA TEST · B${defaultConfig.versionCode}"
         }
     }
 
