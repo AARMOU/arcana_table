@@ -57,12 +57,50 @@ jobs:
             echo '## Six-precon readiness'
             tail -n +1 cardkit-out/gaps.md | head -40
           } >> "$GITHUB_STEP_SUMMARY"
+          python3 - <<'PY'
+          import json
+          r = json.load(open('cardkit-out/gaps.json'))
+          t = r['totals']
+          print(f"::notice title=cardkit readiness::implemented {t['IMPLEMENTED_AND_TESTED']}, supported {t['SUPPORTED']}, "
+                f"needs review {t['NEEDS_REVIEW']}, engine-blocked {t['ENGINE_BLOCKED']}; routes "
+                + ", ".join(f"{k} {len(v)}" for k, v in r['dispatch'].items()))
+          for d in r['decks']:
+              print(f"::notice title={d['name']}::playable {d['playableSlots']}/{d['slots']}, supported {d['SUPPORTED']}, "
+                    f"review {d['NEEDS_REVIEW']}, blocked {d['ENGINE_BLOCKED']} (slots)")
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: cardkit-readiness
           retention-days: 14
           path: cardkit-out/
+
+  # Only on pushes to the toolkit's own claude/ branch: commit the refreshed Oracle cache so agents whose
+  # sandboxes cannot reach Scryfall still get exact card records. Never runs for PRs or other branches.
+  publish-oracle-cache:
+    needs: toolkit
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/claude/agent-card-toolkit-')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: cardkit-readiness
+          path: cardkit-out
+      - name: Commit Oracle cache when it changed
+        run: |
+          set -eu
+          [ -f cardkit-out/oracle-cache.jsonl ] || { echo "no cache produced"; exit 0; }
+          cp cardkit-out/oracle-cache.jsonl tools/cardkit/data/oracle-cache.jsonl
+          git add tools/cardkit/data/oracle-cache.jsonl
+          if git diff --cached --quiet; then echo "Oracle cache unchanged"; exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m "data(cardkit): refresh Oracle cache from Scryfall ($(wc -l < tools/cardkit/data/oracle-cache.jsonl) cards)"
+          git push origin HEAD:${GITHUB_REF#refs/heads/}
 
   scaffold:
     needs: toolkit
@@ -96,6 +134,7 @@ jobs:
           print('other=' + (other[0] if other else ''))
           PY
           cat "$GITHUB_OUTPUT"
+          echo "::notice title=scaffold picks::$(tr '\n' ' ' < "$GITHUB_OUTPUT")"
       - name: Scaffold them
         run: |
           set -eu
@@ -107,7 +146,9 @@ jobs:
           git status --short
       - name: Scaffolds compile against the committed engine
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:compileTestKotlin
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:compileTestKotlin
+          echo "::notice title=scaffold compile::generated scaffolds compile against the committed engine jars"
       - name: Scaffold tests fail on purpose (scaffolding is not implementation)
         working-directory: android
         run: |
@@ -117,7 +158,7 @@ jobs:
           args=""; for t in $tests; do args="$args --tests com.arcanatable.customcards.$t"; done
           ./gradlew --no-daemon --max-workers=2 :custom-cards:test $args
           code=$?
-          [ $code -ne 0 ] && echo "PASS: scaffold tests failed as designed" || { echo "FAIL: a scaffold test passed"; exit 1; }
+          [ $code -ne 0 ] && echo "::notice title=scaffold tests::failed as designed ($tests)" || { echo "::error::a scaffold test passed"; exit 1; }
       - name: cardkit check allows unregistered scaffolds and rejects registered ones
         run: |
           set -eu
@@ -126,4 +167,4 @@ jobs:
           [ -n "$val" ] || exit 0
           sed -i "s|^    val entries: List<Entry> = listOf(|&\n        Entry($val, \"TST\", \"cardkit-ci\"),|" android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt
           if tools/cardkit/cardkit check; then echo "FAIL: registered scaffold accepted"; exit 1; fi
-          echo "PASS: registered scaffold rejected"
+          echo "::notice title=cardkit check::registered scaffold $val rejected as designed"
