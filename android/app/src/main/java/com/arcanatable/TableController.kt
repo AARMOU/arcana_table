@@ -552,7 +552,7 @@ internal class TableController(
         snap.legalActions.mapNotNull { info ->
             val action = info.optJSONObject("action") ?: return@mapNotNull null
             if (!info.optBoolean("isAffordable", true) || info.optBoolean("isManaAbility")) return@mapNotNull null
-            listOf("cardId", "sourceId", "permanentId", "entityId").firstNotNullOfOrNull { key -> byServer[action.optString(key)] }
+            ArgentumActions.CARD_REF_KEYS.firstNotNullOfOrNull { key -> byServer[action.optString(key)] }
         }.toSet()
     }.orEmpty()
     // The one action Arcana's primary buttons perform in an Argentum game, named after what it does.

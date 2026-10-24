@@ -14,7 +14,9 @@ import java.net.NetworkInterface
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketTimeoutException
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -136,13 +138,33 @@ class ArgentumLanServer(
     @Volatile private var server: ServerSocket? = null
     @Volatile private var guest: LanLink? = null
     @Volatile private var helloSeen = false
+    // Released once the listening socket is bound, or binding has failed.
+    private val bound = CountDownLatch(1)
+
+    /** Why the game port couldn't be opened (e.g. already in use), or null. Set before [awaitReady] returns. */
+    @Volatile var bindError: Throwable? = null
+        private set
+
+    /**
+     * Waits until the host is accepting guests. True once the game port is bound and listening;
+     * false if binding failed (see [bindError]), the server was closed, or [timeoutMs] passed.
+     */
+    fun awaitReady(timeoutMs: Long): Boolean =
+        bound.await(timeoutMs, TimeUnit.MILLISECONDS) && bindError == null && server != null
 
     fun start() {
         if (running.getAndSet(true)) return
         Thread({
             try {
-                val socketServer = ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(ArgentumLan.GAME_PORT)) }
-                server = socketServer
+                val socketServer = try {
+                    ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(ArgentumLan.GAME_PORT)) }
+                        .also { server = it }
+                } catch (e: Exception) {
+                    bindError = e
+                    throw e
+                } finally {
+                    bound.countDown()
+                }
                 while (running.get()) {
                     val socket = socketServer.accept()
                     if (guest != null) { runCatching { socket.close() }; continue }
