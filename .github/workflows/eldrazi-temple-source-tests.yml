@@ -32,7 +32,10 @@ jobs:
           set -euo pipefail
           git -C argentum-engine apply --check "$GITHUB_WORKSPACE/engine-upgrade/eldrazi-temple/patches/0001-colorless-eldrazi-source-mana.patch"
           git -C argentum-engine apply "$GITHUB_WORKSPACE/engine-upgrade/eldrazi-temple/patches/0001-colorless-eldrazi-source-mana.patch"
-          cp engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/\n          cp engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/\n          mkdir -p argentum-engine/rules-engine/src/test/kotlin/com/arcanatable/customcards/cards\n          cp engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt argentum-engine/rules-engine/src/test/kotlin/com/arcanatable/customcards/cards/
+          cp engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          cp engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          mkdir -p argentum-engine/rules-engine/src/test/kotlin/com/arcanatable/customcards/cards
+          cp engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt argentum-engine/rules-engine/src/test/kotlin/com/arcanatable/customcards/cards/
           git -C argentum-engine diff --check
       - uses: actions/setup-java@v4
         with:
