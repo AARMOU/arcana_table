@@ -269,6 +269,7 @@ object CustomCards {
         // Eldrazi Incursion.
         Entry(EldraziMonument, "M3C", "Eldrazi Incursion"),
         Entry(OblivionSower, "M3C", "Eldrazi Incursion"),
+        Entry(SireOfStagnation, "BFZ", "Eldrazi Incursion"),
         Entry(SufferThePast, "ROE", "Eldrazi Incursion"),
     )
 
