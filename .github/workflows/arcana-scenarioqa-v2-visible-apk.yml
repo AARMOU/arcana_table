@@ -1,0 +1,109 @@
+name: Arcana B131 scenario QA V2 installable APK
+# Owner-approved: build PR #110 merged development source without modifying production.
+on:
+  push:
+    branches:
+      - gpt/scenario-qa-visible-install-20261024
+    paths:
+      - .github/workflows/arcana-scenarioqa-v2-visible-apk.yml
+      - android/app/src/main/java/com/arcanatable/HomeScreen.kt
+      - android/app/src/debug/java/com/arcanatable/DevBuildGooseBanner.kt
+      - android/app/src/release/java/com/arcanatable/DevBuildGooseBanner.kt
+      - android/app/src/test/java/com/arcanatable/ui/HomeScreenSizesTest.kt
+      - android/app/build.gradle.kts
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: arcana-scenarioqa-v2-preview-20261024
+  cancel-in-progress: false
+jobs:
+  test-and-package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out exact isolated QA V2 source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify immutable source and release-excluded scenarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.sha }}"
+          test -f android/app/src/debug/java/com/arcanatable/TestScenarios.kt
+          test -f android/app/src/release/java/com/arcanatable/TestScenarios.kt
+          grep -Fq 'val available: List<TestScenario> = emptyList()' android/app/src/release/java/com/arcanatable/TestScenarios.kt
+          grep -Fq 'iron-spider-mixed-counters' android/app/src/debug/java/com/arcanatable/TestScenarios.kt
+          grep -Fq 'lunar-whale-just-cast' android/app/src/debug/java/com/arcanatable/TestScenarios.kt
+          grep -Fq 'lunar-whale-held' android/app/src/debug/java/com/arcanatable/TestScenarios.kt
+      - name: Install Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Prepare Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install API 36 and build tools
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Re-export and run all debug app and custom card JVM tests
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test :app:testDebugUnitTest
+      - name: Prove no test scenarios in release build
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest'
+      - name: Confirm exported card assets match pinned source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv
+      - name: Verify unmistakable app identity and visible scenario launcher in source
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Fq 'applicationIdSuffix = ".scenarioqav2"' android/app/build.gradle.kts
+          grep -Fq 'Arcana Scenario QA TEST' android/app/build.gradle.kts
+          grep -Fq 'test-scenarios-entry' android/app/src/main/java/com/arcanatable/HomeScreen.kt
+          grep -Fq 'ARCANA QA · B' android/app/src/main/java/com/arcanatable/HomeScreen.kt
+          grep -Fq 'dev-goose-banner' android/app/src/debug/java/com/arcanatable/DevBuildGooseBanner.kt
+          grep -Fq 'DEV BUILD' android/app/src/debug/java/com/arcanatable/DevBuildGooseBanner.kt
+          grep -Fq 'fun DevBuildGooseBanner()' android/app/src/release/java/com/arcanatable/DevBuildGooseBanner.kt
+      - name: Compile and debug-sign isolated scenario QA APK
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
+      - name: Verify installable APK, debug signature and source provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          apk="android/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$apk"
+          cp "$apk" "dist/ArcanaTable-B131-ScenarioQA-V2-TESTS-debug.apk"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "dist/ArcanaTable-B131-ScenarioQA-V2-TESTS-debug.apk" | head -n 14 > dist/package-info.txt
+          grep -F "package: name='com.arcanatable.scenarioqav2' versionCode='131'" dist/package-info.txt
+          grep -F "application-label:'Arcana Scenario QA TEST · B131'" dist/package-info.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "dist/ArcanaTable-B131-ScenarioQA-V2-TESTS-debug.apk" > dist/signing-info.txt
+          test "$(stat -c%s "dist/ArcanaTable-B131-ScenarioQA-V2-TESTS-debug.apk")" -gt 2000000
+          printf 'source_commit=${{ github.sha }}\nsource_branch=gpt/scenario-qa-visible-install-20261024\nmerged_pr=110\nsource_engine=Build-131 committed B131 JARs\npackage=com.arcanatable.scenarioqav2\nvariant=debug only\napp_label=Arcana Scenario QA TEST B131\nsigning=Android temporary debug certificate (NOT Play Store key)\nproduction_main_modified=false\nWARNING=Manual Save in a scenario can overwrite this test-app package offline saved-game slot\n' > dist/provenance.txt
+          # Installer proof is from package and signature metadata, not a physical Fold smoke test.
+          (cd dist && sha256sum ArcanaTable-B131-ScenarioQA-V2-TESTS-debug.apk > SHA256SUMS.txt)
+      - name: Upload test evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arcana-B131-ScenarioQA-V2-Tests
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            android/custom-cards/build/test-results/
+            android/app/build/test-results/
+      - name: Upload installable scenario QA APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Arcana-B131-ScenarioQA-V2-TESTS-Debug-APK
+          retention-days: 14
+          if-no-files-found: error
+          path: dist/
