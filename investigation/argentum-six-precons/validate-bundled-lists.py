@@ -21,6 +21,18 @@ FILE_NAMES = {
     "Eldrazi Incursion": "eldrazi_incursion.txt",
 }
 ENTRY = re.compile(r"^([1-9][0-9]*) (.+)$")
+# Official manifests may repeat basic-land rows (3 x 10 Swamp in Necron Dynasties;
+# 8 + 7 Wastes in Eldrazi Unbound). Preserve the historical rows in both files.
+BASIC_LANDS = frozenset({"plains", "island", "swamp", "mountain", "forest", "wastes"})
+
+
+def add_card(cards: dict, key: tuple, quantity: int, source: str) -> None:
+    """Aggregate repeated basic-land rows; reject duplicate nonbasic card names."""
+    name, _commander = key
+    if key in cards and name not in BASIC_LANDS:
+        raise AssertionError(f"{source}: duplicate nonbasic card name: {name}")
+    cards[key] = cards.get(key, 0) + quantity
+
 
 
 def parse_asset(path: Path) -> dict:
@@ -43,9 +55,7 @@ def parse_asset(path: Path) -> dict:
             raise AssertionError(f"{path.name}: malformed line: {row!r}")
         quantity, name = int(match.group(1)), match.group(2)
         key = (name.casefold(), section)
-        if key in cards:
-            raise AssertionError(f"{path.name}: duplicate card name: {name}")
-        cards[key] = quantity
+        add_card(cards, key, quantity, path.name)
     return cards
 
 
@@ -59,9 +69,7 @@ def main() -> None:
         expected = {}
         for card in deck["cards"]:
             key = (card["name"].casefold(), bool(card["commander"]))
-            if key in expected:
-                raise AssertionError(f"{deck['name']}: duplicated manifest card {card['name']}")
-            expected[key] = int(card["quantity"])
+            add_card(expected, key, int(card["quantity"]), deck["name"])
         actual = parse_asset(ASSETS / FILE_NAMES[deck["name"]])
         if actual != expected:
             missing = sorted(set(expected.items()) - set(actual.items()))
