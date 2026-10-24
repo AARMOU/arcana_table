@@ -92,6 +92,9 @@ fun ArcanaHomeScreen(
     offlineResumeAvailable: Boolean = false,
     onResumeOffline: () -> Unit = {},
     onDiscardOffline: () -> Unit = {},
+    /** Debug builds only; always empty in release, so the card never renders there. */
+    testScenarios: List<TestScenario> = emptyList(),
+    onTestScenario: (TestScenario) -> Unit = {},
     onPlay: () -> Unit,
     onChangeDeck: () -> Unit,
     onImport: () -> Unit,
@@ -182,6 +185,24 @@ fun ArcanaHomeScreen(
                 playButton()
             }
             Spacer(Modifier.height(8.dp))
+            // Below PLAY, so the debug card never pushes it off a short or narrow screen.
+            if (testScenarios.isNotEmpty() && !argentumActive) Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Panel)
+                    .padding(14.dp).testTag("test-scenarios-card")
+            ) {
+                Text("TEST SCENARIOS · DEBUG BUILD", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                Text("Start an offline game vs the AI from a ready board. The engine plays it normally from there.",
+                    color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                testScenarios.forEach { scenario ->
+                    OutlinedButton(onClick = { onTestScenario(scenario) }, enabled = !working,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 48.dp).testTag("test-scenario-${scenario.id}")) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Text(scenario.title, color = SoftWhite, fontWeight = FontWeight.Bold)
+                            Text(scenario.description, color = Muted, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.weight(1f))
                 Text("Build ${BuildConfig.VERSION_CODE} · Based on Build ${BuildConfig.BASE_BUILD}", color = Muted, fontSize = 12.sp)

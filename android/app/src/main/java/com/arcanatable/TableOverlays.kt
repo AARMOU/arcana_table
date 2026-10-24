@@ -214,6 +214,8 @@ internal fun TableController.TableOverlays() {
                 offlineResumeAvailable = offlineResumeAvailable && !argentumEnabled,
                 onResumeOffline = { resumeOfflineGame() },
                 onDiscardOffline = { offlineDiscardConfirm = true },
+                testScenarios = TestScenarios.available,
+                onTestScenario = { startTestScenario(it) },
                 onResume = {
                     recordDiagnostic("Player chose to resume the previous Argentum game", DiagnosticCategory.CONNECTION)
                     argentumResumeRequested = true
