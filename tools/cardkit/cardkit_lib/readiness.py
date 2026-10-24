@@ -66,9 +66,26 @@ def _blocked_keyword(keyword: str) -> dict | None:
     return kws.get(keyword.casefold())
 
 
+@lru_cache(maxsize=1)
+def _implemented_line_heads() -> tuple[str, ...]:
+    return tuple(r.norm for r in refs.index().refs)
+
+
+@lru_cache(maxsize=512)
 def keyword_known(keyword: str) -> bool:
+    """In the SDK vocabulary (enum, helper, facade member), or printed as a keyword on an implemented card."""
     key = re.sub(r"[^a-z0-9]", "", keyword.casefold())
-    return key in sdk.vocabulary()
+    vocab = sdk.vocabulary()
+    if key in vocab or key + "ability" in vocab:
+        return True
+    k = keyword.casefold()
+    return any(h.startswith(k) and (len(h) == len(k) or h[len(k)] in " {,:-n") for h in _implemented_line_heads())
+
+
+def real_keywords(card: dict) -> list[str]:
+    """Scryfall keywords minus ability words / flavor-named abilities ("Name — …")."""
+    words = text.ability_words(card.get("oracle_text", ""))
+    return [k for k in card.get("keywords", []) if k.casefold() not in words]
 
 
 def mechanics(oracle_text: str, keywords: list[str]) -> list[str]:
@@ -135,7 +152,7 @@ def classify(name: str, use_refs: bool = True) -> dict:
         result["reasons"].append("no cached Oracle record: run `tools/cardkit/cardkit oracle fetch` (needs Scryfall access)")
         return result
     otext = card.get("oracle_text", "")
-    kws = card.get("keywords", [])
+    kws = real_keywords(card)
     result["keywords"] = kws
     result["mechanics"] = mechanics(otext, kws)
     result["oracle"] = {k: card.get(k) for k in ("mana_cost", "type_line", "oracle_text", "power", "toughness",
@@ -156,16 +173,14 @@ def classify(name: str, use_refs: bool = True) -> dict:
         result["mechanics"].insert(0, "multi-face")
     worst = 1.0
     if use_refs:
-        ix = refs.index()
         for line in text.split_lines(otext):
             if text.is_keyword_line(line, kws) and not any(not keyword_known(k) for k in kws if k.casefold() in line.casefold()):
                 result["lines"].append({"text": line, "kind": "keywords", "score": 1.0, "matches": []})
                 continue
-            matches = ix.search(line, name, k=3, exclude=name)
-            best = matches[0].score if matches else 0.0
+            scored = refs.score_line(line, name, k=3, exclude=name)
+            best = scored["score"]
             worst = min(worst, best)
-            result["lines"].append({"text": line, "kind": "rules", "score": round(best, 3),
-                                    "matches": [m.to_json() for m in matches]})
+            result["lines"].append({"text": line, "kind": "rules", **scored})
             if best < GAP_SCORE:
                 gap = True
     if not unknown and card.get("layout") not in MULTI_FACE and worst >= SUPPORTED_SCORE and not result["reasons"]:

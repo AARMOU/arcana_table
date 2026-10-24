@@ -62,7 +62,9 @@ class Index:
             self.exact[r.norm].append(i)
 
     def search(self, line: str, card_name: str = "", k: int = 3, exclude: str | None = None) -> list[Match]:
-        norm = text.normalize_line(line, card_name)
+        return self.search_norm(text.normalize_line(line, card_name), k, exclude)
+
+    def search_norm(self, norm: str, k: int = 3, exclude: str | None = None) -> list[Match]:
         toks = text.tokens(norm)
         if not toks:
             return []
@@ -92,6 +94,40 @@ class Index:
             consider(i, score)
         ranked = sorted(results.values(), key=lambda m: (-m.score, m.ref.source != "custom", m.ref.card))
         return ranked[:k]
+
+
+COMBINATION_PENALTY = 0.04
+
+
+def score_line(line: str, card_name: str = "", k: int = 3, exclude: str | None = None) -> dict:
+    """Whole-line matches plus clause-by-clause evidence for lines that combine implemented pieces.
+
+    score = max(best whole-line similarity, weakest clause similarity - COMBINATION_PENALTY)."""
+    norm = text.normalize_line(line, card_name)
+    whole = index().search_norm(norm, k, exclude)
+    best_whole = whole[0].score if whole else 0.0
+    parts = text.clauses(norm)
+    clause_info = []
+    if len(parts) > 1:
+        for part in parts:
+            ms = clause_index().search_norm(part, 1, exclude)
+            clause_info.append({"clause": part, "score": round(ms[0].score, 3) if ms else 0.0,
+                                "match": ms[0].to_json() if ms else None})
+    combo = (min(c["score"] for c in clause_info) - COMBINATION_PENALTY) if clause_info else 0.0
+    return {"score": round(max(best_whole, combo), 3), "wholeScore": round(best_whole, 3),
+            "matches": [m.to_json() for m in whole], "clauses": clause_info}
+
+
+@lru_cache(maxsize=1)
+def clause_index() -> Index:
+    refs_: list[RefLine] = []
+    seen: set[tuple[str, str]] = set()
+    for r in index().refs:
+        for part in text.clauses(r.norm):
+            if (r.card, part) not in seen:
+                seen.add((r.card, part))
+                refs_.append(RefLine(r.card, r.source, r.line, part, tuple(text.tokens(part))))
+    return Index(refs_)
 
 
 @lru_cache(maxsize=1)

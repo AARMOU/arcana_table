@@ -67,7 +67,8 @@ def cmd_similar(a) -> int:
 
 def cmd_gaps(a) -> int:
     decks = gaps.load_decks(a.manifest, a.deck)
-    result = gaps.analyze(decks, use_refs=not a.no_refs)
+    claims = gaps.open_pr_claims() if a.claims_from_github else None
+    result = gaps.analyze(decks, use_refs=not a.no_refs, claims=claims)
     if a.json_output:
         a.json_output.parent.mkdir(parents=True, exist_ok=True)
         a.json_output.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -80,7 +81,8 @@ def cmd_gaps(a) -> int:
     t = result["totals"]
     print(f"DISTINCT: implemented {t['IMPLEMENTED_AND_TESTED']}, supported {t['SUPPORTED']}, "
           f"needs review {t['NEEDS_REVIEW']}, engine-blocked {t['ENGINE_BLOCKED']}")
-    print("ROUTES: " + ", ".join(f"{k} {len(v)}" for k, v in result["dispatch"].items()))
+    print("ROUTES: " + ", ".join(f"{k} {len(v)}" for k, v in result["dispatch"].items())
+          + ("" if claims is not None else " (open-PR claims not checked; add --claims-from-github)"))
     return 0
 
 
@@ -210,6 +212,8 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--json-output", type=Path)
     s.add_argument("--markdown-output", type=Path)
     s.add_argument("--no-refs", action="store_true", help="skip line matching (fast; never yields SUPPORTED)")
+    s.add_argument("--claims-from-github", action="store_true",
+                   help="mark cards named in open PRs (via gh) as claimed and keep them out of dispatch lists")
     s.set_defaults(func=cmd_gaps)
 
     s = sub.add_parser("unit", help="[Arcana Queue] issue body for SUPPORTED cards")

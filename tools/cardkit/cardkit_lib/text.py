@@ -73,3 +73,51 @@ def is_keyword_line(line: str, keywords: list[str]) -> bool:
         if head not in kws and part not in kws:
             return False
     return True
+
+
+_TRIGGER_HEAD = re.compile(r"^((?:when|whenever|at the beginning of|at)\b[^,]*,)\s*(.+)$")
+
+
+def clauses(normalized: str) -> list[str]:
+    """A normalized line split into sentences, trigger conditions and costs (for combination matching)."""
+    out: list[str] = []
+    for sent in _sentences(normalized):
+        sent = sent.strip()
+        if not sent:
+            continue
+        if '"' in sent:  # a granted ability in quotes is one unit; never match its pieces separately
+            out.append(sent)
+            continue
+        if ":" in sent and not sent.startswith(("when", "whenever", "at ")) and sent.index(":") < 60:
+            cost, _, eff = sent.partition(":")
+            out += [cost.strip() + ":", eff.strip()]
+            continue
+        m = _TRIGGER_HEAD.match(sent)
+        if m:
+            out += [m.group(1).strip(), m.group(2).strip()]
+        else:
+            out.append(sent)
+    return [c for c in out if c]
+
+
+def _sentences(s: str) -> list[str]:
+    """Splits at ". " outside quoted text."""
+    out, start, quoted = [], 0, False
+    for i, ch in enumerate(s):
+        if ch == '"':
+            quoted = not quoted
+        elif ch == "." and not quoted and i + 1 < len(s) and s[i + 1] == " ":
+            out.append(s[start:i + 1])
+            start = i + 2
+    out.append(s[start:])
+    return [x for x in out if x.strip()]
+
+
+def ability_words(oracle: str) -> set[str]:
+    """Names printed as "Name — rules" (ability words, flavor-named abilities)."""
+    found = set()
+    for line in split_lines(oracle):
+        m = _ABILITY_WORD.match(line)
+        if m:
+            found.add(m.group(1).strip().casefold())
+    return found

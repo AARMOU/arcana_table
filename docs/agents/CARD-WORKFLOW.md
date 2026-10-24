@@ -14,6 +14,7 @@ find → classify → scaffold → implement → test → register + export → 
 tools/cardkit/cardkit gaps                         # six official precons (default manifest)
 tools/cardkit/cardkit gaps --deck my-deck.txt      # any ManaBox / Moxfield text or CSV export
 tools/cardkit/cardkit gaps --json-output out/gaps.json --markdown-output out/gaps.md
+tools/cardkit/cardkit gaps --claims-from-github    # skip cards already claimed by an open PR (needs gh)
 ```
 
 Each card gets one readiness class:

@@ -35,7 +35,10 @@ FAKE_UNKNOWN_KW = {"name": "Cardkit Test Gizmo", "mana_cost": "{3}", "type_line"
 FAKE_INFECT = {"name": "Cardkit Test Plaguebearer", "mana_cost": "{1}{B}", "type_line": "Creature — Horror",
                "oracle_text": "Infect", "power": "1", "toughness": "1", "color_identity": ["B"],
                "keywords": ["Infect"], "layout": "normal"}
-FAKES = {repo.normalize_name(c["name"]): c for c in (FAKE_SUPPORTED, FAKE_GAP, FAKE_UNKNOWN_KW, FAKE_INFECT)}
+FAKE_COMBO = {"name": "Cardkit Test Martyr", "mana_cost": "{1}{W}", "type_line": "Creature \u2014 Human Warrior",
+              "oracle_text": "Martyrdom \u2014 When this creature dies, you gain 2 life and draw two cards.",
+              "power": "2", "toughness": "2", "color_identity": ["W"], "keywords": ["Martyrdom"], "layout": "normal"}
+FAKES = {repo.normalize_name(c["name"]): c for c in (FAKE_SUPPORTED, FAKE_GAP, FAKE_UNKNOWN_KW, FAKE_INFECT, FAKE_COMBO)}
 
 
 def with_fake_oracle(test):
@@ -93,6 +96,17 @@ class TextTests(unittest.TestCase):
         self.assertEqual(text.strip_ability_word("Grav-cannon — When this creature enters, draw a card."),
                          "When this creature enters, draw a card.")
         self.assertEqual(text.strip_ability_word("Flashback—{1}{B}{G}, Pay 3 life."), "Flashback—{1}{B}{G}, Pay 3 life.")
+
+    def test_clauses_split_triggers_and_costs_but_not_quoted_abilities(self):
+        self.assertEqual(text.clauses(text.normalize_line("When this creature dies, you gain 2 life and draw two cards.")),
+                         ["when ~ dies,", "you gain n life and draw n cards."])
+        self.assertEqual(text.clauses(text.normalize_line("{T}, Pay 1 life: Add {C}. Spend this mana only on X.")),
+                         ["{t}, pay n life:", "add {c}.", "spend this mana only on x."])
+        quoted = text.normalize_line('Lands you control have "{T}: Add {C}. Spend this mana only on X."')
+        self.assertEqual(text.clauses(quoted), [quoted])
+
+    def test_ability_words_are_not_keywords(self):
+        self.assertEqual(text.ability_words("Martyrdom \u2014 When this creature dies, draw a card.\nFlying"), {"martyrdom"})
 
     def test_reminder_text_removed(self):
         self.assertEqual(text.split_lines("Ravenous (This creature enters with X counters.)\nFlying"), ["Ravenous", "Flying"])
@@ -172,6 +186,15 @@ class ReadinessTests(unittest.TestCase):
         self.assertEqual(rules[0]["matches"][0]["card"], "Space Marine Scout")
 
     @with_fake_oracle
+    def test_line_combining_implemented_clauses_is_supported_and_ability_words_ignored(self):
+        v = readiness.classify("Cardkit Test Martyr")
+        self.assertEqual(v["readiness"], "SUPPORTED", v["reasons"])
+        line = v["lines"][0]
+        self.assertGreater(line["score"], line["wholeScore"])
+        self.assertEqual(len(line["clauses"]), 2)
+        self.assertEqual(v["keywords"], [])
+
+    @with_fake_oracle
     def test_unmatched_line_is_review_with_gap_hint(self):
         v = readiness.classify("Cardkit Test Oddity")
         self.assertEqual(v["readiness"], "NEEDS_REVIEW")
@@ -219,7 +242,20 @@ class GapsTests(unittest.TestCase):
         for d in result["decks"]:
             self.assertIn(f"{d['name']}: {d['playableSlots']}/100 supported", audit)
         self.assertEqual(sum(result["totals"].values()), len(result["cards"]))
-        self.assertTrue(set(result["dispatch"]) == {"copilot", "claude", "gpt"})
+        self.assertEqual(set(result["dispatch"]), {"copilot", "claude", "gpt", "claimed"})
+
+    @with_fake_oracle
+    def test_open_pr_claims_keep_cards_out_of_dispatch(self):
+        deck = {"name": "t", "cards": [{"name": "Cardkit Test Scout", "quantity": 1, "commander": False},
+                                       {"name": "Cardkit Test Martyr", "quantity": 1, "commander": False}]}
+        prs = [{"number": 7, "title": "Add Cardkit Test Scout", "branch": "copilot/x", "body": ""},
+               {"number": 8, "title": "batch", "branch": "gpt/y", "body": "staged: Cardkit Test Martyr"}]
+        r = gaps.analyze([deck], claims=prs)
+        self.assertEqual(r["dispatch"]["claimed"], {"Cardkit Test Scout": "PR #7 (copilot/x)"})
+        self.assertNotIn("Cardkit Test Scout", r["dispatch"]["copilot"])
+        self.assertIn("Cardkit Test Martyr", r["dispatch"]["copilot"])
+        martyr = next(c for c in r["cards"] if c["name"] == "Cardkit Test Martyr")
+        self.assertEqual(martyr["mentionedInOpenPRs"], ["#8"])
 
     @with_fake_oracle
     def test_queue_unit_matches_dispatcher_sections(self):

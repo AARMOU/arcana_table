@@ -5,6 +5,8 @@ import json
 from collections import defaultdict
 from pathlib import Path
 
+import re
+
 from . import decklist, readiness, repo, text
 
 MANIFEST = repo.ROOT / "investigation/argentum-six-precons/deck-manifest.json"
@@ -23,7 +25,36 @@ def load_decks(manifest: Path | None = None, deck_files: list[Path] | None = Non
     return decks
 
 
-def analyze(decks: list[dict], use_refs: bool = True) -> dict:
+def open_pr_claims(repo_slug: str = "AARMOU/arcana_table") -> list[dict]:
+    """Open PRs (number, title, branch, body) via the GitHub CLI; [] when gh is unavailable."""
+    import subprocess
+    try:
+        out = subprocess.run(["gh", "api", f"repos/{repo_slug}/pulls?state=open&per_page=100", "--jq",
+                              "[.[] | {number, title, branch: .head.ref, body: (.body // \"\")[0:4000]}]"],
+                             capture_output=True, text=True, timeout=60, check=True).stdout
+        return json.loads(out or "[]")
+    except Exception as exc:  # noqa: BLE001 - optional enrichment
+        print(f"warning: could not read open PRs ({exc}); claims not applied")
+        return []
+
+
+def _claimed_by(name: str, prs: list[dict]) -> tuple[str | None, list[str]]:
+    """(claim from an open PR's title or branch, other open PRs whose body mentions the card)."""
+    n = name.split(" // ")[0].casefold()
+    slug = repo.val_name_for(name).casefold()
+    dashed = "-".join(re.findall(r"[a-z0-9]+", n))
+    claim, mentions = None, []
+    for pr in prs:
+        branch = pr["branch"].casefold()
+        if claim is None and (n in pr["title"].casefold() or (dashed and dashed in branch)
+                              or (len(slug) > 6 and slug in branch.replace("-", ""))):
+            claim = f"PR #{pr['number']} ({pr['branch']})"
+        elif re.search(rf"(?<![\w']){re.escape(n)}(?![\w'])", pr["body"].casefold()):
+            mentions.append(f"#{pr['number']}")
+    return claim, mentions
+
+
+def analyze(decks: list[dict], use_refs: bool = True, claims: list[dict] | None = None) -> dict:
     verdicts: dict[str, dict] = {}
     usage: dict[str, dict] = {}
     per_deck = []
@@ -47,13 +78,21 @@ def analyze(decks: list[dict], use_refs: bool = True) -> dict:
         cards.append({**v, "decks": usage[key]["decks"], "slots": usage[key]["slots"]})
     cards.sort(key=lambda c: (ORDER.index(c["readiness"]), -len(c["decks"]), -c["slots"], c["name"].casefold()))
     missing = [c for c in cards if c["readiness"] != "IMPLEMENTED_AND_TESTED"]
+    for c in missing:
+        by, mentions = _claimed_by(c["name"], claims or [])
+        if by:
+            c["claimedBy"] = by
+        if mentions:
+            c["mentionedInOpenPRs"] = mentions
     groups: dict[str, list[str]] = defaultdict(list)
     for c in missing:
         groups[(c["mechanics"] or ["other"])[0]].append(c["name"])
+    free = [c for c in missing if not c.get("claimedBy")]
     dispatch = {
-        "copilot": [c["name"] for c in missing if c["route"] == "copilot"],
-        "claude": [c["name"] for c in missing if c["route"] == "claude"],
-        "gpt": [c["name"] for c in missing if c["route"] == "gpt"],
+        "copilot": [c["name"] for c in free if c["route"] == "copilot"],
+        "claude": [c["name"] for c in free if c["route"] == "claude"],
+        "gpt": [c["name"] for c in free if c["route"] == "gpt"],
+        "claimed": {c["name"]: c["claimedBy"] for c in missing if c.get("claimedBy")},
     }
     return {
         "schema": "arcana-cardkit-gaps/1",
@@ -83,7 +122,10 @@ def render_md(result: dict, title: str = "Card readiness") -> str:
         if c["readiness"] == "IMPLEMENTED_AND_TESTED":
             continue
         why = "; ".join(c["reasons"]).replace("|", "\\|")
-        lines.append(f"| {c['name']} | {c['readiness']} | {c['route']} | {len(c['decks'])} | {why} |")
+        route = f"claimed: {c['claimedBy']}" if c.get("claimedBy") else c["route"]
+        if c.get("mentionedInOpenPRs"):
+            why += f" (mentioned in open {', '.join(c['mentionedInOpenPRs'])})"
+        lines.append(f"| {c['name']} | {c['readiness']} | {route} | {len(c['decks'])} | {why} |")
     return "\n".join(lines) + "\n"
 
 

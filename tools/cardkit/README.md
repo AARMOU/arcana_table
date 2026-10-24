@@ -30,10 +30,16 @@ The existing `investigation/argentum-six-precons/coverage-audit.py` keeps its ou
    no scaffold markers → `IMPLEMENTED_AND_TESTED`.
 2. **Recorded gap?** Card or keyword listed in `data/known-blockers.json` → `ENGINE_BLOCKED`.
 3. **Oracle record** from `data/oracle-cache.jsonl` (none → `NEEDS_REVIEW`).
-4. **Keywords** must be known SDK vocabulary (from the generated SDK index).
+4. **Keywords** must be known: SDK vocabulary (generated index) or printed as a keyword on an implemented
+   card. Scryfall lists ability words and 40K named abilities ("Martyrdom —") as keywords; those are ignored.
 5. **Every rules line** is matched against ~30k lines from implemented cards (library Oracle text from the
-   app's assets + custom cards), normalized for self-references, numbers and reminder text. All lines
-   ≥ 0.88 similarity → `SUPPORTED`; any line < 0.6 → `NEEDS_REVIEW` with `reviewHint: possible-engine-gap`.
+   app's assets + custom cards), normalized for self-references, numbers, ability words and reminder text.
+   A line also scores by its clauses (trigger condition / cost / each sentence; quoted granted abilities
+   stay whole), minus a 0.04 combination penalty, so "When this dies, you gain 2 life and draw two cards"
+   counts when both halves exist. All lines ≥ 0.88 → `SUPPORTED`; any line < 0.6 → `NEEDS_REVIEW` with
+   `reviewHint: possible-engine-gap` (routed to Claude).
+6. `gaps --claims-from-github` (read-only, needs `gh`) keeps cards named in an open PR's title or branch out
+   of the dispatch lists (`dispatch.claimed`), and notes PRs whose body mentions a card.
 
 Nothing is ever marked supported by name or art alone, and nothing is marked blocked without a recorded
 source.
