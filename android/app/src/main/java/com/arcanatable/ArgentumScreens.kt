@@ -221,9 +221,8 @@ internal fun ArgentumOpeningHandScreen(
     primaryLabel: String, primaryEnabled: Boolean, onPrimary: () -> Unit,
     secondaryLabel: String?, secondaryEnabled: Boolean, onSecondary: () -> Unit,
 ) {
-    // In Argentum games, holding a card goes to the table-wide zoom, whose popup lives in the
-    // activity window, so it showed behind this dialog and was still up after Keep Hand. The hand
-    // gets its own zoom, drawn inside the dialog and gone when the dialog closes.
+    // The hand gets its own zoom, drawn inside this dialog, so a preview can never outlive the
+    // opening hand (it used to stay up on the table after Keep Hand).
     val tableZoom = LocalCardZoom.current
     LaunchedEffect(tableZoom) { tableZoom.dismiss() } // a table preview would otherwise hide behind the hand
     val handZoom = remember { CardZoomController().apply { enabled = true } }
