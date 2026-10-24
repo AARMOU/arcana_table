@@ -24,6 +24,7 @@ class HomeScreenSizesTest {
         UiTestSupport.settle(rule)
         rule.onNodeWithTag("home-play").assertIsDisplayed()
         rule.onNodeWithTag("test-scenarios-entry").assertIsDisplayed()
+        rule.onNodeWithTag("dev-goose-banner").assertIsDisplayed()
         UiTestSupport.screenshot(rule.activity, "home-$name")
     }
 
