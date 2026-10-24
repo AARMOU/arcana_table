@@ -287,6 +287,9 @@ object ArgentumActions {
     /** Types not tied to a single card; surfaced from the "Argentum actions" list. */
     val PLAYER_LEVEL_TYPES = setOf("DeclareAttackers", "DeclareBlockers", "PassPriority", "Concede")
 
+    /** Action fields that name the card an action belongs to. CrewVehicle names its Vehicle as vehicleId. */
+    val CARD_REF_KEYS = listOf("cardId", "sourceId", "permanentId", "entityId", "vehicleId")
+
     /** A card in ANY public zone is actionable only when Argentum itself supplied an action
      * referencing its stable server id. This also covers effects that let you play an opponent's card.
      * Never infer permission from flashback/escape/exile keywords in the Android client.
@@ -295,7 +298,7 @@ object ArgentumActions {
         if (serverId.isNullOrBlank()) return emptyList()
         return legalActions.filter { info ->
             val action = info.optJSONObject("action") ?: return@filter false
-            listOf("cardId", "sourceId", "permanentId", "entityId").any { key -> action.optString(key) == serverId }
+            CARD_REF_KEYS.any { key -> action.optString(key) == serverId }
         }
     }
 
@@ -433,8 +436,58 @@ data class ArgentumCounterRemoval(val total: Int, val sources: Map<String, Int>,
 }
 
 /**
+ * Crew N: tap any number of untapped creatures you control with total power N or more. Argentum
+ * offers CrewVehicle with crewCreatures empty and lists the eligible creatures (summoning-sick ones
+ * included) in tapForPowerCreatures; the chosen ids go into the action's crewCreatures.
+ * [power] keeps Argentum's order; [canAttack] marks creatures that could otherwise attack.
+ */
+data class ArgentumCrew(val required: Int, val power: Map<String, Int>, val canAttack: Set<String>) {
+    /**
+     * A starting choice that meets the requirement while tapping as little as possible: one
+     * creature that can't attack anyway if any is strong enough, else the fewest, weakest-first
+     * creatures that reach N, preferring ones that can't attack.
+     */
+    fun initial(): List<String> {
+        val order = power.keys.sortedWith(compareBy<String>({ it in canAttack }, { power.getValue(it) }))
+        order.firstOrNull { power.getValue(it) >= required }?.let { return listOf(it) }
+        val chosen = mutableListOf<String>()
+        for (id in power.keys.sortedWith(compareBy<String>({ it in canAttack }, { -power.getValue(it) }))) {
+            if (chosen.sumOf { power.getValue(it) } >= required) break
+            if (power.getValue(id) > 0) chosen += id
+        }
+        return if (chosen.sumOf { power.getValue(it) } >= required) chosen else emptyList()
+    }
+
+    fun total(crew: List<String>): Int = crew.sumOf { power[it] ?: 0 }
+
+    fun problem(crew: List<String>): String? = when {
+        crew.any { it !in power } -> "That creature can't crew."
+        total(crew) < required -> "Tap creatures with total power $required or more (chosen: ${total(crew)})."
+        else -> null
+    }
+
+    companion object {
+        fun from(info: JSONObject): ArgentumCrew? {
+            if (info.optJSONObject("action")?.optString("type") != "CrewVehicle" || !info.optBoolean("tapForPower")) return null
+            val required = info.optInt("tapForPowerRequired")
+            val list = info.optJSONArray("tapForPowerCreatures") ?: return null
+            val power = linkedMapOf<String, Int>()
+            val canAttack = mutableSetOf<String>()
+            for (i in 0 until list.length()) {
+                val c = list.optJSONObject(i) ?: continue
+                val id = c.optString("entityId").takeIf { it.isNotBlank() } ?: continue
+                power[id] = c.optInt("power")
+                if (c.optBoolean("canAttack")) canAttack += id
+            }
+            if (required <= 0 || power.isEmpty()) return null
+            return ArgentumCrew(required, power, canAttack)
+        }
+    }
+}
+
+/**
  * Everything Arcana must collect before submitting a legal action: X, targets (any number of
- * slots), divided damage, counters to remove and a mana colour. Built from the server's LegalActionInfo; the result
+ * slots), divided damage, counters to remove, a crew and a mana colour. Built from the server's LegalActionInfo; the result
  * is the server's own action object with only those player choices filled in.
  */
 data class ArgentumActionPlan(
@@ -445,9 +498,10 @@ data class ArgentumActionPlan(
     val distributeMin: Int,
     val manaColors: List<String>,
     val counterRemoval: ArgentumCounterRemoval? = null,
+    val crew: ArgentumCrew? = null,
 ) {
     val description: String get() = info.optString("description", "Argentum action")
-    val needsInput: Boolean get() = slots.isNotEmpty() || xRange != null || distributeTotal != null || manaColors.isNotEmpty() || counterRemoval != null
+    val needsInput: Boolean get() = slots.isNotEmpty() || xRange != null || distributeTotal != null || manaColors.isNotEmpty() || counterRemoval != null || crew != null
 
     /** Legal choices for a slot given earlier picks (server prefix table first, else the plain list). */
     fun legalFor(slot: ArgentumTargetSlot, picks: Map<Int, List<String>>): List<String> {
@@ -461,7 +515,7 @@ data class ArgentumActionPlan(
 
     fun chosenTargets(picks: Map<Int, List<String>>): List<String> = slots.filter { it.costField == null }.flatMap { picks[it.index].orEmpty() }
 
-    fun problem(picks: Map<Int, List<String>>, distribution: Map<String, Int>, color: String?, removal: Map<String, Int> = emptyMap()): String? {
+    fun problem(picks: Map<Int, List<String>>, distribution: Map<String, Int>, color: String?, removal: Map<String, Int> = emptyMap(), crewPicks: List<String> = emptyList()): String? {
         for (slot in slots) {
             val count = picks[slot.index].orEmpty().size
             if (count < slot.min) return "Choose ${if (slot.min == slot.max) slot.min else "at least ${slot.min}"} for “${slot.description}”."
@@ -475,11 +529,12 @@ data class ArgentumActionPlan(
         }
         if (manaColors.isNotEmpty() && color == null) return "Choose a mana colour."
         counterRemoval?.problem(removal)?.let { return it }
+        crew?.problem(crewPicks)?.let { return it }
         return null
     }
 
     /** The server's action with the player's choices filled in. [ref] turns a target id into ChosenTarget JSON. */
-    fun build(picks: Map<Int, List<String>>, x: Int?, distribution: Map<String, Int>, color: String?, removal: Map<String, Int> = emptyMap(), ref: (String) -> JSONObject?): JSONObject {
+    fun build(picks: Map<Int, List<String>>, x: Int?, distribution: Map<String, Int>, color: String?, removal: Map<String, Int> = emptyMap(), crewPicks: List<String> = emptyList(), ref: (String) -> JSONObject?): JSONObject {
         val action = JSONObject(info.optJSONObject("action")?.toString() ?: "{}")
         val targetSlots = slots.filter { it.costField == null }
         if (targetSlots.isNotEmpty()) {
@@ -502,6 +557,7 @@ data class ArgentumActionPlan(
             payment.put("distributedCounterRemovals", cr.payment(removal))
             action.put(key, payment)
         }
+        if (crew != null) action.put("crewCreatures", JSONArray(crewPicks))
         if (x != null && xRange != null) action.put("xValue", x)
         if (distributeTotal != null) action.put("damageDistribution", JSONObject().apply { chosenTargets(picks).forEach { put(it, distribution[it] ?: 0) } })
         if (color != null && manaColors.isNotEmpty()) action.put("manaColorChoice", color)
@@ -535,6 +591,7 @@ data class ArgentumActionPlan(
                 distributeTotal = if (info.optBoolean("requiresDamageDistribution")) info.optInt("totalDamageToDistribute").takeIf { it > 0 } else null,
                 distributeMin = info.optInt("minDamagePerTarget", 1),
                 counterRemoval = ArgentumCounterRemoval.from(info),
+                crew = ArgentumCrew.from(info),
                 manaColors = if (info.optBoolean("requiresManaColorChoice")) info.optJSONArray("availableManaColors").ids().ifEmpty { listOf("WHITE", "BLUE", "BLACK", "RED", "GREEN") } else emptyList(),
             )
         }

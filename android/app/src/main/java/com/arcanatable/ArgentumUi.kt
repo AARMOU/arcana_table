@@ -471,13 +471,15 @@ private val ManaColorTint = mapOf(
  * damage and a mana colour. Choices come only from the server's LegalActionInfo.
  */
 @Composable
-fun ArgentumActionComposer(plan: ArgentumActionPlan, nameOf: (String) -> String, busy: Boolean, onConfirm: (picks: Map<Int, List<String>>, x: Int?, distribution: Map<String, Int>, color: String?, removal: Map<String, Int>) -> Unit, onDismiss: () -> Unit) {
+fun ArgentumActionComposer(plan: ArgentumActionPlan, nameOf: (String) -> String, busy: Boolean, onConfirm: (picks: Map<Int, List<String>>, x: Int?, distribution: Map<String, Int>, color: String?, removal: Map<String, Int>, crew: List<String>) -> Unit, onDismiss: () -> Unit) {
     var picks by remember(plan) { mutableStateOf(emptyMap<Int, List<String>>()) }
     var x by remember(plan) { mutableIntStateOf(plan.xRange?.last ?: 0) }
     var distribution by remember(plan) { mutableStateOf(emptyMap<String, Int>()) }
     var color by remember(plan) { mutableStateOf(plan.manaColors.singleOrNull()) }
     // Counters to remove: start from a complete split so one tap on CONFIRM works.
     var removal by remember(plan) { mutableStateOf(plan.counterRemoval?.initial().orEmpty()) }
+    // Crew: start from the lightest choice that's enough, so one tap on CONFIRM works.
+    var crew by remember(plan) { mutableStateOf(plan.crew?.initial().orEmpty()) }
     val chosen = plan.chosenTargets(picks)
     // Keep the division in step with the chosen targets: spread the total as evenly as allowed.
     androidx.compose.runtime.LaunchedEffect(chosen, plan.distributeTotal) {
@@ -487,7 +489,7 @@ fun ArgentumActionComposer(plan: ArgentumActionPlan, nameOf: (String) -> String,
         val base = total / chosen.size
         distribution = chosen.mapIndexed { i, id -> id to base + if (i < total % chosen.size) 1 else 0 }.toMap()
     }
-    val problem = plan.problem(picks, distribution, color, removal)
+    val problem = plan.problem(picks, distribution, color, removal, crew)
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(plan.description) },
@@ -532,6 +534,18 @@ fun ArgentumActionComposer(plan: ArgentumActionPlan, nameOf: (String) -> String,
                     Text("Choose which permanents give them up.", color = Muted, fontSize = 10.sp)
                     ArgentumAmountEditor(cr.sources.keys.toList(), { id -> "${nameOf(id)} (${cr.sources[id]})" }, removal, cr.total, emptyMap(), cr.sources) { removal = it }
                 }
+                plan.crew?.let { c ->
+                    Text("Crew ${c.required}: tap creatures with total power ${c.required} or more", color = Mint, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
+                    Text("Chosen power ${c.total(crew)} of ${c.required}", color = if (c.total(crew) >= c.required) Mint else CounterGold, fontSize = 11.sp)
+                    c.power.forEach { (id, power) ->
+                        val on = id in crew
+                        val toggle = { crew = if (on) crew - id else crew + id }
+                        Row(Modifier.fillMaxWidth().clickable(onClick = toggle).padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = on, onCheckedChange = { toggle() })
+                            Text("${nameOf(id)} (power $power)${if (id in c.canAttack) " · could attack" else ""}", color = SoftWhite, fontSize = 13.sp)
+                        }
+                    }
+                }
                 if (plan.manaColors.isNotEmpty()) {
                     Text("Mana colour", color = Mint, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 10.dp))
                     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -549,7 +563,7 @@ fun ArgentumActionComposer(plan: ArgentumActionPlan, nameOf: (String) -> String,
                 Text("Argentum checks legality, costs and payment when you confirm.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 6.dp))
             }
         },
-        confirmButton = { TextButton(enabled = !busy && problem == null, onClick = { onConfirm(picks, plan.xRange?.let { x }, distribution, color, removal) }) { Text("CONFIRM") } },
+        confirmButton = { TextButton(enabled = !busy && problem == null, onClick = { onConfirm(picks, plan.xRange?.let { x }, distribution, color, removal, crew) }) { Text("CONFIRM") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("CANCEL") } }
     )
 }
