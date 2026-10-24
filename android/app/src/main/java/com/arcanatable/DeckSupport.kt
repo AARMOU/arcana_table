@@ -43,9 +43,15 @@ data class SupportedCard(
     /** Color identity letters (W U B R G); null when the asset gave none. */
     val identity: Set<Char>? = null,
     val kind: String = "card",
+    val oracleText: String? = null,
+    val power: String? = null,
+    val toughness: String? = null,
+    val keywords: List<String> = emptyList(),
 ) {
     val manaValue: Double get() = manaValueOf(manaCost)
-    val colors: Set<Char> get() = identity ?: colorsOf(manaCost)
+    // The authoritative override wins; otherwise rules-text mana symbols are also part of
+    // color identity. A mana-cost-only fallback incorrectly allows off-color activated cards.
+    val colors: Set<Char> get() = identity ?: (colorsOf(manaCost) + colorsOf(oracleText.orEmpty()))
     val cardTypes: Set<String> get() = cardTypesOf(typeLine)
     val subtypes: Set<String> get() = subtypesOf(typeLine)
     val support: CardSupport get() = if (custom) CardSupport.CUSTOM_UNVERIFIED else CardSupport.ARGENTUM
@@ -53,7 +59,11 @@ data class SupportedCard(
     /** The existing import/editor card shape, built offline from the library asset. */
     fun toScryfallCard(): ScryfallCard = ScryfallCard(
         name = name, type = typeLine, imageUrl = imageUrl, manaValue = manaValue,
-        manaCost = manaCost.takeIf { it.isNotBlank() }
+        manaCost = manaCost.takeIf { it.isNotBlank() },
+        oracleText = oracleText,
+        power = power,
+        toughness = toughness,
+        keywords = keywords,
     )
 }
 
@@ -195,7 +205,32 @@ class SupportedCardCatalog(cards: List<SupportedCard>) {
                 custom = custom,
                 identity = identity,
                 kind = kind,
+                oracleText = jsonString(line, "oracleText"),
+                power = jsonCreatureStat(line, "power"),
+                toughness = jsonCreatureStat(line, "toughness"),
+                keywords = jsonKeywordList(line),
             )
+        }
+
+        /** Decode just the creatureStats fields of an exported JSONL card (numbers or strings). */
+        internal fun jsonCreatureStat(line: String, key: String): String? {
+            val stats = line.substringAfter("\"creatureStats\":{", "")
+            if (stats.isEmpty()) return null
+            val field = stats.substringBefore('}').substringAfter("\"$key\":", "")
+            if (field.isEmpty()) return null
+            return if (field.startsWith('"')) field.drop(1).substringBefore('"')
+            else field.takeWhile { it == '-' || it.isDigit() }.takeIf { it.isNotEmpty() }
+        }
+
+        /** Normalize exported keyword enum names to the same presentation as Scryfall keywords. */
+        internal fun jsonKeywordList(line: String): List<String> {
+            val array = line.substringAfter("\"keywords\":[", "")
+            if (array.isEmpty()) return emptyList()
+            val content = array.substringBefore(']')
+            if (content.isBlank()) return emptyList()
+            return content.split(',').mapNotNull { raw ->
+                raw.trim().removeSurrounding("\"").takeIf { it.isNotBlank() }
+            }.map { it.lowercase(Locale.ROOT).replace('_', ' ').replaceFirstChar(Char::uppercaseChar) }
         }
 
         /** First string value for [key] in a JSON line, with standard escapes decoded. */
