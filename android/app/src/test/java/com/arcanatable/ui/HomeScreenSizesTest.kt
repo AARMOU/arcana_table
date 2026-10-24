@@ -50,6 +50,7 @@ class HomeScreenSizesTest {
         rule.onNodeWithTag("test-scenario-lunar-whale-held").assertExists()
         rule.onNodeWithTag("test-scenario-ulalek-copy").assertExists()
         rule.onNodeWithTag("test-scenario-ulalek-own-stack").assertExists()
+        rule.onNodeWithTag("test-scenario-eldrazi-displacer-blink").assertExists()
         UiTestSupport.screenshot(rule.activity, "home-scenario-chooser")
     }
 }
