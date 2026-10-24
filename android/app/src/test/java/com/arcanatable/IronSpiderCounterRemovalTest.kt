@@ -26,10 +26,10 @@ class IronSpiderCounterRemovalTest {
             EmbeddedEngineTrial.loadCards(lines.filter { it.contains("\"name\":\"$spider\"") }).single()
         }
 
-    @Test fun requiredCountComesFromTheAbilitysOwnCost() {
+    @Test fun requirementComesFromTheAbilitysOwnCost() {
         val abilities = spiderDefinition().script.activatedAbilities
-        assertNull("the tap ability removes no counters", CounterRemovalCost.requiredCount(abilities[0].cost))
-        assertEquals(2, CounterRemovalCost.requiredCount(abilities[1].cost))
+        assertNull("the tap ability removes no counters", CounterRemovalCost.requirement(abilities[0].cost))
+        assertEquals(CounterRemovalCost.Requirement(2, "+1/+1"), CounterRemovalCost.requirement(abilities[1].cost))
     }
 
     /** The legal action as the offline host now sends it (total filled in). */
@@ -47,6 +47,14 @@ class IronSpiderCounterRemovalTest {
     private fun source(id: String, n: Int) = JSONObject().put("entityId", id).put("name", id)
         .put("availableCounters", n)
         .put("availableCountersByType", if (n > 0) JSONObject().put("+1/+1", n) else JSONObject())
+
+    /** A legal action listing arbitrary per-type counters ([availableCounters] = all of them). */
+    private fun mixed(total: Int, vararg sources: Pair<String, Map<String, Int>>) = legalAction(total).apply {
+        getJSONObject("additionalCostInfo").put("counterRemovalCreatures", JSONArray(sources.map { (id, byType) ->
+            JSONObject().put("entityId", id).put("name", id).put("availableCounters", byType.values.sum())
+                .put("availableCountersByType", JSONObject(byType))
+        }))
+    }
 
     @Test fun planAsksWhichArtifactsGiveUpCountersAndStartsComplete() {
         val plan = ArgentumActionPlan.from(legalAction())
@@ -84,5 +92,51 @@ class IronSpiderCounterRemovalTest {
         // A server that still reports 0 (or too few counters) keeps the old behaviour.
         assertNull(ArgentumActionPlan.from(legalAction(total = 0)).counterRemoval)
         assertNull(ArgentumActionPlan.from(legalAction(thopterCounters = 1)).counterRemoval)
+    }
+
+    // Mixed counter types (GPT review on #104). The host narrows the listing to "+1/+1"; the plan
+    // must also use only that type's count and refuse anything ambiguous.
+
+    @Test fun onePlusOneBesideOtherCountersCannotPayTwo() {
+        // As the host sends it: only "+1/+1" listed, though the permanent has 4 counters in all.
+        val narrowed = mixed(2, "thopter" to mapOf("+1/+1" to 1)).apply {
+            getJSONObject("additionalCostInfo").getJSONArray("counterRemovalCreatures").getJSONObject(0).put("availableCounters", 4)
+        }
+        assertNull("capacity is the +1/+1 count, not all counters", ArgentumActionPlan.from(narrowed).counterRemoval)
+        // Unnarrowed listing with another type: ambiguous, fail closed.
+        assertNull(ArgentumActionPlan.from(mixed(2, "thopter" to mapOf("+1/+1" to 1, "charge" to 3))).counterRemoval)
+    }
+
+    @Test fun twoPlusOneOnAMixedArtifactSendsExactlyTwoPlusOne() {
+        val info = mixed(2, "thopter" to mapOf("+1/+1" to 2)).apply {
+            getJSONObject("additionalCostInfo").getJSONArray("counterRemovalCreatures").getJSONObject(0).put("availableCounters", 5)
+        }
+        val plan = ArgentumActionPlan.from(info)
+        val cr = plan.counterRemoval!!
+        assertEquals(mapOf("thopter" to 2), cr.sources)
+        assertNotNull("can't take three", cr.problem(mapOf("thopter" to 3)))
+        val removals = plan.build(emptyMap(), null, emptyMap(), null, cr.initial()) { null }
+            .getJSONObject("costPayment").getJSONArray("distributedCounterRemovals")
+        assertEquals(1, removals.length())
+        assertEquals("+1/+1", removals.getJSONObject(0).getString("counterType"))
+        assertEquals(2, removals.getJSONObject(0).getInt("count"))
+    }
+
+    @Test fun oneAndOneAcrossTwoArtifactsOneOfThemMixed() {
+        val info = mixed(2, "thopter" to mapOf("+1/+1" to 1), "ring" to mapOf("+1/+1" to 1)).apply {
+            getJSONObject("additionalCostInfo").getJSONArray("counterRemovalCreatures").getJSONObject(0).put("availableCounters", 4)
+        }
+        val plan = ArgentumActionPlan.from(info)
+        val split = plan.counterRemoval!!.initial()
+        assertEquals(mapOf("thopter" to 1, "ring" to 1), split)
+        val removals = plan.build(emptyMap(), null, emptyMap(), null, split) { null }
+            .getJSONObject("costPayment").getJSONArray("distributedCounterRemovals")
+        assertEquals(listOf("thopter" to 1, "ring" to 1), (0 until removals.length()).map {
+            removals.getJSONObject(it).let { r -> assertEquals("+1/+1", r.getString("counterType")); r.getString("entityId") to r.getInt("count") }
+        })
+    }
+
+    @Test fun differentTypesAcrossPermanentsFailClosed() {
+        assertNull(ArgentumActionPlan.from(mixed(2, "thopter" to mapOf("+1/+1" to 1), "ring" to mapOf("charge" to 1))).counterRemoval)
     }
 }

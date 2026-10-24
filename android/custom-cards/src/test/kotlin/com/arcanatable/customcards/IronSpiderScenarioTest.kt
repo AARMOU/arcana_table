@@ -26,10 +26,22 @@ class IronSpiderScenarioTest {
     private fun GameTestDriver.counters(id: EntityId): Int =
         state.getEntity(id)!!.get<CountersComponent>()?.getCount(CounterType.PLUS_ONE_PLUS_ONE) ?: 0
 
-    private fun GameTestDriver.setCounters(id: EntityId, n: Int) =
+    private fun GameTestDriver.setCounters(id: EntityId, n: Int, type: CounterType = CounterType.PLUS_ONE_PLUS_ONE) =
         replaceState(state.updateEntity(id) { c ->
-            c.with((c.get<CountersComponent>() ?: CountersComponent()).withAdded(CounterType.PLUS_ONE_PLUS_ONE, n))
+            c.with((c.get<CountersComponent>() ?: CountersComponent()).withAdded(type, n))
         })
+
+    private fun GameTestDriver.charge(id: EntityId): Int =
+        state.getEntity(id)!!.get<CountersComponent>()?.getCount(CounterType.CHARGE) ?: 0
+
+    /** Iron Spider's draw action as Arcana's offline host sends it: enriched, then CounterRemovalCost.fill. */
+    private fun GameTestDriver.hostDrawInfo(spider: EntityId): com.wingedsheep.engine.view.LegalActionInfo? {
+        val drawId = cardRegistry.getCard(spiderName)!!.script.activatedAbilities[1].id
+        val enriched = com.wingedsheep.engine.view.LegalActionEnricher(services.manaSolver, cardRegistry)
+            .enrich(legalActions(player1), state, player1)
+        return CounterRemovalCost.fill(enriched, state, cardRegistry)
+            .singleOrNull { (it.action as? ActivateAbility)?.let { a -> a.sourceId == spider && a.abilityId == drawId } == true }
+    }
 
     private fun GameTestDriver.drawAction(p: EntityId, spider: EntityId) =
         abilityActions(p, spider).single {
@@ -145,5 +157,66 @@ class IronSpiderScenarioTest {
         // Every other action is passed through unchanged.
         val others = CounterRemovalCost.fill(enriched, d.state, d.cardRegistry).zip(enriched).filter { (_, before) -> before !== draw(enriched) }
         assertTrue(others.isNotEmpty() && others.all { (after, before) -> after === before })
+    }
+
+    @Test fun requirementIsTwoPlusOneCountersAsTheEngineKeysThem() {
+        val cost = scenario(spiderName).cardRegistry.getCard(spiderName)!!.script.activatedAbilities[1].cost
+        assertEquals(CounterRemovalCost.Requirement(2, "+1/+1"), CounterRemovalCost.requirement(cost))
+    }
+
+    @Test fun otherCounterTypesDoNotCountTowardTheCost() {
+        // One +1/+1 and three charge counters on the only other artifact: two +1/+1 can't be paid.
+        val (d, spider, thopter) = setup()
+        d.setCounters(thopter, 1)
+        d.setCounters(thopter, 3, CounterType.CHARGE)
+        val la = d.abilityActions(d.player1, spider).singleOrNull {
+            (it.action as ActivateAbility).abilityId == d.cardRegistry.getCard(spiderName)!!.script.activatedAbilities[1].id
+        }
+        assertTrue("not payable from charge counters", la == null || !la.affordable)
+        val r = activateWith(d, spider, listOf(DistributedCounterRemoval(thopter, "charge", 2)))
+        assertNotNull("the engine refuses another counter type", r.error)
+        assertEquals(3, d.charge(thopter))
+    }
+
+    @Test fun hostListsOnlyPlusOneCountersOnMixedArtifactsAndANoncreatureArtifact() {
+        // Ornithopter: 2 +1/+1 and 3 charge. Sol Ring (noncreature artifact): 1 +1/+1. The cost says "artifacts".
+        val d = scenario(spiderName, "Ornithopter", "Sol Ring")
+        val p = d.player1
+        val spider = d.putCreatureOnBattlefield(p, spiderName)
+        val thopter = d.putCreatureOnBattlefield(p, "Ornithopter")
+        val ring = d.putPermanentOnBattlefield(p, "Sol Ring")
+        d.setCounters(thopter, 2); d.setCounters(thopter, 3, CounterType.CHARGE)
+        d.setCounters(ring, 1)
+        d.giveMana(p, Color.WHITE, 2)
+        val cost = d.hostDrawInfo(spider)!!.additionalCostInfo!!
+        assertEquals(2, cost.distributedCounterRemovalTotal)
+        val listed = cost.counterRemovalCreatures.associate { it.entityId to (it.availableCounters to it.availableCountersByType) }
+        assertEquals(mapOf(
+            thopter to (2 to mapOf("+1/+1" to 2)),
+            ring to (1 to mapOf("+1/+1" to 1)),
+        ), listed)
+        // 1 + 1 across the mixed artifact and the noncreature artifact pays and draws.
+        val hand = d.getHandSize(p)
+        val r = activateWith(d, spider, listOf(
+            DistributedCounterRemoval(thopter, "+1/+1", 1),
+            DistributedCounterRemoval(ring, "+1/+1", 1),
+        ))
+        assertNull("split accepted: ${r.error}", r.error)
+        d.resolveAll()
+        assertEquals(1, d.counters(thopter)); assertEquals(3, d.charge(thopter))
+        assertEquals(0, d.counters(ring))
+        assertEquals(hand + 1, d.getHandSize(p))
+    }
+
+    @Test fun exactlyTwoPlusOneFromAMixedArtifactLeavesItsOtherCounters() {
+        val (d, spider, thopter) = setup()
+        d.setCounters(thopter, 2); d.setCounters(thopter, 3, CounterType.CHARGE)
+        assertEquals(mapOf("+1/+1" to 2), d.hostDrawInfo(spider)!!.additionalCostInfo!!
+            .counterRemovalCreatures.single { it.entityId == thopter }.availableCountersByType)
+        val hand = d.getHandSize(d.player1)
+        assertNull(activateWith(d, spider, listOf(DistributedCounterRemoval(thopter, "+1/+1", 2))).error)
+        d.resolveAll()
+        assertEquals(0, d.counters(thopter)); assertEquals(3, d.charge(thopter))
+        assertEquals(hand + 1, d.getHandSize(d.player1))
     }
 }

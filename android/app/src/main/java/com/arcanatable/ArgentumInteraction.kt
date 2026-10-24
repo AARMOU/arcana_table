@@ -405,6 +405,11 @@ data class ArgentumCounterRemoval(val total: Int, val sources: Map<String, Int>,
     })
 
     companion object {
+        /**
+         * Fails closed (null: the action goes to Argentum unchanged) unless every listed permanent
+         * names exactly one counter type with counters, and all name the same one. The offline host
+         * narrows the listing to the cost's own type ("+1/+1"); capacity is that type's count only.
+         */
         fun from(info: JSONObject): ArgentumCounterRemoval? {
             val cost = info.optJSONObject("additionalCostInfo") ?: return null
             val total = cost.optInt("distributedCounterRemovalTotal")
@@ -413,16 +418,15 @@ data class ArgentumCounterRemoval(val total: Int, val sources: Map<String, Int>,
             val sources = linkedMapOf<String, Int>()
             val types = mutableMapOf<String, String>()
             for (i in 0 until list.length()) {
-                val c = list.optJSONObject(i) ?: continue
-                val id = c.optString("entityId").takeIf { it.isNotBlank() } ?: continue
-                val byType = c.optJSONObject("availableCountersByType")
-                // The counter type with the most counters on this permanent (the cost names one type).
-                val type = byType?.keys()?.asSequence()?.maxByOrNull { byType.optInt(it) } ?: continue
-                val have = c.optInt("availableCounters", byType.optInt(type))
-                if (have <= 0) continue
-                sources[id] = have; types[id] = type
+                val c = list.optJSONObject(i) ?: return null
+                val id = c.optString("entityId").takeIf { it.isNotBlank() } ?: return null
+                val byType = c.optJSONObject("availableCountersByType") ?: return null
+                val withCounters = byType.keys().asSequence().filter { byType.optInt(it) > 0 }.toList()
+                if (withCounters.isEmpty()) continue
+                val type = withCounters.singleOrNull() ?: return null
+                sources[id] = byType.optInt(type); types[id] = type
             }
-            if (sources.values.sum() < total) return null
+            if (types.values.toSet().size != 1 || sources.values.sum() < total) return null
             return ArgentumCounterRemoval(total, sources, types)
         }
     }
