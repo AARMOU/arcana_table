@@ -212,21 +212,59 @@ class SupportedCardCatalog(cards: List<SupportedCard>) {
             )
         }
 
-        /** Decode just the creatureStats fields of an exported JSONL card (numbers or strings). */
+        /**
+         * Find a field directly on the JSONL card object, not in nested script effects.
+         *
+         * Token-making cards frequently contain nested "keywords" / "creatureStats" under
+         * CreateToken. A naive substring search would mislabel the original card with the
+         * token's flying/trample or creature statistics.
+         *
+         * The export is compact JSON. Ignore quoted strings (including escaped quotes),
+         * and accept a field only while at the root object's depth.
+         */
+        private fun topLevelValue(line: String, key: String): String? {
+            val marker = "\"$key\":"
+            if (!line.contains(marker)) return null
+            var depth = 0
+            var quoted = false
+            var escaped = false
+            for (i in line.indices) {
+                val c = line[i]
+                if (quoted) {
+                    when {
+                        escaped -> escaped = false
+                        c == '\\' -> escaped = true
+                        c == '"' -> quoted = false
+                    }
+                    continue
+                }
+                when (c) {
+                    '"' -> {
+                        if (depth == 1 && line.startsWith(marker, i)) {
+                            return line.substring(i + marker.length)
+                        }
+                        quoted = true
+                    }
+                    '{', '[' -> depth++
+                    '}', ']' -> depth--
+                }
+            }
+            return null
+        }
+
+        /** Decode only the card's own creatureStats, never nested token or effect stats. */
         internal fun jsonCreatureStat(line: String, key: String): String? {
-            val stats = line.substringAfter("\"creatureStats\":{", "")
-            if (stats.isEmpty()) return null
+            val stats = topLevelValue(line, "creatureStats")?.takeIf { it.startsWith('{') } ?: return null
             val field = stats.substringBefore('}').substringAfter("\"$key\":", "")
             if (field.isEmpty()) return null
             return if (field.startsWith('"')) field.drop(1).substringBefore('"')
             else field.takeWhile { it == '-' || it.isDigit() }.takeIf { it.isNotEmpty() }
         }
 
-        /** Normalize exported keyword enum names to the same presentation as Scryfall keywords. */
+        /** Normalize only this card's keyword enum names, not its tokens' abilities. */
         internal fun jsonKeywordList(line: String): List<String> {
-            val array = line.substringAfter("\"keywords\":[", "")
-            if (array.isEmpty()) return emptyList()
-            val content = array.substringBefore(']')
+            val array = topLevelValue(line, "keywords")?.takeIf { it.startsWith('[') } ?: return emptyList()
+            val content = array.substringAfter('[').substringBefore(']')
             if (content.isBlank()) return emptyList()
             return content.split(',').mapNotNull { raw ->
                 raw.trim().removeSurrounding("\"").takeIf { it.isNotBlank() }
