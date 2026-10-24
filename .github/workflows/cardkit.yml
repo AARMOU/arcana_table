@@ -26,6 +26,9 @@ jobs:
   toolkit:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -47,10 +50,12 @@ jobs:
         id: oracle
         continue-on-error: true
         run: tools/cardkit/cardkit oracle fetch --missing-only
-      - name: Readiness report for the six precons
+      - name: Readiness report for the six precons (with verified open-PR claims)
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p cardkit-out
-          tools/cardkit/cardkit gaps --json-output cardkit-out/gaps.json --markdown-output cardkit-out/gaps.md
+          tools/cardkit/cardkit gaps --claims-from-github --json-output cardkit-out/gaps.json --markdown-output cardkit-out/gaps.md
           cp tools/cardkit/data/oracle-cache.jsonl cardkit-out/ 2>/dev/null || true
           git diff --stat -- tools/cardkit/data/oracle-cache.jsonl
           {
@@ -63,7 +68,7 @@ jobs:
           t = r['totals']
           print(f"::notice title=cardkit readiness::implemented {t['IMPLEMENTED_AND_TESTED']}, supported {t['SUPPORTED']}, "
                 f"needs review {t['NEEDS_REVIEW']}, engine-blocked {t['ENGINE_BLOCKED']}; routes "
-                + ", ".join(f"{k} {len(v)}" for k, v in r['dispatch'].items()))
+                + ", ".join(f"{k} {len(v)}" for k, v in r['dispatch'].items() if not isinstance(v, bool)) + f"; dispatchable {r['dispatch']['dispatchable']}")
           for d in r['decks']:
               print(f"::notice title={d['name']}::playable {d['playableSlots']}/{d['slots']}, supported {d['SUPPORTED']}, "
                     f"review {d['NEEDS_REVIEW']}, blocked {d['ENGINE_BLOCKED']} (slots)")

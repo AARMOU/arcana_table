@@ -299,6 +299,22 @@ class UnitCommandTests(unittest.TestCase):
             self.assertEqual(cardkit.main(["unit", "Cardkit Test Scout"]), 1)
         self.assertEqual(out.getvalue(), "")
 
+    def test_gaps_cli_end_to_end(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            res = subprocess.run([sys.executable, str(HERE.parent / "cardkit.py"), "gaps", "--no-refs",
+                                  "--json-output", f"{tmp}/g.json", "--markdown-output", f"{tmp}/g.md"],
+                                 capture_output=True, text=True)
+            self.assertEqual(res.returncode, 0, res.stderr)
+            self.assertIn("NOT DISPATCHABLE", res.stdout)
+            self.assertFalse(json.loads(Path(f"{tmp}/g.json").read_text())["dispatch"]["dispatchable"])
+            self.assertIn("## Missing cards", Path(f"{tmp}/g.md").read_text())
+
+    def test_gaps_claims_failure_exits_nonzero(self):
+        import cardkit
+        with mock.patch.object(gaps, "open_pr_claims", side_effect=gaps.ClaimsUnavailable("no gh")), \
+                mock.patch("sys.stdout", io.StringIO()), mock.patch("sys.stderr", io.StringIO()):
+            self.assertEqual(cardkit.main(["gaps", "--no-refs", "--claims-from-github"]), 4)
+
     def test_gaps_without_claims_is_marked_not_dispatchable(self):
         r = gaps.analyze(gaps.load_decks(), use_refs=False)
         self.assertFalse(r["dispatch"]["dispatchable"])

@@ -87,7 +87,7 @@ def cmd_gaps(a) -> int:
     t = result["totals"]
     print(f"DISTINCT: implemented {t['IMPLEMENTED_AND_TESTED']}, supported {t['SUPPORTED']}, "
           f"needs review {t['NEEDS_REVIEW']}, engine-blocked {t['ENGINE_BLOCKED']}")
-    print("ROUTES: " + ", ".join(f"{k} {len(v)}" for k, v in result["dispatch"].items())
+    print("ROUTES: " + ", ".join(f"{k} {len(v)}" for k, v in result["dispatch"].items() if not isinstance(v, bool))
           + ("" if claims is not None else " — NOT DISPATCHABLE: open-PR claims not checked (add --claims-from-github)"))
     return 0
 
