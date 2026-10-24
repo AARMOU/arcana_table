@@ -271,6 +271,8 @@ object CustomCards {
         Entry(OblivionSower, "M3C", "Eldrazi Incursion"),
         Entry(SireOfStagnation, "BFZ", "Eldrazi Incursion"),
         Entry(SufferThePast, "ROE", "Eldrazi Incursion"),
+        // Needs the colorless-hybrid and stack-copy engine patches (engine-upgrade/ulalek).
+        Entry(UlalekFusedAtrocity, "M3C", "Eldrazi Incursion"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)
