@@ -8,6 +8,10 @@ and in Copilot's environment).
 find → classify → scaffold → implement → test → register + export → check → draft PR
 ```
 
+For the full pinned Argentum SDK/Assay compatibility audit and Eldrazi pilot findings, see
+[ASSAY-COMPATIBILITY.md](ASSAY-COMPATIBILITY.md). That guide is complementary to the
+optional read-only `assay-review` command below; neither establishes playable-card coverage.
+
 ## 1. Find work that can actually be finished
 
 ```sh
