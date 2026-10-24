@@ -53,16 +53,28 @@ internal object TestScenarios {
             "Crew 1 with the Elves, then attack with the Whale.",
     )
 
-    val available: List<TestScenario> = listOf(IRON_SPIDER, WHALE_JUST_CAST, WHALE_HELD)
+    val ULALEK = TestScenario(
+        id = "ulalek-copy",
+        title = "Ulalek — pay {C}{C}, copy your stack",
+        description = "Beast Whisperer and Ulalek, Fused Atrocity in play, ten Wastes untapped, Elder Deep-Fiend (an " +
+            "Eldrazi) in hand. Cast the Fiend: Ulalek and Beast Whisperer both trigger. Pay {C}{C} for Ulalek and it " +
+            "copies the Fiend (the copy becomes a token) and Beast Whisperer's trigger (you draw an extra card).",
+    )
+
+    val available: List<TestScenario> = listOf(IRON_SPIDER, WHALE_JUST_CAST, WHALE_HELD, ULALEK)
 
     private const val SPIDER = "Iron Spider, Stark Upgrade"
     private const val WHALE = "The Lunar Whale"
     private const val ELVES = "Llanowar Elves"
+    private const val ULALEK_CARD = "Ulalek, Fused Atrocity"
+    private const val FIEND = "Elder Deep-Fiend"
+    private const val WHISPERER = "Beast Whisperer"
 
     fun build(scenario: TestScenario, library: OfflineCardLibrary): TestScenarioGame = when (scenario.id) {
         IRON_SPIDER.id -> ironSpider(library)
         WHALE_JUST_CAST.id -> whaleJustCast(library)
         WHALE_HELD.id -> whaleHeld(library)
+        ULALEK.id -> ulalek(library)
         else -> error("Unknown test scenario ${scenario.id}")
     }
 
@@ -156,6 +168,29 @@ internal object TestScenarios {
         val aiIsland = state.getZone(LocalArgentumHost.AI_ID, Zone.HAND).first()
         state = zones.moveToZone(state, aiIsland, Zone.BATTLEFIELD).state
         state = passToYourMainPhase(state, services, afterTurn = state.turnNumber)
+        return TestScenarioGame(listOf(you, ai), registry, checkpoint(state, you, ai))
+    }
+
+    /**
+     * Beast Whisperer then Ulalek on your battlefield (in that order, so Ulalek's trigger goes on the stack
+     * above Beast Whisperer's and can copy it), ten Wastes for an {8} Eldrazi plus Ulalek's {C}{C}, and a
+     * Grizzly Bears on the AI's side for Elder Deep-Fiend's tap trigger. Needs the engine with
+     * colorless-hybrid mana and stack copying (engine-upgrade/ulalek).
+     */
+    private fun ulalek(library: OfflineCardLibrary): TestScenarioGame {
+        val you = LocalSeat("You", listOf(WHISPERER, ULALEK_CARD, FIEND) + List(37) { "Wastes" }, null)
+        val ai = LocalSeat("Scenario AI", listOf("Grizzly Bears") + List(39) { "Island" }, null)
+        val registry = CardRegistry().apply { register(library.load((you.deck + ai.deck).toSet())) }
+        val services = EngineServices(registry)
+        var state = mainPhaseOfYourFirstTurn(registry, services, you, ai)
+        val zones = ZoneTransitionService(registry, services.predicateEvaluator)
+        state = zones.moveToZone(state, yourCard(state, WHISPERER), Zone.BATTLEFIELD).state
+        state = zones.moveToZone(state, yourCard(state, ULALEK_CARD), Zone.BATTLEFIELD).state
+        state = zones.moveToZone(state, yourCard(state, FIEND), Zone.HAND).state
+        repeat(10) { state = zones.moveToZone(state, yourCard(state, "Wastes", Zone.LIBRARY), Zone.BATTLEFIELD).state }
+        val bears = (state.getZone(LocalArgentumHost.AI_ID, Zone.LIBRARY) + state.getZone(LocalArgentumHost.AI_ID, Zone.HAND))
+            .first { state.getEntity(it)?.get<CardComponent>()?.name == "Grizzly Bears" }
+        state = zones.moveToZone(state, bears, Zone.BATTLEFIELD).state
         return TestScenarioGame(listOf(you, ai), registry, checkpoint(state, you, ai))
     }
 

@@ -44,8 +44,9 @@ class TestScenariosTest {
 
     private fun JSONArray.objects() = (0 until length()).map { getJSONObject(it) }
 
-    @Test fun debugBuildListsExactlyTheThreeScenarios() {
-        assertEquals(listOf(TestScenarios.IRON_SPIDER, TestScenarios.WHALE_JUST_CAST, TestScenarios.WHALE_HELD), TestScenarios.available)
+    @Test fun debugBuildListsExactlyTheFourScenarios() {
+        assertEquals(listOf(TestScenarios.IRON_SPIDER, TestScenarios.WHALE_JUST_CAST, TestScenarios.WHALE_HELD, TestScenarios.ULALEK),
+            TestScenarios.available)
     }
 
     @Test fun ironSpiderScenarioOpensOnYourMainPhaseWithTheBoardAndDrawsThroughArcanasPicker() {
@@ -159,6 +160,65 @@ class TestScenariosTest {
                 after = s.submit(after, pass.getJSONObject("action"))
             }
             assertEquals("3 damage in the air", lifeBefore - 3, after.snapshot().players[ai].life)
+        } finally { s.host.shutdown() }
+    }
+
+    // ---- Ulalek, Fused Atrocity: pay {C}{C}, copy your spells and other abilities ----
+
+    private fun zoneCards(state: JSONObject, zoneType: String, owner: String): List<String> {
+        val cards = state.getJSONObject("cards")
+        return state.getJSONArray("zones").objects()
+            .filter { it.getJSONObject("zoneId").optString("zoneType").equals(zoneType, true) && it.getJSONObject("zoneId").optString("ownerId") == owner }
+            .flatMap { z -> z.optJSONArray("cardIds")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty() }
+            .map { cards.optJSONObject(it)?.optString("name") ?: it }
+    }
+
+    @Test fun ulalekCopiesTheEldraziSpellAndBeastWhisperersTriggerWhenPaid() {
+        val s = start(TestScenarios.ULALEK)
+        val you = LocalArgentumHost.HUMAN_ID.value
+        try {
+            var msg = s.nextState()
+            val state = msg.getJSONObject("state")
+            assertEquals(listOf("Beast Whisperer", "Ulalek, Fused Atrocity"), zoneCards(state, "BATTLEFIELD", you).filter { it != "Wastes" })
+            assertEquals(10, zoneCards(state, "BATTLEFIELD", you).count { it == "Wastes" })
+            val fiendCard = cardIdNamed(state, "Elder Deep-Fiend")
+            val handBefore = handCount(state)
+            val cast = msg.snapshot().legalActions.single { it.actionType() == "CastSpell" && it.getJSONObject("action").optString("cardId") == fiendCard }
+            assertTrue("ten Wastes pay {8}", cast.optBoolean("isAffordable"))
+            s.host.receive(JSONObject().put("type", "submitAction").put("action", cast.getJSONObject("action")).put("interactionEpoch", msg.getString("interactionEpoch")))
+
+            // Answer every decision the way a player would: no tap targets, yes to {C}{C}, auto-pay it.
+            val asked = mutableListOf<String>()
+            var done: JSONObject? = null
+            repeat(60) {
+                if (done != null) return@repeat
+                val m = s.inbox.poll(30, TimeUnit.SECONDS) ?: error("Host stopped responding")
+                if (m.optString("type") == "error") error("Host error: ${m.optString("message")}")
+                if (m.optString("type") != "stateUpdate") return@repeat
+                val decision = m.optJSONObject("pendingDecision")
+                if (decision != null) {
+                    asked += decision.optString("type") + ":" + decision.optString("prompt")
+                    val response = when (decision.optString("type")) {
+                        "ChooseTargetsDecision" -> JSONObject().put("type", "TargetsResponse").put("selectedTargets",
+                            JSONObject().apply { decision.getJSONObject("legalTargets").keys().forEach { put(it, JSONArray()) } })
+                        "YesNoDecision" -> JSONObject().put("type", "YesNoResponse").put("choice", true)
+                        "SelectManaSourcesDecision" -> ArgentumDecisions.autoPayManaResponse()
+                        "OrderObjectsDecision" -> JSONObject().put("type", "OrderedResponse").put("orderedObjects", decision.getJSONArray("objects"))
+                        else -> error("Unexpected decision ${decision.optString("type")}")
+                    }
+                    s.host.receive(JSONObject().put("type", "submitAction").put("interactionEpoch", m.optString("interactionEpoch"))
+                        .put("action", JSONObject().put("type", "SubmitDecision").put("playerId", decision.getString("playerId"))
+                            .put("response", response.put("decisionId", decision.getString("id")))))
+                    return@repeat
+                }
+                val st = m.getJSONObject("state")
+                if ((m.optJSONArray("legalActions")?.length() ?: 0) > 0 && zoneCards(st, "STACK", you).isEmpty() &&
+                    zoneCards(st, "BATTLEFIELD", you).count { it == "Elder Deep-Fiend" } > 0) done = m
+            }
+            val end = checkNotNull(done) { "The Fiend never resolved; decisions seen: $asked" }.getJSONObject("state")
+            assertTrue("Ulalek offered its {C}{C}: $asked", asked.any { it.startsWith("YesNoDecision") && "{C}{C}" in it })
+            assertEquals("the Fiend and its token copy", 2, zoneCards(end, "BATTLEFIELD", you).count { it == "Elder Deep-Fiend" })
+            assertEquals("Fiend cast (-1); Beast Whisperer's trigger and its Ulalek copy each drew (+2)", handBefore + 1, handCount(end))
         } finally { s.host.shutdown() }
     }
 
