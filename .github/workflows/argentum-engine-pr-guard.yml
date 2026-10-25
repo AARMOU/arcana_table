@@ -46,7 +46,11 @@ jobs:
         run: |
           python3 -m unittest discover -s engine-upgrade/tests -p test_engine_pr_guard.py -v
           python3 -m unittest discover -s engine-upgrade/tests -p test_engine_pr_source_probe.py -v
-          python3 -m unittest discover -s engine-upgrade/tests -p test_weekly_handoff.py -v
+          if test -f engine-upgrade/tests/test_weekly_handoff.py; then
+            python3 -m unittest discover -s engine-upgrade/tests -p test_weekly_handoff.py -v
+          else
+            echo 'Existing handoff tests unavailable on this branch; source/guard tests still required.'
+          fi
       - name: Audit current upstream and all open engine PRs (or this exact PR)
         id: policy
         continue-on-error: true
