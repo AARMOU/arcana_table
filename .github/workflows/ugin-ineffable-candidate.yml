@@ -3,7 +3,7 @@ name: Ugin Ineffable source candidate and private-exile tests
 # No committed assets/runtime jars, no paid workers, no game release.
 on:
   push:
-    branches: [gpt/ugin-ineffable-token-candidate-20261024]
+    branches: [gpt/ugin-ineffable-token-candidate-20261024, gpt/ugin-multiple-linked-spirits-regression-20261025]
     paths:
       - 'engine-upgrade/ugin-ineffable/**'
       - '.github/workflows/ugin-ineffable-candidate.yml'
