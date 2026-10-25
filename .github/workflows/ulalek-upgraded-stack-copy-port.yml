@@ -1,0 +1,72 @@
+name: Ulalek upgraded-engine stack-copy source port
+on:
+  push:
+    branches: [gpt/ulalek-stack-copy-upstream-port-20261025]
+    paths:
+      - 'argentum-patches/0011-stack-object-copying.patch'
+      - '.github/workflows/ulalek-upgraded-stack-copy-port.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+jobs:
+  stack-copy-source:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Restore exact previously verified upstream upgrade patch inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 2 -H "Authorization: Bearer $GH_TOKEN" -H 'Accept: application/vnd.github+json' \
+            https://api.github.com/repos/AARMOU/arcana_table/actions/artifacts/12612323185/zip -o /tmp/upgrade-candidate.zip
+          echo '2eca4e497de60cb3ff0d20a5df7c3635ac5be7e7881900a1b606926da1321cc0  /tmp/upgrade-candidate.zip' | sha256sum -c -
+          unzip -p /tmp/upgrade-candidate.zip candidate.patch > /tmp/upgrade-candidate.patch
+          echo '065ba023c1fab0c855318f0dd70e55592cc340cbf72263019ef6ea136e90231c  /tmp/upgrade-candidate.patch' | sha256sum -c -
+          git apply --check --include='argentum-patches/*' /tmp/upgrade-candidate.patch
+          git apply --include='argentum-patches/*' /tmp/upgrade-candidate.patch
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: c38f145359c342a04f951b7ba48f741bcb1627ac
+          path: upgraded-argentum
+          persist-credentials: false
+      - name: Apply every required source patch in order (no three-way fallback)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import subprocess
+          from pathlib import Path
+          engine = Path('upgraded-argentum')
+          patches = [Path('argentum-patches') / f'{n:04d}-{name}.patch' for n,name in [
+              (1,'android-regex'), (2,'engine-trial-build'), (3,'full-library-export'),
+              (4,'token-copy-triggered-abilities'), (5,'last-known-negative-subtype'),
+              (6,'ai-decision-deadline'), (7,'ai-bounded-stack-search'), (8,'jvm-test-toolchain')]]
+          patches += sorted(Path('argentum-patches').glob('001[1-6]-*.patch'))
+          patches += [Path('engine-upgrade/eldrazi-temple/patches/0001-colorless-eldrazi-source-mana.patch'),
+                      Path('engine-upgrade/eldrazi-combined/patches/0002-devoid-after-temple.patch')]
+          for patch in patches:
+              assert patch.is_file(), f'missing mandatory patch: {patch}'
+              cmd = ['git','-C',str(engine),'apply','--check',str(patch.resolve())]
+              check = subprocess.run(cmd,capture_output=True,text=True)
+              if check.returncode:
+                  print(f'FAILED exact source patch: {patch}\n{check.stderr}',flush=True)
+                  raise SystemExit(1)
+              subprocess.run(['git','-C',str(engine),'apply',str(patch.resolve())],check=True)
+              print(f'APPLIED {patch}',flush=True)
+          PY
+          git -C upgraded-argentum diff --check
+      - uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d165
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Execute Ulalek stack-copy engine and SDK regression tests
+        working-directory: upgraded-argentum
+        run: |
+          set -euo pipefail
+          ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:test --tests '*StackObjectCopySdkTest' :rules-engine:test --tests '*StackObjectCopyEngineTest'
