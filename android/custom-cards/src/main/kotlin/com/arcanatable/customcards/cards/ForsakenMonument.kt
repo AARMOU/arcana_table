@@ -17,7 +17,7 @@ import com.wingedsheep.sdk.scripting.predicates.CardPredicate
  *   tap of ANY permanent you control that produced colorless mana (lands, Scion-free rocks, Temple).
  * - The life gain is a normal cast trigger on colorless spells you cast.
  */
-// CARDKIT-SCAFFOLD — unregistered: implemented by Claude, awaiting CI scenario evidence before registration.
+// Registered for Eldrazi Incursion after engine-backed positive and negative scenario validation.
 val ForsakenMonument = card("Forsaken Monument") {
     manaCost = "{5}"
     colorIdentity = ""
