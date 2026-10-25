@@ -77,4 +77,34 @@ class EldraziConfluenceScenarioTest {
         val ring = d.findPermanent(d.player2, "Sol Ring")!!
         assertNotNull(d.cast(listOf(0, 2, 2), listOf(listOf(ring), emptyList(), emptyList())).error)
     }
+
+    @Test fun explicitColorlessSymbolsRejectFourColoredMana() {
+        val d = setup()
+        val card = d.putCardInHand(d.player1, "Eldrazi Confluence")
+        d.giveMana(d.player1, com.wingedsheep.sdk.core.Color.BLUE, 4)
+        val result = d.submit(CastSpell(
+            playerId = d.player1, cardId = card,
+            paymentStrategy = PaymentStrategy.FromPool,
+            chosenModes = listOf(2, 2, 2),
+            modeTargetsOrdered = listOf(emptyList(), emptyList(), emptyList()),
+        ))
+        assertNotNull("Colored mana cannot satisfy {C}{C}", result.error)
+        assertTrue("Rejected cast must not add a spell to the stack", d.state.stack.isEmpty())
+    }
+
+    @Test fun explicitColorlessSymbolsAllowTwoColorlessAndTwoColored() {
+        val d = setup()
+        val card = d.putCardInHand(d.player1, "Eldrazi Confluence")
+        d.giveColorlessMana(d.player1, 2)
+        d.giveMana(d.player1, com.wingedsheep.sdk.core.Color.BLUE, 2)
+        val result = d.submit(CastSpell(
+            playerId = d.player1, cardId = card,
+            paymentStrategy = PaymentStrategy.FromPool,
+            chosenModes = listOf(2, 2, 2),
+            modeTargetsOrdered = listOf(emptyList(), emptyList(), emptyList()),
+        ))
+        assertNull("Two {C} plus two generic mana should cast", result.error)
+        d.resolveAll()
+        assertEquals(3, d.scions(d.player1).size)
+    }
 }
