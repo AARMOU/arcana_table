@@ -46,95 +46,7 @@ private val deckSectionHeadings = setOf("creatures", "instants", "sorceries", "a
 fun isDeckSectionHeading(name: String): Boolean = name.trim().trim('[', ']', ':', ' ').lowercase(Locale.ROOT) in deckSectionHeadings
 
 /** Accepts common MTG deck exports (Moxfield, Archidekt, ManaBox, Arena-style text and CSV). */
-fun parseDeckList(raw: String): List<DeckEntry> {
-    data class Key(val name: String, val set: String?, val collector: String?, val commander: Boolean)
-    val quantities = linkedMapOf<Key, Int>()
-    var sideboard = false
-    var commanderSection = false
-    var csvNameIndex: Int? = null
-    var csvCountIndex: Int? = null
-    var csvSetIndex: Int? = null
-    var csvCollectorIndex: Int? = null
-    var csvZoneIndex: Int? = null
-
-    fun add(nameRaw: String, countRaw: Int?, setRaw: String? = null, collectorRaw: String? = null, isCommander: Boolean = commanderSection) {
-        val name = nameRaw.trim().trim('"', '\'')
-        val count = countRaw?.coerceAtMost(999) ?: 0
-        if (name.isBlank() || count < 1) return
-        val set = setRaw?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", true) }
-        val collector = collectorRaw?.trim()?.removePrefix("#")?.takeIf { it.isNotBlank() && !it.equals("null", true) }
-        val key = Key(name, set?.uppercase(Locale.ROOT), collector, isCommander)
-        quantities[key] = (quantities[key] ?: 0) + count
-    }
-
-    fun stripPrinting(rawName: String): Triple<String, String?, String?> {
-        var name = rawName.trim().trim('"', '\'')
-        val paren = Regex("^(.*?)\\s+\\(([A-Za-z0-9]{2,6})\\)\\s+#?(\\d+[a-zA-Z]?)$").find(name)
-        if (paren != null) return Triple(paren.groupValues[1].trim(), paren.groupValues[2], paren.groupValues[3])
-        val bracket = Regex("^(.*?)\\s+\\[([A-Za-z0-9]{2,6})]\\s+#?(\\d+[a-zA-Z]?)$").find(name)
-        if (bracket != null) return Triple(bracket.groupValues[1].trim(), bracket.groupValues[2], bracket.groupValues[3])
-        val setOnly = Regex("^(.*?)\\s+\\(([A-Za-z0-9]{2,6})\\)$").find(name)
-        if (setOnly != null) return Triple(setOnly.groupValues[1].trim(), setOnly.groupValues[2], null)
-        return Triple(name, null, null)
-    }
-
-    raw.lineSequence().forEach { rawLine ->
-        var line = rawLine.trim().removePrefix("\uFEFF")
-        if (line.isBlank() || line.startsWith("#") || line.startsWith("//")) return@forEach
-        // Strip a quantity prefix before classifying headings, since exports may
-        // render a category as "1 [INSTANTS]" as well as just "[INSTANTS]".
-        val headingText = line.replace(Regex("^(?:[xX]\\s*)?\\d+\\s*[xX]?\\s+"), "")
-        val normalizedLine = headingText.trim('[', ']', ':', ' ').lowercase(Locale.ROOT)
-        if (normalizedLine in setOf("sideboard", "sideboard cards", "maybeboard", "considering")) {
-            sideboard = true
-            return@forEach
-        }
-        // Some exports include bracketed/category headings. They are structure,
-        // not cards (e.g. the literal "[INSTANTS]" should never become a card).
-        if (normalizedLine in deckSectionHeadings) { commanderSection = false; return@forEach }
-        if (normalizedLine in setOf("mainboard", "main", "deck")) {
-            sideboard = false
-            commanderSection = false
-            return@forEach
-        }
-        if (normalizedLine in setOf("commander", "commanders")) { sideboard = false; commanderSection = true; return@forEach }
-        if (normalizedLine in setOf("companion")) { sideboard = false; commanderSection = false; return@forEach }
-        if (sideboard) return@forEach
-        if (line.startsWith("SB:", ignoreCase = true)) return@forEach
-        var explicitCommander = false
-        if (line.startsWith("Commander:", ignoreCase = true)) {
-            line = line.substringAfter(':').trim()
-            explicitCommander = true
-        }
-
-        val csv = splitCsv(line)
-        val normalizedHeaders = csv.map { it.trim().trim('"').lowercase(Locale.ROOT) }
-        if (normalizedHeaders.any { it in setOf("name", "card name") } && normalizedHeaders.any { it in setOf("count", "quantity", "amount") }) {
-            csvNameIndex = normalizedHeaders.indexOfFirst { it in setOf("name", "card name") }
-            csvCountIndex = normalizedHeaders.indexOfFirst { it in setOf("count", "quantity", "amount") }
-            csvSetIndex = normalizedHeaders.indexOfFirst { it in setOf("set", "set code", "edition") }.takeIf { it >= 0 }
-            csvCollectorIndex = normalizedHeaders.indexOfFirst { it in setOf("collector number", "collector_number", "number", "card number") }.takeIf { it >= 0 }
-            csvZoneIndex = normalizedHeaders.indexOfFirst { it in setOf("zone", "board", "section", "type") }.takeIf { it >= 0 }
-            return@forEach
-        }
-        if (csvNameIndex != null && csvCountIndex != null) {
-            val name = csv.getOrNull(csvNameIndex!!)?.trim().orEmpty()
-            val count = csv.getOrNull(csvCountIndex!!)?.trim()?.toIntOrNull()
-            val zone = csvZoneIndex?.let { csv.getOrNull(it)?.lowercase(Locale.ROOT).orEmpty() }.orEmpty()
-            val isCommander = explicitCommander || commanderSection || zone.contains("commander")
-            add(name, count, csvSetIndex?.let { csv.getOrNull(it) }, csvCollectorIndex?.let { csv.getOrNull(it) }, isCommander)
-            return@forEach
-        }
-        var count = 1
-        var cardPart = line
-        val prefixed = Regex("^(?:[xX]\\s*)?(\\d+)\\s*[xX]?\\s+(.+)$").find(line)
-        if (prefixed != null) { count = prefixed.groupValues[1].toIntOrNull() ?: 0; cardPart = prefixed.groupValues[2].trim() }
-        else if (csv.size >= 2 && csv.first().trim().toIntOrNull() != null) { count = csv.first().trim().toIntOrNull() ?: 0; cardPart = csv.getOrNull(1).orEmpty() }
-        val (name, setCode, collectorNumber) = stripPrinting(cardPart)
-        add(name, count, setCode, collectorNumber, explicitCommander || commanderSection)
-    }
-    return quantities.map { (key, count) -> DeckEntry(key.name, count, key.set, key.collector, key.commander) }
-}
+fun parseDeckList(raw: String): List<DeckEntry> = parseDeckListDetailed(raw).playableEntries
 
 private fun splitCsv(line: String): List<String> {
     val columns = mutableListOf<String>()
@@ -208,9 +120,12 @@ object Scryfall {
             }
         }
         entries.filter { !it.setCode.isNullOrBlank() && !it.collectorNumber.isNullOrBlank() }.chunked(75).forEach { batch ->
-            collect(JSONArray().apply { batch.forEach { put(JSONObject().put("set", it.setCode!!.lowercase(Locale.ROOT)).put("collector_number", it.collectorNumber)) } })
+            try { collect(JSONArray().apply { batch.forEach { put(JSONObject().put("set", it.setCode!!.lowercase(Locale.ROOT)).put("collector_number", it.collectorNumber)) } }) } catch (_: Exception) { /* preserve other batches and offline fallback */ }
         }
-        entries.map { it.name }.distinct().chunked(75).forEach { names -> collect(JSONArray().apply { names.forEach { put(JSONObject().put("name", it)) } }) }
+        entries.map { it.name }.distinct().chunked(75).forEach { names ->
+            try { collect(JSONArray().apply { names.forEach { put(JSONObject().put("name", it)) } }) }
+            catch (_: Exception) { /* one failed API request cannot abort the entire import */ }
+        }
         entries.mapNotNull { entry ->
             val hasExactPrinting = !entry.setCode.isNullOrBlank() && !entry.collectorNumber.isNullOrBlank()
             val card = if (hasExactPrinting) {
