@@ -1,0 +1,11 @@
+{
+  "sdkSha256": "4c77058760b912ca376412151b344529ce67b2d674d1b895f723b7766cc453ac",
+  "class": "com/wingedsheep/sdk/dsl/Effects.class",
+  "method": "ReduceNextSpellCost",
+  "descriptor": "(Lcom/wingedsheep/sdk/scripting/values/DynamicAmount;Lcom/wingedsheep/sdk/scripting/GameObjectFilter;)Lcom/wingedsheep/sdk/scripting/effects/Effect;",
+  "accessFlags": "0x0011 (public final)",
+  "defaultArgumentBridgePresent": true,
+  "inspection": "Direct JVM class-file constant-pool and method-table inspection of the committed SDK; generated/sdk-api.md line 1597 agrees. Pinned Effects.kt constructs ModifySpellCostsEffect(nextSpellOnly=true); PeerlessSamurai is a source usage.",
+  "proves": "Compiled method presence and signature. Does not certify complete Mutated Cultist behavior.",
+  "ownership": "PR #198 remains with its current worker; this branch does not implement Mutated Cultist."
+}

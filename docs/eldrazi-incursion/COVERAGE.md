@@ -6,8 +6,8 @@ Original 100-slot manifest. Category 1 requires a nonempty registered definition
 
 | Category | Slots |
 |---|---:|
-| 1. Fully implemented and tested (reviewed acceptance scope) | 28 |
-| 2. Implemented but missing acceptance tests/evidence | 62 |
+| 1. Fully implemented and tested (reviewed acceptance scope) | 30 |
+| 2. Implemented but missing acceptance tests/evidence | 60 |
 | 3. Implemented but failing tests | 0 |
 | 4. Missing implementation | 2 |
 | 5. Blocked by pinned Argentum capability/runtime | 8 |
@@ -19,14 +19,14 @@ Reported/API-only blockers are distinguished from reproduced failures in each ro
 | Ulalek, Fused Atrocity | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `UlalekFusedAtrocityScenarioTest.kt` (16 green cases). |
 | Azlask, the Swelling Scourge | 1 | 5 | Reported on #171: colorless dies-filter predicate unsupported in TriggerMatcher; known-blockers marks earlier reproduction unverified. Not independently rerun in this audit. |
 | Ulamog's Dreadsire | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `UlamogsDreadsireScenarioTest.kt` (4 green cases). |
-| Benthic Anomaly | 1 | 4 | No implementation. Needs per-opponent nontargeted selection, chosen-copy characteristics, summed power/toughness and mandatory choices. No precise engine blocker independently established; do not call it impossible. |
+| Benthic Anomaly | 1 | 5 | PR #203 primitive probe: direct stored power passes, but StoreNumber inside ForEachInCollection loses numeric outputs (2+3 yields 0). No documented power/toughness aggregate over a stored chosen collection. This demonstrates the attempted exact composition fails; it does not prove every construction or an engine extension impossible. Card remains unimplemented/unregistered. |
 | Eldritch Immunity | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `EldritchImmunityScenarioTest.kt` (10 green cases). |
 | Selective Obliteration | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `SelectiveObliterationScenarioTest.kt` (8 green cases). |
 | Angelic Aberration | 1 | 5 | Pinned SDK filter has BasePowerEquals/BaseToughnessEquals only. CompareNumericProperty has no base-stat numeric properties. Exact <=1 base-stat selection is unavailable through the documented filter API; current-stat or 0/1 equality approximations are invalid. Source/API limitation, not a reproduced gameplay crash. |
 | Bismuth Mindrender | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `BismuthMindrenderScenarioTest.kt` (3 green cases). |
 | Hideous Taskmaster | 1 | 5 | PR #200: 10 actual engine scenarios, 9 pass/1 fails. Target changing from opponent A to B before resolution is incorrectly stolen. Original per-opponent controller binding is missing. Unregistered candidate preserved. |
 | Twins of Discord | 1 | 4 | PR #196 is a rules contract, not implementation/tests. Exact external conditional entering-with-counters replacement and attack parity choice remain unproven; do not claim a demonstrated engine impossibility. |
-| Mutated Cultist | 1 | 5 | Recorded SDK limitation: no dynamic generic reduction for the next spell this turn based on counters removed. Source/API audit only; not independently reproduced by a complete card scenario. |
+| Mutated Cultist | 1 | 4 | No completed registered implementation; #198 owns the active engine probes. Earlier no-dynamic-next-spell-discount blocker is contradicted by the committed SDK public Effects.ReduceNextSpellCost(DynamicAmount, GameObjectFilter) method, generated index line 1597 and pinned Effects.kt. Primitive presence is verified, full removal/player-counter/optional-target/discount behavior is not yet certified. |
 | Eldrazi Confluence | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `EldraziConfluenceScenarioTest.kt` (7 green cases). |
 | Spawnbed Protector | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `SpawnbedProtectorScenarioTest.kt` (5 green cases). |
 | Chittering Dispatcher | 1 | 5 | Registered but known three-player Myriad defender-choice regression fails (#181/#183/#34/#36). Two-player tests pass and do not certify multiplayer behavior. Source-only patch candidate is not a proven integrated repair. `ChitteringDispatcherScenarioTest.kt` (4 green cases). |
@@ -40,7 +40,7 @@ Reported/API-only blockers are distinguished from reproduced failures in each ro
 | Ugin's Insight | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `UginsInsightScenarioTest.kt` (2 green cases). |
 | Drowner of Hope | 1 | 2 | Positive ETB/token/tap scenarios exist; opponent-owned Scion cost eligibility and illegal-target negatives need direct acceptance coverage. `DrownerOfHopeScenarioTest.kt` (2 green cases). |
 | Return of the Wildspeaker | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `ReturnOfTheWildspeakerScenarioTest.kt` (2 green cases). |
-| Tendo Ice Bridge | 1 | 2 | Single positive colored-charge-mana scenario; exhaustion, tap and unrestricted colorless mode need direct acceptance coverage. `TendoIceBridgeScenarioTest.kt` (1 green cases). |
+| Tendo Ice Bridge | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `TendoIceBridgeScenarioTest.kt` (4 green cases). |
 | Battlefield Forge | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
 | Llanowar Wastes | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
 | Brushland | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
@@ -110,7 +110,7 @@ Reported/API-only blockers are distinguished from reproduced failures in each ro
 | Suffer the Past | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `SufferThePastScenarioTest.kt` (9 green cases). |
 | Skittering Invasion | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `SkitteringInvasionScenarioTest.kt` (2 green cases). |
 | Path of Ancestry | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
-| Unclaimed Territory | 1 | 2 | Only tests mana generation, not exact spend eligibility. Need positive chosen-type creature and negative wrong-type/noncreature payment scenarios. `UnclaimedTerritoryScenarioTest.kt` (1 green cases). |
+| Unclaimed Territory | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `UnclaimedTerritoryScenarioTest.kt` (6 green cases). |
 | Plains | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
 | Island | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
 | Swamp | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
