@@ -15,15 +15,15 @@ import com.wingedsheep.sdk.model.Deck
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
 import kotlin.random.Random
 
 /**
  * The bundled original Eldrazi Incursion precon, as the app's offline runtime sees it: which of its
- * 100 slots the shipped assets (Argentum library + exported custom cards) can actually play, and an
- * AI-vs-AI game with it on Argentum's real engine.
+ * 100 slots the committed assets (Argentum library + exported custom cards) can resolve by name,
+ * and an AI-vs-AI game with it on Argentum's real engine. Indexed presence is NOT Oracle-correct
+ * playability: Chittering Dispatcher's Myriad defender choice still fails #181 / #36.
  */
 class EldraziIncursionPlayableTest {
     private val assets = File("src/main/assets")
@@ -40,8 +40,8 @@ class EldraziIncursionPlayableTest {
         "Twins of Discord",
     )
 
-    @Test fun atLeastNinetyOriginalSlotsArePlayableInTheShippedRuntime() {
-        assumeTrue(lib.isFullLibrary)
+    @Test fun ninetyOriginalSlotsAreIndexedInCommittedRuntimeAssets() {
+        assertTrue("Full committed all-cards index must load; never silently skip this regression", lib.isFullLibrary)
         assertEquals(100, names.size)
         assertEquals("Ulalek, Fused Atrocity", commander)
         val playable = names.filter { lib.canonical(it) != null }
@@ -53,7 +53,7 @@ class EldraziIncursionPlayableTest {
     }
 
     @Test fun newlyImplementedCardsLoadIntoTheOfflineGame() {
-        assumeTrue(lib.isFullLibrary)
+        assertTrue("Full committed all-cards index must load; never silently skip this regression", lib.isFullLibrary)
         val (setup, registry) = OfflineGameSetup.build(lib, "You", names, commander, premades, Random(5))
         assertEquals(commander, setup.you.commander)
         assertEquals(99, setup.you.deck.size)
@@ -71,7 +71,7 @@ class EldraziIncursionPlayableTest {
 
     /** Eldrazi Incursion mirror run by Argentum's AI on both sides: no engine stall or crash. */
     @Test fun incursionMirrorAiGame() {
-        assumeTrue(lib.isFullLibrary)
+        assertTrue("Full committed all-cards index must load; never silently skip this regression", lib.isFullLibrary)
         val list = OfflineGameSetup.argentumLibraryList(names, commander).mapNotNull(lib::canonical)
         val registry = CardRegistry().apply { register(lib.load(names.toSet())) }
         for (seed in listOf(1, 2, 3)) {
@@ -96,7 +96,7 @@ class EldraziIncursionPlayableTest {
             }
             println("[eldrazi-incursion] seed=$seed turn=${state.turnNumber} actions=$actions over=${state.gameOver} " +
                 "winner=${state.winnerId} ms=${(System.nanoTime() - started) / 1_000_000}")
-            assertTrue("seed $seed stalled on turn ${state.turnNumber}", state.gameOver || state.turnNumber >= 8)
+            assertTrue("seed $seed must finish the AI mirror game; turn=${state.turnNumber}, actions=$actions", state.gameOver)
         }
     }
 }
