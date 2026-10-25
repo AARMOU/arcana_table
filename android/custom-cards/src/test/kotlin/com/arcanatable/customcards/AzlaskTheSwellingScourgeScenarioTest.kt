@@ -1,8 +1,6 @@
 package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.AzlaskTheSwellingScourge
-import com.arcanatable.customcards.cards.SkitteringInvasion
-import com.arcanatable.customcards.cards.SifterOfSkulls
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.state.components.battlefield.CountersComponent
 import com.wingedsheep.sdk.core.Color
@@ -86,7 +84,7 @@ class AzlaskTheSwellingScourgeScenarioTest {
 
     @Test
     fun scionsAndSpawnsGainIndestructibleAndAnnihilatorButUnrelatedCreaturesDoNot() {
-        val d = customScenario(AzlaskTheSwellingScourge, SkitteringInvasion, SifterOfSkulls, "Grizzly Bears", "Doom Blade")
+        val d = customScenario(AzlaskTheSwellingScourge, "Skittering Invasion", "Sifter of Skulls", "Grizzly Bears", "Doom Blade")
         val p = d.player1
         val q = d.player2
         val azlask = d.putCreatureOnBattlefield(p, "Azlask, the Swelling Scourge")
