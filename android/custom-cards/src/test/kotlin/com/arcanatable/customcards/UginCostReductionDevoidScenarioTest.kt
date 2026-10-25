@@ -2,7 +2,9 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.UginTheIneffable
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.state.components.battlefield.CountersComponent
 import com.wingedsheep.engine.state.components.player.ManaPoolComponent
+import com.wingedsheep.sdk.core.CounterType
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.dsl.card
@@ -20,6 +22,21 @@ import org.junit.Test
 class UginCostReductionDevoidScenarioTest {
     private fun GameTestDriver.poolColorless() =
         state.getEntity(player1)!!.get<ManaPoolComponent>()!!.colorless
+
+    /**
+     * The battlefield setup helper bypasses zone-entry processing and does not
+     * initialize planeswalker loyalty. Seed printed loyalty explicitly so a
+     * later real CastSpell action cannot correctly remove a zero-loyalty Ugin
+     * via state-based actions and masquerade as a legend/controller bug.
+     */
+    private fun GameTestDriver.seedPrintedLoyalty(id: com.wingedsheep.sdk.model.EntityId) {
+        replaceState(state.updateEntity(id) { entity ->
+            val current = entity.get<CountersComponent>() ?: CountersComponent()
+            entity.with(current.withCounters(CounterType.LOYALTY, 4))
+        })
+        assertEquals("Ugin must start with four loyalty counters", 4,
+            state.getEntity(id)!!.get<CountersComponent>()!!.getCount(CounterType.LOYALTY))
+    }
 
     @Test fun devoidSpellKeepsWhiteRequirementButGetsTwoGenericDiscount() {
         val d = customScenario(UginTheIneffable)
@@ -126,6 +143,7 @@ class UginCostReductionDevoidScenarioTest {
         // Two Ugins controlled by different players are legal. Only the Ugin
         // controlled by the player casting the spell may reduce its cost.
         val opposingUgin = d.putPermanentOnBattlefield(opponent, "Ugin, the Ineffable")
+        d.seedPrintedLoyalty(opposingUgin)
         assertEquals("Opponent Ugin must exist before any spell is cast",
             opposingUgin, d.findPermanent(opponent, "Ugin, the Ineffable"))
         val spell = d.putCardInHand(p, probe.name)
@@ -138,6 +156,7 @@ class UginCostReductionDevoidScenarioTest {
             1, d.poolColorless())
 
         val ownUgin = d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        d.seedPrintedLoyalty(ownUgin)
         assertEquals("Our Ugin must exist after setup", ownUgin,
             d.findPermanent(p, "Ugin, the Ineffable"))
         assertEquals("The legend rule is controller-scoped; opponent Ugin must survive setup",
