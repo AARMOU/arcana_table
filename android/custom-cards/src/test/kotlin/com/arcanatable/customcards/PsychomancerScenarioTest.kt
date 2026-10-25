@@ -119,7 +119,7 @@ class PsychomancerScenarioTest {
         assertNull(d.castSpell(p, psychomancer).error)
         d.resolveAll()
 
-        assertEquals("Artifact Creature — Necron Wizard", d.cardRegistry.getCard("Psychomancer")!!.typeLine)
+        assertEquals("Artifact Creature — Necron Wizard", d.cardRegistry.getCard("Psychomancer")!!.typeLine.toString())
         assertEquals(1, d.projected.getPower(psychomancer))
         assertEquals(1, d.projected.getToughness(psychomancer))
         assertTrue(d.projected.hasKeyword(psychomancer, Keyword.FLYING))
@@ -127,7 +127,7 @@ class PsychomancerScenarioTest {
 
     @Test
     fun simultaneousLeavesTriggerOncePerControlledNontokenArtifactAndResolveAfterSourceLeaves() {
-        val d = customScenario(Psychomancer).apply { registerPsychomancerScenarioCards() }
+        val d = customScenario(Psychomancer, "Sol Ring").apply { registerPsychomancerScenarioCards() }
         val p = d.player1
         val opponent = d.player2
         d.putCreatureOnBattlefield(p, "Psychomancer")
@@ -152,7 +152,7 @@ class PsychomancerScenarioTest {
 
     @Test
     fun directExileTriggersForAnotherArtifactAndPsychomancerItself() {
-        val d = customScenario(Psychomancer).apply { registerPsychomancerScenarioCards() }
+        val d = customScenario(Psychomancer, "Sol Ring").apply { registerPsychomancerScenarioCards() }
         val p = d.player1
         val opponent = d.player2
         val psychomancer = d.putCreatureOnBattlefield(p, "Psychomancer")
@@ -178,7 +178,7 @@ class PsychomancerScenarioTest {
 
     @Test
     fun bounceAndArtifactSpellCounteredFromStackDoNotTrigger() {
-        val d = customScenario(Psychomancer).apply { registerPsychomancerScenarioCards() }
+        val d = customScenario(Psychomancer, "Sol Ring").apply { registerPsychomancerScenarioCards() }
         val p = d.player1
         val opponent = d.player2
         d.putCreatureOnBattlefield(p, "Psychomancer")
@@ -232,7 +232,7 @@ class PsychomancerScenarioTest {
 
     @Test
     fun opponentArtifactExiledFromBattlefieldDoesNotTrigger() {
-        val d = customScenario(Psychomancer).apply { registerPsychomancerScenarioCards() }
+        val d = customScenario(Psychomancer, "Sol Ring").apply { registerPsychomancerScenarioCards() }
         val p = d.player1
         val opponent = d.player2
         d.putCreatureOnBattlefield(p, "Psychomancer")
