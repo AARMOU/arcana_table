@@ -35,7 +35,7 @@ RULES = ROOT / "engine-upgrade/rebase-rules.json"
 OUT = ROOT / "engine-upgrade/weekly"
 ASSETS = ROOT / "android/app/src/main/assets/argentum"
 LIBS = ROOT / "android/app/libs"
-SHADOWED = ROOT / "engine-upgrade/shadowed-custom-cards.txt"
+PRECONS = ROOT / "investigation/argentum-six-precons/deck-manifest.json"
 MODULES = {
     "mtg-sdk": "com/wingedsheep/sdk/model/CardDefinition.class",
     "mtg-sdk-tooling": "com/wingedsheep/sdk/tooling/CardLoader.class",
@@ -276,15 +276,46 @@ def cards(old_dir):
         "decks": len(decks),
     }
     report["deck_cards_now_upstream"] = {c: deck_cards[c] for c in report["now_upstream"] if c in deck_cards}
-    # The data test refuses shadowed custom cards; list them so the upgrade can land and retirement
-    # follows as its own reviewed change.
-    shadowed = sorted(n for n in custom if n.lower() in new_set)
-    SHADOWED.write_text("".join(n + "\n" for n in shadowed))
-    report["shadowed_total"] = len(shadowed)
+    # Fail closed: a collision is never exempted here. CustomCardDataTest.noCustomCardShadowsAnArgentumCard
+    # stays strict, so the upgrade stays red until each collision is retired or approved in its own change.
+    report["collisions"] = sorted(n for n in custom if n.lower() in new_set)
+    report["precons"] = precon_report(old_set, new_set, custom_set)
     write("cards.json", report)
     write("cards.md", cards_markdown(report))
     print(cards_markdown(report))
-    return 1 if report["deck_cards_missing"] else 0
+    blocked = report["deck_cards_missing"] or report["collisions"] or any(
+        deck["newly_missing"] for deck in report["precons"])
+    return 1 if blocked else 0
+
+
+def precon_report(old_set, new_set, custom_set):
+    """The six official precons, slot by slot (quantities count). Indexed means the name resolves to an
+    Argentum or custom definition; it says nothing about Oracle-correct rules, which only the scenario
+    tests establish."""
+    if not PRECONS.is_file():
+        return []
+
+    def indexed(name, library):
+        key = name.lower()
+        front = key.split(" // ")[0]
+        return any(k in library or k in custom_set for k in (key, front))
+
+    decks = []
+    for deck in json.loads(PRECONS.read_text())["decks"]:
+        cards = deck["cards"]
+        slots = sum(c["quantity"] for c in cards)
+        before = sum(c["quantity"] for c in cards if indexed(c["name"], old_set))
+        after = sum(c["quantity"] for c in cards if indexed(c["name"], new_set))
+        decks.append({
+            "name": deck["name"], "commander": deck["commander"], "slots": slots,
+            "indexed_before": before, "indexed_after": after,
+            "commander_indexed": indexed(deck["commander"], new_set),
+            "newly_missing": sorted(c["name"] for c in cards
+                                    if indexed(c["name"], old_set) and not indexed(c["name"], new_set)),
+            "newly_indexed": sorted(c["name"] for c in cards
+                                    if not indexed(c["name"], old_set) and indexed(c["name"], new_set)),
+        })
+    return decks
 
 
 def bullet(items, limit=40):
@@ -310,10 +341,27 @@ def cards_markdown(r):
         lines += bullet(f"{c} — {', '.join(d)}" for c, d in r["deck_cards_newly_playable"].items())
     if r["deck_cards_still_swapped"]:
         lines += ["", "Still swapped (unchanged): " + ", ".join(r["deck_cards_still_swapped"])]
-    lines += ["", "**Custom cards upstream now implements** (the app switches to Argentum's version; "
-              "retire the custom copy in a follow-up):", ""]
-    lines += bullet(f"{c}" + (f" — in {', '.join(r['deck_cards_now_upstream'][c])}"
-                              if c in r["deck_cards_now_upstream"] else "") for c in r["now_upstream"])
+    if r.get("precons"):
+        lines += ["", "**Six official precons** — slots whose name resolves (indexed). Indexed is not "
+                  "rules-verified; Oracle-correct behavior comes only from the scenario tests.", "",
+                  "| Deck | Commander | Indexed before | Indexed after | Newly missing |", "|---|---|---|---|---|"]
+        for d in r["precons"]:
+            lines.append(f"| {d['name']} | {d['commander']}{'' if d['commander_indexed'] else ' ❌'} | "
+                         f"{d['indexed_before']}/{d['slots']} | {d['indexed_after']}/{d['slots']} | "
+                         f"{', '.join(d['newly_missing']) or '—'} |")
+        gained = sorted({c for d in r["precons"] for c in d["newly_indexed"]})
+        if gained:
+            lines += ["", "Newly indexed precon cards (upstream added them; need scenario coverage before "
+                      "counting as verified): " + ", ".join(gained)]
+    if r["collisions"]:
+        lines += ["", "**❌ Upstream now implements these custom cards — decision required (blocks the upgrade):**",
+                  "For each: compare upstream's implementation with Arcana's, run the card's positive and negative "
+                  "scenarios against upstream's version, then retire the custom copy or record why it stays. "
+                  "`CustomCardDataTest` stays strict until then.", ""]
+        lines += bullet(f"{c}" + (f" — in {', '.join(r['deck_cards_now_upstream'][c])}"
+                                  if c in r["deck_cards_now_upstream"] else "") for c in r["collisions"])
+    else:
+        lines += ["", "✅ No custom card collides with an upstream card."]
     lines += ["", "**Deck cards whose upstream rules changed** (worth a phone check):", ""]
     lines += bullet(f"{c} — {', '.join(d)}" for c, d in r["deck_cards_changed"].items())
     if lib["removed"]:
