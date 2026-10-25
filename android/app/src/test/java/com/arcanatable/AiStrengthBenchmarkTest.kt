@@ -73,6 +73,11 @@ class AiStrengthBenchmarkTest {
     @Test fun runOnlyWhenExplicitlyRequested() {
         if (System.getenv("ARCANA_AI_BENCHMARK") != "1") return
         val games = (System.getenv("ARCANA_AI_GAMES_PER_MODE") ?: "200").toInt()
+        val modeFilter = System.getenv("ARCANA_AI_GAME_MODE")?.toInt()
+        require(modeFilter == null || modeFilter in listOf(2, 4)) { "ARCANA_AI_GAME_MODE must be 2 or 4" }
+        val modes = modeFilter?.let(::listOf) ?: listOf(2, 4)
+        val pairStart = (System.getenv("ARCANA_AI_PAIR_START") ?: "0").toInt()
+        require(pairStart >= 0) { "ARCANA_AI_PAIR_START must be nonnegative" }
         val maxActions = (System.getenv("ARCANA_AI_MAX_ACTIONS") ?: "4000").toInt()
         val maxWallMs = (System.getenv("ARCANA_AI_MAX_GAME_MS") ?: "120000").toLong()
         require(games > 0 && games % 2 == 0 && maxActions > 0 && maxWallMs > 0) {
@@ -88,7 +93,8 @@ class AiStrengthBenchmarkTest {
         // Until a reviewed candidate exists, run control vs identical control (no strength claim).
         val candidate = OfflineAiPolicy.profile.copy(id = "arcana-ai-candidate-control", budgetPolicy = observer)
         val results = mutableListOf<GameResult>()
-        for (mode in listOf(2, 4)) repeat(games / 2) { pair ->
+        for (mode in modes) repeat(games / 2) { pairIndex ->
+            val pair = pairStart + pairIndex
             val seed = SEEDS[pair % SEEDS.size] + (pair / SEEDS.size) * 1009L
             val picked = (0 until mode).map { eligible[(pair * mode + it) % eligible.size] }
                 .map { d -> d.copy(commander = lib.canonical(d.commander)!!, cards = d.cards.map { lib.canonical(it)!! }) }
@@ -107,7 +113,7 @@ class AiStrengthBenchmarkTest {
         dir.mkdirs()
         File(dir, "comparison.json").writeText(json(results, eligible.size, excluded).toString(2) + "\n")
         File(dir, "comparison.md").writeText(markdown(results, eligible.size, excluded))
-        assertEquals("All paired runs are required", games * 2, results.size)
+        assertEquals("All paired runs are required", games * modes.size, results.size)
     }
 
     private fun decks(lib: OfflineCardLibrary, assets: File): Pair<List<DeckSpec>, List<String>> {
@@ -235,7 +241,7 @@ class AiStrengthBenchmarkTest {
         appendLine()
         appendLine("| Seats | Games | Candidate wins | Baseline wins | Draws | Timeouts | Errors | Candidate win rate (95% Wilson CI, decisive only) |")
         appendLine("| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
-        for (mode in listOf(2, 4)) {
+        for (mode in results.map { it.mode }.distinct().sorted()) {
             val games = results.filter { it.mode == mode }
             val wins = games.count { it.winnerSide == "candidate" }
             val losses = games.count { it.winnerSide == "baseline" }
@@ -246,7 +252,7 @@ class AiStrengthBenchmarkTest {
         appendLine()
         appendLine("| Seats | Side | Actual budget tier | Decisions | p50 ms | p95 ms | p99 ms | max ms | Mean AI ms/turn | Mean game wall ms | Decisions/game |")
         appendLine("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |")
-        for (mode in listOf(2, 4)) for (side in listOf("candidate", "baseline")) {
+        for (mode in results.map { it.mode }.distinct().sorted()) for (side in listOf("candidate", "baseline")) {
             val games = results.filter { it.mode == mode }
             val all = games.flatMap { it.samples.filter { s -> s.side == side } }
             val turnCount = games.sumOf { it.turns.coerceAtLeast(1) }
