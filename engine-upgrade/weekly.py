@@ -21,6 +21,7 @@ which the workflow turns into the pull request body.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import struct
@@ -49,10 +50,12 @@ MODULES = {
 }
 EXPORTS = ("all-cards.jsonl", "por-cards.jsonl", "all-cards.index.tsv")
 PREFIX = "arcana: "
+PATCH_DATE = "2000-01-01T00:00:00+0000"
 
 
-def run(*args, cwd=None, check=True):
-    result = subprocess.run(args, cwd=cwd, text=True, capture_output=True)
+def run(*args, cwd=None, check=True, env=None):
+    result = subprocess.run(args, cwd=cwd, text=True, capture_output=True,
+                            env={**os.environ, **env} if env else None)
     if check and result.returncode:
         raise SystemExit(f"{' '.join(args)} failed:\n{result.stdout}\n{result.stderr}")
     return result
@@ -98,7 +101,10 @@ def prepare(engine, pin, mandatory):
     git("checkout", "-q", "-f", "-B", "arcana", pin)
     for name in mandatory:
         git("apply", "--index", str(patch_file(name)))
-        git("commit", "-q", "--allow-empty", "-m", PREFIX + name[:-len(".patch")])
+        # Fixed dates: the date goes into each patch file's header, so a patch whose content did not
+        # change comes out byte-identical instead of showing up as changed every week.
+        run("git", "commit", "-q", "--allow-empty", "-m", PREFIX + name[:-len(".patch")], cwd=engine,
+            env={"GIT_AUTHOR_DATE": PATCH_DATE, "GIT_COMMITTER_DATE": PATCH_DATE})
 
 
 def save_state(engine, **state):
@@ -109,7 +115,6 @@ def rebase(engine_dir, target, *flags):
     """Rebase the series onto TARGET. --keep-conflict leaves an unresolvable conflict in place (for a
     person or agent to resolve, then `finish`) instead of aborting. With WEEKLY_FORCE=1 a branch whose pin
     already equals TARGET is still validated as-is (fix branches), instead of reporting up_to_date."""
-    import os
     engine = Path(engine_dir).resolve()
     git = engine_git(engine)
     text, pin, mandatory = audit_state()

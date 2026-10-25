@@ -127,6 +127,18 @@ class WeeklyHandoff(unittest.TestCase):
         self.assertEqual(self.report()["status"], "rebased")
         self.assertEqual((self.repo / "argentum-patches/0001-two.patch").read_text(), resolved)
 
+    def test_unchanged_patch_comes_out_byte_identical(self):
+        # A rebase that changes nothing in a patch must not rewrite it (no date churn in weekly PRs).
+        self.resolve_by_hand()
+        before = (self.repo / "argentum-patches/0001-two.patch").read_text()
+        self.assertIn("Date: Sat, 1 Jan 2000 00:00:00 +0000", before)
+        (self.engine / "h.txt").write_text("later upstream file\n")
+        self.git("checkout", "-q", "-f", self.target)
+        self.git("add", "h.txt"), self.git("commit", "-qm", "C")
+        later = self.git("rev-parse", "HEAD").stdout.strip()
+        self.weekly("rebase", str(self.engine), later)
+        self.assertEqual((self.repo / "argentum-patches/0001-two.patch").read_text(), before)
+
     def test_checkout_fixup_finish_folds_fix_into_owning_patch(self):
         self.resolve_by_hand()  # now pinned on the target
         self.weekly("checkout", str(self.engine))
