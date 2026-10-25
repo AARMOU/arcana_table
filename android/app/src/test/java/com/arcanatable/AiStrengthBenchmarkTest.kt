@@ -75,7 +75,7 @@ class AiStrengthBenchmarkTest {
         val games = (System.getenv("ARCANA_AI_GAMES_PER_MODE") ?: "200").toInt()
         val modeFilter = System.getenv("ARCANA_AI_GAME_MODE")?.toInt()
         require(modeFilter == null || modeFilter in listOf(2, 4)) { "ARCANA_AI_GAME_MODE must be 2 or 4" }
-        val modes = modeFilter?.let(::listOf) ?: listOf(2, 4)
+        val modes = modeFilter?.let { listOf(it) } ?: listOf(2, 4)
         val pairStart = (System.getenv("ARCANA_AI_PAIR_START") ?: "0").toInt()
         require(pairStart >= 0) { "ARCANA_AI_PAIR_START must be nonnegative" }
         val maxActions = (System.getenv("ARCANA_AI_MAX_ACTIONS") ?: "4000").toInt()
