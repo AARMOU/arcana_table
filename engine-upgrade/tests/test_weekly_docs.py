@@ -4,7 +4,9 @@ Run: python3 -m unittest -v engine-upgrade/tests/test_weekly_docs.py
 """
 from __future__ import annotations
 
+import contextlib
 import importlib.util
+import io
 import json
 import subprocess
 import tempfile
@@ -72,8 +74,13 @@ class DocsCommand(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
+    def docs(self):
+        # docs() prints ::error annotations on failure; keep them out of the real workflow log.
+        with contextlib.redirect_stdout(io.StringIO()):
+            return self.weekly.docs(str(self.engine))
+
     def test_moves_pins_and_revendors(self):
-        self.assertEqual(self.weekly.docs(str(self.engine)), 0)
+        self.assertEqual(self.docs(), 0)
         for rel in self.weekly.PIN_FILES:
             self.assertEqual((self.root / rel).read_text(),
                              f"pin {self.new} short {self.weekly.short_pin(self.new)} other aaaaaaa\n")
@@ -87,12 +94,12 @@ class DocsCommand(unittest.TestCase):
         git(self.engine, "commit", "-qm", "drop")
         new = git(self.engine, "rev-parse", "HEAD").strip()
         (self.weekly.OUT / "rebase.json").write_text(json.dumps({"old_pin": self.old, "target": new}))
-        self.assertEqual(self.weekly.docs(str(self.engine)), 1)
+        self.assertEqual(self.docs(), 1)
         self.assertIn("docs/sdk-index.md", json.loads((self.weekly.OUT / "docs.json").read_text())["missing_upstream_docs"])
 
     def test_fails_when_a_file_no_longer_states_the_pin(self):
         (self.root / "AGENTS.md").write_text("no pin here\n")
-        self.assertEqual(self.weekly.docs(str(self.engine)), 1)
+        self.assertEqual(self.docs(), 1)
         self.assertEqual(json.loads((self.weekly.OUT / "docs.json").read_text())["pin_not_found"], ["AGENTS.md"])
 
 
