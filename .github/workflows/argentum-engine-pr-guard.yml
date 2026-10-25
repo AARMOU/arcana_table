@@ -42,6 +42,12 @@ jobs:
           # pull_request_target checks out only the reviewed development source.
           ref: ${{ github.event_name == 'pull_request_target' && 'gpt/arcana-integration-next' || github.ref }}
           persist-credentials: false
+      - name: Check out trusted development patch baseline (never PR head)
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: gpt/arcana-integration-next
+          path: trusted-baseline
+          persist-credentials: false
       - name: Guard self-tests
         run: |
           python3 -m unittest discover -s engine-upgrade/tests -p test_engine_pr_guard.py -v
@@ -71,6 +77,7 @@ jobs:
         continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          ARCANA_TRUSTED_BASE: ${{ github.workspace }}/trusted-baseline
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
           set -euo pipefail
