@@ -100,6 +100,34 @@ class EldraziTempleScenarioTest {
         assertEquals(2, d.manaPool(p).restrictedMana.size)
     }
 
+    @Test fun restrictedManaPaysForColorlessNoncreatureEldraziKindredSpell() {
+        // Echoes of Eternity is a {3}{C}{C}{C} Kindred Enchantment — Eldrazi.
+        // The Temple restriction applies to colorless Eldrazi spells, not only creatures.
+        val d = customScenario(EldraziTemple, "Echoes of Eternity")
+        val p = d.player1
+        val temple = d.putPermanentOnBattlefield(p, "Eldrazi Temple")
+        val echoes = d.putCardInHand(p, "Echoes of Eternity")
+
+        assertNull(d.activate(p, temple, index = 1).error)
+        d.resolveAll()
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+
+        // Three unrestricted {C} plus two restricted {C} cannot pay six total.
+        d.giveColorlessMana(p, 3)
+        assertNotNull("One mana is still missing for the Kindred Eldrazi spell", d.castSpell(p, echoes).error)
+        assertEquals(3, d.manaPool(p).colorless)
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+
+        // The exact same restricted mana must now be eligible to fund this
+        // noncreature Eldrazi spell; neither generic nor {C} costs may be waived.
+        d.giveColorlessMana(p, 1)
+        assertNull(d.castSpell(p, echoes).error)
+        assertEquals(0, d.manaPool(p).colorless)
+        assertTrue(d.manaPool(p).restrictedMana.isEmpty())
+        d.resolveAll()
+        assertNotNull(d.findPermanent(p, "Echoes of Eternity"))
+    }
+
     @Test fun restrictedManaCannotFundGenericPartOfColoredSpell() {
         val d = customScenario(EldraziTemple, "Grizzly Bears")
         val p = d.player1
