@@ -1,7 +1,7 @@
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
-@@ -1429,10 +1429,17 @@
+@@ -1429,10 +1429,18 @@
              fun matchesLkiPredicate(predicate: com.wingedsheep.sdk.scripting.predicates.CardPredicate): Boolean {
                  if (liveEntryTypes.isNotEmpty()) {
                      projectedCardTypeMatch(predicate, liveEntryTypes, isFaceDown)?.let { return it }
