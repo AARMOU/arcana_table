@@ -40,3 +40,21 @@ Owner lane: GPT Eldrazi Incursion. Base: `gpt/arcana-integration-next`. Do not m
 - First inspect pinned Argentum engine for a dynamic *choice-based, parity-filtered can't-block* effect and a static *granted ETB replacement* for bloodthirst. **Do not approximate either effect.**
 - Only after exact engine support: add `TwinsOfDiscord.kt`, register in `CustomCards.kt` with `M3C`, implement executable positive/negative engine tests, re-export deterministic JSONL/index, and verify matching runtime + Android CI.
 - Until all gates pass, do **not** mark this original Eldrazi Incursion slot supported or substitute a fake vanilla 8/6.
+
+## Pinned SDK inspection — 2026-10-25
+
+Read `docs/agents/generated/sdk-api.md` from development. This index is generated from the committed Argentum SDK JAR, not from speculative upstream documentation.
+
+**Available public primitives (verified in SDK index):**
+- `GameObjectFilter.manaValueIsEven()` and `manaValueIsOdd()`
+- `Effects.CantBlockGroup(GroupFilter, Duration)` and `CantBlock(EffectTarget, Duration, EffectTarget)`
+- `Effects.GrantStaticAbility(StaticAbility, EffectTarget, Duration)`
+- `Effects.GrantTriggeredAbility(TriggeredAbility, EffectTarget, Duration)`
+- `Conditions.AmountIsEven(DynamicAmount)` / `AmountIsOdd(DynamicAmount)`
+- `Triggers...attacks(...)` forms, but exact semantics of attack-event vs individual-creature attacks remain to be inspected.
+
+**Missing from public SDK index:** No `Keyword.BLOODTHIRST`, no `bloodthirst(...)` builder, and no directly named parity-choice helper were found in the generated index. The SDK exposes general-purpose replacement effects, but this alone **does not establish** that a granted *entering-with-counters* replacement is expressible.
+
+**Decision:** **ENGINE INVESTIGATION REQUIRED**. The even/odd filtering and group cannot-block primitives exist, but player choice and attack-event semantics are not yet verified. Bloodthirst ETB replacement granting is an apparent capability gap pending inspection of upstream engine internals. Do **not** substitute an ETB trigger (it differs in timing and counter interactions) or a plain counter-grant effect.
+
+**Next exact-source investigation:** inspect the pinned Argentum implementation of `ReplacementEffect`, continuous static ability granting, `Triggers.you.attacks` semantics, and choice resolution. If the ETB grant is not representable, make a focused engine-source candidate with executable replacement/stacking tests; do not ship a partial card.
