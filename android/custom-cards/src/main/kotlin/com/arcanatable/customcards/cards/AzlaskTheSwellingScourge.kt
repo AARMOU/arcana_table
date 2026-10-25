@@ -1,7 +1,7 @@
 package com.arcanatable.customcards.cards
 
 import com.wingedsheep.sdk.core.CounterType
-import com.wingedsheep.sdk.core.Duration
+import com.wingedsheep.sdk.scripting.Duration
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.model.Rarity
