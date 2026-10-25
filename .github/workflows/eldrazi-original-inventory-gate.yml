@@ -3,7 +3,7 @@ on:
   push:
     branches: [gpt/eldrazi-91-slot-apk-inventory-gate-20261025]
   pull_request:
-    branches: [gpt/eldrazi-five-card-acceptance-20261025]
+    branches: [gpt/eldrazi-five-card-verification-20261025]
   workflow_dispatch:
 jobs:
   original-deck-inventory:
