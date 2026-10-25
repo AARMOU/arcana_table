@@ -25,7 +25,7 @@ PIN_RE = re.compile(r'^TARGET = "([0-9a-f]{40})"$', re.M)
 MANDATORY_RE = re.compile(r'^MANDATORY\s*=\s*\[(.*?)^\]', re.M | re.S)
 PATCH_RE = re.compile(r'^argentum-patches/([0-9]{4}-.+\.patch)$')
 SHA_RE = re.compile(r'^[0-9a-f]{40}$')
-REPO_RE = re.compile(r'^[A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*
+REPO_RE = re.compile(r'^[A-Za-z0-9_-][A-Za-z0-9_.-]*/[A-Za-z0-9_-][A-Za-z0-9_.-]*$')
 ENGINE_LOCATIONS = (
     "argentum-patches/", "engine-upgrade/forward-ports/",
     "engine-upgrade/rerere/", "android/app/libs/argentum-",
