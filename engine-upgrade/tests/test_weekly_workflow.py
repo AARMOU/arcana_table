@@ -132,17 +132,44 @@ class WeeklyWorkflowSafety(unittest.TestCase):
 
     def test_safety_checks_include_the_scope_tests(self):
         run = self.step("validate", "Workflow safety checks")["run"]
-        for name in ("test_weekly_workflow.py", "test_candidate_scope.py", "test_weekly_docs.py"):
+        for name in ("test_weekly_workflow.py", "test_candidate_scope.py", "test_weekly_docs.py",
+                     "test_weekly_handoff.py"):
             self.assertIn(name, run)
 
-    def test_failed_engine_build_produces_no_candidate(self):
+    def test_failed_engine_build_gives_a_starting_branch_but_no_pr(self):
+        # A failed build still packages its refreshed patches and pins (the engine never built, so no jars
+        # change) and publish pushes them to the bot branch as the place a fix starts (engine-upgrade/HANDOFF.md).
+        # It is reported as an issue only: no PR, so a half-upgraded tree can never be merged.
         candidate = next(s for s in self.validate["steps"] if s.get("id") == "candidate")
-        self.assertEqual(candidate["if"], "steps.final.outputs.status == 'rebased'")
+        self.assertEqual(candidate["if"],
+                         "steps.final.outputs.status == 'rebased' || steps.final.outputs.status == 'build_failed'")
         final = next(s for s in self.validate["steps"] if s.get("id") == "final")
         self.assertIn("build_failed", final["run"])
+        install = next(s for s in self.validate["steps"] if s.get("name") == "Install the new engine into the app")
+        self.assertEqual(install["if"], "steps.final.outputs.status == 'rebased'")
         for name in ("Verify the candidate before using it", "Apply the candidate and check what it changed",
-                     "Push the upgrade branch", "Open or refresh the draft PR"):
-            self.assertEqual(self.step("publish", name)["if"], "needs.validate.outputs.status == 'rebased'", name)
+                     "Push the upgrade branch"):
+            self.assertEqual(self.step("publish", name)["if"],
+                             "needs.validate.outputs.status == 'rebased' || needs.validate.outputs.status == 'build_failed'", name)
+        self.assertEqual(self.step("publish", "Open or refresh the draft PR")["if"],
+                         "needs.validate.outputs.status == 'rebased'")
+
+    def test_fix_branches_are_dry_runs(self):
+        branches = self.wf["on"]["push"]["branches"]
+        self.assertIn("gpt/argentum-weekly-fix-**", branches)
+        self.assertIn("claude/argentum-weekly-fix-**", branches)
+        self.assertNotIn("bot/argentum-weekly", branches)
+        self.assertIn("github.event_name != 'push'", self.publish["if"])
+        rebase = next(s for s in self.validate["steps"] if s.get("id") == "rebase")
+        self.assertEqual(rebase["env"]["WEEKLY_FORCE"], "${{ github.event_name == 'push' && '1' || '' }}")
+
+    def test_no_bytecode_in_the_candidate_checkout(self):
+        self.assertEqual(self.wf["env"]["PYTHONDONTWRITEBYTECODE"], "1")
+
+    def test_red_runs_carry_handoff_notes(self):
+        report = next(s for s in self.validate["steps"] if s.get("id") == "report")
+        self.assertIn("weekly.py', 'handoff'", report["run"])
+        self.assertIn("if not green:", report["run"])
 
     def test_publish_checks_the_applied_index_with_a_trusted_copy(self):
         names = [s.get("name", "") for s in self.publish["steps"]]

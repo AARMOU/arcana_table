@@ -55,3 +55,5 @@ Security: the workflow has two jobs. `validate` runs upstream's build scripts wi
 Files an Arcana patch deliberately replaces are listed in `engine-upgrade/rebase-rules.json`; when upstream edits one, the rebase keeps Arcana's replacement and the PR names the upstream commits to review.
 
 Conflicts: `CHANGELOG.md` hunks take upstream and are dropped from refreshed patches. Recorded resolutions in `engine-upgrade/rerere/` replay automatically. Any other conflict opens an issue with the hunk; resolve it once with `git rerere` enabled, copy the new `.git/rr-cache/<id>` folder into `engine-upgrade/rerere/`, commit, and re-run. A patch upstream fully absorbs is retired from the series and named in the PR.
+
+Red runs: every non-green run carries a **Handoff** section with exact commands, and `engine-upgrade/HANDOFF.md` is the runbook (conflict, failed build, collision, failing test). A failed build pushes its refreshed patches and pins to `bot/argentum-weekly` as the starting point and is reported as an issue, never a PR. Pushing a `gpt/argentum-weekly-fix-*` or `claude/argentum-weekly-fix-*` branch runs a read-only dry run.
