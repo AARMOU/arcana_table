@@ -72,6 +72,11 @@
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
+    "Hideous Taskmaster": {
+      "reason": "Per-opponent targeting does not retain each chosen creature’s original controller: a creature transferred to a different opponent before resolution is incorrectly stolen. Reproduced on committed #171 runtime; 9 positive/negative scenarios pass, controller-change scenario fails. No exact registration until target-controller binding is supported.",
+      "source": "investigation/eldrazi-incursion/hideous-taskmaster/result.xml; pinned ResolutionTargetValidator.kt per-opponent exclusion; WotC LOTR release notes In the Darkness Bind Them same wording",
+      "verified": true
+    },
     "Jeweled Lotus": {
       "reason": "mana spend restriction to casting a commander",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
