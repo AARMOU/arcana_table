@@ -33,8 +33,6 @@ jobs:
         run: python3 engine-upgrade/ulalek/apply_patches.py
       - name: Apply reviewed Myriad patch, fail closed on upstream mismatch
         run: python3 engine-upgrade/myriad/apply_patch.py
-      - name: Apply reviewed Myriad patch, fail closed on upstream mismatch
-        run: python3 engine-upgrade/myriad/apply_patch.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
