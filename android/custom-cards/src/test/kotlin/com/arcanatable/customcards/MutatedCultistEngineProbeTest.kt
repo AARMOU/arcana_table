@@ -62,6 +62,62 @@ class MutatedCultistEngineProbeTest {
     }
 
     /**
+     * Probe the SDK's actual next-spell discount with the count captured BEFORE
+     * removal. This deliberately targets a permanent only: opponent/player
+     * counter removal and the complete Cultist card are separate engine gaps.
+     */
+    private fun counterDiscountProbe() = card("Cultist Next Spell Discount Probe") {
+        manaCost = "{B}"
+        typeLine = "Sorcery"
+        spell {
+            val permanent = target(TargetFilter.Permanent)
+            effect = Effects.Pipeline {
+                val removedCount = storeNumber(DynamicAmounts.countersOnTarget(null))
+                run(Effects.RemoveAllCounters(permanent))
+                run(Effects.ReduceNextSpellCost(removedCount.amount))
+            }
+        }
+    }
+
+    @Test fun removedCounterCountDiscountsExactlyNextSpellGenericMana() {
+        val d = customScenario(counterDiscountProbe(), "Grizzly Bears", "Hill Giant")
+        val bear = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
+        d.addComponent(bear, CountersComponent(mapOf(
+            CounterType.PLUS_ONE_PLUS_ONE to 2, CounterType.CHARGE to 1
+        )))
+        val probe = d.putCardInHand(d.player1, "Cultist Next Spell Discount Probe")
+        d.giveMana(d.player1, com.wingedsheep.sdk.core.Color.BLACK)
+        assertNull(d.castSpell(d.player1, probe, listOf(bear)).error)
+        d.resolveAll()
+        assertEquals(0, d.state.getEntity(bear)!!.get<CountersComponent>()?.getCount(CounterType.CHARGE) ?: 0)
+        val giant = d.putCardInHand(d.player1, "Hill Giant")
+        d.giveMana(d.player1, com.wingedsheep.sdk.core.Color.RED)
+        assertNull("three counters removed should reduce {3}{R} to {R}",
+            d.castSpell(d.player1, giant).error)
+        d.resolveAll()
+        assertEquals(1, d.permanentsNamed(d.player1, "Hill Giant").size)
+    }
+
+    @Test fun discountIsConsumedByFirstMatchingSpellNotAllLaterSpells() {
+        val d = customScenario(counterDiscountProbe(), "Grizzly Bears", "Hill Giant")
+        val bear = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
+        d.addComponent(bear, CountersComponent(mapOf(CounterType.PLUS_ONE_PLUS_ONE to 2)))
+        val probe = d.putCardInHand(d.player1, "Cultist Next Spell Discount Probe")
+        d.giveMana(d.player1, com.wingedsheep.sdk.core.Color.BLACK)
+        assertNull(d.castSpell(d.player1, probe, listOf(bear)).error)
+        d.resolveAll()
+        val first = d.putCardInHand(d.player1, "Grizzly Bears")
+        d.giveMana(d.player1, com.wingedsheep.sdk.core.Color.GREEN)
+        assertNull("first creature should consume the one-shot discount", d.castSpell(d.player1, first).error)
+        d.resolveAll()
+        val second = d.putCardInHand(d.player1, "Hill Giant")
+        d.giveMana(d.player1, com.wingedsheep.sdk.core.Color.RED)
+        d.giveColorlessMana(d.player1, 1)
+        assertNotNull("second spell must still cost {3}{R}", d.castSpell(d.player1, second).error)
+        assertTrue(d.permanentsNamed(d.player1, "Hill Giant").isEmpty())
+    }
+
+    /**
      * Mutated Cultist needs a cast trigger, not an enters-the-battlefield trigger.
      * Exercise the supported isCast() API independently before combining it with
      * the still-unverified next-spell discount and opponent counter removal.
