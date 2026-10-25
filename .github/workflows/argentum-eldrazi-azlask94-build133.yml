@@ -452,7 +452,18 @@ jobs:
           assert test_text.count(members_before) == 1, 'Unknown required-card list'
           test_text = test_text.replace(members_before,
               '"Eldrazi Temple", "Corrupted Crossroads", "Azlask, the Swelling Scourge",', 1)
+          # Keep the terminal-state requirement. The older 30-turn cap caused B132's
+          # seed-1 mirror game to stop at turn 31 / 716 actions without a winner.
+          # A Commander mirror needs more time, but the 8,000-action anti-stall cap stays.
+          old_window = 'while (!state.gameOver && state.turnNumber <= 30 && actions < 8_000)'
+          new_window = 'while (!state.gameOver && state.turnNumber <= 120 && actions < 8_000)'
+          assert test_text.count(old_window) == 1, 'Unrecognized AI mirror bound'
+          assert 'assertTrue("seed $seed must finish the AI mirror game;' in test_text, (
+              'Actual gameOver assertion unexpectedly removed'
+          )
+          test_text = test_text.replace(old_window, new_window, 1)
           test_path.write_text(test_text)
+          print('Runner-only AI mirror: <=120 turns, <=8000 actions, gameOver mandatory for all 3 seeds')
           for source in ('DeckBuilderScreen.kt', 'CardLibrary.kt', 'DeckImportParser.kt'):
               assert Path('android/app/src/main/java/com/arcanatable', source).is_file(), source
           PY
