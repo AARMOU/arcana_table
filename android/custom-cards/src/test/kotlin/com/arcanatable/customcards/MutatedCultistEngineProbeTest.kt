@@ -60,4 +60,29 @@ class MutatedCultistEngineProbeTest {
         assertEquals(0, d.state.getEntity(target)!!.get<CountersComponent>()?.getCount(CounterType.PLUS_ONE_PLUS_ONE) ?: 0)
         assertEquals(4, d.state.getEntity(untouched)!!.get<CountersComponent>()?.getCount(CounterType.PLUS_ONE_PLUS_ONE) ?: 0)
     }
+
+    @Test fun castTriggeredRemovalExecutesBeforeCreatureSpellResolves() {
+        val probe = card("Cultist Cast Trigger Probe") {
+            manaCost = "{2}{B}"
+            colorIdentity = "B"
+            typeLine = "Creature — Eldrazi Horror"
+            power = 1
+            toughness = 3
+            triggeredAbility {
+                trigger = Triggers.self.cast
+                val permanent = target(TargetFilter.Permanent)
+                effect = Effects.RemoveAllCounters(permanent)
+            }
+        }
+        val d = customScenario(probe, "Grizzly Bears")
+        val bear = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
+        d.addComponent(bear, CountersComponent(mapOf(CounterType.PLUS_ONE_PLUS_ONE to 2)))
+        val spell = d.putCardInHand(d.player1, "Cultist Cast Trigger Probe")
+        d.giveColorlessMana(d.player1, 2)
+        d.giveMana(d.player1, com.wingedsheep.sdk.core.Color.BLACK)
+        assertNull(d.castSpell(d.player1, spell, listOf(bear)).error)
+        d.resolveAll()
+        assertEquals(0, d.state.getEntity(bear)!!.get<CountersComponent>()?.getCount(CounterType.PLUS_ONE_PLUS_ONE) ?: 0)
+        assertNotNull(d.findPermanent(d.player1, "Cultist Cast Trigger Probe"))
+    }
 }
