@@ -112,17 +112,23 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
-          count = dict(tests=0, failures=0, errors=0, skipped=0)
-          matches = []
-          for root in ("argentum-engine", "android/custom-cards"):
-              for path in Path(root).glob("**/build/test-results/**/TEST-*.xml"):
-                  if "Temple" not in path.name: continue
-                  elem = ET.parse(path).getroot()
-                  matches.append(path.as_posix())
-                  for key in count: count[key] += int(elem.get(key, 0))
-          print("Eldrazi Temple real tests:", count, "files:", matches)
-          assert matches, "No Temple test XML"
-          assert count["tests"] > 0 and count["failures"] == count["errors"] == 0
+          suites = {
+              "engine": ("argentum-engine", "EldraziTempleManaRestrictionTest", 5),
+              "android": ("android/custom-cards", "EldraziTempleScenarioTest", 6),
+          }
+          total = 0
+          for name, (root, class_name, minimum) in suites.items():
+              matches = list(Path(root).glob(f"**/build/test-results/**/TEST-*{class_name}.xml"))
+              assert len(matches) == 1, f"{name}: expected exactly one {class_name} XML, got {matches}"
+              elem = ET.parse(matches[0]).getroot()
+              counts = {key: int(elem.get(key, 0)) for key in ("tests", "failures", "errors", "skipped")}
+              print(f"{name} {class_name}: {counts} from {matches[0]}")
+              assert counts["tests"] >= minimum, f"{name}: required at least {minimum} executed tests"
+              assert counts["failures"] == counts["errors"] == counts["skipped"] == 0, (
+                  f"{name}: no failing, errored or skipped tests allowed"
+              )
+              total += counts["tests"]
+          print(f"Eldrazi Temple exact engine + Android scenarios: {total} tests, all passed")
           PY
       - uses: actions/upload-artifact@v4
         if: always()
