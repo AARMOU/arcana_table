@@ -189,6 +189,15 @@ jobs:
           assert total >= 25
           print(f"Combined Temple + Crossroads engine and Android scenarios: {total} tests, all passed")
           PY
+      - name: Upload installable combined-runtime debug APK
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: ArcanaTable-Eldrazi-Combined-Dev-debug-apk
+          retention-days: 14
+          if-no-files-found: error
+          path: android/app/build/outputs/apk/debug/*.apk
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
