@@ -1,0 +1,79 @@
+name: Argentum Source-Only Combat Fold Fix Proof
+
+on:
+  pull_request:
+    paths:
+      - 'investigation/ai-strength/engine-candidates/**'
+      - '.github/workflows/arcana-ai-fold-source-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pinned-upstream-red-green:
+    runs-on: ubuntu-latest
+    timeout-minutes: 65
+    steps:
+      - name: Checkout isolated Arcana candidate, NOT development
+        uses: actions/checkout@v4
+        with:
+          path: arcana
+      - name: Checkout exact pinned Argentum source
+        uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: engine
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Stage regression without installing an engine JAR
+        run: |
+          set -euo pipefail
+          mkdir -p engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/event
+          cp arcana/investigation/ai-strength/engine-candidates/SimultaneousDamageFoldBufferTest.kt \
+             engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/event/
+          (cd engine && git apply --check ../arcana/investigation/ai-strength/engine-candidates/0001-fold-same-event-duplicate-damage.patch)
+      - name: Unpatched engine must FAIL on the known buffered-slot bug
+        working-directory: engine
+        id: red
+        continue-on-error: true
+        run: ./gradlew --no-daemon --max-workers=2 :rules-engine:test --tests 'com.wingedsheep.engine.event.SimultaneousDamageFoldBufferTest'
+      - name: Check unpatched failure is the exact same-event bug (not a broken fixture)
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          path=Path('engine/rules-engine/build/test-results/test/TEST-com.wingedsheep.engine.event.SimultaneousDamageFoldBufferTest.xml')
+          if not path.exists(): raise SystemExit('No engine JUnit XML from prepatch regression')
+          root=ET.parse(path).getroot()
+          failures=[f for f in root.iter('failure')]
+          trace='\n'.join((f.text or '')+' '+f.attrib.get('message','') for f in failures)
+          if not failures or 'IndexOutOfBoundsException' not in trace or 'foldSimultaneousDamage' not in trace:
+              raise SystemExit('Unpatched failure was not the expected damage-fold exception: '+trace[:2500])
+          print('RED VERIFIED: unpatched engine throws IndexOutOfBoundsException in foldSimultaneousDamage')
+          PY
+      - name: Apply one candidate patch to temporary Argentum checkout
+        run: |
+          set -euo pipefail
+          cd engine
+          git apply ../arcana/investigation/ai-strength/engine-candidates/0001-fold-same-event-duplicate-damage.patch
+          git diff --check
+          git diff --stat
+      - name: 'Green test: same-event duplicates, across-event sums and prior simultaneous damage suite'
+        working-directory: engine
+        run: |
+          ./gradlew --no-daemon --max-workers=2 --rerun-tasks :rules-engine:test \
+            --tests 'com.wingedsheep.engine.event.SimultaneousDamageFoldBufferTest' \
+            --tests 'com.wingedsheep.engine.triggers.SimultaneousDamageDealtTriggerTest' \
+            --tests 'com.wingedsheep.engine.triggers.SimultaneousDamageReceivedTriggerTest'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-fold-source-only-regression-proof
+          retention-days: 14
+          path: |
+            engine/rules-engine/build/test-results/test/
+            engine/rules-engine/build/reports/tests/test/
