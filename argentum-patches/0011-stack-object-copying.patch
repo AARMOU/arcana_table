@@ -429,25 +429,263 @@ index 1a2476a80d..c62c00fa33 100644
  
      private fun resumeStormCopyTarget(
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ObjectReferencePropagation.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ObjectReferencePropagation.kt
-index 4b9ad564e0..f2801c931f 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ObjectReferencePropagation.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ObjectReferencePropagation.kt
-@@ -99,6 +99,7 @@ internal fun AnswerContinuation.objectReferences(): ObjectReferenceEnvironment?
+@@ -100,129 +100,131 @@
      is ChooseActionContinuation -> objectReferences
      is TriggeredAbilityContinuation -> objectReferences
      is TriggerDamageDistributionContinuation -> objectReferences
+-    is MayAbilityContinuation -> effectContext.objectReferences
+-    is KeywordActionInsteadContinuation -> actionContext.objectReferences
+-    is GatedEffectContinuation -> effectContext.objectReferences
+-    is MayRevealCardFromHandContinuation -> effectContext.objectReferences
+-    is BeholdContinuation -> effectContext.objectReferences
+-    is FlipCoinsUntilLossContinuation -> objectReferences
+-    is CoinFlipChoiceContinuation -> effectContext.objectReferences
+-    is ConvertCountersToTokensContinuation -> objectReferences
+-    else -> null
+-}
+-
+-internal fun AutomaticContinuation.objectReferences(): ObjectReferenceEnvironment? = when (this) {
+-    is ChainCopyAfterActionContinuation -> objectReferences
+-    is ModalPreChosenContinuation -> objectReferences
+-    is SpliceTailContinuation -> objectReferences
+-    is ModalChosenModeTailContinuation -> objectReferences
+-    is CreateTokenCopyRemainingContinuation -> context.objectReferences
+-    is EffectProgram -> effectContext.objectReferences
+-    is GatedActionContinuation -> effectContext.objectReferences
+-    is ForEachContinuation -> effectContext.objectReferences
+-    is RepeatWhileContinuation -> effectContext.objectReferences
+-    is ReflexiveTriggerTargetContinuation -> effectContext.objectReferences
+-    else -> null
+-}
+-
+-/** Frames on the stack: a suspension keeps its references on the answer it carries. */
+-internal fun ContinuationFrame.objectReferences(): ObjectReferenceEnvironment? = when (this) {
+-    is Suspension -> answer.objectReferences()
+-    is AutomaticContinuation -> objectReferences()
+-}
+-
+-internal fun AnswerContinuation.withObjectReferences(refs: ObjectReferenceEnvironment): AnswerContinuation = when (this) {
+-    is EffectCopyAuraEntryContinuation -> copy(context = context.copy(objectReferences = refs))
+-    is EnteringAttackDefenderContinuation -> copy(context = context.copy(objectReferences = refs))
+-    is EffectCopyEntryContinuation -> copy(context = context.copy(objectReferences = refs))
+-    is EffectEntryChoiceContinuation -> copy(context = context.copy(objectReferences = refs))
+-    is EffectDiscardDestinationContinuation -> copy(context = context.copy(objectReferences = refs))
+-    is EffectDiscardOrderContinuation -> copy(context = context.copy(objectReferences = refs))
+-    is CounterUnlessPaysContinuation -> copy(objectReferences = refs)
+-    is MayPayManaContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+-    is MayPayManaSelectionContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+-    is MayPayXContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+-    is MayPayLifeXContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+-    is CounterUnlessPaysManaSelectionContinuation -> copy(objectReferences = refs)
+-    is WardTapPermanentsSubCostContinuation -> copy(objectReferences = refs)
+-    is AddDynamicManaContinuation -> copy(objectReferences = refs)
+-    is AddManaPipsContinuation -> copy(objectReferences = refs)
+-    is ChooseNumberForSourceContinuation -> copy(objectReferences = refs)
+-    is ChooseOpponentForSourceContinuation -> copy(objectReferences = refs)
+-    is ChooseCardTypeForSourceContinuation -> copy(objectReferences = refs)
+-    is ChooseOpponentDeciderContinuation -> copy(baseContext = baseContext.copy(objectReferences = refs))
+-    is PutFromHandContinuation -> copy(objectReferences = refs)
+-    is SecretChoiceContinuation -> copy(objectReferences = refs)
+-    is OpenLifeBidContinuation -> copy(objectReferences = refs)
+-    is ContestedRetargetContinuation -> copy(objectReferences = refs)
+-    is DistributeCountersContinuation -> copy(objectReferences = refs)
+-    is RemoveAnyNumberOfCountersContinuation -> copy(objectReferences = refs)
+-    is AddCountersUpToContinuation -> copy(objectReferences = refs)
+-    is AddCountersOfChosenKindContinuation -> copy(objectReferences = refs)
+-    is PayCountersContinuation -> copy(objectReferences = refs)
+-    is ChooseSpellCastThisTurnContinuation -> copy(objectReferences = refs)
+-    is MoveChosenCountersToTargetContinuation -> copy(objectReferences = refs)
+-    is AmassContinuation -> copy(objectReferences = refs)
+-    is StormCopyTargetContinuation -> copy(objectReferences = refs)
+-    is StormCopyModalTargetContinuation -> copy(objectReferences = refs)
+-    is ChangeSpellTargetContinuation -> copy(objectReferences = refs)
+-    is DistributeDamageContinuation -> copy(objectReferences = refs)
+-    is DeflectDamageSourceChoiceContinuation -> copy(objectReferences = refs)
+-    is PreventDamageFromChosenSourceContinuation -> copy(objectReferences = refs)
+-    is PreventNextDamageLeavingAmountContinuation -> copy(context = context.copy(objectReferences = refs))
+-    is RedirectDamageSourceContinuation -> copy(objectReferences = refs)
+-    is OptionalRedirectEffectContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+-    is EachPlayerDiscardsOrLoseLifeContinuation -> copy(objectReferences = refs)
+-    is DrawUpToContinuation -> copy(objectReferences = refs)
+-    is StaticDrawReplacementContinuation -> copy(objectReferences = refs)
+-    is ChainCopyDecisionContinuation -> copy(objectReferences = refs)
+-    is ChainCopyCostContinuation -> copy(objectReferences = refs)
+-    is ChainCopyTargetContinuation -> copy(objectReferences = refs)
+-    is SacrificeContinuation -> copy(objectReferences = refs)
+-    is ChooseOnePerCategoryContinuation -> copy(objectReferences = refs)
+-    is ExileMultiZoneContinuation -> copy(objectReferences = refs)
+-    is PayOrSufferContinuation -> copy(objectReferences = refs)
+-    is PayOrSufferChoiceContinuation -> copy(objectReferences = refs)
+-    is AnyPlayerMayPayContinuation -> copy(objectReferences = refs)
+-    is ReturnFromGraveyardContinuation -> copy(objectReferences = refs)
+-    is CostPaymentContinuation -> copy(objectReferences = refs)
+-    is ChooseColorThenContinuation -> copy(baseContext = baseContext.copy(objectReferences = refs))
+-    is ChooseNumberThenContinuation -> copy(baseContext = baseContext.copy(objectReferences = refs))
+-    is ChooseManaColorContinuation -> copy(baseContext = baseContext.copy(objectReferences = refs))
+-    is ChooseColorForTargetContinuation -> copy(objectReferences = refs)
+-    is ChooseReplacementContinuation -> copy(objectReferences = refs)
+-    is BecomeCreatureTypeContinuation -> copy(objectReferences = refs)
+-    is ChooseCardTypeForProtectionContinuation -> copy(objectReferences = refs)
+-    is ChooseColorOrColorlessForProtectionContinuation -> copy(objectReferences = refs)
+-    is EachPlayerChoosesCreatureTypeContinuation -> copy(objectReferences = refs)
+-    is SelectFromCollectionContinuation -> copy(objectReferences = refs)
+-    is MoveCollectionOrderContinuation -> copy(objectReferences = refs)
+-    is SelectTargetPipelineContinuation -> copy(objectReferences = refs)
+-    is ChooseOptionPipelineContinuation -> copy(objectReferences = refs)
+-    is NoteCreatureTypePipelineContinuation -> copy(objectReferences = refs)
+-    is ChoosePileContinuation -> copy(objectReferences = refs)
+-    is MoveCollectionAuraTargetContinuation -> copy(objectReferences = refs)
+-    is PutOnBottomOfLibraryContinuation -> copy(objectReferences = refs)
+-    is PutOnTopOrBottomContinuation -> copy(objectReferences = refs)
+-    is ReturnFromLinkedExileContinuation -> copy(objectReferences = refs)
+-    is CascadeMayCastContinuation -> copy(objectReferences = refs)
+-    is DiscoverMayCastContinuation -> copy(objectReferences = refs)
+-    is CastAnyNumberFromCollectionContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+-    is ReplacementChoiceContinuation -> copy(context = context?.copy(objectReferences = refs))
+-    is TokenCreationReplacementContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+-    is TokenSubstitutionChoiceContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+-    is ChooseGuessKindContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+-    is GuessTopCardKindContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+-    is GuessConditionContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+-    is RedistributeLifeTotalsContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+-    is ModalContinuation -> copy(objectReferences = refs)
+-    is ModalTargetContinuation -> copy(objectReferences = refs)
+-    is BudgetModalContinuation -> copy(objectReferences = refs)
+-    is CreateTokenCopyOfChosenContinuation -> copy(objectReferences = refs)
+-    is CreateTokenCopyAuraHostContinuation -> copy(context = context.copy(objectReferences = refs))
+-    is ChooseActionContinuation -> copy(objectReferences = refs)
+-    is TriggeredAbilityContinuation -> copy(objectReferences = refs)
+-    is TriggerDamageDistributionContinuation -> copy(objectReferences = refs)
 +    is CopyStackObjectsOrderContinuation -> effectContext.objectReferences
-     is MayAbilityContinuation -> effectContext.objectReferences
-     is GatedEffectContinuation -> effectContext.objectReferences
-     is MayRevealCardFromHandContinuation -> effectContext.objectReferences
-@@ -220,6 +221,7 @@ internal fun AnswerContinuation.withObjectReferences(refs: ObjectReferenceEnviro
-     is ChooseActionContinuation -> copy(objectReferences = refs)
-     is TriggeredAbilityContinuation -> copy(objectReferences = refs)
-     is TriggerDamageDistributionContinuation -> copy(objectReferences = refs)
++    is MayAbilityContinuation -> effectContext.objectReferences
++    is KeywordActionInsteadContinuation -> actionContext.objectReferences
++    is GatedEffectContinuation -> effectContext.objectReferences
++    is MayRevealCardFromHandContinuation -> effectContext.objectReferences
++    is BeholdContinuation -> effectContext.objectReferences
++    is FlipCoinsUntilLossContinuation -> objectReferences
++    is CoinFlipChoiceContinuation -> effectContext.objectReferences
++    is ConvertCountersToTokensContinuation -> objectReferences
++    else -> null
++}
++
++internal fun AutomaticContinuation.objectReferences(): ObjectReferenceEnvironment? = when (this) {
++    is ChainCopyAfterActionContinuation -> objectReferences
++    is ModalPreChosenContinuation -> objectReferences
++    is SpliceTailContinuation -> objectReferences
++    is ModalChosenModeTailContinuation -> objectReferences
++    is CreateTokenCopyRemainingContinuation -> context.objectReferences
++    is EffectProgram -> effectContext.objectReferences
++    is GatedActionContinuation -> effectContext.objectReferences
++    is ForEachContinuation -> effectContext.objectReferences
++    is RepeatWhileContinuation -> effectContext.objectReferences
++    is ReflexiveTriggerTargetContinuation -> effectContext.objectReferences
++    else -> null
++}
++
++/** Frames on the stack: a suspension keeps its references on the answer it carries. */
++internal fun ContinuationFrame.objectReferences(): ObjectReferenceEnvironment? = when (this) {
++    is Suspension -> answer.objectReferences()
++    is AutomaticContinuation -> objectReferences()
++}
++
++internal fun AnswerContinuation.withObjectReferences(refs: ObjectReferenceEnvironment): AnswerContinuation = when (this) {
++    is EffectCopyAuraEntryContinuation -> copy(context = context.copy(objectReferences = refs))
++    is EnteringAttackDefenderContinuation -> copy(context = context.copy(objectReferences = refs))
++    is EffectCopyEntryContinuation -> copy(context = context.copy(objectReferences = refs))
++    is EffectEntryChoiceContinuation -> copy(context = context.copy(objectReferences = refs))
++    is EffectDiscardDestinationContinuation -> copy(context = context.copy(objectReferences = refs))
++    is EffectDiscardOrderContinuation -> copy(context = context.copy(objectReferences = refs))
++    is CounterUnlessPaysContinuation -> copy(objectReferences = refs)
++    is MayPayManaContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
++    is MayPayManaSelectionContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
++    is MayPayXContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
++    is MayPayLifeXContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
++    is CounterUnlessPaysManaSelectionContinuation -> copy(objectReferences = refs)
++    is WardTapPermanentsSubCostContinuation -> copy(objectReferences = refs)
++    is AddDynamicManaContinuation -> copy(objectReferences = refs)
++    is AddManaPipsContinuation -> copy(objectReferences = refs)
++    is ChooseNumberForSourceContinuation -> copy(objectReferences = refs)
++    is ChooseOpponentForSourceContinuation -> copy(objectReferences = refs)
++    is ChooseCardTypeForSourceContinuation -> copy(objectReferences = refs)
++    is ChooseOpponentDeciderContinuation -> copy(baseContext = baseContext.copy(objectReferences = refs))
++    is PutFromHandContinuation -> copy(objectReferences = refs)
++    is SecretChoiceContinuation -> copy(objectReferences = refs)
++    is OpenLifeBidContinuation -> copy(objectReferences = refs)
++    is ContestedRetargetContinuation -> copy(objectReferences = refs)
++    is DistributeCountersContinuation -> copy(objectReferences = refs)
++    is RemoveAnyNumberOfCountersContinuation -> copy(objectReferences = refs)
++    is AddCountersUpToContinuation -> copy(objectReferences = refs)
++    is AddCountersOfChosenKindContinuation -> copy(objectReferences = refs)
++    is PayCountersContinuation -> copy(objectReferences = refs)
++    is ChooseSpellCastThisTurnContinuation -> copy(objectReferences = refs)
++    is MoveChosenCountersToTargetContinuation -> copy(objectReferences = refs)
++    is AmassContinuation -> copy(objectReferences = refs)
++    is StormCopyTargetContinuation -> copy(objectReferences = refs)
++    is StormCopyModalTargetContinuation -> copy(objectReferences = refs)
++    is ChangeSpellTargetContinuation -> copy(objectReferences = refs)
++    is DistributeDamageContinuation -> copy(objectReferences = refs)
++    is DeflectDamageSourceChoiceContinuation -> copy(objectReferences = refs)
++    is PreventDamageFromChosenSourceContinuation -> copy(objectReferences = refs)
++    is PreventNextDamageLeavingAmountContinuation -> copy(context = context.copy(objectReferences = refs))
++    is RedirectDamageSourceContinuation -> copy(objectReferences = refs)
++    is OptionalRedirectEffectContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
++    is EachPlayerDiscardsOrLoseLifeContinuation -> copy(objectReferences = refs)
++    is DrawUpToContinuation -> copy(objectReferences = refs)
++    is StaticDrawReplacementContinuation -> copy(objectReferences = refs)
++    is ChainCopyDecisionContinuation -> copy(objectReferences = refs)
++    is ChainCopyCostContinuation -> copy(objectReferences = refs)
++    is ChainCopyTargetContinuation -> copy(objectReferences = refs)
++    is SacrificeContinuation -> copy(objectReferences = refs)
++    is ChooseOnePerCategoryContinuation -> copy(objectReferences = refs)
++    is ExileMultiZoneContinuation -> copy(objectReferences = refs)
++    is PayOrSufferContinuation -> copy(objectReferences = refs)
++    is PayOrSufferChoiceContinuation -> copy(objectReferences = refs)
++    is AnyPlayerMayPayContinuation -> copy(objectReferences = refs)
++    is ReturnFromGraveyardContinuation -> copy(objectReferences = refs)
++    is CostPaymentContinuation -> copy(objectReferences = refs)
++    is ChooseColorThenContinuation -> copy(baseContext = baseContext.copy(objectReferences = refs))
++    is ChooseNumberThenContinuation -> copy(baseContext = baseContext.copy(objectReferences = refs))
++    is ChooseManaColorContinuation -> copy(baseContext = baseContext.copy(objectReferences = refs))
++    is ChooseColorForTargetContinuation -> copy(objectReferences = refs)
++    is ChooseReplacementContinuation -> copy(objectReferences = refs)
++    is BecomeCreatureTypeContinuation -> copy(objectReferences = refs)
++    is ChooseCardTypeForProtectionContinuation -> copy(objectReferences = refs)
++    is ChooseColorOrColorlessForProtectionContinuation -> copy(objectReferences = refs)
++    is EachPlayerChoosesCreatureTypeContinuation -> copy(objectReferences = refs)
++    is SelectFromCollectionContinuation -> copy(objectReferences = refs)
++    is MoveCollectionOrderContinuation -> copy(objectReferences = refs)
++    is SelectTargetPipelineContinuation -> copy(objectReferences = refs)
++    is ChooseOptionPipelineContinuation -> copy(objectReferences = refs)
++    is NoteCreatureTypePipelineContinuation -> copy(objectReferences = refs)
++    is ChoosePileContinuation -> copy(objectReferences = refs)
++    is MoveCollectionAuraTargetContinuation -> copy(objectReferences = refs)
++    is PutOnBottomOfLibraryContinuation -> copy(objectReferences = refs)
++    is PutOnTopOrBottomContinuation -> copy(objectReferences = refs)
++    is ReturnFromLinkedExileContinuation -> copy(objectReferences = refs)
++    is CascadeMayCastContinuation -> copy(objectReferences = refs)
++    is DiscoverMayCastContinuation -> copy(objectReferences = refs)
++    is CastAnyNumberFromCollectionContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
++    is ReplacementChoiceContinuation -> copy(context = context?.copy(objectReferences = refs))
++    is TokenCreationReplacementContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
++    is TokenSubstitutionChoiceContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
++    is ChooseGuessKindContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
++    is GuessTopCardKindContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
++    is GuessConditionContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
++    is RedistributeLifeTotalsContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
++    is ModalContinuation -> copy(objectReferences = refs)
++    is ModalTargetContinuation -> copy(objectReferences = refs)
++    is BudgetModalContinuation -> copy(objectReferences = refs)
++    is CreateTokenCopyOfChosenContinuation -> copy(objectReferences = refs)
++    is CreateTokenCopyAuraHostContinuation -> copy(context = context.copy(objectReferences = refs))
++    is ChooseActionContinuation -> copy(objectReferences = refs)
++    is TriggeredAbilityContinuation -> copy(objectReferences = refs)
++    is TriggerDamageDistributionContinuation -> copy(objectReferences = refs)
 +    is CopyStackObjectsOrderContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
      is MayAbilityContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+     is KeywordActionInsteadContinuation -> copy(actionContext = actionContext.copy(objectReferences = refs))
      is GatedEffectContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
-     is MayRevealCardFromHandContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt
 index 812935c27b..bc01b26c55 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt
@@ -461,16 +699,16 @@ index 812935c27b..bc01b26c55 100644
          registerModule(InformationExecutors(cardRegistry))
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyEachTargetSpellExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyEachTargetSpellExecutor.kt
 deleted file mode 100644
-index 502fcf5dc7..0000000000
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyEachTargetSpellExecutor.kt
 +++ /dev/null
-@@ -1,164 +0,0 @@
+@@ -1,173 +0,0 @@
 -package com.wingedsheep.engine.handlers.effects.stack
 -
 -import com.wingedsheep.engine.core.*
 -import com.wingedsheep.engine.handlers.EffectContext
 -import com.wingedsheep.engine.handlers.TargetFinder
 -import com.wingedsheep.engine.handlers.effects.EffectExecutor
+-import com.wingedsheep.engine.handlers.effects.library.KeywordActionAmountModifier
 -import com.wingedsheep.engine.mechanics.stack.StackPlacement
 -import com.wingedsheep.engine.state.GameState
 -import com.wingedsheep.engine.state.components.identity.CantBeCopiedComponent
@@ -511,6 +749,14 @@ index 502fcf5dc7..0000000000
 -            .filterIsInstance<ChosenTarget.Spell>()
 -            .map { it.spellEntityId }
 -            .distinct()
+-            // Each spell is its own copy instruction, so a copy-count replacement (Twinning Staff)
+-            // resizes each one: the queue holds a spell once per copy it gets.
+-            .flatMap { spellId ->
+-                val copies = KeywordActionAmountModifier.copySpell(
+-                    state, context.controllerId, spellId, 1, targetFinder.predicateEvaluator
+-                )
+-                List(copies) { spellId }
+-            }
 -
 -        return EffectResult.from(
 -            driveCopyEachSpell(
@@ -1104,39 +1350,57 @@ index 72edcba38d..874f812707 100644
          CopyTargetTriggeredAbilityExecutor(targetFinder = targetFinder),
          CopyTargetSpellOrAbilityExecutor(dynamicAmountEvaluator = amountEvaluator, targetFinder = targetFinder),
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt
-index 9dafe60071..6efe9da343 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt
-@@ -35,7 +35,8 @@ internal object StackPlacement {
-          * Firebender Ascension's "attacking causes a triggered ability of that creature to trigger"
-          * meta-trigger can key on it.
+@@ -35,26 +35,28 @@
+          * null. Stamped onto the emitted [AbilityTriggeredEvent] so the CR 603.3b meta-triggers
+          * (Firebender Ascension, Strict Proctor) can key on it.
           */
--        causedByAttack: Boolean = false
-+        causedByAttack: Boolean = false,
-+        emitTriggerEvent: Boolean = true
-     ): ExecutionResult {
-         // Create a new entity for the ability on the stack
-         val (abilityId, stateWithId) = state.newEntity()
-@@ -54,16 +55,15 @@ internal object StackPlacement {
-         // for it announced exactly which card had just refused to be targeted.
-         val sourceDisplayName = nameVisibleToAll(state, ability.sourceId, ability.sourceName)
- 
+-        triggerCause: AbilityTriggerCause? = null
+-    ): ExecutionResult {
+-        // Create a new entity for the ability on the stack
+-        val (abilityId, stateWithId) = state.newEntity()
+-
+-        var container = ComponentContainer.of(ability)
+-        if (targets.isNotEmpty()) {
+-            container = container.with(TargetsComponent.capture(state, targets, targetRequirements, ability.sourceId))
+-        }
+-
+-        var newState = stateWithId.withEntity(abilityId, container)
+-        newState = newState.pushToStack(abilityId)
+-            .copy(priorityPassedBy = emptySet())
+-
+-        // The only ability a face-down permanent can put on the stack is the ward its face-down
+-        // mode grants (CR 702.168a disguise / 701.58a cloak), and reporting `ability.sourceName`
+-        // for it announced exactly which card had just refused to be targeted.
+-        val sourceDisplayName = nameVisibleToAll(state, ability.sourceId, ability.sourceName)
+-
 -        val events = mutableListOf<GameEvent>(
--            AbilityTriggeredEvent(
++        triggerCause: AbilityTriggerCause? = null,
++        emitTriggerEvent: Boolean = true
++    ): ExecutionResult {
++        // Create a new entity for the ability on the stack
++        val (abilityId, stateWithId) = state.newEntity()
++
++        var container = ComponentContainer.of(ability)
++        if (targets.isNotEmpty()) {
++            container = container.with(TargetsComponent.capture(state, targets, targetRequirements, ability.sourceId))
++        }
++
++        var newState = stateWithId.withEntity(abilityId, container)
++        newState = newState.pushToStack(abilityId)
++            .copy(priorityPassedBy = emptySet())
++
++        // The only ability a face-down permanent can put on the stack is the ward its face-down
++        // mode grants (CR 702.168a disguise / 701.58a cloak), and reporting `ability.sourceName`
++        // for it announced exactly which card had just refused to be targeted.
++        val sourceDisplayName = nameVisibleToAll(state, ability.sourceId, ability.sourceName)
++
 +        val events = mutableListOf<GameEvent>()
-+        if (emitTriggerEvent) events.add(AbilityTriggeredEvent(
++        if (emitTriggerEvent) events.add(
+             AbilityTriggeredEvent(
                  ability.sourceId,
                  sourceDisplayName,
-                 ability.controllerId,
-                 ability.description,
-                 abilityEntityId = abilityId,
-                 causedByAttack = causedByAttack
--            )
--        )
-+            ))
- 
-         if (CrimeDetector.isCrime(newState, ability.controllerId, targets)) {
-             events.add(CommitCrimeEvent(ability.controllerId, abilityId, sourceDisplayName))
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/ClientEvent.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/ClientEvent.kt
 index aa75c15509..88bda52f9d 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/ClientEvent.kt
