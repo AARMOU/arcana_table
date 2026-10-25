@@ -249,6 +249,18 @@ class ReadinessTests(unittest.TestCase):
         self.assertIn("Bloodthirst", readiness.blockers()["keywords"])
         self.assertIn("bloodthirst", " ".join(v["reasons"]).lower())
 
+    def test_exported_chittering_dispatcher_still_blocked_by_proven_myriad_gap(self):
+        # #181 compiled and executed the actual three-player engine scenario.
+        # Its defender-choice failure must beat indexed/tested source precedence.
+        state, _, source = readiness.implementation_state("Chittering Dispatcher")
+        self.assertEqual(state, "IMPLEMENTED_AND_TESTED")
+        self.assertTrue(source.startswith("custom:"))
+        v = readiness.classify("Chittering Dispatcher")
+        self.assertEqual(v["readiness"], "ENGINE_BLOCKED", v["reasons"])
+        self.assertEqual(v["route"], "claude")
+        self.assertIn("#181", " ".join(v["reasons"]))
+        self.assertIn("Myriad", readiness.blockers()["keywords"])
+
 
 class UnitCommandTests(unittest.TestCase):
     """`cardkit unit` must fail closed: no queue body for anything that is not dispatchable."""
