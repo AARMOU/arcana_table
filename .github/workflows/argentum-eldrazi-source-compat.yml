@@ -1,0 +1,156 @@
+name: Argentum Eldrazi source compatibility
+# Follow-up to #223: prepare only a throwaway merged worktree and test whether
+# legacy Eldrazi engine source patches apply to the newly upgraded Argentum.
+# No jar publication, branch mutation, APK signing or deploy.
+on:
+  push:
+    branches: [gpt/argentum-eldrazi-join-preflight-20261025]
+    paths: [.github/workflows/argentum-eldrazi-source-compat.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compatibility:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Reconcile exact four known text conflicts on runner only
+        env:
+          UPGRADE: e66eca84125c3180c676702a72ae6cd080f85797
+          ELDRAZI: 7e6fc1aa8d6ccca30a6fab7fdebc7e08199efbb3
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p combined-evidence
+          git merge-base --is-ancestor "$UPGRADE" HEAD
+          git fetch --no-tags origin "$ELDRAZI"
+          test "$(git rev-parse FETCH_HEAD)" = "$ELDRAZI"
+          git show "$ELDRAZI:tools/cardkit/data/known-blockers.json" > /tmp/eldrazi-blockers.json
+          git show "$UPGRADE:tools/cardkit/data/known-blockers.json" > /tmp/upgrade-blockers.json
+          git show "$ELDRAZI:engine-upgrade/UPGRADE-TEMPLATE.md" > /tmp/eldrazi-upgrade-template.md
+          set +e
+          git merge --no-commit --no-ff --no-edit "$ELDRAZI" > combined-evidence/merge.log 2>&1
+          merge_code=$?
+          set -e
+          test "$merge_code" -ne 0
+          git diff --name-only --diff-filter=U | sort > combined-evidence/conflicts.txt
+          cat > /tmp/expected-conflicts.txt <<'EOF'
+          docs/agents/generated/pattern-index.json
+          docs/agents/generated/pattern-index.md
+          engine-upgrade/UPGRADE-TEMPLATE.md
+          tools/cardkit/data/known-blockers.json
+          EOF
+          diff -u /tmp/expected-conflicts.txt combined-evidence/conflicts.txt
+          # The generated index is regenerated from the merged source; old data must not survive.
+          git checkout --ours -- docs/agents/generated/pattern-index.json docs/agents/generated/pattern-index.md
+          # Keep weekly handoff instructions; append the legacy Eldrazi engine-patch rule verbatim.
+          git checkout --ours -- engine-upgrade/UPGRADE-TEMPLATE.md
+          python3 - <<'PY'
+          from pathlib import Path
+          old = Path('/tmp/eldrazi-upgrade-template.md').read_text()
+          p = Path('engine-upgrade/UPGRADE-TEMPLATE.md')
+          tag = 'Adding an engine change:'
+          assert old.count(tag) == 1
+          assert tag not in p.read_text()
+          addition = old[old.index(tag):].strip()
+          assert 'MANDATORY' in addition
+          p.write_text(p.read_text().rstrip() + '\n\n' + addition + '\n')
+          PY
+          # Preserve new verified Eldrazi blockers while retiring the obsolete named Port Town.
+          git checkout --ours -- tools/cardkit/data/known-blockers.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          ours = json.loads(Path('/tmp/upgrade-blockers.json').read_text())
+          theirs = json.loads(Path('/tmp/eldrazi-blockers.json').read_text())
+          for section in ('cards', 'keywords'):
+              for key, value in theirs[section].items():
+                  if key == 'Port Town': continue
+                  if key in ours[section]:
+                      assert ours[section][key] == value, (section, key, 'different conflict needs review')
+                  else:
+                      ours[section][key] = value
+          old_names = {p['name']:p for p in ours['patterns']}
+          for p in theirs['patterns']:
+              if p['name'] in old_names:
+                  assert old_names[p['name']] == p, ('pattern conflict', p['name'])
+              else:
+                  ours['patterns'].append(p)
+          assert 'Port Town' not in ours['cards']
+          path = Path('tools/cardkit/data/known-blockers.json')
+          path.write_text(json.dumps(ours, indent=2, ensure_ascii=False) + '\n')
+          PY
+          git add docs/agents/generated/pattern-index.json docs/agents/generated/pattern-index.md engine-upgrade/UPGRADE-TEMPLATE.md tools/cardkit/data/known-blockers.json
+          test -z "$(git diff --name-only --diff-filter=U)"
+          tools/cardkit/cardkit patterns
+          git diff --check
+          python3 -m json.tool tools/cardkit/data/known-blockers.json >/dev/null
+          printf 'reconciled known text conflicts and regenerated pattern index; no commit\n' > combined-evidence/reconciliation.txt
+      - name: Fetch and verify green upgraded-engine candidate evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 2 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            https://api.github.com/repos/AARMOU/arcana_table/actions/artifacts/12612323185/zip -o /tmp/upgrade-candidate.zip
+          echo '2eca4e497de60cb3ff0d20a5df7c3635ac5be7e7881900a1b606926da1321cc0  /tmp/upgrade-candidate.zip' | sha256sum -c -
+          unzip -p /tmp/upgrade-candidate.zip candidate.patch > /tmp/upgrade-candidate.patch
+          echo '065ba023c1fab0c855318f0dd70e55592cc340cbf72263019ef6ea136e90231c  /tmp/upgrade-candidate.patch' | sha256sum -c -
+          git apply --check --include='argentum-patches/*' /tmp/upgrade-candidate.patch
+          git apply --include='argentum-patches/*' /tmp/upgrade-candidate.patch
+          printf '%s\n' 'Verified exact green run 40228118365, upstream c38f145359c342a04f951b7ba48f741bcb1627ac, patch inputs refreshed.' > combined-evidence/upgrade-inputs.txt
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: c38f145359c342a04f951b7ba48f741bcb1627ac
+          path: combined-argentum
+          persist-credentials: false
+      - name: Strict patch-series applicability on upgraded upstream
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'upstream c38f145359c342a04f951b7ba48f741bcb1627ac\n' > combined-evidence/patch-preflight.txt
+          python3 - <<'PY'
+          import subprocess, sys
+          from pathlib import Path
+          engine = Path('combined-argentum')
+          patches = [Path('argentum-patches') / f'{n:04d}-{name}.patch' for n,name in [
+              (1,'android-regex'), (2,'engine-trial-build'),
+              (3,'full-library-export'), (4,'token-copy-triggered-abilities'),
+              (5,'last-known-negative-subtype'), (6,'ai-decision-deadline'),
+              (7,'ai-bounded-stack-search'), (8,'jvm-test-toolchain')]]
+          patches += sorted(Path('argentum-patches').glob('00[1-9][0-9]-*.patch'))
+          # The 93-slot candidate also has Temple and Crossroads extension patches.
+          patches += [
+              Path('engine-upgrade/eldrazi-temple/patches/0001-colorless-eldrazi-source-mana.patch'),
+              Path('engine-upgrade/eldrazi-combined/patches/0002-devoid-after-temple.patch')]
+          report = Path('combined-evidence/patch-preflight.txt')
+          for patch in patches:
+              assert patch.is_file(), f'missing required patch: {patch}'
+              base = ['git', '-C', str(engine), 'apply']
+              check = subprocess.run(base + ['--check', str(patch.resolve())], capture_output=True, text=True)
+              if check.returncode:
+                  with report.open('a') as f:
+                      f.write('BLOCKED ' + str(patch) + '\n' + check.stdout + check.stderr)
+                  print('BLOCKED:', patch, check.stdout, check.stderr, file=sys.stderr)
+                  sys.exit(1)
+              actual = subprocess.run(base + [str(patch.resolve())], capture_output=True, text=True)
+              assert actual.returncode == 0, (patch, actual.stderr)
+              with report.open('a') as f: f.write('APPLIED ' + str(patch) + '\n')
+          PY
+          git -C combined-argentum diff --check
+      - name: Upload conflict and patch reports even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: argentum-eldrazi-source-compatibility
+          retention-days: 14
+          if-no-files-found: warn
+          path: combined-evidence/
