@@ -14,11 +14,5 @@
     "Chittering Dispatcher": "Registered but known three-player Myriad defender-choice regression fails (#181/#183/#34/#36). Two-player tests pass and do not certify multiplayer behavior. Source-only patch candidate is not a proven integrated repair.",
     "Benthic Anomaly": "PR #203 primitive probe: direct stored power passes, but StoreNumber inside ForEachInCollection loses numeric outputs (2+3 yields 0). No documented power/toughness aggregate over a stored chosen collection. This demonstrates the attempted exact composition fails; it does not prove every construction or an engine extension impossible. Card remains unimplemented/unregistered."
   },
-  "incompleteAcceptance": {
-    "All Is Dust": "Positive wipe/colorless-survival scenario exists; broader negative/replacement and simultaneous-event cases not established by this card's suite.",
-    "Drowner of Hope": "Positive ETB/token/tap scenarios exist; opponent-owned Scion cost eligibility and illegal-target negatives need direct acceptance coverage.",
-    "Oblivion Sower": "Cast/optional-zero/preexisting lands scenarios pass; own/nonland exile and ownership targeting negatives need direct acceptance coverage.",
-    "Ulamog's Crusher": "Annihilator positive scenario; must-attack requirement and unable-to-attack negatives need direct acceptance coverage.",
-    "Shrine of the Forsaken Gods": "Seven-land threshold tested; exact restricted spend positive/negative cases need direct acceptance coverage."
-  }
+  "incompleteAcceptance": {}
 }

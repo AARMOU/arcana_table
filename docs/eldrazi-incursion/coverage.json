@@ -1,13 +1,13 @@
 {
   "deck": "Eldrazi Incursion",
   "originalSlots": 100,
-  "sourceBase": "3db55b8dcb723a13ac4037ac1a6d7f18d0c0b2d0",
+  "sourceBase": "9d330b7ac8b5a0ca7246f59976b8095d54f9f60f",
   "scope": "Original 100-slot manifest. Category 1 requires a nonempty registered definition, reviewed card-specific positive and negative acceptance coverage, and green observed JUnit on the candidate runtime. This is not exhaustive certification of every possible interaction. Upstream indexed definitions without current card-specific acceptance evidence stay in category 2.",
   "pickerAssetMatchesOriginalManifest": true,
   "indexedSlots": 91,
   "categorySlots": {
-    "1": 32,
-    "2": 58,
+    "1": 37,
+    "2": 53,
     "3": 0,
     "4": 2,
     "5": 8
@@ -24,11 +24,11 @@
     "android/app/src/main/assets/argentum/all-cards.index.tsv": "f5b6c3028d27f272811a9e43966c1af08551bcc5a40cd3eefba757109a9cc819",
     "android/app/src/main/assets/argentum/custom-cards.index.tsv": "60e250ca8b772a6eb0b2fd94efc37d2723668132dc621493a0a0b5034293f54b",
     "android/app/src/main/assets/argentum/all-cards.jsonl": "998efe9c48827065c1a89f9b758ac0913c9214baaaaf4d063def15d15d4d236a",
-    "android/app/src/main/assets/argentum/custom-cards.jsonl": "6417eded81684cc9ef3e5db5bcb293a20fdb875077aed1005d23bff315197d80",
+    "android/app/src/main/assets/argentum/custom-cards.jsonl": "bfd57d1bd9ae361f8669a5027967a1efb48056072af1e1b468be79a73ab68344",
     "android/app/src/main/assets/argentum/por-cards.jsonl": "0b366901f2485c779d482fa19805d68e180c62459db77ee1c5d253a132140fe0"
   },
   "junitTotals": {
-    "tests": 612,
+    "tests": 626,
     "failures": 0,
     "errors": 0,
     "skipped": 0
@@ -393,17 +393,17 @@
       "source": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShrineOfTheForsakenGods.kt",
       "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShrineOfTheForsakenGodsScenarioTest.kt",
       "junit": {
-        "tests": 2,
+        "tests": 5,
         "failures": 0,
         "errors": 0,
         "skipped": 0
       },
       "definitionHasBehavior": true,
-      "category": 2,
-      "classification": "Implemented but missing acceptance tests/evidence",
-      "reason": "Seven-land threshold tested; exact restricted spend positive/negative cases need direct acceptance coverage.",
+      "category": 1,
+      "classification": "Fully implemented and tested (reviewed acceptance scope)",
+      "reason": "Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions.",
       "sourceSha256": "f21909ea0f5ae0e8fdd5f29c16b674f3fd3bd8e905fbbacd0d76369c470f1e15",
-      "testSha256": "137258d7acc7ce47e71b26fc0a638d1537e10c9743a42465a343b70558f474c6"
+      "testSha256": "5d5d4425cefa278f44f864b19f6fee8dc585f2a32391b9ac2ebd55f64e2aea5e"
     },
     {
       "name": "Ugin's Insight",
@@ -433,17 +433,17 @@
       "source": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DrownerOfHope.kt",
       "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DrownerOfHopeScenarioTest.kt",
       "junit": {
-        "tests": 2,
+        "tests": 5,
         "failures": 0,
         "errors": 0,
         "skipped": 0
       },
       "definitionHasBehavior": true,
-      "category": 2,
-      "classification": "Implemented but missing acceptance tests/evidence",
-      "reason": "Positive ETB/token/tap scenarios exist; opponent-owned Scion cost eligibility and illegal-target negatives need direct acceptance coverage.",
-      "sourceSha256": "28cf06e6fcce504da29e6ed5813c19389f48ca6dba4ce0b99d4b2ab3c05d37eb",
-      "testSha256": "790699aecc15c44351d0e35addd043512185b8cf9cd757840a07b9d30f71e088"
+      "category": 1,
+      "classification": "Fully implemented and tested (reviewed acceptance scope)",
+      "reason": "Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions.",
+      "sourceSha256": "f699f14d0020fe0f5fa647a81644aa5867a832ba3cf306a77ba32587cd476d3f",
+      "testSha256": "9586285f8b99d7a1ad5a6b91d409ccda00bc1f4ae84c25ded78f6b2613c4410e"
     },
     {
       "name": "Return of the Wildspeaker",
@@ -545,17 +545,17 @@
       "source": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/OblivionSower.kt",
       "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/OblivionSowerScenarioTest.kt",
       "junit": {
-        "tests": 3,
+        "tests": 5,
         "failures": 0,
         "errors": 0,
         "skipped": 0
       },
       "definitionHasBehavior": true,
-      "category": 2,
-      "classification": "Implemented but missing acceptance tests/evidence",
-      "reason": "Cast/optional-zero/preexisting lands scenarios pass; own/nonland exile and ownership targeting negatives need direct acceptance coverage.",
-      "sourceSha256": "b626d873db40069cdda5f0b9c4dd29803d1efbe994792db82b1935ba204b1fc0",
-      "testSha256": "6e269d81d61c3a373d98cbc29e4457b651f73939b8e189072b5b332723594fd4"
+      "category": 1,
+      "classification": "Fully implemented and tested (reviewed acceptance scope)",
+      "reason": "Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions.",
+      "sourceSha256": "f40ed32476c0fd9f53b43fb9c76d82494233a27ded046c5f73dc38f1cd17cb11",
+      "testSha256": "9fca8da9485ea6239ac56192c9f20e79c8a88c5b22ff024e2b16e95613512515"
     },
     {
       "name": "Adarkar Wastes",
@@ -874,17 +874,17 @@
       "source": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AllIsDust.kt",
       "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AllIsDustScenarioTest.kt",
       "junit": {
-        "tests": 1,
+        "tests": 3,
         "failures": 0,
         "errors": 0,
         "skipped": 0
       },
       "definitionHasBehavior": true,
-      "category": 2,
-      "classification": "Implemented but missing acceptance tests/evidence",
-      "reason": "Positive wipe/colorless-survival scenario exists; broader negative/replacement and simultaneous-event cases not established by this card's suite.",
+      "category": 1,
+      "classification": "Fully implemented and tested (reviewed acceptance scope)",
+      "reason": "Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions.",
       "sourceSha256": "06b90efd3ef9e2bbad6657a276154b7f9c78a81f115c9623c64675ff53d5d2ac",
-      "testSha256": "355acb67390e73b3785b74a84f08a7979284e2e9830e26b00e3ece2617f2d629"
+      "testSha256": "2aaa4c04c5b084ad89bfdd6a7386cdd9ea2c86385780c06e29c9cb43305b99b6"
     },
     {
       "name": "Rishkar's Expertise",
@@ -1437,17 +1437,17 @@
       "source": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsCrusher.kt",
       "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsCrusherScenarioTest.kt",
       "junit": {
-        "tests": 1,
+        "tests": 5,
         "failures": 0,
         "errors": 0,
         "skipped": 0
       },
       "definitionHasBehavior": true,
-      "category": 2,
-      "classification": "Implemented but missing acceptance tests/evidence",
-      "reason": "Annihilator positive scenario; must-attack requirement and unable-to-attack negatives need direct acceptance coverage.",
+      "category": 1,
+      "classification": "Fully implemented and tested (reviewed acceptance scope)",
+      "reason": "Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions.",
       "sourceSha256": "1580c9153ba8bd452dea269fb1635f3c483f993df19383d91a6ededd3b8bc272",
-      "testSha256": "064814ee5f1aee01665a12beffc966e60788e16ec01fd2e2953ba4cf6d38881e"
+      "testSha256": "eecd94ab3f8a24e93a3fd21afe759afa4f0c818fbf921a99c7b51ba7702346f0"
     },
     {
       "name": "Garruk's Uprising",

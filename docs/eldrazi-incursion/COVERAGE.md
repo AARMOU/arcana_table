@@ -6,8 +6,8 @@ Original 100-slot manifest. Category 1 requires a nonempty registered definition
 
 | Category | Slots |
 |---|---:|
-| 1. Fully implemented and tested (reviewed acceptance scope) | 32 |
-| 2. Implemented but missing acceptance tests/evidence | 58 |
+| 1. Fully implemented and tested (reviewed acceptance scope) | 37 |
+| 2. Implemented but missing acceptance tests/evidence | 53 |
 | 3. Implemented but failing tests | 0 |
 | 4. Missing implementation | 2 |
 | 5. Blocked by pinned Argentum capability/runtime | 8 |
@@ -36,16 +36,16 @@ Reported/API-only blockers are distinguished from reproduced failures in each ro
 | Cascading Cataracts | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
 | Eldrazi Monument | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `EldraziMonumentScenarioTest.kt` (3 green cases). |
 | Sire of Stagnation | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `SireOfStagnationScenarioTest.kt` (5 green cases). |
-| Shrine of the Forsaken Gods | 1 | 2 | Seven-land threshold tested; exact restricted spend positive/negative cases need direct acceptance coverage. `ShrineOfTheForsakenGodsScenarioTest.kt` (2 green cases). |
+| Shrine of the Forsaken Gods | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `ShrineOfTheForsakenGodsScenarioTest.kt` (5 green cases). |
 | Ugin's Insight | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `UginsInsightScenarioTest.kt` (2 green cases). |
-| Drowner of Hope | 1 | 2 | Positive ETB/token/tap scenarios exist; opponent-owned Scion cost eligibility and illegal-target negatives need direct acceptance coverage. `DrownerOfHopeScenarioTest.kt` (2 green cases). |
+| Drowner of Hope | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `DrownerOfHopeScenarioTest.kt` (5 green cases). |
 | Return of the Wildspeaker | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `ReturnOfTheWildspeakerScenarioTest.kt` (2 green cases). |
 | Tendo Ice Bridge | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `TendoIceBridgeScenarioTest.kt` (4 green cases). |
 | Battlefield Forge | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
 | Llanowar Wastes | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
 | Brushland | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
 | Underground River | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
-| Oblivion Sower | 1 | 2 | Cast/optional-zero/preexisting lands scenarios pass; own/nonland exile and ownership targeting negatives need direct acceptance coverage. `OblivionSowerScenarioTest.kt` (3 green cases). |
+| Oblivion Sower | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `OblivionSowerScenarioTest.kt` (5 green cases). |
 | Adarkar Wastes | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
 | Karplusan Forest | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
 | Yavimaya Coast | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
@@ -66,7 +66,7 @@ Reported/API-only blockers are distinguished from reproduced failures in each ro
 | Vile Redeemer | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `VileRedeemerScenarioTest.kt` (3 green cases). |
 | Eldrazi Displacer | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `EldraziDisplacerScenarioTest.kt` (13 green cases). |
 | Mystic Forge | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
-| All Is Dust | 1 | 2 | Positive wipe/colorless-survival scenario exists; broader negative/replacement and simultaneous-event cases not established by this card's suite. `AllIsDustScenarioTest.kt` (1 green cases). |
+| All Is Dust | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `AllIsDustScenarioTest.kt` (3 green cases). |
 | Rishkar's Expertise | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `RishkarsExpertiseScenarioTest.kt` (3 green cases). |
 | Awakening Zone | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `AwakeningZoneScenarioTest.kt` (2 green cases). |
 | Eldrazi Temple | 1 | 5 | Pinned integration runtime lacks exact restriction. PR #158 source predicate + #162 runner-only candidate have 5 engine + 8 Android scenarios green at fb60a660. Not registered/exported on #171; requires separately approved combined runtime integration. |
@@ -105,7 +105,7 @@ Reported/API-only blockers are distinguished from reproduced failures in each ro
 | Command Tower | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
 | Ash Barrens | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
 | Ancient Stirrings | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
-| Ulamog's Crusher | 1 | 2 | Annihilator positive scenario; must-attack requirement and unable-to-attack negatives need direct acceptance coverage. `UlamogsCrusherScenarioTest.kt` (1 green cases). |
+| Ulamog's Crusher | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `UlamogsCrusherScenarioTest.kt` (5 green cases). |
 | Garruk's Uprising | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
 | Suffer the Past | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `SufferThePastScenarioTest.kt` (9 green cases). |
 | Skittering Invasion | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `SkitteringInvasionScenarioTest.kt` (2 green cases). |

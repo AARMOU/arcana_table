@@ -27,7 +27,7 @@ val OblivionSower = card("Oblivion Sower") {
             val lands = gather(
                 CardSource.FromZone(
                     Zone.EXILE,
-                    Player.Any,
+                    Player.Each,
                     GameObjectFilter.Land.ownedByTargetPlayer(),
                 ),
                 name = "oblivionSowerExiledLands",
