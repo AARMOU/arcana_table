@@ -4,7 +4,7 @@ name: Argentum Eldrazi source compatibility
 # No jar publication, branch mutation, APK signing or deploy.
 on:
   push:
-    branches: [gpt/argentum-eldrazi-join-preflight-20261025, gpt/argentum-eldrazi-fullhistory-3way-20261025]
+    branches: [gpt/argentum-eldrazi-join-preflight-20261025, gpt/argentum-eldrazi-fullhistory-3way-20261025, gpt/argentum-eldrazi-conflict-report-20261025]
     paths: [.github/workflows/argentum-eldrazi-source-compat.yml]
 permissions:
   contents: read
@@ -165,6 +165,42 @@ jobs:
               with report.open('a') as f: f.write('APPLIED ' + str(patch) + '\n')
           PY
           git -C combined-argentum diff --check
+      - name: Capture unresolved three-way source conflicts for manual port
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p combined-evidence
+          git -C combined-argentum status --short > combined-evidence/source-status.txt
+          git -C combined-argentum ls-files -u > combined-evidence/unmerged-index-stages.txt
+          git -C combined-argentum diff --cc > combined-evidence/source-conflicts.diff || true
+          python3 - <<'PY'
+          from pathlib import Path
+          engine = Path('combined-argentum')
+          stage = Path('combined-evidence/unmerged-index-stages.txt').read_text().splitlines()
+          paths = sorted({row.split('\t', 1)[1] for row in stage if '\t' in row})
+          out = []
+          for name in paths:
+              source = engine / name
+              out.append(f'=== {name} ===')
+              if not source.is_file():
+                  out.append('missing or deleted source file')
+                  continue
+              lines = source.read_text(errors='replace').splitlines()
+              centers = [i for i, line in enumerate(lines) if line.startswith(('<<<<<<< ', '=======', '>>>>>>> '))]
+              if not centers:
+                  out.append('unmerged index but no textual marker')
+                  continue
+              displayed = set()
+              for center in centers:
+                  for i in range(max(0, center - 16), min(len(lines), center + 17)):
+                      if i not in displayed:
+                          displayed.add(i)
+                          out.append(f'{i+1:5d} {lines[i]}')
+          Path('combined-evidence/source-conflict-excerpts.txt').write_text('\n'.join(out) + '\n')
+          print('Unmerged source paths:', paths)
+          print('\n'.join(out)[:25000])
+          PY
       - name: Upload conflict and patch reports even on failure
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
