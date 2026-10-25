@@ -1,10 +1,10 @@
-name: Argentum + Eldrazi 94 + Azlask Build 133 combined gate
+name: Argentum + Eldrazi + latest Arcana debug APK gate
 # Follow-up to #223: prepare only a throwaway merged worktree and test whether
 # legacy Eldrazi engine source patches apply to the newly upgraded Argentum.
 # No jar publication, branch mutation, APK signing or deploy.
 on:
   push:
-    branches: [gpt/argentum-eldrazi-azlask94-build133-20261025]
+    branches: [gpt/argentum-eldrazi-combined-apk-20261025]
     paths: [.github/workflows/argentum-eldrazi-combined-apk-ci.yml]
 permissions:
   contents: read
@@ -336,17 +336,6 @@ jobs:
               with report.open('a') as f: f.write('APPLIED ' + str(patch) + '\n')
           PY
           git -C combined-argentum diff --check
-      - name: Strictly apply Azlask colorless-death LKI patch on upgraded Argentum
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(git -C combined-argentum rev-parse HEAD)" = c38f145359c342a04f951b7ba48f741bcb1627ac
-          patch="$GITHUB_WORKSPACE/engine-upgrade/azlask/patches/0001-exactly-colors-death-lki.patch"
-          test -s "$patch"
-          git -C combined-argentum apply --check "$patch"
-          git -C combined-argentum apply "$patch"
-          git -C combined-argentum diff --check
-          echo 'Applied Azlask exact-colors LKI patch after all core, Ulalek and Temple/Crossroads patches' >> combined-evidence/patch-preflight.txt
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -400,7 +389,7 @@ jobs:
           packages: platform-tools
       - name: Install Android compile SDK
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-      - name: Inject original Eldrazi Temple, Corrupted Crossroads and Azlask with exact scenarios
+      - name: Inject original Eldrazi Temple and Corrupted Crossroads cards and exact scenarios
         shell: bash
         run: |
           set -euo pipefail
@@ -411,8 +400,6 @@ jobs:
           cp engine-upgrade/corrupted-crossroads/candidate/CorruptedCrossroads.kt "$dest/"
           cp engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt android/custom-cards/src/test/kotlin/com/arcanatable/customcards/
           cp engine-upgrade/corrupted-crossroads/candidate/CorruptedCrossroadsScenarioTest.kt android/custom-cards/src/test/kotlin/com/arcanatable/customcards/
-          test -s "$dest/AzlaskTheSwellingScourge.kt"
-          test -s android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AzlaskTheSwellingScourgeScenarioTest.kt
           python3 - <<'PY'
           from pathlib import Path
           path = Path('android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt')
@@ -420,25 +407,10 @@ jobs:
           marker = 'val entries: List<Entry> = listOf(\n'
           assert value.count(marker) == 1
           assert 'Entry(EldraziTemple,' not in value and 'Entry(CorruptedCrossroads,' not in value
-          assert 'Entry(AzlaskTheSwellingScourge,' not in value
           value = value.replace(marker, marker +
               '        Entry(EldraziTemple, "M3C", "Six WotC precons"),\n' +
-              '        Entry(CorruptedCrossroads, "M3C", "Six WotC precons"),\n' +
-              '        Entry(AzlaskTheSwellingScourge, "M3C", "Six WotC precons"),\n', 1)
+              '        Entry(CorruptedCrossroads, "M3C", "Six WotC precons"),\n', 1)
           path.write_text(value)
-          # Exact original-deck AI inventory assertion, only in this disposable runner.
-          # All seven names were verified missing from the independently green 93-slot candidate.
-          test_path = Path('android/app/src/test/java/com/arcanatable/EldraziIncursionPlayableTest.kt')
-          test_text = test_path.read_text()
-          missing_before = '"Angelic Aberration", "Azlask, the Swelling Scourge", "Benthic Anomaly",'
-          assert test_text.count(missing_before) == 1, 'Unknown original missing-list: no silent rewrite'
-          test_text = test_text.replace(missing_before,
-              '"Angelic Aberration", "Benthic Anomaly",', 1)
-          members_before = '"Eldrazi Temple", "Corrupted Crossroads",'
-          assert test_text.count(members_before) == 1, 'Unknown required-card list'
-          test_text = test_text.replace(members_before,
-              '"Eldrazi Temple", "Corrupted Crossroads", "Azlask, the Swelling Scourge",', 1)
-          test_path.write_text(test_text)
           for source in ('DeckBuilderScreen.kt', 'CardLibrary.kt', 'DeckImportParser.kt'):
               assert Path('android/app/src/main/java/com/arcanatable', source).is_file(), source
           PY
@@ -449,11 +421,11 @@ jobs:
           set -o pipefail
           ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test \
             2>&1 | tee ../combined-evidence/combined-custom-cards.log
-      - name: Enforce 94 original Eldrazi slots and Azlask scenarios on packaged card assets
+      - name: Enforce 93 original Eldrazi slots using same packaged card assets
         shell: bash
         run: |
           set -euo pipefail
-          python3 tools/eldrazi/check_original_inventory.py --minimum 94
+          python3 tools/eldrazi/check_original_inventory.py --minimum 93
           python3 - <<'PY'
           from pathlib import Path
           import json
@@ -461,23 +433,11 @@ jobs:
           names = [x.split('\t', 1)[0] for x in (a / 'custom-cards.index.tsv').read_text().splitlines()]
           assert 'Eldrazi Temple' in names
           assert 'Corrupted Crossroads' in names
-          assert names.count('Azlask, the Swelling Scourge') == 1
           cards = [json.loads(x)['name'] for x in (a / 'custom-cards.jsonl').read_text().splitlines()]
           assert len(cards) == len(names) and set(cards) == set(names)
-          print('PASS: bundled custom-card index/JSONL agree and include Temple, Crossroads, Azlask')
+          print('PASS: bundled custom-card index/JSONL agree and include Temple and Crossroads')
           PY
-          python3 - <<'PY'
-          import xml.etree.ElementTree as ET
-          from pathlib import Path
-          root = Path('android/custom-cards/build/test-results/test')
-          matches = list(root.glob('TEST-*AzlaskTheSwellingScourgeScenarioTest.xml'))
-          assert len(matches) == 1, ('missing or duplicated Azlask XML', matches)
-          suite = ET.parse(matches[0]).getroot()
-          count = {k:int(suite.get(k,0)) for k in ('tests','failures','errors','skipped')}
-          assert count == {'tests':3,'failures':0,'errors':0,'skipped':0}, count
-          print('PASS: 3 of 3 strict Azlask rules tests executed on upgraded engine')
-          PY
-      - name: Label isolated debug preview as Build 133
+      - name: Label isolated debug preview as Build 132
         shell: bash
         run: |
           set -euo pipefail
@@ -488,10 +448,10 @@ jobs:
           old_code = 'versionCode = 131'
           old_name = 'versionName = "0.33.9-build131-argentum-upgrade"'
           assert text.count(old_code) == 1 and text.count(old_name) == 1
-          text = text.replace(old_code, 'versionCode = 133', 1)
-          text = text.replace(old_name, 'versionName = "0.33.11-build133-argentum-eldrazi94-azlask"', 1)
+          text = text.replace(old_code, 'versionCode = 132', 1)
+          text = text.replace(old_name, 'versionName = "0.33.10-build132-argentum-eldrazi93-regex"', 1)
           p.write_text(text)
-          print('PASS: isolated debug Build 133 identity, production untouched')
+          print('PASS: isolated debug Build 132 identity, production untouched')
           PY
       - name: Run full Android app unit tests and strict Eldrazi Commander AI tests
         working-directory: android
@@ -543,21 +503,20 @@ jobs:
           set -euo pipefail
           test -s android/app/build/outputs/apk/debug/app-debug.apk
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/package-info.txt
-          grep -F "package: name='com.arcanatable.argentum' versionCode='133' versionName='0.33.11-build133-argentum-eldrazi94-azlask'" combined-evidence/package-info.txt
+          grep -F "package: name='com.arcanatable.argentum' versionCode='132' versionName='0.33.10-build132-argentum-eldrazi93-regex'" combined-evidence/package-info.txt
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/signing-info.txt
           sha256sum android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/apk.sha256
           git rev-parse HEAD > combined-evidence/local-arcana-head.txt
           echo 'Current development source (PR #234): a4daa4769772bd71caaf4fb98b9050233287c52e' > combined-evidence/source-provenance.txt
           echo 'DeckSupportTest fix (PR #233): 6cf456733fd2c870d4db6888caa067399336f357' >> combined-evidence/source-provenance.txt
           echo 'Argentum upstream: c38f145359c342a04f951b7ba48f741bcb1627ac' >> combined-evidence/source-provenance.txt
-          echo 'Eldrazi 93-slot source: 7e6fc1aa8d6ccca30a6fab7fdebc7e08199efbb3' >> combined-evidence/source-provenance.txt
-          echo 'Azlask tested source + exact LKI patch from PR #228; 94 original slots verified in runner' >> combined-evidence/source-provenance.txt
+          echo 'Eldrazi 93-slot: 7e6fc1aa8d6ccca30a6fab7fdebc7e08199efbb3' >> combined-evidence/source-provenance.txt
           cat combined-evidence/apk.sha256
       - name: Upload APK only when every integrated source, card, AI, and app gate passed
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: arcana-combined-argentum-eldrazi94-azlask-build133-debug-apk
+          name: arcana-combined-argentum-eldrazi93-debug-apk
           retention-days: 14
           if-no-files-found: error
           path: android/app/build/outputs/apk/debug/app-debug.apk
