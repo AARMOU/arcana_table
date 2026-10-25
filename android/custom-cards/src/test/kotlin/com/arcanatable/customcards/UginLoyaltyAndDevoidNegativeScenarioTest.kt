@@ -1,7 +1,7 @@
 package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.UginTheIneffable
-import com.arcanatable.customcards.support.customScenario
+import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.engine.state.components.battlefield.CountersComponent
 import com.wingedsheep.engine.state.components.stack.ChosenTarget
