@@ -11,11 +11,6 @@
       "source": "#134 / #135 / #141 Priority B",
       "verified": false
     },
-    "Port Town": {
-      "reason": "as-enters reveal-from-hand replacement (reveal a Plains or Island card or enter tapped)",
-      "source": "#134 / #135 / #141 Priority C",
-      "verified": false
-    },
     "Fortified Village": {
       "reason": "as-enters reveal-from-hand replacement",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
