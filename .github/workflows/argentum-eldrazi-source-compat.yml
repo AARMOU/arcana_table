@@ -199,27 +199,8 @@ jobs:
                           '        triggerCause: AbilityTriggerCause? = null\n    ): ExecutionResult {',
                           '        triggerCause: AbilityTriggerCause? = null,\n'
                           '        emitTriggerEvent: Boolean = true\n    ): ExecutionResult {')
-                      old_events = '''        val events = mutableListOf<GameEvent>(
-            AbilityTriggeredEvent(
-                ability.sourceId,
-                sourceDisplayName,
-                ability.controllerId,
-                ability.description,
-                abilityEntityId = abilityId,
-                triggerCause = triggerCause
-            )
-        )'''
-                      new_events = '''        val events = mutableListOf<GameEvent>()
-        if (emitTriggerEvent) events.add(
-            AbilityTriggeredEvent(
-                ability.sourceId,
-                sourceDisplayName,
-                ability.controllerId,
-                ability.description,
-                abilityEntityId = abilityId,
-                triggerCause = triggerCause
-            )
-        )'''
+                      old_events = "        val events = mutableListOf<GameEvent>(\n            AbilityTriggeredEvent(\n                ability.sourceId,\n                sourceDisplayName,\n                ability.controllerId,\n                ability.description,\n                abilityEntityId = abilityId,\n                triggerCause = triggerCause\n            )\n        )"
+                      new_events = "        val events = mutableListOf<GameEvent>()\n        if (emitTriggerEvent) events.add(\n            AbilityTriggeredEvent(\n                ability.sourceId,\n                sourceDisplayName,\n                ability.controllerId,\n                ability.description,\n                abilityEntityId = abilityId,\n                triggerCause = triggerCause\n            )\n        )"
                       one(placement, old_events, new_events)
                       obsolete.unlink()
                       for f in expected: Path(f).unlink()
