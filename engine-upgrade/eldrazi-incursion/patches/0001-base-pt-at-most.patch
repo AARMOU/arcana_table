@@ -1,0 +1,131 @@
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/CardPredicate.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/CardPredicate.kt
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/CardPredicate.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/predicates/CardPredicate.kt
+@@ -731,6 +731,19 @@
+         override val description: String = "with base toughness $value"
+     }
+ 
++    /** Layer-7b base stats, not modified power/toughness. */
++    @SerialName("BasePowerAtMost")
++    @Serializable
++    data class BasePowerAtMost(val max: Int) : CardPredicate {
++        override val description: String = "with base power $max or less"
++    }
++
++    @SerialName("BaseToughnessAtMost")
++    @Serializable
++    data class BaseToughnessAtMost(val max: Int) : CardPredicate {
++        override val description: String = "with base toughness $max or less"
++    }
++
+     @SerialName("PowerAtMost")
+     @Serializable
+     data class PowerAtMost(val max: Int) : CardPredicate {
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/filters/unified/ObjectFilterBuilder.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/filters/unified/ObjectFilterBuilder.kt
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/filters/unified/ObjectFilterBuilder.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/filters/unified/ObjectFilterBuilder.kt
+@@ -304,6 +304,11 @@
+     )
+ 
+     /** Compares a candidate's numeric property with any late-bound amount. */
++    /** Qualifies even after counters or anthem buffs; either base stat may be <= max. */
++    fun basePowerOrToughnessAtMost(max: Int) = withCardPredicate(
++        CardPredicate.Or(listOf(CardPredicate.BasePowerAtMost(max), CardPredicate.BaseToughnessAtMost(max)))
++    )
++
+     fun compareNumericProperty(
+         property: CardNumericProperty,
+         operator: ComparisonOperator,
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
+@@ -1810,6 +1810,16 @@
+                     else lastKnownBaseToughness ?: projected.getBaseToughness(entityId) ?: unprojectedStat(isPower = false)
+                 baseToughness == predicate.value
+             }
++            is com.wingedsheep.sdk.scripting.predicates.CardPredicate.BasePowerAtMost -> {
++                val basePower = if (isFaceDown) 2
++                    else lastKnownBasePower ?: projected.getBasePower(entityId) ?: unprojectedStat(isPower = true)
++                basePower != null && basePower <= predicate.max
++            }
++            is com.wingedsheep.sdk.scripting.predicates.CardPredicate.BaseToughnessAtMost -> {
++                val baseToughness = if (isFaceDown) 2
++                    else lastKnownBaseToughness ?: projected.getBaseToughness(entityId) ?: unprojectedStat(isPower = false)
++                baseToughness != null && baseToughness <= predicate.max
++            }
+             is com.wingedsheep.sdk.scripting.predicates.CardPredicate.PowerGreaterThanBase -> {
+                 // Self-relative: last-known/projected power at event time vs the object's own
+                 // effective (layer-7b) base power, printed base once it has no projection entry.
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/CostCalculator.kt
+@@ -1906,6 +1906,8 @@
+             is CardPredicate.PowerEquals -> cardDef.creatureStats?.basePower == predicate.value
+             is CardPredicate.BasePowerEquals -> cardDef.creatureStats?.basePower == predicate.value
+             is CardPredicate.BaseToughnessEquals -> cardDef.creatureStats?.baseToughness == predicate.value
++            is CardPredicate.BasePowerAtMost -> cardDef.creatureStats?.basePower?.let { it <= predicate.max } == true
++            is CardPredicate.BaseToughnessAtMost -> cardDef.creatureStats?.baseToughness?.let { it <= predicate.max } == true
+             is CardPredicate.PowerAtMost -> (cardDef.creatureStats?.basePower ?: 0) <= predicate.max
+             is CardPredicate.PowerAtLeast -> (cardDef.creatureStats?.basePower ?: 0) >= predicate.min
+             is CardPredicate.ToughnessEquals -> cardDef.creatureStats?.baseToughness == predicate.value
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/layers/AffectsFilterResolver.kt
+@@ -1062,6 +1062,8 @@
+         // falls back to the printed value, which is what a base P/T is before 7a/7b apply.
+         is CardPredicate.BasePowerEquals -> (projected?.basePower ?: card.baseStats?.basePower) == predicate.value
+         is CardPredicate.BaseToughnessEquals -> (projected?.baseToughness ?: card.baseStats?.baseToughness) == predicate.value
++        is CardPredicate.BasePowerAtMost -> (projected?.basePower ?: card.baseStats?.basePower)?.let { it <= predicate.max } == true
++        is CardPredicate.BaseToughnessAtMost -> (projected?.baseToughness ?: card.baseStats?.baseToughness)?.let { it <= predicate.max } == true
+         is CardPredicate.ToughnessAtMost -> (projected?.toughness ?: card.baseStats?.baseToughness ?: 0) <= predicate.max
+         is CardPredicate.ToughnessAtLeast -> (projected?.toughness ?: card.baseStats?.baseToughness ?: 0) >= predicate.min
+         is CardPredicate.ToughnessEquals -> (projected?.toughness ?: card.baseStats?.baseToughness) == predicate.value
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastZoneResolver.kt
+@@ -1121,6 +1121,8 @@
+                 // A card in a zone has no projection, so its base P/T is its printed P/T.
+                 is CardPredicate.BasePowerEquals -> power == predicate.value
+                 is CardPredicate.BaseToughnessEquals -> toughness == predicate.value
++                is CardPredicate.BasePowerAtMost -> power != null && power <= predicate.max
++                is CardPredicate.BaseToughnessAtMost -> toughness != null && toughness <= predicate.max
+                 is CardPredicate.PowerAtMost -> power != null && power <= predicate.max
+                 is CardPredicate.PowerAtLeast -> power != null && power >= predicate.min
+                 is CardPredicate.ToughnessEquals -> toughness == predicate.value
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/PredicateEvaluator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/PredicateEvaluator.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/PredicateEvaluator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/PredicateEvaluator.kt
+@@ -498,6 +498,8 @@
+             is CardPredicate.PowerAtMostDynamic,
+             is CardPredicate.BasePowerEquals,
+             is CardPredicate.BaseToughnessEquals,
++            is CardPredicate.BasePowerAtMost,
++            is CardPredicate.BaseToughnessAtMost,
+             is CardPredicate.PowerGreaterThanEntity,
+             is CardPredicate.PowerLessThanEntity,
+             is CardPredicate.CompareNumericProperty,
+@@ -1073,6 +1075,15 @@
+                 baseToughness == predicate.value
+             }
+ 
++            is CardPredicate.BasePowerAtMost -> {
++                val basePower = projectedValues?.basePower ?: amounts.offBattlefieldStat(state, entityId, isPower = true, projected)
++                basePower != null && basePower <= predicate.max
++            }
++            is CardPredicate.BaseToughnessAtMost -> {
++                val baseToughness = projectedValues?.baseToughness ?: amounts.offBattlefieldStat(state, entityId, isPower = false, projected)
++                baseToughness != null && baseToughness <= predicate.max
++            }
++
+             // Power/toughness predicates - use projected P/T
+             is CardPredicate.PowerEquals -> {
+                 val power = projectedValues?.power ?: amounts.offBattlefieldStat(state, entityId, isPower = true, projected)
+@@ -2786,6 +2797,8 @@
+             CardPredicate.PowerGreaterThanBase,
+             is CardPredicate.BasePowerEquals,
+             is CardPredicate.BaseToughnessEquals,
++            is CardPredicate.BasePowerAtMost,
++            is CardPredicate.BaseToughnessAtMost,
+             CardPredicate.ToughnessGreaterThanPower -> false
+ 
+             // Name predicates — matched against the record's card name; a record without a
