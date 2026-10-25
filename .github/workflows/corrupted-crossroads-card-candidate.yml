@@ -115,7 +115,7 @@ jobs:
           from pathlib import Path
           import xml.etree.ElementTree as ET
           suites = {
-              "engine": ("argentum-engine", "CorruptedCrossroadsDevoidRestrictionTest", 5),
+              "engine": ("argentum-engine", "CorruptedCrossroadsDevoidRestrictionTest", 6),
               "android": ("android/custom-cards", "CorruptedCrossroadsScenarioTest", 6),
           }
           total = 0
