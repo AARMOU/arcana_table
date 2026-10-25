@@ -47,6 +47,14 @@ data class SupportedCard(
     val power: String? = null,
     val toughness: String? = null,
     val keywords: List<String> = emptyList(),
+    /** Set of the printing Argentum ships (upper case), when known. */
+    val setCode: String? = null,
+    /** COMMON / UNCOMMON / RARE / MYTHIC. Argentum omits the field for commons. */
+    val rarity: String? = null,
+    /** Argentum's legalFormats lists COMMANDER; null when the asset had no legality data. */
+    val commanderLegal: Boolean? = null,
+    /** Other face names (back face of a double-faced card, halves of a split card). */
+    val faceNames: List<String> = emptyList(),
 ) {
     val manaValue: Double get() = manaValueOf(manaCost)
     // The authoritative override wins; otherwise rules-text mana symbols are also part of
@@ -101,6 +109,8 @@ class SupportedCardCatalog(cards: List<SupportedCard>) {
     }
 
     val size: Int get() = playable.size
+    /** Every playable (non-token) card, sorted by name; the card library's source of truth. */
+    val playableCards: List<SupportedCard> get() = playable
     val customCount: Int get() = playable.count { it.custom }
 
     /** The library's card for [name], also matching a double-faced card listed by both faces. */
@@ -209,7 +219,33 @@ class SupportedCardCatalog(cards: List<SupportedCard>) {
                 power = jsonCreatureStat(line, "power"),
                 toughness = jsonCreatureStat(line, "toughness"),
                 keywords = jsonKeywordList(line),
+                setCode = topLevelValue(line, "setCode")?.takeIf { it.startsWith('"') }?.drop(1)?.substringBefore('"')?.uppercase(Locale.ROOT),
+                rarity = Regex("\"rarity\":\"([A-Z_]+)\"").find(line)?.groupValues?.get(1) ?: "COMMON".takeIf { kind == "card" && line.contains("\"metadata\":") },
+                commanderLegal = topLevelValue(line, "legalFormats")?.takeIf { it.startsWith('[') }?.substringBefore(']')?.contains("\"COMMANDER\""),
+                faceNames = faceNamesOf(line, kind),
             )
+        }
+
+        /** Back-face and split/adventure face names, so a search for either half finds the card. */
+        private fun faceNamesOf(line: String, kind: String): List<String> {
+            if (kind == "token") return emptyList()
+            val names = mutableListOf<String>()
+            topLevelValue(line, "backFace")?.takeIf { it.startsWith('{') }?.let { jsonString(it, "name") }?.let(names::add)
+            topLevelValue(line, "cardFaces")?.takeIf { it.startsWith('[') }?.let { faces ->
+                // Each face object starts at depth 1 of the array; its first key is its own name.
+                var depth = 0; var quoted = false; var escaped = false
+                for (i in faces.indices) {
+                    val c = faces[i]
+                    if (quoted) { when { escaped -> escaped = false; c == '\\' -> escaped = true; c == '"' -> quoted = false }; continue }
+                    when (c) {
+                        '"' -> quoted = true
+                        '[' -> depth++
+                        '{' -> { if (depth == 1 && faces.startsWith("{\"name\":\"", i)) jsonString(faces.substring(i, minOf(faces.length, i + 400)), "name")?.let(names::add); depth++ }
+                        '}', ']' -> { depth--; if (depth == 0) break }
+                    }
+                }
+            }
+            return names.distinct()
         }
 
         /**

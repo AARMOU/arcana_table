@@ -296,6 +296,8 @@ internal class TableController(
         runCatching { AppPreconDeck("bloomburrow_peace_offering", "Bloomburrow: Peace Offering", "Ms. Bumbleflower", context.assets.open("precons/bloomburrow_peace_offering.txt").bufferedReader().use { it.readText() }) }.getOrNull()
     ).filterNotNull()
     var savedDecksOpen by run { mutableStateOf(false) }
+    /** Developer-preview deck builder (see [DeckBuilderFlag]). */
+    var deckBuilderOpen by run { mutableStateOf(false) }
     var localDeckSyncConfirmed by run { mutableStateOf(false) }
     // Structured, redacted diagnostic log (DiagnosticLog.kt). Legacy free-text entries are migrated on load.
     val diagnosticLog = run { DiagnosticLog().apply { restore(optionPrefs.getString("diagnostic_events", "").orEmpty()) } }

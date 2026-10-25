@@ -89,7 +89,7 @@ private fun isCommanderCandidate(card: SupportedCard?): Boolean =
  * Conservative pair eligibility; an unknown catalog entry is NOT approval.
  * This does not assert comprehensive Commander format legality.
  */
-private fun hasLegalCommanderPair(names: List<String>, catalog: SupportedCardCatalog): Boolean {
+internal fun hasLegalCommanderPair(names: List<String>, catalog: SupportedCardCatalog): Boolean {
     if (names.size != 2 || names[0].equals(names[1], true)) return false
     val a = catalog.find(names[0])
     val b = catalog.find(names[1])
