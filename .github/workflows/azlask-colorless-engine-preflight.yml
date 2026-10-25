@@ -1,0 +1,102 @@
+name: Azlask exact colorless death pinned-engine preflight
+# Read-only source-built temporary runtime, never commit/replace Arcana JARs or enable card assets.
+on:
+  push:
+    branches: [gpt/azlask-complete-oracle-20261025]
+    paths:
+      - 'engine-upgrade/azlask/**'
+      - '.github/workflows/azlask-colorless-engine-preflight.yml'
+  pull_request:
+    branches: [gpt/arcana-integration-next]
+    paths:
+      - 'engine-upgrade/azlask/**'
+      - '.github/workflows/azlask-colorless-engine-preflight.yml'
+permissions:
+  contents: read
+concurrency:
+  group: azlask-pinned-source-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  azlask-source-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: argentum-engine
+          persist-credentials: false
+      - name: Enforce pinned source and apply exact LKI source patch
+        run: |
+          set -euo pipefail
+          test "$(git -C argentum-engine rev-parse HEAD)" = 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          file="$GITHUB_WORKSPACE/engine-upgrade/azlask/patches/0001-exactly-colors-death-lki.patch"
+          git -C argentum-engine apply --check "$file"
+          git -C argentum-engine apply "$file"
+          git -C argentum-engine diff --check
+          git -C argentum-engine diff --stat
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Compile patched pinned engine and SDK, no production files
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar
+      - name: Inject temporary verified jars only on this runner
+        run: |
+          python3 - <<'PY'
+          import hashlib, shutil, zipfile, struct
+          from pathlib import Path
+          libs=Path("android/app/libs")
+          markers={"mtg-sdk":"com/wingedsheep/sdk/model/CardDefinition.class",
+                   "mtg-sdk-tooling":"com/wingedsheep/sdk/tooling/CardLoader.class",
+                   "rules-engine":"com/wingedsheep/engine/core/GameAction.class",
+                   "ai":"com/wingedsheep/ai/engine/AIPlayer.class"}
+          for module, identifier in markers.items():
+              jars=[f for f in Path(f"argentum-engine/{module}/build/libs").glob("*.jar")
+                    if "sources" not in f.name and "javadoc" not in f.name
+                    and identifier in zipfile.ZipFile(f).namelist()]
+              assert len(jars)==1,(module,jars)
+              target=libs/f"argentum-{module}.jar"
+              shutil.copyfile(jars[0],target)
+              with zipfile.ZipFile(target) as z:
+                  versions=[struct.unpack(">H",z.read(n)[6:8])[0] for n in z.namelist() if n.endswith(".class")]
+              assert versions and max(versions)<=61,(module,max(versions))
+              print("temporary runner-only",target,hashlib.sha256(target.read_bytes()).hexdigest())
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Run three strict Azlask engine scenarios on temporary source-built runtime
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.AzlaskTheSwellingScourgeScenarioTest'
+      - name: Enforce all three executed with zero failure/skip
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          items=list(Path("android/custom-cards/build/test-results/test").glob("TEST-*AzlaskTheSwellingScourgeScenarioTest.xml"))
+          assert len(items)==1,f"Expected exactly one Azlask XML report; got {items}"
+          root=ET.parse(items[0]).getroot()
+          counts={key:int(root.get(key,0)) for key in ("tests","failures","errors","skipped")}
+          print("Azlask strict engine tests:",counts)
+          assert counts["tests"] >= 3
+          assert counts["failures"] == counts["errors"] == counts["skipped"] == 0
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: azlask-pinned-engine-source-evidence
+          retention-days: 14
+          path: |
+            android/custom-cards/build/test-results/test/TEST-*AzlaskTheSwellingScourgeScenarioTest.xml
