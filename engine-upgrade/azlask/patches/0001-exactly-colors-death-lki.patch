@@ -1,0 +1,22 @@
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
+@@ -1429,10 +1429,18 @@
+             fun matchesLkiPredicate(predicate: com.wingedsheep.sdk.scripting.predicates.CardPredicate): Boolean {
+                 if (liveEntryTypes.isNotEmpty()) {
+                     projectedCardTypeMatch(predicate, liveEntryTypes, isFaceDown)?.let { return it }
+                 }
+                 return when (predicate) {
++                    is com.wingedsheep.sdk.scripting.predicates.CardPredicate.HasExactlyColors -> {
++                        // An exiting permanent must be matched by its last-known projected colors,
++                        // not its printed colors in the graveyard (CR 603.10). This also covers tokens
++                        // swept after death, whose live entity may no longer exist.
++                        val colorsAtEvent = if (event.isBattlefieldDeparture) event.lastKnown?.colors
++                            else projected.getColors(event.entityId)
++                        colorsAtEvent?.size == predicate.count
++                    }
+                     is com.wingedsheep.sdk.scripting.predicates.CardPredicate.IsCreature -> {
+                         // For dying creatures: use base state (they're already in graveyard)
+                         // Face-down permanents are 2/2 creatures (Rule 708.2) and count.
+                         isFaceDown || typeLine?.isCreature == true
+                     }
