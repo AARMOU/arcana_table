@@ -4,7 +4,7 @@ name: Argentum Eldrazi source compatibility
 # No jar publication, branch mutation, APK signing or deploy.
 on:
   push:
-    branches: [gpt/argentum-eldrazi-join-preflight-20261025]
+    branches: [gpt/argentum-eldrazi-join-preflight-20261025, gpt/argentum-eldrazi-fullhistory-3way-20261025]
     paths: [.github/workflows/argentum-eldrazi-source-compat.yml]
 permissions:
   contents: read
@@ -113,7 +113,16 @@ jobs:
           repository: wingedsheep/argentum-engine
           ref: c38f145359c342a04f951b7ba48f741bcb1627ac
           path: combined-argentum
+          fetch-depth: 0  # full source history, including patch base blobs needed by git apply --3way
           persist-credentials: false
+      - name: Verify three-way base blob availability (read-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for sha in 4b9ad564e0 502fcf5dc7 9dafe60071; do
+            git -C combined-argentum cat-file -e "$sha^{blob}"
+            echo "Base Git blob available: $sha"
+          done
       - name: Strict patch-series applicability on upgraded upstream
         shell: bash
         run: |
