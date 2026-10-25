@@ -1,0 +1,52 @@
+name: Ugin loyalty regression — Eldrazi candidate
+on:
+  push:
+    branches: [gpt/ugin-loyalty-per-turn-regressions-20261025]
+    paths:
+      - '.github/workflows/ugin-loyalty-regression.yml'
+      - 'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  ugin-real-engine:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@dded0888837ed1f317902acf8a20df0ad188d1654
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Install pinned Android SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Execute all Ugin real-engine regressions
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.UginTheIneffableScenarioTest'
+      - name: Fail closed on missing, skipped, or failed tests
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          p = Path('android/custom-cards/build/test-results/test/TEST-com.arcanatable.customcards.UginTheIneffableScenarioTest.xml')
+          assert p.is_file(), 'Missing Ugin scenario XML'
+          root = ET.parse(p).getroot()
+          cases = {c.get('name'): c for c in root.iter('testcase')}
+          required = {'plusOneCannotBeActivatedTwiceInOneTurn', 'minusThreeCannotFollowPlusOneInSameTurn'}
+          assert required <= cases.keys(), ('Missing new tests', sorted(required - cases.keys()))
+          assert len(cases) >= 9, ('Unexpectedly few Ugin tests', len(cases))
+          for name, case in cases.items():
+              assert not any(case.find(x) is not None for x in ('failure','error','skipped')), ('Nonpassing Ugin test', name)
+          print('Ugin real-engine scenarios passed:', len(cases))
+          PY
+      - name: Preserve exact test evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ugin-loyalty-regression-evidence
+          retention-days: 14
+          if-no-files-found: warn
+          path: android/custom-cards/build/test-results/test/TEST-*UginTheIneffable*.xml
