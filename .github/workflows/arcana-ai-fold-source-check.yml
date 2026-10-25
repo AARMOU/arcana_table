@@ -62,7 +62,7 @@ jobs:
           git apply ../arcana/investigation/ai-strength/engine-candidates/0001-fold-same-event-duplicate-damage.patch
           git diff --check
           git diff --stat
-      - name: Green test: same-event duplicates, across-event sums and prior simultaneous damage suite
+      - name: 'Green test: same-event duplicates, across-event sums and prior simultaneous damage suite'
         working-directory: engine
         run: |
           ./gradlew --no-daemon --max-workers=2 --rerun-tasks :rules-engine:test \
