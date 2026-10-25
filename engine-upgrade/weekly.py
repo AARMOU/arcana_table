@@ -200,6 +200,57 @@ def conflict_markdown(report):
     return "\n".join(lines)
 
 
+# ---------------------------------------------------------------- docs
+
+VENDORED = ROOT / "docs/agents/argentum-upstream"
+VENDOR_FILES = {  # Arcana copy -> upstream path (docs/agents/argentum-upstream/README.md)
+    "card-sdk-language-reference.md": "docs/card-sdk-language-reference.md",
+    "sdk-index.md": "docs/sdk-index.md",
+    "add-card-examples.md": ".agents/skills/add-card/examples.md",
+}
+# Files that state the pinned upstream commit. Only the pin may change in them
+# (engine-upgrade/candidate_scope.py enforces that on the publish side).
+PIN_FILES = ("AGENTS.md", "docs/agents/CARD-WORKFLOW.md", "docs/agents/argentum-upstream/README.md",
+             "tools/cardkit/cardkit_lib/repo.py")
+
+
+def short_pin(sha):
+    return f"`{sha[:7]}\u2026`"
+
+
+def docs(engine_dir):
+    """Keep agent-facing docs on the new pin: re-vendor upstream's DSL docs and move the stated pin.
+
+    The SDK index (docs/agents/generated/sdk-api.*) is regenerated from the new jar by
+    `tools/cardkit/cardkit sdk-index` in the workflow, right after this.
+    """
+    engine = Path(engine_dir).resolve()
+    report = json.loads((OUT / "rebase.json").read_text())
+    old, new = report["old_pin"], report["target"]
+    if not all(re.fullmatch(r"[0-9a-f]{40}", x) for x in (old, new)):
+        raise SystemExit(f"Bad pins: {old!r} -> {new!r}")
+    missing = []
+    for name, upstream in VENDOR_FILES.items():
+        shown = run("git", "show", f"{new}:{upstream}", cwd=engine, check=False)
+        if shown.returncode:
+            missing.append(upstream)
+        else:
+            (VENDORED / name).write_text(shown.stdout)
+    stale = []
+    for rel in PIN_FILES:
+        path = ROOT / rel
+        text = path.read_text()
+        if old not in text and short_pin(old) not in text:
+            stale.append(rel)  # the file does not state the pin we are moving from
+        path.write_text(text.replace(old, new).replace(short_pin(old), short_pin(new)))
+    write("docs.json", {"old_pin": old, "new_pin": new, "missing_upstream_docs": missing, "pin_not_found": stale})
+    for item in missing:
+        print(f"::error title=Vendored doc gone upstream::{item}")
+    for item in stale:
+        print(f"::error title=Pin not found::{item} does not mention {old[:10]}")
+    return 1 if missing or stale else 0
+
+
 # ---------------------------------------------------------------- install
 
 def install(engine_dir):
@@ -389,4 +440,4 @@ def summary(results_dir):
 
 if __name__ == "__main__":
     command, *args = sys.argv[1:]
-    sys.exit({"rebase": rebase, "install": install, "cards": cards, "summary": summary}[command](*args) or 0)
+    sys.exit({"rebase": rebase, "install": install, "docs": docs, "cards": cards, "summary": summary}[command](*args) or 0)
