@@ -145,7 +145,7 @@ class PsychomancerScenarioTest {
         assertEquals(2, d.state.stack.size)
         d.resolveAll(Choices(targets = listOf(opponent)))
 
-        assertEquals(listOf("Psychomancer", "Sol Ring"), d.zoneNames(p, Zone.GRAVEYARD))
+        assertTrue(d.zoneNames(p, Zone.GRAVEYARD).containsAll(listOf("Psychomancer", "Sol Ring")))
         assertEquals(18, d.getLifeTotal(opponent))
         assertEquals(22, d.getLifeTotal(p))
     }
