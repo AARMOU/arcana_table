@@ -18,7 +18,6 @@ private fun immunityFromEachColor(target: EffectTarget) =
         Effects.GrantProtectionFromColor(Color.RED, target, Duration.EndOfTurn) then
         Effects.GrantProtectionFromColor(Color.GREEN, target, Duration.EndOfTurn)
 
-// CARDKIT-SCAFFOLD: unregistered candidate; real scenario CI must pass before registration.
 val EldritchImmunity = card("Eldritch Immunity") {
     manaCost = "{C}"
     colorIdentity = ""
