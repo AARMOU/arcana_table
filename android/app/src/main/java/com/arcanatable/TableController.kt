@@ -296,6 +296,8 @@ internal class TableController(
         runCatching { AppPreconDeck("bloomburrow_peace_offering", "Bloomburrow: Peace Offering", "Ms. Bumbleflower", context.assets.open("precons/bloomburrow_peace_offering.txt").bufferedReader().use { it.readText() }) }.getOrNull()
     ).filterNotNull()
     var savedDecksOpen by run { mutableStateOf(false) }
+    /** Developer-preview deck builder (see [DeckBuilderFlag]). */
+    var deckBuilderOpen by run { mutableStateOf(false) }
     var localDeckSyncConfirmed by run { mutableStateOf(false) }
     // Structured, redacted diagnostic log (DiagnosticLog.kt). Legacy free-text entries are migrated on load.
     val diagnosticLog = run { DiagnosticLog().apply { restore(optionPrefs.getString("diagnostic_events", "").orEmpty()) } }
@@ -1365,13 +1367,29 @@ internal class TableController(
     }
 
     fun importDeck(text: String, saveAsMine: Boolean = true) {
-        val entries = parseDeckList(text)
-        if (entries.isEmpty()) { importError = "No card names found. Try a list such as ‘2 Sol Ring’."; return }
+        val initial = parseDeckListDetailed(text)
+        if (initial.gameBlockers.isNotEmpty()) {
+            importError = initial.gameBlockers.joinToString(" ") + " " +
+                initial.diagnostics.take(3).joinToString(" ")
+            return
+        }
+        if (initial.playableEntries.isEmpty()) { importError = "No card names found. Try a list such as ‘2 Sol Ring’."; return }
         importing = true
         importError = null
         scope.launch {
             try {
-                val found = Scryfall.lookup(entries).toMutableMap()
+                val catalog = loadSupportCatalog()
+                val parsed = parseDeckListDetailed(text, catalog)
+                if (parsed.gameBlockers.isNotEmpty()) {
+                    importError = parsed.gameBlockers.joinToString(" ") + " " +
+                        parsed.diagnostics.take(3).joinToString(" ")
+                    return@launch
+                }
+                val entries = parsed.playableEntries
+                val found = offlineImportMatches(entries, catalog).toMutableMap()
+                // Scryfall enriches supported local definitions when reachable. Failed requests
+                // must never discard the bundled definitions or a player's unknown card name.
+                found.putAll(Scryfall.lookup(entries))
                 val autoFixedEntries = mutableSetOf<DeckEntry>()
                 val autoFixedNames = mutableListOf<Pair<String, String>>()
                 val unmatchedEntries = entries.filterNot { it in found }
@@ -1395,7 +1413,9 @@ internal class TableController(
                     val nameConflict = match != null && !match.name.equals(entry.name, ignoreCase = true) && entry !in autoFixedEntries
                     val issue = when {
                         nameConflict -> "Requested ${entry.name}, but ${entry.setCode?.uppercase()} #${entry.collectorNumber} resolves to ${match?.name}. You’ll need to resolve it manually in the editor."
-                        match == null && printingRequested -> "Could not verify ${entry.name} in ${entry.setCode?.uppercase()} #${entry.collectorNumber}. You’ll need to resolve it manually in the editor."
+                        printingRequested && (match?.setCode?.equals(entry.setCode, ignoreCase = true) != true ||
+                            match.collectorNumber?.equals(entry.collectorNumber, ignoreCase = true) != true) ->
+                            "Could not verify the requested printing of ${entry.name} in ${entry.setCode?.uppercase()} #${entry.collectorNumber}. Offline rules data may still be available; check the printing in the editor."
                         match == null -> "Could not match ‘${entry.name}’ to a Magic card. You’ll need to resolve it manually in the editor."
                         else -> null
                     }
@@ -1599,7 +1619,13 @@ internal class TableController(
         return when {
             precon != null -> parseDeckList(precon.decklist).let { entries -> entries.flatMap { entry -> List(entry.count) { entry.name } } to precon.commander }
             premade != null -> premade.cards to premade.commander
-            saved != null -> parseDeckList(saved.text).let { e -> e.flatMap { x -> List(x.count) { x.name } } to (saved.commander ?: e.firstOrNull { it.commander }?.name) }
+            saved != null -> parseDeckList(saved.text).let { e ->
+                val commander = saved.commander ?: e.firstOrNull { it.commander }?.name
+                val names = e.flatMap { x -> List(x.count) { x.name } }
+                // An MTGO sideboard commander can be inferred during import but is not
+                // present in the compatibility parser's playable entries without a catalog.
+                (if (commander != null && names.none { it.equals(commander, true) }) names + commander else names) to commander
+            }
             else -> seat?.takeIf { it.deckLoaded }?.let { (it.library + it.hand).filterNot { c -> c.isToken || c.name == "Hidden card" }.map { c -> c.name } }.orEmpty() to
                 seat?.takeIf { it.deckLoaded }?.commanderName?.takeIf(String::isNotBlank)
         }
@@ -1771,6 +1797,13 @@ internal class TableController(
         argentumLastError = null
         scope.launch {
             try {
+                // Saved text might predate current parsing. Refuse unplayable partner/companion
+                // decks rather than losing a commander when the singular engine slot starts.
+                activeDeckId?.let { id -> savedDecks.firstOrNull { it.name == id } }?.let { saved ->
+                    val parsed = parseDeckListDetailed(saved.text, loadSupportCatalog())
+                    val blockers = parsed.gameBlockers
+                    if (blockers.isNotEmpty()) error(blockers.joinToString(" ") + " " + parsed.diagnostics.take(3).joinToString(" "))
+                }
                 val (names, commander) = activeDeckCards()
                 val started = System.currentTimeMillis()
                 val prepared = prepareOfflineSetup(names, commander, offlineAiDeckId, offlineAiCount)

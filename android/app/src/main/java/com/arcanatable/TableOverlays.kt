@@ -252,8 +252,7 @@ internal fun TableController.TableOverlays() {
                 onOnlineHost = { playSheetOpen = false; run { startWifiHost(online = true) } },
                 onOnlineJoin = { playSheetOpen = false; run { onlineCodeInput = ""; onlineJoinOpen = true } },
             )
-            if (deckPickerOpen) DeckPickerSheet(deckChoices, activeDeckId,
-                onPick = { choice ->
+            val pickDeck: (DeckChoice) -> Unit = { choice ->
                     deckPickerOpen = false
                     activeDeckId = choice.id; saveActiveDeck(context, choice.id)
                     recordDiagnostic("Deck chosen: ${choice.name}", DiagnosticCategory.ACTION)
@@ -262,9 +261,21 @@ internal fun TableController.TableOverlays() {
                         ?: savedDecks.firstOrNull { it.name == choice.id }?.text
                         ?: premadeDecks.firstOrNull { "builtin:${it.id}" == choice.id }?.let { d -> "Commander\n1 ${d.commander}\nDeck\n" + d.cards.filterNot { it == d.commander }.groupingBy { it }.eachCount().entries.joinToString("\n") { (n, c) -> "$c $n" } }
                     if (text != null) { selectedPlayer = localSeat; importDeck(text, saveAsMine = false) }
-                },
+            }
+            if (deckPickerOpen) DeckPickerSheet(deckChoices, activeDeckId,
+                onPick = pickDeck,
                 onImport = { deckPickerOpen = false; selectedPlayer = localSeat; importError = null; importOpen = true },
-                onDismiss = { deckPickerOpen = false })
+                onDismiss = { deckPickerOpen = false },
+                onDeckBuilder = if (DeckBuilderFlag.enabled) { { deckPickerOpen = false; deckBuilderOpen = true } } else null)
+            if (deckBuilderOpen && DeckBuilderFlag.enabled) DeckManagerDialog(
+                decks = savedDecks,
+                loadCatalog = { loadSupportCatalog() },
+                onDecksChanged = { updated -> savedDecks = updated; saveSavedDecks(context, updated) },
+                onPlay = { deck ->
+                    deckBuilderOpen = false
+                    pickDeck(DeckChoice(deck.name, deck.name, deck.commander, builtIn = false, category = DeckChoiceCategory.OTHER))
+                },
+                onDismiss = { deckBuilderOpen = false })
         }
 
     if (argentumEnabled && argentumSnapshot == null && !homeOpen) {
