@@ -23,7 +23,7 @@ permissions:
   contents: read
   pull-requests: read
 concurrency:
-  group: engine-pr-guard-\${{ github.event_name }}-\${{ github.ref }}
+  group: engine-pr-guard-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   inspect:
@@ -34,14 +34,14 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           # pull_request_target checks out only the reviewed development source.
-          ref: \${{ github.event_name == 'pull_request_target' && 'gpt/arcana-integration-next' || github.ref }}
+          ref: ${{ github.event_name == 'pull_request_target' && 'gpt/arcana-integration-next' || github.ref }}
           persist-credentials: false
       - name: Guard self-tests
         run: python3 -m unittest discover -s engine-upgrade/tests -p test_engine_pr_guard.py -v
       - name: Audit current upstream and all open engine PRs (or this exact PR)
         env:
-          GITHUB_TOKEN: \${{ github.token }}
-          PR_NUMBER: \${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || '' }}
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || '' }}
           PYTHONDONTWRITEBYTECODE: '1'
         run: |
           set -euo pipefail
@@ -57,4 +57,4 @@ jobs:
           name: engine-pr-guard-report
           if-no-files-found: ignore
           retention-days: 14
-          path: \${{ runner.temp }}/engine-pr-guard.json
+          path: ${{ runner.temp }}/engine-pr-guard.json
