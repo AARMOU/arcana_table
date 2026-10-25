@@ -120,7 +120,12 @@ class AzlaskTheSwellingScourgeScenarioTest {
         d.putPermanentOnBattlefield(q, "Plains")
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
         assertNull(d.declareAttackers(p, listOf(spawn), q).error)
-        d.resolveAll()
-        assertTrue("The defender must sacrifice for granted annihilator 1", d.permanentsNamed(q, "Plains").isEmpty())
+        d.bothPass()
+        val decision = d.state.pendingDecision as? com.wingedsheep.engine.core.SelectCardsDecision
+        assertNotNull("Granted annihilator 1 must offer a real permanent-sacrifice choice", decision)
+        assertEquals("The defending player chooses what to sacrifice", q, decision!!.playerId)
+        d.resolveAll(Choices(pick = listOf("Plains")))
+        assertTrue("The defender's chosen Plains must be sacrificed", d.permanentsNamed(q, "Plains").isEmpty())
+        assertEquals("Annihilator must not also sacrifice the unchosen creature", 1, d.permanentsNamed(q, "Grizzly Bears").size)
     }
 }
