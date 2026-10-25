@@ -114,7 +114,7 @@ jobs:
           import xml.etree.ElementTree as ET
           suites = {
               "engine": ("argentum-engine", "EldraziTempleManaRestrictionTest", 5),
-              "android": ("android/custom-cards", "EldraziTempleScenarioTest", 6),
+              "android": ("android/custom-cards", "EldraziTempleScenarioTest", 7),
           }
           total = 0
           for name, (root, class_name, minimum) in suites.items():
