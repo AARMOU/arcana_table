@@ -1,7 +1,8 @@
 # Finishing a red weekly Argentum upgrade
 
-For whoever picks up a weekly upgrade that did not come back green: Claude (engine lane) or GPT (covering
-when Claude is unavailable, and always for card decisions). Coordination is issue #81. The owner merges.
+For any authorized worker picking up a red weekly upgrade (GPT, Claude, Copilot when explicitly
+assigned, or a human). There is no single required engine worker. Coordination is issue #81; record
+the latest exact head, upstream SHA, failed gate and recovery commands. The owner approves merges.
 
 Every red run already contains a **Handoff** section (in the draft PR or the issue, and in the run summary)
 with these commands filled in for that run: the upstream commit, the branch to start from and a fix-branch
@@ -11,8 +12,8 @@ name. This page explains them.
 
 | The run says | Where it is reported | Start from | Lane |
 |---|---|---|---|
-| `blocked: patch conflict` | issue | `origin/gpt/arcana-integration-next` | engine (Claude; GPT covers) |
-| `blocked: engine build failed` | issue (compiler errors listed) | `origin/bot/argentum-weekly` | engine (Claude; GPT covers) |
+| `blocked: patch conflict` | issue | `origin/gpt/arcana-integration-next` | available authorized engine worker |
+| `blocked: engine build failed` | issue (compiler errors listed) | `origin/bot/argentum-weekly` | available authorized engine worker |
 | `(needs work)`: custom-card collision | draft PR from `bot/argentum-weekly` | `origin/bot/argentum-weekly` | cards (GPT) |
 | `(needs work)`: failing test or lost precon slot | draft PR | `origin/bot/argentum-weekly` | whoever owns the failing area |
 
@@ -110,3 +111,33 @@ the six-precon manifest uses no longer resolves: find out whether upstream renam
   commit; anything else stops the next weekly run.
 - Weaken or skip a test, or add a collision exemption.
 - Merge, release, sign or publish. Those are the owner's.
+
+## Engine PR compatibility and split-landing rule
+
+Every engine-changing PR must record its exact Argentum `TARGET` pin and register every
+required patch in `engine-upgrade/audit_patches.py` **MANDATORY**. Do not count an
+unregistered or experimental patch as included in a shippable runtime. Keep the patch plus its
+positive/negative engine regressions in an **engine-only PR** against development; land this
+separately after passing tests and owner review, before the related card/UI work. Do not
+fast-forward production, replace committed runtime JARs or merge automatically.
+
+The read-only `argentum-engine-pr-guard.yml` inspects engine PRs on change and weekly:
+it fails for a stale pin relative to development or a mandatory patch omitted from its audit,
+and warns for an older upstream SHA or engine patches isolated on long-lived PRs.
+The warning proves only **drift**, not a compilation or functional incompatibility.
+When drift appears, use this runbook and `weekly.py rebase` / `weekly.py finish`;
+rerun the actual upgraded-engine + card/Android tests to certify the combination.
+
+### Same resolution command, every worker
+
+For a patch clash, use `python3 engine-upgrade/weekly.py rebase argentum-engine <UPSTREAM_SHA> --keep-conflict`,
+resolve each conflicting file in that isolated checkout, stage and continue Git rebase.
+Then run `python3 engine-upgrade/weekly.py finish argentum-engine`. This writes the
+refreshed patch files, updated pin and reusable `engine-upgrade/rerere/` records. Commit
+all relevant files **together** and push the isolated fix branch for its read-only dry run.
+
+Do **not** claim a conflict was resolved merely because `git apply --3way` succeeded or
+a prior patch compiled on an earlier upstream version. Save source/test evidence and
+the exact new upstream commit in issue #81, so the next available worker can proceed
+without reconstructing another worker's scratchpad. Separate engine and card/UI PRs
+must still be tested in a **single** integrated APK candidate before release.

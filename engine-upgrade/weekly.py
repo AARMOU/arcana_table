@@ -304,7 +304,7 @@ def conflict_markdown(report):
 
 
 def handoff(kind, upstream, run_url=""):
-    """Write weekly/handoff.md: exact next steps for whoever picks up a red run (Claude, or GPT covering).
+    """Write weekly/handoff.md: exact next steps for any authorized worker resuming a red run.
     KIND: conflict | build_failed | needs_work."""
     import datetime
     day = datetime.date.today().isoformat()
@@ -344,8 +344,8 @@ def handoff(kind, upstream, run_url=""):
                  f"git push -u origin {fix}   # starts a dry run automatically (read-only, publishes nothing)"]
         goal = "every check in the table above is green"
     lines = ["### Handoff", "",
-             f"**Who:** engine fixes are Claude's lane; GPT finishes when Claude is unavailable (issue #81). Card "
-             f"decisions are GPT's lane. Full runbook: `engine-upgrade/HANDOFF.md`.", "",
+             f"**Who:** any available authorized worker (GPT, Claude, or an assigned human/agent) may resume "
+             f"from this exact GitHub handoff (issue #81). Full runbook: `engine-upgrade/HANDOFF.md`.", "",
              f"**Done when:** {goal}, and the dry run on `{fix}` is green except for anything listed as a card "
              f"decision. Then open a draft PR from `{fix}` into `gpt/arcana-integration-next`, link this run, post on #81. "
              "The owner merges.", "",
