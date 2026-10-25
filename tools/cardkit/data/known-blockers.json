@@ -127,6 +127,11 @@
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
+    "Twins of Discord": {
+      "reason": "Its static ability grants bloodthirst 2 to other colorless creatures. Pinned Argentum SDK Keyword enum has no BLOODTHIRST; no source-verified grantable replacement/counter-on-entry mechanism has been demonstrated. Do not approximate with a fixed +1/+1 anthem or unconditional counters.",
+      "source": "wingedsheep/argentum-engine@61e71e586b100faa661f86cac827ac3c3bbb5a78 mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt; #150 Oracle audit 2026-10-25",
+      "verified": false
+    },
     "Vadrok, Apex of Thunder": {
       "reason": "mutate plus free cast from graveyard combination",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
@@ -157,6 +162,11 @@
     "More Than Meets the Eye": {
       "reason": "converting is not represented",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Transformers cards)",
+      "verified": true
+    },
+    "Bloodthirst": {
+      "reason": "Pinned SDK Keyword enum lacks BLOODTHIRST, including bloodthirst N as a grantable ETB replacement; cannot silently substitute counters or a permanent stat buff.",
+      "source": "wingedsheep/argentum-engine@61e71e586b100faa661f86cac827ac3c3bbb5a78 mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt",
       "verified": true
     }
   },
