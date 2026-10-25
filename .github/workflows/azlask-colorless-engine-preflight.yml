@@ -117,10 +117,68 @@ jobs:
           assert counts["tests"] >= 3
           assert counts["failures"] == counts["errors"] == counts["skipped"] == 0
           PY
+      - name: Register Azlask ONLY in disposable runner workspace
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt")
+          s = p.read_text()
+          marker = "        // Eldrazi Incursion.\n"
+          assert s.count(marker) == 1, "Registry changed, fail closed"
+          assert "Entry(AzlaskTheSwellingScourge," not in s, "Already registered in source; review before retry"
+          p.write_text(s.replace(marker, marker + '        Entry(AzlaskTheSwellingScourge, "M3C", "Eldrazi Incursion"),\n'))
+          print("Runner only: registered Azlask in CustomCards.kt (not committed)")
+          PY
+      - name: Export runner-only Azlask card and validate exact names
+        working-directory: android
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          assets = Path("app/src/main/assets/argentum")
+          names = [x.split("\t")[0] for x in (assets/"custom-cards.index.tsv").read_text().splitlines() if x.strip()]
+          exported = [json.loads(x)["name"] for x in (assets/"custom-cards.jsonl").read_text().splitlines() if x.strip()]
+          assert names == exported, "Index/export mismatch"
+          assert names.count("Azlask, the Swelling Scourge") == 1, "Missing or duplicate Azlask definition"
+          assert len(names) == len({n.casefold() for n in names}), "Duplicate names in registry"
+          print(f"Runner-only index consistent: {len(names)} exported definitions, exactly one Azlask")
+          PY
+      - name: Run full custom-card and Android debug unit tests against patched engine
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
+      - name: Enforce full test XML results (no missing, failed, or skipped suites)
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for label, location in [
+              ("custom", Path("android/custom-cards/build/test-results/test")),
+              ("android", Path("android/app/build/test-results/testDebugUnitTest")),
+          ]:
+              files=list(location.glob("TEST-*.xml"))
+              assert files, f"{label}: no test XML found"
+              totals = {key: 0 for key in ("tests","failures","errors","skipped")}
+              for p in files:
+                  suite=ET.parse(p).getroot()
+                  for key in totals:
+                      totals[key] += int(suite.get(key, 0))
+              print(label, totals)
+              assert totals["tests"] > 0, f"{label}: no tests executed"
+              assert totals["failures"] == totals["errors"] == totals["skipped"] == 0, (
+                  f"{label}: failed/errored/skipped test, no playable claim"
+              )
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: azlask-pinned-engine-source-evidence
           retention-days: 14
           path: |
-            android/custom-cards/build/test-results/test/TEST-*AzlaskTheSwellingScourgeScenarioTest.xml
+            android/custom-cards/build/test-results/test/TEST-*.xml
+            android/app/build/test-results/testDebugUnitTest/TEST-*.xml
+            android/app/src/main/assets/argentum/custom-cards.index.tsv
