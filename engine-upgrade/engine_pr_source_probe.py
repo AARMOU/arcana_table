@@ -22,6 +22,21 @@ from pathlib import Path
 from engine_pr_guard import Api, MANDATORY_RE, PIN_RE, SHA_RE, REPO_RE, read_pin, read_mandatory
 
 ROOT = Path(__file__).resolve().parent.parent
+
+
+def trusted_baseline(expected_dev_sha: str) -> Path:
+    """Read only from an exact checked-out development commit, never the PR head."""
+    value = os.environ.get("ARCANA_TRUSTED_BASE", "")
+    root = Path(value).resolve() if value else ROOT
+    if not (root / "argentum-patches").is_dir() or not (root / "engine-upgrade/weekly.py").is_file():
+        raise ValueError("Trusted development patch checkout not present; cannot test source")
+    if value:
+        result = command(["git", "-C", str(root), "rev-parse", "HEAD"], cwd=root, timeout=20)
+        if result.returncode or result.stdout.strip() != expected_dev_sha:
+            raise ValueError("Development head changed during scan; re-run with matching exact SHA")
+    return root
+
+
 SOURCE_PATCH = re.compile(r"^argentum-patches/[0-9]{4}-.+\.patch$")
 EXTRA_PATCH = re.compile(r"^engine-upgrade/.+/patches/[0-9]{4}-.+\.patch$")
 ENGINE_REPO = "https://github.com/wingedsheep/argentum-engine.git"
@@ -152,9 +167,10 @@ def source_rebase(api: Api, row: dict, repo: str, upstream: str) -> dict:
         base = Path(folder)
         source = base / "arcana"
         source.mkdir()
-        shutil.copytree(ROOT / "engine-upgrade", source / "engine-upgrade",
+        trusted = trusted_baseline(row["dev_sha"])
+        shutil.copytree(trusted / "engine-upgrade", source / "engine-upgrade",
                         ignore=shutil.ignore_patterns("weekly", "__pycache__", "*.pyc"))
-        shutil.copytree(ROOT / "argentum-patches", source / "argentum-patches")
+        shutil.copytree(trusted / "argentum-patches", source / "argentum-patches")
         mandatory, extras = stage_pr_patch_data(api, row, source, repo)
         result["mandatory"] = mandatory
         result["extra_patches"] = extras
