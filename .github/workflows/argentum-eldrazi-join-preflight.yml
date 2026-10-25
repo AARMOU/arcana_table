@@ -1,0 +1,95 @@
+name: Argentum plus Eldrazi integration preflight
+# Isolated, read-only conflict/provenance probe. Does not resolve any conflict,
+# commit a mixed runtime, sign or release an APK, or alter development/main.
+on:
+  push:
+    branches: [gpt/argentum-eldrazi-join-preflight-20261025]
+    paths: [.github/workflows/argentum-eldrazi-join-preflight.yml]
+permissions:
+  contents: read
+concurrency:
+  group: argentum-eldrazi-join-preflight-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Compare pinned candidate heads and attempt a strict source merge
+        shell: bash
+        env:
+          UPGRADE_PARENT: e66eca84125c3180c676702a72ae6cd080f85797
+          ELDRAZI_HEAD: 7e6fc1aa8d6ccca30a6fab7fdebc7e08199efbb3
+        run: |
+          set -euo pipefail
+          mkdir -p integration-preflight
+          git diff --quiet && git diff --cached --quiet
+          git merge-base --is-ancestor "$UPGRADE_PARENT" HEAD
+          git fetch --no-tags origin "$ELDRAZI_HEAD"
+          test "$(git rev-parse FETCH_HEAD)" = "$ELDRAZI_HEAD"
+          echo "upgrade=$UPGRADE_PARENT" > integration-preflight/provenance.txt
+          echo "eldrazi=$ELDRAZI_HEAD" >> integration-preflight/provenance.txt
+          echo "preflight=$(git rev-parse HEAD)" >> integration-preflight/provenance.txt
+          echo "merge_base=$(git merge-base "$UPGRADE_PARENT" "$ELDRAZI_HEAD")" >> integration-preflight/provenance.txt
+          echo 'Runtime jar comparison (Git blob IDs, not playability or approval):' | tee integration-preflight/runtime-blobs.txt
+          different=0
+          for p in android/app/libs/argentum-ai.jar android/app/libs/argentum-mtg-sdk.jar android/app/libs/argentum-mtg-sdk-tooling.jar android/app/libs/argentum-rules-engine.jar; do
+            left="$(git rev-parse "$UPGRADE_PARENT:$p")"
+            right="$(git rev-parse "$ELDRAZI_HEAD:$p")"
+            printf '%s upgrade=%s eldrazi=%s\n' "$p" "$left" "$right" | tee -a integration-preflight/runtime-blobs.txt
+            if [ "$left" != "$right" ]; then different=$((different+1)); fi
+          done
+          echo "Different committed runtime jars: $different of 4" | tee -a integration-preflight/runtime-blobs.txt
+          git config user.name arcana-integration-preflight
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          set +e
+          git merge --no-commit --no-ff --no-edit "$ELDRAZI_HEAD" > integration-preflight/merge-output.txt 2>&1
+          merge_code=$?
+          set -e
+          git ls-files -u > integration-preflight/unmerged-index.txt
+          git diff --name-only --diff-filter=U > integration-preflight/conflict-paths.txt
+          git status --short > integration-preflight/worktree-status.txt
+          cat integration-preflight/merge-output.txt
+          echo "merge_exit=$merge_code" >> integration-preflight/provenance.txt
+          echo "conflict_count=$(wc -l < integration-preflight/conflict-paths.txt)" >> integration-preflight/provenance.txt
+          {
+            echo '### Upgrade + 93-slot Eldrazi merge preflight'
+            echo ''
+            echo "`Upgrade source:` $UPGRADE_PARENT"
+            echo ''
+            echo "`Eldrazi candidate:` $ELDRAZI_HEAD"
+            echo ''
+            echo "Committed runtime JAR blob disagreements: **$different/4**"
+            echo ''
+            echo "Git merge exit: **$merge_code**"
+            echo ''
+            echo '#### Unresolved paths'
+            if test -s integration-preflight/conflict-paths.txt; then
+              sed 's/^/- `/;s/$/`/' integration-preflight/conflict-paths.txt
+            else
+              echo '(none)'
+            fi
+            echo ''
+            echo 'No source or binary resolution is applied automatically. A clean Git merge alone would NOT certify runtime compatibility.'
+          } >> "$GITHUB_STEP_SUMMARY"
+          if test "$merge_code" -ne 0; then
+            echo "::error::The two engine/card candidates conflict. See merge-output and conflict-paths artifacts."
+            exit 1
+          fi
+          if test "$different" -gt 0; then
+            echo "::error::Engine runtimes differ. A fully source-built combined candidate is required before an APK."
+            exit 1
+          fi
+          echo 'No merge conflicts or runtime blob differences observed. Full engine/card/Android CI still required.'
+      - name: Upload precise merge evidence even when blocked
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: argentum-eldrazi-combined-preflight
+          retention-days: 14
+          if-no-files-found: error
+          path: integration-preflight/
