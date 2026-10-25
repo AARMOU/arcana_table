@@ -1,0 +1,26 @@
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
+@@ -3579,11 +3579,20 @@
+             val slot = slots[key]
+             if (slot == null) {
+                 // The caller appends `kept` to `triggers` in order, so this is its final slot.
+                 slots[key] = triggers.size + kept.size
+                 kept.add(pending)
+                 continue
+             }
++            if (slot >= triggers.size) {
++                // The first occurrence is still buffered in this event's `kept` list.
++                // It is not in `triggers` until detectTriggers appends the result.
++                // A duplicate matching trigger in the SAME damage event is one
++                // occurrence (CR 603.2c); do not double-count its damage amount.
++                check(slot - triggers.size in kept.indices) {
++                    "Buffered combat damage trigger slot $slot was not present"
++                }
++                continue
++            }
+             val first = triggers[slot]
+             val ctx = first.triggerContext
+             triggers[slot] = first.copy(triggerContext = ctx.copy(
+                 damageAmount = (ctx.damageAmount ?: 0) + event.amount,
+                 excessDamageAmount = ((ctx.excessDamageAmount ?: 0) + event.excessAmount).takeIf { it > 0 }
