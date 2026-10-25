@@ -6,8 +6,8 @@ Original 100-slot manifest. Category 1 requires a nonempty registered definition
 
 | Category | Slots |
 |---|---:|
-| 1. Fully implemented and tested (reviewed acceptance scope) | 30 |
-| 2. Implemented but missing acceptance tests/evidence | 60 |
+| 1. Fully implemented and tested (reviewed acceptance scope) | 32 |
+| 2. Implemented but missing acceptance tests/evidence | 58 |
 | 3. Implemented but failing tests | 0 |
 | 4. Missing implementation | 2 |
 | 5. Blocked by pinned Argentum capability/runtime | 8 |
@@ -58,8 +58,8 @@ Reported/API-only blockers are distinguished from reproduced failures in each ro
 | Morophon, the Boundless | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `MorophonTheBoundlessScenarioTest.kt` (4 green cases). |
 | Kozilek's Return | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `KozileksReturnScenarioTest.kt` (6 green cases). |
 | World Breaker | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
-| Ruins of Oran-Rief | 1 | 2 | Single scenario; need controlled/colorless/entered-this-turn negative coverage and actual mana mode checks. `RuinsOfOranRiefScenarioTest.kt` (1 green cases). |
-| Sifter of Skulls | 1 | 2 | Single positive death/token scenario; self/opponent/token-death negatives need direct acceptance coverage. `SifterOfSkullsScenarioTest.kt` (1 green cases). |
+| Ruins of Oran-Rief | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `RuinsOfOranRiefScenarioTest.kt` (5 green cases). |
+| Sifter of Skulls | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `SifterOfSkullsScenarioTest.kt` (6 green cases). |
 | Endbringer | 1 | 2 | Nonempty bundled definition inspected, but no reviewed positive/negative card-specific execution against this candidate runtime supplied. Upstream/index presence is not certification. |
 | Corrupted Crossroads | 1 | 5 | Pinned integration runtime lacks exact Devoid-only restriction. PR #192 runner-only candidate at 1bf22a66 has 6 engine + 6 Android scenarios green. Must not substitute generic colorless restriction. Needs separately approved combined runtime integration. |
 | Deepfathom Skulker | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `DeepfathomSkulkerScenarioTest.kt` (3 green cases). |
