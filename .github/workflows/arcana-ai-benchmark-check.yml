@@ -1,0 +1,38 @@
+name: Arcana AI Benchmark Compile Check
+
+# A narrow, read-only check for the opt-in harness. Never runs the expensive games.
+on:
+  pull_request:
+    paths:
+      - 'android/app/src/test/java/com/arcanatable/AiStrengthBenchmarkTest.kt'
+      - 'docs/agents/AI-STRENGTH-BENCHMARK.md'
+      - '.github/workflows/arcana-ai-benchmark-check.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arcana-ai-benchmark-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  headless-harness-compile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Verify benchmark compiles and pure statistical assertions pass
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.AiStrengthBenchmarkTest'
+      - name: Verify Android regex compatibility
+        run: |
+          python3 tools/check_android_regex.py
+          python3 -m unittest discover -s tools/tests -p 'test_android_regex.py'
