@@ -37,6 +37,20 @@ jobs:
           git -C argentum-engine apply "$file"
           git -C argentum-engine diff --check
           git -C argentum-engine diff --stat
+      - name: Compile disposable Argentum source for Android's Java 17 bytecode
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("argentum-engine/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts")
+          raw = p.read_text()
+          assert raw.count("jvmToolchain(21)") == 1, "unexpected upstream convention: fail closed"
+          p.write_text(raw.replace("jvmToolchain(21)", "jvmToolchain(17)", 1))
+          print("Disposable engine module toolchain: Java 17; upstream pin unchanged")
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
