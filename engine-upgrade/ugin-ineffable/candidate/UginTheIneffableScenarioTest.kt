@@ -98,4 +98,58 @@ class UginTheIneffableScenarioTest {
         assertTrue(d.state.getEntity(d.permanentsNamed(p, "Spirit").single())!!
             .get<LinkedExileComponent>()?.exiledIds.orEmpty().isEmpty())
     }
+
+    @Test fun multipleSpiritsKeepIndependentFaceDownLinksAcrossTurns() {
+        val d = customScenario(UginTheIneffable, "Sol Ring")
+        val p = d.player1
+        val ugin = d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+
+        assertNull(d.activate(p, ugin, index = 0).error)
+        d.resolveAll()
+        val firstSpirit = d.permanentsNamed(p, "Spirit").single()
+        val firstExile = d.getExile(p).single()
+
+        // Loyalty abilities are limited to once per turn. Advance through the
+        // opponent's turn before creating a second, independently linked Spirit.
+        d.passPriorityUntil(com.wingedsheep.sdk.core.Step.END, activePlayer = p)
+        d.passPriorityUntil(com.wingedsheep.sdk.core.Step.PRECOMBAT_MAIN, activePlayer = p)
+        assertNull(d.activate(p, ugin, index = 0).error)
+        d.resolveAll()
+
+        val spirits = d.permanentsNamed(p, "Spirit")
+        assertEquals(2, spirits.size)
+        val secondSpirit = spirits.single { it != firstSpirit }
+        val secondExile = d.getExile(p).single { it != firstExile }
+        assertEquals(listOf(firstExile), d.state.getEntity(firstSpirit)!!
+            .get<LinkedExileComponent>()?.exiledIds)
+        assertEquals(listOf(secondExile), d.state.getEntity(secondSpirit)!!
+            .get<LinkedExileComponent>()?.exiledIds)
+
+        // Destroy only the first Spirit via a real engine spell. The other
+        // token and its private exiled card must remain unaffected.
+        val removal = com.wingedsheep.sdk.dsl.card("Ugin First Spirit Removal Probe") {
+            manaCost = "{0}"
+            typeLine = "Instant"
+            spell {
+                effect = com.wingedsheep.sdk.dsl.Effects.Destroy(
+                    target(com.wingedsheep.sdk.scripting.filters.unified.TargetFilter(
+                        com.wingedsheep.sdk.scripting.GameObjectFilter.Creature
+                    ))
+                )
+            }
+        }
+        d.registerCard(removal)
+        val spell = d.putCardInHand(p, removal.name)
+        assertNull(d.castSpell(p, spell, listOf(firstSpirit)).error)
+        d.resolveAll()
+
+        assertEquals(listOf(secondSpirit), d.permanentsNamed(p, "Spirit"))
+        assertTrue(firstExile in d.getHand(p))
+        assertFalse(firstExile in d.getExile(p))
+        assertTrue(secondExile in d.getExile(p))
+        assertFalse(secondExile in d.getHand(p))
+        assertEquals(listOf(secondExile), d.state.getEntity(secondSpirit)!!
+            .get<LinkedExileComponent>()?.exiledIds)
+    }
+
 }
