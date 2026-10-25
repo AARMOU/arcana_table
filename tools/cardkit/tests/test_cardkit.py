@@ -240,6 +240,15 @@ class ReadinessTests(unittest.TestCase):
         v = readiness.classify("Cardkit Test Plaguebearer")
         self.assertEqual(v["readiness"], "ENGINE_BLOCKED")
 
+    def test_twins_of_discord_cannot_be_routed_as_supported_without_bloodthirst(self):
+        # Original Eldrazi Incursion slot. The pinned SDK has no grantable
+        # BLOODTHIRST keyword; matching only the odd/even attack text is not enough.
+        v = readiness.classify("Twins of Discord")
+        self.assertEqual(v["readiness"], "ENGINE_BLOCKED", v["reasons"])
+        self.assertEqual(v["route"], "claude")
+        self.assertIn("Bloodthirst", readiness.blockers()["keywords"])
+        self.assertIn("bloodthirst", " ".join(v["reasons"]).lower())
+
 
 class UnitCommandTests(unittest.TestCase):
     """`cardkit unit` must fail closed: no queue body for anything that is not dispatchable."""
