@@ -152,8 +152,7 @@ jobs:
           grep -F 'upstream cards must not retain shadowing custom definitions' "$path"
           grep -F 'every probed card must remain in the shipped library' "$path"
           git diff --check -- "$path"
-          printf '%s\\n' "DeckSupportTest upstream migration fix PR #233: $TEST_FIX_SHA" \\
-            > combined-evidence/decksupport-regression-fix.txt
+          echo "DeckSupportTest upstream migration fix PR #233: $TEST_FIX_SHA" > combined-evidence/decksupport-regression-fix.txt
       - name: Fetch and verify green upgraded-engine candidate evidence
         shell: bash
         env:
