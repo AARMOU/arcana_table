@@ -58,3 +58,11 @@ Read `docs/agents/generated/sdk-api.md` from development. This index is generate
 **Decision:** **ENGINE INVESTIGATION REQUIRED**. The even/odd filtering and group cannot-block primitives exist, but player choice and attack-event semantics are not yet verified. Bloodthirst ETB replacement granting is an apparent capability gap pending inspection of upstream engine internals. Do **not** substitute an ETB trigger (it differs in timing and counter interactions) or a plain counter-grant effect.
 
 **Next exact-source investigation:** inspect the pinned Argentum implementation of `ReplacementEffect`, continuous static ability granting, `Triggers.you.attacks` semantics, and choice resolution. If the ETB grant is not representable, make a focused engine-source candidate with executable replacement/stacking tests; do not ship a partial card.
+
+## Follow-up SDK evidence — choice and replacement hooks
+
+Additional full-index inspection found `Effects.ChooseAction(List<EffectChoice>, EffectTarget)`, `Effects.ChooseOption(OptionType, String, String, List<String>)`, and `Effects.GrantReplacementEffect(ReplacementEffect, EffectTarget, Duration)`. Thus the earlier statement that there was no directly named parity-choice helper remains literally true, **but general choice mechanisms are available**; investigate `ChooseAction` and `EffectChoice` rather than treating parity selection as a missing primitive. Likewise, `GrantReplacementEffect` exists, but this is not proof that the specific replacement required for bloodthirst can be constructed and applied to future entering creatures via a static continuous effect.
+
+`PlayerTriggerSubject.attacks(GameObjectFilter, Int)` and `attackTriggersAbility()` are present. Inspect their implementation to distinguish attack declaration event vs per-creature attack triggers.
+
+**Current blocker classification:** SDK API shape partially supports the effect; exact behavioral source proof and runnable scenarios are outstanding. No implementation/coverage claim.
