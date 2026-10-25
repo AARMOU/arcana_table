@@ -29,11 +29,7 @@ class CustomCardDataTest {
     @Test
     fun noCustomCardShadowsAnArgentumCard() {
         val library = File(assets, "all-cards.index.tsv").readLines().map { it.substringBefore('\t').lowercase() }.toSet()
-        // The weekly engine upgrade lists cards upstream newly implements in engine-upgrade/shadowed-custom-cards.txt,
-        // so the upgrade can land and retiring each custom copy follows as its own reviewed change.
-        val pending = System.getProperty("arcana.shadowed")?.let(::File)?.takeIf { it.isFile }
-            ?.readLines()?.map { it.trim().lowercase() }?.filter { it.isNotEmpty() }?.toSet().orEmpty()
-        val clashes = CustomCards.all.map { it.name }.filter { it.lowercase() in library && it.lowercase() !in pending }
+        val clashes = CustomCards.all.map { it.name }.filter { it.lowercase() in library }
         assertTrue("Argentum now has these; drop the custom versions: $clashes", clashes.isEmpty())
     }
 

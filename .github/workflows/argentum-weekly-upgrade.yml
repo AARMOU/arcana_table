@@ -1,45 +1,88 @@
 name: Weekly Argentum upgrade
 # Every Monday: move Arcana onto upstream Argentum's latest main, rebuild the engine, check every
-# imported card (custom cards, premade decks) and the full app test suite, then open or refresh one
-# draft PR into development. Nothing merges on its own; the owner approves the PR as usual.
+# imported card (custom cards, premade decks, the six official precons) and the full app test suite,
+# then open or refresh one draft PR into development. Nothing merges on its own.
+#
+# Two security domains (engine-upgrade/tests/test_weekly_workflow.py enforces them):
+#   validate  runs upstream's build scripts with a READ-ONLY token and no stored credentials. It can
+#             change nothing remotely; it uploads a candidate patch, its SHA-256 and the reports.
+#   publish   never runs upstream code. It verifies the candidate's hash and paths, then pushes the bot
+#             branch and opens/updates the PR or the conflict issue. Skipped entirely on dry runs.
 # Uses only GitHub-hosted Actions minutes on this public repo: no Copilot, no paid workers.
 on:
   schedule:
-    - cron: '17 9 * * 1'   # Mondays 09:17 UTC (03:17 Denver)
+    - cron: '17 9 * * 1'   # Mondays 09:17 UTC = 03:17 Denver in summer (MDT), 02:17 in winter (MST)
   workflow_dispatch:
     inputs:
       target:
-        description: 'Upstream commit or branch to upgrade to'
+        description: 'Upstream commit (40 hex) or branch to upgrade to'
         default: main
   push:
-    # A push to the automation's own branch is a dry run: full pipeline, no PR, no issue.
+    # A push to the automation's own branch is a dry run: validate only, nothing published.
     branches: [claude/argentum-weekly-upgrade]
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+permissions: {}
 concurrency:
-  group: argentum-weekly-upgrade
+  group: argentum-weekly-upgrade-${{ github.event_name == 'push' && 'dry-run' || 'live' }}
   cancel-in-progress: false
 env:
   BASE: gpt/arcana-integration-next
-  BOT_BRANCH: ${{ github.event_name == 'push' && 'bot/argentum-weekly-dry-run' || 'bot/argentum-weekly' }}
-  DRY_RUN: ${{ github.event_name == 'push' }}
+  UPSTREAM_URL: https://github.com/wingedsheep/argentum-engine
 jobs:
-  upgrade:
+  validate:
     runs-on: ubuntu-latest
     timeout-minutes: 150
+    permissions:
+      contents: read
+    outputs:
+      status: ${{ steps.final.outputs.status }}
+      green: ${{ steps.report.outputs.green }}
+      base_sha: ${{ steps.base.outputs.sha }}
+      upstream_sha: ${{ steps.target.outputs.sha }}
+      candidate_sha256: ${{ steps.candidate.outputs.sha256 }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'push' && github.ref || env.BASE }}
+          persist-credentials: false
+      - name: Record the exact Arcana base
+        id: base
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: The running workflow is the reviewed copy on the base
+        # A scheduled run uses main's copy of this file; the safety tests below read the base's copy.
+        # They must be the same file, or the tests would certify a workflow that is not the one running.
+        env:
+          RUNNING_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          f=.github/workflows/argentum-weekly-upgrade.yml
+          if [ "$RUNNING_SHA" != "$(git rev-parse HEAD)" ]; then
+            git fetch -q --depth=1 origin "$RUNNING_SHA"
+          fi
+          if ! git diff --exit-code "$RUNNING_SHA" HEAD -- "$f"; then
+            echo "::error title=Workflow drift::$f at $RUNNING_SHA differs from $BASE; sync main with the reviewed copy"
+            exit 1
+          fi
+      - name: Workflow safety checks
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 -m unittest -v engine-upgrade/tests/test_weekly_workflow.py engine-upgrade/tests/test_candidate_scope.py
       - name: Keep the shipped card data for comparison
         run: cp -r android/app/src/main/assets/argentum "$RUNNER_TEMP/old-assets"
-
+      - name: Resolve the upstream target to an exact commit
+        id: target
+        env:
+          REQUESTED: ${{ inputs.target || 'main' }}
+        run: |
+          set -euo pipefail
+          if [[ "$REQUESTED" =~ ^[0-9a-f]{40}$ ]]; then sha="$REQUESTED"
+          else sha=$(git ls-remote "$UPSTREAM_URL" "refs/heads/$REQUESTED" | cut -f1); fi
+          [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "::error::Could not resolve upstream $REQUESTED"; exit 1; }
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "Upstream target: $sha ($REQUESTED)"
       - uses: actions/checkout@v4
         with:
           repository: wingedsheep/argentum-engine
-          ref: main
+          ref: ${{ steps.target.outputs.sha }}
           path: argentum-engine
           fetch-depth: 0
           filter: blob:none
@@ -48,16 +91,17 @@ jobs:
         id: rebase
         run: |
           set +e
-          python3 engine-upgrade/weekly.py rebase argentum-engine "${{ inputs.target || 'origin/main' }}"
+          python3 engine-upgrade/weekly.py rebase argentum-engine "${{ steps.target.outputs.sha }}"
           code=$?
           echo "status=$(python3 -c "import json;print(json.load(open('engine-upgrade/weekly/rebase.json'))['status'])")" >> "$GITHUB_OUTPUT"
           exit $([ $code -eq 2 ] && echo 0 || echo $code)
 
       - name: Prove the refreshed patches apply exactly to the target
+        id: audit
         if: steps.rebase.outputs.status == 'rebased'
+        continue-on-error: true
         run: |
-          target=$(python3 -c "import json;print(json.load(open('engine-upgrade/weekly/rebase.json'))['target'])")
-          git -C argentum-engine checkout -q -f "$target"
+          git -C argentum-engine checkout -q -f "${{ steps.target.outputs.sha }}"
           git -C argentum-engine clean -fdq
           python3 engine-upgrade/audit_patches.py
       - uses: actions/setup-java@v4
@@ -65,48 +109,70 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
-          cache: gradle
-          cache-dependency-path: argentum-engine/**/*.gradle.kts
       - name: Build the four engine jars and export the card library
-        if: steps.rebase.outputs.status == 'rebased'
+        id: build
+        if: steps.rebase.outputs.status == 'rebased' && steps.audit.outcome == 'success'
+        continue-on-error: true
         working-directory: argentum-engine
         run: |
+          set -o pipefail
           ./scripts/gradle-locked --no-daemon --max-workers=2 \
             -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
             '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
-            :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar :arcana-export:run
+            :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar :arcana-export:run \
+            2>&1 | tee "$RUNNER_TEMP/engine-build.log"
+      - name: Collect engine build errors
+        if: steps.audit.outcome == 'failure' || steps.build.outcome == 'failure'
+        run: |
+          mkdir -p engine-upgrade/weekly
+          if [ "${{ steps.audit.outcome }}" = failure ]; then
+            python3 -c "import json;r=json.load(open('engine-upgrade/patch-report.json'));[print(p['patch'],p['status'],p['diagnostics'][:400]) for p in r['patches'] if p['status']!='applied']" \
+              > "$RUNNER_TEMP/engine-build.log" 2>&1 || echo 'strict patch audit failed' > "$RUNNER_TEMP/engine-build.log"
+          fi
+          { grep -E '^e: |^\* What went wrong|^> ' "$RUNNER_TEMP/engine-build.log" || tail -40 "$RUNNER_TEMP/engine-build.log"; } \
+            | sed -E 's#file://[^ ]*/argentum-engine/##' | head -60 > engine-upgrade/weekly/build-errors.txt
+          head -20 engine-upgrade/weekly/build-errors.txt | while IFS= read -r line; do echo "::error title=Engine build::${line:0:900}"; done
+      - name: Final status
+        id: final
+        env:
+          REBASE: ${{ steps.rebase.outputs.status }}
+          AUDIT: ${{ steps.audit.outcome }}
+          BUILD: ${{ steps.build.outcome }}
+        run: |
+          if [ "$REBASE" = rebased ] && { [ "$AUDIT" = failure ] || [ "$BUILD" = failure ]; }; then echo "status=build_failed" >> "$GITHUB_OUTPUT"
+          else echo "status=$REBASE" >> "$GITHUB_OUTPUT"; fi
       - name: Install the new engine into the app
-        if: steps.rebase.outputs.status == 'rebased'
+        if: steps.final.outputs.status == 'rebased'
         run: python3 engine-upgrade/weekly.py install argentum-engine
 
       - name: Check every imported card against the new library
         id: cards
-        if: steps.rebase.outputs.status == 'rebased'
+        if: steps.final.outputs.status == 'rebased'
         run: |
           set +e
           python3 engine-upgrade/weekly.py cards "$RUNNER_TEMP/old-assets"
           echo "code=$?" >> "$GITHUB_OUTPUT"
       - uses: actions/setup-java@v4
-        if: steps.rebase.outputs.status == 'rebased'
+        if: steps.final.outputs.status == 'rebased'
         with:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@v3
-        if: steps.rebase.outputs.status == 'rebased'
+        if: steps.final.outputs.status == 'rebased'
         with:
           packages: platform-tools
       - name: Android SDK
-        if: steps.rebase.outputs.status == 'rebased'
+        if: steps.final.outputs.status == 'rebased'
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-      - name: Custom cards on the new engine (compile, export, scenario tests)
+      - name: Custom cards on the new engine (compile, export, scenario tests, strict collision test)
         id: custom
-        if: steps.rebase.outputs.status == 'rebased'
+        if: steps.final.outputs.status == 'rebased'
         continue-on-error: true
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test
       - name: App test suite on the new engine
         id: app
-        if: steps.rebase.outputs.status == 'rebased'
+        if: steps.final.outputs.status == 'rebased'
         continue-on-error: true
         working-directory: android
         run: |
@@ -114,40 +180,48 @@ jobs:
             :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest'
       - name: Build a test APK
         id: apk
-        if: steps.rebase.outputs.status == 'rebased'
+        if: steps.final.outputs.status == 'rebased'
         continue-on-error: true
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
       - name: Count test results
-        if: steps.rebase.outputs.status == 'rebased'
+        if: steps.final.outputs.status == 'rebased'
         run: python3 engine-upgrade/weekly.py summary android
 
       - name: Write the report
         id: report
-        if: steps.rebase.outputs.status != 'up_to_date'
+        if: always() && steps.final.outputs.status != 'up_to_date' && steps.final.outputs.status != ''
         env:
-          REBASE: ${{ steps.rebase.outputs.status }}
+          REBASE: ${{ steps.final.outputs.status }}
           CARDS: ${{ steps.cards.outputs.code }}
           CUSTOM: ${{ steps.custom.outcome }}
           APP: ${{ steps.app.outcome }}
           APK: ${{ steps.apk.outcome }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BASE_SHA: ${{ steps.base.outputs.sha }}
         run: |
           python3 - <<'PY'
           import json, os, pathlib
           w = pathlib.Path('engine-upgrade/weekly')
           r = json.loads((w / 'rebase.json').read_text())
           env = os.environ
-          head = f"Upstream `{r['old_pin'][:10]}` → `{r['target'][:10]}` ({r.get('upstream_commits', '?')} upstream commits)."
+          head = (f"Upstream `{r['old_pin'][:10]}` → `{r['target']}` ({r.get('upstream_commits', '?')} upstream commits), "
+                  f"on Arcana `{env['BASE_SHA']}`.")
           if env['REBASE'] == 'conflict':
               green, title = False, 'Weekly Argentum upgrade blocked: patch conflict'
               body = [head, '', (w / 'rebase.md').read_text()]
+          elif env['REBASE'] == 'build_failed':
+              green, title = False, 'Weekly Argentum upgrade blocked: engine build failed'
+              errors = (w / 'build-errors.txt').read_text().strip() if (w / 'build-errors.txt').is_file() else '(no output captured)'
+              body = [head, '', 'The patches merged as text, but the patched engine does not compile: upstream changed '
+                      'code an Arcana patch depends on. Fix the patch (engine lane), record any conflict resolution, '
+                      'and re-run.', '', '```', errors, '```']
           else:
               t = json.loads((w / 'tests.json').read_text())
               checks = {
                   'Patches rebased and pass the strict audit': True,
-                  'Every premade-deck card resolves': env['CARDS'] == '0',
-                  'Custom cards compile and pass scenario tests on the new engine': env['CUSTOM'] == 'success',
+                  'Imported cards: premade decks, six precons, no custom-card collisions': env['CARDS'] == '0',
+                  'Custom cards compile and pass scenario + strict data tests on the new engine': env['CUSTOM'] == 'success',
                   'App test suite': env['APP'] == 'success',
                   'Test APK builds': env['APK'] == 'success',
               }
@@ -162,9 +236,13 @@ jobs:
                   body += ['', '<details><summary>Failing tests</summary>', ''] + [f'- `{x}`' for x in t['failed']] + ['', '</details>']
               body += ['', f"Patches: {len(patches) - len(retired)} refreshed" +
                        (f"; retired because upstream now has them: {', '.join(retired)}" if retired else '') + '.']
+              auto = w / 'auto-resolved.md'
+              if auto.is_file() and auto.read_text().strip():
+                  body += ['', auto.read_text()]
               body += ['', (w / 'cards.md').read_text()]
               body += ['', 'Not run here: upstream\'s own rules/card/AI suites (upstream CI covers them) and the '
-                       'device checks in `engine-upgrade/UPGRADE-TEMPLATE.md`. Debug APK: see the run artifacts.']
+                       'device checks in `engine-upgrade/UPGRADE-TEMPLATE.md`. A green PR means the checks above passed, '
+                       'not that every card is Oracle-correct. Debug APK: see the run artifacts.']
           body += ['', f"Run: {env['RUN_URL']}", '',
                    'Owner approves the merge. Engine conflicts and failing engine-facing tests go to Claude\'s lane; '
                    'card regressions to GPT (issue #81).']
@@ -174,58 +252,191 @@ jobs:
               out.write(f"green={'true' if green else 'false'}\n")
           with open(env['GITHUB_STEP_SUMMARY'], 'a') as out:
               out.write(f"## {title}\n\n" + '\n'.join(body) + '\n')
+          # The headline also as annotations, readable from the run page and the checks API.
+          clean = lambda x: str(x).replace('%', '%25').replace('\r', '').replace('\n', ' ')[:900]
+          print(f"::notice title=Weekly upgrade::{clean(title)}")
+          if env['REBASE'] == 'rebased':
+              print("::notice title=Checks::" + clean('; '.join(f"{k}: {'pass' if v else 'FAIL'}" for k, v in checks.items())))
+              for name in t['failed'][:8]:
+                  print(f"::error title=Failing test::{clean(name)}")
+              cards = json.loads((w / 'cards.json').read_text())
+              if cards.get('collisions'):
+                  print("::warning title=Custom-card collisions (decision required)::" + clean(', '.join(cards['collisions'])))
+              for d in cards.get('precons', []):
+                  if d['newly_missing']:
+                      print(f"::warning title=Precon slots lost ({clean(d['name'])})::" + clean(', '.join(d['newly_missing'])))
           PY
-
-      - name: Push the upgrade branch
-        if: steps.rebase.outputs.status == 'rebased'
+      - name: Package the candidate (local only, nothing pushed)
+        id: candidate
+        if: steps.final.outputs.status == 'rebased'
         run: |
           set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git checkout -q -B "$BOT_BRANCH"
+          mkdir -p "$RUNNER_TEMP/candidate"
           git add -A argentum-patches engine-upgrade android/app/libs android/app/src/main/assets/argentum
-          git commit -q -F - <<EOF
-          $(cat engine-upgrade/weekly/title.txt)
-
-          Automated by .github/workflows/argentum-weekly-upgrade.yml
-          EOF
-          git push -f origin "$BOT_BRANCH"
-      - name: Open or refresh the draft PR
-        if: steps.rebase.outputs.status == 'rebased' && env.DRY_RUN != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
+          git reset -q -- engine-upgrade/weekly engine-upgrade/patch-report.json
+          git diff --cached --binary > "$RUNNER_TEMP/candidate/candidate.patch"
+          sum=$(sha256sum "$RUNNER_TEMP/candidate/candidate.patch" | cut -d' ' -f1)
+          echo "sha256=$sum" >> "$GITHUB_OUTPUT"
+          echo "Candidate patch sha256: $sum"
+      - name: Stage reports for upload
+        if: always()
         run: |
-          set -uo pipefail
-          title=$(cat engine-upgrade/weekly/title.txt)
-          number=$(gh pr list --head "$BOT_BRANCH" --base "$BASE" --state open --json number --jq '.[0].number')
-          if [ -n "$number" ]; then
-            gh pr edit "$number" --title "$title" --body-file engine-upgrade/weekly/body.md
-          elif ! url=$(gh pr create --draft --head "$BOT_BRANCH" --base "$BASE" --title "$title" --body-file engine-upgrade/weekly/body.md); then
-            # Repo setting may forbid Actions from opening PRs; fall back to an issue with a compare link.
-            printf '\n[Open the PR](%s/%s/compare/%s...%s?expand=1)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$BASE" "$BOT_BRANCH" >> engine-upgrade/weekly/body.md
-            gh issue create --title "$title" --body-file engine-upgrade/weekly/body.md
-          else
-            number=${url##*/}
-          fi
-          gh issue comment 81 --body "Weekly Argentum upgrade: **$title** — ${number:+#$number }($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" || true
-      - name: Report a patch conflict
-        if: steps.rebase.outputs.status == 'conflict' && env.DRY_RUN != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          title=$(cat engine-upgrade/weekly/title.txt)
-          number=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
-          if [ -n "$number" ]; then gh issue comment "$number" --body-file engine-upgrade/weekly/body.md
-          else gh issue create --title "$title" --body-file engine-upgrade/weekly/body.md; fi
-          gh issue comment 81 --body "Weekly Argentum upgrade blocked by a patch conflict ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID). Engine lane: resolve and record it in engine-upgrade/rerere/." || true
+          mkdir -p "$RUNNER_TEMP/candidate"
+          cp -r engine-upgrade/weekly "$RUNNER_TEMP/candidate/" 2>/dev/null || true
       - uses: actions/upload-artifact@v4
-        if: always() && steps.rebase.outputs.status == 'rebased'
+        if: always()
         with:
-          name: argentum-weekly-upgrade
+          name: argentum-weekly-candidate
+          retention-days: 14
+          path: ${{ runner.temp }}/candidate/
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.final.outputs.status == 'rebased'
+        with:
+          name: argentum-weekly-evidence
           retention-days: 14
           path: |
-            engine-upgrade/weekly/
             engine-upgrade/patch-report.json
             android/custom-cards/build/test-results/
             android/app/build/test-results/
             android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Fail the dry run when the upgrade is blocked
+        if: always() && github.event_name == 'push' && (steps.final.outputs.status == 'conflict' || steps.final.outputs.status == 'build_failed')
+        run: |
+          cat engine-upgrade/weekly/body.md
+          echo '::error::Upgrade blocked (${{ steps.final.outputs.status }}); see the job summary'
+          exit 1
+
+  publish:
+    needs: validate
+    # Never on a dry run (push); never when already up to date.
+    if: github.event_name != 'push' && contains(fromJSON('["rebased","conflict","build_failed"]'), needs.validate.outputs.status)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+    env:
+      BOT_BRANCH: bot/argentum-weekly
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.validate.outputs.base_sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: argentum-weekly-candidate
+          path: ${{ runner.temp }}/candidate
+      - name: Verify the candidate before using it
+        if: needs.validate.outputs.status == 'rebased'
+        env:
+          EXPECTED: ${{ needs.validate.outputs.candidate_sha256 }}
+        run: |
+          set -euo pipefail
+          patch="$RUNNER_TEMP/candidate/candidate.patch"
+          echo "$EXPECTED  $patch" | sha256sum -c -
+          # Quick pre-check on the patch text: every file header must be a plain, in-scope path.
+          python3 - "$patch" <<'PY'
+          import re, sys
+          allowed = ('argentum-patches/', 'engine-upgrade/forward-ports/', 'engine-upgrade/audit_patches.py',
+                     'engine-upgrade/preview-config.json', 'android/app/libs/argentum-',
+                     'android/app/src/main/assets/argentum/')
+          text = open(sys.argv[1], 'rb').read().decode('utf-8', 'replace')
+          headers = re.findall(r'^diff --git .*$', text, re.M)
+          pairs = [re.fullmatch(r'diff --git a/(\S+) b/(\S+)', h) for h in headers]
+          paths = {p for m in pairs if m for p in m.groups()}
+          bad = sorted(p for p in paths if not p.startswith(allowed) or '..' in p)
+          if bad or not paths or not all(pairs):
+              sys.exit(f'Candidate touches paths outside the upgrade scope: {bad or headers or "none at all"}')
+          print(f'{len(paths)} paths, all inside the upgrade scope')
+          PY
+          # The authoritative check runs on git's staged index (next step), from this trusted copy.
+          cp engine-upgrade/candidate_scope.py "$RUNNER_TEMP/candidate_scope.py"
+      - name: Apply the candidate and check what it changed
+        if: needs.validate.outputs.status == 'rebased'
+        run: |
+          set -euo pipefail
+          git checkout -q -B "$BOT_BRANCH"
+          git apply --index --binary --whitespace=nowarn "$RUNNER_TEMP/candidate/candidate.patch"
+          python3 -I "$RUNNER_TEMP/candidate_scope.py"
+      - name: Push the upgrade branch
+        if: needs.validate.outputs.status == 'rebased'
+        run: |
+          set -euo pipefail
+          bot_email='41898282+github-actions[bot]@users.noreply.github.com'
+          git config user.name 'github-actions[bot]'
+          git config user.email "$bot_email"
+          git commit -q -F - <<EOF
+          $(cat "$RUNNER_TEMP/candidate/weekly/title.txt")
+
+          Upstream ${{ needs.validate.outputs.upstream_sha }}
+          Validated in run ${{ github.run_id }}; candidate sha256 ${{ needs.validate.outputs.candidate_sha256 }}
+          Automated by .github/workflows/argentum-weekly-upgrade.yml
+          EOF
+          # Replace the bot branch only if it is absent or still exactly the automation's own previous
+          # commit (bot author, our trailer). Anything else on it is someone's work: stop, don't overwrite.
+          remote=$(git ls-remote origin "refs/heads/$BOT_BRANCH" | cut -f1)
+          if [ -n "$remote" ]; then
+            tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/$remote" --jq '[.commit.author.email, .commit.committer.email, (.commit.message | contains("Automated by .github/workflows/argentum-weekly-upgrade.yml"))] | @tsv')
+            if [ "$tip" != "$(printf '%s\t%s\ttrue' "$bot_email" "$bot_email")" ]; then
+              echo "::error title=Bot branch has other work::$BOT_BRANCH is at $remote, which this workflow did not write; not overwriting"
+              exit 1
+            fi
+          fi
+          # The lease pins the exact head we just inspected (empty = branch must not exist yet).
+          git push --force-with-lease="refs/heads/$BOT_BRANCH:$remote" origin "HEAD:refs/heads/$BOT_BRANCH"
+      - name: Open or refresh the draft PR
+        if: needs.validate.outputs.status == 'rebased'
+        run: |
+          set -uo pipefail
+          w="$RUNNER_TEMP/candidate/weekly"
+          title=$(cat "$w/title.txt")
+          number=$(gh pr list --head "$BOT_BRANCH" --base "$BASE" --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --title "$title" --body-file "$w/body.md"
+          elif ! url=$(gh pr create --draft --head "$BOT_BRANCH" --base "$BASE" --title "$title" --body-file "$w/body.md"); then
+            # Repo setting may forbid Actions from opening PRs; fall back to an issue with a compare link.
+            printf '\n[Open the PR](%s/%s/compare/%s...%s?expand=1)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$BASE" "$BOT_BRANCH" >> "$w/body.md"
+            gh issue create --title "$title" --body-file "$w/body.md"
+          else
+            number=${url##*/}
+          fi
+          gh issue comment 81 --body "Weekly Argentum upgrade: **$title** — ${number:+#$number }($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" || true
+      - name: Report a blocked upgrade
+        if: needs.validate.outputs.status == 'conflict' || needs.validate.outputs.status == 'build_failed'
+        run: |
+          w="$RUNNER_TEMP/candidate/weekly"
+          title=$(cat "$w/title.txt")
+          number=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$number" ]; then gh issue comment "$number" --body-file "$w/body.md"
+          else gh issue create --title "$title" --body-file "$w/body.md"; fi
+          gh issue comment 81 --body "**$title** ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID). Engine lane: fix the patch, record any resolution in engine-upgrade/rerere/ or rebase-rules.json, re-run." || true
+
+  verdict:
+    # The run's own result: green only when the upgrade is green (or there was nothing to do). A dry run
+    # or a live run that found failing tests, a collision, a conflict or a broken build ends red, even
+    # though the live run still published its draft PR or issue for people to act on.
+    needs: [validate, publish]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Overall result
+        env:
+          VALIDATE: ${{ needs.validate.result }}
+          PUBLISH: ${{ needs.publish.result }}
+          STATUS: ${{ needs.validate.outputs.status }}
+          GREEN: ${{ needs.validate.outputs.green }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          echo "validate=$VALIDATE publish=$PUBLISH status=$STATUS green=$GREEN event=$EVENT"
+          if [ "$VALIDATE" != success ]; then echo "::error::Validation did not finish successfully ($VALIDATE)"; exit 1; fi
+          if [ "$STATUS" = up_to_date ]; then echo 'Already on the latest upstream; nothing to do.'; exit 0; fi
+          if [ "$EVENT" = push ] && [ "$PUBLISH" != skipped ]; then echo "::error::Publish ran on a dry run ($PUBLISH)"; exit 1; fi
+          if [ "$EVENT" != push ] && [ "$PUBLISH" != success ]; then echo "::error::Publishing did not succeed ($PUBLISH)"; exit 1; fi
+          if [ "$STATUS" != rebased ] || [ "$GREEN" != true ]; then
+            echo "::error::Upgrade not green (status=$STATUS, green=$GREEN); see the validate job summary"; exit 1
+          fi
+          echo 'Upgrade green.'
