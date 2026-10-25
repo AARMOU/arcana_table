@@ -1913,7 +1913,7 @@
    ]
   },
   "Effects.ForEachInGroup": {
-   "count": 25,
+   "count": 26,
    "examples": [
     {
      "card": "Mutilate",
@@ -2104,8 +2104,14 @@
    ]
   },
   "Effects.GrantProtectionFromColor": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Eldritch Immunity",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldritchImmunity.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldritchImmunityScenarioTest.kt"
+    },
     {
      "card": "Akroma's Will",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AkromasWill.kt",
@@ -3535,6 +3541,17 @@
     }
    ]
   },
+  "KeywordAbility.overload": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Eldritch Immunity",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldritchImmunity.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldritchImmunityScenarioTest.kt"
+    }
+   ]
+  },
   "KeywordAbility.partner": {
    "count": 1,
    "examples": [
@@ -4282,7 +4299,7 @@
    ]
   },
   "keywordAbility()": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4462,7 +4479,7 @@
    ]
   },
   "spell { }": {
-   "count": 41,
+   "count": 42,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -5047,7 +5064,7 @@
    ]
   },
   "Duration.EndOfTurn": {
-   "count": 9,
+   "count": 10,
    "examples": [
     {
      "card": "Silence",
@@ -5068,6 +5085,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CyberdriveAwakenerScenarioTest.kt"
     },
     {
+     "card": "Eldritch Immunity",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldritchImmunity.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldritchImmunityScenarioTest.kt"
+    },
+    {
      "card": "The Fantasticar",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheFantasticar.kt",
      "lines": 56,
@@ -5078,12 +5101,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AllosaurusShepherd.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AllosaurusShepherdScenarioTest.kt"
-    },
-    {
-     "card": "Purphoros, God of the Forge",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PurphorosGodOfTheForge.kt",
-     "lines": 57,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PurphorosGodOfTheForgeScenarioTest.kt"
     }
    ]
   },
@@ -6002,7 +6019,7 @@
    ]
   },
   "EffectTarget.IterationEntity": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Mutilate",
@@ -6404,7 +6421,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 95,
+   "count": 96,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -7053,7 +7070,7 @@
    ]
   },
   "TargetFilter.CreatureYouControl": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Mandate of Abaddon",
@@ -7078,6 +7095,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SigardasAid.kt",
      "lines": 42,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SigardasAidScenarioTest.kt"
+    },
+    {
+     "card": "Eldritch Immunity",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldritchImmunity.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldritchImmunityScenarioTest.kt"
     }
    ]
   },
@@ -7307,7 +7330,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 63,
+   "count": 64,
    "examples": [
     {
      "card": "Defile",
