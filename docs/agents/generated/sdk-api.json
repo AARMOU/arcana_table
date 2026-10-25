@@ -3326,6 +3326,9 @@
    "CopyCollectionIntoCollection": [
     "CopyCollectionIntoCollection(String, String): Effect"
    ],
+   "CopyControlledStackObjects": [
+    "CopyControlledStackObjects(Set<? extends StackObjectKind>, Player): Effect"
+   ],
    "CopyEachSpellCast": [
     "CopyEachSpellCast(Int, GameObjectFilter): Effect"
    ],
@@ -8471,6 +8474,7 @@
   "Connive",
   "ControlPlayerDuringResolution",
   "ConvertCountersToTokens",
+  "CopyControlledStackObjects",
   "CopyEachSpellCast",
   "CopyEachTargetSpell",
   "CopyForEachOtherPossibleTarget",

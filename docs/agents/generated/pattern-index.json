@@ -1384,6 +1384,17 @@
     }
    ]
   },
+  "Effects.CopyControlledStackObjects": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Ulalek, Fused Atrocity",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlalekFusedAtrocity.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlalekFusedAtrocityScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.CopyTargetSpell": {
    "count": 2,
    "examples": [
@@ -2266,8 +2277,14 @@
    ]
   },
   "Effects.MayPay": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Ulalek, Fused Atrocity",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlalekFusedAtrocity.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlalekFusedAtrocityScenarioTest.kt"
+    },
     {
      "card": "Savai Thundermane",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SavaiThundermane.kt",
@@ -2729,7 +2746,7 @@
  },
  "Keyword": {
   "Keyword.CASCADE": {
-   "count": 5,
+   "count": 7,
    "examples": [
     {
      "card": "Noise Marine",
@@ -2756,10 +2773,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DenyRealityScenarioTest.kt"
     },
     {
-     "card": "Violent Outburst",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ViolentOutburst.kt",
+     "card": "Zhulodok, Void Gorger",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ZhulodokVoidGorger.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ZhulodokVoidGorgerScenarioTest.kt"
+    },
+    {
+     "card": "Abaddon the Despoiler",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AbaddonTheDespoiler.kt",
      "lines": 44,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ViolentOutburstScenarioTest.kt"
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AbaddonTheDespoilerScenarioTest.kt"
     }
    ]
   },
@@ -2815,7 +2838,7 @@
    ]
   },
   "Keyword.DEVOID": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Deepfathom Skulker",
@@ -2828,6 +2851,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SifterOfSkulls.kt",
      "lines": 34,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SifterOfSkullsScenarioTest.kt"
+    },
+    {
+     "card": "Ulalek, Fused Atrocity",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlalekFusedAtrocity.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlalekFusedAtrocityScenarioTest.kt"
     },
     {
      "card": "Drowner of Hope",
@@ -3257,7 +3286,7 @@
    ]
   },
   "Keyword.TRAMPLE": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Atalan Jackal",
@@ -4060,7 +4089,7 @@
    ]
   },
   "Triggers.you.casts": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Skittering Cicada",
@@ -4081,6 +4110,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ScreamerKillerScenarioTest.kt"
     },
     {
+     "card": "Ulalek, Fused Atrocity",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlalekFusedAtrocity.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlalekFusedAtrocityScenarioTest.kt"
+    },
+    {
      "card": "Iron Man, Bleeding Edge",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IronManBleedingEdge.kt",
      "lines": 41,
@@ -4091,12 +4126,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SaiMasterThopterist.kt",
      "lines": 49,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SaiMasterThopteristScenarioTest.kt"
-    },
-    {
-     "card": "The Fantasticar",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheFantasticar.kt",
-     "lines": 56,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheFantasticarScenarioTest.kt"
     }
    ]
   },
@@ -4288,7 +4317,7 @@
    ]
   },
   "keywords()": {
-   "count": 78,
+   "count": 80,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4354,6 +4383,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Tervigon.kt",
      "lines": 40,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TervigonScenarioTest.kt"
+    }
+   ]
+  },
+  "repeat()": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Zhulodok, Void Gorger",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ZhulodokVoidGorger.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ZhulodokVoidGorgerScenarioTest.kt"
     }
    ]
   },
@@ -4492,7 +4532,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 52,
+   "count": 53,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -4533,7 +4573,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5712,6 +5752,23 @@
     }
    ]
   },
+  "GrantKeywordToOwnSpells": {
+   "count": 2,
+   "examples": [
+    {
+     "card": "Zhulodok, Void Gorger",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ZhulodokVoidGorger.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ZhulodokVoidGorgerScenarioTest.kt"
+    },
+    {
+     "card": "Abaddon the Despoiler",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AbaddonTheDespoiler.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AbaddonTheDespoilerScenarioTest.kt"
+    }
+   ]
+  },
   "GrantProtection": {
    "count": 5,
    "examples": [
@@ -6178,7 +6235,7 @@
    ]
   },
   "GameObjectFilter.Any": {
-   "count": 9,
+   "count": 12,
    "examples": [
     {
      "card": "Skittering Cicada",
@@ -6191,6 +6248,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KeeperOfSecrets.kt",
      "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KeeperOfSecretsScenarioTest.kt"
+    },
+    {
+     "card": "Ulalek, Fused Atrocity",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlalekFusedAtrocity.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlalekFusedAtrocityScenarioTest.kt"
     },
     {
      "card": "Suffer the Past",
@@ -6209,12 +6272,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SzarekhTheSilentKing.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SzarekhTheSilentKingScenarioTest.kt"
-    },
-    {
-     "card": "Homing Sliver",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HomingSliver.kt",
-     "lines": 46,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HomingSliverScenarioTest.kt"
     }
    ]
   },
@@ -6719,7 +6776,7 @@
    ]
   },
   "Player.EachOpponent": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Silence",

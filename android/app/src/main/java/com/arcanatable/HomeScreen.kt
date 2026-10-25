@@ -78,6 +78,7 @@ data class AppPreconDeck(val id: String, val name: String, val commander: String
  * Home: your deck at the top, one PLAY button, small footer. PLAY opens [PlaySheet] (offline vs AI
  * or online with Argentum). Approved design, Build 97.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArcanaHomeScreen(
     wide: Boolean,
@@ -101,6 +102,7 @@ fun ArcanaHomeScreen(
     onSettings: () -> Unit,
     onReturnToTable: () -> Unit,
 ) {
+    var scenarioPickerOpen by remember { mutableStateOf(false) }
     Column(
         Modifier.fillMaxSize().background(Ink).windowInsetsPadding(WindowInsets.safeDrawing)
             .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 14.dp),
@@ -108,7 +110,11 @@ fun ArcanaHomeScreen(
     ) {
         Column(Modifier.widthIn(max = if (LocalConfiguration.current.screenHeightDp < 520) 820.dp else if (wide) 560.dp else 460.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("ARCANA TABLE", color = SoftWhite, fontSize = 20.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
+                Text(if (testScenarios.isNotEmpty()) "ARCANA QA · B${BuildConfig.VERSION_CODE}" else "ARCANA TABLE", color = SoftWhite, fontSize = if (testScenarios.isNotEmpty()) 17.sp else 20.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
+                if (testScenarios.isNotEmpty() && !argentumActive) OutlinedButton(
+                    onClick = { scenarioPickerOpen = true },
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("test-scenarios-entry")
+                ) { Text("TESTS (${testScenarios.size})", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black) }
                 IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).clip(CircleShape).border(1.dp, PanelLight, CircleShape)) {
                     Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = SoftWhite)
                 }
@@ -186,27 +192,34 @@ fun ArcanaHomeScreen(
                 playButton()
             }
             Spacer(Modifier.height(8.dp))
-            // Below PLAY, so the debug card never pushes it off a short or narrow screen.
-            if (testScenarios.isNotEmpty() && !argentumActive) Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Panel)
-                    .padding(14.dp).testTag("test-scenarios-card")
-            ) {
-                Text("TEST SCENARIOS · DEBUG BUILD", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
-                Text("Start an offline game vs the AI from a ready board. The engine plays it normally from there.",
-                    color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-                testScenarios.forEach { scenario ->
-                    OutlinedButton(onClick = { onTestScenario(scenario) }, enabled = !working,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 48.dp).testTag("test-scenario-${scenario.id}")) {
-                        Column(Modifier.fillMaxWidth()) {
-                            Text(scenario.title, color = SoftWhite, fontWeight = FontWeight.Bold)
-                            Text(scenario.description, color = Muted, fontSize = 11.sp)
-                        }
-                    }
-                }
-            }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.weight(1f))
                 Text("Build ${BuildConfig.VERSION_CODE} · Based on Build ${BuildConfig.BASE_BUILD}", color = Muted, fontSize = 12.sp)
+            }
+        }
+    }
+    if (scenarioPickerOpen && testScenarios.isNotEmpty()) ModalBottomSheet(
+        onDismissRequest = { scenarioPickerOpen = false },
+        containerColor = Panel,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp).padding(bottom = 28.dp).testTag("test-scenarios-picker"),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("TEST SCENARIOS · DEBUG ONLY", color = CounterGold, fontSize = 16.sp, fontWeight = FontWeight.Black)
+            Text("Choose a ready-made offline game against the AI.", color = Muted, fontSize = 13.sp)
+            testScenarios.forEach { scenario ->
+                OutlinedButton(
+                    onClick = { scenarioPickerOpen = false; onTestScenario(scenario) },
+                    enabled = !working && !argentumActive,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("test-scenario-${scenario.id}"),
+                ) {
+                    Column(Modifier.fillMaxWidth()) {
+                        Text(scenario.title, color = SoftWhite, fontWeight = FontWeight.Bold)
+                        Text(scenario.description, color = Muted, fontSize = 11.sp)
+                    }
+                }
             }
         }
     }
