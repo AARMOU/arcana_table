@@ -128,7 +128,7 @@ jobs:
               (3,'full-library-export'), (4,'token-copy-triggered-abilities'),
               (5,'last-known-negative-subtype'), (6,'ai-decision-deadline'),
               (7,'ai-bounded-stack-search'), (8,'jvm-test-toolchain')]]
-          patches += sorted(Path('argentum-patches').glob('00[1-9][0-9]-*.patch'))
+          patches += sorted(Path('argentum-patches').glob('001[1-6]-*.patch'))
           # The 93-slot candidate also has Temple and Crossroads extension patches.
           patches += [
               Path('engine-upgrade/eldrazi-temple/patches/0001-colorless-eldrazi-source-mana.patch'),
