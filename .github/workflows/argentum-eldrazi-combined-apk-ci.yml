@@ -1,0 +1,531 @@
+name: Argentum + Eldrazi + latest Arcana debug APK gate
+# Follow-up to #223: prepare only a throwaway merged worktree and test whether
+# legacy Eldrazi engine source patches apply to the newly upgraded Argentum.
+# No jar publication, branch mutation, APK signing or deploy.
+on:
+  push:
+    branches: [gpt/argentum-eldrazi-combined-apk-20261025]
+    paths: [.github/workflows/argentum-eldrazi-combined-apk-ci.yml]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compatibility:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Reconcile exact four known text conflicts on runner only
+        env:
+          UPGRADE: e66eca84125c3180c676702a72ae6cd080f85797
+          ELDRAZI: 7e6fc1aa8d6ccca30a6fab7fdebc7e08199efbb3
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name arcana-source-preflight
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          mkdir -p combined-evidence
+          git merge-base --is-ancestor "$UPGRADE" HEAD
+          git fetch --no-tags origin "$ELDRAZI"
+          test "$(git rev-parse FETCH_HEAD)" = "$ELDRAZI"
+          git show "$ELDRAZI:tools/cardkit/data/known-blockers.json" > /tmp/eldrazi-blockers.json
+          git show "$UPGRADE:tools/cardkit/data/known-blockers.json" > /tmp/upgrade-blockers.json
+          git show "$ELDRAZI:engine-upgrade/UPGRADE-TEMPLATE.md" > /tmp/eldrazi-upgrade-template.md
+          set +e
+          git merge --no-commit --no-ff --no-edit "$ELDRAZI" > combined-evidence/merge.log 2>&1
+          merge_code=$?
+          set -e
+          test "$merge_code" -ne 0
+          git diff --name-only --diff-filter=U | sort > combined-evidence/conflicts.txt
+          cat > /tmp/expected-conflicts.txt <<'EOF'
+          docs/agents/generated/pattern-index.json
+          docs/agents/generated/pattern-index.md
+          engine-upgrade/UPGRADE-TEMPLATE.md
+          tools/cardkit/data/known-blockers.json
+          EOF
+          diff -u /tmp/expected-conflicts.txt combined-evidence/conflicts.txt
+          # The generated index is regenerated from the merged source; old data must not survive.
+          git checkout --ours -- docs/agents/generated/pattern-index.json docs/agents/generated/pattern-index.md
+          # Keep weekly handoff instructions; append the legacy Eldrazi engine-patch rule verbatim.
+          git checkout --ours -- engine-upgrade/UPGRADE-TEMPLATE.md
+          python3 - <<'PY'
+          from pathlib import Path
+          old = Path('/tmp/eldrazi-upgrade-template.md').read_text()
+          p = Path('engine-upgrade/UPGRADE-TEMPLATE.md')
+          tag = 'Adding an engine change:'
+          assert old.count(tag) == 1
+          assert tag not in p.read_text()
+          addition = old[old.index(tag):].strip()
+          assert 'MANDATORY' in addition
+          p.write_text(p.read_text().rstrip() + '\n\n' + addition + '\n')
+          PY
+          # Preserve new verified Eldrazi blockers while retiring the obsolete named Port Town.
+          git checkout --ours -- tools/cardkit/data/known-blockers.json
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          ours = json.loads(Path('/tmp/upgrade-blockers.json').read_text())
+          theirs = json.loads(Path('/tmp/eldrazi-blockers.json').read_text())
+          for section in ('cards', 'keywords'):
+              for key, value in theirs[section].items():
+                  if key == 'Port Town': continue
+                  if key in ours[section]:
+                      assert ours[section][key] == value, (section, key, 'different conflict needs review')
+                  else:
+                      ours[section][key] = value
+          old_names = {p['name']:p for p in ours['patterns']}
+          for p in theirs['patterns']:
+              if p['name'] in old_names:
+                  assert old_names[p['name']] == p, ('pattern conflict', p['name'])
+              else:
+                  ours['patterns'].append(p)
+          assert 'Port Town' not in ours['cards']
+          path = Path('tools/cardkit/data/known-blockers.json')
+          path.write_text(json.dumps(ours, indent=2, ensure_ascii=False) + '\n')
+          PY
+          git add docs/agents/generated/pattern-index.json docs/agents/generated/pattern-index.md engine-upgrade/UPGRADE-TEMPLATE.md tools/cardkit/data/known-blockers.json
+          test -z "$(git diff --name-only --diff-filter=U)"
+          tools/cardkit/cardkit patterns
+          git diff --check
+          python3 -m json.tool tools/cardkit/data/known-blockers.json >/dev/null
+          printf 'reconciled known text conflicts and regenerated pattern index; no commit\n' > combined-evidence/reconciliation.txt
+      - name: Finish local merged source and integrate exact development head
+        shell: bash
+        env:
+          DEV_SHA: a7961ea55314610ecdf02f164570f215f81278ac
+        run: |
+          set -euo pipefail
+          git add -u
+          # Historical .patch and rerere preimage files intentionally contain conflict markers/whitespace.
+          # Validate staged application/source code, but never rewrite patch/rerere evidence.
+          git diff --cached --check -- android/app android/custom-cards tools/cardkit
+          git commit --no-gpg-sign -m "Temporary local source merge for CI only"
+          git fetch --no-tags origin "$DEV_SHA"
+          test "$(git rev-parse FETCH_HEAD)" = "$DEV_SHA"
+          set +e
+          git merge --no-commit --no-ff --no-edit "$DEV_SHA" > combined-evidence/latest-development-merge.log 2>&1
+          status=$?
+          set -e
+          cat combined-evidence/latest-development-merge.log
+          git diff --name-only --diff-filter=U > combined-evidence/latest-development-conflicts.txt
+          if [ "$status" -ne 0 ] || [ -s combined-evidence/latest-development-conflicts.txt ]; then
+            echo "::error title=Integration conflict::Current development cannot merge without manual review"
+            cat combined-evidence/latest-development-conflicts.txt
+            exit 1
+          fi
+          # Historical .patch and rerere preimage files intentionally contain conflict markers/whitespace.
+          # Validate staged application/source code, but never rewrite patch/rerere evidence.
+          git diff --cached --check -- android/app android/custom-cards tools/cardkit
+          python3 - <<'PY'
+          from pathlib import Path
+          defs = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt").read_text()
+          six = ["BlackMarketConnections", "CommissarSeverinaRaine", "JaheiraFriendOfTheForest", "ScurryOak", "TataruTaru", "WaywardSwordtooth"]
+          for name in six: assert "Entry(" + name + "," not in defs, ("Duplicate custom card registration", name)
+          assert Path("android/app/src/main/java/com/arcanatable/DeckBuilderScreen.kt").is_file(), "Latest dev's debug DeckBuilder absent"
+          for relative in ("engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt",
+                           "engine-upgrade/corrupted-crossroads/candidate/CorruptedCrossroads.kt"):
+              assert Path(relative).is_file(), relative
+          print("PASS: current development debug deck builder, six upstream-only definitions, both Eldrazi candidate cards")
+          PY
+          echo "Verified local source merge with $DEV_SHA; no remote writes" > combined-evidence/latest-development-join.txt
+      - name: Fetch and verify green upgraded-engine candidate evidence
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 2 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            https://api.github.com/repos/AARMOU/arcana_table/actions/artifacts/12612323185/zip -o /tmp/upgrade-candidate.zip
+          echo '2eca4e497de60cb3ff0d20a5df7c3635ac5be7e7881900a1b606926da1321cc0  /tmp/upgrade-candidate.zip' | sha256sum -c -
+          unzip -p /tmp/upgrade-candidate.zip candidate.patch > /tmp/upgrade-candidate.patch
+          echo '065ba023c1fab0c855318f0dd70e55592cc340cbf72263019ef6ea136e90231c  /tmp/upgrade-candidate.patch' | sha256sum -c -
+          git apply --check --include='argentum-patches/*' /tmp/upgrade-candidate.patch
+          git apply --include='argentum-patches/*' /tmp/upgrade-candidate.patch
+          printf '%s\n' 'Verified exact green run 40228118365, upstream c38f145359c342a04f951b7ba48f741bcb1627ac, patch inputs refreshed.' > combined-evidence/upgrade-inputs.txt
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: c38f145359c342a04f951b7ba48f741bcb1627ac
+          path: combined-argentum
+          fetch-depth: 0  # full source history, including patch base blobs needed by git apply --3way
+          persist-credentials: false
+      - name: Verify three-way base blob availability (read-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          for sha in 4b9ad564e0 502fcf5dc7 9dafe60071; do
+            git -C combined-argentum cat-file -e "$sha^{blob}"
+            echo "Base Git blob available: $sha"
+          done
+      - name: Strict patch-series applicability on upgraded upstream
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'upstream c38f145359c342a04f951b7ba48f741bcb1627ac\n' > combined-evidence/patch-preflight.txt
+          python3 - <<'PY'
+          import subprocess, sys
+          from pathlib import Path
+          engine = Path('combined-argentum')
+          patches = [Path('argentum-patches') / f'{n:04d}-{name}.patch' for n,name in [
+              (1,'android-regex'), (2,'engine-trial-build'),
+              (3,'full-library-export'), (4,'token-copy-triggered-abilities'),
+              (5,'last-known-negative-subtype'), (6,'ai-decision-deadline'),
+              (7,'ai-bounded-stack-search'), (8,'jvm-test-toolchain')]]
+          patches += sorted(Path('argentum-patches').glob('001[1-6]-*.patch'))
+          # The 93-slot candidate also has Temple and Crossroads extension patches.
+          patches += [
+              Path('engine-upgrade/eldrazi-temple/patches/0001-colorless-eldrazi-source-mana.patch'),
+              Path('engine-upgrade/eldrazi-combined/patches/0002-devoid-after-temple.patch')]
+          report = Path('combined-evidence/patch-preflight.txt')
+          for patch in patches:
+              assert patch.is_file(), f'missing required patch: {patch}'
+              base = ['git', '-C', str(engine), 'apply']
+              check = subprocess.run(base + ['--check', str(patch.resolve())], capture_output=True, text=True)
+              if check.returncode:
+                  # Exact hunks moved upstream: test Git's index-backed three-way merge,
+                  # but fail closed on any real conflict. No source is published by this job.
+                  actual = subprocess.run(base + ['--3way', str(patch.resolve())],
+                                          capture_output=True, text=True)
+                  with report.open('a') as f:
+                      f.write('THREEWAY ' + str(patch) + ' exit=' + str(actual.returncode)
+                              + '\n' + actual.stdout + actual.stderr)
+                  if actual.returncode:
+                      # Source port only for the known, reviewed 0011 conflict. Every
+                      # other patch remains fail-closed; never silently drop any hunk.
+                      if patch.name == '0001-colorless-eldrazi-source-mana.patch':
+                          # Source-compatibility port for Temple's source-restricted mana.
+                          # Preserve upstream's newer Class-level source-payment context.
+                          reject = subprocess.run(base + ['--reject', str(patch.resolve())],
+                                                  capture_output=True, text=True)
+                          with report.open('a') as f:
+                              f.write('TEMPLE_REJECT_DIAGNOSTIC exit='
+                                      + str(reject.returncode) + '\n' + reject.stdout + reject.stderr)
+                          root = engine
+                          ability = root / 'rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt'
+                          index = root / 'docs/sdk-index.md'
+                          baseline = root / 'mtg-sdk/src/test/resources/sdk-surface-baseline.txt'
+                          allowed = {str(p) + '.rej' for p in (ability, index, baseline)}
+                          rejected = {str(p) for p in root.rglob('*.rej')}
+                          assert rejected <= allowed, ('unreviewed Temple rejects', rejected - allowed)
+                          payment = ability.read_text()
+                          if 'isAbilitySourceColorless =' not in payment:
+                              needle = '        abilitySourceCardTypes = cardTypes,\n'
+                              assert payment.count(needle) == 1
+                              payment = payment.replace(needle, needle +
+                                  '        // Projected characteristics on the battlefield; printed colors in other zones.\n'
+                                  '        isAbilitySourceColorless = if (sourceId in projected.getBaseState().getBattlefield()) {\n'
+                                  '            projected.getColors(sourceId).isEmpty()\n'
+                                  '        } else {\n'
+                                  '            cardComponent.colors.isEmpty()\n'
+                                  '        },\n', 1)
+                              ability.write_text(payment)
+                          assert payment.count('isAbilitySourceColorless =') == 1
+                          chunks = patch.read_text().split('diff --git ')
+                          def patch_added(prefix):
+                              found = [l[1:] for c in chunks for l in c.splitlines()
+                                       if l.startswith('+' + prefix)]
+                              assert len(found) == 1, (prefix, len(found))
+                              return found[0]
+                          def insert_after(path, prefix, new_line):
+                              lines = path.read_text().splitlines()
+                              if new_line in lines: return
+                              matches = [i for i, l in enumerate(lines) if l.startswith(prefix)]
+                              assert len(matches) == 1, (path, prefix, len(matches))
+                              lines.insert(matches[0] + 1, new_line)
+                              path.write_text('\n'.join(lines) + '\n')
+                          insert_after(index, '- ' + chr(96) + 'ManaRestriction.ColorlessSpellsOnly' + chr(96),
+                                       patch_added('- ' + chr(96) + 'ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly'))
+                          insert_after(baseline, 'LoyaltyDamageFloor — ReplacementEffect',
+                                       patch_added('ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly'))
+                          assert 'data class ColorlessSubtypeSpellsOrAbilitiesOnly' in (
+                              root / 'mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt').read_text()
+                          for reject_file in rejected: Path(reject_file).unlink()
+                          assert not list(root.rglob('*.rej')), 'No partial Temple rejects allowed'
+                          with report.open('a') as f:
+                              f.write('MANUAL_PORT Temple: source colors and current SDK index/baseline retained\n')
+                          print('PORTED Temple restricted mana on upgraded upstream, testing Devoid next')
+                          continue
+                      if patch.name != '0011-stack-object-copying.patch':
+                          print('BLOCKED:', patch, check.stderr, actual.stdout, actual.stderr,
+                                file=sys.stderr)
+                          sys.exit(1)
+                      reject = subprocess.run(base + ['--reject', str(patch.resolve())],
+                                              capture_output=True, text=True)
+                      with report.open('a') as f:
+                          f.write('REJECT_DIAGNOSTIC ' + str(patch) + ' exit='
+                                  + str(reject.returncode) + '\n' + reject.stdout + reject.stderr)
+                      root = engine / 'rules-engine/src/main/kotlin/com/wingedsheep/engine'
+                      refs = root / 'handlers/continuations/ObjectReferencePropagation.kt'
+                      placement = root / 'mechanics/stack/StackPlacement.kt'
+                      obsolete = root / 'handlers/effects/stack/CopyEachTargetSpellExecutor.kt'
+                      generic = root / 'handlers/effects/stack/CopyStackObjectsExecutor.kt'
+                      expected = {str(refs) + '.rej', str(placement) + '.rej'}
+                      rejected = {str(p) for p in engine.rglob('*.rej')}
+                      assert rejected == expected, ('unexpected source rejects', rejected, expected)
+                      assert obsolete.is_file() and generic.is_file()
+                      # The upstream spell-copy executor gained keyword-action replacement
+                      # counts. New CopyStackObjectsExecutor delegates each individual
+                      # spell copy to CopyTargetSpellEffect, whose upstream executor already
+                      # applies KeywordActionAmountModifier.copySpell. Keep that behavior.
+                      original = obsolete.read_text()
+                      assert 'KeywordActionAmountModifier.copySpell' in original
+                      assert 'CopyTargetSpellEffect' in generic.read_text()
+                      def one(path, needle, replacement):
+                          data = path.read_text()
+                          assert data.count(needle) == 1, (path, needle, data.count(needle))
+                          path.write_text(data.replace(needle, replacement, 1))
+                      one(refs,
+                          '    is TriggerDamageDistributionContinuation -> objectReferences\n',
+                          '    is TriggerDamageDistributionContinuation -> objectReferences\n'
+                          '    is CopyStackObjectsOrderContinuation -> effectContext.objectReferences\n')
+                      one(refs,
+                          '    is TriggerDamageDistributionContinuation -> copy(objectReferences = refs)\n',
+                          '    is TriggerDamageDistributionContinuation -> copy(objectReferences = refs)\n'
+                          '    is CopyStackObjectsOrderContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))\n')
+                      one(placement,
+                          '        triggerCause: AbilityTriggerCause? = null\n    ): ExecutionResult {',
+                          '        triggerCause: AbilityTriggerCause? = null,\n'
+                          '        emitTriggerEvent: Boolean = true\n    ): ExecutionResult {')
+                      old_events = "        val events = mutableListOf<GameEvent>(\n            AbilityTriggeredEvent(\n                ability.sourceId,\n                sourceDisplayName,\n                ability.controllerId,\n                ability.description,\n                abilityEntityId = abilityId,\n                triggerCause = triggerCause\n            )\n        )"
+                      new_events = "        val events = mutableListOf<GameEvent>()\n        if (emitTriggerEvent) events.add(\n            AbilityTriggeredEvent(\n                ability.sourceId,\n                sourceDisplayName,\n                ability.controllerId,\n                ability.description,\n                abilityEntityId = abilityId,\n                triggerCause = triggerCause\n            )\n        )"
+                      one(placement, old_events, new_events)
+                      obsolete.unlink()
+                      for f in expected: Path(f).unlink()
+                      assert not list(engine.rglob('*.rej')), 'No rejected patch hunks may remain'
+                      with report.open('a') as f:
+                          f.write('MANUAL_PORT 0011: modern triggerCause and StackPlacement events, '
+                                  'preserve Twinning Staff via CopyTargetSpellEffect; no rejects\n')
+                      print('PORTED 0011 stack copying against upgraded upstream, testing next patch')
+                      continue
+                  continue
+              actual = subprocess.run(base + [str(patch.resolve())], capture_output=True, text=True)
+              assert actual.returncode == 0, (patch, actual.stderr)
+              with report.open('a') as f: f.write('APPLIED ' + str(patch) + '\n')
+          PY
+          git -C combined-argentum diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Inject pinned exact restricted-mana source regressions
+        shell: bash
+        run: |
+          set -euo pipefail
+          dest=combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios
+          cp engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt "$dest/"
+          cp engine-upgrade/corrupted-crossroads/engine-tests/CorruptedCrossroadsDevoidRestrictionTest.kt "$dest/"
+          test -f "$dest/StackObjectCopyEngineTest.kt"
+          git -C combined-argentum diff --check
+      - name: Build all four upgraded Argentum runtime JARs
+        working-directory: combined-argentum
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar :arcana-export:run \
+            2>&1 | tee ../combined-evidence/source-build.log
+      - name: Verify Stack-copying SDK, Ulalek primitives and restricted mana in real engine
+        working-directory: combined-argentum
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :mtg-sdk:test --tests 'com.wingedsheep.sdk.scripting.StackObjectCopySdkTest' \
+            :rules-engine:test --tests 'com.wingedsheep.engine.scenarios.StackObjectCopyEngineTest' \
+            --tests 'com.wingedsheep.engine.scenarios.EldraziTempleManaRestrictionTest' \
+            --tests 'com.wingedsheep.engine.scenarios.CorruptedCrossroadsDevoidRestrictionTest' \
+            2>&1 | tee ../combined-evidence/source-scenarios.log
+      - name: Install coherent source-built Argentum engine and bundled library on disposable runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 engine-upgrade/weekly.py install combined-argentum
+          sha256sum android/app/libs/argentum-*.jar > combined-evidence/runtime-jars.sha256
+          wc -l android/app/src/main/assets/argentum/all-cards.index.tsv > combined-evidence/export-count.txt
+          cat combined-evidence/runtime-jars.sha256
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android compile SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Inject original Eldrazi Temple and Corrupted Crossroads cards and exact scenarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          dest=android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards
+          test ! -e "$dest/EldraziTemple.kt"
+          test ! -e "$dest/CorruptedCrossroads.kt"
+          cp engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt "$dest/"
+          cp engine-upgrade/corrupted-crossroads/candidate/CorruptedCrossroads.kt "$dest/"
+          cp engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt android/custom-cards/src/test/kotlin/com/arcanatable/customcards/
+          cp engine-upgrade/corrupted-crossroads/candidate/CorruptedCrossroadsScenarioTest.kt android/custom-cards/src/test/kotlin/com/arcanatable/customcards/
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt')
+          value = path.read_text()
+          marker = 'val entries: List<Entry> = listOf(\n'
+          assert value.count(marker) == 1
+          assert 'Entry(EldraziTemple,' not in value and 'Entry(CorruptedCrossroads,' not in value
+          value = value.replace(marker, marker +
+              '        Entry(EldraziTemple, "M3C", "Six WotC precons"),\n' +
+              '        Entry(CorruptedCrossroads, "M3C", "Six WotC precons"),\n', 1)
+          path.write_text(value)
+          for source in ('DeckBuilderScreen.kt', 'CardLibrary.kt', 'DeckImportParser.kt'):
+              assert Path('android/app/src/main/java/com/arcanatable', source).is_file(), source
+          PY
+      - name: Rebuild and test all bundled custom cards against exact upgraded runtime
+        working-directory: android
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test \
+            2>&1 | tee ../combined-evidence/combined-custom-cards.log
+      - name: Enforce 93 original Eldrazi slots using same packaged card assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/eldrazi/check_original_inventory.py --minimum 93
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          a = Path('android/app/src/main/assets/argentum')
+          names = [x.split('\t', 1)[0] for x in (a / 'custom-cards.index.tsv').read_text().splitlines()]
+          assert 'Eldrazi Temple' in names
+          assert 'Corrupted Crossroads' in names
+          cards = [json.loads(x)['name'] for x in (a / 'custom-cards.jsonl').read_text().splitlines()]
+          assert len(cards) == len(names) and set(cards) == set(names)
+          print('PASS: bundled custom-card index/JSONL agree and include Temple and Crossroads')
+          PY
+      - name: Run full Android app unit tests and strict Eldrazi Commander AI tests
+        working-directory: android
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
+            2>&1 | tee ../combined-evidence/combined-android-debug.log
+      - name: Verify three required original-deck scenarios executed without skips
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root = Path('android/app/build/test-results/testDebugUnitTest')
+          files = list(root.rglob('TEST-*.xml'))
+          assert files, 'Missing Android unit-test evidence'
+          cases = []
+          total_failures = total_errors = 0
+          for file in files:
+              tree = ET.parse(file).getroot()
+              total_failures += int(tree.get('failures', 0))
+              total_errors += int(tree.get('errors', 0))
+              for case in tree.iter('testcase'):
+                  if case.get('classname', '').endswith('EldraziIncursionPlayableTest'):
+                      cases.append(case)
+          expected = {'originalSlotIndexInventoryMatchesTheExplicitMissingList',
+                      'newlyImplementedCardsLoadIntoTheOfflineGame', 'incursionMirrorAiGame'}
+          assert {c.get('name') for c in cases} == expected, ('Missing exact Eldrazi tests', cases)
+          assert all(not any(c.find(k) is not None for k in ('skipped','failure','error'))
+                     for c in cases), 'Eldrazi required test skipped or failed'
+          assert total_failures == total_errors == 0, (total_failures, total_errors)
+          print('PASS: all required Eldrazi scenarios executed, AI mirror ended, and app tests green')
+          PY
+      - name: Release must not expose debug test scenarios
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest'
+      - name: Build installable combined test APK
+        working-directory: android
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 :app:assembleDebug \
+            2>&1 | tee ../combined-evidence/combined-apk-build.log
+      - name: Verify installable APK and record provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s android/app/build/outputs/apk/debug/app-debug.apk
+          sha256sum android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/apk.sha256
+          git rev-parse HEAD > combined-evidence/local-arcana-head.txt
+          echo 'Current development: a7961ea55314610ecdf02f164570f215f81278ac' > combined-evidence/source-provenance.txt
+          echo 'Argentum upstream: c38f145359c342a04f951b7ba48f741bcb1627ac' >> combined-evidence/source-provenance.txt
+          echo 'Eldrazi 93-slot: 7e6fc1aa8d6ccca30a6fab7fdebc7e08199efbb3' >> combined-evidence/source-provenance.txt
+          cat combined-evidence/apk.sha256
+      - name: Upload APK only when every integrated source, card, AI, and app gate passed
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcana-combined-argentum-eldrazi93-debug-apk
+          retention-days: 14
+          if-no-files-found: error
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+      - name: Capture unresolved three-way source conflicts for manual port
+        if: failure()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p combined-evidence
+          git -C combined-argentum status --short > combined-evidence/source-status.txt
+          git -C combined-argentum ls-files -u > combined-evidence/unmerged-index-stages.txt
+          git -C combined-argentum diff --cc > combined-evidence/source-conflicts.diff || true
+          python3 - <<'PY'
+          from pathlib import Path
+          engine = Path('combined-argentum')
+          stage = Path('combined-evidence/unmerged-index-stages.txt').read_text().splitlines()
+          paths = sorted({row.split('\t', 1)[1] for row in stage if '\t' in row})
+          out = []
+          for name in paths:
+              source = engine / name
+              out.append(f'=== {name} ===')
+              if not source.is_file():
+                  out.append('missing or deleted source file')
+                  continue
+              lines = source.read_text(errors='replace').splitlines()
+              centers = [i for i, line in enumerate(lines) if line.startswith(('<<<<<<< ', '=======', '>>>>>>> '))]
+              if not centers:
+                  out.append('unmerged index but no textual marker')
+                  continue
+              displayed = set()
+              for center in centers:
+                  for i in range(max(0, center - 16), min(len(lines), center + 17)):
+                      if i not in displayed:
+                          displayed.add(i)
+                          out.append(f'{i+1:5d} {lines[i]}')
+          Path('combined-evidence/source-conflict-excerpts.txt').write_text('\n'.join(out) + '\n')
+          rejected = sorted(engine.rglob('*.rej'))
+          reject_text = []
+          for p in rejected:
+              reject_text.append('=== ' + str(p.relative_to(engine)) + ' ===')
+              reject_text.append(p.read_text(errors='replace'))
+          Path('combined-evidence/rejected-hunks.txt').write_text('\n'.join(reject_text) + '\n')
+          print('Rejected paths:', [str(p.relative_to(engine)) for p in rejected])
+          print('\n'.join(reject_text)[:40000])
+          print('Unmerged source paths:', paths)
+          print('\n'.join(out)[:25000])
+          PY
+      - name: Upload conflict and patch reports even on failure
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: argentum-eldrazi-source-compatibility
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            combined-evidence/
+            combined-argentum/rules-engine/build/test-results/test/
+            combined-argentum/mtg-sdk/build/test-results/test/
+            android/custom-cards/build/test-results/test/
+            android/app/build/test-results/testDebugUnitTest/
