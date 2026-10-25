@@ -49,19 +49,23 @@ Hard rules:
 
 ## Lanes and coordination (issue #81)
 
-- **Claude:** engine primitives, infrastructure, major features, the engine-blocker backlog (#141). `claude/…` branches.
-- **GPT:** card batches, independent review, integration prep. `gpt/…` branches.
-- **Copilot:** well-scoped `SUPPORTED` cards and glue tasks from `[Arcana Queue]` issues. `copilot/…` branches.
-- Development base: `gpt/arcana-integration-next`. Open **draft** PRs against it; post handoffs to #81.
+- **Worker-neutral ownership:** Any available authorized worker (GPT, Claude, Copilot where explicitly dispatched, or a human) may continue an engine/card task from the exact GitHub commit, issue #81 handoff and tests. Nobody is a required dependency.
+- **Engine compatibility:** one authoritative, audited patch series in development. Engine patches, rules tests and audit registration should be proposed **separately from unfinished card/UI work**, then merged only after full engine-specific checks and explicit owner approval. Card/UI work follows the reviewed engine lane.
+- **Copilot:** only well-scoped `SUPPORTED` card/glue tasks authorized by existing queue policy. Do not override spend throttles.
+- Development base: `gpt/arcana-integration-next`. Work on isolated `gpt/…`, `claude/…` or owner-approved worker branches. Open **draft** PRs against development; post handoffs to #81.
 - The owner approves every merge, release and spend.
 
 Never, without explicit owner approval: push to or merge into `main`; release, sign or publish builds;
 replace runtime jars or B131 snapshots; change billing, dispatch, `ARCANA_*` variables or Copilot agent
 settings; open `[Arcana Queue]` issues or apply `arcana:authorize-once`.
 
-## Weekly engine upgrade
+## Weekly engine upgrade and stale-branch guard
 
-`.github/workflows/argentum-weekly-upgrade.yml` moves Arcana onto upstream Argentum every Monday. When a run is red (patch conflict, engine build failure, collision or failing test), its PR or issue has a **Handoff** section with the exact commands. Follow [`engine-upgrade/HANDOFF.md`](engine-upgrade/HANDOFF.md): work on `gpt/argentum-weekly-fix-<date>` (pushing it runs a read-only dry run), never push to `bot/argentum-weekly`. Engine fixes are Claude's lane; GPT finishes them when Claude is unavailable.
+`.github/workflows/argentum-weekly-upgrade.yml` moves Arcana onto upstream Argentum every Monday. The separate read-only `.github/workflows/argentum-engine-pr-guard.yml` audits open engine-changing PRs weekly and when engine PRs change. Its checks flag **stale development engine pins**, **mandatory patches missing from the audit**, long-lived isolated engine patches and upstream drift. A drift warning is *not* source-compatibility or Oracle-playability certification; the full upgrade and card/Android suites remain required.
+
+When a run is red (patch conflict, engine build failure, collision or failing test), use its **Handoff** section and [`engine-upgrade/HANDOFF.md`](engine-upgrade/HANDOFF.md). Work on an isolated `gpt/argentum-weekly-fix-<date>` or `claude/argentum-weekly-fix-<date>` (pushing it runs a read-only dry run), never push to `bot/argentum-weekly`.
+
+**One resolution path for every worker:** resolve upstream conflicts in the isolated engine checkout, run `python3 engine-upgrade/weekly.py finish argentum-engine`, commit the refreshed mandatory patches, pin files and any `engine-upgrade/rerere/` resolutions, then rerun the exact-head checks. **Never** hand-copy a resolved patch to a long-lived branch without capturing and testing its reusable resolution. If another worker disappears, take over at the recorded SHA and commands rather than starting the port from scratch.
 
 ## Checks to run before asking for review
 
