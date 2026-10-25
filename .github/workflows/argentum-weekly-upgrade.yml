@@ -167,11 +167,18 @@ jobs:
         if: steps.final.outputs.status == 'rebased'
         continue-on-error: true
         run: |
-          set -euo pipefail
-          python3 engine-upgrade/weekly.py docs argentum-engine
-          tools/cardkit/cardkit sdk-index
-          tools/cardkit/cardkit docs-check
-          python3 -m unittest discover -s tools/cardkit/tests
+          set -uo pipefail
+          fail() {  # name the failing sub-step and its last lines as annotations, then stop
+            echo "::error title=Agent docs: $1::$(tail -5 "$RUNNER_TEMP/docs.log" | tr '\n' ' ' | cut -c1-900)"
+            exit 1
+          }
+          python3 engine-upgrade/weekly.py docs argentum-engine 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "weekly.py docs"
+          tools/cardkit/cardkit sdk-index 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "cardkit sdk-index"
+          tools/cardkit/cardkit docs-check 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "cardkit docs-check"
+          python3 -m unittest discover -s tools/cardkit/tests 2>&1 | tee "$RUNNER_TEMP/docs.log" || {
+            grep -E '^(FAIL|ERROR):' "$RUNNER_TEMP/docs.log" | head -5 | while IFS= read -r l; do echo "::error title=Cardkit test::$l"; done
+            fail "cardkit unit tests"
+          }
 
       - name: Check every imported card against the new library
         id: cards
