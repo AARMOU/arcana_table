@@ -43,3 +43,11 @@ Keep production merges, Play publication and unrelated card-development branch i
 ## Current verified candidate
 
 Commit `369b7ff442e1b0815d505a9599902d18008364ea`, run [39840218785](https://github.com/AARMOU/arcana_table/actions/runs/39840218785): baseline focused 32 passed; replacement focused passed; full replacement Android suite 206 passed, zero failures/errors, 4 live-service tests skipped; lint and debug assembly passed. B131 changes only version metadata in the tested Android source.
+
+## Weekly automatic upgrade
+
+`.github/workflows/argentum-weekly-upgrade.yml` runs every Monday (and on demand). `engine-upgrade/weekly.py` rebuilds the patch series as commits on the current pin and **rebases** them onto upstream `main` with a three-way merge, instead of requiring each `.patch` to apply byte-for-byte. It then rewrites `argentum-patches/`, the audit pin and `preview-config.json`, proves the result with the strict `audit_patches.py`, rebuilds the four jars and card export, and runs the imported-card checks and the full app suite. The outcome is one rolling draft PR from `bot/argentum-weekly` into development, plus a line on issue #81. Nothing merges on its own.
+
+Imported cards: custom cards must compile and pass their scenario tests on the new engine; every premade-deck card that resolved before must still resolve; custom cards upstream newly implements (Argentum's version wins at runtime) go to `shadowed-custom-cards.txt` for a follow-up retirement; deck cards whose upstream rules changed are listed for a phone check.
+
+Conflicts: `CHANGELOG.md` hunks take upstream and are dropped from refreshed patches. Recorded resolutions in `engine-upgrade/rerere/` replay automatically. Any other conflict opens an issue with the hunk; resolve it once with `git rerere` enabled, copy the new `.git/rr-cache/<id>` folder into `engine-upgrade/rerere/`, commit, and re-run. A patch upstream fully absorbs is retired from the series and named in the PR.

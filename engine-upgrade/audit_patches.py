@@ -57,6 +57,8 @@ def main() -> int:
     }
     for patch_name in MANDATORY:
         patch = forward_ports.get(patch_name, PATCHES / patch_name)
+        if not patch.is_file():  # weekly.py folds forward ports back into the refreshed series
+            patch = PATCHES / patch_name
         if not patch.is_file():
             outcome = "missing"
             diagnostics = "Patch file not found"
