@@ -82,11 +82,10 @@ class ForsakenMonumentScenarioTest {
         assertNull(d.passPriority(d.player1).error)
         assertEquals(d.player2, d.priorityPlayer)
         val action = d.abilityActions(d.player2, theirWastes).firstOrNull()?.action as? ActivateAbility
-        if (action != null) {
-            assertNull(d.submit(action).error)
-            d.resolveAll()
-            assertEquals("opponent's {C} is not doubled", 1, d.manaPool(d.player2).colorless)
-        }
+        assertNotNull("opponent must have a legal Wastes mana action at priority", action)
+        assertNull(d.submit(action!!).error)
+        d.resolveAll()
+        assertEquals("opponent's {C} is not doubled", 1, d.manaPool(d.player2).colorless)
     }
 
     @Test fun withoutMonumentNoExtraMana() {
