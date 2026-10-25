@@ -64,6 +64,42 @@ class EldraziTempleScenarioTest {
         assertEquals(2, d.manaPool(p).restrictedMana.size)
     }
 
+    @Test fun mixedPoolNeverLaundersRestrictedManaIntoUnrelatedCosts() {
+        val d = customScenario(EldraziTemple, "Sol Ring", "Grizzly Bears")
+        val p = d.player1
+        val temple = d.putPermanentOnBattlefield(p, "Eldrazi Temple")
+        val ring = d.putCardInHand(p, "Sol Ring")
+        val bears = d.putCardInHand(p, "Grizzly Bears")
+
+        assertNull(d.activate(p, temple, index = 1).error)
+        d.resolveAll()
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+
+        // A non-Eldrazi colorless spell must not borrow even one restricted {C}.
+        assertNotNull(d.castSpell(p, ring).error)
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+
+        // An unrestricted {C} pays for Sol Ring; both restricted units survive.
+        d.giveColorlessMana(p, 1)
+        assertNull(d.castSpell(p, ring).error)
+        d.resolveAll()
+        assertNotNull(d.findPermanent(p, "Sol Ring"))
+        assertEquals(0, d.manaPool(p).colorless)
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+
+        // The same restriction holds for a colored spell's generic portion.
+        d.giveMana(p, Color.GREEN)
+        assertNotNull(d.castSpell(p, bears).error)
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+
+        d.giveColorlessMana(p, 1)
+        assertNull(d.castSpell(p, bears).error)
+        d.resolveAll()
+        assertNotNull(d.findPermanent(p, "Grizzly Bears"))
+        assertEquals(0, d.manaPool(p).colorless)
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+    }
+
     @Test fun restrictedManaCannotFundGenericPartOfColoredSpell() {
         val d = customScenario(EldraziTemple, "Grizzly Bears")
         val p = d.player1
