@@ -36,7 +36,13 @@ val AzlaskTheSwellingScourge = card("Azlask, the Swelling Scourge") {
         "indestructible and annihilator 1 until end of turn."
 
     triggeredAbility {
-        trigger = Triggers.a(GameObjectFilter.Creature.exactlyColors(0).youControl()).dies()
+        // Azlask's own death always counts, even if an effect changed its color.
+        // Other friendly creatures count only if they were colorless immediately before dying.
+        // OTHER deliberately excludes this card, preventing two triggers for a colorless Azlask.
+        trigger = Triggers.or(
+            Triggers.self.dies(),
+            Triggers.another(GameObjectFilter.Creature.exactlyColors(0).youControl()).dies(),
+        )
         effect = Effects.AddCounters(CounterType.EXPERIENCE, 1, EffectTarget.Controller)
     }
 
