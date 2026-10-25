@@ -51,3 +51,5 @@ Commit `369b7ff442e1b0815d505a9599902d18008364ea`, run [39840218785](https://git
 Imported cards: custom cards must compile and pass their scenario tests on the new engine; every premade-deck card that resolved before must still resolve; custom cards upstream newly implements (Argentum's version wins at runtime) go to `shadowed-custom-cards.txt` for a follow-up retirement; deck cards whose upstream rules changed are listed for a phone check.
 
 Conflicts: `CHANGELOG.md` hunks take upstream and are dropped from refreshed patches. Recorded resolutions in `engine-upgrade/rerere/` replay automatically. Any other conflict opens an issue with the hunk; resolve it once with `git rerere` enabled, copy the new `.git/rr-cache/<id>` folder into `engine-upgrade/rerere/`, commit, and re-run. A patch upstream fully absorbs is retired from the series and named in the PR.
+
+Adding an engine change: put the patch in `argentum-patches/` **and** list it in `MANDATORY` in `audit_patches.py`. That list is the only series the weekly upgrade carries forward; a patch kept in its own folder with its own apply script stays pinned to the old engine and turns every weekly PR red.

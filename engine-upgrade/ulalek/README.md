@@ -1,3 +1,5 @@
+> **Moved (2026-10-25):** the six engine patches now live in `argentum-patches/0011-0016` and are applied by `engine-upgrade/audit_patches.py`, so the weekly upgrade carries them forward. `apply_patches.py` only confirms them, copies `engine-tests/` and writes `apply-report.json`. The patch numbers below refer to the old folder.
+
 # Precon engine candidate: Ulalek, Zhulodok, Abaddon (Claude lane, #132 / #81)
 
 Engine support needed by **Ulalek, Fused Atrocity** that the shipped Build 131 runtime lacks:
