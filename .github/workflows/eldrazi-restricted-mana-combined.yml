@@ -3,11 +3,16 @@ name: Eldrazi Temple + Crossroads source compatibility (temporary runner)
 # export files, Android builds, or change any production/release flag.
 on:
   push:
-    branches: [gpt/eldrazi-temple-crossroads-source-compat-20261025]
+    branches: [gpt/eldrazi-temple-crossroads-source-compat-20261025, gpt/eldrazi-combined-android-dev-gate-20261025]
     paths:
       - 'engine-upgrade/eldrazi-combined/**'
       - '.github/workflows/eldrazi-restricted-mana-combined.yml'
   workflow_dispatch:
+  pull_request:
+    branches: [gpt/eldrazi-temple-crossroads-source-compat-20261025]
+    paths:
+      - 'engine-upgrade/eldrazi-combined/**'
+      - '.github/workflows/eldrazi-restricted-mana-combined.yml'
 permissions:
   contents: read
 concurrency:
@@ -112,6 +117,48 @@ jobs:
       - name: Run executable card scenarios against patched temporary runtime
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.EldraziTempleScenarioTest' --tests 'com.arcanatable.customcards.CorruptedCrossroadsScenarioTest'
+      - name: Compile complete Android debug application against temporary combined runtime
+        working-directory: android
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --max-workers=2 :app:assembleDebug :app:testDebugUnitTest
+
+      - name: Verify debug APK contains both candidate cards
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import zipfile
+          apks = list(Path("android/app/build/outputs/apk/debug").glob("*.apk"))
+          assert len(apks) == 1, f"expected one debug APK, found {apks}"
+          with zipfile.ZipFile(apks[0]) as apk:
+              assets = [name for name in apk.namelist() if name.endswith("argentum/custom-cards.jsonl")]
+              assert len(assets) == 1, f"missing or duplicate bundled custom cards: {assets}"
+              text = apk.read(assets[0]).decode("utf-8")
+              for name in ("Eldrazi Temple", "Corrupted Crossroads"):
+                  assert text.count('"name":"' + name + '"') == 1, f"{name} missing or duplicated in APK"
+              print("Candidate debug APK contains exactly one definition for each restricted-mana land")
+          PY
+
+      - name: Assert Android app unit-test XML exists and is green
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          files = list(Path("android/app/build/test-results/testDebugUnitTest").glob("TEST-*.xml"))
+          assert files, "No full-app testDebugUnitTest XML: compile/test gate not verified"
+          total = failures = errors = skipped = 0
+          for path in files:
+              root = ET.parse(path).getroot()
+              total += int(root.get("tests", 0))
+              failures += int(root.get("failures", 0))
+              errors += int(root.get("errors", 0))
+              skipped += int(root.get("skipped", 0))
+          print(f"Full Android app unit tests: {total} tests, {failures} failures, {errors} errors, {skipped} skipped")
+          assert total > 0 and failures == 0 and errors == 0, "Full Android app unit tests failed"
+          PY
+
       - name: Verify deterministic candidate export in runner
         working-directory: android
         run: |
@@ -147,6 +194,15 @@ jobs:
           assert total >= 25
           print(f"Combined Temple + Crossroads engine and Android scenarios: {total} tests, all passed")
           PY
+      - name: Upload installable combined-runtime debug APK
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: ArcanaTable-Eldrazi-Combined-Dev-debug-apk
+          retention-days: 14
+          if-no-files-found: error
+          path: android/app/build/outputs/apk/debug/*.apk
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -159,3 +215,4 @@ jobs:
             argentum-engine/rules-engine/build/test-results/test/TEST-*CorruptedCrossroads*.xml
             android/custom-cards/build/test-results/test/TEST-*EldraziTemple*.xml
             android/custom-cards/build/test-results/test/TEST-*CorruptedCrossroads*.xml
+            android/app/build/test-results/testDebugUnitTest/TEST-*.xml
