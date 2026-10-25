@@ -175,6 +175,8 @@ class WeeklyHandoff(unittest.TestCase):
             self.assertIn(start, notes)
             self.assertIn(self.target, notes)
             self.assertIn("Never:", notes)
+            self.assertIn("any available authorized worker", notes)
+            self.assertNotIn("Claude's lane", notes)
 
 
 if __name__ == "__main__":
