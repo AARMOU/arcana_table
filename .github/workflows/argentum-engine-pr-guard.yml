@@ -1,0 +1,66 @@
+name: Argentum engine PR guard
+# Read-only PR metadata inspection: never check out, execute, or merge untrusted PR code.
+# This is a cheap drift/policy gate; the separate weekly upgrade remains the full engine build gate.
+on:
+  # Runs after the ordinary Monday weekly upgrade window; does not consume Copilot/AI credits.
+  schedule:
+    - cron: '37 12 * * 1'
+  workflow_dispatch:
+  pull_request_target:
+    branches: [gpt/arcana-integration-next]
+    paths:
+      - 'argentum-patches/**'
+      - 'engine-upgrade/**'
+      - 'android/app/libs/argentum-*.jar'
+  # Only the isolated implementation branch self-tests this new workflow prior to review.
+  push:
+    branches: [gpt/engine-pr-guard-20261025, gpt/engine-pr-guard-main-20261025]
+    paths:
+      - '.github/workflows/argentum-engine-pr-guard.yml'
+      - 'engine-upgrade/engine_pr_guard.py'
+      - 'engine-upgrade/tests/test_engine_pr_guard.py'
+      - 'engine-upgrade/tests/test_weekly_handoff.py'
+      - 'engine-upgrade/weekly.py'
+      - 'AGENTS.md'
+      - 'engine-upgrade/HANDOFF.md'
+permissions:
+  contents: read
+  pull-requests: read
+concurrency:
+  group: engine-pr-guard-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out trusted inspector, not PR head
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          # pull_request_target checks out only the reviewed development source.
+          ref: ${{ github.event_name == 'pull_request_target' && 'gpt/arcana-integration-next' || github.ref }}
+          persist-credentials: false
+      - name: Guard self-tests
+        run: |
+          python3 -m unittest discover -s engine-upgrade/tests -p test_engine_pr_guard.py -v
+          python3 -m unittest discover -s engine-upgrade/tests -p test_weekly_handoff.py -v
+      - name: Audit current upstream and all open engine PRs (or this exact PR)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || '' }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          if test -n "$PR_NUMBER"; then
+            python3 engine-upgrade/engine_pr_guard.py --pr "$PR_NUMBER" --output "$RUNNER_TEMP/engine-pr-guard.json"
+          else
+            python3 engine-upgrade/engine_pr_guard.py --output "$RUNNER_TEMP/engine-pr-guard.json"
+          fi
+      - name: Preserve the read-only report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: engine-pr-guard-report
+          if-no-files-found: ignore
+          retention-days: 14
+          path: ${{ runner.temp }}/engine-pr-guard.json
