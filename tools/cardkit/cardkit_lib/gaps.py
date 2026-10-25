@@ -64,10 +64,18 @@ def analyze(decks: list[dict], use_refs: bool = True, claims: list[dict] | None 
     verdicts: dict[str, dict] = {}
     usage: dict[str, dict] = {}
     per_deck = []
+    library = repo.library_index()
+    custom_exported = repo.custom_index_names()
     for deck in decks:
         counts = defaultdict(int)
+        indexed_slots = 0
         for card in deck["cards"]:
             key = repo.normalize_name(card["name"])
+            # The historical coverage-audit script measures *asset presence*.
+            # Keep that separate from Cardkit's fail-closed rules-readiness count:
+            # an exported card can still have a reproduced engine blocker.
+            if library.get(key) in ("card", "basic") or key in custom_exported:
+                indexed_slots += card.get("quantity", 1)
             if key not in verdicts:
                 verdicts[key] = readiness.classify(card["name"], use_refs=use_refs)
             v = verdicts[key]
@@ -76,7 +84,7 @@ def analyze(decks: list[dict], use_refs: bool = True, claims: list[dict] | None 
             u["decks"].append(deck["name"])
             u["slots"] += card.get("quantity", 1)
         slots = sum(c.get("quantity", 1) for c in deck["cards"])
-        per_deck.append({"name": deck["name"], "slots": slots,
+        per_deck.append({"name": deck["name"], "slots": slots, "indexedSlots": indexed_slots,
                          **{r: counts.get(r, 0) for r in ORDER},
                          "playableSlots": counts.get("IMPLEMENTED_AND_TESTED", 0)})
     cards = []
@@ -105,8 +113,9 @@ def analyze(decks: list[dict], use_refs: bool = True, claims: list[dict] | None 
     }
     return {
         "schema": "arcana-cardkit-gaps/1",
-        "note": "Readiness is evidence for routing, not a gameplay certification; every card still needs real scenario "
-                "tests. dispatch.dispatchable is false unless open-PR claims were read successfully "
+        "note": "Indexed slots mean card-name asset presence, not rules certification. Cardkit readiness excludes "
+                "known engine-blocked cards even when exported; full gameplay still needs real scenarios. "
+                "dispatch.dispatchable is false unless open-PR claims were read successfully "
                 "(--claims-from-github); automated dispatch must refuse when it is false.",
         "decks": per_deck,
         "totals": {r: sum(1 for c in cards if c["readiness"] == r) for r in ORDER},
@@ -122,9 +131,9 @@ def render_md(result: dict, title: str = "Card readiness") -> str:
              f"**Distinct cards:** {sum(t.values())} — implemented {t['IMPLEMENTED_AND_TESTED']}, "
              f"supported (Copilot-ready) {t['SUPPORTED']}, needs review {t['NEEDS_REVIEW']}, "
              f"engine-blocked {t['ENGINE_BLOCKED']}.", "",
-             "## Per deck (slots)", "", "| Deck | Playable | Supported | Needs review | Blocked |", "|---|---:|---:|---:|---:|"]
+             "## Per deck (slots)", "", "| Deck | Indexed (names only) | Readiness-passed | Supported | Needs review | Blocked |", "|---|---:|---:|---:|---:|---:|"]
     for d in result["decks"]:
-        lines.append(f"| {d['name']} | {d['playableSlots']}/{d['slots']} | {d['SUPPORTED']} | {d['NEEDS_REVIEW']} | {d['ENGINE_BLOCKED']} |")
+        lines.append(f"| {d['name']} | {d['indexedSlots']}/{d['slots']} | {d['playableSlots']}/{d['slots']} | {d['SUPPORTED']} | {d['NEEDS_REVIEW']} | {d['ENGINE_BLOCKED']} |")
     lines += ["", "## Missing cards by mechanic", ""]
     for mech, names in result["missingByMechanic"].items():
         lines.append(f"- **{mech}** ({len(names)}): " + ", ".join(names))
