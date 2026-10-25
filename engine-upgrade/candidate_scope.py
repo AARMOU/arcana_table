@@ -15,11 +15,16 @@ it) and fails unless every change is one the upgrade itself makes:
   * engine-upgrade/preview-config.json       modified
   * android/app/libs/argentum-<module>.jar   modified
   * android/app/src/main/assets/argentum/... added, modified or deleted
+  * docs/agents/generated/sdk-api.{md,json}  modified (regenerated from the new jar)
+  * docs/agents/argentum-upstream/<3 files>  modified (re-vendored from upstream at the new pin)
+  * AGENTS.md, docs/agents/CARD-WORKFLOW.md, docs/agents/argentum-upstream/README.md,
+    tools/cardkit/cardkit_lib/repo.py        only the pinned upstream commit may change
 Every resulting file must be a regular, non-executable file (no symlinks, submodules or +x).
 Exit 0 when the candidate is in scope, 1 otherwise. Tests: engine-upgrade/tests/test_candidate_scope.py
 """
 from __future__ import annotations
 
+import json
 import re
 import subprocess
 import sys
@@ -31,7 +36,13 @@ RULES = [
     (re.compile(r"engine-upgrade/preview-config\.json"), "M"),
     (re.compile(r"android/app/libs/argentum-[a-z0-9-]+\.jar"), "M"),
     (re.compile(r"android/app/src/main/assets/argentum/[A-Za-z0-9._/-]+"), "AMD"),
+    (re.compile(r"docs/agents/generated/sdk-api\.(md|json)"), "M"),
+    (re.compile(r"docs/agents/argentum-upstream/(card-sdk-language-reference|sdk-index|add-card-examples)\.md"), "M"),
 ]
+# Files where only the pinned upstream commit (full SHA, or `abc1234…`) may change.
+PIN_ONLY = ("AGENTS.md", "docs/agents/CARD-WORKFLOW.md", "docs/agents/argentum-upstream/README.md",
+            "tools/cardkit/cardkit_lib/repo.py")
+RULES += [(re.compile(re.escape(path)), "M") for path in PIN_ONLY]
 REGULAR = {"100644", "000000"}  # 000000 = the file is deleted
 
 
@@ -76,6 +87,19 @@ def problems() -> list[str]:
         after = git("show", ":engine-upgrade/audit_patches.py")
         if strip_pins(before) != strip_pins(after):
             found.append("engine-upgrade/audit_patches.py: changes beyond the TARGET pin and MANDATORY list")
+    pin_changes = [path for _, _, path in changes if path in PIN_ONLY]
+    if pin_changes:
+        try:
+            old = json.loads(git("show", "HEAD:engine-upgrade/preview-config.json"))["upstream"]
+            new = json.loads(git("show", ":engine-upgrade/preview-config.json"))["upstream"]
+        except (subprocess.CalledProcessError, KeyError, ValueError):
+            old = new = ""
+        for path in pin_changes:
+            before, after = git("show", f"HEAD:{path}"), git("show", f":{path}")
+            if not (old != new and all(re.fullmatch(r"[0-9a-f]{40}", str(x)) for x in (old, new))):
+                found.append(f"{path}: changed without a pin move in engine-upgrade/preview-config.json")
+            elif after.replace(new, old).replace(f"`{new[:7]}\u2026`", f"`{old[:7]}\u2026`") != before:
+                found.append(f"{path}: changes beyond the pinned upstream commit")
     return found
 
 

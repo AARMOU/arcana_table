@@ -15,6 +15,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+OLD, NEW = "a" * 40, "b" * 40
 CHECKER = Path(__file__).resolve().parents[1] / "candidate_scope.py"
 AUDIT = '''"""audit"""
 TARGET = "{pin}"
@@ -42,7 +43,12 @@ class CandidateScope(unittest.TestCase):
         self.write("argentum-patches/0001-a.patch", "old\n")
         self.write("engine-upgrade/forward-ports/0002-b.patch", "fp\n")
         self.write("engine-upgrade/audit_patches.py", audit("a" * 40, ["0001-a.patch"]))
-        self.write("engine-upgrade/preview-config.json", "{}\n")
+        self.write("engine-upgrade/preview-config.json", '{"upstream": "%s"}\n' % OLD)
+        self.write("AGENTS.md", f"Engine pinned at `{OLD}`, shipped as jars.\n")
+        self.write("docs/agents/CARD-WORKFLOW.md", f"Upstream at the pinned commit (`{OLD[:7]}\u2026`).\n")
+        self.write("tools/cardkit/cardkit_lib/repo.py", f'UPSTREAM_COMMIT = "{OLD}"\n')
+        self.write("docs/agents/generated/sdk-api.md", "# SDK\n")
+        self.write("docs/agents/argentum-upstream/sdk-index.md", "# idx\n")
         self.write("engine-upgrade/weekly.py", "print('trusted')\n")
         self.write("android/app/libs/argentum-rules-engine.jar", "jar\n")
         self.write("android/app/src/main/assets/argentum/cards.jsonl", "{}\n")
@@ -79,7 +85,12 @@ class CandidateScope(unittest.TestCase):
         self.write("argentum-patches/0003-new.patch", "new\n")
         (self.repo / "engine-upgrade/forward-ports/0002-b.patch").unlink()
         self.write("engine-upgrade/audit_patches.py", audit("b" * 40, ["0001-a.patch", "0003-new.patch"]))
-        self.write("engine-upgrade/preview-config.json", '{"upstream": "b"}\n')
+        self.write("engine-upgrade/preview-config.json", '{"upstream": "%s"}\n' % NEW)
+        self.write("AGENTS.md", f"Engine pinned at `{NEW}`, shipped as jars.\n")
+        self.write("docs/agents/CARD-WORKFLOW.md", f"Upstream at the pinned commit (`{NEW[:7]}\u2026`).\n")
+        self.write("tools/cardkit/cardkit_lib/repo.py", f'UPSTREAM_COMMIT = "{NEW}"\n')
+        self.write("docs/agents/generated/sdk-api.md", "# SDK v2\n")
+        self.write("docs/agents/argentum-upstream/sdk-index.md", "# idx v2\n")
         self.write("android/app/libs/argentum-rules-engine.jar", "jar2\n")
         self.write("android/app/src/main/assets/argentum/cards.jsonl", "{\"a\": 1}\n")
         self.write("android/app/src/main/assets/argentum/new/index.tsv", "x\n")
@@ -158,6 +169,36 @@ class CandidateScope(unittest.TestCase):
                    audit("b" * 40, ["0001-a.patch"], extra="\nimport os; os.system('id')\n"))
         self.stage()
         self.assertRejected("changes beyond the TARGET pin and MANDATORY list")
+
+
+    def move_pin(self):
+        self.write("engine-upgrade/preview-config.json", '{"upstream": "%s"}\n' % NEW)
+
+    def test_pin_file_may_change_only_its_pin(self):
+        self.move_pin()
+        self.write("tools/cardkit/cardkit_lib/repo.py", f'UPSTREAM_COMMIT = "{NEW}"\nimport os\n')
+        self.stage()
+        self.assertRejected("tools/cardkit/cardkit_lib/repo.py: changes beyond the pinned upstream commit")
+
+    def test_pin_file_cannot_change_without_a_pin_move(self):
+        self.write("AGENTS.md", "Engine pinned at whatever.\n")
+        self.stage()
+        self.assertRejected("AGENTS.md: changed without a pin move")
+
+    def test_pin_must_be_a_full_sha(self):
+        self.write("engine-upgrade/preview-config.json", '{"upstream": "main"}\n')
+        self.write("AGENTS.md", "Engine pinned at `main`, shipped as jars.\n")
+        self.stage()
+        self.assertRejected("AGENTS.md: changed without a pin move")
+
+    def test_other_docs_are_rejected(self):
+        self.write("docs/agents/CARD-PATTERNS.md", "x\n")
+        self.write("docs/agents/argentum-upstream/LICENSE", "x\n")
+        self.stage()
+        code, out = self.check()
+        self.assertEqual(code, 1, out)
+        self.assertIn("docs/agents/CARD-PATTERNS.md: outside the upgrade scope", out)
+        self.assertIn("docs/agents/argentum-upstream/LICENSE: outside the upgrade scope", out)
 
 
 if __name__ == "__main__":

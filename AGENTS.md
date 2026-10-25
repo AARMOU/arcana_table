@@ -59,6 +59,10 @@ Never, without explicit owner approval: push to or merge into `main`; release, s
 replace runtime jars or B131 snapshots; change billing, dispatch, `ARCANA_*` variables or Copilot agent
 settings; open `[Arcana Queue]` issues or apply `arcana:authorize-once`.
 
+## Weekly engine upgrade
+
+`.github/workflows/argentum-weekly-upgrade.yml` moves Arcana onto upstream Argentum every Monday. When a run is red (patch conflict, engine build failure, collision or failing test), its PR or issue has a **Handoff** section with the exact commands. Follow [`engine-upgrade/HANDOFF.md`](engine-upgrade/HANDOFF.md): work on `gpt/argentum-weekly-fix-<date>` (pushing it runs a read-only dry run), never push to `bot/argentum-weekly`. Engine fixes are Claude's lane; GPT finishes them when Claude is unavailable.
+
 ## Checks to run before asking for review
 
 ```sh

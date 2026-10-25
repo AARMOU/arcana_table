@@ -2,8 +2,13 @@
 """Weekly Argentum upgrade: move Arcana onto upstream's latest engine without breaking imported cards.
 
     weekly.py rebase   ENGINE TARGET  rebuild the patch series as commits on the current pin, rebase
-                                      them onto TARGET (three-way merge, not strict patch application),
-                                      then rewrite argentum-patches/ and the pins from the result
+                       [--keep-conflict]  them onto TARGET (three-way merge, not strict patch application),
+                                      then rewrite argentum-patches/ and the pins from the result;
+                                      --keep-conflict leaves a conflict in place for a person or agent
+    weekly.py checkout ENGINE         the series as one commit per patch on the pin, for hand fixes
+    weekly.py finish   ENGINE         after a hand-resolved rebase or --fixup commits: record conflict
+                                      resolutions in engine-upgrade/rerere/, rewrite patches and pins
+    weekly.py handoff  KIND UPSTREAM  write weekly/handoff.md (conflict | build_failed | needs_work)
     weekly.py install  ENGINE         copy the four rebuilt Java 17 jars and exported card data into the app
     weekly.py cards    OLD_ASSETS     imported-card report: decks, custom cards, corpus diff
     weekly.py summary  RESULTS_DIR    test totals from JUnit XML
@@ -16,6 +21,7 @@ which the workflow turns into the pull request body.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import struct
@@ -44,10 +50,12 @@ MODULES = {
 }
 EXPORTS = ("all-cards.jsonl", "por-cards.jsonl", "all-cards.index.tsv")
 PREFIX = "arcana: "
+PATCH_DATE = "2000-01-01T00:00:00+0000"
 
 
-def run(*args, cwd=None, check=True):
-    result = subprocess.run(args, cwd=cwd, text=True, capture_output=True)
+def run(*args, cwd=None, check=True, env=None):
+    result = subprocess.run(args, cwd=cwd, text=True, capture_output=True,
+                            env={**os.environ, **env} if env else None)
     if check and result.returncode:
         raise SystemExit(f"{' '.join(args)} failed:\n{result.stdout}\n{result.stderr}")
     return result
@@ -72,19 +80,16 @@ def patch_file(name):
 
 # ---------------------------------------------------------------- rebase
 
-def rebase(engine_dir, target):
-    engine = Path(engine_dir).resolve()
-    git = lambda *a, check=True: run("git", *a, cwd=engine, check=check)
-    text, pin, mandatory = audit_state()
-    target = git("rev-parse", target).stdout.strip()
-    report = {"old_pin": pin, "target": target, "status": "pending", "patches": [], "conflicts": []}
-    if target == pin:
-        report["status"] = "up_to_date"
-        write("rebase.json", report)
-        print("Already on upstream", target)
-        return 0
-    report["upstream_commits"] = int(git("rev-list", "--count", f"{pin}..{target}").stdout)
+STATE = ".git/arcana-weekly.json"  # inside the engine checkout: what checkout/rebase set up, for finish
 
+
+def engine_git(engine):
+    return lambda *a, check=True: run("git", *a, cwd=engine, check=check)
+
+
+def prepare(engine, pin, mandatory):
+    """The series as commits on the pin (the strict audit proves it applies there), with rerere primed."""
+    git = engine_git(engine)
     git("config", "user.name", "arcana-weekly-bot")
     git("config", "user.email", "41898282+github-actions[bot]@users.noreply.github.com")
     git("config", "rerere.enabled", "true")
@@ -93,16 +98,49 @@ def rebase(engine_dir, target):
     cache.mkdir(parents=True, exist_ok=True)
     if RERERE.is_dir():
         shutil.copytree(RERERE, cache, dirs_exist_ok=True)
-
-    # 1. The series as commits on the pin: the strict audit already proves it applies there.
-    git("checkout", "-q", "-B", "arcana", pin)
+    git("checkout", "-q", "-f", "-B", "arcana", pin)
     for name in mandatory:
         git("apply", "--index", str(patch_file(name)))
-        git("commit", "-q", "--allow-empty", "-m", PREFIX + name[:-len(".patch")])
+        # Fixed dates: the date goes into each patch file's header, so a patch whose content did not
+        # change comes out byte-identical instead of showing up as changed every week.
+        run("git", "commit", "-q", "--allow-empty", "-m", PREFIX + name[:-len(".patch")], cwd=engine,
+            env={"GIT_AUTHOR_DATE": PATCH_DATE, "GIT_COMMITTER_DATE": PATCH_DATE})
 
-    # 2. Three-way rebase onto the new upstream, auto-resolving only the safe cases.
-    #    rerere cannot record "keep this file deleted", so files an Arcana patch deliberately replaces are
-    #    listed in rebase-rules.json; upstream edits to them are reported, never silently dropped.
+
+def save_state(engine, **state):
+    (engine / STATE).write_text(json.dumps(state, indent=2) + "\n")
+
+
+def rebase(engine_dir, target, *flags):
+    """Rebase the series onto TARGET. --keep-conflict leaves an unresolvable conflict in place (for a
+    person or agent to resolve, then `finish`) instead of aborting. With WEEKLY_FORCE=1 a branch whose pin
+    already equals TARGET is still validated as-is (fix branches), instead of reporting up_to_date."""
+    engine = Path(engine_dir).resolve()
+    git = engine_git(engine)
+    text, pin, mandatory = audit_state()
+    target = git("rev-parse", target).stdout.strip()
+    report = {"old_pin": pin, "target": target, "status": "pending", "patches": [], "conflicts": []}
+    if target == pin:
+        if os.environ.get("WEEKLY_FORCE") != "1":
+            report["status"] = "up_to_date"
+            write("rebase.json", report)
+            print("Already on upstream", target)
+            return 0
+        prepare(engine, pin, mandatory)  # proves the series applies; nothing to rewrite
+        report.update(status="rebased", upstream_commits=0, auto_resolved=[],
+                      patches=[{"patch": n, "status": "unchanged"} for n in mandatory],
+                      engine_head=git("rev-parse", "HEAD").stdout.strip())
+        write("rebase.json", report)
+        write("auto-resolved.md", "")
+        print(f"Validating this branch's {len(mandatory)} patches as-is on {target}")
+        return 0
+    report["upstream_commits"] = int(git("rev-list", "--count", f"{pin}..{target}").stdout)
+    prepare(engine, pin, mandatory)
+    save_state(engine, pin=pin, target=target, mode="rebase")
+
+    # Three-way rebase onto the new upstream, auto-resolving only the safe cases.
+    # rerere cannot record "keep this file deleted", so files an Arcana patch deliberately replaces are
+    # listed in rebase-rules.json; upstream edits to them are reported, never silently dropped.
     rules = json.loads(RULES.read_text()) if RULES.is_file() else {}
     keep_deleted = {entry["path"]: entry for entry in rules.get("keep_deleted", [])}
     report["auto_resolved"] = []
@@ -125,19 +163,86 @@ def rebase(engine_dir, target):
             report["conflicts"] = [{
                 "patch": current.removeprefix(PREFIX) + ".patch",
                 "file": path,
+                "kind": "modify/delete" if not git("ls-files", "-u", "--", path).stdout.count(" 3\t") else "content",
                 "diff": git("diff", "--", path, check=False).stdout[-5000:],
             } for path in unresolved]
-            git("rebase", "--abort", check=False)
             write("rebase.json", report)
             write("rebase.md", conflict_markdown(report))
-            print("Conflict needs a person or agent:", unresolved)
+            if "--keep-conflict" in flags:
+                print(f"Conflict left in place in {engine} for: {unresolved}\n"
+                      "Resolve each file, `git add` it, run `git -c core.editor=true rebase --continue`, repeat until\n"
+                      "the rebase completes, then run: python3 engine-upgrade/weekly.py finish " + str(engine_dir))
+            else:
+                git("rebase", "--abort", check=False)
+                print("Conflict needs a person or agent:", unresolved)
             return 2
         step = run("git", "-c", "core.editor=true", "rebase", "--continue", cwd=engine, check=False)
         if step.returncode and "nothing to commit" in step.stdout + step.stderr:
             step = git("rebase", "--skip", check=False)
 
-    # 3. Rewrite the series from the rebased commits. Absorbed patches drop out; changelog hunks never
-    #    come back, so they cannot conflict again next week.
+    export_series(engine, target, mandatory, text, report)
+    print(f"Rebased {len([p for p in report['patches'] if p['status'] == 'refreshed'])} patches onto {target} "
+          f"({report['upstream_commits']} upstream commits)")
+    return 0
+
+
+def checkout(engine_dir):
+    """Set up the engine checkout for hand-editing: the current series as one commit per patch on the
+    pin. Fix code, commit each fix as `git commit --fixup <that patch's commit>`, then `finish`."""
+    engine = Path(engine_dir).resolve()
+    text, pin, mandatory = audit_state()
+    prepare(engine, pin, mandatory)
+    save_state(engine, pin=pin, target=pin, mode="checkout")
+    print(f"{engine}: branch `arcana`, {len(mandatory)} patch commits on {pin[:10]}:")
+    print(run("git", "log", "--oneline", f"{pin}..HEAD", cwd=engine).stdout)
+    print("Commit fixes with `git commit --fixup <commit>`, then: python3 engine-upgrade/weekly.py finish " + str(engine_dir))
+    return 0
+
+
+def finish(engine_dir):
+    """After a hand-resolved rebase or hand-made fixes: record new conflict resolutions in
+    engine-upgrade/rerere/ (so the robot replays them) and rewrite argentum-patches/ and the pins."""
+    engine = Path(engine_dir).resolve()
+    git = engine_git(engine)
+    state_file = engine / STATE
+    if not state_file.is_file():
+        raise SystemExit("Run `weekly.py checkout` or `weekly.py rebase ... --keep-conflict` first")
+    state = json.loads(state_file.read_text())
+    if (engine / ".git/rebase-merge").exists() or (engine / ".git/rebase-apply").exists():
+        raise SystemExit("A rebase is still in progress: resolve, `git add`, `git -c core.editor=true rebase --continue` until done")
+    if git("status", "--porcelain", "--untracked-files=no").stdout.strip():
+        raise SystemExit("Uncommitted changes in the engine checkout: commit them (as --fixup of the owning patch)")
+    target, pin = state["target"], state["pin"]
+    base = git("merge-base", "HEAD", target).stdout.strip()
+    if base != target:
+        raise SystemExit(f"HEAD is not on top of the target {target[:10]}")
+    # Fold fixup! commits into the patch they fix.
+    if git("log", "--format=%s", f"{target}..HEAD").stdout.count("fixup! "):
+        run("git", "-c", "sequence.editor=true", "rebase", "-q", "-i", "--autosquash", target, cwd=engine)
+    subjects = git("log", "--format=%s", f"{target}..HEAD").stdout.splitlines()
+    strays = [s for s in subjects if not s.startswith(PREFIX)]
+    if strays:
+        raise SystemExit(f"Commits that belong to no patch (use --fixup): {strays}")
+    recorded = []
+    cache = engine / ".git/rr-cache"
+    for entry in sorted(cache.iterdir()) if cache.is_dir() else []:
+        if (entry / "postimage").is_file() and not (RERERE / entry.name).exists():
+            shutil.copytree(entry, RERERE / entry.name)
+            recorded.append(entry.name)
+    text, _, mandatory = audit_state()
+    report = {"old_pin": pin, "target": target, "status": "pending", "patches": [], "conflicts": [],
+              "auto_resolved": [], "upstream_commits": int(git("rev-list", "--count", f"{pin}..{target}").stdout)}
+    export_series(engine, target, mandatory, text, report)
+    state_file.unlink()
+    print(f"Rewrote argentum-patches/ from {len(subjects)} commits on {target[:10]}; "
+          f"recorded {len(recorded)} conflict resolution(s) in engine-upgrade/rerere/: {recorded}")
+    return 0
+
+
+def export_series(engine, target, mandatory, text, report):
+    """Rewrite argentum-patches/ from the `arcana: <patch>` commits on TARGET, then the pins. Absorbed patches
+    drop out; changelog hunks never come back, so they cannot conflict again next week."""
+    git = engine_git(engine)
     commits = git("log", "--reverse", "--format=%H %s", f"{target}..HEAD").stdout.splitlines()
     kept = []
     for line in commits:
@@ -157,11 +262,11 @@ def rebase(engine_dir, target):
         (FORWARD / name).unlink(missing_ok=True)  # forward ports are folded into the refreshed patch
 
     # Experimental patch: report only, never part of the runtime.
-    experimental = re.search(r'^EXPERIMENTAL = "([^"]+)"', text, re.M)[1]
-    probe = git("apply", "--check", str(PATCHES / experimental), check=False)
-    report["experimental"] = {"patch": experimental, "applies": probe.returncode == 0}
+    experimental = re.search(r'^EXPERIMENTAL = "([^"]+)"', text, re.M)
+    if experimental and (PATCHES / experimental[1]).is_file():
+        probe = git("apply", "--check", str(PATCHES / experimental[1]), check=False)
+        report["experimental"] = {"patch": experimental[1], "applies": probe.returncode == 0}
 
-    # 4. Pins: audit target and mandatory list, preview config, recorded resolutions now obsolete.
     listing = "".join(f'    "{n}",\n' for n in kept)
     text = re.sub(r'^TARGET = "[0-9a-f]{40}"', f'TARGET = "{target}"', text, flags=re.M)
     text = re.sub(r"^MANDATORY = \[\n.*?^\]", "MANDATORY = [\n" + listing + "]", text, flags=re.M | re.S)
@@ -173,8 +278,7 @@ def rebase(engine_dir, target):
     report["engine_head"] = git("rev-parse", "HEAD").stdout.strip()
     write("rebase.json", report)
     write("auto-resolved.md", auto_resolved_markdown(report))
-    print(f"Rebased {len(kept)} patches onto {target} ({report['upstream_commits']} upstream commits)")
-    return 0
+    return kept
 
 
 def auto_resolved_markdown(report):
@@ -191,13 +295,118 @@ def auto_resolved_markdown(report):
 
 def conflict_markdown(report):
     lines = [f"Upstream `{report['target'][:10]}` is {report.get('upstream_commits', '?')} commits ahead of the pin "
-             f"`{report['old_pin'][:10]}`. A patch no longer merges on its own.", "",
-             "**To unblock:** run the series onto the target with `git rerere` enabled, resolve the hunk, "
-             "then copy the new `.git/rr-cache/<id>` folder into `engine-upgrade/rerere/` and commit it. "
-             "The next weekly run replays that resolution automatically.", ""]
+             f"`{report['old_pin'][:10]}`. A patch no longer merges on its own; see **Handoff** below.", ""]
     for conflict in report["conflicts"]:
-        lines += [f"### `{conflict['patch']}` → `{conflict['file']}`", "", "```diff", conflict["diff"].strip(), "```", ""]
+        kind = conflict.get("kind", "content")
+        lines += [f"### `{conflict['patch']}` → `{conflict['file']}` ({kind})", "", "```diff",
+                  conflict["diff"].strip() or "(no text diff: the patch deletes this file and upstream edited it)", "```", ""]
     return "\n".join(lines)
+
+
+def handoff(kind, upstream, run_url=""):
+    """Write weekly/handoff.md: exact next steps for whoever picks up a red run (Claude, or GPT covering).
+    KIND: conflict | build_failed | needs_work."""
+    import datetime
+    day = datetime.date.today().isoformat()
+    fix = f"gpt/argentum-weekly-fix-{day}"
+    clone = ["git clone --filter=blob:none https://github.com/wingedsheep/argentum-engine argentum-engine"]
+    if kind == "conflict":
+        start = "origin/gpt/arcana-integration-next"
+        steps = [f"git fetch origin && git checkout -b {fix} {start}", *clone,
+                 f"python3 engine-upgrade/weekly.py rebase argentum-engine {upstream} --keep-conflict",
+                 "# resolve each conflicted file in argentum-engine/ (keep BOTH upstream's change and the patch's intent),",
+                 "# then: git -C argentum-engine add <file> && git -C argentum-engine -c core.editor=true rebase --continue",
+                 "# repeat until the rebase completes; a modify/delete conflict on a file Arcana replaces goes in",
+                 "# engine-upgrade/rebase-rules.json (keep_deleted, with a `why`) instead, then re-run the rebase command",
+                 "python3 engine-upgrade/weekly.py finish argentum-engine",
+                 "git add argentum-patches engine-upgrade && git commit -m 'Resolve weekly upgrade conflict'",
+                 f"git push -u origin {fix}   # starts a dry run automatically (read-only, publishes nothing)"]
+        goal = "the patch series rebases onto the target; the resolution is recorded in engine-upgrade/rerere/"
+    elif kind == "build_failed":
+        start = "origin/bot/argentum-weekly"
+        steps = [f"git fetch origin && git checkout -b {fix} {start}   # refreshed patches + new pin", *clone,
+                 "python3 engine-upgrade/weekly.py checkout argentum-engine   # one commit per patch on the new pin",
+                 "# fix the compiler errors listed above inside argentum-engine/; find the owning patch with",
+                 "#   git -C argentum-engine log --oneline -- <file>",
+                 "# commit each fix as: git -C argentum-engine commit -a --fixup <that patch's commit>",
+                 "python3 engine-upgrade/weekly.py finish argentum-engine   # folds fixups, rewrites argentum-patches/",
+                 "git add argentum-patches engine-upgrade && git commit -m 'Fix weekly upgrade engine build'",
+                 f"git push -u origin {fix}   # starts a dry run automatically (read-only, publishes nothing)"]
+        goal = "the patched engine compiles and the strict audit passes"
+    else:
+        start = "origin/bot/argentum-weekly"
+        steps = [f"git fetch origin && git checkout -b {fix} {start}",
+                 "# custom-card collision: compare upstream's card with Arcana's; run the card's positive and negative",
+                 "#   scenarios against upstream's version; if upstream is correct, retire the custom card (definition,",
+                 "#   CustomCards.kt entry, re-export); if not, record why it stays. Never exempt it from the test.",
+                 "# failing test: find the root cause; never weaken, skip or delete the test (AGENTS.md rules)",
+                 "cd android && ./gradlew --no-daemon :custom-cards:exportCards :custom-cards:test :app:testDebugUnitTest",
+                 f"git push -u origin {fix}   # starts a dry run automatically (read-only, publishes nothing)"]
+        goal = "every check in the table above is green"
+    lines = ["### Handoff", "",
+             f"**Who:** engine fixes are Claude's lane; GPT finishes when Claude is unavailable (issue #81). Card "
+             f"decisions are GPT's lane. Full runbook: `engine-upgrade/HANDOFF.md`.", "",
+             f"**Done when:** {goal}, and the dry run on `{fix}` is green except for anything listed as a card "
+             f"decision. Then open a draft PR from `{fix}` into `gpt/arcana-integration-next`, link this run, post on #81. "
+             "The owner merges.", "",
+             f"**Start from:** `{start}` · upstream `{upstream}`" + (f" · run {run_url}" if run_url else ""), "",
+             "```sh", *steps, "```", "",
+             "Never: push to `bot/argentum-weekly` (the robot refuses to overwrite it and stops), weaken or skip a test, "
+             "add a collision exemption, or merge."]
+    write("handoff.md", "\n".join(lines) + "\n")
+    print("\n".join(lines))
+    return 0
+
+
+# ---------------------------------------------------------------- docs
+
+VENDORED = ROOT / "docs/agents/argentum-upstream"
+VENDOR_FILES = {  # Arcana copy -> upstream path (docs/agents/argentum-upstream/README.md)
+    "card-sdk-language-reference.md": "docs/card-sdk-language-reference.md",
+    "sdk-index.md": "docs/sdk-index.md",
+    "add-card-examples.md": ".agents/skills/add-card/examples.md",
+}
+# Files that state the pinned upstream commit. Only the pin may change in them
+# (engine-upgrade/candidate_scope.py enforces that on the publish side).
+PIN_FILES = ("AGENTS.md", "docs/agents/CARD-WORKFLOW.md", "docs/agents/argentum-upstream/README.md",
+             "tools/cardkit/cardkit_lib/repo.py")
+
+
+def short_pin(sha):
+    return f"`{sha[:7]}\u2026`"
+
+
+def docs(engine_dir):
+    """Keep agent-facing docs on the new pin: re-vendor upstream's DSL docs and move the stated pin.
+
+    The SDK index (docs/agents/generated/sdk-api.*) is regenerated from the new jar by
+    `tools/cardkit/cardkit sdk-index` in the workflow, right after this.
+    """
+    engine = Path(engine_dir).resolve()
+    report = json.loads((OUT / "rebase.json").read_text())
+    old, new = report["old_pin"], report["target"]
+    if not all(re.fullmatch(r"[0-9a-f]{40}", x) for x in (old, new)):
+        raise SystemExit(f"Bad pins: {old!r} -> {new!r}")
+    missing = []
+    for name, upstream in VENDOR_FILES.items():
+        shown = run("git", "show", f"{new}:{upstream}", cwd=engine, check=False)
+        if shown.returncode:
+            missing.append(upstream)
+        else:
+            (VENDORED / name).write_text(shown.stdout)
+    stale = []
+    for rel in PIN_FILES:
+        path = ROOT / rel
+        text = path.read_text()
+        if old not in text and short_pin(old) not in text:
+            stale.append(rel)  # the file does not state the pin we are moving from
+        path.write_text(text.replace(old, new).replace(short_pin(old), short_pin(new)))
+    write("docs.json", {"old_pin": old, "new_pin": new, "missing_upstream_docs": missing, "pin_not_found": stale})
+    for item in missing:
+        print(f"::error title=Vendored doc gone upstream::{item}")
+    for item in stale:
+        print(f"::error title=Pin not found::{item} does not mention {old[:10]}")
+    return 1 if missing or stale else 0
 
 
 # ---------------------------------------------------------------- install
@@ -389,4 +598,5 @@ def summary(results_dir):
 
 if __name__ == "__main__":
     command, *args = sys.argv[1:]
-    sys.exit({"rebase": rebase, "install": install, "cards": cards, "summary": summary}[command](*args) or 0)
+    sys.exit({"rebase": rebase, "checkout": checkout, "finish": finish, "handoff": handoff, "install": install,
+              "docs": docs, "cards": cards, "summary": summary}[command](*args) or 0)
