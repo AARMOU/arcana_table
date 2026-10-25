@@ -35,15 +35,19 @@ val AzlaskTheSwellingScourge = card("Azlask, the Swelling Scourge") {
         "number of experience counters you have. Scions and Spawns you control gain " +
         "indestructible and annihilator 1 until end of turn."
 
+    // Separate SELF and OTHER abilities: the SDK cannot combine different trigger bindings
+    // with Triggers.or. Each death produces at most one experience counter.
     triggeredAbility {
-        // Azlask's own death always counts, even if an effect changed its color.
-        // Other friendly creatures count only if they were colorless immediately before dying.
-        // OTHER deliberately excludes this card, preventing two triggers for a colorless Azlask.
-        trigger = Triggers.or(
-            Triggers.self.dies(),
-            Triggers.another(GameObjectFilter.Creature.exactlyColors(0).youControl()).dies(),
-        )
+        trigger = Triggers.self.dies()
         effect = Effects.AddCounters(CounterType.EXPERIENCE, 1, EffectTarget.Controller)
+        description = "Whenever Azlask dies, you get an experience counter."
+    }
+
+    triggeredAbility {
+        // The dying creature's last-known projected color matters, even if it was color-changed.
+        trigger = Triggers.another(GameObjectFilter.Creature.exactlyColors(0).youControl()).dies()
+        effect = Effects.AddCounters(CounterType.EXPERIENCE, 1, EffectTarget.Controller)
+        description = "Whenever another colorless creature you control dies, you get an experience counter."
     }
 
     activatedAbility {
