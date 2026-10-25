@@ -112,4 +112,36 @@ class UginCostReductionDevoidScenarioTest {
             d.castSpell(p, second).error)
         assertEquals(0, d.poolColorless())
     }
+
+    @Test fun opponentsUginCannotDiscountMySpellOrStackWithMyUgin() {
+        val d = customScenario(UginTheIneffable)
+        val p = d.player1
+        val opponent = d.player2
+        val probe = card("Ugin Controller-Scope Colorless Probe") {
+            manaCost = "{3}"
+            typeLine = "Artifact"
+        }
+        d.registerCard(probe)
+
+        // Two Ugins controlled by different players are legal. Only the Ugin
+        // controlled by the player casting the spell may reduce its cost.
+        d.putPermanentOnBattlefield(opponent, "Ugin, the Ineffable")
+        val spell = d.putCardInHand(p, probe.name)
+        d.giveColorlessMana(p, 1)
+
+        assertEquals("Rejection must occur while the caster has priority", p, d.priorityPlayer)
+        assertNotNull("Opponent's Ugin must not reduce our {3} spell to {1}",
+            d.castSpell(p, spell).error)
+        assertEquals("Failed payment cannot consume the one available mana",
+            1, d.poolColorless())
+
+        d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        assertNull("Our own Ugin now reduces the same {3} spell to exactly {1}",
+            d.castSpell(p, spell).error)
+        assertEquals("Opponent's Ugin must not stack an extra reduction",
+            0, d.poolColorless())
+        d.resolveAll()
+        assertNotNull(d.findPermanent(p, probe.name))
+        assertEquals(1, d.permanentsNamed(opponent, "Ugin, the Ineffable").size)
+    }
 }
