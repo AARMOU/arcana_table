@@ -85,4 +85,43 @@ class SpawnbedProtectorScenarioTest {
         assertEquals(2, d.permanentsNamed(p, "Eldrazi Scion").size)
         assertEquals(0, d.permanentsNamed(opponent, "Eldrazi Scion").size)
     }
+
+    /**
+     * Oracle ruling: if the chosen graveyard target becomes illegal before this
+     * triggered ability resolves, its entire effect fails (including the Scions).
+     *
+     * The fixture's moveToExile simulates an intervening graveyard-exile effect;
+     * target choice and stack resolution still use the actual Argentum engine.
+     */
+    @Test
+    fun targetExiledInResponseCausesEntireEndStepTriggerToFizzleWithoutScions() {
+        val d = customScenario(SpawnbedProtector, "Bane of Bala Ged")
+        val p = d.player1
+        d.putCreatureOnBattlefield(p, "Spawnbed Protector")
+        val target = d.putCardInGraveyard(p, "Bane of Bala Ged")
+
+        d.passPriorityUntil(Step.END, activePlayer = p)
+        assertTrue(
+            "Triggered ability must choose its target while going onto the stack, not at resolution",
+            d.pendingDecision is com.wingedsheep.engine.core.ChooseTargetsDecision,
+        )
+        assertNull(d.submitTargetSelection(p, listOf(target)).error)
+        assertTrue("The targeted trigger must still be waiting on the stack", d.stackSize > 0)
+
+        // Simulate an instant-speed response removing the chosen card from the graveyard.
+        d.moveToExile(target)
+        assertFalse(d.zoneNames(p, Zone.GRAVEYARD).contains("Bane of Bala Ged"))
+        assertTrue(d.zoneNames(p, Zone.EXILE).contains("Bane of Bala Ged"))
+
+        d.resolveAll()
+
+        assertFalse(d.zoneNames(p, Zone.HAND).contains("Bane of Bala Ged"))
+        assertTrue(d.zoneNames(p, Zone.EXILE).contains("Bane of Bala Ged"))
+        assertEquals(
+            "All targets illegal at resolution: the trigger must not create Scions",
+            0,
+            d.permanentsNamed(p, "Eldrazi Scion").size,
+        )
+    }
+
 }
