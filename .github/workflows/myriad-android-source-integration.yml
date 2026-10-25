@@ -3,6 +3,17 @@ name: Myriad Android source integration (manual, isolated)
 # runs the engine suites, then runs Arcana's custom-card and Android suites against the rebuilt jars
 # installed ONLY in this workspace. Never commits, uploads to a release, signs or replaces jars.
 on:
+  # [myriad-full-ci] on isolated branch: owner-authorized source engine + Android validation.
+  # Preflight must pass before either expensive suite starts.
+  # One branch only: avoid accidentally running full source builds.
+  push:
+    branches:
+      - gpt/myriad-source-preflight-20261025
+    paths:
+      - .github/workflows/myriad-android-source-integration.yml
+      - engine-upgrade/myriad/**
+      - engine-upgrade/ulalek/**
+      - engine-upgrade/audit_patches.py
   workflow_dispatch:
 permissions:
   contents: read
@@ -11,7 +22,50 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  patch-preflight:
+    name: pinned Myriad patch applicability (no Gradle or APK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: argentum-engine
+          persist-credentials: false
+      - name: Apply mandatory B131 patches
+        run: python3 engine-upgrade/audit_patches.py
+      - name: Apply Ulalek patches
+        run: python3 engine-upgrade/ulalek/apply_patches.py
+      - name: Apply Myriad defender-choice patch
+        run: python3 engine-upgrade/myriad/apply_patch.py
+      - name: Verify exact patch and protect committed Android assets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("argentum-engine/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/Myriad.kt")
+          assert "attackDefender = EnteringAttackDefender.CONTROLLER_CHOOSES" in p.read_text()
+          print("Pinned engine Myriad choice source present")
+          PY
+          git -C argentum-engine diff --check
+          git diff --exit-code -- android/app/libs android/app/src/main/assets
+      - name: Save exact patch reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: myriad-patch-preflight
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            engine-upgrade/patch-report.json
+            engine-upgrade/ulalek/apply-report.json
+
   engine-tests:
+    needs: patch-preflight
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[myriad-full-ci]'))
     name: engine ${{ matrix.suite }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
@@ -75,6 +129,8 @@ jobs:
             argentum-engine/**/build/test-results/**/TEST-*.xml
 
   app-candidate:
+    needs: patch-preflight
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[myriad-full-ci]'))
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
