@@ -240,6 +240,27 @@ class ReadinessTests(unittest.TestCase):
         v = readiness.classify("Cardkit Test Plaguebearer")
         self.assertEqual(v["readiness"], "ENGINE_BLOCKED")
 
+    def test_twins_of_discord_cannot_be_routed_as_supported_without_bloodthirst(self):
+        # Original Eldrazi Incursion slot. The pinned SDK has no grantable
+        # BLOODTHIRST keyword; matching only the odd/even attack text is not enough.
+        v = readiness.classify("Twins of Discord")
+        self.assertEqual(v["readiness"], "ENGINE_BLOCKED", v["reasons"])
+        self.assertEqual(v["route"], "claude")
+        self.assertIn("Bloodthirst", readiness.blockers()["keywords"])
+        self.assertIn("bloodthirst", " ".join(v["reasons"]).lower())
+
+    def test_exported_chittering_dispatcher_still_blocked_by_proven_myriad_gap(self):
+        # #181 compiled and executed the actual three-player engine scenario.
+        # Its defender-choice failure must beat indexed/tested source precedence.
+        state, _, source = readiness.implementation_state("Chittering Dispatcher")
+        self.assertEqual(state, "IMPLEMENTED_AND_TESTED")
+        self.assertTrue(source.startswith("custom:"))
+        v = readiness.classify("Chittering Dispatcher")
+        self.assertEqual(v["readiness"], "ENGINE_BLOCKED", v["reasons"])
+        self.assertEqual(v["route"], "claude")
+        self.assertIn("#181", " ".join(v["reasons"]))
+        self.assertIn("Myriad", readiness.blockers()["keywords"])
+
 
 class UnitCommandTests(unittest.TestCase):
     """`cardkit unit` must fail closed: no queue body for anything that is not dispatchable."""
@@ -349,7 +370,14 @@ class GapsTests(unittest.TestCase):
         audit = subprocess.run([sys.executable, str(repo.ROOT / "investigation/argentum-six-precons/coverage-audit.py")],
                                capture_output=True, text=True, check=True).stdout
         for d in result["decks"]:
-            self.assertIn(f"{d['name']}: {d['playableSlots']}/100 supported", audit)
+            # coverage-audit.py is intentionally a raw *index* inventory.
+            # A reproduced engine blocker can make readiness strictly lower.
+            self.assertIn(f"{d['name']}: {d['indexedSlots']}/100 supported", audit)
+            self.assertLessEqual(d["playableSlots"], d["indexedSlots"])
+        incursion = next(d for d in result["decks"] if d["name"] == "Eldrazi Incursion")
+        self.assertEqual(90, incursion["indexedSlots"])
+        self.assertEqual(89, incursion["playableSlots"])  # Myriad #181 fails in 3-player engine
+        self.assertGreaterEqual(incursion["ENGINE_BLOCKED"], 1)
         self.assertEqual(sum(result["totals"].values()), len(result["cards"]))
         self.assertEqual(set(result["dispatch"]), {"copilot", "claude", "gpt", "claimed", "claimsVerified", "dispatchable"})
 

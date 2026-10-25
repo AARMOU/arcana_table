@@ -26,6 +26,11 @@
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
+    "Chittering Dispatcher": {
+      "reason": "The current Android-consumer runtime lacks CR 702.116a's Myriad defender choice (other opponent OR a planeswalker they control). A real three-player scenario reaches optional token creation but no required ChooseTargetsDecision; two-player no-copy tests do not establish full support.",
+      "source": "#34 / #36 / #181, exact-head Development CI 40157943733 (577 tests, only new multiplayer Myriad gate fails at line 68)",
+      "verified": true
+    },
     "Determined Iteration": {
       "reason": "cannot give the populated token haste and schedule its sacrifice",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
@@ -127,6 +132,11 @@
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
+    "Twins of Discord": {
+      "reason": "Its static ability grants bloodthirst 2 to other colorless creatures. Pinned Argentum SDK Keyword enum has no BLOODTHIRST; no source-verified grantable replacement/counter-on-entry mechanism has been demonstrated. Do not approximate with a fixed +1/+1 anthem or unconditional counters.",
+      "source": "wingedsheep/argentum-engine@61e71e586b100faa661f86cac827ac3c3bbb5a78 mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt; #150 Oracle audit 2026-10-25",
+      "verified": false
+    },
     "Vadrok, Apex of Thunder": {
       "reason": "mutate plus free cast from graveyard combination",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
@@ -157,6 +167,16 @@
     "More Than Meets the Eye": {
       "reason": "converting is not represented",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md (Transformers cards)",
+      "verified": true
+    },
+    "Bloodthirst": {
+      "reason": "Pinned SDK Keyword enum lacks BLOODTHIRST, including bloodthirst N as a grantable ETB replacement; cannot silently substitute counters or a permanent stat buff.",
+      "source": "wingedsheep/argentum-engine@61e71e586b100faa661f86cac827ac3c3bbb5a78 mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/Keyword.kt",
+      "verified": true
+    },
+    "Myriad": {
+      "reason": "Current integrated Argentum Myriad auto-attacks a player instead of offering that opponent or their planeswalker; CR 702.116a defender-choice gap reproduced in Android-consumer 3-player engine test.",
+      "source": "#36 / #41 / #181, CI 40157943733; pinned Myriad.kt@61e71e586b100faa661f86cac827ac3c3bbb5a78",
       "verified": true
     }
   },
