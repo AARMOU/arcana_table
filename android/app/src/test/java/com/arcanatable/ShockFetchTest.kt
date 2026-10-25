@@ -30,8 +30,25 @@ class ShockFetchTest {
         var lifeAfter = -1
         var untapped = false
         var guard = 0
+        // Diagnostic trail (Build 133): what the host sent and what the test answered, so a failure
+        // pinpoints the stalled step instead of only reporting the final stage.
+        val trail = ArrayDeque<String>()
+        fun note(entry: String) { trail.addLast(entry); while (trail.size > 40) trail.removeFirst() }
+        var lastMsgType = "none"
         while (stage < 4 && guard++ < 300) {
-            val msg = inbox.poll(60, TimeUnit.SECONDS) ?: break
+            val msg = inbox.poll(60, TimeUnit.SECONDS) ?: run { note("TIMEOUT(60s) after $lastMsgType at stage=$stage"); null } ?: break
+            lastMsgType = msg.optString("type")
+            if (lastMsgType == "stateUpdate") {
+                val st = msg.optJSONObject("state")
+                val dec = msg.optJSONObject("pendingDecision")
+                val acts = msg.optJSONArray("legalActions") ?: JSONArray()
+                val kinds = (0 until acts.length()).map { acts.getJSONObject(it).optJSONObject("action")?.optString("type") ?: "?" }.groupingBy { it }.eachCount()
+                val named = (0 until acts.length()).map { acts.getJSONObject(it) }
+                    .filter { it.optJSONObject("action")?.optString("type") !in setOf("PassPriority", "DeclareAttackers", "DeclareBlockers") }
+                    .map { it.optString("description").take(60) }.distinct().take(3)
+                note("state t=${st?.optInt("turnNumber")} step=${st?.optString("step")} prio=${st?.optString("priorityPlayerId")} " +
+                    "dec=${dec?.optString("type")}:${dec?.optString("id")}:${dec?.optString("playerId")} acts=$kinds $named stage=$stage")
+            } else note("msg ${msg.toString().take(160)}")
             when (msg.optString("type")) {
                 "mulliganDecision" -> host.receive(JSONObject().put("type", "keepHand"))
                 "stateUpdate" -> {
@@ -72,8 +89,9 @@ class ShockFetchTest {
             }
         }
         host.shutdown()
-        println("[shock-fetch] stage=$stage life=$lifeAfter untapped=$untapped")
-        assertEquals("reached shock prompt; stage=$stage life=$lifeAfter untapped=$untapped", 4, stage)
+        println("[shock-fetch] stage=$stage life=$lifeAfter untapped=$untapped guard=$guard")
+        trail.forEach { println("[shock-fetch] $it") }
+        assertEquals("reached shock prompt; stage=$stage life=$lifeAfter untapped=$untapped guard=$guard\n" + trail.takeLast(15).joinToString("\n"), 4, stage)
         assertEquals("fetch/shock life accounting; stage=$stage life=$lifeAfter untapped=$untapped", 17, lifeAfter)
         assertTrue("Stomping Ground untapped after Yes; stage=$stage life=$lifeAfter untapped=$untapped", untapped)
         assertFalse(lifeAfter < 0)

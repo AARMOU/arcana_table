@@ -527,6 +527,34 @@ jobs:
           set -o pipefail
           ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
             2>&1 | tee ../combined-evidence/combined-android-debug.log
+      # Diagnostics only (no gate change): surface JUnit failure messages and the shock-fetch trail
+      # as check-run annotations, readable through the REST API when job logs are not reachable.
+      - name: Annotate Android unit-test failures (diagnostic, read-only)
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          def esc(s):
+              return s.replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+          root = Path('android/app/build/test-results/testDebugUnitTest')
+          emitted = 0
+          for f in sorted(root.rglob('TEST-*.xml')):
+              suite = ET.parse(f).getroot()
+              out = (suite.findtext('system-out') or '')
+              trail = [l for l in out.splitlines() if l.startswith('[shock-fetch]')]
+              if trail:
+                  print('::warning title=shock-fetch trail::' + esc('\n'.join(trail[-45:])[:20000]))
+              for case in suite.iter('testcase'):
+                  for kind in ('failure', 'error'):
+                      el = case.find(kind)
+                      if el is None or emitted >= 8: continue
+                      emitted += 1
+                      text = (el.get('message') or '') + '\n' + (el.text or '')[:3000]
+                      print(f"::error title={case.get('classname')}.{case.get('name')} {kind}::" + esc(text[:20000]))
+          print(f'annotated {emitted} failing test(s)')
+          PY
       - name: Verify three required original-deck scenarios executed without skips
         shell: bash
         run: |
