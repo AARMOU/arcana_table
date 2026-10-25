@@ -8,7 +8,8 @@ import com.wingedsheep.sdk.scripting.GameObjectFilter
 import com.wingedsheep.sdk.scripting.filters.unified.TargetFilter
 
 /**
- * CARDKIT-SCAFFOLD — unregistered until optional-target engine scenarios pass.\n * Spawnbed Protector — M3C #36. The graveyard target is optional, but the two Scions
+ * CARDKIT-SCAFFOLD — unregistered until optional-target engine scenarios pass.
+ * Spawnbed Protector — M3C #36. The graveyard target is optional, but the two Scions
  * are created on every resolution, including when no eligible Eldrazi card is chosen.
  * The shared Scion factory gives each token its own sacrifice-for-{C} mana ability.
  */
