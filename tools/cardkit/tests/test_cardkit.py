@@ -44,7 +44,7 @@ FAKE_REVEAL = {"name": "Cardkit Test Harbor", "type_line": "Land", "color_identi
                               "this land enters tapped.\n{T}: Add {W} or {U}.", "layout": "normal"}
 FAKE_VARIANT = {"name": "Cardkit Test Monument", "mana_cost": "{5}", "type_line": "Artifact", "color_identity": [],
                 "keywords": [], "layout": "normal",
-                "oracle_text": "Whenever you tap a land for {C}, add an additional {C}."}
+                "oracle_text": "Whenever you tap a permanent for {C}, add an additional {C}."}
 FAKES = {repo.normalize_name(c["name"]): c for c in (FAKE_SUPPORTED, FAKE_GAP, FAKE_UNKNOWN_KW, FAKE_INFECT, FAKE_COMBO,
                                                      FAKE_REVEAL, FAKE_VARIANT)}
 
@@ -134,6 +134,14 @@ class RefsTests(unittest.TestCase):
         lib = [m for m in matches if m.ref.source == "library"]
         self.assertTrue(lib)
         self.assertTrue(any(repo.UPSTREAM_COMMIT in refs.where(m.ref.card, "library") for m in lib))
+
+    def test_unexported_custom_sources_are_not_similarity_evidence(self):
+        with mock.patch.object(repo, "custom_index_names", return_value=set()):
+            refs.index.cache_clear()
+            try:
+                self.assertFalse(any(r.source == "custom" for r in refs.index().refs))
+            finally:
+                refs.index.cache_clear()
 
 
 class SdkTests(unittest.TestCase):
