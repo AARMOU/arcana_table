@@ -205,4 +205,47 @@ class UginTheIneffableScenarioTest {
             targets = listOf(com.wingedsheep.engine.state.components.stack.ChosenTarget.Permanent(ring)))).error)
         assertEquals(1, d.permanentsNamed(d.player2, "Sol Ring").size)
     }
+
+    @Test fun plusOneCannotBeActivatedTwiceInOneTurn() {
+        val d = customScenario(UginTheIneffable, "Sol Ring")
+        val p = d.player1
+        val ugin = d.castUgin()
+        assertNull(d.activate(p, ugin, index = 0).error)
+        d.resolveAll()
+        assertEquals(5, d.loyalty(ugin))
+        assertEquals(1, d.permanentsNamed(p, "Spirit").size)
+        assertEquals(1, d.getExile(p).size)
+
+        // The second attempt is illegal even though +1 would increase loyalty.
+        assertNotNull("loyalty abilities may be activated only once per turn",
+            d.activate(p, ugin, index = 0).error)
+        d.resolveAll()
+        assertEquals("failed activation must not add loyalty", 5, d.loyalty(ugin))
+        assertEquals("failed activation must not create a second Spirit", 1,
+            d.permanentsNamed(p, "Spirit").size)
+        assertEquals("failed activation must not exile another card", 1, d.getExile(p).size)
+    }
+
+    @Test fun minusThreeCannotFollowPlusOneInSameTurn() {
+        val d = customScenario(UginTheIneffable, "Grizzly Bears", "Sol Ring")
+        val p = d.player1
+        val ugin = d.castUgin()
+        val bear = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
+        assertNull(d.activate(p, ugin, index = 0).error)
+        d.resolveAll()
+        assertEquals(5, d.loyalty(ugin))
+
+        // A valid colored target and sufficient loyalty must not override the
+        // one-loyalty-activation-per-turn restriction.
+        val ability = d.cardRegistry.getCard("Ugin, the Ineffable")!!.script.activatedAbilities[1]
+        val second = d.submit(com.wingedsheep.engine.core.ActivateAbility(
+            p, ugin, ability.id,
+            targets = listOf(com.wingedsheep.engine.state.components.stack.ChosenTarget.Permanent(bear))
+        ))
+        assertNotNull("cannot use -3 after +1 in the same turn", second.error)
+        d.resolveAll()
+        assertEquals(5, d.loyalty(ugin))
+        assertEquals(1, d.permanentsNamed(d.player2, "Grizzly Bears").size)
+    }
+
 }
