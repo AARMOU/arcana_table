@@ -14,7 +14,7 @@ on:
       - 'android/app/libs/argentum-*.jar'
   # Only the isolated implementation branch self-tests this new workflow prior to review.
   push:
-    branches: [gpt/engine-pr-guard-20261025]
+    branches: [gpt/engine-pr-guard-20261025, gpt/engine-pr-guard-main-20261025]
     paths:
       - '.github/workflows/argentum-engine-pr-guard.yml'
       - 'engine-upgrade/engine_pr_guard.py'
