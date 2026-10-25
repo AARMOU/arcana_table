@@ -6,15 +6,46 @@
       "source": "#137 / #138 / #141 Priority A",
       "verified": false
     },
+    "Alms Collector": {
+      "reason": "replace only the extra cards of a multi-card draw and redistribute them",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
     "Arcane Lighthouse": {
       "reason": "until end of turn, opponents' creatures lose hexproof and shroud AND can't have either; only hexproof suppression exists",
       "source": "#134 / #135 / #141 Priority B",
       "verified": false
     },
-    "Port Town": {
-      "reason": "as-enters reveal-from-hand replacement (reveal a Plains or Island card or enter tapped)",
-      "source": "#134 / #135 / #141 Priority C",
+    "Azlask, the Swelling Scourge": {
+      "reason": "dies-trigger subject filter cannot test colorless: TriggerMatcher.matchesCardPredicate has no branch for CardPredicate.IsColorless (throws IllegalStateException at runtime); TriggeringEntityWas accepts only type/subtype predicates",
+      "source": "claude/eldrazi-incursion-tonight-20261024 scenario run 2026-10-25 (AzlaskTheSwellingScourgeScenarioTest)",
       "verified": false
+    },
+    "Bruvac the Grandiloquent": {
+      "reason": "mill multiplier; the engine's mill modifier only adds a fixed amount",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Determined Iteration": {
+      "reason": "cannot give the populated token haste and schedule its sacrifice",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Devil Dinosaur": {
+      "reason": "opponent-only hexproof static is rejected by the pinned SDK at script init",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Doubling Cube": {
+      "reason": "doubling the mana already in a mana pool",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Ephemerate": {
+      "reason": "immediate exile-and-return of any creature plus rebound (recorded as limited to double-faced cards before the 2026-10-22 engine upgrade)",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": false,
+      "recheck": "Pinned upstream Emiel the Blessed implements exile-then-return with Effects.Move(…, Zone.EXILE) then Effects.Move(…, Zone.BATTLEFIELD), so the exile-and-return half appears available now; reproduce before relying on this entry or deleting it."
     },
     "Fortified Village": {
       "reason": "as-enters reveal-from-hand replacement",
@@ -26,79 +57,8 @@
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
-    "Alms Collector": {
-      "reason": "replace only the extra cards of a multi-card draw and redistribute them",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Bruvac the Grandiloquent": {
-      "reason": "mill multiplier; the engine's mill modifier only adds a fixed amount",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Heroes in a Half Shell": {
-      "reason": "effect cannot see the whole group of creatures from one damage event",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Locke, Treasure Hunter": {
-      "reason": "cannot gather milled cards from every library and grant casting from that group",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Ratchet, Field Medic": {
-      "reason": "Living metal and convert are not represented",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Vadrok, Apex of Thunder": {
-      "reason": "mutate plus free cast from graveyard combination",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Doubling Cube": {
-      "reason": "doubling the mana already in a mana pool",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Jeweled Lotus": {
-      "reason": "mana spend restriction to casting a commander",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Mox Diamond": {
-      "reason": "enters-the-battlefield replacement that discards a land card",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Ephemerate": {
-      "reason": "immediate exile-and-return of any creature plus rebound (recorded as limited to double-faced cards before the 2026-10-22 engine upgrade)",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": false,
-      "recheck": "Pinned upstream Emiel the Blessed implements exile-then-return with Effects.Move(…, Zone.EXILE) then Effects.Move(…, Zone.BATTLEFIELD), so the exile-and-return half appears available now; reproduce before relying on this entry or deleting it."
-    },
-    "Determined Iteration": {
-      "reason": "cannot give the populated token haste and schedule its sacrifice",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Lotus Vale": {
-      "reason": "enters-the-battlefield replacement that sacrifices two untapped lands",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
     "Gemstone Caverns": {
       "reason": "starting-hand / game-start replacement effect",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Tippy-Toe, Terrific Partner": {
-      "reason": "token-copy replacement behavior",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Pulmonic Sliver": {
-      "reason": "optional replacement effect",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
@@ -107,13 +67,48 @@
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
-    "Devil Dinosaur": {
-      "reason": "opponent-only hexproof static is rejected by the pinned SDK at script init",
+    "Heroes in a Half Shell": {
+      "reason": "effect cannot see the whole group of creatures from one damage event",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
-    "Zilortha, Strength Incarnate": {
-      "reason": "changes the lethal-damage rule",
+    "Jeweled Lotus": {
+      "reason": "mana spend restriction to casting a commander",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Locke, Treasure Hunter": {
+      "reason": "cannot gather milled cards from every library and grant casting from that group",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Lotus Vale": {
+      "reason": "enters-the-battlefield replacement that sacrifices two untapped lands",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Mox Diamond": {
+      "reason": "enters-the-battlefield replacement that discards a land card",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Mutated Cultist": {
+      "reason": "no primitive for 'the next spell you cast this turn costs {1} less for each counter removed this way' (GrantNextSpellFreeCast/GrantNextSpellAffinity exist, no dynamic next-spell generic reduction)",
+      "source": "docs/agents/generated/sdk-api.md audit 2026-10-25",
+      "verified": false
+    },
+    "Port Town": {
+      "reason": "as-enters reveal-from-hand replacement (reveal a Plains or Island card or enter tapped)",
+      "source": "#134 / #135 / #141 Priority C",
+      "verified": false
+    },
+    "Pulmonic Sliver": {
+      "reason": "optional replacement effect",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Ratchet, Field Medic": {
+      "reason": "Living metal and convert are not represented",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
@@ -124,6 +119,21 @@
     },
     "Thunderherd Migration": {
       "reason": "reveal-or-pay additional cost",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Tippy-Toe, Terrific Partner": {
+      "reason": "token-copy replacement behavior",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Vadrok, Apex of Thunder": {
+      "reason": "mutate plus free cast from graveyard combination",
+      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
+      "verified": true
+    },
+    "Zilortha, Strength Incarnate": {
+      "reason": "changes the lethal-damage rule",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     }

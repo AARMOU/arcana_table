@@ -279,6 +279,12 @@ object CustomCards {
         Entry(InversionBehemoth, "M3C", "Eldrazi Incursion"),
         Entry(SpawnbedProtector, "M3C", "Eldrazi Incursion"),
         Entry(UginTheIneffable, "CMM", "Eldrazi Incursion"),
+        Entry(ChitteringDispatcher, "M3C", "Eldrazi Incursion"),
+        Entry(RishkarsExpertise, "LCC", "Eldrazi Incursion"),
+        Entry(VileRedeemer, "OGW", "Eldrazi Incursion"),
+        Entry(BismuthMindrender, "M3C", "Eldrazi Incursion"),
+        Entry(UlamogsNullifier, "BFZ", "Eldrazi Incursion"),
+        Entry(MorophonTheBoundless, "CMM", "Eldrazi Incursion"),
         // Needs the colorless-hybrid and stack-copy engine patches (engine-upgrade/ulalek).
         Entry(UlalekFusedAtrocity, "M3C", "Eldrazi Incursion"),
         // Eldrazi Unbound. Needs the granted-cascade engine patch (engine-upgrade/ulalek).

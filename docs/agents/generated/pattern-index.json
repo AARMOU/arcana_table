@@ -18,7 +18,7 @@
    ]
   },
   "Conditions.CompareAmounts": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Endless Atlas",
@@ -39,6 +39,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DefenseOfTheHeartScenarioTest.kt"
     },
     {
+     "card": "Ulamog's Nullifier",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
+     "lines": 53,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
+    },
+    {
      "card": "Purphoros, God of the Forge",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PurphorosGodOfTheForge.kt",
      "lines": 57,
@@ -49,12 +55,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TectonicEdge.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TectonicEdgeScenarioTest.kt"
-    },
-    {
-     "card": "Great Unclean One",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GreatUncleanOne.kt",
-     "lines": 58,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GreatUncleanOneScenarioTest.kt"
     }
    ]
   },
@@ -640,7 +640,7 @@
    ]
   },
   "Costs.additional": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -659,13 +659,19 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SavageOrder.kt",
      "lines": 33,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SavageOrderScenarioTest.kt"
+    },
+    {
+     "card": "Bismuth Mindrender",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BismuthMindrender.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BismuthMindrenderScenarioTest.kt"
     }
    ]
   }
  },
  "DynamicAmounts": {
   "DynamicAmounts.battlefield": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Defile",
@@ -742,6 +748,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AkromasWill.kt",
      "lines": 63,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AkromasWillScenarioTest.kt"
+    }
+   ]
+  },
+  "DynamicAmounts.count": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Ulamog's Nullifier",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
+     "lines": 53,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
     }
    ]
   },
@@ -842,6 +859,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SisterHospitaller.kt",
      "lines": 21,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SisterHospitallerScenarioTest.kt"
+    }
+   ]
+  },
+  "DynamicAmounts.nonTokenCreaturesDiedThisTurn": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Vile Redeemer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/VileRedeemer.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VileRedeemerScenarioTest.kt"
     }
    ]
   },
@@ -1368,9 +1396,26 @@
     }
    ]
   },
-  "Effects.CastFromCollectionWithoutPayingCost": {
+  "Effects.CastFromCollectionByPaying": {
    "count": 1,
    "examples": [
+    {
+     "card": "Bismuth Mindrender",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BismuthMindrender.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BismuthMindrenderScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.CastFromCollectionWithoutPayingCost": {
+   "count": 2,
+   "examples": [
+    {
+     "card": "Rishkar's Expertise",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RishkarsExpertise.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RishkarsExpertiseScenarioTest.kt"
+    },
     {
      "card": "Descendants' Path",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DescendantsPath.kt",
@@ -1419,13 +1464,19 @@
    ]
   },
   "Effects.CounterSpell": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Rewind",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Rewind.kt",
      "lines": 28,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RewindScenarioTest.kt"
+    },
+    {
+     "card": "Ulamog's Nullifier",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
+     "lines": 53,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
     },
     {
      "card": "Warping Wail",
@@ -1481,7 +1532,7 @@
    ]
   },
   "Effects.CreateEldraziSpawn": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Skittering Invasion",
@@ -1494,6 +1545,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AwakeningZone.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AwakeningZoneScenarioTest.kt"
+    },
+    {
+     "card": "Chittering Dispatcher",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ChitteringDispatcher.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ChitteringDispatcherScenarioTest.kt"
     }
    ]
   },
@@ -1816,7 +1873,7 @@
    ]
   },
   "Effects.DrawCards": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Ugin's Insight",
@@ -2150,7 +2207,7 @@
    ]
   },
   "Effects.If": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Grey Knight Paragon",
@@ -2277,7 +2334,7 @@
    ]
   },
   "Effects.May": {
-   "count": 9,
+   "count": 11,
    "examples": [
     {
      "card": "Dinosaur Egg",
@@ -2304,27 +2361,33 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ConstrictingSliverScenarioTest.kt"
     },
     {
+     "card": "Bismuth Mindrender",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BismuthMindrender.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BismuthMindrenderScenarioTest.kt"
+    },
+    {
      "card": "Tataru Taru",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TataruTaru.kt",
      "lines": 48,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TataruTaruScenarioTest.kt"
-    },
-    {
-     "card": "Kozilek's Return",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KozileksReturn.kt",
-     "lines": 58,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KozileksReturnScenarioTest.kt"
     }
    ]
   },
   "Effects.MayPay": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Ulalek, Fused Atrocity",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlalekFusedAtrocity.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlalekFusedAtrocityScenarioTest.kt"
+    },
+    {
+     "card": "Vile Redeemer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/VileRedeemer.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VileRedeemerScenarioTest.kt"
     },
     {
      "card": "Savai Thundermane",
@@ -2463,7 +2526,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 15,
+   "count": 18,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -2484,6 +2547,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/QuicksilverAmuletScenarioTest.kt"
     },
     {
+     "card": "Rishkar's Expertise",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RishkarsExpertise.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RishkarsExpertiseScenarioTest.kt"
+    },
+    {
      "card": "Suffer the Past",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SufferThePast.kt",
      "lines": 38,
@@ -2494,12 +2563,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SzarekhTheSilentKing.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SzarekhTheSilentKingScenarioTest.kt"
-    },
-    {
-     "card": "Traverse the Outlands",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TraverseTheOutlands.kt",
-     "lines": 42,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TraverseTheOutlandsScenarioTest.kt"
     }
    ]
   },
@@ -2845,7 +2908,7 @@
    ]
   },
   "Keyword.CHANGELING": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Springleaf Parade",
@@ -2858,6 +2921,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BlackMarketConnections.kt",
      "lines": 45,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BlackMarketConnectionsScenarioTest.kt"
+    },
+    {
+     "card": "Morophon, the Boundless",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MorophonTheBoundless.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MorophonTheBoundlessScenarioTest.kt"
     }
    ]
   },
@@ -2896,13 +2965,19 @@
    ]
   },
   "Keyword.DEVOID": {
-   "count": 8,
+   "count": 12,
    "examples": [
     {
      "card": "Deepfathom Skulker",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DeepfathomSkulker.kt",
      "lines": 30,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DeepfathomSkulkerScenarioTest.kt"
+    },
+    {
+     "card": "Chittering Dispatcher",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ChitteringDispatcher.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ChitteringDispatcherScenarioTest.kt"
     },
     {
      "card": "Sifter of Skulls",
@@ -2923,16 +2998,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlalekFusedAtrocityScenarioTest.kt"
     },
     {
-     "card": "Drowner of Hope",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DrownerOfHope.kt",
-     "lines": 38,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DrownerOfHopeScenarioTest.kt"
-    },
-    {
-     "card": "Sire of Stagnation",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SireOfStagnation.kt",
-     "lines": 47,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SireOfStagnationScenarioTest.kt"
+     "card": "Vile Redeemer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/VileRedeemer.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VileRedeemerScenarioTest.kt"
     }
    ]
   },
@@ -3023,7 +3092,7 @@
    ]
   },
   "Keyword.FLASH": {
-   "count": 9,
+   "count": 11,
    "examples": [
     {
      "card": "Sister of Silence",
@@ -3064,7 +3133,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3257,7 +3326,7 @@
    ]
   },
   "Keyword.MENACE": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -3284,10 +3353,27 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RampagingFerocidonScenarioTest.kt"
     },
     {
+     "card": "Bismuth Mindrender",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BismuthMindrender.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BismuthMindrenderScenarioTest.kt"
+    },
+    {
      "card": "Leonardo, the Balance",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/LeonardoTheBalance.kt",
      "lines": 58,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LeonardoTheBalanceScenarioTest.kt"
+    }
+   ]
+  },
+  "Keyword.MYRIAD": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Chittering Dispatcher",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ChitteringDispatcher.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ChitteringDispatcherScenarioTest.kt"
     }
    ]
   },
@@ -3915,7 +4001,7 @@
    ]
   },
   "Triggers.self.dealsCombatDamage": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Atalan Jackal",
@@ -3948,10 +4034,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TervigonScenarioTest.kt"
     },
     {
-     "card": "Ancient Copper Dragon",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AncientCopperDragon.kt",
-     "lines": 46,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AncientCopperDragonScenarioTest.kt"
+     "card": "Bismuth Mindrender",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BismuthMindrender.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BismuthMindrenderScenarioTest.kt"
     }
    ]
   },
@@ -3979,7 +4065,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 40,
+   "count": 41,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -4031,7 +4117,7 @@
    ]
   },
   "Triggers.self.isCast": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Noise Marine",
@@ -4058,16 +4144,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DenyRealityScenarioTest.kt"
     },
     {
+     "card": "Vile Redeemer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/VileRedeemer.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VileRedeemerScenarioTest.kt"
+    },
+    {
      "card": "Violent Outburst",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ViolentOutburst.kt",
      "lines": 44,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ViolentOutburstScenarioTest.kt"
-    },
-    {
-     "card": "Oblivion Sower",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/OblivionSower.kt",
-     "lines": 48,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/OblivionSowerScenarioTest.kt"
     }
    ]
   },
@@ -4100,8 +4186,14 @@
    ]
   },
   "Triggers.self.leaves": {
-   "count": 3,
+   "count": 4,
    "examples": [
+    {
+     "card": "Chittering Dispatcher",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ChitteringDispatcher.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ChitteringDispatcherScenarioTest.kt"
+    },
     {
      "card": "Constricting Sliver",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ConstrictingSliver.kt",
@@ -4392,7 +4484,7 @@
    ]
   },
   "keywords()": {
-   "count": 82,
+   "count": 87,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4484,7 +4576,7 @@
    ]
   },
   "replacementEffect()": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4542,7 +4634,7 @@
    ]
   },
   "spell { }": {
-   "count": 44,
+   "count": 45,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -4618,7 +4710,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 55,
+   "count": 56,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -4659,7 +4751,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 126,
+   "count": 130,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5596,13 +5688,19 @@
    ]
   },
   "EntersWithChoice": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Unclaimed Territory",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UnclaimedTerritory.kt",
      "lines": 34,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UnclaimedTerritoryScenarioTest.kt"
+    },
+    {
+     "card": "Morophon, the Boundless",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MorophonTheBoundless.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MorophonTheBoundlessScenarioTest.kt"
     }
    ]
   },
@@ -5930,13 +6028,19 @@
    ]
   },
   "ModifySpellCost": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Herald of Slaanesh",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HeraldOfSlaanesh.kt",
      "lines": 28,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HeraldOfSlaaneshScenarioTest.kt"
+    },
+    {
+     "card": "Morophon, the Boundless",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MorophonTheBoundless.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MorophonTheBoundlessScenarioTest.kt"
     },
     {
      "card": "Primal Amulet",
@@ -5953,7 +6057,7 @@
    ]
   },
   "ModifyStats": {
-   "count": 15,
+   "count": 16,
    "examples": [
     {
      "card": "Ultramarines Honour Guard",
@@ -6361,7 +6465,7 @@
    ]
   },
   "GameObjectFilter.Any": {
-   "count": 14,
+   "count": 16,
    "examples": [
     {
      "card": "Skittering Cicada",
@@ -6524,7 +6628,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 99,
+   "count": 101,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -6663,6 +6767,23 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheFantasticar.kt",
      "lines": 56,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheFantasticarScenarioTest.kt"
+    }
+   ]
+  },
+  "GameObjectFilter.Nonland": {
+   "count": 2,
+   "examples": [
+    {
+     "card": "Rishkar's Expertise",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RishkarsExpertise.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RishkarsExpertiseScenarioTest.kt"
+    },
+    {
+     "card": "Bismuth Mindrender",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BismuthMindrender.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BismuthMindrenderScenarioTest.kt"
     }
    ]
   },
@@ -6902,7 +7023,7 @@
    ]
   },
   "Player.EachOpponent": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Silence",
@@ -6971,7 +7092,7 @@
    ]
   },
   "Player.TriggeringPlayer": {
-   "count": 10,
+   "count": 11,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -7012,7 +7133,7 @@
    ]
   },
   "Player.You": {
-   "count": 33,
+   "count": 35,
    "examples": [
     {
      "card": "Defile",
@@ -7330,13 +7451,19 @@
    ]
   },
   "TargetFilter.SpellOnStack": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Rewind",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Rewind.kt",
      "lines": 28,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RewindScenarioTest.kt"
+    },
+    {
+     "card": "Ulamog's Nullifier",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
+     "lines": 53,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
     }
    ]
   },
@@ -7439,7 +7566,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 67,
+   "count": 68,
    "examples": [
     {
      "card": "Defile",
