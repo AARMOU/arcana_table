@@ -61,7 +61,40 @@ class MutatedCultistEngineProbeTest {
         assertEquals(4, d.state.getEntity(untouched)!!.get<CountersComponent>()?.getCount(CounterType.PLUS_ONE_PLUS_ONE) ?: 0)
     }
 
-    // The pinned runtime does not compile Triggers.self.cast from this module.
-    // Cast-trigger and next-spell-discount probes are intentionally withheld until
-    // the runtime API is verified. See CI run 40214208819 for exact compiler evidence.
+    /**
+     * Mutated Cultist needs a cast trigger, not an enters-the-battlefield trigger.
+     * Exercise the supported isCast() API independently before combining it with
+     * the still-unverified next-spell discount and opponent counter removal.
+     */
+    private fun castTriggerProbe() = card("Cultist Cast Trigger Probe") {
+        manaCost = "{1}{B}"
+        typeLine = "Creature — Eldrazi Horror"
+        power = 1
+        toughness = 3
+        triggeredAbility {
+            trigger = Triggers.self.isCast()
+            effect = Effects.AddColorlessMana(1)
+        }
+    }
+
+    @Test fun castTriggerFiresWhenCreatureSpellIsCast() {
+        val d = customScenario(castTriggerProbe())
+        val spell = d.putCardInHand(d.player1, "Cultist Cast Trigger Probe")
+        d.giveMana(d.player1, com.wingedsheep.sdk.core.Color.BLACK)
+        d.giveColorlessMana(d.player1, 1)
+        assertNull(d.castSpell(d.player1, spell).error)
+        d.resolveAll()
+        assertEquals("cast trigger resolves even though creature has no ETB trigger",
+            1, d.manaPool(d.player1).colorless)
+        assertEquals(1, d.permanentsNamed(d.player1, "Cultist Cast Trigger Probe").size)
+    }
+
+    @Test fun puttingCreatureDirectlyOntoBattlefieldDoesNotFireCastTrigger() {
+        val d = customScenario(castTriggerProbe())
+        d.putCreatureOnBattlefield(d.player1, "Cultist Cast Trigger Probe")
+        d.resolveAll()
+        assertEquals("noncast ETB must not trigger a cast ability",
+            0, d.manaPool(d.player1).colorless)
+        assertEquals(1, d.permanentsNamed(d.player1, "Cultist Cast Trigger Probe").size)
+    }
 }
