@@ -4,19 +4,21 @@ name: Argentum + Eldrazi 94 + Azlask Build 133 combined gate
 # No jar publication, branch mutation, APK signing or deploy.
 on:
   push:
-    branches: [gpt/argentum-eldrazi-azlask94-build133-20261025]
+    branches: [gpt/argentum-eldrazi-azlask94-build133-20261025, gpt/build133-shockfetch-diagnostics-20261025]
     paths:
       - '.github/workflows/argentum-eldrazi-azlask94-build133.yml'
       - 'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AzlaskTheSwellingScourge.kt'
       - 'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AzlaskTheSwellingScourgeScenarioTest.kt'
       - 'engine-upgrade/azlask/**'
+      - 'android/app/src/test/java/com/arcanatable/ShockFetchTest.kt'
   pull_request:
-    branches: [gpt/argentum-eldrazi-combined-apk-20261025]
+    branches: [gpt/argentum-eldrazi-combined-apk-20261025, gpt/argentum-eldrazi-azlask94-build133-20261025]
     paths:
       - '.github/workflows/argentum-eldrazi-azlask94-build133.yml'
       - 'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AzlaskTheSwellingScourge.kt'
       - 'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AzlaskTheSwellingScourgeScenarioTest.kt'
       - 'engine-upgrade/azlask/**'
+      - 'android/app/src/test/java/com/arcanatable/ShockFetchTest.kt'
 concurrency:
   group: eldrazi94-azlask-${{ github.ref }}
   cancel-in-progress: true
@@ -525,6 +527,34 @@ jobs:
           set -o pipefail
           ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
             2>&1 | tee ../combined-evidence/combined-android-debug.log
+      # Diagnostics only (no gate change): surface JUnit failure messages and the shock-fetch trail
+      # as check-run annotations, readable through the REST API when job logs are not reachable.
+      - name: Annotate Android unit-test failures (diagnostic, read-only)
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          def esc(s):
+              return s.replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+          root = Path('android/app/build/test-results/testDebugUnitTest')
+          emitted = 0
+          for f in sorted(root.rglob('TEST-*.xml')):
+              suite = ET.parse(f).getroot()
+              out = (suite.findtext('system-out') or '')
+              trail = [l for l in out.splitlines() if l.startswith('[shock-fetch]')]
+              if trail:
+                  print('::warning title=shock-fetch trail::' + esc('\n'.join(trail[-45:])[:20000]))
+              for case in suite.iter('testcase'):
+                  for kind in ('failure', 'error'):
+                      el = case.find(kind)
+                      if el is None or emitted >= 8: continue
+                      emitted += 1
+                      text = (el.get('message') or '') + '\n' + (el.text or '')[:3000]
+                      print(f"::error title={case.get('classname')}.{case.get('name')} {kind}::" + esc(text[:20000]))
+          print(f'annotated {emitted} failing test(s)')
+          PY
       - name: Verify three required original-deck scenarios executed without skips
         shell: bash
         run: |
@@ -643,3 +673,36 @@ jobs:
             combined-argentum/mtg-sdk/build/test-results/test/
             android/custom-cards/build/test-results/test/
             android/app/build/test-results/testDebugUnitTest/
+      # Diagnostics only, after every gate and upload: ShockFetchTest failed once (run 40239468567)
+      # and passed once (run 40241936224) with no product change, so rerun it to catch a failing
+      # trail. Never gates, never touches the APK artifact; results surface as annotations.
+      - name: Stress ShockFetchTest for intermittent failure trails (diagnostic, non-gating)
+        if: always()
+        continue-on-error: true
+        timeout-minutes: 25
+        working-directory: android
+        shell: bash
+        run: |
+          mkdir -p ../combined-evidence/shockfetch-stress
+          pass=0; fail=0
+          for i in $(seq 1 30); do
+            if ./gradlew --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.ShockFetchTest' --rerun -q > /dev/null 2>&1; then pass=$((pass+1)); else fail=$((fail+1)); fi
+            cp app/build/test-results/testDebugUnitTest/TEST-com.arcanatable.ShockFetchTest.xml "../combined-evidence/shockfetch-stress/run-$i.xml" 2>/dev/null || true
+          done
+          echo "::notice title=ShockFetchTest stress::passed=$pass failed=$fail of 30"
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          esc = lambda s: s.replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+          shown = 0
+          for f in sorted(Path('../combined-evidence/shockfetch-stress').glob('run-*.xml'), key=lambda p: int(p.stem.split('-')[1])):
+              suite = ET.parse(f).getroot()
+              case = next(suite.iter('testcase'), None)
+              bad = case is not None and (case.find('failure') is not None or case.find('error') is not None)
+              if not bad or shown >= 6: continue
+              shown += 1
+              el = case.find('failure') if case.find('failure') is not None else case.find('error')
+              trail = [l for l in (suite.findtext('system-out') or '').splitlines() if l.startswith('[shock-fetch]')]
+              body = (el.get('message') or '') + '\n--- trail ---\n' + '\n'.join(trail[-45:]) + '\n--- stderr ---\n' + (suite.findtext('system-err') or '')[-3000:]
+              print(f'::error title=ShockFetchTest stress {f.stem}::' + esc(body[:20000]))
+          PY
