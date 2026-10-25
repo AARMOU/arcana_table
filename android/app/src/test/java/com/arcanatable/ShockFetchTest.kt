@@ -73,9 +73,9 @@ class ShockFetchTest {
         }
         host.shutdown()
         println("[shock-fetch] stage=$stage life=$lifeAfter untapped=$untapped")
-        assertEquals("reached the shock prompt and answered it", 4, stage)
-        assertEquals("paid 2 life (fetch cost 1 + shock 2)", 17, lifeAfter)
-        assertTrue("Stomping Ground is untapped", untapped)
+        assertEquals("reached shock prompt; stage=$stage life=$lifeAfter untapped=$untapped", 4, stage)
+        assertEquals("fetch/shock life accounting; stage=$stage life=$lifeAfter untapped=$untapped", 17, lifeAfter)
+        assertTrue("Stomping Ground untapped after Yes; stage=$stage life=$lifeAfter untapped=$untapped", untapped)
         assertFalse(lifeAfter < 0)
     }
 }
