@@ -35,7 +35,6 @@ dependencies {
 tasks.test {
     maxHeapSize = "2g"
     systemProperty("arcana.assets", assetsDir.asFile.absolutePath)
-    systemProperty("arcana.shadowed", rootProject.file("../engine-upgrade/shadowed-custom-cards.txt").absolutePath)
     // Engine threads recurse deeply on big boards.
     jvmArgs("-Xss16m")
     testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
