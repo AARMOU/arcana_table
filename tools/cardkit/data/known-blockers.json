@@ -102,11 +102,6 @@
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
     },
-    "Mutated Cultist": {
-      "reason": "no primitive for 'the next spell you cast this turn costs {1} less for each counter removed this way' (GrantNextSpellFreeCast/GrantNextSpellAffinity exist, no dynamic next-spell generic reduction)",
-      "source": "docs/agents/generated/sdk-api.md audit 2026-10-25",
-      "verified": false
-    },
     "Port Town": {
       "reason": "as-enters reveal-from-hand replacement (reveal a Plains or Island card or enter tapped)",
       "source": "#134 / #135 / #141 Priority C",

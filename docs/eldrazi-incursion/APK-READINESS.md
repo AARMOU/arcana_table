@@ -10,8 +10,8 @@ candidate includes #197 Confluence regressions and the verified source tests fro
 The accompanying [100-card audit](COVERAGE.md) and [machine-readable evidence](coverage.json)
 classify every original slot: **30 implemented with reviewed positive/negative acceptance scenarios;
 60 implemented but missing direct acceptance evidence or required negative cases; 0 current
-registered-card test failures observed; 1 missing implementation; 9 pinned-engine/runtime blocks.**
-The nine include registered Chittering Dispatcher, so they are not nine additional absent names.
+registered-card test failures observed; 2 missing implementations; 8 pinned-engine/runtime blocks.**
+The eight include registered Chittering Dispatcher, so they are not eight additional absent names.
 These are evidence classes, not a new 30% completion claim. Several of the 60 have upstream tests;
 those have not been independently executed against this exact Arcana runtime in this audit.
 
@@ -50,7 +50,7 @@ Subsequent evidence: #201 exact head `78528e2` Development [40214937451](https:/
 | Angelic Aberration | Documented filter API lacks base power/toughness <=1. It has equality and current-stat comparison only. Extend exact base-stat filtering, then variable sacrifice/token tests |
 | Hideous Taskmaster | **Fresh reproduced blocker #200: 9 pass / 1 fail**. A selected target changing between opponents is incorrectly stolen. Preserve per-target original-controller binding through resolution/copies/retargeting |
 | Twins of Discord | #196 is a contract/investigation only. Prove external conditional bloodthirst replacement plus parity attack restriction before implementation; not an implemented card |
-| Mutated Cultist | Dynamic next-spell generic discount based on removed counters lacks a documented primitive. Requires exact next-spell scope/expiry and counter-removal tests |
+| Mutated Cultist | #198 owns the unregistered probes. The earlier missing-primitive report was stale: committed Effects.class exposes ReduceNextSpellCost(DynamicAmount, GameObjectFilter). SDK presence is verified; complete optional/permanent/opponent counter-removal and discount semantics still need executable scenarios. Classify as missing implementation, not proven engine limitation |
 | Corrupted Crossroads | #192 exact Devoid-only source candidate: 6 engine + 6 Android scenarios passed at `1bf22a66`, but runtime/registry/export absent from integration |
 | Eldrazi Temple | #158/#162 exact restriction source candidate: 5 engine + 8 Android scenarios passed at `fb60a660`, but runtime/registry/export absent from integration |
 | Opal Palace | Commander-specific mana provenance and command-zone cast-count-dependent entering counters need an exact mana rider/replacement primitive |

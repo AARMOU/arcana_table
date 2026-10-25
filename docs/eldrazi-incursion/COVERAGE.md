@@ -9,8 +9,8 @@ Original 100-slot manifest. Category 1 requires a nonempty registered definition
 | 1. Fully implemented and tested (reviewed acceptance scope) | 30 |
 | 2. Implemented but missing acceptance tests/evidence | 60 |
 | 3. Implemented but failing tests | 0 |
-| 4. Missing implementation | 1 |
-| 5. Blocked by pinned Argentum capability/runtime | 9 |
+| 4. Missing implementation | 2 |
+| 5. Blocked by pinned Argentum capability/runtime | 8 |
 
 Reported/API-only blockers are distinguished from reproduced failures in each row.
 
@@ -26,7 +26,7 @@ Reported/API-only blockers are distinguished from reproduced failures in each ro
 | Bismuth Mindrender | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `BismuthMindrenderScenarioTest.kt` (3 green cases). |
 | Hideous Taskmaster | 1 | 5 | PR #200: 10 actual engine scenarios, 9 pass/1 fails. Target changing from opponent A to B before resolution is incorrectly stolen. Original per-opponent controller binding is missing. Unregistered candidate preserved. |
 | Twins of Discord | 1 | 4 | PR #196 is a rules contract, not implementation/tests. Exact external conditional entering-with-counters replacement and attack parity choice remain unproven; do not claim a demonstrated engine impossibility. |
-| Mutated Cultist | 1 | 5 | Recorded SDK limitation: no dynamic generic reduction for the next spell this turn based on counters removed. Source/API audit only; not independently reproduced by a complete card scenario. |
+| Mutated Cultist | 1 | 4 | No completed registered implementation; #198 owns the active engine probes. Earlier no-dynamic-next-spell-discount blocker is contradicted by the committed SDK public Effects.ReduceNextSpellCost(DynamicAmount, GameObjectFilter) method, generated index line 1597 and pinned Effects.kt. Primitive presence is verified, full removal/player-counter/optional-target/discount behavior is not yet certified. |
 | Eldrazi Confluence | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `EldraziConfluenceScenarioTest.kt` (7 green cases). |
 | Spawnbed Protector | 1 | 1 | Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions. `SpawnbedProtectorScenarioTest.kt` (5 green cases). |
 | Chittering Dispatcher | 1 | 5 | Registered but known three-player Myriad defender-choice regression fails (#181/#183/#34/#36). Two-player tests pass and do not certify multiplayer behavior. Source-only patch candidate is not a proven integrated repair. `ChitteringDispatcherScenarioTest.kt` (4 green cases). |

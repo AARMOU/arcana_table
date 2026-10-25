@@ -1,7 +1,7 @@
 {
   "deck": "Eldrazi Incursion",
   "originalSlots": 100,
-  "sourceBase": "3092586cbbba5b94414f11a49b0c0f8d3b71cb44",
+  "sourceBase": "1f0c97ab310aba179abf1a94128a3da29f3fa089",
   "scope": "Original 100-slot manifest. Category 1 requires a nonempty registered definition, reviewed card-specific positive and negative acceptance coverage, and green observed JUnit on the candidate runtime. This is not exhaustive certification of every possible interaction. Upstream indexed definitions without current card-specific acceptance evidence stay in category 2.",
   "pickerAssetMatchesOriginalManifest": true,
   "indexedSlots": 91,
@@ -9,8 +9,8 @@
     "1": 30,
     "2": 60,
     "3": 0,
-    "4": 1,
-    "5": 9
+    "4": 2,
+    "5": 8
   },
   "runtimeSha256": {
     "argentum-ai.jar": "10321247e9d3b052547123bdab6dab8f720882a2dd8a2782c8a8a74714eb5757",
@@ -208,9 +208,9 @@
       "test": null,
       "junit": null,
       "definitionHasBehavior": false,
-      "category": 5,
-      "classification": "Blocked by pinned Argentum capability/runtime",
-      "reason": "Recorded SDK limitation: no dynamic generic reduction for the next spell this turn based on counters removed. Source/API audit only; not independently reproduced by a complete card scenario."
+      "category": 4,
+      "classification": "Missing implementation",
+      "reason": "No completed registered implementation; #198 owns the active engine probes. Earlier no-dynamic-next-spell-discount blocker is contradicted by the committed SDK public Effects.ReduceNextSpellCost(DynamicAmount, GameObjectFilter) method, generated index line 1597 and pinned Effects.kt. Primitive presence is verified, full removal/player-counter/optional-target/discount behavior is not yet certified."
     },
     {
       "name": "Eldrazi Confluence",

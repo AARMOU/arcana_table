@@ -36,3 +36,5 @@ positive/negative acceptance coverage. Benthic Anomaly moves from uninvestigated
 qualified, reproduced primitive-composition blocker per #203. It remains absent from the index.
 No new original card slot is counted, no failing blocker probe is hidden in the normal suite,
 and no APK or 100/100 readiness claim is made.
+
+Audit correction: Mutated Cultist's old no-discount-primitive blocker was false. The committed SDK method table contains public `Effects.ReduceNextSpellCost(DynamicAmount, GameObjectFilter)` and the pinned source implements its one-shot behavior. Its active #198 owner has been notified of the correct `Triggers.self.isCast()` entrypoint. The stale unverified Cardkit blocker is removed; the card remains missing/unregistered until full scenarios prove it. This is no coverage increment.
