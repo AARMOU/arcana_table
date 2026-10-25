@@ -58,17 +58,25 @@ jobs:
       - name: Compile patched pinned engine and SDK, no production files
         working-directory: argentum-engine
         run: |
-          ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar
+          ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar
       - name: Inject temporary verified jars only on this runner
         run: |
           python3 - <<'PY'
           import hashlib, shutil, zipfile, struct
           from pathlib import Path
           libs=Path("android/app/libs")
+          # Preserve the Arcana-pinned AI JAR: source-upstream AI lacks the app's
+          # RetargetingCandidateFilter. We are testing an engine patch, NOT an AI upgrade.
+          ai=libs/"argentum-ai.jar"
+          assert ai.is_file(), "Arcana-pinned AI JAR missing"
+          ai_hash=hashlib.sha256(ai.read_bytes()).hexdigest()
+          with zipfile.ZipFile(ai) as pinned_ai:
+              assert "com/wingedsheep/ai/engine/RetargetingCandidateFilter.class" in pinned_ai.namelist(), (
+                  "Arcana AI extension missing: fail closed before compiling tests"
+              )
           markers={"mtg-sdk":"com/wingedsheep/sdk/model/CardDefinition.class",
                    "mtg-sdk-tooling":"com/wingedsheep/sdk/tooling/CardLoader.class",
-                   "rules-engine":"com/wingedsheep/engine/core/GameAction.class",
-                   "ai":"com/wingedsheep/ai/engine/AIPlayer.class"}
+                   "rules-engine":"com/wingedsheep/engine/core/GameAction.class"}
           for module, identifier in markers.items():
               jars=[f for f in Path(f"argentum-engine/{module}/build/libs").glob("*.jar")
                     if "sources" not in f.name and "javadoc" not in f.name
@@ -80,6 +88,8 @@ jobs:
                   versions=[struct.unpack(">H",z.read(n)[6:8])[0] for n in z.namelist() if n.endswith(".class")]
               assert versions and max(versions)<=61,(module,max(versions))
               print("temporary runner-only",target,hashlib.sha256(target.read_bytes()).hexdigest())
+          assert hashlib.sha256(ai.read_bytes()).hexdigest()==ai_hash, "Unexpected AI JAR change"
+          print("kept Arcana-pinned AI JAR:", ai_hash)
           PY
       - uses: actions/setup-java@v4
         with:
