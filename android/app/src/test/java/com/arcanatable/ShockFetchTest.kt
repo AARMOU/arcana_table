@@ -22,7 +22,8 @@ class ShockFetchTest {
         val you = LocalSeat("You", List(20) { "Wooded Foothills" } + List(20) { "Stomping Ground" }, null)
         val ai = LocalSeat("AI", List(40) { "Mountain" }, null)
         val inbox = LinkedBlockingQueue<JSONObject>()
-        val host = LocalArgentumHost(registry, you, ai, paceMs = 0) { inbox.put(it) }
+        // Fixed shuffle: an unseeded game sometimes opens without Wooded Foothills (CI run 40198684000).
+        val host = LocalArgentumHost(registry, you, ai, paceMs = 0, gameSeed = 7L) { inbox.put(it) }
         host.receive(JSONObject().put("type", "connect"))
         host.receive(JSONObject().put("type", "createQuickGameLobby"))
         fun send(action: JSONObject) = host.receive(JSONObject().put("type", "submitAction").put("action", action).put("interactionEpoch", "offline"))
@@ -48,7 +49,9 @@ class ShockFetchTest {
                             val pick = decision.getJSONArray("options").getString(0)
                             send(JSONObject().put("type", "SubmitDecision").put("playerId", decision.getString("playerId"))
                                 .put("response", JSONObject().put("type", "CardsSelectedResponse").put("decisionId", decision.getString("id")).put("selectedCards", JSONArray().put(pick))))
-                            stage = 2
+                            // Only the fetch land's library search advances the scenario; a cleanup
+                            // "discard down to 7" is also a SelectCardsDecision and must not count as it.
+                            if (stage == 1) stage = 2
                         }
                         stage == 3 -> {
                             val state = msg.getJSONObject("state")
