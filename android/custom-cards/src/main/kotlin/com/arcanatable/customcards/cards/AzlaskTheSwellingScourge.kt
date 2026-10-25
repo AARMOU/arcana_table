@@ -12,6 +12,7 @@ import com.wingedsheep.sdk.scripting.references.Player
 import com.wingedsheep.sdk.scripting.targets.EffectTarget
 
 /**
+ * CARDKIT-SCAFFOLD: test-first source; do not register until engine scenarios prove exact behavior.
  * Azlask, the Swelling Scourge (M3C #5).
  *
  * Experience counters belong to the player, not the source permanent. The death trigger
