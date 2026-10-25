@@ -1,8 +1,8 @@
-From 0043d114095e46356aa14611352a485ab6d25e06 Mon Sep 17 00:00:00 2001
-From: Claude <noreply@anthropic.com>
-Date: Sat, 17 Oct 2026 06:40:34 -0600
-Subject: [PATCH] Arcana engine trial: Java 17 API target and Portal card-data
- exporter
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sun, 25 Oct 2026 05:21:02 +0000
+Subject: [PATCH] arcana: 0002-engine-trial-build
 
 ---
  arcana-export/build.gradle.kts                | 20 ++++++++++++++
@@ -72,7 +72,7 @@ index 0000000000..3b9b6fa91d
 +    if (failures > 0) kotlin.system.exitProcess(2)
 +}
 diff --git a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
-index 19839403b9..e189c8dd6f 100644
+index f1241bd8bb..3374cddf82 100644
 --- a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
 +++ b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
 @@ -17,8 +17,15 @@ plugins {
@@ -104,6 +104,3 @@ index 2c0b79f053..5c26424105 100644
  
  // The card corpus, split out of :mtg-sets and nested underneath it. `:mtg-sets` still re-exports
  // all of it, so every existing `project(":mtg-sets")` dependency is unchanged — the split only
--- 
-2.43.0
-

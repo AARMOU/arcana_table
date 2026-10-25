@@ -1,7 +1,8 @@
-From a825a62ed881565bd58eef7a88f7e5527b8d766a Mon Sep 17 00:00:00 2001
-From: Claude <noreply@anthropic.com>
-Date: Sat, 17 Oct 2026 06:56:31 -0600
-Subject: [PATCH] Arcana export: full card library as data, with index
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sun, 25 Oct 2026 05:21:03 +0000
+Subject: [PATCH] arcana: 0003-full-library-export
 
 ---
  arcana-export/build.gradle.kts                |  6 +--
@@ -104,6 +105,3 @@ index 3b9b6fa91d..7b0b7e65a0 100644
 +    File(outDir, "$base.index.tsv").writeText(index.toString())
 +    println("ARCANA-EXPORT $base cards=${lines.size} bytes=${out.length()} roundTripFailures=$failures")
  }
--- 
-2.43.0
-

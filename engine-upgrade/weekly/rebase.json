@@ -1,0 +1,46 @@
+{
+  "old_pin": "61e71e586b100faa661f86cac827ac3c3bbb5a78",
+  "target": "c49672e9b49b834fcbb9338aeca822cce6db10f3",
+  "status": "rebased",
+  "patches": [
+    {
+      "patch": "0001-android-regex.patch",
+      "status": "refreshed"
+    },
+    {
+      "patch": "0002-engine-trial-build.patch",
+      "status": "refreshed"
+    },
+    {
+      "patch": "0003-full-library-export.patch",
+      "status": "refreshed"
+    },
+    {
+      "patch": "0004-token-copy-triggered-abilities.patch",
+      "status": "refreshed"
+    },
+    {
+      "patch": "0005-last-known-negative-subtype.patch",
+      "status": "refreshed"
+    },
+    {
+      "patch": "0006-ai-decision-deadline.patch",
+      "status": "refreshed"
+    },
+    {
+      "patch": "0007-ai-bounded-stack-search.patch",
+      "status": "refreshed"
+    },
+    {
+      "patch": "0008-jvm-test-toolchain.patch",
+      "status": "refreshed"
+    }
+  ],
+  "conflicts": [],
+  "upstream_commits": 96,
+  "experimental": {
+    "patch": "0010-enumeration-absence-index.patch",
+    "applies": false
+  },
+  "engine_head": "3ca408cd330efb6f2803bd75a875338f2f9dd74f"
+}

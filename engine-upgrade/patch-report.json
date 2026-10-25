@@ -1,0 +1,53 @@
+{
+  "upstream": "c49672e9b49b834fcbb9338aeca822cce6db10f3",
+  "status": "mandatory_patches_applied",
+  "patches": [
+    {
+      "patch": "0001-android-regex.patch",
+      "status": "applied",
+      "diagnostics": ""
+    },
+    {
+      "patch": "0002-engine-trial-build.patch",
+      "status": "applied",
+      "diagnostics": ""
+    },
+    {
+      "patch": "0003-full-library-export.patch",
+      "status": "applied",
+      "diagnostics": ""
+    },
+    {
+      "patch": "0004-token-copy-triggered-abilities.patch",
+      "status": "applied",
+      "diagnostics": ""
+    },
+    {
+      "patch": "0005-last-known-negative-subtype.patch",
+      "status": "applied",
+      "diagnostics": ""
+    },
+    {
+      "patch": "0006-ai-decision-deadline.patch",
+      "status": "applied",
+      "diagnostics": ""
+    },
+    {
+      "patch": "0007-ai-bounded-stack-search.patch",
+      "status": "applied",
+      "diagnostics": ""
+    },
+    {
+      "patch": "0008-jvm-test-toolchain.patch",
+      "status": "applied",
+      "diagnostics": ""
+    },
+    {
+      "patch": "0010-enumeration-absence-index.patch",
+      "status": "experimental_conflict",
+      "diagnostics": "error: patch failed: rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/ActivatedAbilityEnumerator.kt:78\nerror: rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/ActivatedAbilityEnumerator.kt: patch does not apply\nerror: patch failed: rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/ManaAbilityEnumerator.kt:1\nerror: rules-engine/src/main/kotlin/com/wingedsheep/engine/legalactions/enumerators/ManaAbilityEnumerator.kt: patch does not apply"
+    }
+  ],
+  "mandatory_blocker": null,
+  "experiment": "0010-enumeration-absence-index.patch"
+}
