@@ -3,6 +3,8 @@ package com.arcanatable.customcards
 import com.arcanatable.customcards.cards.OblivionSower
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.sdk.core.Zone
+import com.wingedsheep.sdk.core.Color
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.engine.core.SelectCardsDecision
 import com.wingedsheep.engine.state.ZoneKey
 import com.wingedsheep.engine.state.components.identity.OwnerComponent
@@ -104,11 +106,17 @@ class OblivionSowerScenarioTest {
     }
 
     @Test fun enteringWithoutCastingDoesNotExileOrStealAnything() {
-        val d = customScenario(OblivionSower, "Forest")
+        val d = customScenario(OblivionSower, "Forest", "Reanimate")
         val land = d.putCardInExile(d.player2, "Forest")
         val library = d.state.getZone(d.player2, Zone.LIBRARY).toList()
-        d.putCreatureOnBattlefield(d.player1, "Oblivion Sower")
+        val sower = d.putCardInGraveyard(d.player1, "Oblivion Sower")
+        val reanimate = d.putCardInHand(d.player1, "Reanimate")
+        d.giveMana(d.player1, Color.BLACK)
+        assertNull(d.castSpellWithTargets(d.player1, reanimate,
+            listOf(ChosenTarget.Card(sower, d.player1, Zone.GRAVEYARD))).error)
         d.resolveAll()
+        assertNotNull("Actual reanimation resolved", d.findPermanent(d.player1, "Oblivion Sower"))
+        assertFalse(sower in d.state.getZone(d.player1, Zone.GRAVEYARD))
         assertEquals(library, d.state.getZone(d.player2, Zone.LIBRARY))
         assertTrue(land in d.state.getZone(d.player2, Zone.EXILE))
         assertTrue(d.permanentsNamed(d.player1, "Forest").isEmpty())

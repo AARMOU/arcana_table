@@ -18,7 +18,7 @@
         "allDeathsAreSimultaneousSoADyingObserverSeesOtherPlayersCreatures",
         "sacrificeIgnoresIndestructibleHexproofAndPermanentTypeButPreservesDevoid"
       ],
-      "xmlSha256": "480796bcb543d2683276645b1162f36967b56ee5115b7e50b93b94c4af309361",
+      "xmlSha256": "1a97f1968f7162860046b1aa9e41e5af2296025fc777de9f085dd4e22747f1c3",
       "sourceSha256": "2aaa4c04c5b084ad89bfdd6a7386cdd9ea2c86385780c06e29c9cb43305b99b6"
     },
     {
@@ -34,7 +34,7 @@
         "noncreatureEldraziScionPermanentCanPayTheOracleCost",
         "cannotSacrificeAnOpponentsScionOrARegularCreature"
       ],
-      "xmlSha256": "98f19131aa1a9a57d01b1d8d1b9985367dd6ed8759486267a278863644835733",
+      "xmlSha256": "95d432fb090353fc8e76f1e7b9feb9eae391ce03242a6215e4fdcbe5a5ccf338",
       "sourceSha256": "9586285f8b99d7a1ad5a6b91d409ccda00bc1f4ae84c25ded78f6b2613c4410e"
     },
     {
@@ -50,8 +50,8 @@
         "ownLandsAndNonlandsAreNotChoicesButOpponentOwnedLandsInAnotherExileBucketAre",
         "enteringWithoutCastingDoesNotExileOrStealAnything"
       ],
-      "xmlSha256": "0e95dd2889c6178cebca7cf3012d52d14d9e9f40f3190156fc452c5024250ecf",
-      "sourceSha256": "32854c95d4a5462792736ff490960c68d829c8ab54255cbb5745f511c43dae91"
+      "xmlSha256": "f49887301258f3e2895f32b83fd61fc7ee643e4fe32ea8dc77820fba2d233ef7",
+      "sourceSha256": "9fca8da9485ea6239ac56192c9f20e79c8a88c5b22ff024e2b16e95613512515"
     },
     {
       "class": "UlamogsCrusherScenarioTest",
@@ -66,7 +66,7 @@
         "ableCrusherCannotBeOmittedFromAttackDeclaration",
         "attackMakesDefendingPlayerSacrificeTwoPermanents"
       ],
-      "xmlSha256": "5147c3fb9837207e3b9359d3f5fc732e0d7c2d0e61f3afa272acf199504ebb41",
+      "xmlSha256": "6a25a105e503a6e25522cd0b3c9b12477bc47a5248c1bd732c8b79bec378b0b5",
       "sourceSha256": "eecd94ab3f8a24e93a3fd21afe759afa4f0c818fbf921a99c7b51ba7702346f0"
     },
     {
@@ -82,7 +82,7 @@
         "fewerThanSevenLandsCannotActivateDoubleColorlessAbility",
         "sevenLandsUnlockTheDoubleColorlessAbilityAndItCanPayForColorlessSpell"
       ],
-      "xmlSha256": "19a766406137bc30599036784db3602372ad48f4bb1d3fb5308374732a6b1e7f",
+      "xmlSha256": "fd5b18dd4d7e4c143845398083a01c1660825d3a84a5b3ead4608e632a444115",
       "sourceSha256": "5d5d4425cefa278f44f864b19f6fee8dc585f2a32391b9ac2ebd55f64e2aea5e"
     }
   ],
@@ -124,5 +124,6 @@
     "argentum-mtg-sdk.jar": "4c77058760b912ca376412151b344529ce67b2d674d1b895f723b7766cc453ac",
     "argentum-rules-engine.jar": "8c151136af028fa36438dfa931d5fea14286abc9f58876e483c6850acec4f66f"
   },
-  "scope": "Two card definitions repaired using existing SDK; no runtime changes; 14 new scenarios, 23 focused, 626 total green; not exhaustive certification of original 100."
+  "scope": "Two card definitions repaired using existing SDK; no runtime changes; 14 new scenarios, 23 focused, 626 total green; not exhaustive certification of original 100.",
+  "reanimationNegative": "Oblivion Sower actually enters via a resolved Reanimate spell targeting its graveyard card, not a battlefield setup helper."
 }

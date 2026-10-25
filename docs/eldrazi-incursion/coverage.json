@@ -1,7 +1,7 @@
 {
   "deck": "Eldrazi Incursion",
   "originalSlots": 100,
-  "sourceBase": "2c54d3e5c7df9fa5144aae62b953dd2262fe56ca",
+  "sourceBase": "9d330b7ac8b5a0ca7246f59976b8095d54f9f60f",
   "scope": "Original 100-slot manifest. Category 1 requires a nonempty registered definition, reviewed card-specific positive and negative acceptance coverage, and green observed JUnit on the candidate runtime. This is not exhaustive certification of every possible interaction. Upstream indexed definitions without current card-specific acceptance evidence stay in category 2.",
   "pickerAssetMatchesOriginalManifest": true,
   "indexedSlots": 91,
@@ -555,7 +555,7 @@
       "classification": "Fully implemented and tested (reviewed acceptance scope)",
       "reason": "Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions.",
       "sourceSha256": "f40ed32476c0fd9f53b43fb9c76d82494233a27ded046c5f73dc38f1cd17cb11",
-      "testSha256": "32854c95d4a5462792736ff490960c68d829c8ab54255cbb5745f511c43dae91"
+      "testSha256": "9fca8da9485ea6239ac56192c9f20e79c8a88c5b22ff024e2b16e95613512515"
     },
     {
       "name": "Adarkar Wastes",

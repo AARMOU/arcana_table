@@ -10,7 +10,7 @@ it does not certify the entire original deck. Updated categories are **37 review
 |---|---:|---|
 | All Is Dust | 3 | Both players sacrifice colored permanents; colored artifacts/enchantments, multicolor, indestructible and hexproof do not escape; colorless/Devoid survive; generic {7} accepts colored mana; a dying observer sees simultaneous friendly and opposing deaths |
 | Drowner of Hope | 5 | Actual ETB creates two Scions; sacrifice cost taps a creature; reject opposing Scions, ordinary creatures, Eldrazi Spawn and Scions lacking Eldrazi; reject noncreature target before paying cost; allow a noncreature Kindred Eldrazi Scion permanent as cost, including while Drowner is tapped and summoning sick |
-| Oblivion Sower | 5 | Cast trigger exiles four, can choose zero or old exiled lands; own lands and nonlands excluded; opponent-owned lands remain eligible in another exile bucket; caster chooses and controls returned lands while ownership is preserved; entering without casting does nothing |
+| Oblivion Sower | 5 | Cast trigger exiles four, can choose zero or old exiled lands; own lands and nonlands excluded; opponent-owned lands remain eligible in another exile bucket; caster chooses and controls returned lands while ownership is preserved; an actual Reanimate cast returns Sower without causing exile or land theft |
 | Ulamog's Crusher | 5 | Annihilator sacrifices exactly two from four, only defending player; able Crusher cannot be omitted; tapped/summoning-sick Crusher cannot attack and creates no annihilator trigger |
 | Shrine of the Forsaken Gods | 5 | Six vs seven lands; actual colorless spell payment; colored generic costs cannot consume restricted mana; Devoid colorless spell with a printed colored cost can; an activated ability cannot spend spell-only restricted mana; failed payments preserve the pool |
 
@@ -30,6 +30,8 @@ the target-opponent ownership predicate in gathering and selection. An opponent-
 caster's exile bucket was previously missed and produced no optional land decision; the same
 case now offers exactly that land to the caster, excludes their own Forest/nonland cards and
 puts it under the caster's control with opponent ownership intact.
+
+The entering-without-casting negative uses an actual Reanimate cast from the graveyard, not a battlefield setup helper that bypasses trigger events.
 
 Historical red JUnit is preserved under `investigation/eldrazi-incursion/five-card-verification/`;
 current executable tests remain in the normal suite. No failing test was skipped or weakened.
