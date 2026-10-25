@@ -19,6 +19,8 @@ on:
       - '.github/workflows/argentum-engine-pr-guard.yml'
       - 'engine-upgrade/engine_pr_guard.py'
       - 'engine-upgrade/tests/test_engine_pr_guard.py'
+      - 'engine-upgrade/engine_pr_source_probe.py'
+      - 'engine-upgrade/tests/test_engine_pr_source_probe.py'
       - 'engine-upgrade/tests/test_weekly_handoff.py'
       - 'engine-upgrade/weekly.py'
       - 'AGENTS.md'
@@ -32,7 +34,7 @@ concurrency:
 jobs:
   inspect:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 50
     steps:
       - name: Check out trusted inspector, not PR head
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -43,8 +45,11 @@ jobs:
       - name: Guard self-tests
         run: |
           python3 -m unittest discover -s engine-upgrade/tests -p test_engine_pr_guard.py -v
+          python3 -m unittest discover -s engine-upgrade/tests -p test_engine_pr_source_probe.py -v
           python3 -m unittest discover -s engine-upgrade/tests -p test_weekly_handoff.py -v
       - name: Audit current upstream and all open engine PRs (or this exact PR)
+        id: policy
+        continue-on-error: true
         env:
           GITHUB_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.number || '' }}
@@ -56,6 +61,23 @@ jobs:
           else
             python3 engine-upgrade/engine_pr_guard.py --output "$RUNNER_TEMP/engine-pr-guard.json"
           fi
+      - name: Source rebase every open patch-changing engine PR using trusted weekly.py
+        id: source
+        if: always() && steps.policy.outcome != 'skipped'
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PYTHONDONTWRITEBYTECODE: '1'
+        run: |
+          set -euo pipefail
+          python3 engine-upgrade/engine_pr_source_probe.py --report "$RUNNER_TEMP/engine-pr-guard.json" --output "$RUNNER_TEMP/engine-pr-source.json"
+      - name: Enforce both fail-closed checks
+        if: always()
+        env:
+          POLICY: ${{ steps.policy.outcome }}
+          SOURCE: ${{ steps.source.outcome }}
+        run: |
+          test "$POLICY" = success && test "$SOURCE" = success
       - name: Preserve the read-only report
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
@@ -63,4 +85,6 @@ jobs:
           name: engine-pr-guard-report
           if-no-files-found: ignore
           retention-days: 14
-          path: ${{ runner.temp }}/engine-pr-guard.json
+          path: |
+            ${{ runner.temp }}/engine-pr-guard.json
+            ${{ runner.temp }}/engine-pr-source.json
