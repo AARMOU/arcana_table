@@ -8,11 +8,11 @@ adds one, producing **91 indexed / 9 absent**. Index membership is not Oracle pl
 candidate includes #197 Confluence regressions and the verified source tests from #187/#188.
 
 The accompanying [100-card audit](COVERAGE.md) and [machine-readable evidence](coverage.json)
-classify every original slot: **28 implemented with reviewed positive/negative acceptance scenarios;
-62 implemented but missing direct acceptance evidence or required negative cases; 0 current
-registered-card test failures observed; 2 missing implementations; 8 pinned-engine/runtime blocks.**
-The eight include registered Chittering Dispatcher, so they are not eight additional absent names.
-These are evidence classes, not a new 28% completion claim. Several of the 62 have upstream tests;
+classify every original slot: **30 implemented with reviewed positive/negative acceptance scenarios;
+60 implemented but missing direct acceptance evidence or required negative cases; 0 current
+registered-card test failures observed; 1 missing implementation; 9 pinned-engine/runtime blocks.**
+The nine include registered Chittering Dispatcher, so they are not nine additional absent names.
+These are evidence classes, not a new 30% completion claim. Several of the 60 have upstream tests;
 those have not been independently executed against this exact Arcana runtime in this audit.
 
 ## Executed checks
@@ -28,9 +28,9 @@ those have not been independently executed against this exact Arcana runtime in 
 | Scions | Confluence, Spawnbed Protector, Spawning Bed, Warping Wail suites | PASS: actual sacrifice-for-{C} and relevant creation/target/cost negatives |
 | Spawn | Skittering Invasion extended beyond ability-exists inspection | PASS: sacrifice immediately generates one spendable {C}; no stack; no summoning-sickness tap restriction; opponent cannot activate; no repeated sacrifice; actual Sol Ring cast consumes it |
 | Ugin intake | #187/#188's 8 extra loyalty/Devoid/controller tests and second Spirit-link destruction regression applied to current source | PASS locally with existing seven Ugin scenarios |
-| Combined custom-card suite | Actual repository Kotlin + Android AI/priority/cost source sets, committed jars, JDK 17, Kotlin 2.4.0, exact dependencies, standalone Gradle JVM harness | **595 executed / 0 failed / 0 errors / 0 skips**. Android app tests are separate |
+| Combined custom-card suite | Actual repository Kotlin + Android AI/priority/cost source sets, committed jars, JDK 17, Kotlin 2.4.0, exact dependencies, standalone Gradle JVM harness | **603 executed / 0 failed / 0 errors / 0 skips**. Android app tests are separate |
 | Cardkit | 58 unit tests, one existing skip; check/docs-check; diff check | PASS; 0 toolkit check errors/warnings |
-| Android app suite | First #199 run 40213533557: custom-card task passed; 270 Android cases, 2 failed / 4 existing skips | Two exact inventory assertions still expected 90/10. Corrected to exact nine-name missing set and required Selective loading; fresh #199 head `ca3a01c3` CI required. No rules assertion weakened |
+| Android app suite | First #199 run 40213533557: custom-card task passed; 270 Android cases, 2 failed / 4 existing skips | Two exact inventory assertions still expected 90/10. Corrected to exact nine-name missing set and required Selective loading; corrected #199 head `ca3a01c3` passed Development 40214289212 + Cardkit 40214289234. No rules assertion weakened |
 | Real original-deck match vs AI | Existing smoke test uses only indexed names, with a turn-progress assertion | NOT PROVEN: an incomplete filtered-deck smoke cannot certify the original 100-card deck |
 | Fold/release exclusion | Parent #197 release-only scenario exclusion passed in 40212361451 | New combined exact-head release check and physical Fold testing still needed |
 
@@ -39,12 +39,14 @@ The coverage JSON records source/test fingerprints and the exact four unchanged 
 The standalone harness bypasses Android plugin configuration only; it does not mock or rebuild the
 Argentum engine. Its full-suite command was `test` with the repository custom-card source sets.
 
+Subsequent evidence: #201 exact head `78528e2` Development [40214937451](https://github.com/AARMOU/arcana_table/actions/runs/40214937451) and Cardkit 40214937485 are now SUCCESS. The current land follow-up adds eight scenarios; its own combined CI is separate. [Land acceptance details](LAND-MANA-ACCEPTANCE.md) cover Unclaimed Territory and Tendo Ice Bridge.
+
 ## Exact remaining unindexed originals
 
 | Card | Actual next step / blocker |
 |---|---|
 | Azlask, the Swelling Scourge | Earlier #171 colorless dies-filter failure reported in Cardkit. Independently reproduce and repair the trigger matcher; do not treat that old report as freshly certified |
-| Benthic Anomaly | Missing. Investigate exact mandatory per-opponent nontargeted selection, summed stats and copy exceptions. No demonstrated engine impossibility yet |
+| Benthic Anomaly | #203 primitive probe: direct stored projected power works; chosen-collection accumulation loses numeric outputs (2+3 becomes 0). No documented chosen-collection power/toughness sum. This blocks the tested composition, not every possible engine extension. Remains unimplemented/unregistered |
 | Angelic Aberration | Documented filter API lacks base power/toughness <=1. It has equality and current-stat comparison only. Extend exact base-stat filtering, then variable sacrifice/token tests |
 | Hideous Taskmaster | **Fresh reproduced blocker #200: 9 pass / 1 fail**. A selected target changing between opponents is incorrectly stolen. Preserve per-target original-controller binding through resolution/copies/retargeting |
 | Twins of Discord | #196 is a contract/investigation only. Prove external conditional bloodthirst replacement plus parity attack restriction before implementation; not an implemented card |
@@ -56,7 +58,7 @@ Argentum engine. Its full-suite command was `test` with the repository custom-ca
 **Additional indexed blocker:** Chittering Dispatcher's three-player Myriad defender-choice regression
 remains blocked (#34/#36/#181/#183). Its two-player cases passing cannot erase that rules defect.
 **Additional acceptance backlog:** All Is Dust, Drowner of Hope, Oblivion Sower, Ruins of Oran-Rief,
-Sifter of Skulls, Tendo Ice Bridge, Ulamog's Crusher, Unclaimed Territory and Shrine of the Forsaken Gods
+Sifter of Skulls, Ulamog's Crusher and Shrine of the Forsaken Gods
 need the specific missing negative/cost/timing cases listed in the 100-row audit. Imported upstream
 cards stay evidence-unverified rather than being counted playable from their names.
 
@@ -68,10 +70,12 @@ cards stay evidence-unverified rather than being counted playable from their nam
   candidate sources and cleans up on failure. It must remain outside normal runtime registration.
 - #187/#188 intake is **test files only**, preserving their exact source and adding no duplicate Ugin
   implementation. The existing Ugin source is reused and all combined tests pass locally.
-- Temple #158/#162 and Crossroads #192 remain source/runner candidates. Both alter shared `ManaRestriction.kt` and `ManaPool.kt`; Temple also changes ability payment context and SDK baselines, while Crossroads changes spell payment subtype/context projection. independently green old-base results do not certify their combination
-  with #171's newer Ulalek runtime. Review both variants, serializers and every spell/ability payment
-  context together, then source-build one temporary combined runtime and execute all acceptance suites.
-  No committed jar replacement is authorized or performed.
+- Temple #158/#162 and Crossroads #192 remain source/runner candidates. Their original patches
+  conflict in `ManaRestriction.kt` and `ManaPool.kt`; the clean-pin applicability check reproduced it.
+  The other GPT lane now owns #202 (`20091368`), an additive source resolution with a 25-case
+  combined engine/consumer gate. This report does not certify that gate or #171 runtime compatibility.
+  Review serializers and every spell/ability payment context on the full Ulalek patch stack before
+  runtime intake. No committed jar replacement is authorized or performed.
 - Myriad #183's source patch targets a different upstream context. Reconcile it with #171's pinned
   patch stack and prove three-player controller/planeswalker defender choices before counting Dispatcher.
 - Duplicate historical Eldrazi Temple candidates #158/#161/#162 represent **one card**, not three.

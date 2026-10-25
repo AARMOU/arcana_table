@@ -1,5 +1,5 @@
 {
-  "runner": "Local standalone Gradle JVM harness; repository sources and unchanged committed runtime; entire suite 595 passed, zero failed/errored/skipped. Android CI separate.",
+  "runner": "Local standalone Gradle JVM harness; repository sources and unchanged committed runtime; entire suite 603 passed, zero failed/errored/skipped. Android CI separate.",
   "suites": [
     {
       "class": "UlalekFusedAtrocityScenarioTest",
@@ -25,7 +25,7 @@
         "nonEldraziSpellsDoNotTrigger",
         "decliningMakesNoCopiesAndKeepsTheMana"
       ],
-      "xmlSha256": "16a3e347e71d80fafe7eadd02e9e13a483c4703c06001d681bc4ded0119b7469",
+      "xmlSha256": "4fcb5ff80382870ef9c6c7beaf87dabb096c44bd9fd9c884faedb762b4debcc5",
       "sourceSha256": "bdaeca66fd1b316c60f8f63e13b2c5769f913b199af74e7770d0f8ccb7ec1964"
     },
     {
@@ -43,7 +43,7 @@
         "explicitColorlessSymbolsAllowTwoColorlessAndTwoColored",
         "blinkCannotTargetALand"
       ],
-      "xmlSha256": "f01939c40c76ace02f2965f52ac3ccb9bb9bd9fe647362e275c20c34faa2349f",
+      "xmlSha256": "877f1b999cc5e55c1be9d43a44e9c466649c8249be5f8472da5f5b68c55e6adc",
       "sourceSha256": "550fd64e2eac0c146d069b0bd7ebfec223aa815baf6b0a8d65b6d59ad54087a0"
     },
     {
@@ -62,7 +62,7 @@
         "threePlayersChooseInApnapOrderBeforeAnyPermanentLeaves",
         "allColoredManaCannotPayAndMixedManaPaysExactlyTwoRequiredColorless"
       ],
-      "xmlSha256": "a6f415e0066ead2c20f4c1feb7760243ed222d376979d46157f60353333017e2",
+      "xmlSha256": "5bf356ba679bc906e2ad0869efefe14c742ca614a2e459e962bfe5e12efc0935",
       "sourceSha256": "f819a9245d31ad8f01533b84df74ab94738e0656b89bb56652b5dc32063046be"
     },
     {
@@ -75,7 +75,7 @@
         "spawnSacrificeImmediatelyProducesSpendableColorlessAndCannotBeRepeatedOrUsedByOpponent",
         "createsFiveManaCapableEldraziSpawn"
       ],
-      "xmlSha256": "50b4b4ef71e3eb3591bc1684da6488e470dda63bb65220866a1a2071f556d457",
+      "xmlSha256": "6fec9099fa4a7dfcaede733afad44c4a791d5237b4327f2e7c92ef711300c41e",
       "sourceSha256": "814e8749ed3c1db11ab41983afb3bff485c16b768320a20cf36fce959471f440"
     },
     {
@@ -91,7 +91,7 @@
         "returnsOneChosenOwnEldraziCreatureCardAndCreatesTwoScions",
         "cannotReturnOpponentsEldraziFromOpponentsGraveyard"
       ],
-      "xmlSha256": "be5b4e493cd4782abd128f2285f88cebc386e0f717531f5f188540743feb97f4",
+      "xmlSha256": "9dc98b7f4b506cb38d4a375f110418327c3b4c56687044f72aa45a350c2f8c39",
       "sourceSha256": "68b340b0855d3dd918b396cf8733f5d5443c5ad7c946e3560902a18c3d9e3f68"
     },
     {
@@ -105,7 +105,7 @@
         "sacrificesLandAsCostAndCreatesThreeManaCapableOneOneScions",
         "ordinaryManaAbilityAddsOneColorless"
       ],
-      "xmlSha256": "1bb3c88ecc09706c34d1c426c02a231125a82e5ea555c33fa53af74e96680d2c",
+      "xmlSha256": "f689a57345c3b67e246dfd1e1d6c0f3577cf9df4a9551c7d2dbfbb85d2e695fa",
       "sourceSha256": "eabbf1b157dc623741d675af86dac6d253819531c1ef1133a1332ef82b2e644c"
     },
     {
@@ -119,7 +119,7 @@
         "thirdModeMakesManaCapableScionWithSacrificeAsCost",
         "counterModeCountersOnlyASorcerySpellOnTheStack"
       ],
-      "xmlSha256": "4012cd2115e88f39073d0fc97104a7bab78942fe82924b5df0b98a9275aac8b0",
+      "xmlSha256": "44886b9c21b8b6cf5055c4259d36a5fa4a26bcd1d07f1bb17a47e20ffdd67a5f",
       "sourceSha256": "5e3ee0ede516827d0dd0a0451f8f17acee10a0bde168eeccfef7583c5b6c66c4"
     },
     {
@@ -132,7 +132,7 @@
         "playerMayDeclineSpawnAtBeginningOfUpkeep",
         "beginningOfOwnersUpkeepMayMakeAnEldraziSpawn"
       ],
-      "xmlSha256": "a15e0dd8e8dac1456991d6cdb1a2c9a34b8b180044aef944f872b4bc099ad8ea",
+      "xmlSha256": "a01d2f8dcfdb5ce4aec108a67dfb54df886d75c025bbfa7c898717f94cf09e81",
       "sourceSha256": "424636bdaf4684699cffefde7ac809b0e0ee9cd5d31165273c11c99d99fd35b4"
     },
     {
@@ -150,7 +150,7 @@
         "plusOneExilesOneFaceDownForControllerOnlyAndCreatesLinkedSpirit",
         "linkedSpiritReturnsItsOwnExiledCardAfterUginLeaves"
       ],
-      "xmlSha256": "b850d53da02cbb52fb4cc0f2a0c5e1f0b6761218df1c340e7a4ec5990fc634c4",
+      "xmlSha256": "f73ea7656c140f545feda796bbe0e0781b7fd8563af7bcf6aa90ae28ccdd3d6a",
       "sourceSha256": "b91b2b0c066bd5feb55fd503e70883a4392c760581027419348bef243c6dfd70"
     },
     {
@@ -165,7 +165,7 @@
         "opponentsUginCannotDiscountMySpellOrStackWithMyUgin",
         "printedColoredSpellStillRequiresItsTwoGenericMana"
       ],
-      "xmlSha256": "4b5ad2d34aedc15ad3109b4c67c20f190e730ba4e33a3fd74c7a5935ce589eaf",
+      "xmlSha256": "3f8c6539c21e6b8754b647c181997da44b4614e9ac53333a8eea38e83b71aa57",
       "sourceSha256": "1b48a7cdc927c741bdc2e101afdc95d43dd6f578621fcce5d63e6559c7934951"
     },
     {
@@ -180,8 +180,40 @@
         "minusThreeRejectsOpposingHexproofButCanTargetOwnHexproofColoredCreature",
         "plusOneCannotBeActivatedTwiceDuringTheSameTurn"
       ],
-      "xmlSha256": "1a9bf719fee7af229d6d8ea2a20f3d778dc97e727c229cfeddc91eee52fac567",
+      "xmlSha256": "58bdb9421bbb1db7d5630fb7d49821f2b01a738cbf992fd3690ab04867f9ad5c",
       "sourceSha256": "57b699c664da654188b0f375a5e263bcbdae7243eb3cbd873ced6ddf3e40d602"
+    },
+    {
+      "class": "UnclaimedTerritoryScenarioTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "wrongCreatureTypeIsRejectedWithoutSpendingAndUnrestrictedManaCanPayIt",
+        "chosenBearCreatureConsumesTheRestrictedColoredMana",
+        "unrestrictedColorlessModeCastsAnArtifactAndBothModesRequireUntappedLand",
+        "restrictedManaCannotPayForANoncreatureEvenWhenItHasTheChosenSubtype",
+        "coloredManaAbilityUsesTheChosenCreatureTypeEffect",
+        "restrictedManaCannotPayTheGenericPartOfAWrongTypeCreature"
+      ],
+      "xmlSha256": "e77a0a24e807d5e35c8c778f38e87b36e268c45244937d8410a13abcadd781a0",
+      "sourceSha256": "d23e97495c8de0e784b6093a9c547652f945d9f1a1fe4fc17e016480b7a0d93a"
+    },
+    {
+      "class": "TendoIceBridgeScenarioTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "colorlessModeDoesNotConsumeTheChargeAndPaysForAnArtifact",
+        "spentChargeCannotBeUsedAgainAfterUntappingButColorlessModeStillWorks",
+        "chargeCounterPaysForOneColoredManaUse",
+        "tappingForColoredManaPreventsASecondActivationOfEitherMode"
+      ],
+      "xmlSha256": "0f034f8624191865827b80e6593e38e22f916655ae960d8823130dec848b4018",
+      "sourceSha256": "9821551a40d8b451b3fa9716248b82b97ea1f03a80430c9622e8d5c26ed14c0b"
     }
   ]
 }

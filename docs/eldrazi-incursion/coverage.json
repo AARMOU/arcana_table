@@ -1,16 +1,16 @@
 {
   "deck": "Eldrazi Incursion",
   "originalSlots": 100,
-  "sourceBase": "1e8295f851c6c14a8a8b1b29f0b0f39c7e034528",
+  "sourceBase": "3092586cbbba5b94414f11a49b0c0f8d3b71cb44",
   "scope": "Original 100-slot manifest. Category 1 requires a nonempty registered definition, reviewed card-specific positive and negative acceptance coverage, and green observed JUnit on the candidate runtime. This is not exhaustive certification of every possible interaction. Upstream indexed definitions without current card-specific acceptance evidence stay in category 2.",
   "pickerAssetMatchesOriginalManifest": true,
   "indexedSlots": 91,
   "categorySlots": {
-    "1": 28,
-    "2": 62,
+    "1": 30,
+    "2": 60,
     "3": 0,
-    "4": 2,
-    "5": 8
+    "4": 1,
+    "5": 9
   },
   "runtimeSha256": {
     "argentum-ai.jar": "10321247e9d3b052547123bdab6dab8f720882a2dd8a2782c8a8a74714eb5757",
@@ -28,7 +28,7 @@
     "android/app/src/main/assets/argentum/por-cards.jsonl": "0b366901f2485c779d482fa19805d68e180c62459db77ee1c5d253a132140fe0"
   },
   "junitTotals": {
-    "tests": 595,
+    "tests": 603,
     "failures": 0,
     "errors": 0,
     "skipped": 0
@@ -96,9 +96,9 @@
       "test": null,
       "junit": null,
       "definitionHasBehavior": false,
-      "category": 4,
-      "classification": "Missing implementation",
-      "reason": "No implementation. Needs per-opponent nontargeted selection, chosen-copy characteristics, summed power/toughness and mandatory choices. No precise engine blocker independently established; do not call it impossible."
+      "category": 5,
+      "classification": "Blocked by pinned Argentum capability/runtime",
+      "reason": "PR #203 primitive probe: direct stored power passes, but StoreNumber inside ForEachInCollection loses numeric outputs (2+3 yields 0). No documented power/toughness aggregate over a stored chosen collection. This demonstrates the attempted exact composition fails; it does not prove every construction or an engine extension impossible. Card remains unimplemented/unregistered."
     },
     {
       "name": "Eldritch Immunity",
@@ -473,17 +473,17 @@
       "source": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TendoIceBridge.kt",
       "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TendoIceBridgeScenarioTest.kt",
       "junit": {
-        "tests": 1,
+        "tests": 4,
         "failures": 0,
         "errors": 0,
         "skipped": 0
       },
       "definitionHasBehavior": true,
-      "category": 2,
-      "classification": "Implemented but missing acceptance tests/evidence",
-      "reason": "Single positive colored-charge-mana scenario; exhaustion, tap and unrestricted colorless mode need direct acceptance coverage.",
+      "category": 1,
+      "classification": "Fully implemented and tested (reviewed acceptance scope)",
+      "reason": "Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions.",
       "sourceSha256": "4f336d3aec4303f6eae3e15ed518204dc52469a4bfabaa9af8b4e007482caf32",
-      "testSha256": "ec33fcb12a34c5ff034154c81afc44cb32a9e3bedf2cd522966edcd99a21063b"
+      "testSha256": "9821551a40d8b451b3fa9716248b82b97ea1f03a80430c9622e8d5c26ed14c0b"
     },
     {
       "name": "Battlefield Forge",
@@ -1523,17 +1523,17 @@
       "source": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UnclaimedTerritory.kt",
       "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UnclaimedTerritoryScenarioTest.kt",
       "junit": {
-        "tests": 1,
+        "tests": 6,
         "failures": 0,
         "errors": 0,
         "skipped": 0
       },
       "definitionHasBehavior": true,
-      "category": 2,
-      "classification": "Implemented but missing acceptance tests/evidence",
-      "reason": "Only tests mana generation, not exact spend eligibility. Need positive chosen-type creature and negative wrong-type/noncreature payment scenarios.",
+      "category": 1,
+      "classification": "Fully implemented and tested (reviewed acceptance scope)",
+      "reason": "Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions.",
       "sourceSha256": "0627ee16cdf4e371110d98725fa3cecb13f3852aa015fc90abc1298b6b1f6f00",
-      "testSha256": "d46470c4fa52dafeb377c33efe0177aeb7ca5497820f40369c56d8aeebc40d45"
+      "testSha256": "d23e97495c8de0e784b6093a9c547652f945d9f1a1fe4fc17e016480b7a0d93a"
     },
     {
       "name": "Plains",
