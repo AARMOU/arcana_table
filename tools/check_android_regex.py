@@ -133,7 +133,8 @@ def scan(source: str) -> list[tuple[int, str]]:
         while pos < len(source) and source[pos].isspace():
             pos += 1
         value = literal(source, pos)
-        if value is None:
+        if value is None or "${" in value:
+            # Kotlin interpolation builds a dynamic pattern; needs on-device testing.
             continue
         line = source.count("\n", 0, match.start()) + 1
         findings.extend((line, issue) for issue in issues(value))

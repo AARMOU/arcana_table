@@ -155,7 +155,7 @@ fun parseDeckListDetailed(raw: String, catalog: SupportedCardCatalog? = null): P
         if (line.equals("About", true)) return@forEachIndexed
         if (line.startsWith("Name ", true)) { deckName = line.substringAfter(' ').trim().ifBlank { null }; return@forEachIndexed }
         if (Regex("""^(format|created|updated|author|description|source|deckstats)\s*:""", RegexOption.IGNORE_CASE).containsMatchIn(line)) return@forEachIndexed
-        if (line.matches(Regex("""^\[[^\]]+]$""")) && !line.matches(Regex("""^\[[A-Za-z0-9]{2,6}#\d+[a-zA-Z]?\]$"""))) {
+        if (line.matches(Regex("""^\[[^\]]+\]$""")) && !line.matches(Regex("""^\[[A-Za-z0-9]{2,6}#\d+[a-zA-Z]?\]$"""))) {
             // Category subheadings must not move a Sideboard or Companion into Main.
             if (zone == ImportZone.COMMANDER) zone = ImportZone.MAIN
             return@forEachIndexed
@@ -168,13 +168,13 @@ fun parseDeckListDetailed(raw: String, catalog: SupportedCardCatalog? = null): P
             line = line.substringAfter(':').trim()
         }
         if (line.contains("*CMDR*", true)) { explicitZone = ImportZone.COMMANDER; line = line.replace(Regex("""\*CMDR\*""", RegexOption.IGNORE_CASE), "").trim() }
-        if (line.contains(Regex("""\[Commander(?:\{[^]]*})?]""", RegexOption.IGNORE_CASE))) {
+        if (line.contains(Regex("""\[Commander(?:\{[^\]]*\})?\]""", RegexOption.IGNORE_CASE))) {
             explicitZone = ImportZone.COMMANDER
-            line = line.replace(Regex("""\[Commander(?:\{[^]]*})?]""", RegexOption.IGNORE_CASE), "").trim()
+            line = line.replace(Regex("""\[Commander(?:\{[^\]]*\})?\]""", RegexOption.IGNORE_CASE), "").trim()
         }
         if (line.contains("{noDeck}", true)) {
             explicitZone = ImportZone.EXCLUDED
-            line = line.replace(Regex("""\{noDeck}""", RegexOption.IGNORE_CASE), "").trim()
+            line = line.replace(Regex("""\{noDeck\}""", RegexOption.IGNORE_CASE), "").trim()
         }
         line = line.replace(Regex("""\*[FA]\*""", RegexOption.IGNORE_CASE), "").trim()
         line = line.replace(Regex("""\s+#(?!\d+\s*$)[\w-]+(?:\s+#[\w-]+)*\s*$"""), "").trim()
