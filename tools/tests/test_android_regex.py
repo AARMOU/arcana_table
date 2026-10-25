@@ -42,8 +42,8 @@ val safe = Regex("[a-z]+")'''
         self.assertEqual([], android_regex.scan('val dynamic = Regex("${Regex.escape(keyword)}")'))
 
     def test_importer_bracket_regression(self):
-        self.assertTrue(android_regex.scan(r'val bad = Regex("""\\[Commander(?:\\{[^]]*})?]""")'))
-        self.assertFalse(android_regex.scan(r'val fixed = Regex("""\\[Commander(?:\\{[^\\]]*\\})?\\]""")'))
+        self.assertTrue(android_regex.scan(r'val bad = Regex("""\[Commander(?:\{[^]]*})?]""")'))
+        self.assertFalse(android_regex.scan(r'val fixed = Regex("""\[Commander(?:\{[^\]]*\})?\]""")'))
 
     def test_java_pattern_compile(self):
         self.assertTrue(android_regex.scan('Pattern.compile("broken}");'))
