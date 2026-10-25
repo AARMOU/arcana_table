@@ -78,5 +78,6 @@ jobs:
           path: |
             android/custom-cards/build/test-results/
             android/app/build/test-results/
+            android/app/build/screenshots/
             android/app/src/main/assets/argentum/custom-cards.index.tsv
             android/app/src/main/assets/argentum/custom-cards.jsonl

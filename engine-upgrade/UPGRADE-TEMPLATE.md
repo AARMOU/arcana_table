@@ -55,3 +55,5 @@ Security: the workflow has two jobs. `validate` runs upstream's build scripts wi
 Files an Arcana patch deliberately replaces are listed in `engine-upgrade/rebase-rules.json`; when upstream edits one, the rebase keeps Arcana's replacement and the PR names the upstream commits to review.
 
 Conflicts: `CHANGELOG.md` hunks take upstream and are dropped from refreshed patches. Recorded resolutions in `engine-upgrade/rerere/` replay automatically. Any other conflict opens an issue with the hunk; resolve it once with `git rerere` enabled, copy the new `.git/rr-cache/<id>` folder into `engine-upgrade/rerere/`, commit, and re-run. A patch upstream fully absorbs is retired from the series and named in the PR.
+
+Adding an engine change: put the patch in `argentum-patches/` **and** list it in `MANDATORY` in `audit_patches.py`. That list is the only series the weekly upgrade carries forward; a patch kept in its own folder with its own apply script stays pinned to the old engine and turns every weekly PR red.

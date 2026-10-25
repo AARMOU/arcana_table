@@ -27,6 +27,13 @@ MANDATORY = [
     "0006-ai-decision-deadline.patch",
     "0007-ai-bounded-stack-search.patch",
     "0008-jvm-test-toolchain.patch",
+    # Ulalek / Zhulodok / Abaddon engine support (were engine-upgrade/ulalek/patches 0004-0009).
+    "0011-stack-object-copying.patch",
+    "0012-colorless-hybrid-sdk.patch",
+    "0013-colorless-hybrid-floating-payment.patch",
+    "0014-colorless-hybrid-auto-tap.patch",
+    "0015-granted-cascade.patch",
+    "0016-granted-keyword-mana-value-cap.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 

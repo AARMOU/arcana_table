@@ -293,7 +293,9 @@ internal class TableController(
         runCatching { AppPreconDeck("fallout_mutant_menace", "Fallout: Mutant Menace", "The Wise Mothman", context.assets.open("precons/fallout_mutant_menace.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
         runCatching { AppPreconDeck("fallout_science", "Fallout: Science!", "Dr. Madison Li", context.assets.open("precons/fallout_science.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
         runCatching { AppPreconDeck("bloomburrow_family_matters", "Bloomburrow: Family Matters", "Zinnia, Valley's Voice", context.assets.open("precons/bloomburrow_family_matters.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
-        runCatching { AppPreconDeck("bloomburrow_peace_offering", "Bloomburrow: Peace Offering", "Ms. Bumbleflower", context.assets.open("precons/bloomburrow_peace_offering.txt").bufferedReader().use { it.readText() }) }.getOrNull()
+        runCatching { AppPreconDeck("bloomburrow_peace_offering", "Bloomburrow: Peace Offering", "Ms. Bumbleflower", context.assets.open("precons/bloomburrow_peace_offering.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
+        // Original Eldrazi Incursion (M3C). Cards Argentum can't play yet are left out and filled with basics.
+        runCatching { AppPreconDeck("eldrazi_incursion", "Eldrazi Incursion (M3C)", "Ulalek, Fused Atrocity", context.assets.open("precons/eldrazi_incursion.txt").bufferedReader().use { it.readText() }) }.getOrNull()
     ).filterNotNull()
     var savedDecksOpen by run { mutableStateOf(false) }
     var localDeckSyncConfirmed by run { mutableStateOf(false) }
@@ -322,6 +324,8 @@ internal class TableController(
     var tokenTarget by run { mutableIntStateOf(0) }
     var counterTarget by run { mutableStateOf<Pair<Int, Int>?>(null) }
     var preview by run { mutableStateOf<CardPreview?>(null) }
+    /** Read-only private top-library look from Argentum's per-seat masked view; no priority needed. */
+    var argentumTopLibraryOpen by run { mutableStateOf(false) }
     var rulesOpen by run { mutableStateOf(false) }
     var battlefieldBounds by run { mutableStateOf<Rect?>(null) }
     var handSheetBounds by run { mutableStateOf<Rect?>(null) }
@@ -488,6 +492,7 @@ internal class TableController(
     /** Turn number when "Pass to my turn" was switched on; null when it is off. */
     var passToMyTurnFrom by run { mutableStateOf<Int?>(null) }
     var followActivePlayer by run { mutableStateOf(optionPrefs.getBoolean("follow_active_player", true)) }
+    var respondToOwnStack by run { mutableStateOf(optionPrefs.getBoolean("respond_to_own_stack", false)) }
     var quietOpponentTurns by run { mutableStateOf(optionPrefs.getBoolean("quiet_opponent_turns", false)) }
     /** Offline games: how many AI opponents (1 = a duel, 3 = a four-player game). */
     var offlineAiCount by run { mutableStateOf(optionPrefs.getInt("offline_ai_count", 1).coerceIn(1, 3)) }
@@ -1714,6 +1719,7 @@ internal class TableController(
         registry: com.wingedsheep.engine.registry.CardRegistry,
         checkpoint: String,
     ) {
+        respondToOwnStack = JSONObject(checkpoint).optBoolean("respondToOwnStack")
         argentumSocket.localHostFactory = { emit ->
             com.arcanatable.engine.LocalArgentumHost(
                 registry, seats[0], seats[1], emit = emit,
@@ -1777,7 +1783,7 @@ internal class TableController(
                 val (setup, registry) = prepared
                 recordDiagnostic("Offline game prepared in ${System.currentTimeMillis() - started} ms: ${setup.you.commander ?: "Portal"} vs ${setup.aiDeckName} (${setup.extraAis.size + 2} players)", DiagnosticCategory.ENGINE)
                 setup.notes.forEach { recordDiagnostic("Offline: $it", DiagnosticCategory.ENGINE) }
-                argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, setup.you, setup.ai, emit = emit, extraOpponents = setup.extraAis).also { it.quietOpponentTurns = quietOpponentTurns } }
+                argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, setup.you, setup.ai, emit = emit, extraOpponents = setup.extraAis).also { it.quietOpponentTurns = quietOpponentTurns; it.respondToOwnStack = respondToOwnStack } }
                 argentumOffline = true
                 argentumDeckForLobby = null
                 argentumCommanderForLobby = null

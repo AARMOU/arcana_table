@@ -60,6 +60,41 @@ class OfflineHumanAutoPassParityTest {
         println("AUTO_PASS_PARITY case=$label stack=${state.stack.size} battlefield=${state.getBattlefield().size} original=$baseline candidate=$candidate fullActions=${oldDto.size} candidateEnumerations=$newEnumCalls")
     }
 
+
+    @Test(timeout = 60000)
+    fun optInKeepsOwnSpellWithAFlashResponseButDefaultStillPasses() {
+        val d = scenario("Lightning Bolt", "Elder Deep-Fiend")
+        val bolt = d.putCardInHand(d.player1, "Lightning Bolt")
+        d.putCardInHand(d.player1, "Elder Deep-Fiend")
+        d.giveMana(d.player1, Color.RED)
+        d.giveColorlessMana(d.player1, 8)
+        assertNull(d.castSpell(d.player1, bolt, listOf(d.player2)).error)
+        val enumerator = LegalActionEnumerator(d.cardRegistry, d.services.manaSolver,
+            d.services.costCalculator, d.services.predicateEvaluator, d.services.conditionEvaluator, d.services.turnManager)
+        fun passes(stops: Set<com.wingedsheep.engine.legalactions.OwnStackStop>) = OfflineHumanAutoPass.shouldPass(
+            d.state, d.player1, d.cardRegistry,
+            { enumerator.enumerate(d.state, d.player1, EnumerationMode.ACTIONS_ONLY) },
+            quietOpponentTurn = true, ownStackStops = stops)
+        assertTrue("Default keeps the existing fast auto-pass", passes(emptySet()))
+        assertFalse("Explicit own-stack stops let the player respond with flash", passes(com.wingedsheep.engine.legalactions.OwnStackStop.entries.toSet()))
+    }
+
+    @Test(timeout = 60000)
+    fun ownStackOptInDoesNotStopForUnaffordableResponsesOrJustMana() {
+        val d = scenario("Lightning Bolt", "Elder Deep-Fiend")
+        val bolt = d.putCardInHand(d.player1, "Lightning Bolt")
+        d.putCardInHand(d.player1, "Elder Deep-Fiend")
+        d.putLandOnBattlefield(d.player1, "Mountain")
+        d.giveMana(d.player1, Color.RED)
+        assertNull(d.castSpell(d.player1, bolt, listOf(d.player2)).error)
+        val enumerator = LegalActionEnumerator(d.cardRegistry, d.services.manaSolver,
+            d.services.costCalculator, d.services.predicateEvaluator, d.services.conditionEvaluator, d.services.turnManager)
+        assertTrue("An unaffordable Fiend and mana abilities alone must not create a stop",
+            OfflineHumanAutoPass.shouldPass(d.state, d.player1, d.cardRegistry,
+                { enumerator.enumerate(d.state, d.player1, EnumerationMode.ACTIONS_ONLY) },
+                ownStackStops = com.wingedsheep.engine.legalactions.OwnStackStop.entries.toSet()))
+    }
+
     @Test(timeout = 180000)
     fun tokenHeavyOwnMainAndEmptyStackEndStepKeepTheSameStop() {
         for ((token, count) in listOf("Food" to 40, "Food" to 200, "Treasure" to 200)) {

@@ -710,6 +710,7 @@ internal fun OptionsPage(
     reducedSwipeMotion: Boolean, cardSizeScale: Float, onOpenLayoutLab: () -> Unit,
     onToggleTheme: () -> Unit, onToggleTimerVisibility: () -> Unit, onToggleBackgroundAlerts: (Boolean) -> Unit,
     onFollowActivePlayer: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, onCardSizeScale: (Float) -> Unit,
+    respondToOwnStack: Boolean = false, onRespondToOwnStack: (Boolean) -> Unit = {},
     quietOpponentTurns: Boolean = false, onQuietOpponentTurns: (Boolean) -> Unit = {},
     onTestConnection: () -> Unit, onReconnect: (() -> Unit)?, onViewDiagnostics: () -> Unit, onExportDiagnostics: () -> Unit,
     onWhatsNew: () -> Unit,
@@ -749,6 +750,7 @@ internal fun OptionsPage(
                 }
                 Section("GAMEPLAY")
                 SettingsToggle("Follow the active player", "Show the player whose turn it is. Your selected tab stays until the next turn.", followActivePlayer, onFollowActivePlayer, Modifier)
+                SettingsToggle("Respond to my spells and abilities", "Offline games: keep priority over your own stack when you have a legal response. Turn this on before casting to build Ulalek stacks.", respondToOwnStack, onRespondToOwnStack, Modifier)
                 SettingsToggle("Skip AI actions unless needed", "Offline games: pass over AI spells and abilities unless they affect you. Prompts and blocks still stop the game.", quietOpponentTurns, onQuietOpponentTurns, Modifier)
                 SettingsToggle("Show turn timer", "Show the time spent on the current turn.", timerVisible, { onToggleTimerVisibility() }, Modifier)
                 Section("NOTIFICATIONS")
