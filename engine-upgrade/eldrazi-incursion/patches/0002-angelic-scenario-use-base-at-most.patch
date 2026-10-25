@@ -1,0 +1,12 @@
+diff --git a/android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AngelicAberrationBaseStatsProbeTest.kt b/android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AngelicAberrationBaseStatsProbeTest.kt
+--- a/android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AngelicAberrationBaseStatsProbeTest.kt
++++ b/android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AngelicAberrationBaseStatsProbeTest.kt
+@@ -26,7 +26,7 @@
+         typeLine = "Sorcery"
+         spell {
+             effect = Effects.SacrificeAnyNumber(
+-                GameObjectFilter.Creature.youControl().basePowerOrToughness(1)
++                GameObjectFilter.Creature.youControl().basePowerOrToughnessAtMost(1)
+             ) then Effects.CreateToken(
+                 count = DynamicAmounts.permanentsSacrificedThisWay(),
+                 power = 4,
