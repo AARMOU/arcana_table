@@ -38,4 +38,26 @@ class MutatedCultistEngineProbeTest {
         assertEquals(0, counters?.getCount(CounterType.PLUS_ONE_PLUS_ONE) ?: 0)
         assertEquals(0, counters?.getCount(CounterType.CHARGE) ?: 0)
     }
+
+    @Test fun removeAllCountersDoesNotRemoveAnUnrelatedPermanentsCounters() {
+        val probe = card("Cultist Counter Scope Probe") {
+            manaCost = "{B}"
+            typeLine = "Sorcery"
+            spell {
+                val permanent = target(TargetFilter.Permanent)
+                effect = Effects.RemoveAllCounters(permanent)
+            }
+        }
+        val d = customScenario(probe, "Grizzly Bears", "Hill Giant")
+        val target = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
+        val untouched = d.putCreatureOnBattlefield(d.player2, "Hill Giant")
+        d.addComponent(target, CountersComponent(mapOf(CounterType.PLUS_ONE_PLUS_ONE to 2)))
+        d.addComponent(untouched, CountersComponent(mapOf(CounterType.PLUS_ONE_PLUS_ONE to 4)))
+        val spell = d.putCardInHand(d.player1, "Cultist Counter Scope Probe")
+        d.giveMana(d.player1, com.wingedsheep.sdk.core.Color.BLACK)
+        assertNull(d.castSpell(d.player1, spell, listOf(target)).error)
+        d.resolveAll()
+        assertEquals(0, d.state.getEntity(target)!!.get<CountersComponent>()?.getCount(CounterType.PLUS_ONE_PLUS_ONE) ?: 0)
+        assertEquals(4, d.state.getEntity(untouched)!!.get<CountersComponent>()?.getCount(CounterType.PLUS_ONE_PLUS_ONE) ?: 0)
+    }
 }
