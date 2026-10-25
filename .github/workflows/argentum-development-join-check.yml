@@ -95,7 +95,9 @@ jobs:
         run: |
           set -euo pipefail
           git add -u
-          git diff --cached --check
+          # Historical .patch and rerere preimage files intentionally contain conflict markers/whitespace.
+          # Validate staged application/source code, but never rewrite patch/rerere evidence.
+          git diff --cached --check -- android/app android/custom-cards tools/cardkit
           git commit --no-gpg-sign -m "Temporary local source merge for CI only"
           git fetch --no-tags origin "$DEV_SHA"
           test "$(git rev-parse FETCH_HEAD)" = "$DEV_SHA"
@@ -110,7 +112,9 @@ jobs:
             cat combined-evidence/latest-development-conflicts.txt
             exit 1
           fi
-          git diff --cached --check
+          # Historical .patch and rerere preimage files intentionally contain conflict markers/whitespace.
+          # Validate staged application/source code, but never rewrite patch/rerere evidence.
+          git diff --cached --check -- android/app android/custom-cards tools/cardkit
           python3 - <<'PY'
           from pathlib import Path
           defs = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt").read_text()
