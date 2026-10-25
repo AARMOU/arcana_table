@@ -1,6 +1,5 @@
 package com.arcanatable.customcards
 
-import com.arcanatable.customcards.cards.BlackMarketConnections
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.ChooseOptionDecision
 import com.wingedsheep.engine.core.OptionChosenResponse
@@ -9,11 +8,11 @@ import com.wingedsheep.sdk.model.Deck
 import org.junit.Assert.*
 import org.junit.Test
 
+/** Regression against upstream Argentum's BlackMarketConnections card, not a duplicate Arcana definition. */
 class BlackMarketConnectionsScenarioTest {
     @Test
     fun choosesFirstModeAndCreatesTreasureAtPrecombatMain() {
-        val d = CardPool.driver().apply {
-            registerCard(BlackMarketConnections)
+        val d = CardPool.driver("Black Market Connections").apply {
             initMirrorMatch(Deck.of("Forest" to 40))
         }
         val p = d.player1

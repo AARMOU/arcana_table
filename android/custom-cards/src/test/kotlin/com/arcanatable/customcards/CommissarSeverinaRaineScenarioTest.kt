@@ -1,16 +1,16 @@
 package com.arcanatable.customcards
 
-import com.arcanatable.customcards.cards.CommissarSeverinaRaine
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.sdk.core.Step
 import org.junit.Assert.*
 import org.junit.Test
 
+/** Regression against upstream Argentum's CommissarSeverinaRaine card, not a duplicate Arcana definition. */
 class CommissarSeverinaRaineScenarioTest {
     @Test
     fun attackMakesEachOpponentLoseLifeForOtherAttackers() {
-        val d = customScenario(CommissarSeverinaRaine, "Grizzly Bears")
+        val d = scenario("Commissar Severina Raine", "Grizzly Bears")
         val p = d.player1
         val commissar = d.putCreatureOnBattlefield(p, "Commissar Severina Raine")
         val bearOne = d.putCreatureOnBattlefield(p, "Grizzly Bears")
@@ -26,7 +26,7 @@ class CommissarSeverinaRaineScenarioTest {
 
     @Test
     fun summaryExecutionSacrificesAnotherCreatureAndGainsLifeAndDraws() {
-        val d = customScenario(CommissarSeverinaRaine, "Grizzly Bears")
+        val d = scenario("Commissar Severina Raine", "Grizzly Bears")
         val p = d.player1
         val commissar = d.putCreatureOnBattlefield(p, "Commissar Severina Raine")
         val bear = d.putCreatureOnBattlefield(p, "Grizzly Bears")

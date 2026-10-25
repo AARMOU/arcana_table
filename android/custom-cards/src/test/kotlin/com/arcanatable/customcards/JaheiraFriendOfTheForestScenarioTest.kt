@@ -11,10 +11,11 @@ import com.wingedsheep.sdk.scripting.AdditionalCostPayment
 import org.junit.Assert.*
 import org.junit.Test
 
+/** Regression against upstream Argentum's JaheiraFriendOfTheForest card, not a duplicate Arcana definition. */
 class JaheiraFriendOfTheForestScenarioTest {
     @Test
     fun tokensYouControlTapForGreen() {
-        val d = scenario()
+        val d = scenario("Jaheira, Friend of the Forest")
         val p = d.player1
         d.putCreatureOnBattlefield(p, "Jaheira, Friend of the Forest")
         val treasure = d.putToken(p, "Treasure")

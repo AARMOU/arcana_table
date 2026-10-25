@@ -11,10 +11,11 @@ import com.wingedsheep.sdk.scripting.AdditionalCostPayment
 import org.junit.Assert.*
 import org.junit.Test
 
+/** Regression against upstream Argentum's TataruTaru card, not a duplicate Arcana definition. */
 class TataruTaruScenarioTest {
     @Test
     fun entersDrawingForBothAndOpponentsOffTurnDrawMakesATappedTreasure() {
-        val d = scenario()
+        val d = scenario("Tataru Taru")
         val p = d.player1
         val opp = d.player2
         val handBefore = d.getHand(p).size

@@ -1,6 +1,5 @@
 package com.arcanatable.customcards
 
-import com.arcanatable.customcards.cards.ScurryOak
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.engine.state.components.battlefield.CountersComponent
@@ -9,11 +8,11 @@ import com.wingedsheep.sdk.model.Deck
 import org.junit.Assert.*
 import org.junit.Test
 
+/** Regression against upstream Argentum's ScurryOak card, not a duplicate Arcana definition. */
 class ScurryOakScenarioTest {
     @Test
     fun evolveCounterMayCreateSquirrel() {
-        val d = CardPool.driver("Grizzly Bears").apply {
-            registerCard(ScurryOak)
+        val d = CardPool.driver("Grizzly Bears", "Scurry Oak").apply {
             initMirrorMatch(Deck.of("Forest" to 40))
             passPriorityUntil(Step.PRECOMBAT_MAIN)
         }
