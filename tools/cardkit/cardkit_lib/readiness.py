@@ -155,12 +155,15 @@ def classify(name: str, use_refs: bool = True) -> dict:
                     "lines": [], "keywords": [], "route": None}
     state, reasons, source = implementation_state(name)
     result["source"] = source
-    if state == "IMPLEMENTED_AND_TESTED":
+    # A committed/exported card is not proof of Oracle correctness. A reproduced
+    # engine blocker MUST take precedence over an indexed source and passing
+    # partial scenarios (e.g. Chittering Dispatcher 1v1 vs multiplayer Myriad).
+    blocked = _blocked_card(name)
+    if state == "IMPLEMENTED_AND_TESTED" and blocked is None:
         result.update(readiness=state, reasons=reasons, route=None)
         return result
     result["reasons"] += reasons
     card = oracle.cached(name)
-    blocked = _blocked_card(name)
     if blocked:
         result.update(readiness="ENGINE_BLOCKED", route="claude", mechanics=["engine-blocked"])
         result["reasons"].append(f"recorded engine gap: {blocked['reason']} ({blocked['source']}"
