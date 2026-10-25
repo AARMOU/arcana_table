@@ -135,6 +135,25 @@ jobs:
               print("Candidate debug APK contains exactly one definition for each restricted-mana land")
           PY
 
+      - name: Assert Android app unit-test XML exists and is green
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          files = list(Path("android/app/build/test-results/testDebugUnitTest").glob("TEST-*.xml"))
+          assert files, "No full-app testDebugUnitTest XML: compile/test gate not verified"
+          total = failures = errors = skipped = 0
+          for path in files:
+              root = ET.parse(path).getroot()
+              total += int(root.get("tests", 0))
+              failures += int(root.get("failures", 0))
+              errors += int(root.get("errors", 0))
+              skipped += int(root.get("skipped", 0))
+          print(f"Full Android app unit tests: {total} tests, {failures} failures, {errors} errors, {skipped} skipped")
+          assert total > 0 and failures == 0 and errors == 0, "Full Android app unit tests failed"
+          PY
+
       - name: Verify deterministic candidate export in runner
         working-directory: android
         run: |
@@ -182,3 +201,4 @@ jobs:
             argentum-engine/rules-engine/build/test-results/test/TEST-*CorruptedCrossroads*.xml
             android/custom-cards/build/test-results/test/TEST-*EldraziTemple*.xml
             android/custom-cards/build/test-results/test/TEST-*CorruptedCrossroads*.xml
+            android/app/build/test-results/testDebugUnitTest/TEST-*.xml
