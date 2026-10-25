@@ -6,6 +6,9 @@ on:
       - 'argentum-patches/0011-stack-object-copying.patch'
       - '.github/workflows/ulalek-upgraded-stack-copy-port.yml'
   workflow_dispatch:
+concurrency:
+  group: ulalek-upstream-port-${{ github.ref }}
+  cancel-in-progress: true
 permissions:
   contents: read
   actions: read
