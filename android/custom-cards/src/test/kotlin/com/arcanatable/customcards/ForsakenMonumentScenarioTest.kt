@@ -76,6 +76,11 @@ class ForsakenMonumentScenarioTest {
         assertEquals(1, d.manaPool(d.player1).white)
         assertEquals(0, d.manaPool(d.player1).colorless)
         val theirWastes = d.putLandOnBattlefield(d.player2, "Wastes")
+        // The active player retains priority after activating a mana ability.
+        // Give the opponent priority before exercising their mana ability.
+        assertEquals(d.player1, d.priorityPlayer)
+        assertNull(d.passPriority(d.player1).error)
+        assertEquals(d.player2, d.priorityPlayer)
         val action = d.abilityActions(d.player2, theirWastes).firstOrNull()?.action as? ActivateAbility
         if (action != null) {
             assertNull(d.submit(action).error)
