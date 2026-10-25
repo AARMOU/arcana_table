@@ -1,7 +1,7 @@
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDetector.kt
-@@ -3579,13 +3579,22 @@
+@@ -3579,13 +3579,23 @@
              val slot = slots[key]
              if (slot == null) {
                  // The caller appends `kept` to `triggers` in order, so this is its final slot.
@@ -24,3 +24,4 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerDe
              triggers[slot] = first.copy(triggerContext = ctx.copy(
                  damageAmount = (ctx.damageAmount ?: 0) + event.amount,
                  excessDamageAmount = ((ctx.excessDamageAmount ?: 0) + event.excessAmount).takeIf { it > 0 }
+             ))
