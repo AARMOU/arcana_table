@@ -12,7 +12,7 @@ import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performTextClearance
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.performTextInput
 import com.arcanatable.DeckManagerDialog
 import com.arcanatable.SavedDeck
@@ -60,14 +60,17 @@ class DeckBuilderUiTest {
         rule.onNodeWithTag("library-search").performTextInput("krenko mob")
         rule.waitUntil(30_000) { rule.onAllNodes(hasText("Krenko, Mob Boss")).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithText("CMDR").performClick()
-        UiTestSupport.settle(rule, 300)
+        rule.mainClock.advanceTimeBy(1_000)
+        rule.waitForIdle() // past the autosave pause (virtual clock)
 
-        rule.onNodeWithTag("library-search").performTextClearance()
-        rule.onNodeWithTag("library-search").performTextInput("sol ring")
+        rule.onNodeWithTag("library-search").performTextReplacement("sol ring")
+        rule.mainClock.advanceTimeBy(500)
+        rule.waitForIdle() // past the search debounce
         rule.waitUntil(30_000) { rule.onAllNodes(hasTestTag("add-Sol Ring")).fetchSemanticsNodes().isNotEmpty() }
         rule.onNodeWithTag("add-Sol Ring").performClick()
 
         // Autosave after a short pause.
+        rule.mainClock.advanceTimeBy(1_000)
         rule.waitUntil(10_000) { decks.isNotEmpty() && parseDeckList(decks.first().text).any { it.name == "Sol Ring" } }
         val saved = parseDeckList(decks.single().text)
         assertEquals("Krenko, Mob Boss", saved.single { it.commander }.name)

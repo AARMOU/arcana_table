@@ -414,7 +414,7 @@ private fun LibraryPane(
             }
             else -> {
                 Text(buildString {
-                    append(if (r.total > r.cards.size) "Showing ${r.cards.size} of ${r.total}" else "${r.total} cards")
+                    append(if (r.total > r.cards.size) "Showing ${r.cards.size} of ${r.total}" else "${r.total} card${if (r.total == 1) "" else "s"}")
                     if (r.fuzzy) append(" · closest names (check spelling)")
                 }, color = if (r.fuzzy) CounterGold else Muted, fontSize = 11.sp)
                 r.errors.forEach { Text(it, color = CounterGold, fontSize = 11.sp) }
