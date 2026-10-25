@@ -8,6 +8,10 @@ on:
     paths:
       - android/custom-cards/**
       - android/app/src/main/assets/argentum/custom-cards.*
+      # Focused LAN host source and regression tests. Avoid broad Android-only reruns.
+      - android/app/src/main/java/com/arcanatable/ArgentumLan.kt
+      - android/app/src/main/java/com/arcanatable/TableWifi.kt
+      - android/app/src/test/java/com/arcanatable/WifiHostTest.kt
       - .github/workflows/arcana-development-ci.yml
   workflow_dispatch:
 permissions:
