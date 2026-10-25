@@ -52,7 +52,8 @@ class UginCostReductionDevoidScenarioTest {
         d.registerCard(probe)
         assertTrue("Devoid is colorless despite the printed white symbol",
             d.cardRegistry.requireCard(probe.name).colors.isEmpty())
-        d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        val ugin = d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        d.seedPrintedLoyalty(ugin)
         val spell = d.putCardInHand(p, probe.name)
         d.giveColorlessMana(p, 2)
 
@@ -68,6 +69,8 @@ class UginCostReductionDevoidScenarioTest {
             2, d.poolColorless())
         d.resolveAll()
         assertNotNull(d.findPermanent(p, probe.name))
+        assertEquals("Ugin must survive casting with four loyalty", ugin,
+            d.findPermanent(p, "Ugin, the Ineffable"))
     }
 
     @Test fun printedColoredSpellStillRequiresItsTwoGenericMana() {
@@ -81,7 +84,8 @@ class UginCostReductionDevoidScenarioTest {
             toughness = 2
         }
         d.registerCard(probe)
-        d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        val ugin = d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        d.seedPrintedLoyalty(ugin)
         val spell = d.putCardInHand(p, probe.name)
         d.giveMana(p, Color.GREEN)
 
@@ -94,6 +98,8 @@ class UginCostReductionDevoidScenarioTest {
         assertEquals(0, d.poolColorless())
         d.resolveAll()
         assertNotNull(d.findPermanent(p, probe.name))
+        assertEquals("Ugin must survive casting with four loyalty", ugin,
+            d.findPermanent(p, "Ugin, the Ineffable"))
     }
 
     @Test fun exactTwoGenericDiscountEndsWhenUginLeaves() {
@@ -110,6 +116,7 @@ class UginCostReductionDevoidScenarioTest {
             d.castSpell(p, first).error)
 
         val ugin = d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        d.seedPrintedLoyalty(ugin)
         assertNull("With Ugin, {3} becomes {1}, not {0}",
             d.castSpell(p, first).error)
         assertEquals("The remaining {1} is actually paid", 0, d.poolColorless())
