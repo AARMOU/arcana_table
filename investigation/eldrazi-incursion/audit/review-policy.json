@@ -1,0 +1,28 @@
+{
+  "scope": "Original 100-slot manifest. Category 1 requires a nonempty registered definition, reviewed card-specific positive and negative acceptance coverage, and green observed JUnit on the candidate runtime. This is not exhaustive certification of every possible interaction. Upstream indexed definitions without current card-specific acceptance evidence stay in category 2.",
+  "missing": {
+    "Benthic Anomaly": "No implementation. Needs per-opponent nontargeted selection, chosen-copy characteristics, summed power/toughness and mandatory choices. No precise engine blocker independently established; do not call it impossible.",
+    "Twins of Discord": "PR #196 is a rules contract, not implementation/tests. Exact external conditional entering-with-counters replacement and attack parity choice remain unproven; do not claim a demonstrated engine impossibility."
+  },
+  "blocked": {
+    "Azlask, the Swelling Scourge": "Reported on #171: colorless dies-filter predicate unsupported in TriggerMatcher; known-blockers marks earlier reproduction unverified. Not independently rerun in this audit.",
+    "Angelic Aberration": "Pinned SDK filter has BasePowerEquals/BaseToughnessEquals only. CompareNumericProperty has no base-stat numeric properties. Exact <=1 base-stat selection is unavailable through the documented filter API; current-stat or 0/1 equality approximations are invalid. Source/API limitation, not a reproduced gameplay crash.",
+    "Hideous Taskmaster": "PR #200: 10 actual engine scenarios, 9 pass/1 fails. Target changing from opponent A to B before resolution is incorrectly stolen. Original per-opponent controller binding is missing. Unregistered candidate preserved.",
+    "Mutated Cultist": "Recorded SDK limitation: no dynamic generic reduction for the next spell this turn based on counters removed. Source/API audit only; not independently reproduced by a complete card scenario.",
+    "Opal Palace": "No documented ManaSpellRider for commander-cast-count-dependent entering counters. Requires mana provenance, actual commander identity and cumulative command-zone cast count. Source/API gap; a full candidate is not implemented or runtime-tested.",
+    "Eldrazi Temple": "Pinned integration runtime lacks exact restriction. PR #158 source predicate + #162 runner-only candidate have 5 engine + 8 Android scenarios green at fb60a660. Not registered/exported on #171; requires separately approved combined runtime integration.",
+    "Corrupted Crossroads": "Pinned integration runtime lacks exact Devoid-only restriction. PR #192 runner-only candidate at 1bf22a66 has 6 engine + 6 Android scenarios green. Must not substitute generic colorless restriction. Needs separately approved combined runtime integration.",
+    "Chittering Dispatcher": "Registered but known three-player Myriad defender-choice regression fails (#181/#183/#34/#36). Two-player tests pass and do not certify multiplayer behavior. Source-only patch candidate is not a proven integrated repair."
+  },
+  "incompleteAcceptance": {
+    "All Is Dust": "Positive wipe/colorless-survival scenario exists; broader negative/replacement and simultaneous-event cases not established by this card's suite.",
+    "Drowner of Hope": "Positive ETB/token/tap scenarios exist; opponent-owned Scion cost eligibility and illegal-target negatives need direct acceptance coverage.",
+    "Oblivion Sower": "Cast/optional-zero/preexisting lands scenarios pass; own/nonland exile and ownership targeting negatives need direct acceptance coverage.",
+    "Ruins of Oran-Rief": "Single scenario; need controlled/colorless/entered-this-turn negative coverage and actual mana mode checks.",
+    "Sifter of Skulls": "Single positive death/token scenario; self/opponent/token-death negatives need direct acceptance coverage.",
+    "Tendo Ice Bridge": "Single positive colored-charge-mana scenario; exhaustion, tap and unrestricted colorless mode need direct acceptance coverage.",
+    "Ulamog's Crusher": "Annihilator positive scenario; must-attack requirement and unable-to-attack negatives need direct acceptance coverage.",
+    "Unclaimed Territory": "Only tests mana generation, not exact spend eligibility. Need positive chosen-type creature and negative wrong-type/noncreature payment scenarios.",
+    "Shrine of the Forsaken Gods": "Seven-land threshold tested; exact restricted spend positive/negative cases need direct acceptance coverage."
+  }
+}
