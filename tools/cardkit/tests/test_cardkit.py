@@ -370,7 +370,14 @@ class GapsTests(unittest.TestCase):
         audit = subprocess.run([sys.executable, str(repo.ROOT / "investigation/argentum-six-precons/coverage-audit.py")],
                                capture_output=True, text=True, check=True).stdout
         for d in result["decks"]:
-            self.assertIn(f"{d['name']}: {d['playableSlots']}/100 supported", audit)
+            # coverage-audit.py is intentionally a raw *index* inventory.
+            # A reproduced engine blocker can make readiness strictly lower.
+            self.assertIn(f"{d['name']}: {d['indexedSlots']}/100 supported", audit)
+            self.assertLessEqual(d["playableSlots"], d["indexedSlots"])
+        incursion = next(d for d in result["decks"] if d["name"] == "Eldrazi Incursion")
+        self.assertEqual(90, incursion["indexedSlots"])
+        self.assertEqual(89, incursion["playableSlots"])  # Myriad #181 fails in 3-player engine
+        self.assertEqual(1, incursion["ENGINE_BLOCKED"] - 0 if incursion["ENGINE_BLOCKED"] >= 1 else 0)
         self.assertEqual(sum(result["totals"].values()), len(result["cards"]))
         self.assertEqual(set(result["dispatch"]), {"copilot", "claude", "gpt", "claimed", "claimsVerified", "dispatchable"})
 
