@@ -268,6 +268,7 @@ object CustomCards {
         Entry(EldraziConscription, "M3C", "Six WotC precons"),
         // Eldrazi Incursion.
         Entry(EldraziDisplacer, "OGW", "Eldrazi Incursion"),
+        Entry(EldritchImmunity, "M3C", "Eldrazi Incursion"),
         Entry(EldraziMonument, "M3C", "Eldrazi Incursion"),
         Entry(OblivionSower, "M3C", "Eldrazi Incursion"),
         Entry(SireOfStagnation, "BFZ", "Eldrazi Incursion"),
