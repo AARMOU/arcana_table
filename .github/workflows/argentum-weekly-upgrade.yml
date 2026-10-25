@@ -162,6 +162,9 @@ jobs:
                   body += ['', '<details><summary>Failing tests</summary>', ''] + [f'- `{x}`' for x in t['failed']] + ['', '</details>']
               body += ['', f"Patches: {len(patches) - len(retired)} refreshed" +
                        (f"; retired because upstream now has them: {', '.join(retired)}" if retired else '') + '.']
+              auto = w / 'auto-resolved.md'
+              if auto.is_file() and auto.read_text().strip():
+                  body += ['', auto.read_text()]
               body += ['', (w / 'cards.md').read_text()]
               body += ['', 'Not run here: upstream\'s own rules/card/AI suites (upstream CI covers them) and the '
                        'device checks in `engine-upgrade/UPGRADE-TEMPLATE.md`. Debug APK: see the run artifacts.']
@@ -218,6 +221,12 @@ jobs:
           if [ -n "$number" ]; then gh issue comment "$number" --body-file engine-upgrade/weekly/body.md
           else gh issue create --title "$title" --body-file engine-upgrade/weekly/body.md; fi
           gh issue comment 81 --body "Weekly Argentum upgrade blocked by a patch conflict ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID). Engine lane: resolve and record it in engine-upgrade/rerere/." || true
+      - name: Fail the dry run on a patch conflict
+        if: steps.rebase.outputs.status == 'conflict' && env.DRY_RUN == 'true'
+        run: |
+          cat engine-upgrade/weekly/body.md
+          echo '::error::Patch conflict; see the job summary'
+          exit 1
       - uses: actions/upload-artifact@v4
         if: always() && steps.rebase.outputs.status == 'rebased'
         with:
