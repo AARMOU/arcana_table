@@ -158,6 +158,59 @@ jobs:
                   if actual.returncode:
                       # Source port only for the known, reviewed 0011 conflict. Every
                       # other patch remains fail-closed; never silently drop any hunk.
+                      if patch.name == '0001-colorless-eldrazi-source-mana.patch':
+                          # Source-compatibility port for Temple's source-restricted mana.
+                          # Preserve upstream's newer Class-level source-payment context.
+                          reject = subprocess.run(base + ['--reject', str(patch.resolve())],
+                                                  capture_output=True, text=True)
+                          with report.open('a') as f:
+                              f.write('TEMPLE_REJECT_DIAGNOSTIC exit='
+                                      + str(reject.returncode) + '\n' + reject.stdout + reject.stderr)
+                          root = engine
+                          ability = root / 'rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt'
+                          index = root / 'docs/sdk-index.md'
+                          baseline = root / 'mtg-sdk/src/test/resources/sdk-surface-baseline.txt'
+                          allowed = {str(p) + '.rej' for p in (ability, index, baseline)}
+                          rejected = {str(p) for p in root.rglob('*.rej')}
+                          assert rejected <= allowed, ('unreviewed Temple rejects', rejected - allowed)
+                          payment = ability.read_text()
+                          if 'isAbilitySourceColorless =' not in payment:
+                              needle = '        abilitySourceCardTypes = cardTypes,\n'
+                              assert payment.count(needle) == 1
+                              payment = payment.replace(needle, needle +
+                                  '        // Projected characteristics on the battlefield; printed colors in other zones.\n'
+                                  '        isAbilitySourceColorless = if (sourceId in projected.getBaseState().getBattlefield()) {\n'
+                                  '            projected.getColors(sourceId).isEmpty()\n'
+                                  '        } else {\n'
+                                  '            cardComponent.colors.isEmpty()\n'
+                                  '        },\n', 1)
+                              ability.write_text(payment)
+                          assert payment.count('isAbilitySourceColorless =') == 1
+                          chunks = patch.read_text().split('diff --git ')
+                          def patch_added(prefix):
+                              found = [l[1:] for c in chunks for l in c.splitlines()
+                                       if l.startswith('+' + prefix)]
+                              assert len(found) == 1, (prefix, len(found))
+                              return found[0]
+                          def insert_after(path, prefix, new_line):
+                              lines = path.read_text().splitlines()
+                              if new_line in lines: return
+                              matches = [i for i, l in enumerate(lines) if l.startswith(prefix)]
+                              assert len(matches) == 1, (path, prefix, len(matches))
+                              lines.insert(matches[0] + 1, new_line)
+                              path.write_text('\n'.join(lines) + '\n')
+                          insert_after(index, '- ' + chr(96) + 'ManaRestriction.ColorlessSpellsOnly' + chr(96),
+                                       patch_added('- ' + chr(96) + 'ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly'))
+                          insert_after(baseline, 'LoyaltyDamageFloor — ReplacementEffect',
+                                       patch_added('ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly'))
+                          assert 'data class ColorlessSubtypeSpellsOrAbilitiesOnly' in (
+                              root / 'mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaRestriction.kt').read_text()
+                          for reject_file in rejected: Path(reject_file).unlink()
+                          assert not list(root.rglob('*.rej')), 'No partial Temple rejects allowed'
+                          with report.open('a') as f:
+                              f.write('MANUAL_PORT Temple: source colors and current SDK index/baseline retained\n')
+                          print('PORTED Temple restricted mana on upgraded upstream, testing Devoid next')
+                          continue
                       if patch.name != '0011-stack-object-copying.patch':
                           print('BLOCKED:', patch, check.stderr, actual.stdout, actual.stderr,
                                 file=sys.stderr)
