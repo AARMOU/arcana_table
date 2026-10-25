@@ -131,6 +131,29 @@ jobs:
           print("PASS: current development debug deck builder, six upstream-only definitions, both Eldrazi candidate cards")
           PY
           echo "Verified local source merge with $DEV_SHA; no remote writes" > combined-evidence/latest-development-join.txt
+      - name: Stage reviewed DeckSupport keyword test fix from exact isolated SHA
+        shell: bash
+        env:
+          DEV_SHA: a7961ea55314610ecdf02f164570f215f81278ac
+          TEST_FIX_SHA: 6cf456733fd2c870d4db6888caa067399336f357
+        run: |
+          set -euo pipefail
+          path=android/app/src/test/java/com/arcanatable/DeckSupportTest.kt
+          git fetch --no-tags origin "$TEST_FIX_SHA"
+          test "$(git rev-parse FETCH_HEAD)" = "$TEST_FIX_SHA"
+          git merge-base --is-ancestor "$DEV_SHA" "$TEST_FIX_SHA"
+          # The isolated PR #233 is exactly one test-file change, never a hidden
+          # engine/asset change or a skip/disable of the failing regression.
+          test "$(git diff --name-only "$DEV_SHA" "$TEST_FIX_SHA")" = "$path"
+          test "$(git hash-object "$path")" = 9612b26f56c80d2e3e9e212c44c49d1e7c5db8ed
+          git show "$TEST_FIX_SHA:$path" > /tmp/DeckSupportTest.kt
+          test "$(git hash-object /tmp/DeckSupportTest.kt)" = cde361d1cb366733888ab985766f53cd73a365f5
+          cp /tmp/DeckSupportTest.kt "$path"
+          grep -F 'upstream cards must not retain shadowing custom definitions' "$path"
+          grep -F 'every probed card must remain in the shipped library' "$path"
+          git diff --check -- "$path"
+          printf '%s\\n' "DeckSupportTest upstream migration fix PR #233: $TEST_FIX_SHA" \\
+            > combined-evidence/decksupport-regression-fix.txt
       - name: Fetch and verify green upgraded-engine candidate evidence
         shell: bash
         env:
