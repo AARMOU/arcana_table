@@ -9,7 +9,7 @@ on:
       - '.github/workflows/eldrazi-restricted-mana-combined.yml'
   workflow_dispatch:
   pull_request:
-    branches: [gpt/eldrazi-temple-card-candidate-20261024]
+    branches: [gpt/eldrazi-temple-crossroads-source-compat-20261025]
     paths:
       - 'engine-upgrade/eldrazi-combined/**'
       - '.github/workflows/eldrazi-restricted-mana-combined.yml'
