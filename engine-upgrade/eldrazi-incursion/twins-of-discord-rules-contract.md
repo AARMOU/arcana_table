@@ -66,3 +66,28 @@ Additional full-index inspection found `Effects.ChooseAction(List<EffectChoice>,
 `PlayerTriggerSubject.attacks(GameObjectFilter, Int)` and `attackTriggersAbility()` are present. Inspect their implementation to distinguish attack declaration event vs per-creature attack triggers.
 
 **Current blocker classification:** SDK API shape partially supports the effect; exact behavioral source proof and runnable scenarios are outstanding. No implementation/coverage claim.
+
+## Tested Arcana source patterns — stronger evidence
+
+The generated pattern index on development lists **three tested `EntersWithCounters` cards** and **two tested `EntersWithDynamicCounters` cards**. Direct inspection of `SautekhImmortal.kt` confirms the shipped Kotlin syntax:
+
+```kotlin
+replacementEffect(
+    EntersWithDynamicCounters(count = DynamicAmounts.creaturesDiedThisTurn(Player.Each)),
+)
+```
+
+This is a **self-applied** enters-with-counters replacement. Direct inspection of `KinjallisSunwing.kt` confirms a battlefield-source replacement applying to *other* creatures:
+
+```kotlin
+replacementEffect(
+    PermanentsEnterTapped(
+        EventPattern.ZoneChangeEvent(
+            filter = GameObjectFilter.Creature.opponentControls(),
+            to = Zone.BATTLEFIELD,
+        ),
+    ),
+)
+```
+
+**Precise unresolved combination:** a battlefield source applying a **conditional +2 counters as another creature enters**. The engine has tested examples of each half separately, but no demonstrated combined primitive yet. A trigger that adds counters *after* entry is not equivalent. Next inspect `EntersWithCounters`/`EntersWithDynamicCounters` data model constructors and zone-change processing for external recipient patterns; if unavailable, add a reusable scoped enter-with-counters replacement primitive and test before registering Twins.
