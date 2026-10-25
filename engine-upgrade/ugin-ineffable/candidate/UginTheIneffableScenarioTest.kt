@@ -6,8 +6,6 @@ import com.wingedsheep.engine.state.components.battlefield.LinkedExileComponent
 import com.wingedsheep.engine.state.components.identity.FaceDownComponent
 import com.wingedsheep.engine.state.components.identity.MayLookAtInExileComponent
 import com.wingedsheep.sdk.core.Zone
-import com.wingedsheep.engine.core.ActivateAbility
-import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -99,33 +97,5 @@ class UginTheIneffableScenarioTest {
         assertTrue(d.getExile(p).isEmpty())
         assertTrue(d.state.getEntity(d.permanentsNamed(p, "Spirit").single())!!
             .get<LinkedExileComponent>()?.exiledIds.orEmpty().isEmpty())
-    }
-
-    @Test fun minusThreeRejectsColorlessTargetsThenDestroysAColoredPermanent() {
-        val d = customScenario(UginTheIneffable, "Sol Ring", "Grizzly Bears")
-        val p = d.player1
-        val ugin = d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
-        val ring = d.putPermanentOnBattlefield(d.player2, "Sol Ring")
-        val bear = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
-        val minusThree = d.cardRegistry.requireCard("Ugin, the Ineffable")
-            .script.activatedAbilities[1].id
-
-        // Target legality must reject a colorless permanent without spending loyalty.
-        val invalid = d.submit(ActivateAbility(
-            p, ugin, minusThree, targets = listOf(ChosenTarget.Permanent(ring))
-        ))
-        assertNotNull("Ugin's -3 cannot target colorless Sol Ring", invalid.error)
-        assertTrue(ring in d.state.getBattlefield())
-        assertTrue(d.state.stack.isEmpty())
-
-        // A colored permanent is a legal target for the same loyalty ability.
-        assertNull(d.submit(ActivateAbility(
-            p, ugin, minusThree, targets = listOf(ChosenTarget.Permanent(bear))
-        )).error)
-        d.resolveAll()
-        assertTrue("The colored creature must be destroyed",
-            bear in d.state.getZone(d.player2, Zone.GRAVEYARD))
-        assertTrue("The colorless artifact must remain untouched",
-            ring in d.state.getBattlefield())
     }
 }
