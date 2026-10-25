@@ -12,12 +12,13 @@ on:
       - 'engine-upgrade/azlask/**'
       - 'android/app/src/test/java/com/arcanatable/ShockFetchTest.kt'
   pull_request:
-    branches: [gpt/argentum-eldrazi-combined-apk-20261025]
+    branches: [gpt/argentum-eldrazi-combined-apk-20261025, gpt/argentum-eldrazi-azlask94-build133-20261025]
     paths:
       - '.github/workflows/argentum-eldrazi-azlask94-build133.yml'
       - 'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AzlaskTheSwellingScourge.kt'
       - 'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AzlaskTheSwellingScourgeScenarioTest.kt'
       - 'engine-upgrade/azlask/**'
+      - 'android/app/src/test/java/com/arcanatable/ShockFetchTest.kt'
 concurrency:
   group: eldrazi94-azlask-${{ github.ref }}
   cancel-in-progress: true
