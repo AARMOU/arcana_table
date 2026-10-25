@@ -31,6 +31,7 @@ FORWARD = ROOT / "engine-upgrade/forward-ports"
 AUDIT = ROOT / "engine-upgrade/audit_patches.py"
 CONFIG = ROOT / "engine-upgrade/preview-config.json"
 RERERE = ROOT / "engine-upgrade/rerere"
+RULES = ROOT / "engine-upgrade/rebase-rules.json"
 OUT = ROOT / "engine-upgrade/weekly"
 ASSETS = ROOT / "android/app/src/main/assets/argentum"
 LIBS = ROOT / "android/app/libs"
@@ -100,12 +101,23 @@ def rebase(engine_dir, target):
         git("commit", "-q", "--allow-empty", "-m", PREFIX + name[:-len(".patch")])
 
     # 2. Three-way rebase onto the new upstream, auto-resolving only the safe cases.
+    #    rerere cannot record "keep this file deleted", so files an Arcana patch deliberately replaces are
+    #    listed in rebase-rules.json; upstream edits to them are reported, never silently dropped.
+    rules = json.loads(RULES.read_text()) if RULES.is_file() else {}
+    keep_deleted = {entry["path"]: entry for entry in rules.get("keep_deleted", [])}
+    report["auto_resolved"] = []
     step = git("rebase", target, check=False)
     while step.returncode:
         unresolved = git("diff", "--name-only", "--diff-filter=U").stdout.split()
         for path in [p for p in unresolved if p.endswith("CHANGELOG.md")]:
             git("checkout", "--ours", "--", path)  # during a rebase "ours" is upstream
             git("add", "--", path)
+        for path in [p for p in unresolved if p in keep_deleted]:
+            upstream_edits = git("log", "--format=%h %s", f"{pin}..{target}", "--", path).stdout.splitlines()
+            git("rm", "-q", "--", path)
+            report["auto_resolved"].append({"path": path, "rule": "keep_deleted",
+                                            "why": keep_deleted[path].get("why", ""),
+                                            "upstream_commits": upstream_edits})
         unresolved = git("diff", "--name-only", "--diff-filter=U").stdout.split()
         if unresolved:
             current = git("log", "-1", "--format=%s", "REBASE_HEAD", check=False).stdout.strip()
@@ -160,8 +172,21 @@ def rebase(engine_dir, target):
     report["status"] = "rebased"
     report["engine_head"] = git("rev-parse", "HEAD").stdout.strip()
     write("rebase.json", report)
+    write("auto-resolved.md", auto_resolved_markdown(report))
     print(f"Rebased {len(kept)} patches onto {target} ({report['upstream_commits']} upstream commits)")
     return 0
+
+
+def auto_resolved_markdown(report):
+    if not report.get("auto_resolved"):
+        return ""
+    lines = ["### Upstream edited files Arcana replaces", "",
+             "Resolved by `engine-upgrade/rebase-rules.json` (Arcana's replacement kept). Check upstream's change "
+             "is covered by the replacement:", ""]
+    for entry in report["auto_resolved"]:
+        lines.append(f"- `{entry['path']}` — {entry['why']}")
+        lines += [f"  - upstream {commit}" for commit in entry["upstream_commits"][:5]]
+    return "\n".join(lines) + "\n"
 
 
 def conflict_markdown(report):
