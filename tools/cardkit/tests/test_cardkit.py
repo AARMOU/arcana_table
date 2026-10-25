@@ -377,7 +377,7 @@ class GapsTests(unittest.TestCase):
         incursion = next(d for d in result["decks"] if d["name"] == "Eldrazi Incursion")
         self.assertEqual(90, incursion["indexedSlots"])
         self.assertEqual(89, incursion["playableSlots"])  # Myriad #181 fails in 3-player engine
-        self.assertEqual(1, incursion["ENGINE_BLOCKED"] - 0 if incursion["ENGINE_BLOCKED"] >= 1 else 0)
+        self.assertGreaterEqual(incursion["ENGINE_BLOCKED"], 1)
         self.assertEqual(sum(result["totals"].values()), len(result["cards"]))
         self.assertEqual(set(result["dispatch"]), {"copilot", "claude", "gpt", "claimed", "claimsVerified", "dispatchable"})
 
