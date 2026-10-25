@@ -7,6 +7,10 @@ on:
   pull_request:
     paths:
       - android/custom-cards/**
+      - android/app/src/main/java/**
+      - tools/check_android_regex.py
+      - tools/tests/test_android_regex.py
+      - AGENTS.md
       - android/app/src/main/java/com/arcanatable/DeckSupport.kt
       - android/app/src/test/java/com/arcanatable/DeckSupportTest.kt
       - android/app/src/main/assets/argentum/custom-cards.*
@@ -23,6 +27,10 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - name: Reject Android-incompatible regex patterns before build
+        run: |
+          python3 -m unittest discover -s tools/tests -p 'test_android_regex.py'
+          python3 tools/check_android_regex.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

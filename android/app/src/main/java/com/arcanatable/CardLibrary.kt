@@ -190,7 +190,7 @@ class CardLibrary(val catalog: SupportedCardCatalog) {
             "on", "in", "for", "with", "as", "at", "by", "from", "may", "card", "cards", "each", "until", "end", "turn", "if", "then", "target", "one")
 
         internal fun significantWords(text: String): Set<String> = text.lowercase(Locale.ROOT)
-            .replace(Regex("\\{[^}]*}"), " ").split(Regex("[^a-z]+")).filter { it.length > 2 && it !in STOP }.toSet()
+            .replace(Regex("\\{[^}]*\\}"), " ").split(Regex("[^a-z]+")).filter { it.length > 2 && it !in STOP }.toSet()
 
         private fun fmtMv(v: Double) = if (v % 1.0 == 0.0) v.toInt().toString() else v.toString()
 

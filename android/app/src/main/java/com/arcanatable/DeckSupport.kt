@@ -204,7 +204,7 @@ class SupportedCardCatalog(cards: List<SupportedCard>) {
 
         internal fun parseLibraryLine(line: String, custom: Boolean, kind: String): SupportedCard? {
             val name = jsonString(line, "name")?.takeIf { it.isNotBlank() } ?: return null
-            val identity = Regex("\"colorIdentityOverride\":\\[([^\\]]*)]").find(line)?.groupValues?.get(1)?.let { raw ->
+            val identity = Regex("\"colorIdentityOverride\":\\[([^\\]]*)\\]").find(line)?.groupValues?.get(1)?.let { raw ->
                 raw.split(',').mapNotNull { colorLetter(it.trim().trim('"')) }.toSet()
             }
             return SupportedCard(
@@ -348,7 +348,7 @@ fun subtypesOf(typeLine: String): Set<String> = typeLine.substringBefore(" // ")
     .lowercase(Locale.ROOT).split(' ').filter { it.isNotBlank() }.toSet()
 
 /** Mana value of a cost such as "{2}{W/U}{G/P}" (X counts as 0; {2/W} counts as 2). */
-fun manaValueOf(manaCost: String): Double = Regex("\\{([^}]+)}").findAll(manaCost).sumOf { match ->
+fun manaValueOf(manaCost: String): Double = Regex("\\{([^}]+)\\}").findAll(manaCost).sumOf { match ->
     val symbol = match.groupValues[1].uppercase(Locale.ROOT)
     when {
         symbol.toIntOrNull() != null -> symbol.toInt().toDouble()
@@ -360,7 +360,7 @@ fun manaValueOf(manaCost: String): Double = Regex("\\{([^}]+)}").findAll(manaCos
 }
 
 /** Colors appearing in a mana cost (W U B R G). */
-fun colorsOf(manaCost: String): Set<Char> = Regex("\\{([^}]+)}").findAll(manaCost)
+fun colorsOf(manaCost: String): Set<Char> = Regex("\\{([^}]+)\\}").findAll(manaCost)
     .flatMap { m -> m.groupValues[1].uppercase(Locale.ROOT).asSequence().filter { it in "WUBRG" } }.toSet()
 
 /**

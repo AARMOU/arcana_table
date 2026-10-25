@@ -253,7 +253,7 @@ fun deckStats(deck: DeckDraft, catalog: SupportedCardCatalog): DeckStats {
         nonland += line.count
         mvSum += card.manaValue * line.count
         curve[card.manaValue.toInt().coerceIn(0, 7)] += line.count
-        Regex("\\{([^}]+)}").findAll(card.manaCost.substringBefore(" // ")).forEach { m ->
+        Regex("\\{([^}]+)\\}").findAll(card.manaCost.substringBefore(" // ")).forEach { m ->
             m.groupValues[1].uppercase(Locale.ROOT).filter { it in "WUBRG" }.forEach { c -> pips[c] = pips.getValue(c) + line.count }
         }
     }
