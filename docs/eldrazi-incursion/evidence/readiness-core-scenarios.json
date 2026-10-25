@@ -1,0 +1,187 @@
+{
+  "runner": "Local standalone Gradle JVM harness; repository sources and unchanged committed runtime; entire suite 595 passed, zero failed/errored/skipped. Android CI separate.",
+  "suites": [
+    {
+      "class": "UlalekFusedAtrocityScenarioTest",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "payingCopiesTheEldraziSpellAndThePermanentCopyBecomesAToken",
+        "eachHalfCanBePaidWithColorlessMana",
+        "otherSpellsYouControlAreCopiedAndCopiesCanBeRetargeted",
+        "coloredManaCannotPayTheColorlessCost",
+        "printedCostIsFiveColorlessHybridSymbolsWithFiveColorIdentityAndDevoid",
+        "withNoOtherObjectsOnlyTheTriggeringSpellIsCopied",
+        "mixedColorlessAndColoredPaymentWorks",
+        "otherTriggeredAbilitiesAreCopiedButUlaleksOwnIsNot",
+        "activatedAbilitiesAreCopiedWithTheirTargets",
+        "opponentsSpellsAreNotCopied",
+        "castingUlalekItselfDoesNotTriggerItWhenItIsNotOnTheBattlefield",
+        "manaOfOneColorCannotPayTheOtherColorsHalves",
+        "commanderCastFromCommandZoneWithHybridCostAndTax",
+        "eachHalfCanBePaidWithItsColor",
+        "nonEldraziSpellsDoNotTrigger",
+        "decliningMakesNoCopiesAndKeepsTheMana"
+      ],
+      "xmlSha256": "16a3e347e71d80fafe7eadd02e9e13a483c4703c06001d681bc4ded0119b7469",
+      "sourceSha256": "bdaeca66fd1b316c60f8f63e13b2c5769f913b199af74e7770d0f8ccb7ec1964"
+    },
+    {
+      "class": "EldraziConfluenceScenarioTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "explicitColorlessSymbolsRejectFourColoredMana",
+        "minusModeCannotTargetANoncreature",
+        "oneOfEachMode",
+        "sameModeThreeTimesMakesThreeScionsThatSacrificeForColorless",
+        "repeatedMinusThreeKillsAndOwnCreatureBlinksBackTapped",
+        "explicitColorlessSymbolsAllowTwoColorlessAndTwoColored",
+        "blinkCannotTargetALand"
+      ],
+      "xmlSha256": "f01939c40c76ace02f2965f52ac3ccb9bb9bd9fe647362e275c20c34faa2349f",
+      "sourceSha256": "550fd64e2eac0c146d069b0bd7ebfec223aa815baf6b0a8d65b6d59ad54087a0"
+    },
+    {
+      "class": "SelectiveObliterationScenarioTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "exileIsNotTargetingOrDestructionAndAppliesToNoncreaturePermanents",
+        "eachPlayerKeepsOnlyTheirOwnChosenMonocolor",
+        "usesCurrentControllerChoiceButExilesIntoTheOwnersZone",
+        "colorlessLandsArtifactsAndDevoidCreaturesSurviveEveryChoice",
+        "jsonExportIsByteStableAndPreservesTheEntirePipeline",
+        "multicolorIsExiledEvenWhenItIncludesTheChosenColor",
+        "threePlayersChooseInApnapOrderBeforeAnyPermanentLeaves",
+        "allColoredManaCannotPayAndMixedManaPaysExactlyTwoRequiredColorless"
+      ],
+      "xmlSha256": "a6f415e0066ead2c20f4c1feb7760243ed222d376979d46157f60353333017e2",
+      "sourceSha256": "f819a9245d31ad8f01533b84df74ab94738e0656b89bb56652b5dc32063046be"
+    },
+    {
+      "class": "SkitteringInvasionScenarioTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "spawnSacrificeImmediatelyProducesSpendableColorlessAndCannotBeRepeatedOrUsedByOpponent",
+        "createsFiveManaCapableEldraziSpawn"
+      ],
+      "xmlSha256": "50b4b4ef71e3eb3591bc1684da6488e470dda63bb65220866a1a2071f556d457",
+      "sourceSha256": "814e8749ed3c1db11ab41983afb3bff485c16b768320a20cf36fce959471f440"
+    },
+    {
+      "class": "SpawnbedProtectorScenarioTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "cannotReturnNonEldraziCreatureOrEldraziNoncreatureCard",
+        "targetExiledInResponseCausesEntireEndStepTriggerToFizzleWithoutScions",
+        "endStepWithoutGraveyardTargetStillCreatesTwoSacrificeForColorlessScions",
+        "returnsOneChosenOwnEldraziCreatureCardAndCreatesTwoScions",
+        "cannotReturnOpponentsEldraziFromOpponentsGraveyard"
+      ],
+      "xmlSha256": "be5b4e493cd4782abd128f2285f88cebc386e0f717531f5f188540743feb97f4",
+      "sourceSha256": "68b340b0855d3dd918b396cf8733f5d5443c5ad7c946e3560902a18c3d9e3f68"
+    },
+    {
+      "class": "SpawningBedScenarioTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "cannotActivateSpawnAbilityWithoutSixMana",
+        "sacrificesLandAsCostAndCreatesThreeManaCapableOneOneScions",
+        "ordinaryManaAbilityAddsOneColorless"
+      ],
+      "xmlSha256": "1bb3c88ecc09706c34d1c426c02a231125a82e5ea555c33fa53af74e96680d2c",
+      "sourceSha256": "eabbf1b157dc623741d675af86dac6d253819531c1ef1133a1332ef82b2e644c"
+    },
+    {
+      "class": "WarpingWailScenarioTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "exileModeAcceptsEitherLowPowerOrLowToughnessButRejectsTwoTwo",
+        "thirdModeMakesManaCapableScionWithSacrificeAsCost",
+        "counterModeCountersOnlyASorcerySpellOnTheStack"
+      ],
+      "xmlSha256": "4012cd2115e88f39073d0fc97104a7bab78942fe82924b5df0b98a9275aac8b0",
+      "sourceSha256": "5e3ee0ede516827d0dd0a0451f8f17acee10a0bde168eeccfef7583c5b6c66c4"
+    },
+    {
+      "class": "AwakeningZoneScenarioTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "playerMayDeclineSpawnAtBeginningOfUpkeep",
+        "beginningOfOwnersUpkeepMayMakeAnEldraziSpawn"
+      ],
+      "xmlSha256": "a15e0dd8e8dac1456991d6cdb1a2c9a34b8b180044aef944f872b4bc099ad8ea",
+      "sourceSha256": "424636bdaf4684699cffefde7ac809b0e0ee9cd5d31165273c11c99d99fd35b4"
+    },
+    {
+      "class": "UginTheIneffableScenarioTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "multipleSpiritsKeepIndependentFaceDownLinksAcrossTurns",
+        "colorlessSpellDiscountDoesNotPayColoredMana",
+        "minusThreeCannotTargetAColorlessPermanent",
+        "minusThreeDestroysAColoredPermanent",
+        "plusOneWithEmptyLibraryStillCreatesSpiritWithoutFakeLinkedCard",
+        "plusOneExilesOneFaceDownForControllerOnlyAndCreatesLinkedSpirit",
+        "linkedSpiritReturnsItsOwnExiledCardAfterUginLeaves"
+      ],
+      "xmlSha256": "b850d53da02cbb52fb4cc0f2a0c5e1f0b6761218df1c340e7a4ec5990fc634c4",
+      "sourceSha256": "b91b2b0c066bd5feb55fd503e70883a4392c760581027419348bef243c6dfd70"
+    },
+    {
+      "class": "UginCostReductionDevoidScenarioTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "exactTwoGenericDiscountEndsWhenUginLeaves",
+        "devoidSpellKeepsWhiteRequirementButGetsTwoGenericDiscount",
+        "opponentsUginCannotDiscountMySpellOrStackWithMyUgin",
+        "printedColoredSpellStillRequiresItsTwoGenericMana"
+      ],
+      "xmlSha256": "4b5ad2d34aedc15ad3109b4c67c20f190e730ba4e33a3fd74c7a5935ce589eaf",
+      "sourceSha256": "1b48a7cdc927c741bdc2e101afdc95d43dd6f578621fcce5d63e6559c7934951"
+    },
+    {
+      "class": "UginLoyaltyAndDevoidNegativeScenarioTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "minusThreeCannotDestroyDevoidEldraziWithPrintedWhiteCost",
+        "minusThreeResolvesButDoesNotDestroyIndestructibleColoredCreature",
+        "minusThreeRejectsOpposingHexproofButCanTargetOwnHexproofColoredCreature",
+        "plusOneCannotBeActivatedTwiceDuringTheSameTurn"
+      ],
+      "xmlSha256": "1a9bf719fee7af229d6d8ea2a20f3d778dc97e727c229cfeddc91eee52fac567",
+      "sourceSha256": "57b699c664da654188b0f375a5e263bcbdae7243eb3cbd873ced6ddf3e40d602"
+    }
+  ]
+}
