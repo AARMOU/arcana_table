@@ -6634,7 +6634,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 101,
+   "count": 100,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -6811,7 +6811,7 @@
    ]
   },
   "GameObjectFilter.Permanent": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -6844,10 +6844,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DenyRealityScenarioTest.kt"
     },
     {
-     "card": "Ulamog's Dreadsire",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsDreadsire.kt",
+     "card": "Drowner of Hope",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DrownerOfHope.kt",
      "lines": 38,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsDreadsireScenarioTest.kt"
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DrownerOfHopeScenarioTest.kt"
     }
    ]
   },
@@ -6902,7 +6902,7 @@
    ]
   },
   "Player.Any": {
-   "count": 6,
+   "count": 5,
    "examples": [
     {
      "card": "Sword of Light and Shadow",
@@ -6927,12 +6927,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfWarAndPeace.kt",
      "lines": 43,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfWarAndPeaceScenarioTest.kt"
-    },
-    {
-     "card": "Oblivion Sower",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/OblivionSower.kt",
-     "lines": 48,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/OblivionSowerScenarioTest.kt"
     },
     {
      "card": "Sword of Body and Mind",
@@ -7000,7 +6994,7 @@
    ]
   },
   "Player.Each": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Sautekh Immortal",
@@ -7031,6 +7025,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TallymanOfNurgle.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TallymanOfNurgleScenarioTest.kt"
+    },
+    {
+     "card": "Oblivion Sower",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/OblivionSower.kt",
+     "lines": 48,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/OblivionSowerScenarioTest.kt"
     }
    ]
   },

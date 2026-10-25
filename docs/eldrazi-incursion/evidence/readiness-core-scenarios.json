@@ -1,5 +1,5 @@
 {
-  "runner": "Local standalone Gradle JVM harness; repository sources and unchanged committed runtime; entire suite 612 passed, zero failed/errored/skipped. Android CI separate.",
+  "runner": "Local standalone Gradle JVM harness; repository sources and unchanged committed runtime; entire suite 626 passed, zero failed/errored/skipped. Android CI separate.",
   "suites": [
     {
       "class": "UlalekFusedAtrocityScenarioTest",
@@ -25,7 +25,7 @@
         "nonEldraziSpellsDoNotTrigger",
         "decliningMakesNoCopiesAndKeepsTheMana"
       ],
-      "xmlSha256": "df9e5589a29a4837261e108f06c2349d51bf6628bd21edb0f17b08db0d979624",
+      "xmlSha256": "7df5cb8ce5eef2caafc95d4efe1125119023c9ebcd0279fc06ea2eea7eb2ee89",
       "sourceSha256": "bdaeca66fd1b316c60f8f63e13b2c5769f913b199af74e7770d0f8ccb7ec1964"
     },
     {
@@ -43,7 +43,7 @@
         "explicitColorlessSymbolsAllowTwoColorlessAndTwoColored",
         "blinkCannotTargetALand"
       ],
-      "xmlSha256": "89938cc78077d50047aadc14930532075b5d16eeb327c644f5820fcce3843f3c",
+      "xmlSha256": "3c8b33cec5496f15a0eb611937b020359f9ab5abd77ae6a86385a886b86b9d17",
       "sourceSha256": "550fd64e2eac0c146d069b0bd7ebfec223aa815baf6b0a8d65b6d59ad54087a0"
     },
     {
@@ -62,7 +62,7 @@
         "threePlayersChooseInApnapOrderBeforeAnyPermanentLeaves",
         "allColoredManaCannotPayAndMixedManaPaysExactlyTwoRequiredColorless"
       ],
-      "xmlSha256": "f4990b2d92638688fa873a206cd2f3ad9416e0d21febc0ebfec6a67fd5ca227f",
+      "xmlSha256": "61662e2508cc25b290080c83f923de4e1cb76925629e2a261c3eb30d15d9eb71",
       "sourceSha256": "f819a9245d31ad8f01533b84df74ab94738e0656b89bb56652b5dc32063046be"
     },
     {
@@ -75,7 +75,7 @@
         "spawnSacrificeImmediatelyProducesSpendableColorlessAndCannotBeRepeatedOrUsedByOpponent",
         "createsFiveManaCapableEldraziSpawn"
       ],
-      "xmlSha256": "458bf12ab524c37e0417c85f0fccb16a6268dc067d1cec9ed982a23804d1f534",
+      "xmlSha256": "0a721deec76d2738be923858bf060c2232573164c63acc0af0bedd222935936f",
       "sourceSha256": "814e8749ed3c1db11ab41983afb3bff485c16b768320a20cf36fce959471f440"
     },
     {
@@ -91,7 +91,7 @@
         "returnsOneChosenOwnEldraziCreatureCardAndCreatesTwoScions",
         "cannotReturnOpponentsEldraziFromOpponentsGraveyard"
       ],
-      "xmlSha256": "8f76f5ee66cb7777e71d159b1d734c14b025990c9caae83fa0309bcedf5d161c",
+      "xmlSha256": "33a12dfe021d1d3adc534d02f6d4ef6b3db201abd0f51cd99204733641bb6dad",
       "sourceSha256": "68b340b0855d3dd918b396cf8733f5d5443c5ad7c946e3560902a18c3d9e3f68"
     },
     {
@@ -105,7 +105,7 @@
         "sacrificesLandAsCostAndCreatesThreeManaCapableOneOneScions",
         "ordinaryManaAbilityAddsOneColorless"
       ],
-      "xmlSha256": "0eda051948323ae12880ed335684458dc56d62c78ab64ad0d25e4c964f84bfad",
+      "xmlSha256": "40bf25a6bb7d85a014132eb53f0a11a4b5acf714f09c44e6f6a2354157bbef8c",
       "sourceSha256": "eabbf1b157dc623741d675af86dac6d253819531c1ef1133a1332ef82b2e644c"
     },
     {
@@ -119,7 +119,7 @@
         "thirdModeMakesManaCapableScionWithSacrificeAsCost",
         "counterModeCountersOnlyASorcerySpellOnTheStack"
       ],
-      "xmlSha256": "4e797d40ca0f4c900be3a63c341606940f1602261a68e4c14a9d79767efe8d10",
+      "xmlSha256": "164be3269684b81a9419f2aba0a72eacea2fb2d85d5b465591cd0a906bdd92c4",
       "sourceSha256": "5e3ee0ede516827d0dd0a0451f8f17acee10a0bde168eeccfef7583c5b6c66c4"
     },
     {
@@ -132,7 +132,7 @@
         "playerMayDeclineSpawnAtBeginningOfUpkeep",
         "beginningOfOwnersUpkeepMayMakeAnEldraziSpawn"
       ],
-      "xmlSha256": "c8c542e1819dd7cca1b8895941d0fd7d4e25d6982dd4379fd6278096099e502a",
+      "xmlSha256": "d9141c18160a3a76aea8acb83bba02f88da4fdf4b99a11ef09ce2f0efa0260d8",
       "sourceSha256": "424636bdaf4684699cffefde7ac809b0e0ee9cd5d31165273c11c99d99fd35b4"
     },
     {
@@ -150,7 +150,7 @@
         "plusOneExilesOneFaceDownForControllerOnlyAndCreatesLinkedSpirit",
         "linkedSpiritReturnsItsOwnExiledCardAfterUginLeaves"
       ],
-      "xmlSha256": "154bd13046e41aec7e893a552f2bf771e4985499f1e27b80a25cd9567507611b",
+      "xmlSha256": "e248d428ccf3b2cdd4eb9c5788bad90fbf6ade1ef47c0affb47af0072c21ecbe",
       "sourceSha256": "b91b2b0c066bd5feb55fd503e70883a4392c760581027419348bef243c6dfd70"
     },
     {
@@ -165,7 +165,7 @@
         "opponentsUginCannotDiscountMySpellOrStackWithMyUgin",
         "printedColoredSpellStillRequiresItsTwoGenericMana"
       ],
-      "xmlSha256": "08299eb5cba161cfafe6537471ce35e81ad896285083684730ca0f48e1c87173",
+      "xmlSha256": "d8919842902c29c64479f909a6346f2f821c58b7b552798118c8877417fe9f9f",
       "sourceSha256": "1b48a7cdc927c741bdc2e101afdc95d43dd6f578621fcce5d63e6559c7934951"
     },
     {
@@ -180,7 +180,7 @@
         "minusThreeRejectsOpposingHexproofButCanTargetOwnHexproofColoredCreature",
         "plusOneCannotBeActivatedTwiceDuringTheSameTurn"
       ],
-      "xmlSha256": "9860462cb857e3b80381f855a7c5f119701d8539099933d0b8b66ba3fc360d7c",
+      "xmlSha256": "dddfa59525364966b90fea86cd1b07e7f6eb12a8e3cbbb7d5da46cbfdb56f05a",
       "sourceSha256": "57b699c664da654188b0f375a5e263bcbdae7243eb3cbd873ced6ddf3e40d602"
     },
     {
@@ -197,7 +197,7 @@
         "coloredManaAbilityUsesTheChosenCreatureTypeEffect",
         "restrictedManaCannotPayTheGenericPartOfAWrongTypeCreature"
       ],
-      "xmlSha256": "133b20173d31ae148a46060a1878cfc0ff5e1d57001f4185c83f54437d3dd3c0",
+      "xmlSha256": "e8dd1719fbefce8268df0da9a671dca8f1c2aac54348e40b3511a5107e513ed5",
       "sourceSha256": "d23e97495c8de0e784b6093a9c547652f945d9f1a1fe4fc17e016480b7a0d93a"
     },
     {
@@ -212,7 +212,7 @@
         "chargeCounterPaysForOneColoredManaUse",
         "tappingForColoredManaPreventsASecondActivationOfEitherMode"
       ],
-      "xmlSha256": "e7eb21a03e33fa128eee7cde59bc6013aebbd712c9180bd4cd94b495d14c1ee7",
+      "xmlSha256": "95469593ad85c867748c8c75d8f441325246d01ed5a35993a2c95c63f32eda78",
       "sourceSha256": "9821551a40d8b451b3fa9716248b82b97ea1f03a80430c9622e8d5c26ed14c0b"
     },
     {
@@ -228,7 +228,7 @@
         "rejectsColoredCreatureColorlessNoncreatureAndCreatureFromEarlierTurnWithoutTapping",
         "mayTargetAnOpponentsColorlessCreatureThatEnteredThisTurn"
       ],
-      "xmlSha256": "12d1340455889b2c40bb2daf2acee887d5651b8cb2428747374f1ffe84f677b7",
+      "xmlSha256": "49d77e9e165a0fc3aa26655a1c4c23ca56d6562096cd368b254b43a07b8a8aa8",
       "sourceSha256": "8ae28957ca30b13fa9f670bdde2ea67d71752aaf6a2e2f01839df8955f1c6731"
     },
     {
@@ -245,8 +245,86 @@
         "itsOwnDeathDoesNotCreateAScion",
         "friendlyCreatureTokenDeathDoesNotCreateAScion"
       ],
-      "xmlSha256": "74631266af1f06628ad61e6700135db8449274b2d997e50752386119db61d658",
+      "xmlSha256": "017b14affc869fcf475ec519f19fb5632cdf770f9783f1eeabc21f5b5d322542",
       "sourceSha256": "7525ff68aba1374ab71602c6e721c6645a7fa3a0a75fbf1a4d4078466611a097"
+    },
+    {
+      "class": "AllIsDustScenarioTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "bothPlayersSacrificeColoredPermanentsButKeepColorlessArtifactsAndLands",
+        "allDeathsAreSimultaneousSoADyingObserverSeesOtherPlayersCreatures",
+        "sacrificeIgnoresIndestructibleHexproofAndPermanentTypeButPreservesDevoid"
+      ],
+      "xmlSha256": "480796bcb543d2683276645b1162f36967b56ee5115b7e50b93b94c4af309361",
+      "sourceSha256": "2aaa4c04c5b084ad89bfdd6a7386cdd9ea2c86385780c06e29c9cb43305b99b6"
+    },
+    {
+      "class": "DrownerOfHopeScenarioTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "illegalNoncreatureTargetDoesNotSpendTheSacrificeCost",
+        "enteringCreatesTwoFunctionalEldraziScions",
+        "sacrificingScionAsCostTapsTargetCreature",
+        "noncreatureEldraziScionPermanentCanPayTheOracleCost",
+        "cannotSacrificeAnOpponentsScionOrARegularCreature"
+      ],
+      "xmlSha256": "98f19131aa1a9a57d01b1d8d1b9985367dd6ed8759486267a278863644835733",
+      "sourceSha256": "9586285f8b99d7a1ad5a6b91d409ccda00bc1f4ae84c25ded78f6b2613c4410e"
+    },
+    {
+      "class": "OblivionSowerScenarioTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "mayChooseZeroExiledLandsWithoutReversingTheExile",
+        "castTriggerExilesFourAndLetsYouTakeAnyOwnedLandsFromExile",
+        "preexistingExiledLandsMayBeChosenEvenWhenTopFourAreNonlands",
+        "ownLandsAndNonlandsAreNotChoicesButOpponentOwnedLandsInAnotherExileBucketAre",
+        "enteringWithoutCastingDoesNotExileOrStealAnything"
+      ],
+      "xmlSha256": "0e95dd2889c6178cebca7cf3012d52d14d9e9f40f3190156fc452c5024250ecf",
+      "sourceSha256": "32854c95d4a5462792736ff490960c68d829c8ab54255cbb5745f511c43dae91"
+    },
+    {
+      "class": "UlamogsCrusherScenarioTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "annihilatorIsExactlyTwoAndOnlyTheDefenderSacrifices",
+        "summoningSickCrusherIsNotRequiredToAttack",
+        "tappedCrusherIsNotRequiredToAttackAndCreatesNoAnnihilatorTrigger",
+        "ableCrusherCannotBeOmittedFromAttackDeclaration",
+        "attackMakesDefendingPlayerSacrificeTwoPermanents"
+      ],
+      "xmlSha256": "5147c3fb9837207e3b9359d3f5fc732e0d7c2d0e61f3afa272acf199504ebb41",
+      "sourceSha256": "eecd94ab3f8a24e93a3fd21afe759afa4f0c818fbf921a99c7b51ba7702346f0"
+    },
+    {
+      "class": "ShrineOfTheForsakenGodsScenarioTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "testCases": [
+        "restrictedManaCannotPayForAnAbilityOfAColorlessSource",
+        "devoidSpellCanSpendRestrictedManaDespiteItsPrintedColoredManaCost",
+        "coloredSpellCannotSpendRestrictedManaEvenForItsGenericPart",
+        "fewerThanSevenLandsCannotActivateDoubleColorlessAbility",
+        "sevenLandsUnlockTheDoubleColorlessAbilityAndItCanPayForColorlessSpell"
+      ],
+      "xmlSha256": "19a766406137bc30599036784db3602372ad48f4bb1d3fb5308374732a6b1e7f",
+      "sourceSha256": "5d5d4425cefa278f44f864b19f6fee8dc585f2a32391b9ac2ebd55f64e2aea5e"
     }
   ]
 }

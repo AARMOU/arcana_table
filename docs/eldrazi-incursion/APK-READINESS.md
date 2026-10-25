@@ -8,11 +8,11 @@ adds one, producing **91 indexed / 9 absent**. Index membership is not Oracle pl
 candidate includes #197 Confluence regressions and the verified source tests from #187/#188.
 
 The accompanying [100-card audit](COVERAGE.md) and [machine-readable evidence](coverage.json)
-classify every original slot: **32 implemented with reviewed positive/negative acceptance scenarios;
-58 implemented but missing direct acceptance evidence or required negative cases; 0 current
+classify every original slot: **37 implemented with reviewed positive/negative acceptance scenarios;
+53 implemented but missing direct acceptance evidence or required negative cases; 0 current
 registered-card test failures observed; 2 missing implementations; 8 pinned-engine/runtime blocks.**
 The eight include registered Chittering Dispatcher, so they are not eight additional absent names.
-These are evidence classes, not a new 32% completion claim. Several of the 58 have upstream tests;
+These are evidence classes, not a new 37% completion claim. Several of the 53 have upstream tests;
 those have not been independently executed against this exact Arcana runtime in this audit.
 
 ## Executed checks
@@ -28,8 +28,8 @@ those have not been independently executed against this exact Arcana runtime in 
 | Scions | Confluence, Spawnbed Protector, Spawning Bed, Warping Wail suites | PASS: actual sacrifice-for-{C} and relevant creation/target/cost negatives |
 | Spawn | Skittering Invasion extended beyond ability-exists inspection | PASS: sacrifice immediately generates one spendable {C}; no stack; no summoning-sickness tap restriction; opponent cannot activate; no repeated sacrifice; actual Sol Ring cast consumes it |
 | Ugin intake | #187/#188's 8 extra loyalty/Devoid/controller tests and second Spirit-link destruction regression applied to current source | PASS locally with existing seven Ugin scenarios |
-| Combined custom-card suite | Actual repository Kotlin + Android AI/priority/cost source sets, committed jars, JDK 17, Kotlin 2.4.0, exact dependencies, standalone Gradle JVM harness | **612 executed / 0 failed / 0 errors / 0 skips**. Android app tests are separate |
-| Cardkit | 58 unit tests, one existing skip; check/docs-check; diff check | PASS; 0 errors. Two wording warnings from newly fetched Oracle reminder text for Ruins/Sifter; behavior unchanged |
+| Combined custom-card suite | Actual repository Kotlin + Android AI/priority/cost source sets, committed jars, JDK 17, Kotlin 2.4.0, exact dependencies, standalone Gradle JVM harness | **626 executed / 0 failed / 0 errors / 0 skips**. Android app tests are separate |
+| Cardkit | 58 unit tests, one existing skip; check/docs-check; diff check | PASS; 0 errors. Four wording warnings concern omitted Oracle reminder text for Drowner, Crusher, Ruins and Sifter |
 | Android app suite | First #199 run 40213533557: custom-card task passed; 270 Android cases, 2 failed / 4 existing skips | Two exact inventory assertions still expected 90/10. Corrected to exact nine-name missing set and required Selective loading; corrected #199 head `ca3a01c3` passed Development 40214289212 + Cardkit 40214289234. No rules assertion weakened |
 | Real original-deck match vs AI | Existing smoke test uses only indexed names, with a turn-progress assertion | NOT PROVEN: an incomplete filtered-deck smoke cannot certify the original 100-card deck |
 | Fold/release exclusion | Parent #197 release-only scenario exclusion passed in 40212361451 | New combined exact-head release check and physical Fold testing still needed |
@@ -39,7 +39,7 @@ The coverage JSON records source/test fingerprints and the exact four unchanged 
 The standalone harness bypasses Android plugin configuration only; it does not mock or rebuild the
 Argentum engine. Its full-suite command was `test` with the repository custom-card source sets.
 
-Subsequent evidence: #201 exact head `78528e2` Development [40214937451](https://github.com/AARMOU/arcana_table/actions/runs/40214937451) and Cardkit 40214937485 are now SUCCESS. The #206 land follow-up adds eight scenarios. Its Development run 40217188658 passed the custom-card task but failed one Android undo fixture (270 tests, 1 failed, 4 existing skips). Draft #209 guarantees an opening land and seeds the actual engine shuffle while preserving undo assertions; all three real-host tests pass locally. The app-only diff does not match the Development workflow path filter, so #209 has no automatic run; the stacked Ruins/Sifter test PR triggers the full Android gate with this fixture fix included. [Land acceptance details](LAND-MANA-ACCEPTANCE.md) cover Unclaimed Territory and Tendo Ice Bridge. The next follow-up adds nine cases for Ruins of Oran-Rief and Sifter of Skulls; all eleven focused cases and all 612 custom-card tests pass. [Acceptance details](RUINS-SIFTER-ACCEPTANCE.md).
+Subsequent evidence: #201 exact head `78528e2` Development [40214937451](https://github.com/AARMOU/arcana_table/actions/runs/40214937451) and Cardkit 40214937485 are now SUCCESS. The #206 land follow-up adds eight scenarios. Its Development run 40217188658 passed the custom-card task but failed one Android undo fixture (270 tests, 1 failed, 4 existing skips). Draft #209 guarantees an opening land and seeds the actual engine shuffle while preserving undo assertions; all three real-host tests pass locally. The app-only #209 diff matches no automatic Development path; stacked #210 now passed full Development 40218625281 and Cardkit 40218625363, including that fixture fix. [Land acceptance details](LAND-MANA-ACCEPTANCE.md) cover Unclaimed Territory and Tendo Ice Bridge. The next follow-up adds nine cases for Ruins of Oran-Rief and Sifter of Skulls; all eleven focused cases and the then-current 612 custom-card tests passed. [Acceptance details](RUINS-SIFTER-ACCEPTANCE.md).
 
 ## Exact remaining unindexed originals
 
@@ -57,9 +57,7 @@ Subsequent evidence: #201 exact head `78528e2` Development [40214937451](https:/
 
 **Additional indexed blocker:** Chittering Dispatcher's three-player Myriad defender-choice regression
 remains blocked (#34/#36/#181/#183). Its two-player cases passing cannot erase that rules defect.
-**Additional acceptance backlog:** All Is Dust, Drowner of Hope, Oblivion Sower, Ulamog's Crusher and Shrine of the Forsaken Gods
-need the specific missing negative/cost/timing cases listed in the 100-row audit. Imported upstream
-cards stay evidence-unverified rather than being counted playable from their names.
+**Five-card verification follow-up:** all five remaining custom acceptance suites now have reviewed positives and negatives: All Is Dust, Drowner of Hope, Oblivion Sower, Ulamog's Crusher and Shrine of the Forsaken Gods. Fourteen added cases expose and repair two card-definition defects: Drowner's cost incorrectly required a creature, and Sower searched only one exile bucket. **23/23 focused, 626/626 full-suite cases pass**; two deterministic exports differ from the parent in only those two definitions. See [verification details](FIVE-CARD-VERIFICATION.md). The remaining **53 imported definitions** retain category 2 without reviewed direct acceptance evidence; their names alone do not certify them.
 
 ## Integration intake and reversibility
 
@@ -80,6 +78,7 @@ cards stay evidence-unverified rather than being counted playable from their nam
 - Duplicate historical Eldrazi Temple candidates #158/#161/#162 represent **one card**, not three.
   Prefer #162's eight Android scenarios over the older six/seven-case variants. #169/#168/#167 are
   older integration stacks, not extra implementations to replay into #171.
+- The five-card follow-up repairs Drowner with `GameObjectFilter.Permanent` and Sower with `Player.Each`; both remain the same registered cards. Source and two exported JSON lines change, with no duplicate registration or original-index increment. Red before-fix JUnit and green current receipts are preserved. New combined CI is separate from green parent #210.
 - The integration preparation branch is isolated and reversible. **It is not a 100/100 release-ready
   branch.** No merge to main, runtime replacement, weekly-upgrade change, paid worker dispatch,
   signing, release or APK publication occurred.
