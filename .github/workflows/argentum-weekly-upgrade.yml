@@ -1,0 +1,231 @@
+name: Weekly Argentum upgrade
+# Every Monday: move Arcana onto upstream Argentum's latest main, rebuild the engine, check every
+# imported card (custom cards, premade decks) and the full app test suite, then open or refresh one
+# draft PR into development. Nothing merges on its own; the owner approves the PR as usual.
+# Uses only GitHub-hosted Actions minutes on this public repo: no Copilot, no paid workers.
+on:
+  schedule:
+    - cron: '17 9 * * 1'   # Mondays 09:17 UTC (03:17 Denver)
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Upstream commit or branch to upgrade to'
+        default: main
+  push:
+    # A push to the automation's own branch is a dry run: full pipeline, no PR, no issue.
+    branches: [claude/argentum-weekly-upgrade]
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+concurrency:
+  group: argentum-weekly-upgrade
+  cancel-in-progress: false
+env:
+  BASE: gpt/arcana-integration-next
+  BOT_BRANCH: ${{ github.event_name == 'push' && 'bot/argentum-weekly-dry-run' || 'bot/argentum-weekly' }}
+  DRY_RUN: ${{ github.event_name == 'push' }}
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'push' && github.ref || env.BASE }}
+      - name: Keep the shipped card data for comparison
+        run: cp -r android/app/src/main/assets/argentum "$RUNNER_TEMP/old-assets"
+
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: main
+          path: argentum-engine
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+      - name: Rebase Arcana's patches onto upstream
+        id: rebase
+        run: |
+          set +e
+          python3 engine-upgrade/weekly.py rebase argentum-engine "${{ inputs.target || 'origin/main' }}"
+          code=$?
+          echo "status=$(python3 -c "import json;print(json.load(open('engine-upgrade/weekly/rebase.json'))['status'])")" >> "$GITHUB_OUTPUT"
+          exit $([ $code -eq 2 ] && echo 0 || echo $code)
+
+      - name: Prove the refreshed patches apply exactly to the target
+        if: steps.rebase.outputs.status == 'rebased'
+        run: |
+          target=$(python3 -c "import json;print(json.load(open('engine-upgrade/weekly/rebase.json'))['target'])")
+          git -C argentum-engine checkout -q -f "$target"
+          git -C argentum-engine clean -fdq
+          python3 engine-upgrade/audit_patches.py
+      - uses: actions/setup-java@v4
+        if: steps.rebase.outputs.status == 'rebased'
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+          cache-dependency-path: argentum-engine/**/*.gradle.kts
+      - name: Build the four engine jars and export the card library
+        if: steps.rebase.outputs.status == 'rebased'
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar :arcana-export:run
+      - name: Install the new engine into the app
+        if: steps.rebase.outputs.status == 'rebased'
+        run: python3 engine-upgrade/weekly.py install argentum-engine
+
+      - name: Check every imported card against the new library
+        id: cards
+        if: steps.rebase.outputs.status == 'rebased'
+        run: |
+          set +e
+          python3 engine-upgrade/weekly.py cards "$RUNNER_TEMP/old-assets"
+          echo "code=$?" >> "$GITHUB_OUTPUT"
+      - uses: actions/setup-java@v4
+        if: steps.rebase.outputs.status == 'rebased'
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        if: steps.rebase.outputs.status == 'rebased'
+        with:
+          packages: platform-tools
+      - name: Android SDK
+        if: steps.rebase.outputs.status == 'rebased'
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Custom cards on the new engine (compile, export, scenario tests)
+        id: custom
+        if: steps.rebase.outputs.status == 'rebased'
+        continue-on-error: true
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test
+      - name: App test suite on the new engine
+        id: app
+        if: steps.rebase.outputs.status == 'rebased'
+        continue-on-error: true
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 --continue :app:testDebugUnitTest \
+            :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest'
+      - name: Build a test APK
+        id: apk
+        if: steps.rebase.outputs.status == 'rebased'
+        continue-on-error: true
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
+      - name: Count test results
+        if: steps.rebase.outputs.status == 'rebased'
+        run: python3 engine-upgrade/weekly.py summary android
+
+      - name: Write the report
+        id: report
+        if: steps.rebase.outputs.status != 'up_to_date'
+        env:
+          REBASE: ${{ steps.rebase.outputs.status }}
+          CARDS: ${{ steps.cards.outputs.code }}
+          CUSTOM: ${{ steps.custom.outcome }}
+          APP: ${{ steps.app.outcome }}
+          APK: ${{ steps.apk.outcome }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib
+          w = pathlib.Path('engine-upgrade/weekly')
+          r = json.loads((w / 'rebase.json').read_text())
+          env = os.environ
+          head = f"Upstream `{r['old_pin'][:10]}` → `{r['target'][:10]}` ({r.get('upstream_commits', '?')} upstream commits)."
+          if env['REBASE'] == 'conflict':
+              green, title = False, 'Weekly Argentum upgrade blocked: patch conflict'
+              body = [head, '', (w / 'rebase.md').read_text()]
+          else:
+              t = json.loads((w / 'tests.json').read_text())
+              checks = {
+                  'Patches rebased and pass the strict audit': True,
+                  'Every premade-deck card resolves': env['CARDS'] == '0',
+                  'Custom cards compile and pass scenario tests on the new engine': env['CUSTOM'] == 'success',
+                  'App test suite': env['APP'] == 'success',
+                  'Test APK builds': env['APK'] == 'success',
+              }
+              green = all(checks.values())
+              title = f"Weekly Argentum upgrade to {r['target'][:10]}" + ('' if green else ' (needs work)')
+              patches = r['patches']
+              retired = [p['patch'] for p in patches if p['status'] != 'refreshed']
+              body = [head, '', '| Check | Result |', '|---|---|']
+              body += [f"| {k} | {'✅' if v else '❌'} |" for k, v in checks.items()]
+              body += ['', f"Tests: {t['tests']} run, {t['failures'] + t['errors']} failed, {t['skipped']} skipped."]
+              if t['failed']:
+                  body += ['', '<details><summary>Failing tests</summary>', ''] + [f'- `{x}`' for x in t['failed']] + ['', '</details>']
+              body += ['', f"Patches: {len(patches) - len(retired)} refreshed" +
+                       (f"; retired because upstream now has them: {', '.join(retired)}" if retired else '') + '.']
+              body += ['', (w / 'cards.md').read_text()]
+              body += ['', 'Not run here: upstream\'s own rules/card/AI suites (upstream CI covers them) and the '
+                       'device checks in `engine-upgrade/UPGRADE-TEMPLATE.md`. Debug APK: see the run artifacts.']
+          body += ['', f"Run: {env['RUN_URL']}", '',
+                   'Owner approves the merge. Engine conflicts and failing engine-facing tests go to Claude\'s lane; '
+                   'card regressions to GPT (issue #81).']
+          (w / 'title.txt').write_text(title)
+          (w / 'body.md').write_text('\n'.join(body) + '\n')
+          with open(env['GITHUB_OUTPUT'], 'a') as out:
+              out.write(f"green={'true' if green else 'false'}\n")
+          with open(env['GITHUB_STEP_SUMMARY'], 'a') as out:
+              out.write(f"## {title}\n\n" + '\n'.join(body) + '\n')
+          PY
+
+      - name: Push the upgrade branch
+        if: steps.rebase.outputs.status == 'rebased'
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -q -B "$BOT_BRANCH"
+          git add -A argentum-patches engine-upgrade android/app/libs android/app/src/main/assets/argentum
+          git commit -q -F - <<EOF
+          $(cat engine-upgrade/weekly/title.txt)
+
+          Automated by .github/workflows/argentum-weekly-upgrade.yml
+          EOF
+          git push -f origin "$BOT_BRANCH"
+      - name: Open or refresh the draft PR
+        if: steps.rebase.outputs.status == 'rebased' && env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          title=$(cat engine-upgrade/weekly/title.txt)
+          number=$(gh pr list --head "$BOT_BRANCH" --base "$BASE" --state open --json number --jq '.[0].number')
+          if [ -n "$number" ]; then
+            gh pr edit "$number" --title "$title" --body-file engine-upgrade/weekly/body.md
+          elif ! url=$(gh pr create --draft --head "$BOT_BRANCH" --base "$BASE" --title "$title" --body-file engine-upgrade/weekly/body.md); then
+            # Repo setting may forbid Actions from opening PRs; fall back to an issue with a compare link.
+            printf '\n[Open the PR](%s/%s/compare/%s...%s?expand=1)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$BASE" "$BOT_BRANCH" >> engine-upgrade/weekly/body.md
+            gh issue create --title "$title" --body-file engine-upgrade/weekly/body.md
+          else
+            number=${url##*/}
+          fi
+          gh issue comment 81 --body "Weekly Argentum upgrade: **$title** — ${number:+#$number }($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)" || true
+      - name: Report a patch conflict
+        if: steps.rebase.outputs.status == 'conflict' && env.DRY_RUN != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          title=$(cat engine-upgrade/weekly/title.txt)
+          number=$(gh issue list --state open --search "in:title \"$title\"" --json number --jq '.[0].number')
+          if [ -n "$number" ]; then gh issue comment "$number" --body-file engine-upgrade/weekly/body.md
+          else gh issue create --title "$title" --body-file engine-upgrade/weekly/body.md; fi
+          gh issue comment 81 --body "Weekly Argentum upgrade blocked by a patch conflict ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID). Engine lane: resolve and record it in engine-upgrade/rerere/." || true
+      - uses: actions/upload-artifact@v4
+        if: always() && steps.rebase.outputs.status == 'rebased'
+        with:
+          name: argentum-weekly-upgrade
+          retention-days: 14
+          path: |
+            engine-upgrade/weekly/
+            engine-upgrade/patch-report.json
+            android/custom-cards/build/test-results/
+            android/app/build/test-results/
+            android/app/build/outputs/apk/debug/app-debug.apk
