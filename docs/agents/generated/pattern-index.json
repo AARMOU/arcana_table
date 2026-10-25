@@ -1425,13 +1425,19 @@
    ]
   },
   "Effects.ChooseColorThen": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Mother of Runes",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MotherOfRunes.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MotherOfRunesScenarioTest.kt"
+    },
+    {
+     "card": "Selective Obliteration",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SelectiveObliteration.kt",
+     "lines": 51,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SelectiveObliterationScenarioTest.kt"
     }
    ]
   },
@@ -2526,7 +2532,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -4634,7 +4640,7 @@
    ]
   },
   "spell { }": {
-   "count": 45,
+   "count": 46,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -6805,7 +6811,7 @@
    ]
   },
   "GameObjectFilter.Permanent": {
-   "count": 15,
+   "count": 16,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -6879,13 +6885,19 @@
    ]
   },
   "Player.ActivePlayerFirst": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Geier Reach Sanitarium",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GeierReachSanitarium.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GeierReachSanitariumScenarioTest.kt"
+    },
+    {
+     "card": "Selective Obliteration",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SelectiveObliteration.kt",
+     "lines": 51,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SelectiveObliterationScenarioTest.kt"
     }
    ]
   },
@@ -7133,7 +7145,7 @@
    ]
   },
   "Player.You": {
-   "count": 35,
+   "count": 36,
    "examples": [
     {
      "card": "Defile",

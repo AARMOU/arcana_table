@@ -275,6 +275,7 @@ object CustomCards {
         Entry(SufferThePast, "ROE", "Eldrazi Incursion"),
         Entry(ForsakenMonument, "CMM", "Eldrazi Incursion"),
         Entry(EldraziConfluence, "M3C", "Eldrazi Incursion"),
+        Entry(SelectiveObliteration, "M3C", "Eldrazi Incursion"),
         Entry(KozileksReturn, "OGW", "Eldrazi Incursion"),
         Entry(InversionBehemoth, "M3C", "Eldrazi Incursion"),
         Entry(SpawnbedProtector, "M3C", "Eldrazi Incursion"),

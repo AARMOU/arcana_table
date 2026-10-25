@@ -22,7 +22,7 @@ import kotlin.random.Random
 
 /**
  * The bundled original Eldrazi Incursion precon, as the app's offline runtime sees it: which of its
- * 100 slots the shipped assets (Argentum library + exported custom cards) can actually play, and an
+ * 100 slots are indexed by the shipped assets (not a rules certification), and an
  * AI-vs-AI game with it on Argentum's real engine.
  */
 class EldraziIncursionPlayableTest {
@@ -36,20 +36,20 @@ class EldraziIncursionPlayableTest {
     /** Originals the pinned engine can't play yet; each is a recorded blocker or unimplemented. */
     private val expectedMissing = setOf(
         "Angelic Aberration", "Azlask, the Swelling Scourge", "Benthic Anomaly", "Corrupted Crossroads",
-        "Eldrazi Temple", "Hideous Taskmaster", "Mutated Cultist", "Opal Palace", "Selective Obliteration",
+        "Eldrazi Temple", "Hideous Taskmaster", "Mutated Cultist", "Opal Palace",
         "Twins of Discord",
     )
 
-    @Test fun atLeastNinetyOriginalSlotsArePlayableInTheShippedRuntime() {
+    @Test fun originalSlotIndexInventoryMatchesTheExplicitMissingList() {
         assumeTrue(lib.isFullLibrary)
         assertEquals(100, names.size)
         assertEquals("Ulalek, Fused Atrocity", commander)
-        val playable = names.filter { lib.canonical(it) != null }
+        val indexed = names.filter { lib.canonical(it) != null }
         val missing = names.filter { lib.canonical(it) == null }
         assertEquals(expectedMissing, missing.toSet())
         assertEquals("one copy each", missing.size, missing.toSet().size)
-        assertTrue("playable slots ${playable.size}", playable.size >= 90)
-        assertEquals(90, playable.size)
+        assertTrue("indexed slots ${indexed.size}", indexed.size >= 90)
+        assertEquals("All original slots accounted for, without substitutions", 100 - expectedMissing.size, indexed.size)
     }
 
     @Test fun newlyImplementedCardsLoadIntoTheOfflineGame() {
@@ -58,7 +58,7 @@ class EldraziIncursionPlayableTest {
         assertEquals(commander, setup.you.commander)
         assertEquals(99, setup.you.deck.size)
         listOf(
-            "Forsaken Monument", "Eldrazi Confluence", "Kozilek's Return", "Inversion Behemoth",
+            "Selective Obliteration", "Forsaken Monument", "Eldrazi Confluence", "Kozilek's Return", "Inversion Behemoth",
             "Spawnbed Protector", "Ugin, the Ineffable", "Chittering Dispatcher", "Rishkar's Expertise",
             "Vile Redeemer", "Bismuth Mindrender", "Ulamog's Nullifier", "Morophon, the Boundless",
         ).forEach { name ->
@@ -66,7 +66,7 @@ class EldraziIncursionPlayableTest {
             assertTrue("in the deck: $name", name in setup.you.deck)
         }
         val leftOut = setup.notes.first { "Left out" in it }
-        assertTrue(leftOut, "10 card" in leftOut)
+        assertTrue(leftOut, "${expectedMissing.size} card" in leftOut)
     }
 
     /** Eldrazi Incursion mirror run by Argentum's AI on both sides: no engine stall or crash. */
