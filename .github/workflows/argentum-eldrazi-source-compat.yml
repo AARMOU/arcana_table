@@ -25,6 +25,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          git config user.name arcana-source-preflight
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           mkdir -p combined-evidence
           git merge-base --is-ancestor "$UPGRADE" HEAD
           git fetch --no-tags origin "$ELDRAZI"
