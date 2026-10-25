@@ -293,7 +293,9 @@ internal class TableController(
         runCatching { AppPreconDeck("fallout_mutant_menace", "Fallout: Mutant Menace", "The Wise Mothman", context.assets.open("precons/fallout_mutant_menace.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
         runCatching { AppPreconDeck("fallout_science", "Fallout: Science!", "Dr. Madison Li", context.assets.open("precons/fallout_science.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
         runCatching { AppPreconDeck("bloomburrow_family_matters", "Bloomburrow: Family Matters", "Zinnia, Valley's Voice", context.assets.open("precons/bloomburrow_family_matters.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
-        runCatching { AppPreconDeck("bloomburrow_peace_offering", "Bloomburrow: Peace Offering", "Ms. Bumbleflower", context.assets.open("precons/bloomburrow_peace_offering.txt").bufferedReader().use { it.readText() }) }.getOrNull()
+        runCatching { AppPreconDeck("bloomburrow_peace_offering", "Bloomburrow: Peace Offering", "Ms. Bumbleflower", context.assets.open("precons/bloomburrow_peace_offering.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
+        // Original Eldrazi Incursion (M3C). Cards Argentum can't play yet are left out and filled with basics.
+        runCatching { AppPreconDeck("eldrazi_incursion", "Eldrazi Incursion (M3C)", "Ulalek, Fused Atrocity", context.assets.open("precons/eldrazi_incursion.txt").bufferedReader().use { it.readText() }) }.getOrNull()
     ).filterNotNull()
     var savedDecksOpen by run { mutableStateOf(false) }
     var localDeckSyncConfirmed by run { mutableStateOf(false) }
