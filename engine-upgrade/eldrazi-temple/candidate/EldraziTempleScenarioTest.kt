@@ -128,6 +128,35 @@ class EldraziTempleScenarioTest {
         assertNotNull(d.findPermanent(p, "Echoes of Eternity"))
     }
 
+    @Test fun twoTempleRestrictedPoolsCombineForOneEldraziSpell() {
+        // Each Temple independently generates two restricted units. They must
+        // combine to pay an Eldrazi spell, never waive any part of its {8} cost.
+        val d = customScenario(EldraziTemple, "Ulamog's Crusher")
+        val p = d.player1
+        val first = d.putPermanentOnBattlefield(p, "Eldrazi Temple")
+        val second = d.putPermanentOnBattlefield(p, "Eldrazi Temple")
+        val crusher = d.putCardInHand(p, "Ulamog's Crusher")
+
+        assertNull(d.activate(p, first, index = 1).error)
+        d.resolveAll()
+        assertNull(d.activate(p, second, index = 1).error)
+        d.resolveAll()
+        assertEquals(4, d.manaPool(p).restrictedMana.size)
+
+        // Four restricted + three unrestricted is still one short of {8}.
+        d.giveColorlessMana(p, 3)
+        assertNotNull(d.castSpell(p, crusher).error)
+        assertEquals(4, d.manaPool(p).restrictedMana.size)
+        assertEquals(3, d.manaPool(p).colorless)
+
+        d.giveColorlessMana(p, 1)
+        assertNull(d.castSpell(p, crusher).error)
+        assertEquals(0, d.manaPool(p).colorless)
+        assertTrue(d.manaPool(p).restrictedMana.isEmpty())
+        d.resolveAll()
+        assertEquals(1, d.permanentsNamed(p, "Ulamog's Crusher").size)
+    }
+
     @Test fun restrictedManaCannotFundGenericPartOfColoredSpell() {
         val d = customScenario(EldraziTemple, "Grizzly Bears")
         val p = d.player1
