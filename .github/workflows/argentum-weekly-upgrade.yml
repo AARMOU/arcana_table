@@ -47,10 +47,25 @@ jobs:
       - name: Record the exact Arcana base
         id: base
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: The running workflow is the reviewed copy on the base
+        # A scheduled run uses main's copy of this file; the safety tests below read the base's copy.
+        # They must be the same file, or the tests would certify a workflow that is not the one running.
+        env:
+          RUNNING_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          f=.github/workflows/argentum-weekly-upgrade.yml
+          if [ "$RUNNING_SHA" != "$(git rev-parse HEAD)" ]; then
+            git fetch -q --depth=1 origin "$RUNNING_SHA"
+          fi
+          if ! git diff --exit-code "$RUNNING_SHA" HEAD -- "$f"; then
+            echo "::error title=Workflow drift::$f at $RUNNING_SHA differs from $BASE; sync main with the reviewed copy"
+            exit 1
+          fi
       - name: Workflow safety checks
         run: |
           python3 -m pip install --quiet pyyaml
-          python3 -m unittest -v engine-upgrade/tests/test_weekly_workflow.py
+          python3 -m unittest -v engine-upgrade/tests/test_weekly_workflow.py engine-upgrade/tests/test_candidate_scope.py
       - name: Keep the shipped card data for comparison
         run: cp -r android/app/src/main/assets/argentum "$RUNNER_TEMP/old-assets"
       - name: Resolve the upstream target to an exact commit
@@ -321,25 +336,37 @@ jobs:
           set -euo pipefail
           patch="$RUNNER_TEMP/candidate/candidate.patch"
           echo "$EXPECTED  $patch" | sha256sum -c -
+          # Quick pre-check on the patch text: every file header must be a plain, in-scope path.
           python3 - "$patch" <<'PY'
           import re, sys
-          allowed = ('argentum-patches/', 'engine-upgrade/', 'android/app/libs/argentum-',
+          allowed = ('argentum-patches/', 'engine-upgrade/forward-ports/', 'engine-upgrade/audit_patches.py',
+                     'engine-upgrade/preview-config.json', 'android/app/libs/argentum-',
                      'android/app/src/main/assets/argentum/')
           text = open(sys.argv[1], 'rb').read().decode('utf-8', 'replace')
-          paths = {p for pair in re.findall(r'^diff --git a/(\S+) b/(\S+)$', text, re.M) for p in pair}
-          bad = sorted(p for p in paths if not p.startswith(allowed) or '..' in p or p.startswith('engine-upgrade/tests/'))
-          if bad or not paths:
-              sys.exit(f'Candidate touches paths outside the upgrade scope: {bad or "none at all"}')
+          headers = re.findall(r'^diff --git .*$', text, re.M)
+          pairs = [re.fullmatch(r'diff --git a/(\S+) b/(\S+)', h) for h in headers]
+          paths = {p for m in pairs if m for p in m.groups()}
+          bad = sorted(p for p in paths if not p.startswith(allowed) or '..' in p)
+          if bad or not paths or not all(pairs):
+              sys.exit(f'Candidate touches paths outside the upgrade scope: {bad or headers or "none at all"}')
           print(f'{len(paths)} paths, all inside the upgrade scope')
           PY
+          # The authoritative check runs on git's staged index (next step), from this trusted copy.
+          cp engine-upgrade/candidate_scope.py "$RUNNER_TEMP/candidate_scope.py"
+      - name: Apply the candidate and check what it changed
+        if: needs.validate.outputs.status == 'rebased'
+        run: |
+          set -euo pipefail
+          git checkout -q -B "$BOT_BRANCH"
+          git apply --index --binary --whitespace=nowarn "$RUNNER_TEMP/candidate/candidate.patch"
+          python3 -I "$RUNNER_TEMP/candidate_scope.py"
       - name: Push the upgrade branch
         if: needs.validate.outputs.status == 'rebased'
         run: |
           set -euo pipefail
+          bot_email='41898282+github-actions[bot]@users.noreply.github.com'
           git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git checkout -q -B "$BOT_BRANCH"
-          git apply --index --binary --whitespace=nowarn "$RUNNER_TEMP/candidate/candidate.patch"
+          git config user.email "$bot_email"
           git commit -q -F - <<EOF
           $(cat "$RUNNER_TEMP/candidate/weekly/title.txt")
 
@@ -347,7 +374,18 @@ jobs:
           Validated in run ${{ github.run_id }}; candidate sha256 ${{ needs.validate.outputs.candidate_sha256 }}
           Automated by .github/workflows/argentum-weekly-upgrade.yml
           EOF
-          git push -f origin "$BOT_BRANCH"
+          # Replace the bot branch only if it is absent or still exactly the automation's own previous
+          # commit (bot author, our trailer). Anything else on it is someone's work: stop, don't overwrite.
+          remote=$(git ls-remote origin "refs/heads/$BOT_BRANCH" | cut -f1)
+          if [ -n "$remote" ]; then
+            tip=$(gh api "repos/$GITHUB_REPOSITORY/commits/$remote" --jq '[.commit.author.email, .commit.committer.email, (.commit.message | contains("Automated by .github/workflows/argentum-weekly-upgrade.yml"))] | @tsv')
+            if [ "$tip" != "$(printf '%s\t%s\ttrue' "$bot_email" "$bot_email")" ]; then
+              echo "::error title=Bot branch has other work::$BOT_BRANCH is at $remote, which this workflow did not write; not overwriting"
+              exit 1
+            fi
+          fi
+          # The lease pins the exact head we just inspected (empty = branch must not exist yet).
+          git push --force-with-lease="refs/heads/$BOT_BRANCH:$remote" origin "HEAD:refs/heads/$BOT_BRANCH"
       - name: Open or refresh the draft PR
         if: needs.validate.outputs.status == 'rebased'
         run: |
@@ -374,3 +412,31 @@ jobs:
           if [ -n "$number" ]; then gh issue comment "$number" --body-file "$w/body.md"
           else gh issue create --title "$title" --body-file "$w/body.md"; fi
           gh issue comment 81 --body "**$title** ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID). Engine lane: fix the patch, record any resolution in engine-upgrade/rerere/ or rebase-rules.json, re-run." || true
+
+  verdict:
+    # The run's own result: green only when the upgrade is green (or there was nothing to do). A dry run
+    # or a live run that found failing tests, a collision, a conflict or a broken build ends red, even
+    # though the live run still published its draft PR or issue for people to act on.
+    needs: [validate, publish]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Overall result
+        env:
+          VALIDATE: ${{ needs.validate.result }}
+          PUBLISH: ${{ needs.publish.result }}
+          STATUS: ${{ needs.validate.outputs.status }}
+          GREEN: ${{ needs.validate.outputs.green }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          echo "validate=$VALIDATE publish=$PUBLISH status=$STATUS green=$GREEN event=$EVENT"
+          if [ "$VALIDATE" != success ]; then echo "::error::Validation did not finish successfully ($VALIDATE)"; exit 1; fi
+          if [ "$STATUS" = up_to_date ]; then echo 'Already on the latest upstream; nothing to do.'; exit 0; fi
+          if [ "$EVENT" = push ] && [ "$PUBLISH" != skipped ]; then echo "::error::Publish ran on a dry run ($PUBLISH)"; exit 1; fi
+          if [ "$EVENT" != push ] && [ "$PUBLISH" != success ]; then echo "::error::Publishing did not succeed ($PUBLISH)"; exit 1; fi
+          if [ "$STATUS" != rebased ] || [ "$GREEN" != true ]; then
+            echo "::error::Upgrade not green (status=$STATUS, green=$GREEN); see the validate job summary"; exit 1
+          fi
+          echo 'Upgrade green.'

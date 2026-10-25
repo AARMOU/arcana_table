@@ -7,7 +7,11 @@ boundary so it cannot quietly regress:
   * the job that runs upstream code holds a read-only token and stores no credentials, so it cannot
     push, open PRs or edit issues, on a dry run or otherwise;
   * the job that can write never checks out or runs upstream code and never runs on a dry run;
-  * the upstream engine is checked out by exact commit, never a moving branch.
+  * the upstream engine is checked out by exact commit, never a moving branch;
+  * publish applies only an in-scope candidate (engine-upgrade/candidate_scope.py, run from a copy taken
+    before the candidate is applied), and replaces the bot branch only with a lease on a head it wrote;
+  * the run ends red unless the upgrade is green, so a failing dry run can never look like a success;
+  * the running copy of this workflow (main's, on a schedule) must equal the tested copy on the base.
 """
 from __future__ import annotations
 
@@ -21,7 +25,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = ROOT / ".github/workflows/argentum-weekly-upgrade.yml"
 WRITE_COMMANDS = re.compile(r"\bgit\s+push\b|\bgh\s+(pr|issue|api|release|workflow)\b|\bcurl\b.*-X\s*(POST|PUT|PATCH|DELETE)")
-UPSTREAM_CODE = re.compile(r"gradle|wingedsheep|argentum-engine|weekly\.py\s+(rebase|install)|audit_patches|setup-java|setup-android")
+UPSTREAM_CODE = re.compile(r"gradle|wingedsheep|argentum-engine|weekly\.py\s+(rebase|install)|python3?\s+(-\S+\s+)*\S*audit_patches|setup-java|setup-android")
 
 
 def load():
@@ -44,8 +48,8 @@ class WeeklyWorkflowSafety(unittest.TestCase):
     def test_default_token_has_no_permissions(self):
         self.assertEqual(self.wf.get("permissions"), {})
 
-    def test_only_two_jobs(self):
-        self.assertEqual(set(self.jobs), {"validate", "publish"})
+    def test_only_three_jobs(self):
+        self.assertEqual(set(self.jobs), {"validate", "publish", "verdict"})
 
     def test_validate_token_is_read_only(self):
         self.assertEqual(self.validate["permissions"], {"contents": "read"})
@@ -112,6 +116,69 @@ class WeeklyWorkflowSafety(unittest.TestCase):
         pushers = [(job, s.get("name")) for job, spec in self.jobs.items() for s in spec["steps"]
                    if re.search(r"\bgit\s+push\b", s.get("run", ""))]
         self.assertEqual(pushers, [("publish", "Push the upgrade branch")])
+
+
+    def step(self, job, name):
+        return next(s for s in self.jobs[job]["steps"] if s.get("name") == name)
+
+    def test_running_workflow_must_match_the_tested_copy(self):
+        names = [s.get("name", "") for s in self.validate["steps"]]
+        drift = names.index("The running workflow is the reviewed copy on the base")
+        self.assertLess(drift, names.index("Workflow safety checks"))
+        run = self.validate["steps"][drift]["run"]
+        self.assertIn("git diff --exit-code", run)
+        self.assertIn(".github/workflows/argentum-weekly-upgrade.yml", run)
+        self.assertEqual(self.validate["steps"][drift]["env"]["RUNNING_SHA"], "${{ github.sha }}")
+
+    def test_safety_checks_include_the_scope_tests(self):
+        self.assertIn("test_candidate_scope.py", self.step("validate", "Workflow safety checks")["run"])
+
+    def test_failed_engine_build_produces_no_candidate(self):
+        candidate = next(s for s in self.validate["steps"] if s.get("id") == "candidate")
+        self.assertEqual(candidate["if"], "steps.final.outputs.status == 'rebased'")
+        final = next(s for s in self.validate["steps"] if s.get("id") == "final")
+        self.assertIn("build_failed", final["run"])
+        for name in ("Verify the candidate before using it", "Apply the candidate and check what it changed",
+                     "Push the upgrade branch", "Open or refresh the draft PR"):
+            self.assertEqual(self.step("publish", name)["if"], "needs.validate.outputs.status == 'rebased'", name)
+
+    def test_publish_checks_the_applied_index_with_a_trusted_copy(self):
+        names = [s.get("name", "") for s in self.publish["steps"]]
+        verify = names.index("Verify the candidate before using it")
+        apply = names.index("Apply the candidate and check what it changed")
+        self.assertLess(verify, apply)
+        self.assertLess(apply, names.index("Push the upgrade branch"))
+        self.assertIn('cp engine-upgrade/candidate_scope.py "$RUNNER_TEMP/candidate_scope.py"',
+                      self.publish["steps"][verify]["run"])
+        run = self.publish["steps"][apply]["run"]
+        self.assertLess(run.index("git apply --index"), run.index('python3 -I "$RUNNER_TEMP/candidate_scope.py"'))
+        self.assertNotIn("engine-upgrade/candidate_scope.py", run)  # never the copy the patch may have touched
+
+    def test_pre_check_allowlist_is_narrow(self):
+        allowed = self.step("publish", "Verify the candidate before using it")["run"].split("allowed =")[1].split(")")[0]
+        self.assertNotIn("'engine-upgrade/'", allowed)
+        self.assertNotIn(".github", allowed)
+        self.assertIn("not all(pairs)", self.step("publish", "Verify the candidate before using it")["run"])
+
+    def test_bot_branch_replaced_only_with_a_lease_on_its_own_head(self):
+        run = self.step("publish", "Push the upgrade branch")["run"]
+        self.assertNotRegex(run, r"git push (-f|--force)\b(?!-with-lease)")
+        self.assertIn('--force-with-lease="refs/heads/$BOT_BRANCH:$remote"', run)
+        self.assertIn('git ls-remote origin "refs/heads/$BOT_BRANCH"', run)
+        self.assertIn("Automated by .github/workflows/argentum-weekly-upgrade.yml", run)
+        self.assertLess(run.index("exit 1"), run.index("git push"))
+
+    def test_verdict_fails_unless_green(self):
+        verdict = self.jobs["verdict"]
+        self.assertEqual(verdict["needs"], ["validate", "publish"])
+        self.assertEqual(verdict["if"], "always()")
+        self.assertEqual(verdict["permissions"], {})
+        self.assertTrue(all("uses" not in s for s in verdict["steps"]))
+        run = verdict["steps"][0]["run"]
+        self.assertIn('[ "$VALIDATE" != success ]', run)
+        self.assertIn('[ "$GREEN" != true ]', run)
+        self.assertIn('[ "$EVENT" = push ] && [ "$PUBLISH" != skipped ]', run)
+        self.assertEqual(verdict["steps"][0]["env"]["GREEN"], "${{ needs.validate.outputs.green }}")
 
 
 if __name__ == "__main__":
