@@ -114,16 +114,50 @@ jobs:
           ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
           grep -F '"name":"Eldrazi Temple"' app/src/main/assets/argentum/custom-cards.jsonl > /dev/null
           grep -F '"name":"Corrupted Crossroads"' app/src/main/assets/argentum/custom-cards.jsonl > /dev/null
+      - name: Audit exact original Incursion slots in temporary candidate assets
+        id: incursion_coverage
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          manifest = json.loads(Path("investigation/argentum-six-precons/deck-manifest.json").read_text())
+          deck = next(d for d in manifest["decks"] if d["name"] == "Eldrazi Incursion")
+          index_paths = [
+              Path("android/app/src/main/assets/argentum/all-cards.index.tsv"),
+              Path("android/app/src/main/assets/argentum/custom-cards.index.tsv"),
+          ]
+          indexed = set()
+          for path in index_paths:
+              indexed.update(line.split("\t", 1)[0] for line in path.read_text().splitlines() if line.strip())
+          total = sum(card["quantity"] for card in deck["cards"])
+          present = sum(card["quantity"] for card in deck["cards"] if card["name"] in indexed)
+          missing = [card["name"] for card in deck["cards"] if card["name"] not in indexed]
+          assert total == 100, f"Original deck changed: {total} slots"
+          print(f"Original Eldrazi Incursion candidate inventory: {present}/{total} indexed; absent: {missing}")
+          print("Index presence is a necessary gate, NOT proof of Oracle playability.")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"indexed={present}\n")
+              out.write(f"indexed_ge_90={'true' if present >= 90 else 'false'}\n")
+          PY
       - name: Run executable card scenarios against patched temporary runtime
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.EldraziTempleScenarioTest' --tests 'com.arcanatable.customcards.CorruptedCrossroadsScenarioTest'
-      - name: Compile complete Android debug application against temporary combined runtime
+      - name: Compile and test Android app without packaging an APK
         working-directory: android
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon --max-workers=2 :app:assembleDebug :app:testDebugUnitTest
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+
+      # No APK packaging on automatic pushes or PRs. A manually invoked candidate
+      # still needs the 90-slot necessary inventory gate; gameplay acceptance and
+      # owner release approval remain separate requirements.
+      - name: Build opt-in debug APK only after original-deck inventory gate
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.incursion_coverage.outputs.indexed_ge_90 == 'true' }}
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
 
       - name: Verify debug APK contains both candidate cards
+        if: ${{ github.event_name == 'workflow_dispatch' && steps.incursion_coverage.outputs.indexed_ge_90 == 'true' }}
         run: |
           set -euo pipefail
           python3 - <<'PY'
@@ -196,7 +230,7 @@ jobs:
           PY
       - name: Upload installable combined-runtime debug APK
         uses: actions/upload-artifact@v4
-        if: success()
+        if: ${{ success() && github.event_name == 'workflow_dispatch' && steps.incursion_coverage.outputs.indexed_ge_90 == 'true' }}
         with:
           name: ArcanaTable-Eldrazi-Combined-Dev-debug-apk
           retention-days: 14
