@@ -139,6 +139,8 @@ def implementation_state(name: str) -> tuple[str | None, list[str], str | None]:
             return "NEEDS_REVIEW", [f"definition exists but is not registered in CustomCards.kt: {repo.rel(custom.path)}"], "custom"
         if not tests:
             return "NEEDS_REVIEW", ["registered custom card without a scenario test"], "custom"
+        if key not in repo.custom_index_names() and not in_library:
+            return "NEEDS_REVIEW", ["registered and tested, but missing from exported custom-cards.index.tsv"], "custom"
         own = repo.own_test(custom.val)
         level = "custom-card-scenario-test" if own else "custom-shared-test"
         return "IMPLEMENTED_AND_TESTED", [f"registered custom card {repo.rel(custom.path)}; "
