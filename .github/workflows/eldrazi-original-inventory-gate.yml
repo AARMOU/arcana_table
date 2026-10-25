@@ -1,0 +1,21 @@
+name: Eldrazi Incursion exact inventory gate
+on:
+  push:
+    branches: [gpt/eldrazi-91-slot-apk-inventory-gate-20261025]
+  pull_request:
+    branches: [gpt/eldrazi-five-card-verification-20261025]
+  workflow_dispatch:
+jobs:
+  original-deck-inventory:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify original 100-card inventory at minimum 90 indexed
+        run: python3 tools/eldrazi/check_original_inventory.py --minimum 90
+      - name: Verify incomplete candidate fails closed at 100
+        run: |
+          if python3 tools/eldrazi/check_original_inventory.py --minimum 100; then
+            echo 'Unexpectedly complete inventory: update audit evidence before declaring 100/100.'
+          else
+            echo 'Confirmed: inventory gate rejects premature 100/100 claim.'
+          fi
