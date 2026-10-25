@@ -176,11 +176,23 @@ class ReadinessTests(unittest.TestCase):
         self.assertEqual(v["source"], "argentum-indexed")
         self.assertIn("no Arcana card-specific scenario", v["reasons"][0])
 
+    @with_fake_oracle
     def test_recorded_engine_gap_routes_to_claude(self):
-        v = readiness.classify("Port Town")
+        # Never use a real upstream card as a permanent engine-blocker fixture.
+        v = readiness.classify("Cardkit Test Harbor")
         self.assertEqual(v["readiness"], "ENGINE_BLOCKED")
         self.assertEqual(v["route"], "claude")
         self.assertIn("#141", " ".join(v["reasons"]))
+        self.assertNotIn("Port Town", readiness.blockers()["cards"])
+
+    def test_upstream_indexed_reveal_land_is_not_blocked_by_old_pattern(self):
+        # Upstream now implements Port Town; preserve the generic pattern for
+        # other cards until their exact behavior is independently verified.
+        with mock.patch.object(repo, "library_index", return_value={repo.normalize_name("Port Town"): "card"}):
+            v = readiness.classify("Port Town")
+        self.assertEqual(v["readiness"], "IMPLEMENTED_AND_TESTED")
+        self.assertEqual(v["source"], "argentum-indexed")
+        self.assertIsNone(v["route"])
 
     def test_uncached_unknown_card_needs_review(self):
         v = readiness.classify("Cardkit Definitely Not A Card")
