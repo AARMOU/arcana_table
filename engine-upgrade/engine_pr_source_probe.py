@@ -39,20 +39,6 @@ def candidates(rows: list[dict], limit: int) -> list[dict]:
     return relevant
 
 
-def trusted_audit(source: str, head_pin: str, mandatory: set[str]) -> str:
-    if not SHA_RE.fullmatch(head_pin):
-        raise ValueError("Missing full source pin")
-    if not MANDATORY_RE.search(source) or not PIN_RE.search(source):
-        raise ValueError("Trusted baseline has no exact pin / mandatory list")
-    original = read_mandatory(source)
-    if any(not re.fullmatch(r"[0-9]{4}-[A-Za-z0-9_-]+\.patch", name) for name in mandatory):
-        raise ValueError("Unsafe mandatory patch basename from PR data")
-    if not mandatory:
-        raise ValueError("Refusing empty mandatory patch series")
-    # Preserve order from the PR's audited list, never sort into an unreviewed order.
-    raise NotImplementedError("Call materialize_audit to preserve original mandatory ordering")
-
-
 def materialize_audit(source: str, pr_audit: str) -> str:
     pin = read_pin(pr_audit)
     block = MANDATORY_RE.search(pr_audit)
@@ -76,6 +62,7 @@ def safe_env() -> dict:
            and not k.startswith(("ACTIONS_", "GITHUB_"))}
     env["GIT_TERMINAL_PROMPT"] = "0"
     env["PYTHONDONTWRITEBYTECODE"] = "1"
+    env["WEEKLY_FORCE"] = "1"
     return env
 
 
@@ -218,12 +205,12 @@ def main() -> int:
         data.append(r)
     markdown = [
         "## Read-only source rebase of open engine patch PRs", "",
-        f"Exact upstream: \`{upstream}\`", "",
+        f"Exact upstream: `{upstream}`", "",
         "| PR | Source rebase | First conflicts |",
         "|---|---|---|",
     ]
     for r in data:
-        conflicts = ", ".join(f"\`{x['patch']}\` in \`{x['file']}\`"
+        conflicts = ", ".join(f"`{x['patch']}` in `{x['file']}`"
                               for x in r["conflicts"][:4]) or r.get("diagnostic", "")[:180].replace("|", "/")
         markdown.append(f"| #{r['pr']} | {r['status']} | {conflicts} |")
     markdown += ["", "A successful source rebase does NOT certify engine compile, rules or Android tests."]
