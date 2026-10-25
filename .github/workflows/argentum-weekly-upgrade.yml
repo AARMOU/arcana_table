@@ -71,7 +71,15 @@ jobs:
       - name: Workflow safety checks
         run: |
           python3 -m pip install --quiet pyyaml
-          python3 -m unittest -v engine-upgrade/tests/test_weekly_workflow.py engine-upgrade/tests/test_candidate_scope.py engine-upgrade/tests/test_weekly_docs.py engine-upgrade/tests/test_weekly_handoff.py
+          set +e
+          python3 -m unittest -v engine-upgrade/tests/test_weekly_workflow.py engine-upgrade/tests/test_candidate_scope.py \
+            engine-upgrade/tests/test_weekly_docs.py engine-upgrade/tests/test_weekly_handoff.py 2>&1 | tee "$RUNNER_TEMP/safety.log"
+          code=${PIPESTATUS[0]}
+          if [ "$code" -ne 0 ]; then  # failing tests as annotations, readable without the log
+            grep -E '^(FAIL|ERROR):|Error:|^AssertionError' "$RUNNER_TEMP/safety.log" | head -12 \
+              | while IFS= read -r line; do echo "::error title=Safety check::${line:0:900}"; done
+          fi
+          exit "$code"
       - name: Keep the shipped card data for comparison
         run: cp -r android/app/src/main/assets/argentum "$RUNNER_TEMP/old-assets"
       - name: Resolve the upstream target to an exact commit
