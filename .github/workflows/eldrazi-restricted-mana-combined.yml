@@ -3,10 +3,11 @@ name: Eldrazi Incursion 93-slot Temple and Crossroads source integration
 # export files, Android builds, or change any production/release flag.
 on:
   push:
-    branches: [gpt/eldrazi-93-slot-restricted-mana-integration-20261025]
+    branches: [gpt/eldrazi-93-slot-restricted-mana-integration-20261025, gpt/eldrazi-93-slot-acceptance-repair-20261025]
     paths:
       - 'engine-upgrade/**'
       - '.github/workflows/eldrazi-restricted-mana-combined.yml'
+      - 'android/app/src/test/java/com/arcanatable/EldraziIncursionPlayableTest.kt'
   pull_request:
     branches: [gpt/eldrazi-91-slot-apk-inventory-gate-20261025]
     paths:

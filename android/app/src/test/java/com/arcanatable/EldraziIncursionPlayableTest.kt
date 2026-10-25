@@ -15,7 +15,6 @@ import com.wingedsheep.sdk.model.Deck
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
-import org.junit.Assume.assumeTrue
 import org.junit.Test
 import java.io.File
 import kotlin.random.Random
@@ -23,7 +22,8 @@ import kotlin.random.Random
 /**
  * The bundled original Eldrazi Incursion precon, as the app's offline runtime sees it: which of its
  * 100 slots are indexed by the shipped assets (not a rules certification), and an
- * AI-vs-AI game with it on Argentum's real engine.
+ * AI-vs-AI game with it on Argentum's real engine. The library and game-end conditions
+ * are mandatory assertions: missing assets or a stalled AI game must not silently pass.
  */
 class EldraziIncursionPlayableTest {
     private val assets = File("src/main/assets")
@@ -35,13 +35,13 @@ class EldraziIncursionPlayableTest {
 
     /** Originals the pinned engine can't play yet; each is a recorded blocker or unimplemented. */
     private val expectedMissing = setOf(
-        "Angelic Aberration", "Azlask, the Swelling Scourge", "Benthic Anomaly", "Corrupted Crossroads",
-        "Eldrazi Temple", "Hideous Taskmaster", "Mutated Cultist", "Opal Palace",
+        "Angelic Aberration", "Azlask, the Swelling Scourge", "Benthic Anomaly",
+        "Hideous Taskmaster", "Mutated Cultist", "Opal Palace",
         "Twins of Discord",
     )
 
     @Test fun originalSlotIndexInventoryMatchesTheExplicitMissingList() {
-        assumeTrue(lib.isFullLibrary)
+        assertTrue("Offline library must be present; never skip Eldrazi acceptance tests", lib.isFullLibrary)
         assertEquals(100, names.size)
         assertEquals("Ulalek, Fused Atrocity", commander)
         val indexed = names.filter { lib.canonical(it) != null }
@@ -53,7 +53,7 @@ class EldraziIncursionPlayableTest {
     }
 
     @Test fun newlyImplementedCardsLoadIntoTheOfflineGame() {
-        assumeTrue(lib.isFullLibrary)
+        assertTrue("Offline library must be present; never skip Eldrazi acceptance tests", lib.isFullLibrary)
         val (setup, registry) = OfflineGameSetup.build(lib, "You", names, commander, premades, Random(5))
         assertEquals(commander, setup.you.commander)
         assertEquals(99, setup.you.deck.size)
@@ -61,6 +61,7 @@ class EldraziIncursionPlayableTest {
             "Selective Obliteration", "Forsaken Monument", "Eldrazi Confluence", "Kozilek's Return", "Inversion Behemoth",
             "Spawnbed Protector", "Ugin, the Ineffable", "Chittering Dispatcher", "Rishkar's Expertise",
             "Vile Redeemer", "Bismuth Mindrender", "Ulamog's Nullifier", "Morophon, the Boundless",
+            "Eldrazi Temple", "Corrupted Crossroads",
         ).forEach { name ->
             assertNotNull("registered: $name", registry.getCard(name))
             assertTrue("in the deck: $name", name in setup.you.deck)
@@ -71,7 +72,7 @@ class EldraziIncursionPlayableTest {
 
     /** Eldrazi Incursion mirror run by Argentum's AI on both sides: no engine stall or crash. */
     @Test fun incursionMirrorAiGame() {
-        assumeTrue(lib.isFullLibrary)
+        assertTrue("Offline library must be present; never skip Eldrazi acceptance tests", lib.isFullLibrary)
         val list = OfflineGameSetup.argentumLibraryList(names, commander).mapNotNull(lib::canonical)
         val registry = CardRegistry().apply { register(lib.load(names.toSet())) }
         for (seed in listOf(1, 2, 3)) {
@@ -96,7 +97,7 @@ class EldraziIncursionPlayableTest {
             }
             println("[eldrazi-incursion] seed=$seed turn=${state.turnNumber} actions=$actions over=${state.gameOver} " +
                 "winner=${state.winnerId} ms=${(System.nanoTime() - started) / 1_000_000}")
-            assertTrue("seed $seed stalled on turn ${state.turnNumber}", state.gameOver || state.turnNumber >= 8)
+            assertTrue("seed $seed must finish the AI mirror game; turn=${state.turnNumber}, actions=$actions", state.gameOver)
         }
     }
 }
