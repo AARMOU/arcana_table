@@ -91,6 +91,23 @@ class WeeklyWorkflowSafety(unittest.TestCase):
         self.assertIn("outside the upgrade scope", run)
         self.assertNotIn(".github", run.split("allowed =")[1].split(")")[0])
 
+    def test_every_blocked_upgrade_is_reported(self):
+        # A conflict or a failed engine build must reach publish (issue) on live runs and fail dry runs,
+        # never stop silently.
+        for status in ("rebased", "conflict", "build_failed"):
+            self.assertIn(status, self.publish["if"])
+        report = next(s for s in self.publish["steps"] if s.get("name") == "Report a blocked upgrade")
+        self.assertIn("build_failed", report["if"])
+        self.assertIn("conflict", report["if"])
+        final = next(s for s in self.validate["steps"] if s.get("id") == "final")
+        self.assertIn("build_failed", final["run"])
+        build = next(s for s in self.validate["steps"] if s.get("id") == "build")
+        self.assertTrue(build.get("continue-on-error"))
+        dry = next(s for s in self.validate["steps"] if s.get("name") == "Fail the dry run when the upgrade is blocked")
+        self.assertIn("build_failed", dry["if"])
+        self.assertIn("conflict", dry["if"])
+        self.assertEqual(self.validate["outputs"]["status"], "${{ steps.final.outputs.status }}")
+
     def test_only_publish_pushes(self):
         pushers = [(job, s.get("name")) for job, spec in self.jobs.items() for s in spec["steps"]
                    if re.search(r"\bgit\s+push\b", s.get("run", ""))]
