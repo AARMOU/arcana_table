@@ -28,10 +28,14 @@ jobs:
           ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
           path: argentum-engine
           persist-credentials: false
-      - name: Enforce pinned source and apply exact LKI source patch
+      - name: Enforce pinned source and apply all mandatory Arcana engine patches before Azlask
         run: |
           set -euo pipefail
           test "$(git -C argentum-engine rev-parse HEAD)" = 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          # Baseline Arcana fixes are REQUIRED for copy-trigger/legend-rule behavior.
+          # This is the exact same ordered mandatory series used by the integrated upgrade audit,
+          # including selected forward ports. The audit refuses missing or conflicting patches.
+          python3 engine-upgrade/audit_patches.py
           file="$GITHUB_WORKSPACE/engine-upgrade/azlask/patches/0001-exactly-colors-death-lki.patch"
           git -C argentum-engine apply --check "$file"
           git -C argentum-engine apply "$file"
