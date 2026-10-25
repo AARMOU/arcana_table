@@ -95,7 +95,7 @@ jobs:
       - name: Finish local merged source and integrate exact development head
         shell: bash
         env:
-          DEV_SHA: a7961ea55314610ecdf02f164570f215f81278ac
+          DEV_SHA: a4daa4769772bd71caaf4fb98b9050233287c52e
         run: |
           set -euo pipefail
           git add -u
@@ -134,17 +134,17 @@ jobs:
       - name: Stage reviewed DeckSupport keyword test fix from exact isolated SHA
         shell: bash
         env:
-          DEV_SHA: a7961ea55314610ecdf02f164570f215f81278ac
+          FIX_BASE_SHA: a7961ea55314610ecdf02f164570f215f81278ac
           TEST_FIX_SHA: 6cf456733fd2c870d4db6888caa067399336f357
         run: |
           set -euo pipefail
           path=android/app/src/test/java/com/arcanatable/DeckSupportTest.kt
           git fetch --no-tags origin "$TEST_FIX_SHA"
           test "$(git rev-parse FETCH_HEAD)" = "$TEST_FIX_SHA"
-          git merge-base --is-ancestor "$DEV_SHA" "$TEST_FIX_SHA"
+          git merge-base --is-ancestor "$FIX_BASE_SHA" "$TEST_FIX_SHA"
           # The isolated PR #233 is exactly one test-file change, never a hidden
           # engine/asset change or a skip/disable of the failing regression.
-          test "$(git diff --name-only "$DEV_SHA" "$TEST_FIX_SHA")" = "$path"
+          test "$(git diff --name-only "$FIX_BASE_SHA" "$TEST_FIX_SHA")" = "$path"
           test "$(git hash-object "$path")" = 9612b26f56c80d2e3e9e212c44c49d1e7c5db8ed
           git show "$TEST_FIX_SHA:$path" > /tmp/DeckSupportTest.kt
           test "$(git hash-object /tmp/DeckSupportTest.kt)" = cde361d1cb366733888ab985766f53cd73a365f5
@@ -153,6 +153,12 @@ jobs:
           grep -F 'every probed card must remain in the shipped library' "$path"
           git diff --check -- "$path"
           echo "DeckSupportTest upstream migration fix PR #233: $TEST_FIX_SHA" > combined-evidence/decksupport-regression-fix.txt
+      - name: Verify Android regex guard on the exact merged app source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/tests -p 'test_android_regex.py'
+          python3 tools/check_android_regex.py
       - name: Fetch and verify green upgraded-engine candidate evidence
         shell: bash
         env:
@@ -431,6 +437,22 @@ jobs:
           assert len(cards) == len(names) and set(cards) == set(names)
           print('PASS: bundled custom-card index/JSONL agree and include Temple and Crossroads')
           PY
+      - name: Label isolated debug preview as Build 132
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('android/app/build.gradle.kts')
+          text = p.read_text()
+          old_code = 'versionCode = 131'
+          old_name = 'versionName = "0.33.9-build131-argentum-upgrade"'
+          assert text.count(old_code) == 1 and text.count(old_name) == 1
+          text = text.replace(old_code, 'versionCode = 132', 1)
+          text = text.replace(old_name, 'versionName = "0.33.10-build132-argentum-eldrazi93-regex"', 1)
+          p.write_text(text)
+          print('PASS: isolated debug Build 132 identity, production untouched')
+          PY
       - name: Run full Android app unit tests and strict Eldrazi Commander AI tests
         working-directory: android
         shell: bash
@@ -480,9 +502,13 @@ jobs:
         run: |
           set -euo pipefail
           test -s android/app/build/outputs/apk/debug/app-debug.apk
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/package-info.txt
+          grep -F "package: name='com.arcanatable.argentum' versionCode='132' versionName='0.33.10-build132-argentum-eldrazi93-regex'" combined-evidence/package-info.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/signing-info.txt
           sha256sum android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/apk.sha256
           git rev-parse HEAD > combined-evidence/local-arcana-head.txt
-          echo 'Current development: a7961ea55314610ecdf02f164570f215f81278ac' > combined-evidence/source-provenance.txt
+          echo 'Current development source (PR #234): a4daa4769772bd71caaf4fb98b9050233287c52e' > combined-evidence/source-provenance.txt
+          echo 'DeckSupportTest fix (PR #233): 6cf456733fd2c870d4db6888caa067399336f357' >> combined-evidence/source-provenance.txt
           echo 'Argentum upstream: c38f145359c342a04f951b7ba48f741bcb1627ac' >> combined-evidence/source-provenance.txt
           echo 'Eldrazi 93-slot: 7e6fc1aa8d6ccca30a6fab7fdebc7e08199efbb3' >> combined-evidence/source-provenance.txt
           cat combined-evidence/apk.sha256
