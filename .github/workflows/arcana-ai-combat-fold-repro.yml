@@ -1,0 +1,71 @@
+name: Argentum Combat Damage Fold — Known Crash Reproducer
+
+# Dedicated engine investigation lane. "Success" means the known crash was reproduced, NOT fixed.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/arcana-ai-combat-fold-repro.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  reproduce-pinned-engine-crash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      ARCANA_AI_BENCHMARK: '1'
+      ARCANA_AI_GAME_MODE: '4'
+      ARCANA_AI_GAMES_PER_MODE: '2'
+      ARCANA_AI_PAIR_START: '81'
+      ARCANA_AI_MAX_ACTIONS: '6000'
+      ARCANA_AI_MAX_GAME_MS: '45000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Replay seed 8079, pair 81, four-player first swap with existing engine
+        id: benchmark
+        continue-on-error: true
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.AiStrengthBenchmarkTest'
+      - name: Require exact engine exception, not a generic test failure
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          path=Path('android/app/build/test-results/testDebugUnitTest/TEST-com.arcanatable.AiStrengthBenchmarkTest.xml')
+          if not path.is_file():
+              raise SystemExit('No JUnit XML; reproduction inconclusive')
+          root=ET.parse(path).getroot()
+          cases=[c for c in root.iter('testcase') if c.attrib.get('name')=='runOnlyWhenExplicitlyRequested']
+          if len(cases)!=1: raise SystemExit('Missing targeted benchmark test')
+          failures=cases[0].findall('failure')
+          if len(failures)!=1:
+              raise SystemExit('Expected exactly one benchmark failure; did not reproduce known engine exception')
+          stack=(failures[0].text or '') + str(failures[0].attrib)
+          if 'java.lang.IndexOutOfBoundsException' not in stack or 'TriggerDetector.foldSimultaneousDamage' not in stack:
+              raise SystemExit('Different failure: '+stack[:3500])
+          output=root.findtext('system-out') or ''
+          if '[ai-benchmark]' in output:
+              print('Benchmark progress before the crash:')
+              for line in output.splitlines():
+                  if line.startswith('[ai-benchmark]'): print(line)
+          print('REPRODUCED: known engine defect at TriggerDetector.foldSimultaneousDamage')
+          print('This check confirms a defect; it is not a passing engine rules test.')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arcana-ai-combat-fold-crash-reproduction
+          retention-days: 14
+          path: |
+            android/app/build/test-results/testDebugUnitTest/
+            android/app/build/reports/tests/testDebugUnitTest/
