@@ -4,7 +4,7 @@ name: Argentum Eldrazi source compatibility
 # No jar publication, branch mutation, APK signing or deploy.
 on:
   push:
-    branches: [gpt/argentum-eldrazi-join-preflight-20261025, gpt/argentum-eldrazi-fullhistory-3way-20261025, gpt/argentum-eldrazi-conflict-report-20261025]
+    branches: [gpt/argentum-eldrazi-join-preflight-20261025, gpt/argentum-eldrazi-fullhistory-3way-20261025, gpt/argentum-eldrazi-conflict-report-20261025, gpt/argentum-stackcopy-0011-source-port-20261025]
     paths: [.github/workflows/argentum-eldrazi-source-compat.yml]
 permissions:
   contents: read
@@ -156,16 +156,79 @@ jobs:
                       f.write('THREEWAY ' + str(patch) + ' exit=' + str(actual.returncode)
                               + '\n' + actual.stdout + actual.stderr)
                   if actual.returncode:
-                      # On this throwaway runner only: write .rej hunks to aid an exact port.
-                      # This still returns a failure. Never ship partial patch application.
+                      # Source port only for the known, reviewed 0011 conflict. Every
+                      # other patch remains fail-closed; never silently drop any hunk.
+                      if patch.name != '0011-stack-object-copying.patch':
+                          print('BLOCKED:', patch, check.stderr, actual.stdout, actual.stderr,
+                                file=sys.stderr)
+                          sys.exit(1)
                       reject = subprocess.run(base + ['--reject', str(patch.resolve())],
                                               capture_output=True, text=True)
                       with report.open('a') as f:
                           f.write('REJECT_DIAGNOSTIC ' + str(patch) + ' exit='
                                   + str(reject.returncode) + '\n' + reject.stdout + reject.stderr)
-                      print('BLOCKED:', patch, check.stderr, actual.stdout, actual.stderr,
-                            file=sys.stderr)
-                      sys.exit(1)
+                      root = engine / 'rules-engine/src/main/kotlin/com/wingedsheep/engine'
+                      refs = root / 'handlers/continuations/ObjectReferencePropagation.kt'
+                      placement = root / 'mechanics/stack/StackPlacement.kt'
+                      obsolete = root / 'handlers/effects/stack/CopyEachTargetSpellExecutor.kt'
+                      generic = root / 'handlers/effects/stack/CopyStackObjectsExecutor.kt'
+                      expected = {str(refs) + '.rej', str(placement) + '.rej'}
+                      rejected = {str(p) for p in engine.rglob('*.rej')}
+                      assert rejected == expected, ('unexpected source rejects', rejected, expected)
+                      assert obsolete.is_file() and generic.is_file()
+                      # The upstream spell-copy executor gained keyword-action replacement
+                      # counts. New CopyStackObjectsExecutor delegates each individual
+                      # spell copy to CopyTargetSpellEffect, whose upstream executor already
+                      # applies KeywordActionAmountModifier.copySpell. Keep that behavior.
+                      original = obsolete.read_text()
+                      assert 'KeywordActionAmountModifier.copySpell' in original
+                      assert 'CopyTargetSpellEffect' in generic.read_text()
+                      def one(path, needle, replacement):
+                          data = path.read_text()
+                          assert data.count(needle) == 1, (path, needle, data.count(needle))
+                          path.write_text(data.replace(needle, replacement, 1))
+                      one(refs,
+                          '    is TriggerDamageDistributionContinuation -> objectReferences\n',
+                          '    is TriggerDamageDistributionContinuation -> objectReferences\n'
+                          '    is CopyStackObjectsOrderContinuation -> effectContext.objectReferences\n')
+                      one(refs,
+                          '    is TriggerDamageDistributionContinuation -> copy(objectReferences = refs)\n',
+                          '    is TriggerDamageDistributionContinuation -> copy(objectReferences = refs)\n'
+                          '    is CopyStackObjectsOrderContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))\n')
+                      one(placement,
+                          '        triggerCause: AbilityTriggerCause? = null\n    ): ExecutionResult {',
+                          '        triggerCause: AbilityTriggerCause? = null,\n'
+                          '        emitTriggerEvent: Boolean = true\n    ): ExecutionResult {')
+                      old_events = '''        val events = mutableListOf<GameEvent>(
+            AbilityTriggeredEvent(
+                ability.sourceId,
+                sourceDisplayName,
+                ability.controllerId,
+                ability.description,
+                abilityEntityId = abilityId,
+                triggerCause = triggerCause
+            )
+        )'''
+                      new_events = '''        val events = mutableListOf<GameEvent>()
+        if (emitTriggerEvent) events.add(
+            AbilityTriggeredEvent(
+                ability.sourceId,
+                sourceDisplayName,
+                ability.controllerId,
+                ability.description,
+                abilityEntityId = abilityId,
+                triggerCause = triggerCause
+            )
+        )'''
+                      one(placement, old_events, new_events)
+                      obsolete.unlink()
+                      for f in expected: Path(f).unlink()
+                      assert not list(engine.rglob('*.rej')), 'No rejected patch hunks may remain'
+                      with report.open('a') as f:
+                          f.write('MANUAL_PORT 0011: modern triggerCause and StackPlacement events, '
+                                  'preserve Twinning Staff via CopyTargetSpellEffect; no rejects\n')
+                      print('PORTED 0011 stack copying against upgraded upstream, testing next patch')
+                      continue
                   continue
               actual = subprocess.run(base + [str(patch.resolve())], capture_output=True, text=True)
               assert actual.returncode == 0, (patch, actual.stderr)
