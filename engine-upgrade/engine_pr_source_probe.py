@@ -118,8 +118,19 @@ def stage_pr_patch_data(api: Api, row: dict, target: Path, repo: str) -> list[st
         if not isinstance(data, dict):
             raise ValueError("Untrusted rebase-rules JSON is not an object")
         (target / "engine-upgrade/rebase-rules.json").write_text(config)
+    extras = []
     for file in api.pages(f"/repos/{repo}/pulls/{row['pr']}/files"):
         path = file["filename"]
+        if EXTRA_PATCH.fullmatch(path) and file.get("status") != "removed":
+            if ".." in Path(path).parts:
+                raise ValueError("Unsafe external patch path")
+            data = head_file(api, head_repo, head_sha, path)
+            if data is None:
+                raise ValueError("Missing external patch blob: " + path)
+            dest = target / path
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(data)
+            extras.append(path)
         if not path.startswith("engine-upgrade/rerere/") or file.get("status") == "removed":
             continue
         if not re.fullmatch(r"engine-upgrade/rerere/[0-9a-f]{40}/(preimage|postimage|thisimage)", path):
@@ -130,7 +141,7 @@ def stage_pr_patch_data(api: Api, row: dict, target: Path, repo: str) -> list[st
         dst = target / path
         dst.parent.mkdir(parents=True, exist_ok=True)
         dst.write_text(entry)
-    return mandatory
+    return mandatory, sorted(extras, key=lambda p: (0 if 'eldrazi-temple/' in p else 1 if 'eldrazi-combined/' in p else 2, p))
 
 
 def source_rebase(api: Api, row: dict, repo: str, upstream: str) -> dict:
@@ -144,8 +155,9 @@ def source_rebase(api: Api, row: dict, repo: str, upstream: str) -> dict:
         shutil.copytree(ROOT / "engine-upgrade", source / "engine-upgrade",
                         ignore=shutil.ignore_patterns("weekly", "__pycache__", "*.pyc"))
         shutil.copytree(ROOT / "argentum-patches", source / "argentum-patches")
-        mandatory = stage_pr_patch_data(api, row, source, repo)
+        mandatory, extras = stage_pr_patch_data(api, row, source, repo)
         result["mandatory"] = mandatory
+        result["extra_patches"] = extras
         engine = base / "argentum-engine"
         clone = command(["git", "clone", "--quiet", "--filter=blob:none",
                          ENGINE_REPO, str(engine)], cwd=base)
@@ -174,6 +186,22 @@ def source_rebase(api: Api, row: dict, repo: str, upstream: str) -> dict:
         if response.returncode not in (0, 2) or result["status"] not in ("rebased", "conflict"):
             result["status"] = "probe_failed"
         result["diagnostic"] = (response.stdout + "\n" + response.stderr)[-2600:]
+        if result["status"] == "rebased":
+            for external in extras:
+                patch = source / external
+                check = command(["git", "-C", str(engine), "apply", "--check",
+                                 str(patch)], cwd=source, timeout=45)
+                if check.returncode:
+                    result["status"] = "conflict"
+                    result["conflicts"].append({"patch": external, "file": "source patch applicability"})
+                    result["diagnostic"] += "\n" + (check.stderr + check.stdout)[-1400:]
+                    break
+                apply = command(["git", "-C", str(engine), "apply", str(patch)], cwd=source,
+                                timeout=45)
+                if apply.returncode:
+                    result["status"] = "probe_failed"
+                    result["diagnostic"] += "\n" + (apply.stderr + apply.stdout)[-1400:]
+                    break
         # This is only source rebase verification, never evidence of a successful JAR build.
     return result
 
