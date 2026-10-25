@@ -125,7 +125,9 @@ class UginCostReductionDevoidScenarioTest {
 
         // Two Ugins controlled by different players are legal. Only the Ugin
         // controlled by the player casting the spell may reduce its cost.
-        d.putPermanentOnBattlefield(opponent, "Ugin, the Ineffable")
+        val opposingUgin = d.putPermanentOnBattlefield(opponent, "Ugin, the Ineffable")
+        assertEquals("Opponent Ugin must exist before any spell is cast",
+            opposingUgin, d.findPermanent(opponent, "Ugin, the Ineffable"))
         val spell = d.putCardInHand(p, probe.name)
         d.giveColorlessMana(p, 1)
 
@@ -135,13 +137,21 @@ class UginCostReductionDevoidScenarioTest {
         assertEquals("Failed payment cannot consume the one available mana",
             1, d.poolColorless())
 
-        d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        val ownUgin = d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        assertEquals("Our Ugin must exist after setup", ownUgin,
+            d.findPermanent(p, "Ugin, the Ineffable"))
+        assertEquals("The legend rule is controller-scoped; opponent Ugin must survive setup",
+            opposingUgin, d.findPermanent(opponent, "Ugin, the Ineffable"))
         assertNull("Our own Ugin now reduces the same {3} spell to exactly {1}",
             d.castSpell(p, spell).error)
         assertEquals("Opponent's Ugin must not stack an extra reduction",
             0, d.poolColorless())
+        assertEquals("Opponent Ugin must survive the cast before resolution",
+            opposingUgin, d.findPermanent(opponent, "Ugin, the Ineffable"))
         d.resolveAll()
         assertNotNull(d.findPermanent(p, probe.name))
+        assertEquals("An unrelated artifact resolving must not remove opponent Ugin",
+            opposingUgin, d.findPermanent(opponent, "Ugin, the Ineffable"))
         assertEquals(1, d.permanentsNamed(opponent, "Ugin, the Ineffable").size)
     }
 }
