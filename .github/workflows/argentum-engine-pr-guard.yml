@@ -19,6 +19,10 @@ on:
       - '.github/workflows/argentum-engine-pr-guard.yml'
       - 'engine-upgrade/engine_pr_guard.py'
       - 'engine-upgrade/tests/test_engine_pr_guard.py'
+      - 'engine-upgrade/tests/test_weekly_handoff.py'
+      - 'engine-upgrade/weekly.py'
+      - 'AGENTS.md'
+      - 'engine-upgrade/HANDOFF.md'
 permissions:
   contents: read
   pull-requests: read
@@ -37,7 +41,9 @@ jobs:
           ref: ${{ github.event_name == 'pull_request_target' && 'gpt/arcana-integration-next' || github.ref }}
           persist-credentials: false
       - name: Guard self-tests
-        run: python3 -m unittest discover -s engine-upgrade/tests -p test_engine_pr_guard.py -v
+        run: |
+          python3 -m unittest discover -s engine-upgrade/tests -p test_engine_pr_guard.py -v
+          python3 -m unittest discover -s engine-upgrade/tests -p test_weekly_handoff.py -v
       - name: Audit current upstream and all open engine PRs (or this exact PR)
         env:
           GITHUB_TOKEN: ${{ github.token }}
