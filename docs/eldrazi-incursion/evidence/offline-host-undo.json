@@ -1,5 +1,5 @@
 {
-  "scope": "Real LocalArgentumHost, engine, AI, assets, and unchanged app test class in standalone JVM harness; no host/engine mocks. Android framework jar is present for compiling OfflineCheckpointStore; persistence methods are not exercised by these three tests. Normal Android CI remains required.",
+  "scope": "Real LocalArgentumHost, engine, AI, assets, and repository app test class in standalone JVM harness; no host/engine mocks. Android framework jar is present for compiling OfflineCheckpointStore; persistence methods are not exercised by these three tests. Normal Android CI remains required.",
   "runtime": "Committed B131 jars unchanged",
   "tests": 3,
   "failures": 0,

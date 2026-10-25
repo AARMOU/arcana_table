@@ -1,13 +1,13 @@
 {
   "deck": "Eldrazi Incursion",
   "originalSlots": 100,
-  "sourceBase": "1f0c97ab310aba179abf1a94128a3da29f3fa089",
+  "sourceBase": "3db55b8dcb723a13ac4037ac1a6d7f18d0c0b2d0",
   "scope": "Original 100-slot manifest. Category 1 requires a nonempty registered definition, reviewed card-specific positive and negative acceptance coverage, and green observed JUnit on the candidate runtime. This is not exhaustive certification of every possible interaction. Upstream indexed definitions without current card-specific acceptance evidence stay in category 2.",
   "pickerAssetMatchesOriginalManifest": true,
   "indexedSlots": 91,
   "categorySlots": {
-    "1": 30,
-    "2": 60,
+    "1": 32,
+    "2": 58,
     "3": 0,
     "4": 2,
     "5": 8
@@ -28,7 +28,7 @@
     "android/app/src/main/assets/argentum/por-cards.jsonl": "0b366901f2485c779d482fa19805d68e180c62459db77ee1c5d253a132140fe0"
   },
   "junitTotals": {
-    "tests": 603,
+    "tests": 612,
     "failures": 0,
     "errors": 0,
     "skipped": 0
@@ -735,17 +735,17 @@
       "source": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RuinsOfOranRief.kt",
       "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RuinsOfOranRiefScenarioTest.kt",
       "junit": {
-        "tests": 1,
+        "tests": 5,
         "failures": 0,
         "errors": 0,
         "skipped": 0
       },
       "definitionHasBehavior": true,
-      "category": 2,
-      "classification": "Implemented but missing acceptance tests/evidence",
-      "reason": "Single scenario; need controlled/colorless/entered-this-turn negative coverage and actual mana mode checks.",
+      "category": 1,
+      "classification": "Fully implemented and tested (reviewed acceptance scope)",
+      "reason": "Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions.",
       "sourceSha256": "d29272c50cd83d3580092d78ad9a21a55ccf9b9dd7228136f1964cb84e7f133c",
-      "testSha256": "a346e423cc4d9b4d47b07926bb63c72a4bff9d9c61c0b0eadb0f7e1d6520e6d1"
+      "testSha256": "8ae28957ca30b13fa9f670bdde2ea67d71752aaf6a2e2f01839df8955f1c6731"
     },
     {
       "name": "Sifter of Skulls",
@@ -755,17 +755,17 @@
       "source": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SifterOfSkulls.kt",
       "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SifterOfSkullsScenarioTest.kt",
       "junit": {
-        "tests": 1,
+        "tests": 6,
         "failures": 0,
         "errors": 0,
         "skipped": 0
       },
       "definitionHasBehavior": true,
-      "category": 2,
-      "classification": "Implemented but missing acceptance tests/evidence",
-      "reason": "Single positive death/token scenario; self/opponent/token-death negatives need direct acceptance coverage.",
+      "category": 1,
+      "classification": "Fully implemented and tested (reviewed acceptance scope)",
+      "reason": "Registered nonempty definition; reviewed positive/negative card-specific scenarios executed green. Scope is the assertions in the linked suite, not all possible interactions.",
       "sourceSha256": "4d6ce39db64f0aa51fca08eb55bae79ef5bc56eea7743fdd14518ea3e5f02077",
-      "testSha256": "d4dc820bdeafea94347d24be83975f7f1e8f110d60cbdf3f742fe4ddbddb86e7"
+      "testSha256": "7525ff68aba1374ab71602c6e721c6645a7fa3a0a75fbf1a4d4078466611a097"
     },
     {
       "name": "Endbringer",
