@@ -10,7 +10,6 @@ import com.wingedsheep.sdk.scripting.filters.unified.TargetFilter
  * Eldrazi Confluence — M3C #32. Choose three, repeats allowed (Cosmium Confluence's shape).
  * The blink mode reuses Eldrazi Displacer's exile-then-return-tapped sequence (owner's control).
  */
-// CARDKIT-SCAFFOLD — unregistered: implemented by Claude, awaiting CI scenario evidence before registration.
 val EldraziConfluence = card("Eldrazi Confluence") {
     manaCost = "{2}{C}{C}"
     colorIdentity = ""

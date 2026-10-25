@@ -6,14 +6,10 @@ import com.wingedsheep.sdk.model.Rarity
 import com.wingedsheep.sdk.scripting.filters.unified.TargetFilter
 import com.wingedsheep.sdk.scripting.targets.EffectTarget
 
-/** Upper bound for "any number of target creatures"; far above any real board. */
-private const val ANY_NUMBER = 99
-
 /**
  * Inversion Behemoth — M3C #34. Your-turn beginning-of-combat trigger with any number (including
  * zero) of creature targets, any controller, each switched independently until end of turn.
  */
-// CARDKIT-SCAFFOLD — unregistered: implemented by Claude, awaiting CI scenario evidence before registration.
 val InversionBehemoth = card("Inversion Behemoth") {
     manaCost = "{2}{C}{C}"
     colorIdentity = ""
@@ -24,7 +20,7 @@ val InversionBehemoth = card("Inversion Behemoth") {
 
     triggeredAbility {
         trigger = Triggers.you.beginningOf(Step.BEGIN_COMBAT)
-        targets(TargetFilter.Creature, count = ANY_NUMBER, minCount = 0)
+        targets(TargetFilter.Creature, unlimited = true)
         effect = Effects.ForEachTarget(Effects.SwitchPowerToughness(EffectTarget.ContextTarget(0)))
     }
 

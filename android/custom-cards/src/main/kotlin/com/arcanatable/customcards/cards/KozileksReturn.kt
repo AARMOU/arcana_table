@@ -18,7 +18,6 @@ private fun damageEachCreature(amount: Int) = Effects.ForEachInGroup(
  * The graveyard trigger follows Ugin's Binding: it only exists in the graveyard, re-checks that the
  * card is still there on resolution, and the 5 damage happens only if the exile actually happened.
  */
-// CARDKIT-SCAFFOLD — unregistered: implemented by Claude, awaiting CI scenario evidence before registration.
 val KozileksReturn = card("Kozilek's Return") {
     manaCost = "{2}{R}"
     colorIdentity = "R"

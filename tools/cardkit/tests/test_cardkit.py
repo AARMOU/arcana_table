@@ -44,7 +44,7 @@ FAKE_REVEAL = {"name": "Cardkit Test Harbor", "type_line": "Land", "color_identi
                               "this land enters tapped.\n{T}: Add {W} or {U}.", "layout": "normal"}
 FAKE_VARIANT = {"name": "Cardkit Test Monument", "mana_cost": "{5}", "type_line": "Artifact", "color_identity": [],
                 "keywords": [], "layout": "normal",
-                "oracle_text": "Whenever you tap a permanent for {C}, add an additional {C}."}
+                "oracle_text": "Whenever you tap a creature for {C}, add an additional {C}."}
 FAKES = {repo.normalize_name(c["name"]): c for c in (FAKE_SUPPORTED, FAKE_GAP, FAKE_UNKNOWN_KW, FAKE_INFECT, FAKE_COMBO,
                                                      FAKE_REVEAL, FAKE_VARIANT)}
 
@@ -214,7 +214,7 @@ class ReadinessTests(unittest.TestCase):
         v = readiness.classify("Cardkit Test Monument")
         self.assertEqual(v["readiness"], "NEEDS_REVIEW", v["reasons"])
         self.assertEqual(v["reviewHint"], "near-variant")
-        self.assertIn("permanent", " ".join(v["reasons"]))
+        self.assertIn("creature", " ".join(v["reasons"]))
 
     def test_verified_support_and_blockers_never_overlap(self):
         blocked = {repo.normalize_name(k) for k in readiness.blockers()["cards"]}
