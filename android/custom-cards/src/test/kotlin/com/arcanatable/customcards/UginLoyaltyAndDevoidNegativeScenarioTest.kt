@@ -68,4 +68,76 @@ class UginLoyaltyAndDevoidNegativeScenarioTest {
         assertEquals(loyaltyBefore, d.state.getEntity(ugin)!!
             .get<CountersComponent>()!!.getCount(CounterType.LOYALTY))
     }
+    @Test fun minusThreeResolvesButDoesNotDestroyIndestructibleColoredCreature() {
+        val d = customScenario(UginTheIneffable)
+        val p = d.player1
+        val fixture = com.wingedsheep.sdk.dsl.card("Ugin Indestructible Green Probe") {
+            manaCost = "{G}"
+            colorIdentity = "G"
+            typeLine = "Creature — Beast"
+            power = 2
+            toughness = 2
+            keywords(com.wingedsheep.sdk.core.Keyword.INDESTRUCTIBLE)
+        }
+        d.registerCard(fixture)
+
+        val card = d.putCardInHand(p, "Ugin, the Ineffable")
+        d.giveColorlessMana(p, 6)
+        assertNull(d.castSpell(p, card).error)
+        d.resolveAll()
+        val ugin = d.permanentsNamed(p, "Ugin, the Ineffable").single()
+        val target = d.putCreatureOnBattlefield(d.player2, fixture.name)
+        val ability = d.cardRegistry.requireCard("Ugin, the Ineffable").script.activatedAbilities[1]
+
+        assertEquals(p, d.priorityPlayer)
+        assertNull("Colored indestructible permanent is a legal target",
+            d.submit(ActivateAbility(p, ugin, ability.id,
+                targets = listOf(ChosenTarget.Permanent(target)))).error)
+        d.resolveAll()
+        assertEquals("Ugin must pay the -3 loyalty cost even if destruction is prevented", 1,
+            d.state.getEntity(ugin)!!.get<CountersComponent>()!!.getCount(CounterType.LOYALTY))
+        assertEquals("Indestructible prevents destruction, not targeting",
+            listOf(target), d.permanentsNamed(d.player2, fixture.name))
+        assertFalse(d.getGraveyardCardNames(d.player2).contains(fixture.name))
+    }
+
+    @Test fun minusThreeRejectsOpposingHexproofButCanTargetOwnHexproofColoredCreature() {
+        val d = customScenario(UginTheIneffable)
+        val p = d.player1
+        val fixture = com.wingedsheep.sdk.dsl.card("Ugin Hexproof Green Probe") {
+            manaCost = "{G}"
+            colorIdentity = "G"
+            typeLine = "Creature — Beast"
+            power = 2
+            toughness = 2
+            keywords(com.wingedsheep.sdk.core.Keyword.HEXPROOF)
+        }
+        d.registerCard(fixture)
+
+        val card = d.putCardInHand(p, "Ugin, the Ineffable")
+        d.giveColorlessMana(p, 6)
+        assertNull(d.castSpell(p, card).error)
+        d.resolveAll()
+        val ugin = d.permanentsNamed(p, "Ugin, the Ineffable").single()
+        val opponentTarget = d.putCreatureOnBattlefield(d.player2, fixture.name)
+        val ownTarget = d.putCreatureOnBattlefield(p, fixture.name)
+        val ability = d.cardRegistry.requireCard("Ugin, the Ineffable").script.activatedAbilities[1]
+
+        assertEquals(p, d.priorityPlayer)
+        assertNotNull("Opponent's hexproof creature must not be targetable",
+            d.submit(ActivateAbility(p, ugin, ability.id,
+                targets = listOf(ChosenTarget.Permanent(opponentTarget)))).error)
+        assertEquals(4, d.state.getEntity(ugin)!!
+            .get<CountersComponent>()!!.getCount(CounterType.LOYALTY))
+        assertEquals(p, d.priorityPlayer)
+        assertNull("Your own hexproof creature remains a legal colored target",
+            d.submit(ActivateAbility(p, ugin, ability.id,
+                targets = listOf(ChosenTarget.Permanent(ownTarget)))).error)
+        d.resolveAll()
+        assertEquals(1, d.state.getEntity(ugin)!!
+            .get<CountersComponent>()!!.getCount(CounterType.LOYALTY))
+        assertTrue(d.permanentsNamed(p, fixture.name).isEmpty())
+        assertEquals(listOf(opponentTarget), d.permanentsNamed(d.player2, fixture.name))
+    }
+
 }
