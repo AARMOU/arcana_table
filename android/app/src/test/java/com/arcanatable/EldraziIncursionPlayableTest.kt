@@ -44,12 +44,12 @@ class EldraziIncursionPlayableTest {
         assertTrue("Full committed all-cards index must load; never silently skip this regression", lib.isFullLibrary)
         assertEquals(100, names.size)
         assertEquals("Ulalek, Fused Atrocity", commander)
-        val playable = names.filter { lib.canonical(it) != null }
+        val indexed = names.filter { lib.canonical(it) != null }
         val missing = names.filter { lib.canonical(it) == null }
         assertEquals(expectedMissing, missing.toSet())
         assertEquals("one copy each", missing.size, missing.toSet().size)
-        assertTrue("playable slots ${playable.size}", playable.size >= 90)
-        assertEquals(90, playable.size)
+        assertTrue("indexed original slots ${indexed.size}", indexed.size >= 90)
+        assertEquals(90, indexed.size)
     }
 
     @Test fun newlyImplementedCardsLoadIntoTheOfflineGame() {
