@@ -194,6 +194,7 @@ class PsychomancerScenarioTest {
         val artifactSpell = d.putCardInHand(p, ARTIFACT_SPELL)
         assertNull(d.castSpell(p, artifactSpell).error)
         val spellOnStack = d.getTopOfStack()!!
+        assertNull(d.passPriority(p).error)
         val counter = d.putCardInHand(opponent, COUNTER_SPELL)
         assertNull(
             d.castSpellWithTargets(
