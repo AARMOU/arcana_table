@@ -237,6 +237,19 @@ jobs:
               out.write(f"green={'true' if green else 'false'}\n")
           with open(env['GITHUB_STEP_SUMMARY'], 'a') as out:
               out.write(f"## {title}\n\n" + '\n'.join(body) + '\n')
+          # The headline also as annotations, readable from the run page and the checks API.
+          clean = lambda x: str(x).replace('%', '%25').replace('\r', '').replace('\n', ' ')[:900]
+          print(f"::notice title=Weekly upgrade::{clean(title)}")
+          if env['REBASE'] == 'rebased':
+              print("::notice title=Checks::" + clean('; '.join(f"{k}: {'pass' if v else 'FAIL'}" for k, v in checks.items())))
+              for name in t['failed'][:8]:
+                  print(f"::error title=Failing test::{clean(name)}")
+              cards = json.loads((w / 'cards.json').read_text())
+              if cards.get('collisions'):
+                  print("::warning title=Custom-card collisions (decision required)::" + clean(', '.join(cards['collisions'])))
+              for d in cards.get('precons', []):
+                  if d['newly_missing']:
+                      print(f"::warning title=Precon slots lost ({clean(d['name'])})::" + clean(', '.join(d['newly_missing'])))
           PY
       - name: Package the candidate (local only, nothing pushed)
         id: candidate
