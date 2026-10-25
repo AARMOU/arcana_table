@@ -150,6 +150,19 @@ class UginTheIneffableScenarioTest {
         assertFalse(secondExile in d.getHand(p))
         assertEquals(listOf(secondExile), d.state.getEntity(secondSpirit)!!
             .get<LinkedExileComponent>()?.exiledIds)
+
+        // Resolve a separate leave event for the surviving token. Returning
+        // the first card must not consume or overwrite the second token's link.
+        val secondRemoval = d.putCardInHand(p, removal.name)
+        assertNull(d.castSpell(p, secondRemoval, listOf(secondSpirit)).error)
+        d.resolveAll()
+
+        assertTrue("Both Spirit tokens must have left", d.permanentsNamed(p, "Spirit").isEmpty())
+        assertTrue("Each face-down exile must have been consumed once", d.getExile(p).isEmpty())
+        assertEquals("First token must return only its card once",
+            1, d.getHand(p).count { it == firstExile })
+        assertEquals("Second token must independently return its card once",
+            1, d.getHand(p).count { it == secondExile })
     }
 
 
