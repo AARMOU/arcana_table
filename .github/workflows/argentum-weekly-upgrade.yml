@@ -12,6 +12,10 @@ name: Weekly Argentum upgrade
 on:
   schedule:
     - cron: '17 9 * * 1'   # Mondays 09:17 UTC = 03:17 Denver in summer (MDT), 02:17 in winter (MST)
+    # Backups: GitHub sometimes drops a scheduled run (2026-10-26). A later run that finds the upgrade
+    # already merged stops at "up to date"; one that finds it still open refreshes the same PR.
+    - cron: '47 14 * * 1'  # Mondays 14:47 UTC
+    - cron: '47 14 * * 2'  # Tuesdays 14:47 UTC
   workflow_dispatch:
     inputs:
       target:
@@ -73,7 +77,7 @@ jobs:
           python3 -m pip install --quiet pyyaml
           set +e
           python3 -m unittest -v engine-upgrade/tests/test_weekly_workflow.py engine-upgrade/tests/test_candidate_scope.py \
-            engine-upgrade/tests/test_weekly_docs.py engine-upgrade/tests/test_weekly_handoff.py 2>&1 | tee "$RUNNER_TEMP/safety.log"
+            engine-upgrade/tests/test_weekly_docs.py engine-upgrade/tests/test_weekly_handoff.py engine-upgrade/tests/test_weekly_reconcile.py 2>&1 | tee "$RUNNER_TEMP/safety.log"
           code=${PIPESTATUS[0]}
           if [ "$code" -ne 0 ]; then  # failing tests as annotations, readable without the log
             grep -E '^(FAIL|ERROR):|Error:|^AssertionError' "$RUNNER_TEMP/safety.log" | head -12 \
@@ -199,12 +203,13 @@ jobs:
       - name: Android SDK
         if: steps.final.outputs.status == 'rebased'
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-      - name: Custom cards on the new engine (compile, export, scenario tests, strict collision test)
+      - name: Custom cards on the new engine (compile, export, scenario tests; collisions reconciled)
         id: custom
         if: steps.final.outputs.status == 'rebased'
         continue-on-error: true
-        working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test
+        # Every Arcana custom card is kept. Where Argentum now has the same card, its scenario tests pick
+        # which version is played (custom-overrides.txt, part of the candidate's assets).
+        run: python3 engine-upgrade/weekly.py reconcile
       - name: App test suite on the new engine
         id: app
         if: steps.final.outputs.status == 'rebased'
@@ -256,8 +261,8 @@ jobs:
               t = json.loads((w / 'tests.json').read_text())
               checks = {
                   'Patches rebased and pass the strict audit': True,
-                  'Imported cards: premade decks, six precons, no custom-card collisions': env['CARDS'] == '0',
-                  'Custom cards compile and pass scenario + strict data tests on the new engine': env['CUSTOM'] == 'success',
+                  'Imported cards: every premade-deck and precon card still resolves': env['CARDS'] == '0',
+                  'Custom cards compile and pass scenario + data tests on the new engine (collisions reconciled)': env['CUSTOM'] == 'success',
                   'App test suite': env['APP'] == 'success',
                   'Test APK builds': env['APK'] == 'success',
                   'Agent docs and cardkit current on the new engine (SDK index, vendored docs, pin)': env['DOCS'] == 'success',
@@ -277,6 +282,9 @@ jobs:
               if auto.is_file() and auto.read_text().strip():
                   body += ['', auto.read_text()]
               body += ['', (w / 'cards.md').read_text()]
+              rec = w / 'reconcile.md'
+              if rec.is_file():
+                  body += ['', rec.read_text()]
               body += ['', 'Not run here: upstream\'s own rules/card/AI suites (upstream CI covers them) and the '
                        'device checks in `engine-upgrade/UPGRADE-TEMPLATE.md`. A green PR means the checks above passed, '
                        'not that every card is Oracle-correct. Debug APK: see the run artifacts.']
@@ -303,8 +311,13 @@ jobs:
               for name in t['failed'][:8]:
                   print(f"::error title=Failing test::{clean(name)}")
               cards = json.loads((w / 'cards.json').read_text())
-              if cards.get('collisions'):
-                  print("::warning title=Custom-card collisions (decision required)::" + clean(', '.join(cards['collisions'])))
+              rec = w / 'reconcile.json'
+              if rec.is_file():
+                  rr = json.loads(rec.read_text())
+                  if rr['collisions']:
+                      print("::notice title=Custom cards reconciled::" + clean(
+                          f"Argentum's version played: {', '.join(rr['argentum_in_play']) or 'none'}; "
+                          f"Arcana's kept: {', '.join(rr['arcana_kept']) or 'none'}"))
               for d in cards.get('precons', []):
                   if d['newly_missing']:
                       print(f"::warning title=Precon slots lost ({clean(d['name'])})::" + clean(', '.join(d['newly_missing'])))
@@ -446,7 +459,7 @@ jobs:
           elif ! url=$(gh pr create --draft --head "$BOT_BRANCH" --base "$BASE" --title "$title" --body-file "$w/body.md"); then
             # Repo setting may forbid Actions from opening PRs; fall back to an issue with a compare link.
             printf '\n[Open the PR](%s/%s/compare/%s...%s?expand=1)\n' "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$BASE" "$BOT_BRANCH" >> "$w/body.md"
-            gh issue create --title "$title" --body-file "$w/body.md"
+            issue=$(gh issue create --title "$title" --body-file "$w/body.md") && number=${issue##*/}
           else
             number=${url##*/}
           fi
@@ -455,6 +468,26 @@ jobs:
             note=" Not green: handoff notes in the PR (Claude's engine lane; GPT finishes if Claude is unavailable; card decisions are GPT's)."
           fi
           gh issue comment 81 --body "Weekly Argentum upgrade: **$title** — ${number:+#$number }($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID).$note" || true
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+        id: pr
+      - name: Merge a green upgrade into the integration branch
+        # Owner decision (2026-10-26): fully automated. Only a green run merges, only into $BASE (never
+        # main, never a release); the PR (or issue) body records every check and each custom-card choice.
+        # Repo settings may forbid Actions from opening PRs, so this merges the bot branch directly.
+        if: needs.validate.outputs.status == 'rebased' && needs.validate.outputs.green == 'true'
+        env:
+          NUMBER: ${{ steps.pr.outputs.number }}
+        run: |
+          set -uo pipefail
+          title=$(cat "$RUNNER_TEMP/candidate/weekly/title.txt")
+          if gh api -X POST "repos/$GITHUB_REPOSITORY/merges" -f base="$BASE" -f head="$BOT_BRANCH" \
+               -f commit_message="Merge $title (run $GITHUB_RUN_ID)" >/dev/null; then
+            gh issue comment 81 --body "**$title** was green and has been merged into \`$BASE\` automatically ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)." || true
+            if [ -n "$NUMBER" ]; then gh issue close "$NUMBER" --comment "Merged automatically into \`$BASE\`." || true; fi
+          else
+            echo "::warning title=Auto-merge::Could not merge $BOT_BRANCH into $BASE; it stays for a manual merge."
+            gh issue comment 81 --body "**$title** is green but could not be merged into \`$BASE\` automatically; please merge \`$BOT_BRANCH\`." || true
+          fi
       - name: Report a blocked upgrade
         # Both get an issue with handoff notes, never a PR: a failed build's refreshed patches and pins (no
         # jars) were pushed to the bot branch above as the place a fix starts, but must not be mergeable.

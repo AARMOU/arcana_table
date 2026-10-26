@@ -35,6 +35,9 @@ dependencies {
 tasks.test {
     maxHeapSize = "2g"
     systemProperty("arcana.assets", assetsDir.asFile.absolutePath)
+    // Which version of a card is in play depends on these, so a change must re-run the tests.
+    inputs.file(assetsDir.file("custom-overrides.txt")).optional().withPropertyName("customOverrides")
+    inputs.file(assetsDir.file("all-cards.index.tsv")).optional().withPropertyName("libraryIndex")
     // Engine threads recurse deeply on big boards.
     jvmArgs("-Xss16m")
     testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
