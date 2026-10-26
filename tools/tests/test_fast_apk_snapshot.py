@@ -67,6 +67,7 @@ class FastArtifactChecksTests(unittest.TestCase):
         self.patchers=[
             patch.object(fast,"INPUT_ROOTS",("inputs",)),
             patch.object(fast,"WORKFLOW",Path("workflow.txt")),
+            patch.object(fast,"b136_source_pins",return_value={key:"0"*40 for key in fast.B136_SOURCE_KEYS}),
             patch.object(fast,"FINGERPRINT",Path("fingerprint.txt")),
         ]
         for p in self.patchers:
