@@ -151,8 +151,8 @@ internal fun TableController.TableMainLayout() {
         val turnAccent = argentumSnapshot?.let { TurnColors.forSeat(it.activePlayer == localSeat) } ?: Mint
         // Player tabs (seat tabs with life in Argentum games). In landscape they share the top strip.
         val seatTabs: @Composable (Modifier) -> Unit = { rowModifier ->
-            Row(rowModifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Box(Modifier) { ViewChip("TABLE", selected = showOverview, compact = compactArgentumTable, onClick = { run { showOverview = true; showHand = false } }) }
+            Row(rowModifier.tutorialTarget("player-tabs").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Box(Modifier.tutorialTarget("table-tab")) { ViewChip("TABLE", selected = showOverview, compact = compactArgentumTable, onClick = { run { showOverview = true; showHand = false; TutorialActions.tap("table-tab") } }) }
                 // Your own tab always comes right after TABLE, then everyone else in seat order.
                 val tabOrder = players.indices.sortedBy { if (it == localSeat) -1 else it }
                 tabOrder.forEach { index -> val player = players[index]
@@ -513,7 +513,7 @@ internal fun TableController.TableMainLayout() {
             // Pass · Hand · Table share one baseline and height; the hand drawer is the one larger
             // control (a little taller and wider). The pass button works whichever board you're
             // looking at, and lights up when you can respond on someone else's turn.
-            Row(Modifier.fillMaxWidth().padding(top = 5.dp).testTag("bottom-bar"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+            Row(Modifier.fillMaxWidth().padding(top = 5.dp).testTag("bottom-bar").tutorialTarget("bottom-bar"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                 PassButton(
                     if (argentumEnabled && passToMyTurnFrom != null) "AUTO-PASSING · STOP" else if (argentumEnabled) argentumPrimaryLabel ?: "WAITING" else "PASS TURN",
                     onClick = { run { if (argentumEnabled && passToMyTurnFrom != null) togglePassToMyTurn() else if (argentumEnabled) argentumPrimary() else passTurn() } },
