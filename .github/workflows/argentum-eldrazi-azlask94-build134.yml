@@ -1,15 +1,12 @@
-name: Arcana release polish + Argentum + Eldrazi 94 Build 134 gate
+name: Build 134 coherent release-source preview (owner approval required)
 # Follow-up to #223: prepare only a throwaway merged worktree and test whether
 # legacy Eldrazi engine source patches apply to the newly upgraded Argentum.
-# No jar publication, branch mutation, APK signing or deploy.
+# No production jar publication, branch mutation, production signing or deploy.
 # Reproducible isolated integration candidate: no production branch is mutated.
 on:
-  push:
-    branches: [gpt/build134-logo-notification-preview-20261025]
-    paths: ['.github/workflows/argentum-eldrazi-azlask94-build134.yml']
   workflow_dispatch:
 concurrency:
-  group: arcana-b134-eldrazi94-${{ github.ref }}
+  group: arcana-b134-final-preview-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -100,7 +97,7 @@ jobs:
       - name: Finish local merged source and integrate exact development head
         shell: bash
         env:
-          DEV_SHA: 666607755f1dbe0a3b7413f92d331aeb9168daa1
+          DEV_SHA: 7ef06ec3645714529c44e258497ce3d679c5d020
         run: |
           set -euo pipefail
           git add -u
@@ -120,7 +117,8 @@ jobs:
             path=android/app/src/main/java/com/arcanatable/TableDialogs.kt
             # Only the *known* two-line Eldrazi priority preference collides with
             # PR #250's Help & Diagnostics improvements. Any other conflict fails closed.
-            if [ "$(cat combined-evidence/latest-development-conflicts.txt)" != "$path" ]; then
+            expected=$(printf '%s\n' android/app/src/main/java/com/arcanatable/HomeScreen.kt android/app/src/main/java/com/arcanatable/TableController.kt "$path")
+            if [ "$(cat combined-evidence/latest-development-conflicts.txt)" != "$expected" ]; then
               echo "::error title=Unknown integration conflict::Unexpected conflicting paths"
               cat combined-evidence/latest-development-conflicts.txt
               exit 1
@@ -148,7 +146,48 @@ jobs:
           path.write_text(merged)
           print('PASS: preserved legacy Eldrazi respond-to-own-stack toggle and new PR #250 Help & Diagnostics')
           PY
-            git add "$path"
+            home=android/app/src/main/java/com/arcanatable/HomeScreen.kt
+            git show "HEAD:$home" > /tmp/eldrazi-home.kt
+            git show "$DEV_SHA:$home" > /tmp/development-home.kt
+            python3 - <<'PYHOME'
+          from pathlib import Path
+          ours = Path('/tmp/eldrazi-home.kt').read_text()
+          dev = Path('/tmp/development-home.kt').read_text()
+          start = '                Text("ARCANA TABLE",'
+          old_start = '                Text(if (testScenarios.isNotEmpty())'
+          end = '                    Icon(Icons.Filled.Settings,'
+          assert dev.count(start) == ours.count(old_start) == 1
+          assert dev.count(end) == ours.count(end) == 1
+          a, b = dev.index(start), dev.index(end)
+          c, d = ours.index(old_start), ours.index(end)
+          block = ours[c:d]
+          icon = 'Modifier.size(48.dp).clip(CircleShape)'
+          assert block.count(icon) == 1 and 'test-scenarios-entry' in block
+          assert dev.count('.tutorialTarget("home-settings")') == 1
+          block = block.replace(icon, 'Modifier.size(48.dp).tutorialTarget("home-settings").clip(CircleShape)', 1)
+          merged = dev[:a] + block + dev[b:]
+          assert merged.count('test-scenarios-entry') == 1
+          assert merged.count('.tutorialTarget("home-settings")') == 1
+          Path('android/app/src/main/java/com/arcanatable/HomeScreen.kt').write_text(merged)
+          print('PASS: debug QA entry and tutorial settings target both retained')
+          PYHOME
+            python3 - <<'PYCONTROLLER'
+          import os
+          from pathlib import Path
+          path = Path('android/app/src/main/java/com/arcanatable/TableController.kt')
+          value = path.read_text()
+          priority = '        respondToOwnStack = JSONObject(checkpoint).optBoolean("respondToOwnStack")'
+          guard = ('        require(ReleaseFeatures.multiplayerPreviewEnabled || seats.size == 2) {\n'
+                   '            "This release can resume two-player games only. Your saved game was preserved."\n'
+                   '        }')
+          conflict = '<<<<<<< HEAD\n' + priority + '\n=======\n' + guard + '\n>>>>>>> ' + os.environ['DEV_SHA']
+          assert value.count('<<<<<<< HEAD') == value.count(conflict) == 1, 'Unknown controller conflict'
+          value = value.replace(conflict, guard + '\n' + priority, 1)
+          assert not any(marker in value for marker in ('<<<<<<<', '=======', '>>>>>>>'))
+          path.write_text(value)
+          print('PASS: release seat validation precedes restoring own-stack preference')
+          PYCONTROLLER
+            git add "$path" "$home" android/app/src/main/java/com/arcanatable/TableController.kt
             test -z "$(git diff --name-only --diff-filter=U)"
             git diff --cached --check -- "$path"
             echo "$path: merged Eldrazi priority preference with current Help & Diagnostics" > combined-evidence/latest-development-reconciliation.txt
@@ -533,7 +572,7 @@ jobs:
           assert count == {'tests':3,'failures':0,'errors':0,'skipped':0}, count
           print('PASS: 3 of 3 strict Azlask rules tests executed on upgraded engine')
           PY
-      - name: Label isolated debug preview as Build 134
+      - name: Label isolated validation source as Build 134
         shell: bash
         run: |
           set -euo pipefail
@@ -613,7 +652,60 @@ jobs:
           PY
       - name: Release must not expose debug test scenarios
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest' --tests 'com.arcanatable.LauncherBrandingTest'
+        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest' --tests 'com.arcanatable.LauncherBrandingTest' --tests 'com.arcanatable.TutorialPracticeScenariosTest'
+      - name: Require tutorial tests actually executed on upgraded engine
+        shell: bash
+        run: |
+          python3 - <<'PYTUTORIAL'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for variant in ('testDebugUnitTest', 'testReleaseUnitTest'):
+              root = Path('android/app/build/test-results') / variant
+              files = list(root.glob('TEST-*TutorialPracticeScenariosTest.xml'))
+              assert len(files) == 1, (variant, 'missing practice test XML')
+              suite = ET.parse(files[0]).getroot()
+              assert int(suite.get('tests', 0)) == 4, (variant, suite.attrib)
+              assert all(int(suite.get(k, 0)) == 0 for k in ('failures', 'errors', 'skipped')), suite.attrib
+              print('PASS:', variant, 'four real-engine tutorial setup tests')
+          PYTUTORIAL
+      - name: Compile and lint unsigned release package for source validation
+        working-directory: android
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 :app:lintRelease :app:assembleRelease :app:bundleRelease \
+            2>&1 | tee ../combined-evidence/release-compile-lint.log
+      - name: Verify original logo and tutorial assets inside unsigned release package
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=android/app/build/outputs/apk/release/app-release-unsigned.apk
+          test -s "$apk"
+          test -s android/app/build/outputs/bundle/release/app-release.aab
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > combined-evidence/release-badging.txt
+          grep -F "package: name='com.arcanatable' versionCode='134'" combined-evidence/release-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml > combined-evidence/release-manifest.txt
+          grep -F 'android:icon' combined-evidence/release-manifest.txt
+          grep -F 'android:roundIcon' combined-evidence/release-manifest.txt
+          python3 - <<'PYPACKAGE'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import json
+          apk = Path('android/app/build/outputs/apk/release/app-release-unsigned.apk')
+          with ZipFile(apk) as archive:
+              for asset in ('catalog.json', 'glossary.json'):
+                  expected = Path('android/app/src/main/assets/tutorials', asset).read_bytes()
+                  assert archive.read('assets/tutorials/' + asset) == expected, asset
+              catalog = json.loads(archive.read('assets/tutorials/catalog.json'))
+              assert len(catalog['chapters']) == 20
+          with ZipFile('android/app/build/outputs/bundle/release/app-release.aab') as archive:
+              for asset in ('catalog.json', 'glossary.json'):
+                  assert archive.read('base/assets/tutorials/' + asset) == Path('android/app/src/main/assets/tutorials', asset).read_bytes()
+          print('PASS: 20-chapter curriculum and glossary are byte-identical in unsigned release APK and AAB')
+          PYPACKAGE
+          python3 tools/verify_launcher_branding.py
+          sha256sum "$apk" android/app/build/outputs/bundle/release/app-release.aab > combined-evidence/unsigned-release-package.sha256
+          echo 'Validation only: Unsigned production APK/AAB are validation-only; only the approved debug preview is uploaded.' > combined-evidence/validation-scope.txt
       - name: Build installable combined test APK
         working-directory: android
         shell: bash
@@ -638,7 +730,7 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/signing-info.txt
           sha256sum android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/apk.sha256
           git rev-parse HEAD > combined-evidence/local-arcana-head.txt
-          echo 'Release polish source (PR #250 exact-head): 666607755f1dbe0a3b7413f92d331aeb9168daa1' > combined-evidence/source-provenance.txt
+          echo 'Combined release source (PR #261 exact-head; includes #259/#250/#256): 7ef06ec3645714529c44e258497ce3d679c5d020' > combined-evidence/source-provenance.txt
           echo 'Original Arcana logo Git blob: 45959a18f72d01e2ba1a71fe52767e864b221178' >> combined-evidence/source-provenance.txt
           echo 'DeckSupportTest fix (PR #233): 6cf456733fd2c870d4db6888caa067399336f357' >> combined-evidence/source-provenance.txt
           echo 'Argentum upstream: c38f145359c342a04f951b7ba48f741bcb1627ac' >> combined-evidence/source-provenance.txt
@@ -659,6 +751,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p combined-evidence
+          test -d combined-argentum/.git || exit 0
           git -C combined-argentum status --short > combined-evidence/source-status.txt
           git -C combined-argentum ls-files -u > combined-evidence/unmerged-index-stages.txt
           git -C combined-argentum diff --cc > combined-evidence/source-conflicts.diff || true
@@ -710,3 +803,5 @@ jobs:
             combined-argentum/mtg-sdk/build/test-results/test/
             android/custom-cards/build/test-results/test/
             android/app/build/test-results/testDebugUnitTest/
+            android/app/build/test-results/testReleaseUnitTest/
+            android/app/build/reports/lint-results-release.*
