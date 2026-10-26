@@ -122,7 +122,7 @@ private class LanLink(private val socket: Socket, private val onMessage: (JSONOb
             writes.execute {
                 try {
                     writer.write(message.toString())
-                    writer.write("\\n")
+                    writer.write("\n")
                     writer.flush()
                 } catch (_: Exception) {
                 } finally {
