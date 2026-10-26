@@ -464,6 +464,8 @@ internal fun TableController.TableOverlays() {
         onPrimary = { if (argentumSocket.keepHand()) { argentumMulliganPrompt = false; argentumAwaitingUpdate = true; tutorialKeepPending = tutorialPracticeActive; recordDiagnostic("Kept opening hand", DiagnosticCategory.ACTION) } },
         secondaryLabel = "MULLIGAN", secondaryEnabled = !argentumAwaitingUpdate,
         onSecondary = { if (argentumSocket.mulligan()) { argentumAwaitingUpdate = true; tutorialMulliganPending = tutorialPracticeActive; recordDiagnostic("Took a mulligan", DiagnosticCategory.ACTION) } },
+        tutorialStep = if (tutorialPracticeActive) tutorialStep else null,
+        onTutorialNext = { tutorialAdvance() }, onTutorialExit = { stopTutorial() },
     )
 
     argentumBottomCardIds?.let { ids ->
@@ -484,6 +486,8 @@ internal fun TableController.TableOverlays() {
             primaryEnabled = argentumBottomSelection.size == argentumBottomCardCount && !argentumAwaitingUpdate,
             onPrimary = { if (argentumSocket.chooseBottomCards(argentumBottomSelection.toList())) { argentumBottomCardIds = null; argentumAwaitingUpdate = true } },
             secondaryLabel = null, secondaryEnabled = false, onSecondary = {},
+            tutorialStep = if (tutorialPracticeActive) tutorialStep else null,
+            onTutorialNext = { tutorialAdvance() }, onTutorialExit = { stopTutorial() },
         )
     }
 
