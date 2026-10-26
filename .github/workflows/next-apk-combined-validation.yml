@@ -294,10 +294,17 @@ jobs:
             git fetch --no-tags origin "$sha"
             test "$(git rev-parse FETCH_HEAD)" = "$sha"
             if ! git merge --no-ff --no-edit -m "Runner-only next APK: $label" "$sha" > "combined-evidence/next-apk-${label}-merge.log" 2>&1; then
-              echo "::error title=APK integration conflict::$label requires source reconciliation; no build candidate certified."
-              git diff --name-only --diff-filter=U | tee "combined-evidence/next-apk-${label}-conflicts.txt"
-              cat "combined-evidence/next-apk-${label}-merge.log"
-              exit 1
+              # Only one exact reviewed source collision may be auto-reconciled.
+              # The helper keeps BOTH release tutorial/seat guards and Claude's
+              # newer touch targets/menu text. Unknown conflicts stop the build.
+              if [ "$label" = "table-ui" ] && python3 tools/next_apk_resolve_conflicts.py table "$sha"; then
+                git commit --no-gpg-sign -m "Runner-only: reconcile table UI with Build 134 release source"
+              else
+                echo "::error title=APK integration conflict::$label requires reviewed source reconciliation; not certified."
+                git diff --name-only --diff-filter=U | tee "combined-evidence/next-apk-${label}-conflicts.txt"
+                cat "combined-evidence/next-apk-${label}-merge.log"
+                exit 1
+              fi
             fi
             git merge-base --is-ancestor "$sha" HEAD
             printf '%s %s\n' "$label" "$sha" >> combined-evidence/next-apk-source-pins.txt
