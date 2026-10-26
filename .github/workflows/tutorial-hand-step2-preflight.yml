@@ -1,0 +1,44 @@
+name: Tutorial HAND step-2 exact-source preflight (no APK)
+on:
+  push:
+    branches: [gpt/tutorial-step2-nextbuild-20261026]
+    paths:
+      - '.github/workflows/tutorial-hand-step2-preflight.yml'
+      - 'tools/next_apk_tutorial_hand_fix.py'
+      - 'tools/tests/test_next_apk_tutorial_hand_fix.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test-tutorial-port:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Run isolated HAND port positive and negative cases
+        run: python3 -m unittest discover -s tools/tests -p 'test_next_apk_tutorial_hand_fix.py' -v
+      - name: Prove compatibility with existing PR 282 and frozen tutorial baseline
+        shell: bash
+        env:
+          PR282_SHA: 8e4702065dff96ba7ce0a64cd5d420fb54def43d
+          TUTORIAL_BASE: 1751f1893cc4706572d4f4382e6b0a137bf46536
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin "$PR282_SHA" "$TUTORIAL_BASE"
+          mkdir -p "$RUNNER_TEMP/tutorial-port"
+          git show "$PR282_SHA:android/app/src/main/java/com/arcanatable/TableMainLayout.kt" > "$RUNNER_TEMP/tutorial-port/patched.kt"
+          git show "$PR282_SHA:android/app/src/main/assets/tutorials/catalog.json" > "$RUNNER_TEMP/tutorial-port/catalog.json"
+          python3 tools/next_apk_tutorial_hand_fix.py \
+            --source "$RUNNER_TEMP/tutorial-port/patched.kt" \
+            --catalog "$RUNNER_TEMP/tutorial-port/catalog.json" --verify-only
+          git show "$TUTORIAL_BASE:android/app/src/main/java/com/arcanatable/TableMainLayout.kt" > "$RUNNER_TEMP/tutorial-port/base.kt"
+          python3 tools/next_apk_tutorial_hand_fix.py \
+            --source "$RUNNER_TEMP/tutorial-port/base.kt" \
+            --catalog "$RUNNER_TEMP/tutorial-port/catalog.json"
+          cmp "$RUNNER_TEMP/tutorial-port/base.kt" "$RUNNER_TEMP/tutorial-port/patched.kt"
+          python3 tools/next_apk_tutorial_hand_fix.py \
+            --source "$RUNNER_TEMP/tutorial-port/base.kt" \
+            --catalog "$RUNNER_TEMP/tutorial-port/catalog.json" --verify-only
+          echo 'PASS: exact PR282 source matches deterministic one-line forward port; 20-chapter curriculum unchanged'
