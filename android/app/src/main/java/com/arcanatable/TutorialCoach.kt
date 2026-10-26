@@ -58,6 +58,20 @@ internal object TutorialStepGate {
     }
 }
 
+/** Facts already confirmed by the engine while a player is reading an explanation.
+ * Priority passes remain fresh gestures: an earlier pass must not satisfy a later prompt.
+ */
+internal class TutorialMilestones {
+    private val confirmed = mutableSetOf<String>()
+    fun observe(event: String) {
+        if (event in setOf("SpellResolved", "AttackersDeclared", "CombatDamageDealt", "TurnAdvanced"))
+            confirmed.add(event)
+    }
+    fun completes(step: ArcanaLessonStep?): Boolean =
+        step?.actionKind == "event" && step.event in confirmed
+    fun clear() = confirmed.clear()
+}
+
 internal object TutorialActions {
     var onGesture: ((String, String) -> Unit)? = null
     fun tap(target: String) { onGesture?.invoke(target, "tap") }

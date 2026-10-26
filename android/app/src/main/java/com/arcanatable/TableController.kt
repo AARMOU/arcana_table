@@ -255,7 +255,7 @@ internal class TableController(
     var autoOpenHand by run { mutableStateOf(optionPrefs.getBoolean("adjust_auto_open_hand", true)) }
     var playedPopupSeconds by run { mutableFloatStateOf(optionPrefs.getFloat("adjust_notice_seconds", 4f).coerceIn(1f, 8f)) }
     var combatCardScale by run { mutableFloatStateOf(optionPrefs.getFloat("adjust_combat_card_scale", 1f).coerceIn(.65f, 1.35f)) }
-    var showEngineStatus by run { mutableStateOf(optionPrefs.getBoolean("show_engine_status", true)) }
+    var showEngineStatus by run { mutableStateOf(optionPrefs.getBoolean("show_engine_status", BuildConfig.DEBUG)) }
     val defaultQuickActionOrder get() = argentumQuickActionIds.joinToString("|")
     var nextId by run { mutableIntStateOf(20) }
     // Seat indexes always stay inside the current player list. Ending a 3–4 player game swaps the
@@ -391,6 +391,7 @@ internal class TableController(
     var tutorialPassPending by mutableStateOf(false)
     var tutorialMulliganPending by mutableStateOf(false)
     var tutorialKeepPending by mutableStateOf(false)
+    private val tutorialMilestones = TutorialMilestones()
     internal val tutorialChapters: List<ArcanaLesson> by lazy { loadTutorialLessons(context) }
     internal val tutorialLesson: ArcanaLesson? get() = tutorialChapters.firstOrNull { it.id == tutorialChapterId }
     internal val tutorialStep: ArcanaLessonStep? get() = tutorialLesson?.steps?.getOrNull(tutorialStepIndex)
@@ -400,12 +401,9 @@ internal class TableController(
         if (tutorialStepIndex < lesson.steps.lastIndex) {
             tutorialStepIndex++
             tutorialRouteScreen()
-            val next = tutorialStep
-            val mine = argentumSnapshot?.players?.getOrNull(localSeat)
-            // A quick state burst can resolve the creature before the player reads the
-            // stack explanation. Catch up to already-confirmed results, never fake an event.
-            if (tutorialPracticeActive && next?.event == "SpellResolved" &&
-                mine?.battlefield?.any { it.name == "Elvish Mystic" } == true) tutorialStepIndex++
+            // Combat and stack resolution can finish while an explanation is open.
+            // Consume only confirmed milestones, preserving all informational steps.
+            if (tutorialPracticeActive && tutorialMilestones.completes(tutorialStep)) tutorialAdvance()
         } else {
             val preferences = context.getSharedPreferences("arcana_tutorials", Context.MODE_PRIVATE)
             val completed = preferences.getStringSet("practiced_chapters", emptySet()).orEmpty().toMutableSet()
@@ -416,6 +414,7 @@ internal class TableController(
     }
 
     fun tutorialSignal(kind: String, key: String) {
+        if (tutorialPracticeActive && kind == "event") tutorialMilestones.observe(key)
         val step = tutorialStep ?: return
         if (TutorialStepGate.accepts(step, kind, key)) tutorialAdvance()
     }
@@ -462,6 +461,8 @@ internal class TableController(
     fun stopTutorial() {
         val wasPractice = tutorialPracticeActive
         tutorialPracticeActive = false
+        tutorialMilestones.clear()
+        stackOpen = false
         tutorialChapterId = null
         tutorialStepIndex = 0
         tutorialLoading = false
@@ -517,6 +518,7 @@ internal class TableController(
         tutorialChapterId = id
         tutorialStepIndex = 0
         tutorialStartTurn = 0
+        tutorialMilestones.clear()
         tutorialPracticeActive = true
         tutorialLoading = true
         offlineStarting = true

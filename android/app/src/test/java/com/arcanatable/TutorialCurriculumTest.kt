@@ -62,4 +62,23 @@ class TutorialCurriculumTest {
         assertTrue(TutorialStepGate.accepts(step, "hold", "battlefield-card:Grizzly Bears"))
         assertFalse(TutorialStepGate.accepts(step, "hold", "hand-card:Grizzly Bears"))
     }
+
+    @Test fun combatAndResolutionConfirmedDuringExplanationsCompleteLaterGates() {
+        val milestones = TutorialMilestones()
+        for (event in listOf("SpellResolved", "AttackersDeclared", "CombatDamageDealt", "TurnAdvanced")) {
+            val step = ArcanaLessonStep(event, "board", null, event, "Wait", "", "", "event")
+            assertFalse(milestones.completes(step))
+            milestones.observe(event)
+            assertTrue("An already confirmed $event must not strand the learner", milestones.completes(step))
+            assertFalse("An explanation still needs Next", milestones.completes(step.copy(actionKind = "next")))
+        }
+        milestones.clear()
+        assertFalse(milestones.completes(ArcanaLessonStep("damage", "board", null, "CombatDamageDealt", "", "", "", "event")))
+    }
+
+    @Test fun earlierPriorityPassCannotCompleteALaterPassPrompt() {
+        val milestones = TutorialMilestones()
+        milestones.observe("PriorityPassed")
+        assertFalse(milestones.completes(ArcanaLessonStep("pass", "board", null, "PriorityPassed", "", "", "", "event")))
+    }
 }

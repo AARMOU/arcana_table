@@ -226,11 +226,11 @@ internal fun TableController.TableMainLayout() {
                     }
                     if (topMenuSection == null) {
                         DropdownMenuItem(text = { Text("Learn & tutorials") }, onClick = { topMenuExpanded = false; topMenuSection = null; tutorialHubOpen = true })
-                                                DropdownMenuItem(text = { Text("Game tools") }, modifier = Modifier, onClick = { run { topMenuSection = "tools"; TutorialActions.tap("menu-game-tools") } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                        DropdownMenuItem(text = { Text("Game tools") }, modifier = Modifier, onClick = { run { topMenuSection = "tools"; TutorialActions.tap("menu-game-tools") } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("Room & game") }, modifier = Modifier, onClick = { run { topMenuSection = "game" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("What's new") }, onClick = { topMenuExpanded = false; changelogOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("Adjust UI") }, onClick = { topMenuExpanded = false; topMenuSection = null; layoutLabOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
-                        DropdownMenuItem(text = { Text("Options") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; optionsOpen = true } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                        DropdownMenuItem(text = { Text("Options") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; optionsOpen = true } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                     } else {
                         DropdownMenuItem(text = { Text("‹  MAIN MENU") }, modifier = Modifier, onClick = { run { topMenuSection = null } })
                         when (topMenuSection) {

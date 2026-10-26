@@ -705,11 +705,11 @@ internal fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKe
 
 @Composable
 internal fun OptionsPage(
-    darkMode: Boolean, timerVisible: Boolean, backgroundAlertsEnabled: Boolean,
+    darkMode: Boolean, timerVisible: Boolean, backgroundAlertsEnabled: Boolean, showEngineStatus: Boolean,
     followActivePlayer: Boolean, connectionLabel: String, pingResult: String?, versionLabel: String, diagnosticCount: Int,
     reducedSwipeMotion: Boolean, cardSizeScale: Float, onOpenLayoutLab: () -> Unit,
     onToggleTheme: () -> Unit, onToggleTimerVisibility: () -> Unit, onToggleBackgroundAlerts: (Boolean) -> Unit,
-    onFollowActivePlayer: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, onCardSizeScale: (Float) -> Unit,
+    onShowEngineStatus: (Boolean) -> Unit, onFollowActivePlayer: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, onCardSizeScale: (Float) -> Unit,
     quietOpponentTurns: Boolean = false, onQuietOpponentTurns: (Boolean) -> Unit = {},
     onTestConnection: () -> Unit, onReconnect: (() -> Unit)?, onViewDiagnostics: () -> Unit, onExportDiagnostics: () -> Unit,
     onWhatsNew: () -> Unit, onTutorials: () -> Unit = {},
@@ -793,12 +793,26 @@ internal fun OptionsPage(
                     Switch(checked = backgroundAlertsEnabled, onCheckedChange = onToggleBackgroundAlerts)
                 }
                 Section("HELP & DIAGNOSTICS")
+                Row(Modifier.fillMaxWidth().heightIn(min = 60.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text("Engine running notice", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Show the in-game processing banner and elapsed time while Argentum works.", color = Muted, fontSize = 10.sp)
+                    }
+                    Switch(checked = showEngineStatus, onCheckedChange = onShowEngineStatus,
+                        modifier = Modifier.testTag("engine-processing-toggle"))
+                }
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(PanelLight).padding(horizontal = 10.dp, vertical = 8.dp)) {
                     Text(connectionLabel, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     if (pingResult != null) Text(pingResult, color = if (pingResult.startsWith("Can't")) Color(0xFFE9978B) else Muted, fontSize = 10.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
-                        HeaderButton("TEST CONNECTION", onTestConnection, enabled = pingResult != "Testing…")
-                        if (onReconnect != null) HeaderButton("RECONNECT", onReconnect)
+                    Column(Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        OutlinedButton(onClick = onTestConnection, enabled = pingResult != "Testing…",
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("diagnostics-test-connection")) {
+                            Text("TEST CONNECTION", color = if (pingResult == "Testing…") Muted else Mint)
+                        }
+                        if (onReconnect != null) OutlinedButton(onClick = onReconnect,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("diagnostics-reconnect")) {
+                            Text("RECONNECT", color = Mint)
+                        }
                     }
                 }
                 LinkRow("Diagnostic log", "Search $diagnosticCount recorded events", onClick = onViewDiagnostics)
@@ -807,10 +821,11 @@ internal fun OptionsPage(
                 LinkRow("What's new", "Version $versionLabel", onClick = onWhatsNew)
                 if (onEngineSelfTest != null) LinkRow(
                     "Run engine self-test",
-                    engineTrialResult ?: "Plays one AI-vs-AI game with Argentum inside this phone, no server. Takes up to a minute.",
+                    engineTrialResult ?: "Runs a local AI-vs-AI rules check using Argentum. No server needed.",
                     modifier = Modifier.testTag("engine-self-test"),
                     onClick = { if (engineTrialResult?.startsWith("Running") != true) onEngineSelfTest() })
                 HorizontalDivider(color = Muted.copy(alpha = 0.25f), modifier = Modifier.padding(top = 14.dp))
+                Section("RESET", top = 8.dp)
                 TextButton(onClick = onClearAllData, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(top = 6.dp)) {
                     Text("CLEAR ALL DATA", color = Color(0xFFE9978B), fontWeight = FontWeight.Black, modifier = Modifier.fillMaxWidth())
                 }
