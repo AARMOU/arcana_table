@@ -31,13 +31,15 @@ import org.json.JSONObject
 internal object TutorialPracticeScenarios {
     const val FIRST_TURN = "first-turn"
     const val COMBAT = "combat"
+    const val STACK = "stack"
     const val MULLIGAN = "opening-hand"
 
-    val supported = setOf(FIRST_TURN, COMBAT, MULLIGAN)
+    val supported = setOf(FIRST_TURN, COMBAT, STACK, MULLIGAN)
 
     fun build(id: String, library: OfflineCardLibrary): TestScenarioGame = when (id) {
         FIRST_TURN -> firstTurn(library)
         COMBAT -> combat(library)
+        STACK -> stack(library)
         else -> error("Unknown checkpoint tutorial $id")
     }
 
@@ -51,8 +53,9 @@ internal object TutorialPracticeScenarios {
     private fun registry(library: OfflineCardLibrary, you: LocalSeat, ai: LocalSeat) =
         CardRegistry().apply { register(library.load((you.deck + ai.deck).toSet())) }
 
-    private fun prepare(library: OfflineCardLibrary, creature: String): Prepared {
-        val you = LocalSeat("You", listOf(creature, "Elvish Mystic") + List(38) { "Forest" }, null)
+    private fun prepare(library: OfflineCardLibrary, creature: String, additional: String? = null): Prepared {
+        val specials = listOf(creature, "Elvish Mystic") + listOfNotNull(additional)
+        val you = LocalSeat("You", specials + List(40 - specials.size) { "Forest" }, null)
         val ai = LocalSeat("Training Opponent", List(40) { "Island" }, null)
         val registry = registry(library, you, ai)
         val services = EngineServices(registry)
@@ -96,6 +99,21 @@ internal object TutorialPracticeScenarios {
             yourCard(prepared.state, "Grizzly Bears", Zone.LIBRARY, Zone.HAND), Zone.BATTLEFIELD).state
         // Advance a full turn cycle through the real engine so summoning sickness is removed.
         state = passToMain(state, prepared.services, afterTurn = state.turnNumber)
+        return TestScenarioGame(listOf(prepared.you, prepared.ai), prepared.registry,
+            checkpoint(state, prepared.you, prepared.ai))
+    }
+
+    private fun stack(library: OfflineCardLibrary): TestScenarioGame {
+        val prepared = prepare(library, "Grizzly Bears", "Giant Growth")
+        val zones = ZoneTransitionService(prepared.registry, prepared.services.predicateEvaluator)
+        var state = zones.moveToZone(prepared.state,
+            yourCard(prepared.state, "Grizzly Bears", Zone.LIBRARY, Zone.HAND), Zone.BATTLEFIELD).state
+        repeat(2) {
+            state = zones.moveToZone(state, yourCard(state, "Forest", Zone.LIBRARY, Zone.HAND), Zone.BATTLEFIELD).state
+        }
+        if (state.getZone(LocalArgentumHost.HUMAN_ID, Zone.HAND).none {
+            state.getEntity(it)?.get<CardComponent>()?.name == "Giant Growth"
+        }) state = zones.moveToZone(state, yourCard(state, "Giant Growth", Zone.LIBRARY), Zone.HAND).state
         return TestScenarioGame(listOf(prepared.you, prepared.ai), prepared.registry,
             checkpoint(state, prepared.you, prepared.ai))
     }
