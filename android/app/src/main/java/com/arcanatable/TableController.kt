@@ -391,9 +391,9 @@ internal class TableController(
     var tutorialPassPending by mutableStateOf(false)
     var tutorialMulliganPending by mutableStateOf(false)
     var tutorialKeepPending by mutableStateOf(false)
-    val tutorialChapters: List<ArcanaLesson> by lazy { loadTutorialLessons(context) }
-    val tutorialLesson: ArcanaLesson? get() = tutorialChapters.firstOrNull { it.id == tutorialChapterId }
-    val tutorialStep: ArcanaLessonStep? get() = tutorialLesson?.steps?.getOrNull(tutorialStepIndex)
+    internal val tutorialChapters: List<ArcanaLesson> by lazy { loadTutorialLessons(context) }
+    internal val tutorialLesson: ArcanaLesson? get() = tutorialChapters.firstOrNull { it.id == tutorialChapterId }
+    internal val tutorialStep: ArcanaLessonStep? get() = tutorialLesson?.steps?.getOrNull(tutorialStepIndex)
 
     fun tutorialAdvance() {
         val lesson = tutorialLesson ?: return
