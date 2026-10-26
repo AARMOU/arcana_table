@@ -1,14 +1,19 @@
-name: Build 134 lobby + tutorial release-look APKs (prepared; not run)
+name: Build 135 no-goose lobby + tutorial + import/editor test APKs
 # Owner-authorized follow-up after successful integrated Build 134 run 40353390125.
 # Build both full-feature, mascot-free debug and release-layout test-signed APKs.
 # No production signing, branch promotion, Cloudflare deploy, or Play publication.
 # Reproducible isolated integration candidate: no production branch is mutated.
 on:
   push:
-    branches: [gpt/release-look-build134-20261026]
+    branches: [gpt/build134-next-deck-tools-candidate-20261026]
     paths:
       - '.github/workflows/release-look-followup-build134.yml'
       - 'tools/next_apk_resolve_conflicts.py'
+      - 'tools/next_apk_lobby_resolve_conflict.py'
+      - 'tools/next_apk_tutorial_hand_fix.py'
+      - 'tools/next_apk_changelog_since_b121.py'
+      - 'tools/next_apk_enable_deck_tools.py'
+      - 'tools/next_apk_release_scope_candidate.py'
   workflow_dispatch:
     inputs:
       include_online_multiplayer:
@@ -395,6 +400,46 @@ jobs:
           printf 'claude-fullscreen-ready-lobby %s (PR283)\n' "$LOBBY_SHA" >> combined-evidence/next-apk-source-pins.txt
           printf '%s\n' 'Worker deployment is a separate gate: deployed PR268 relay lacks PR283 reconfigure support.' > combined-evidence/lobby-worker-deployment-gate.txt
           echo 'PASS: Claude full-screen lobby + host seat reconfiguration staged onto Build134 runner; no remote writes'
+      - name: Port ONLY Claude's six reviewed quiet-import files (no dev/JAR merge)
+        shell: bash
+        env:
+          CLAUDE_QUIET_SHA: 82eb18a96ddf80a9bd31b7adf2cc244b588e2f25
+          CLAUDE_DEV_BASE_SHA: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$CLAUDE_QUIET_SHA"
+          test "$(git rev-parse FETCH_HEAD)" = "$CLAUDE_QUIET_SHA"
+          git merge-base --is-ancestor "$CLAUDE_DEV_BASE_SHA" "$CLAUDE_QUIET_SHA"
+          # Merge JUST the reviewed PR287 diff, not Claude's development
+          # ancestor (which carries different engine JARs and generated indexes).
+          paths=(
+            android/app/src/main/java/com/arcanatable/TableArgentum.kt
+            android/app/src/main/java/com/arcanatable/TableController.kt
+            android/app/src/main/java/com/arcanatable/TableOverlays.kt
+            android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
+            android/app/src/main/java/com/arcanatable/TableWifi.kt
+            android/app/src/test/java/com/arcanatable/ui/ArgentumResilienceUiTest.kt
+          )
+          git diff --name-only "$CLAUDE_DEV_BASE_SHA" "$CLAUDE_QUIET_SHA" | sort > combined-evidence/quiet-notices-changed-files.txt
+          printf '%s\n' "${paths[@]}" | sort > combined-evidence/quiet-notices-allowed-files.txt
+          diff -u combined-evidence/quiet-notices-allowed-files.txt combined-evidence/quiet-notices-changed-files.txt
+          git diff --binary "$CLAUDE_DEV_BASE_SHA" "$CLAUDE_QUIET_SHA" -- "${paths[@]}" > combined-evidence/quiet-notices-reviewed.patch
+          if ! git apply --3way --index combined-evidence/quiet-notices-reviewed.patch; then
+            echo '::error title=Quiet-import port conflict::Exact six-file patch needs review; do not replace runtime JARs.'
+            git status --short
+            git diff --name-only --diff-filter=U | tee combined-evidence/quiet-notices-conflicts.txt
+            for file in "${paths[@]}"; do
+              if grep -q '^<<<<<<< ' "$file" 2>/dev/null; then
+                echo "=== conflict in $file ==="
+                grep -n -C 10 -E '^(<<<<<<< |=======|>>>>>>> )' "$file" | head -130
+              fi
+            done
+            exit 1
+          fi
+          git diff --cached --check -- "${paths[@]}"
+          test -z "$(git diff --name-only --diff-filter=U)"
+          printf 'quiet-import-notices %s (PR287; six-file diff only)\n' "$CLAUDE_QUIET_SHA" >> combined-evidence/next-apk-source-pins.txt
+          echo 'PASS: Claude #287 six-file diff, without importing unrelated engine, registry or card assets'
       - name: Enforce owner-requested mascot-free home on integrated source
         shell: bash
         run: |
@@ -449,8 +494,30 @@ jobs:
           python3 tools/next_apk_changelog_since_b121.py --verify-only
           git diff --check -- android/app/src/main/java/com/arcanatable/TableDialogs.kt
           grep -F 'CURRENT NO-GOOSE TEST PREVIEW' android/app/src/main/java/com/arcanatable/TableDialogs.kt
-          grep -F 'NEXT APK · PREPARED BUT NOT YET BUILT' android/app/src/main/java/com/arcanatable/TableDialogs.kt
+          grep -F 'NEXT TEST APK · LOBBY, TUTORIAL AND DECK TOOLS' android/app/src/main/java/com/arcanatable/TableDialogs.kt
           printf '%s\n' 'Build 122–134 cumulative in-app changelog plus staged-next-build warnings: PASS' > combined-evidence/build121-changelog-acceptance.txt
+      - name: Verify owner-requested Import new and Deck Editor enablement contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/tests -p 'test_next_apk_enable_deck_tools.py' -v
+      - name: Enable existing deck tools in combined next-test source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/next_apk_enable_deck_tools.py
+          python3 tools/next_apk_enable_deck_tools.py --verify-only
+          git diff --check -- android/app/src/main/java/com/arcanatable/HomeScreen.kt android/app/src/main/java/com/arcanatable/DeckBuilder.kt
+          printf '%s\n' 'Home Import new and Deck Editor enabled in both TEST variants: SOURCE PASS; on-device QA outstanding' > combined-evidence/import-editor-candidate.txt
+      - name: Apply owner-approved next TEST-release 2–4 seats and saved-deck scope (runner only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/next_apk_release_scope_candidate.py
+          python3 tools/next_apk_release_scope_candidate.py --verify-only
+          grep -F 'fun releaseHasNoScenarios()' android/app/src/testRelease/java/com/arcanatable/ReleaseHasNoTestScenariosTest.kt
+          git diff --check -- android/app/src/main/java/com/arcanatable/ReleaseFeatures.kt android/app/src/test android/app/src/testRelease
+          printf '%s\n' 'Release-look TEST scope: Import new, saved decks, deck editor, 2–4 seats; debug scenarios strictly omitted' > combined-evidence/test-release-scope.txt
       - uses: actions/setup-node@v4
         if: ${{ github.event_name == 'push' || inputs.include_online_multiplayer }}
         with:
@@ -817,7 +884,7 @@ jobs:
           assert count == {'tests':3,'failures':0,'errors':0,'skipped':0}, count
           print('PASS: 3 of 3 strict Azlask rules tests executed on upgraded engine')
           PY
-      - name: Label isolated validation source as Build 134
+      - name: Label isolated validation source as Build 135 (TEST preview)
         shell: bash
         run: |
           set -euo pipefail
@@ -828,10 +895,10 @@ jobs:
           old_code = 'versionCode = 131'
           old_name = 'versionName = "0.33.9-build131-argentum-upgrade"'
           assert text.count(old_code) == 1 and text.count(old_name) == 1
-          text = text.replace(old_code, 'versionCode = 134', 1)
-          text = text.replace(old_name, 'versionName = "0.33.12-build134-argentum-eldrazi94-polish"', 1)
+          text = text.replace(old_code, 'versionCode = 135', 1)
+          text = text.replace(old_name, 'versionName = "0.33.13-build135-lobby-decks-tutorial"', 1)
           p.write_text(text)
-          print('PASS: isolated debug Build 134 identity, production untouched')
+          print('PASS: isolated TEST Build 135 identity, production untouched')
           PY
       - name: Run full Android app unit tests and strict Eldrazi Commander AI tests
         working-directory: android
@@ -934,7 +1001,7 @@ jobs:
           test -s "$apk"
           test -s android/app/build/outputs/bundle/release/app-release.aab
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > combined-evidence/release-badging.txt
-          grep -F "package: name='com.arcanatable' versionCode='134'" combined-evidence/release-badging.txt
+          grep -F "package: name='com.arcanatable' versionCode='135'" combined-evidence/release-badging.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml > combined-evidence/release-manifest.txt
           grep -F 'android:icon' combined-evidence/release-manifest.txt
           grep -F 'android:roundIcon' combined-evidence/release-manifest.txt
@@ -971,7 +1038,7 @@ jobs:
           apk=android/app/build/outputs/apk/debug/app-debug.apk
           test -s "$apk"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > combined-evidence/next-apk-package.txt
-          grep -F "package: name='com.arcanatable.argentum' versionCode='134'" combined-evidence/next-apk-package.txt
+          grep -F "package: name='com.arcanatable.argentum' versionCode='135'" combined-evidence/next-apk-package.txt
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" > combined-evidence/next-apk-debug-signing.txt
           grep -F 'Signer #1 certificate SHA-256 digest:' combined-evidence/next-apk-debug-signing.txt
           python3 tools/verify_launcher_branding.py
@@ -983,12 +1050,12 @@ jobs:
         run: |
           set -euo pipefail
           source_apk=android/app/build/outputs/apk/release/app-release-unsigned.apk
-          preview_apk=android/app/build/outputs/apk/release/arcana-build134-release-look-test-signed.apk
+          preview_apk=android/app/build/outputs/apk/release/arcana-build135-release-look-test-signed.apk
           test -s "$source_apk"
           # CI may sign AGP debug builds with a throwaway key outside $HOME;
           # create an explicit temporary test certificate for this release-layout APK.
           # This certificate must never be used for Play release/upload signing.
-          test_keystore="$RUNNER_TEMP/arcana-build134-test-only.jks"
+          test_keystore="$RUNNER_TEMP/arcana-build135-test-only.jks"
           keytool -genkeypair -noprompt -keystore "$test_keystore" \
             -storepass android -keypass android -alias androiddebugkey \
             -keyalg RSA -keysize 2048 -validity 30 \
@@ -1000,7 +1067,7 @@ jobs:
             --out "$preview_apk" "$source_apk"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$preview_apk" > combined-evidence/release-look-test-cert.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$preview_apk" > combined-evidence/release-look-badging.txt
-          grep -F "package: name='com.arcanatable' versionCode='134'" combined-evidence/release-look-badging.txt
+          grep -F "package: name='com.arcanatable' versionCode='135'" combined-evidence/release-look-badging.txt
           sha256sum "$preview_apk" > combined-evidence/release-look-test-apk.sha256
           echo 'TEST SIGNATURE ONLY: production layout, no dev goose; release feature limits may differ from full-feature debug; not Play Store signed.' > combined-evidence/release-look-scope.txt
       - name: Upload production-layout release-look APK (TEST signature)
@@ -1010,7 +1077,7 @@ jobs:
           name: arcana-b134-release-look-no-goose-test-signed
           retention-days: 14
           if-no-files-found: error
-          path: android/app/build/outputs/apk/release/arcana-build134-release-look-test-signed.apk
+          path: android/app/build/outputs/apk/release/arcana-build135-release-look-test-signed.apk
       - name: Upload owner-approved debug test APK
         if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

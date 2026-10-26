@@ -1,0 +1,36 @@
+name: Next no-goose APK — importer/editor/lobby/tutorial source preflight (no APK)
+on:
+  push:
+    branches: [gpt/build134-next-deck-tools-candidate-20261026]
+    paths:
+      - '.github/workflows/next-no-goose-deck-tools-preflight.yml'
+      - '.github/workflows/release-look-followup-build134.yml'
+      - 'tools/lobby_tutorial_join_smoke.py'
+      - 'tools/next_apk_enable_deck_tools.py'
+      - 'tools/tests/test_next_apk_enable_deck_tools.py'
+      - 'tools/next_apk_changelog_since_b121.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Exercise source-join contracts on actual no-goose Build134 base
+        run: python3 tools/lobby_tutorial_join_smoke.py
+      - name: Archive exact source join and conflicts
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: next-apk-deck-tools-source-preflight
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            combined-evidence/*.txt
+            combined-evidence/*merge.log
+            combined-evidence/*conflicts.txt

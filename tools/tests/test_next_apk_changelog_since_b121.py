@@ -53,8 +53,8 @@ class SinceBuild121ChangelogTest(unittest.TestCase):
         b134 = ENTRIES[0][1]
         nextup = ENTRIES[1][1]
         self.assertTrue(any("CI TEST certificate" in line or "test" in line.lower() for line in b134))
-        self.assertTrue(any("NOT in the existing Build 134 APK" in line for line in b134))
-        self.assertTrue(any("NOT IMPLEMENTED" in line for line in nextup))
+        self.assertTrue(any("NOT in the previous no-goose Build 134 APK" in line for line in b134))
+        self.assertTrue(any("require Android device validation" in line for line in nextup))
         self.assertTrue(any("Worker is updated" in line for line in nextup))
 
     def test_no_premature_release_or_editor_claim(self):
