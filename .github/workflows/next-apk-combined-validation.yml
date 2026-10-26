@@ -6,7 +6,9 @@ name: Next APK Build 134 combined test APK (no release)
 on:
   push:
     branches: [gpt/next-apk-combined-preflight-20261026]
-    paths: ['.github/workflows/next-apk-combined-validation.yml']
+    paths:
+      - '.github/workflows/next-apk-combined-validation.yml'
+      - 'tools/next_apk_resolve_conflicts.py'
   workflow_dispatch:
     inputs:
       include_online_multiplayer:
