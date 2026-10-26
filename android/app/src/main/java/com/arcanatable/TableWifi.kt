@@ -413,16 +413,103 @@ internal fun TableController.stopWifi() {
 /** Host's "waiting for your friend" card and the guest's "find a host" dialog. */
 @Composable
 internal fun TableController.WifiDialogs() {
+    if (wifiMultiConfigOpen && BuildConfig.DEBUG) {
+        AlertDialog(
+            onDismissRequest = { wifiMultiConfigOpen = false },
+            title = { Text("Host Wi-Fi Commander · Preview") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Choose 2–4 seats. Each can be a friend or an AI opponent. Every phone must use this Wi-Fi.")
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        (2..4).forEach { size ->
+                            TextButton(onClick = {
+                                wifiMultiSeatCount = size
+                                wifiMultiFriendSlots = wifiMultiFriendSlots.filter { it < size }
+                                    .toSet().ifEmpty { setOf(1) }
+                            }) { Text(if (wifiMultiSeatCount == size) "[$size]" else "$size") }
+                        }
+                    }
+                    (1 until wifiMultiSeatCount).forEach { seat ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Seat ${seat + 1}")
+                            TextButton(onClick = {
+                                wifiMultiFriendSlots = if (seat in wifiMultiFriendSlots)
+                                    wifiMultiFriendSlots - seat else wifiMultiFriendSlots + seat
+                            }) {
+                                Text(if (seat in wifiMultiFriendSlots) "Friend · change to AI"
+                                    else "AI · change to friend")
+                            }
+                        }
+                    }
+                    Text("When each selected friend has joined, tap Start Game on this phone.")
+                }
+            },
+            confirmButton = { TextButton(
+                enabled = (1 until wifiMultiSeatCount).any(wifiMultiFriendSlots::contains),
+                onClick = { startMultiWifiHost() }
+            ) { Text("HOST LOBBY") } },
+            dismissButton = { TextButton(onClick = { wifiMultiConfigOpen = false }) { Text("CANCEL") } },
+        )
+    }
     wifiWaitingAddress?.let { address ->
+        val current = wifiMultiLobbyState
+        if (current != null) {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text("Wi-Fi Commander · ${current.optInt("seatCount")} players") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Other phones: PLAY → Play with a friend → Join on Wi-Fi.")
+                        Text("Host address: $address")
+                        val seats = current.optJSONArray("seats") ?: JSONArray()
+                        for (i in 0 until seats.length()) {
+                            val seat = seats.getJSONObject(i)
+                            Text("${i + 1}. ${seat.optString("name")} · ${seat.optString("kind")}")
+                        }
+                        Text("Waiting for ${current.optInt("openSeats")} friend(s).")
+                    }
+                },
+                confirmButton = { TextButton(
+                    enabled = current.optBoolean("canStart"),
+                    onClick = { startMultiWifiGame() }
+                ) { Text("START GAME") } },
+                dismissButton = { TextButton(onClick = { stopWifi() }) { Text("CANCEL") } },
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text("Waiting for your friend") },
+                text = {
+                    Text("Keep this screen open. On the other phone: PLAY → Wi-Fi with a friend → Join a game.\\n\\n" +
+                        "If it doesn't find you, type this address there:\\n$address")
+                },
+                confirmButton = {},
+                dismissButton = { TextButton(onClick = { stopWifi() }) { Text("CANCEL") } },
+            )
+        }
+    }
+    if (wifiGuestWaiting && wifiRole == "guest") {
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("Waiting for your friend") },
+            title = { Text("Waiting for the host") },
             text = {
-                Text("Keep this screen open. On the other phone: PLAY → Wi-Fi with a friend → Join a game.\n\n" +
-                    "If it doesn't find you, type this address there:\n$address")
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("The host starts Commander when everyone's seated.")
+                    wifiGuestLobbyState?.optJSONArray("seats")?.let { roster ->
+                        for (i in 0 until roster.length()) {
+                            val seat = roster.getJSONObject(i)
+                            Text("${i + 1}. ${seat.optString("name")} · ${seat.optString("kind")}")
+                        }
+                    }
+                }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { stopWifi() }) { Text("CANCEL") } },
+            dismissButton = { TextButton(onClick = {
+                argentumSocket.close()
+                stopWifi()
+                argentumEnabled = false
+                homeOpen = true
+            }) { Text("LEAVE LOBBY") } },
         )
     }
     onlineRoomCode?.let { code ->
