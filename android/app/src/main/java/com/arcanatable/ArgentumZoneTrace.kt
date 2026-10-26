@@ -16,11 +16,11 @@ internal class ArgentumZoneTrace {
     fun reset() { previous = null; labels.clear(); nextLabel = 1 }
 
     fun observe(state: JSONObject): List<String> {
-        val cards = state.optJSONObject("cards") ?: JSONObject()
-        val zones = state.optJSONArray("zones")
+        val cards = state.optJSONObject("cards") ?: return emptyList()
+        val zones = state.optJSONArray("zones") ?: return emptyList()
         val viewer = state.optString("viewingPlayerId")
         val now = linkedMapOf<String, CardAt>()
-        if (zones != null) for (i in 0 until zones.length()) {
+        for (i in 0 until zones.length()) {
             val zone = zones.optJSONObject(i) ?: continue
             val descriptor = zone.optJSONObject("zoneId") ?: continue
             val type = descriptor.optString("zoneType").uppercase()
@@ -45,7 +45,8 @@ internal class ArgentumZoneTrace {
             if (old?.zone == current?.zone && old?.owner == current?.owner) continue
             if (old == null && current == null) continue
             val label = labels.getOrPut(id) { nextLabel++ }
-            val title = (current?.name ?: old?.name)?.takeIf { (old?.zone ?: current?.zone) !in setOf("HAND", "LIBRARY") }
+            // Identity is deliberately omitted: the same card may become hidden across snapshots.
+            val title: String? = null
             val prefix = "Observed card #$label" + (if (title != null) " ($title)" else "")
             val from = old?.zone ?: "not visible"
             val to = current?.zone ?: if (old?.token == true) "not visible (token may have ceased to exist)" else "not visible"
