@@ -52,7 +52,9 @@ internal class ArgentumDirectedLink(
         .readTimeout(0, TimeUnit.MILLISECONDS).pingInterval(15, TimeUnit.SECONDS).build()
     private val seqByTarget = mutableMapOf<Int, Long>()
     private val outgoing = mutableMapOf<Int, ArrayDeque<Pair<Long, String>>>()
-    private val lastFrom = mutableMapOf<Int, Long>()
+    private val inbox = RelayInbox()
+    /** Identifies this phone's link, so a receiver can tell a new phone in a seat from a repeat. */
+    private val linkId = java.util.UUID.randomUUID().toString()
     private val peers = mutableMapOf<Int, Boolean>()
     private val absent = mutableMapOf<Int, ScheduledFuture<*>>()
     private val everPresent = mutableSetOf<Int>()
@@ -135,11 +137,17 @@ internal class ArgentumDirectedLink(
                 if (from !in 0..3 || sequence < 1 || from == ownSeat ||
                     (isHost && from == 0) || (!isHost && from != 0)) return
                 val decoded = ArgentumCloudLink.unpack(data) ?: return
-                synchronized(this) {
-                    if (sequence <= (lastFrom[from] ?: 0L)) return
-                    lastFrom[from] = sequence
+                val sender = decoded.optString(RelayInbox.LINK_FIELD)
+                decoded.remove(RelayInbox.LINK_FIELD)
+                when (inbox.accept(from, sender, sequence)) {
+                    RelayInbox.Verdict.DUPLICATE -> return
+                    // A different phone now holds that seat: whatever we queued for the
+                    // previous one must never be replayed to it.
+                    RelayInbox.Verdict.NEW_SENDER -> forget(from)
+                    RelayInbox.Verdict.SAME_SENDER -> Unit
                 }
                 if (decoded.optString("type") == "arcanaBye") {
+                    forget(from)
                     absent.remove(from)?.cancel(false)
                     peers[from] = false
                     onPeerLeft(from)
@@ -165,7 +173,7 @@ internal class ArgentumDirectedLink(
                         onPeerAway(other)
                         absent.remove(other)?.cancel(false)
                         absent[other] = timer.schedule({
-                            if (!ended.get() && peers[other] != true) onPeerLeft(other)
+                            if (!ended.get() && peers[other] != true) { forget(other); onPeerLeft(other) }
                         }, graceMs, TimeUnit.MILLISECONDS)
                     }
                 }
@@ -239,7 +247,7 @@ internal class ArgentumDirectedLink(
         if (ended.get() || target !in 0..3 ||
             (isHost && (target == 0 || target > seatKinds.size)) ||
             (!isHost && target != 0)) return false
-        val encoded = ArgentumCloudLink.pack(message)
+        val encoded = ArgentumCloudLink.pack(JSONObject(message.toString()).put(RelayInbox.LINK_FIELD, linkId))
         if (encoded.length > 400_000) return false
         val seq = synchronized(this) {
             val next = (seqByTarget[target] ?: 0L) + 1
@@ -253,8 +261,16 @@ internal class ArgentumDirectedLink(
         return true
     }
 
-    fun kickGuest(seat: Int): Boolean = isHost && seat in 1..3 &&
-        sendPacket(JSONObject().put("type", "relayKick").put("to", seat))
+    /** Drop the replay ring for a seat whose phone is gone, so a newcomer never gets its messages. */
+    private fun forget(seat: Int) {
+        synchronized(this) { outgoing.remove(seat) }
+    }
+
+    fun kickGuest(seat: Int): Boolean {
+        if (!isHost || seat !in 1..3) return false
+        forget(seat)
+        return sendPacket(JSONObject().put("type", "relayKick").put("to", seat))
+    }
 
 
 
@@ -273,7 +289,7 @@ internal class ArgentumDirectedLink(
     }
 
     private fun sendToBye(target: Int) {
-        val data = ArgentumCloudLink.pack(JSONObject().put("type", "arcanaBye"))
+        val data = ArgentumCloudLink.pack(JSONObject().put("type", "arcanaBye").put(RelayInbox.LINK_FIELD, linkId))
         val seq = synchronized(this) {
             val next = (seqByTarget[target] ?: 0L) + 1
             seqByTarget[target] = next
@@ -379,4 +395,27 @@ internal class ArgentumCloudMultiGuest(
 
     override fun send(message: JSONObject): Boolean = link.sendTo(0, message)
     override fun close() = link.close()
+}
+
+/**
+ * Relay de-duplication per sending seat. Messages carry the sender's link ID; when a different
+ * phone takes a seat (a rejected deck rejoining, or a newcomer in a freed seat) its numbering
+ * starts again at 1, so the count for that seat restarts instead of dropping everything it sends.
+ */
+internal class RelayInbox {
+    enum class Verdict { DUPLICATE, SAME_SENDER, NEW_SENDER }
+
+    private val lastSeq = mutableMapOf<Int, Long>()
+    private val lastLink = mutableMapOf<Int, String>()
+
+    @Synchronized fun accept(from: Int, link: String, seq: Long): Verdict {
+        val previous = lastLink[from]
+        val newSender = previous != link
+        if (newSender) { lastLink[from] = link; lastSeq[from] = 0L }
+        if (seq <= (lastSeq[from] ?: 0L)) return Verdict.DUPLICATE
+        lastSeq[from] = seq
+        return if (newSender && previous != null) Verdict.NEW_SENDER else Verdict.SAME_SENDER
+    }
+
+    companion object { const val LINK_FIELD = "_relayLink" }
 }
