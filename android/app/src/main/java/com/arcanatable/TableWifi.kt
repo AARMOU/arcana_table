@@ -327,6 +327,8 @@ internal fun TableController.joinWifiGame(address: String) {
             withContext(Dispatchers.IO) { guest.connect(address, hello) }
             wifiJoinOpen = false
             wifiRole = "guest"
+            wifiGuestWaiting = true
+            wifiGuestLobbyState = null
             argentumOffline = true
             argentumDeckForLobby = null
             argentumCommanderForLobby = null
@@ -400,6 +402,12 @@ internal fun TableController.stopWifi() {
     wifiWaitingAddress = null
     onlineRoomCode = null
     wifiRole = null
+    wifiMultiLobby = null
+    wifiMultiSetup = null
+    wifiMultiRegistry = null
+    wifiMultiLobbyState = null
+    wifiGuestLobbyState = null
+    wifiGuestWaiting = false
 }
 
 /** Host's "waiting for your friend" card and the guest's "find a host" dialog. */
