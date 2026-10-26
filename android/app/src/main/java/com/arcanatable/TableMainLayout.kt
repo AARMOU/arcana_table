@@ -487,7 +487,8 @@ internal fun TableController.TableMainLayout() {
                 if (argentumEnabled && gameInProgress) HandPeekBar(
                     players.getOrNull(localSeat)?.hand?.size ?: 0,
                     modifier = Modifier.weight(1f).testTag("hand-peek-table").tutorialTarget("hand-handle"),
-                    onClick = { run { showHand = true } }
+                    // The table-view handle must signal the same tutorial tap as the player-view handle.
+                    onClick = { run { showHand = true; TutorialActions.tap("hand-handle") } }
                 ) else Text("Tap a player to inspect their board", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
                 if (argentumEnabled) {
                     if (passToMyTurnFrom != null) HeaderButton("AUTO-PASSING · STOP", onClick = { run { togglePassToMyTurn() } }, modifier = Modifier, onLongClick = { run { togglePassToMyTurn() } })
