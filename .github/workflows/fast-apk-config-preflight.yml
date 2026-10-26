@@ -1,0 +1,54 @@
+name: Fast APK workflow configuration tests ONLY (never builds APK)
+on:
+  push:
+    branches: [gpt/fast-apk-workflows-20261026]
+    paths:
+      - '.github/workflows/fast-apk-config-preflight.yml'
+      - '.github/workflows/fast-test-apk-manual.yml'
+      - 'tools/fast_apk_snapshot.py'
+      - 'tools/tests/test_fast_apk_snapshot.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  config-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify Python syntax and test every cache safety contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/fast_apk_snapshot.py tools/tests/test_fast_apk_snapshot.py
+          python3 -m unittest discover -s tools/tests -p 'test_fast_apk_snapshot.py' -v
+      - name: Rehearse exact source-only join + fingerprint; no compilation or APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/fast_apk_snapshot.py source
+          python3 tools/fast_apk_snapshot.py fingerprint
+          test -s fast-engine-inputs.sha256
+          python3 - <<'PYFPRINT'
+          import re
+          from pathlib import Path
+          assert re.fullmatch(r'[a-f0-9]{64}', Path('fast-engine-inputs.sha256').read_text().strip())
+          print('PASS: full source assembly fingerprinted; no Android or engine compile started')
+          PYFPRINT
+      - name: Verify that no APK-producing workflow starts without future owner action
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('.github/workflows/fast-test-apk-manual.yml')
+          data=p.read_text()
+          triggers=data.split('\non:\n',1)[1].split('\npermissions:\n',1)[0]
+          assert '  workflow_dispatch:\n' in triggers
+          assert all(f'  {event}:' not in triggers for event in ('push','pull_request','schedule','workflow_run'))
+          assert 'actions/upload-artifact@v4' in data
+          print('PASS: seed and fast APK jobs are FUTURE MANUAL ONLY; this CI runs no builds')
+          PY

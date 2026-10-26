@@ -1,0 +1,244 @@
+#!/usr/bin/env python3
+"""Build/reuse a strictly source-fingerprinted Argentum + custom-card snapshot.
+
+Manual workflow only. Seed performs full engine/card validation WITHOUT any APK.
+Fast mode consumes one explicitly selected successful seed workflow artifact.
+All matching is *content-based* so UI-only edits can reuse the same engine.
+Never substitutes repo/JARs from Claude's unrelated development branch.
+"""
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+
+from lobby_tutorial_join_smoke import PINS
+
+UPSTREAM = "c38f145359c342a04f951b7ba48f741bcb1627ac"
+PATCH_ARTIFACT_SHA256 = "2eca4e497de60cb3ff0d20a5df7c3635ac5be7e7881900a1b606926da1321cc0"
+PATCH_SHA256 = "065ba023c1fab0c855318f0dd70e55592cc340cbf72263019ef6ea136e90231c"
+WORKFLOW = Path(".github/workflows/release-look-followup-build134.yml")
+FINGERPRINT = Path("fast-engine-inputs.sha256")
+ASSET_DIR = Path("android/app/src/main/assets/argentum")
+JAR_DIR = Path("android/app/libs")
+BUNDLE_FILES = tuple(
+    f"android/app/libs/argentum-{n}.jar"
+    for n in ("mtg-sdk", "mtg-sdk-tooling", "rules-engine", "ai")
+) + tuple(
+    f"android/app/src/main/assets/argentum/{n}"
+    for n in ("all-cards.jsonl", "por-cards.jsonl", "all-cards.index.tsv",
+              "custom-cards.jsonl", "custom-cards.index.tsv")
+)
+INPUT_ROOTS = (
+    "argentum-patches",
+    "engine-upgrade/weekly.py",
+    "engine-upgrade/audit_patches.py",
+    "engine-upgrade/preview-config.json",
+    "engine-upgrade/forward-ports",
+    "engine-upgrade/eldrazi-temple",
+    "engine-upgrade/eldrazi-combined",
+    "engine-upgrade/corrupted-crossroads",
+    "engine-upgrade/azlask",
+    "android/custom-cards/src",
+    "android/custom-cards/build.gradle.kts",
+    "android/app/src/main/assets/argentum",
+    "android/app/libs",
+    "android/app/src/main/java/com/arcanatable/engine/ai",
+    "android/app/src/main/java/com/arcanatable/engine/costs",
+    "android/app/src/main/java/com/arcanatable/engine/priority",
+    "android/build.gradle.kts",
+    "android/settings.gradle.kts",
+)
+SEED_PREFLIGHT = ["Fetch and verify green upgraded-engine candidate evidence"]
+SEED_ENGINE = [
+    "Verify three-way base blob availability (read-only)",
+    "Strict patch-series applicability on upgraded upstream",
+    "Strictly apply Azlask colorless-death LKI patch on upgraded Argentum",
+    "Inject pinned exact restricted-mana source regressions",
+    "Build all four upgraded Argentum runtime JARs",
+    "Verify Stack-copying SDK, Ulalek primitives and restricted mana in real engine",
+    "Install coherent source-built Argentum engine and bundled library on disposable runner",
+]
+SEED_CARDS = [
+    "Inject original Eldrazi Temple, Corrupted Crossroads and Azlask with exact scenarios",
+    "Rebuild and test all bundled custom cards against exact upgraded runtime",
+    "Enforce 94 original Eldrazi slots and Azlask scenarios on packaged card assets",
+]
+
+
+def sha(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def files_for_fingerprint() -> list[Path]:
+    result: set[Path] = set()
+    for name in INPUT_ROOTS:
+        path = Path(name)
+        if not path.exists():
+            raise ValueError(f"Required input missing: {path}")
+        for p in (path.rglob("*") if path.is_dir() else [path]):
+            if p.is_file():
+                if p.is_symlink():
+                    raise ValueError(f"Unexpected source symlink: {p}")
+                result.add(p)
+    if len(result) < 35:
+        raise ValueError(f"Unexpectedly small engine/card source set: {len(result)}")
+    return sorted(result)
+
+
+def fingerprint() -> str:
+    # Delimit content, path and size. Avoid mutable branch/head IDs: UI-only
+    # changes must not invalidate pinned engine/card outputs.
+    h = hashlib.sha256()
+    for v in ("arcana-fast-snapshot-v1", UPSTREAM, PATCH_ARTIFACT_SHA256,
+              PATCH_SHA256, *[f"{k}={v}" for k,v in sorted(PINS.items()) if k != "INCLUDE_ONLINE"]):
+        h.update(v.encode() + b"\0")
+    body = WORKFLOW.read_text()
+    for expected in (UPSTREAM, PATCH_ARTIFACT_SHA256, PATCH_SHA256):
+        if expected not in body:
+            raise ValueError(f"Full validated release workflow pin drift: {expected}")
+    for path in files_for_fingerprint():
+        data = path.read_bytes()
+        h.update(str(path).encode() + b"\0")
+        h.update(str(len(data)).encode() + b"\0")
+        h.update(bytes.fromhex(sha(data)))
+    return h.hexdigest()
+
+
+def named_scripts(names: list[str]) -> dict[str,str]:
+    # Extract *exact* step scripts from the same full Build135 workflow, do not
+    # maintain a divergent second copy of fragile Argentum patch logic.
+    source = WORKFLOW.read_text()
+    headings = list(re.finditer(r"^      - (?:name|uses): .*?$", source, re.MULTILINE))
+    scripts: dict[str,str] = {}
+    for i, match in enumerate(headings):
+        label = match.group().strip()
+        if not label.startswith("- name: "):
+            continue
+        name = label[len("- name: "):]
+        if name not in names:
+            continue
+        span = source[match.end():headings[i+1].start() if i+1<len(headings) else len(source)]
+        if span.count("        run: |\n") != 1:
+            raise ValueError(f"Not a literal run step: {name}")
+        text = span.split("        run: |\n",1)[1]
+        lines = []
+        for line in text.splitlines(keepends=True):
+            if not line.strip(): lines.append("\n")
+            elif line.startswith("          "): lines.append(line[10:])
+            else: raise ValueError(f"Invalid step indentation: {name}: {line[:100]!r}")
+        scripts[name] = "".join(lines)
+    if sorted(scripts) != sorted(names):
+        raise ValueError(f"Missing exact checked scripts: {sorted(set(names)-set(scripts))}")
+    return scripts
+
+
+def run_phase(phase: str) -> None:
+    steps = {"preflight": SEED_PREFLIGHT, "engine": SEED_ENGINE, "cards": SEED_CARDS}[phase]
+    env = {**os.environ, **PINS}
+    for name, shell in named_scripts(steps).items():
+        print(f"EXECUTING SOURCE-PINNED FULL-VALIDATION STEP: {name}", flush=True)
+        subprocess.run(["bash","-euo","pipefail","-c",shell], check=True, env=env)
+
+
+def seed_manifest(directory: Path) -> None:
+    if not FINGERPRINT.exists():
+        raise ValueError("Fingerprint must be captured BEFORE engine/card outputs changed")
+    expected = FINGERPRINT.read_text().strip()
+    if not re.fullmatch(r"[0-9a-f]{64}", expected):
+        raise ValueError("Invalid content fingerprint")
+    hashes = {}
+    for name in BUNDLE_FILES:
+        p = Path(name)
+        if not p.is_file() or p.stat().st_size < 100:
+            raise ValueError(f"Missing validated JAR/data export: {name}")
+        hashes[name] = sha(p.read_bytes())
+    if len([x for x in hashes if x.endswith(".jar")]) != 4:
+        raise ValueError("Expected four exact runtime JARs")
+    rows = (ASSET_DIR/"all-cards.index.tsv").read_text().splitlines()
+    custom = (ASSET_DIR/"custom-cards.index.tsv").read_text().splitlines()
+    if len(rows) < 16000 or len(custom) < 50:
+        raise ValueError(f"Unexpectedly incomplete exported card library: {len(rows)}+{len(custom)}")
+    directory.mkdir(exist_ok=False, parents=True)
+    for name in BUNDLE_FILES:
+        p = directory/name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(name, p)
+    manifest = {
+        "schema": 1, "input_fingerprint": expected,
+        "seed_commit": os.environ.get("GITHUB_SHA", "local"),
+        "seed_run_id": os.environ.get("GITHUB_RUN_ID", "local"),
+        "upstream": UPSTREAM, "engine_patch_sha256": PATCH_SHA256,
+        "files": hashes, "exported_cards": len(rows), "custom_cards": len(custom),
+    }
+    (directory/"manifest.json").write_text(json.dumps(manifest,sort_keys=True,indent=2)+"\n")
+    print(f"SEALED: {len(hashes)} SHA-256-checked files; {len(rows)} engine cards; {len(custom)} custom cards")
+
+
+def restore(directory: Path) -> None:
+    expected = fingerprint()  # MUST be before touching repo JARs and card assets
+    manifest = json.loads((directory/"manifest.json").read_text())
+    if manifest.get("schema") != 1 or manifest.get("upstream") != UPSTREAM:
+        raise ValueError("Incompatible or unknown seed format/upstream")
+    if manifest.get("input_fingerprint") != expected:
+        raise ValueError("REJECT stale/mismatched engine cache: source/patches/custom cards changed. Refresh seed; no fallback to unverified binary.")
+    if manifest.get("engine_patch_sha256") != PATCH_SHA256:
+        raise ValueError("Engine patch pin mismatch")
+    if set(manifest.get("files",{})) != set(BUNDLE_FILES):
+        raise ValueError("Seed artifact has missing/unapproved runtime files")
+    if str(manifest.get("seed_run_id")) != os.environ.get("FAST_SEED_RUN_ID"):
+        raise ValueError("Seed run identity in artifact does not match exact selected run")
+    for name in BUNDLE_FILES:
+        file = directory/name
+        if not file.is_file() or sha(file.read_bytes()) != manifest["files"][name]:
+            raise ValueError(f"Corrupt or changed cached runtime file: {name}")
+    for name in BUNDLE_FILES:
+        target = Path(name)
+        target.parent.mkdir(exist_ok=True,parents=True)
+        shutil.copyfile(directory/name,target)
+        if sha(target.read_bytes()) != manifest["files"][name]:
+            raise ValueError(f"Restored runtime checksum differs: {name}")
+    print(f"PASS: all 4 JARs + 5 card/index assets restored from VERIFIED {manifest['seed_run_id']}")
+    print(f"PASS: current merged source/patches/custom-card inputs match {expected}")
+
+
+def version(code: int) -> None:
+    if not 136 <= code <= 999999:
+        raise ValueError("Fast TEST APK requires new versionCode >=136")
+    file = Path("android/app/build.gradle.kts")
+    text = file.read_text()
+    a='versionCode = 131'
+    b='versionName = "0.33.9-build131-argentum-upgrade"'
+    if text.count(a)!=1 or text.count(b)!=1:
+        raise ValueError("BuildConfig base changed; review rather than silently replacing version")
+    text=text.replace(a,f"versionCode = {code}",1).replace(b,f'versionName = "0.33.14-build{code}-fast-test"',1)
+    file.write_text(text)
+    print(f"PASS: disposable debug-test package versionCode={code}, no production app package signing")
+
+
+def main() -> None:
+    parser=argparse.ArgumentParser()
+    choices=("source","preflight","engine","cards","fingerprint","seal","restore","version")
+    parser.add_argument("phase",choices=choices)
+    parser.add_argument("--bundle",default="fast-engine-bundle")
+    parser.add_argument("--version-code",type=int,default=136)
+    args=parser.parse_args()
+    if args.phase=="source":
+        subprocess.run([sys.executable,"tools/lobby_tutorial_join_smoke.py"],check=True)
+    elif args.phase=="fingerprint":
+        FINGERPRINT.write_text(fingerprint()+"\n")
+        print("SOURCE INPUT FINGERPRINT: "+FINGERPRINT.read_text().strip())
+    elif args.phase=="seal": seed_manifest(Path(args.bundle))
+    elif args.phase=="restore": restore(Path(args.bundle))
+    elif args.phase=="version": version(args.version_code)
+    else: run_phase(args.phase)
+
+
+if __name__=="__main__":
+    main()
