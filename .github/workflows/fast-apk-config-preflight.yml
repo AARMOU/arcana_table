@@ -13,7 +13,7 @@ permissions:
 jobs:
   config-only:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -25,6 +25,29 @@ jobs:
           set -euo pipefail
           python3 -m py_compile tools/fast_apk_snapshot.py tools/tests/test_fast_apk_snapshot.py
           python3 -m unittest discover -s tools/tests -p 'test_fast_apk_snapshot.py' -v
+      - name: Assemble exact already-reviewed source + compute engine cache key ONLY (NO compilation)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/fast_apk_snapshot.py source
+          python3 tools/fast_apk_snapshot.py fingerprint
+          test -s fast-engine-inputs.sha256
+          grep -Eq '^[a-f0-9]{64}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('.github/workflows/fast-test-apk-manual.yml')
+          data=p.read_text()
+          triggers=data.split('\non:\n',1)[1].split('\npermissions:\n',1)[0]
+          assert '  workflow_dispatch:\n' in triggers
+          assert all(f'  {event}:' not in triggers for event in ('push','pull_request','schedule','workflow_run'))
+          assert 'actions/upload-artifact@v4' in data
+          print('PASS: seed and fast APK jobs are FUTURE MANUAL ONLY; this CI runs no builds')
+          PY
+ fast-engine-inputs.sha256
+          echo 'PASS: all engine/card source paths available after full exact UI/AI/lobby/tutorial/deck source join'
       - name: Verify that no APK-producing workflow starts without future owner action
         shell: bash
         run: |
