@@ -43,7 +43,8 @@ def one_port(content: str, before: str, after: str, label: str) -> str:
 def transform(home: str, builder: str, picker: str) -> tuple[str, str, str]:
     result_home = one_port(home, OLD_HOME, NEW_HOME, "Home Import new")
     result_builder = one_port(builder, OLD_FLAG, NEW_FLAG, "DeckBuilderFlag")
-    result_picker = one_port(picker, OLD_PICKER, NEW_PICKER, "DeckPicker deck editor")
+    result_home = one_port(result_home, OLD_PICKER, NEW_PICKER, "DeckPicker deck editor label")
+    result_picker = picker
     # Verify this remains the one real deck-import service, not a second parser.
     if 'onImport = { selectedPlayer = localSeat; importError = null; importOpen = true }' not in result_picker:
         raise ValueError("Original Home -> importOpen dispatch missing")
