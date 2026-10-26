@@ -20,6 +20,7 @@ TABLE_OLD = (
 )
 TABLE_FIXED = (
     'modifier = Modifier.weight(1f).testTag("hand-peek-table").tutorialTarget("hand-handle"),\n'
+    '                    // The table-view handle must signal the same tutorial tap as the player-view handle.\n'
     '                    onClick = { run { showHand = true; TutorialActions.tap("hand-handle") } }'
 )
 PLAYER_REQUIRED = (
