@@ -173,12 +173,13 @@ internal fun TutorialHubDialog(
                         ) {
                             Text("START HERE", color = TutorialGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             Text("Your first turn", color = TutorialText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            Text("Play a real practice turn against a passive opponent. Your saved game is never touched.",
+                            Text(if (gameRunning) "A game is in progress, so this follows along on it. Leave the game to play the practice turn instead."
+                                else "Play a real practice turn against a passive opponent. Your saved game is never touched.",
                                 color = TutorialMuted, fontSize = 12.sp)
                             Button(
                                 onClick = { onStart(intro.id, 0) },
                                 modifier = Modifier.heightIn(min = 48.dp).testTag("tutorial-start-first-turn")
-                            ) { Text("PLAY THE FIRST TURN") }
+                            ) { Text(if (gameRunning) "FOLLOW ON MY GAME" else "PLAY THE FIRST TURN") }
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
