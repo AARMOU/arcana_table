@@ -253,6 +253,15 @@ internal fun TableController.TableOverlays() {
                 } },
                 onWifiJoin = { playSheetOpen = false; run { wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() } },
                 onOnlineHost = { playSheetOpen = false; run { startWifiHost(online = true) } },
+                onOnlineMultiHost = { playSheetOpen = false; run {
+                    wifiMultiOnline = true
+                    wifiMultiConfigOpen = true
+                } },
+                onOnlineMultiJoin = { playSheetOpen = false; run {
+                    wifiMultiOnlineJoin = true
+                    onlineCodeInput = ""
+                    onlineJoinOpen = true
+                } },
                 onOnlineJoin = { playSheetOpen = false; run { onlineCodeInput = ""; onlineJoinOpen = true } },
             )
             val pickDeck: (DeckChoice) -> Unit = { choice ->
