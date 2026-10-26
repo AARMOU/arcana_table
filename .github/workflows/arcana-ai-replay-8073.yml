@@ -107,3 +107,39 @@ jobs:
           path: |
             android/custom-cards/build/test-results/
             android/custom-cards/build/reports/tests/
+
+  fixed-work-replay-probe:
+    name: Fixed-work seed 8073 replay (experimental, no app changes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ARCANA_AI_BENCHMARK: '1'
+      ARCANA_AI_REPEAT_REPLAY: '1'
+      ARCANA_AI_FIXED_WORK: '1'
+      ARCANA_AI_GAMES_PER_MODE: '2'
+      ARCANA_AI_GAME_MODE: '2'
+      ARCANA_AI_PAIR_START: '80'
+      ARCANA_AI_MAX_ACTIONS: '6000'
+      ARCANA_AI_MAX_GAME_MS: '45000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Repeat the same game with fixed search-work counts, no AI search cutoff
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.AiStrengthBenchmarkTest'
+      - name: Upload exact evidence including first coarse mismatch on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcana-ai-replay-8073-fixed-work-evidence
+          retention-days: 14
+          path: |
+            android/app/build/reports/ai-strength/
+            android/app/build/test-results/testDebugUnitTest/
