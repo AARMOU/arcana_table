@@ -4,6 +4,7 @@ on:
     branches: [gpt/next-apk-combined-preflight-20261026]
     paths:
       - '.github/workflows/next-apk-merge-smoke.yml'
+      - 'tools/next_apk_resolve_conflicts.py'
   workflow_dispatch:
 permissions:
   contents: read
