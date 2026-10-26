@@ -2,9 +2,11 @@ name: Arcana release polish + Argentum + Eldrazi 94 Build 134 gate
 # Follow-up to #223: prepare only a throwaway merged worktree and test whether
 # legacy Eldrazi engine source patches apply to the newly upgraded Argentum.
 # No jar publication, branch mutation, APK signing or deploy.
-# Staged read-only until PR #250 exact-head checks are green and merged.
-# A new commit enabling the push trigger starts the full expensive integration gate.
+# Reproducible isolated integration candidate: no production branch is mutated.
 on:
+  push:
+    branches: [gpt/build134-logo-notification-preview-20261025]
+    paths: ['.github/workflows/argentum-eldrazi-azlask94-build134.yml']
   workflow_dispatch:
 concurrency:
   group: arcana-b134-eldrazi94-${{ github.ref }}
@@ -98,7 +100,7 @@ jobs:
       - name: Finish local merged source and integrate exact development head
         shell: bash
         env:
-          DEV_SHA: 7033ca853db99603814e35fe8ffe20a2b0f5a627
+          DEV_SHA: 666607755f1dbe0a3b7413f92d331aeb9168daa1
         run: |
           set -euo pipefail
           git add -u
@@ -604,7 +606,7 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/signing-info.txt
           sha256sum android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/apk.sha256
           git rev-parse HEAD > combined-evidence/local-arcana-head.txt
-          echo 'New development source (PR #250, candidate): 7033ca853db99603814e35fe8ffe20a2b0f5a627' > combined-evidence/source-provenance.txt
+          echo 'Release polish source (PR #250 exact-head): 666607755f1dbe0a3b7413f92d331aeb9168daa1' > combined-evidence/source-provenance.txt
           echo 'Original Arcana logo Git blob: 45959a18f72d01e2ba1a71fe52767e864b221178' >> combined-evidence/source-provenance.txt
           echo 'DeckSupportTest fix (PR #233): 6cf456733fd2c870d4db6888caa067399336f357' >> combined-evidence/source-provenance.txt
           echo 'Argentum upstream: c38f145359c342a04f951b7ba48f741bcb1627ac' >> combined-evidence/source-provenance.txt
