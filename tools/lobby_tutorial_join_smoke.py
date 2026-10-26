@@ -18,11 +18,14 @@ NAMES = [
     "Align merged QA home fixture with the current welcome invitation",
     "Integrate exact latest AI, table UI and optional cross-network multiplayer heads",
     "Integrate Claude's exact lobby revision after four-player transport (runner-only)",
+    "Integrate Claude's already-green quiet import-notices PR287 (runner-only)",
     "Enforce owner-requested mascot-free home on integrated source",
     "Validate PR 282 tutorial HAND port contract (source-only)",
     "Apply and verify exact PR 282 tutorial step-two fix AFTER integrated UI merge",
     "Validate post-121 changelog content, source preservation and next-build disclaimers",
     "Populate What's new with verified changes since Build 121 (after source merges)",
+    "Verify owner-requested Import new and Deck Editor enablement contract",
+    "Enable existing deck tools in combined next-test source",
 ]
 PINS = {
     "UPGRADE": "e66eca84125c3180c676702a72ae6cd080f85797",
@@ -36,6 +39,8 @@ PINS = {
     "ONLINE_SHA": "6641f1883f54ca3a13c8faa7ef0b01b05976ef74",
     "ONLINE_BASE_SHA": "6641f1883f54ca3a13c8faa7ef0b01b05976ef74",
     "LOBBY_SHA": "79dcd0c58837305fcd1f8790fbf052af214d204b",
+    "CLAUDE_QUIET_SHA": "82eb18a96ddf80a9bd31b7adf2cc244b588e2f25",
+    "CLAUDE_DEV_BASE_SHA": "9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f",
     "INCLUDE_ONLINE": "true",
 }
 
@@ -103,6 +108,9 @@ def main() -> None:
     assert "NEXT APK · PREPARED BUT NOT YET BUILT" in dialog
     assert "BUILD 123 · LARGE END-STEP AI FIX" in dialog and "BUILD 122 · FIXES AND QUICK UI TIPS" in dialog
     assert Path("combined-evidence/build121-changelog-acceptance.txt").is_file()
+    assert Path("combined-evidence/import-editor-candidate.txt").is_file()
+    assert "quiet-import-notices" in pins
+    assert "onClick = onImport" in Path("android/app/src/main/java/com/arcanatable/HomeScreen.kt").read_text()
     print("PASS: source-only next-build join includes Claude lobby + HAND tutorial + no-goose, exact pins", flush=True)
     print("HOLD: no Android executable or live Cloudflare Worker upgrade was made", flush=True)
 
