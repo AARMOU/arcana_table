@@ -55,6 +55,10 @@ jobs:
           f=$(ls android/custom-cards/build/reports/ai-difficulty/*.txt 2>/dev/null | head -1)
           if [ -z "$f" ]; then echo "No report produced" >> "$GITHUB_STEP_SUMMARY"; exit 1; fi
           { echo '### ${{ matrix.levels }} (pairs from ${{ matrix.start }})'; echo '```'; cat "$f"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          # Also as an annotation, so the results are readable from the checks API.
+          statuses=$(grep -oE 'status=[^ ]+' "$f" | sort | uniq -c | tr -s ' ' | tr '\n' ';')
+          body=$(grep -E '^(RESULT|LATENCY|eligible)|crash' "$f" | head -12 | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::notice title=Duel ${{ matrix.levels }} from ${{ matrix.start }}::${body}%0Astatuses:${statuses}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
