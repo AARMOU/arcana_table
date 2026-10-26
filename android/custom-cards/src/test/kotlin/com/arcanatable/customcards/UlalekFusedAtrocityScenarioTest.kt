@@ -214,6 +214,36 @@ class UlalekFusedAtrocityScenarioTest {
     }
 
     @Test
+    fun opponentsActivatedAbilitiesAreNotCopiedEvenWhenTheyAreOnTheStack() {
+        val d = withUlalekOnBattlefield("Prodigal Pyromancer", "Grizzly Bears")
+        val p = d.player1
+        val opponent = d.player2
+        val pyro = d.putCreatureOnBattlefield(opponent, "Prodigal Pyromancer")
+        d.removeSummoningSickness(pyro)
+
+        // Give the opponent priority while our creature spell is on the stack.
+        val bears = d.putCardInHand(p, "Grizzly Bears")
+        d.giveMana(p, Color.GREEN)
+        d.giveColorlessMana(p, 1)
+        assertNull(d.castSpell(p, bears).error)
+        assertNull(d.passPriority(p).error)
+        val ability = d.cardRegistry.getCard("Prodigal Pyromancer")!!.script.activatedAbilities.single().id
+        assertNull(d.submit(ActivateAbility(opponent, pyro, ability,
+            targets = listOf(ChosenTarget.Player(p)))).error)
+        assertTrue(d.stackObjects().contains("Prodigal Pyromancer activated"))
+
+        // Ulalek can copy our own pending spells, but never the opponent's activation.
+        assertNull(d.passPriority(opponent).error)
+        val fiendCard = d.putCardInHand(p, fiend)
+        d.giveColorlessMana(p, 10)
+        assertNull(d.castSpell(p, fiendCard).error)
+        assertEquals(1, d.resolveUlalek(pay = true))
+        assertEquals("Opponent's Pyromancer ability must resolve only once", 19, d.getLifeTotal(p))
+        assertEquals(2, d.permanentsNamed(p, "Grizzly Bears").size)
+        assertEquals(2, d.permanentsNamed(p, fiend).size)
+    }
+
+    @Test
     fun otherSpellsYouControlAreCopiedAndCopiesCanBeRetargeted() {
         val d = withUlalekOnBattlefield("Lightning Bolt", "Grizzly Bears")
         val opponent = d.player2
