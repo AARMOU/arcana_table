@@ -728,6 +728,7 @@ internal fun TableController.closeArgentumSession(concede: Boolean) {
     argentumEnabled = false
     argentumOffline = false
     setArgentumGameActive(false)
+    argentumZoneTrace.reset()
     argentumSnapshot = null
     argentumPendingDecision = null
     argentumActionChoices = emptyList(); argentumActionCard = null; argentumComposer = null
