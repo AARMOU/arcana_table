@@ -252,9 +252,12 @@ internal fun PlaySheet(
                 Text("PLAYERS", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     DeckChip("2 · you vs AI", aiCount == 1) { onAiCount(1) }
-                    DeckChip("3 players", aiCount == 2) { onAiCount(2) }
-                    DeckChip("4 players", aiCount == 3) { onAiCount(3) }
+                    if (ReleaseFeatures.multiplayerPreviewEnabled) {
+                        DeckChip("3 players", aiCount == 2) { onAiCount(2) }
+                        DeckChip("4 players", aiCount == 3) { onAiCount(3) }
+                    }
                 }
+                if (!ReleaseFeatures.multiplayerPreviewEnabled) Text("Four-player support coming soon.", color = Muted, fontSize = 12.sp)
                 Text(if (aiCount > 1) "FIRST AI'S DECK (the others are random)" else "AI'S DECK", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
                 val shown = if (showAllDecks) aiDecks else aiDecks.filter { !it.builtIn || it.id in setOf("tokens_win", "artificer_v4", "ayula_bears", "sliver_overlord", "hazel_squirrels", "mabel_heir", "velociraptor_beefcake") || it.id == aiDeckId }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -327,10 +330,10 @@ internal fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick:
                 DeckChoiceCategory.ARCANA to "ARCANA",
                 DeckChoiceCategory.ARGENTUM to "ARGENTUM PREMADE DECKS",
                 DeckChoiceCategory.OTHER to "YOUR OTHER DECKS"
-            ).forEach { (category, heading) ->
+            ).filter { ReleaseFeatures.deckImportEnabled || it.first != DeckChoiceCategory.OTHER }.forEach { (category, heading) ->
                 val list = decks.filter { it.category == category }
                 Text(heading, color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
-                if (list.isEmpty()) Text("None yet. Import a deck and it lands here.", color = Muted, fontSize = 13.sp)
+                if (list.isEmpty()) Text(if (ReleaseFeatures.deckImportEnabled) "None yet. Import a deck and it lands here." else "No decks in this group.", color = Muted, fontSize = 13.sp)
                 list.forEach { d ->
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(if (d.id == activeId) PanelLight else Panel)
@@ -345,7 +348,9 @@ internal fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick:
                     }
                 }
             }
-            OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth().padding(top = 16.dp).heightIn(min = 52.dp)) { Text("Import a new deck", color = SoftWhite, fontWeight = FontWeight.Bold) }
+            if (ReleaseFeatures.deckImportEnabled) {
+                OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth().padding(top = 16.dp).heightIn(min = 52.dp)) { Text("Import a new deck", color = SoftWhite, fontWeight = FontWeight.Bold) }
+            } else Text("Deck importing coming soon.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 16.dp))
             // Developer builds only (DeckBuilderFlag): search the library and build or edit decks.
             onDeckBuilder?.let { open ->
                 OutlinedButton(onClick = open, modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 52.dp).testTag("open-deck-builder")) {

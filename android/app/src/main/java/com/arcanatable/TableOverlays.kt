@@ -197,13 +197,13 @@ internal fun TableController.TableOverlays() {
                 },
             )
             val deckChoices = remember(savedDecks, premadeDecks, preconDecks) {
-                preconDecks.map { DeckChoice("precon:${it.id}", it.name, it.commander, builtIn = true, category = DeckChoiceCategory.PRECON) } +
+                ReleaseFeatures.availableDecks(preconDecks.map { DeckChoice("precon:${it.id}", it.name, it.commander, builtIn = true, category = DeckChoiceCategory.PRECON) } +
                     premadeDecks.map { DeckChoice("builtin:${it.id}", it.name, it.commander, builtIn = true, category = argentumDeckCategory(it.id)) } +
-                    savedDecks.map { DeckChoice(it.name, it.name, it.commander ?: parseDeckList(it.text).firstOrNull { e -> e.commander }?.name, builtIn = false, category = DeckChoiceCategory.OTHER) }
+                    savedDecks.map { DeckChoice(it.name, it.name, it.commander ?: parseDeckList(it.text).firstOrNull { e -> e.commander }?.name, builtIn = false, category = DeckChoiceCategory.OTHER) })
             }
             val seat = players.getOrNull(localSeat)
             val activeDeck = deckChoices.firstOrNull { it.id == activeDeckId }
-                ?: seat?.takeIf { it.deckLoaded }?.let { DeckChoice("table", it.commanderName ?: "Your table deck", it.commanderName, builtIn = false) }
+                ?: seat?.takeIf { it.deckLoaded && ReleaseFeatures.deckImportEnabled }?.let { DeckChoice("table", it.commanderName ?: "Your table deck", it.commanderName, builtIn = false) }
             // Commander art: the table card's own picture, else the app's card data (cached on the
             // phone by CardImages), and only then a Scryfall name lookup.
             val commanderName = activeDeck?.commander
@@ -249,7 +249,7 @@ internal fun TableController.TableOverlays() {
                 aiDeckId = offlineAiDeckId,
                 onAiDeck = { offlineAiDeckId = it; TutorialActions.tap("setup-ai-deck") },
                 aiCount = offlineAiCount,
-                onAiCount = { offlineAiCount = it; optionPrefs.edit().putInt("offline_ai_count", it).apply() },
+                onAiCount = { offlineAiCount = ReleaseFeatures.aiCount(it); optionPrefs.edit().putInt("offline_ai_count", offlineAiCount).apply() },
                 onOffline = {
                     playSheetOpen = false
                     if (tutorialChapterId != null && !tutorialPracticeActive) TutorialActions.tap("setup-start")
