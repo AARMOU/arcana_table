@@ -104,7 +104,7 @@ private val TutorialGold = Color(0xFFE6B65C)
 internal fun TutorialHubDialog(
     onDismiss: () -> Unit,
     onPractice: (String) -> Unit = {},
-    onCoach: (String) -> Unit = {},
+    onCoach: (String, Int) -> Unit = { _, _ -> },
     practiceEnabled: Boolean = false
 ) {
     val context = LocalContext.current
@@ -228,7 +228,7 @@ internal fun TutorialHubDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("STEP " + (stepIndex + 1).toString() + " OF " + current.steps.size.toString(),
                             color = TutorialMuted, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { onCoach(current.id) }) {
+                        TextButton(onClick = { onCoach(current.id, stepIndex) }) {
                             Text("SHOW ON SCREEN", color = TutorialGold, fontSize = 11.sp)
                         }
                         if (practiceEnabled && current.id in TutorialPracticeScenarios.supported) {
