@@ -61,12 +61,22 @@ class AiStrengthBenchmarkTest {
     )
 
     /** Observe the actual decision tier while delegating unchanged limits to the mobile policy. */
-    private class TierObserver : BudgetPolicy {
+    private class TierObserver(private val fixedWorkOnly: Boolean = false) : BudgetPolicy {
         val seen = mutableSetOf<BudgetTier>()
+        private fun observe(budget: DecisionBudget): DecisionBudget {
+            seen += budget.tier
+            if (!fixedWorkOnly) return budget
+            // Test-only hypothesis: keep *the same count-based work allowances* as the mobile
+            // policy, but prevent a host/runner wall clock from ending a healthy search early.
+            // Even combat's secondary deadline is widened; the per-decision game timeout
+            // remains in the harness. Never enable this for shipping Android.
+            val allowances = budget.allowances.copy(combatSearchMillis = 60_000L)
+            return DecisionBudget(budget.tier, allowances, DecisionBudget.UNBOUNDED_MILLIS)
+        }
         override fun budgetFor(state: GameState, playerId: EntityId, meaningfulActions: List<LegalAction>): DecisionBudget =
-            OfflineAiPolicy.budgetFor(state, playerId, meaningfulActions).also { seen += it.tier }
+            observe(OfflineAiPolicy.budgetFor(state, playerId, meaningfulActions))
         override fun budgetForDecision(state: GameState, playerId: EntityId): DecisionBudget =
-            OfflineAiPolicy.budgetForDecision(state, playerId).also { seen += it.tier }
+            observe(OfflineAiPolicy.budgetForDecision(state, playerId))
         fun takeTier(): String {
             val tier = listOf(BudgetTier.CRITICAL, BudgetTier.NORMAL, BudgetTier.ROUTINE, BudgetTier.TRIVIAL)
                 .firstOrNull { it in seen }?.name ?: "UNOBSERVED"
@@ -103,7 +113,9 @@ class AiStrengthBenchmarkTest {
         require(lib.isFullLibrary) { "Full Argentum library is required; no Portal substitution" }
         val (eligible, excluded) = decks(lib, assets)
         require(eligible.size >= 4) { "Fewer than four fully supported decks: ${eligible.size}" }
-        val observer = TierObserver()
+        val fixedWorkOnly = System.getenv("ARCANA_AI_FIXED_WORK") == "1"
+        println("[ai-replay-mode] fixedWorkOnly=$fixedWorkOnly (test-only; mobile unchanged)")
+        val observer = TierObserver(fixedWorkOnly)
         val baseline = OfflineAiPolicy.profile.copy(budgetPolicy = observer)
         // Until a reviewed candidate exists, run control vs identical control (no strength claim).
         val candidate = OfflineAiPolicy.profile.copy(id = "arcana-ai-candidate-control", budgetPolicy = observer)
@@ -284,6 +296,7 @@ class AiStrengthBenchmarkTest {
             .put("candidateIdenticalToBaseline", true).put("eligibleDecks", eligible)
             .put("excludedDecks", JSONArray(excluded))
             .put("reproducibleGameConfigSeed", true).put("productionHostBurstEquivalent", false)
+            .put("fixedWorkOnly", System.getenv("ARCANA_AI_FIXED_WORK") == "1")
         out.put("games", JSONArray(results.map { g ->
             JSONObject().put("mode", g.mode).put("seed", g.seed).put("pair", g.pair)
                 .put("candidateSeatsZeroBased", JSONArray(g.candidateSeats))
