@@ -470,8 +470,14 @@ internal class TableController(
 
     fun tutorialRouteScreen() {
         if (tutorialPracticeActive) {
-            if (tutorialStep?.screen == "stack" && argentumSnapshot?.stack?.isNotEmpty() == true) stackOpen = true
-            else if (tutorialStep?.screen == "board") stackOpen = false
+            val step = tutorialStep
+            if (step?.screen == "stack" && argentumSnapshot?.stack?.isNotEmpty() == true) {
+                showHand = false
+                stackOpen = true
+            } else if (step?.screen == "board") {
+                stackOpen = false
+                showHand = step.target?.startsWith("hand-card:") == true
+            }
             return
         }
         when (tutorialStep?.screen) {
