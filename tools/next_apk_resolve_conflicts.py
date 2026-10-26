@@ -89,7 +89,83 @@ def resolve_table(head_sha: str) -> None:
     print("PASS: retained release tutorial chip targets, 44dp hit area, gated AI-seat UI, and revised token text")
 
 
+
+AI_SHA = "e99b4954ad80885af0e338f7df87b1b4587bc5df"
+CONTROLLER = "android/app/src/main/java/com/arcanatable/TableController.kt"
+OVERLAYS = "android/app/src/main/java/com/arcanatable/TableOverlays.kt"
+AI_HOST = "android/app/src/main/java/com/arcanatable/engine/LocalArgentumHost.kt"
+
+
+def resolve_ai(head_sha: str) -> None:
+    if head_sha != AI_SHA:
+        raise RuntimeError(f"Unreviewed AI PR head {head_sha}; expected {AI_SHA}")
+    paths = sorted(run("git", "diff", "--name-only", "--diff-filter=U").splitlines())
+    if paths != sorted((CONTROLLER, OVERLAYS, AI_HOST)):
+        raise RuntimeError(f"Unexpected AI conflicts: {paths!r}")
+
+    for name in paths:
+        path = Path(name)
+        original = path.read_text()
+        matches = list(CONFLICT.finditer(original))
+        if len(matches) != 1 or matches[0].group("head") != AI_SHA:
+            raise RuntimeError(f"Unexpected {name} AI conflict shape")
+        match = matches[0]
+        ours, theirs = match.group("ours"), match.group("theirs")
+        if name == CONTROLLER:
+            old_count = '    var offlineAiCount by run { mutableStateOf(ReleaseFeatures.aiCount(optionPrefs.getInt("offline_ai_count", 1))) }\\n'
+            new_count = '    var offlineAiCount by run { mutableStateOf(optionPrefs.getInt("offline_ai_count", 1).coerceIn(1, 3)) }\\n'
+            if ours != old_count or not theirs.startswith(new_count):
+                raise RuntimeError("Unexpected saved-count/AI-difficulty collision")
+            if theirs.count("fun setOfflineAiDifficulty(") != 1:
+                raise RuntimeError("Missing difficulty persistence")
+            replacement = old_count + theirs[len(new_count):]
+        elif name == OVERLAYS:
+            old_count = '                onAiCount = { offlineAiCount = ReleaseFeatures.aiCount(it); optionPrefs.edit().putInt("offline_ai_count", offlineAiCount).apply() },\\n'
+            new_count = '                onAiCount = { offlineAiCount = it; optionPrefs.edit().putInt("offline_ai_count", it).apply() },\\n'
+            if not ours.startswith(old_count) or not theirs.startswith(new_count):
+                raise RuntimeError("Unexpected release seat gating/source overlay collision")
+            if ours.count('TutorialActions.tap("setup-start")') != 1:
+                raise RuntimeError("Tutorial start hook missing")
+            if theirs.count('aiDifficulties = offlineAiDifficulties,') != 1 or theirs.count('onAiDifficulty = ') != 1:
+                raise RuntimeError("Difficulty controls missing")
+            difficulty = (
+                "                aiDifficulties = offlineAiDifficulties,\\n"
+                "                onAiDifficulty = { seat, level -> setOfflineAiDifficulty(seat, level) },\\n"
+            )
+            replacement = old_count + difficulty + ours[len(old_count):]
+        else:
+            old_head = '                val chosen = if (tutorialPassiveOpponent) safePass(current, priority)\\n'
+            new_head = '                val chosen = timed("aiChoice")'
+            if not ours.startswith(old_head) or not theirs.startswith(new_head):
+                raise RuntimeError("Unexpected training AI / guarded AI collision")
+            if ours.count('bot.chooseAction(current)') != 1:
+                raise RuntimeError("Tutorial baseline differs")
+            if (
+                theirs.count('aiGuarded("aiChoiceErrors")') != 1
+                or theirs.count('OfflineAiPolicy.chooseAction(bot, seatOf(priority).difficulty, current)') != 1
+                or theirs.count('?: safePass(current, priority)') != 1
+            ):
+                raise RuntimeError("Guarded AI recovery is missing or modified")
+            # Tutorial's deliberately passive training bot still passes, while
+            # normal games use Claude's difficulty-aware guarded action selection.
+            replacement = old_head + "                    else (" + theirs[len('                val chosen = '):].rstrip("\\n") + ")\\n"
+        result = original[:match.start()] + replacement + original[match.end():]
+        if any(tag in result for tag in ("<<<<<<<", "=======", ">>>>>>>")):
+            raise RuntimeError(f"Remaining AI merge markers in {name}")
+        path.write_text(result)
+        subprocess.check_call(["git", "add", name])
+        print("Reviewed AI conflict resolution:", name)
+
+    remaining = run("git", "diff", "--name-only", "--diff-filter=U")
+    if remaining:
+        raise RuntimeError(f"Unresolved AI conflicts: {remaining}")
+    subprocess.check_call(["git", "diff", "--cached", "--check", "--", CONTROLLER, OVERLAYS, AI_HOST])
+    print("PASS: retained release AI-seat limit/tutorial passive opponent and Claude's difficulty + action recovery")
+
 if __name__ == "__main__":
-    if len(sys.argv) != 3 or sys.argv[1] != "table":
-        raise SystemExit("usage: next_apk_resolve_conflicts.py table <exact-pr-head>")
-    resolve_table(sys.argv[2])
+    if len(sys.argv) != 3 or sys.argv[1] not in ("table", "ai"):
+        raise SystemExit("usage: next_apk_resolve_conflicts.py table|ai <exact-pr-head>")
+    if sys.argv[1] == "table":
+        resolve_table(sys.argv[2])
+    else:
+        resolve_ai(sys.argv[2])
