@@ -1900,7 +1900,8 @@ internal class TableController(
         argentumSocket.localHostFactory = { emit ->
             com.arcanatable.engine.LocalArgentumHost(
                 registry, seats[0], seats[1], emit = emit,
-                extraOpponents = seats.drop(2), resumeCheckpoint = checkpoint
+                extraOpponents = seats.drop(2), resumeCheckpoint = checkpoint,
+                tutorialPassiveOpponent = tutorialPracticeActive
             )
         }
         offlineRestoreRequested = true
