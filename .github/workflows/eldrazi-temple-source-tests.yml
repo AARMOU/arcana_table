@@ -51,14 +51,24 @@ jobs:
           from pathlib import Path
           import xml.etree.ElementTree as ET
           c = dict(tests=0, failures=0, errors=0, skipped=0)
+          temple = dict(tests=0, failures=0, errors=0, skipped=0)
           names = []
           for p in Path('argentum-engine').glob('**/build/test-results/**/TEST-*.xml'):
               r = ET.parse(p).getroot()
               for k in c: c[k] += int(r.get(k, 0))
               if 'EldraziTempleManaRestrictionTest' in p.name:
                   names.append(p.name)
+                  for k in temple: temple[k] += int(r.get(k, 0))
           print('Eldrazi Temple source-only CI:', c)
           print('Matching scenario XML:', names)
+          print('Temple executable scenarios:', temple)
+          # Seven real Kotest scenarios, including projected color/subtype
+          # changes and mixed-pool laundering. Never accept zero/missing XML,
+          # skipped assertions, or stale six-scenario output as a green gate.
+          if len(names) != 1 or temple != dict(tests=7, failures=0, errors=0, skipped=0):
+              raise SystemExit('FAIL: exact seven Temple scenarios did not all execute and pass')
+          if c['failures'] or c['errors']:
+              raise SystemExit('FAIL: SDK or engine test XML contains failures')
           PY
       - uses: actions/upload-artifact@v4
         if: always()
