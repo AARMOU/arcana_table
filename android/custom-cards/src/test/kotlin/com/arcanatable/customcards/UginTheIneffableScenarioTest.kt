@@ -124,6 +124,10 @@ class UginTheIneffableScenarioTest {
             .get<LinkedExileComponent>()?.exiledIds)
         assertEquals(listOf(secondExile), d.state.getEntity(secondSpirit)!!
             .get<LinkedExileComponent>()?.exiledIds)
+        // Both independently linked cards must survive the *actual per-seat
+        // JSON wire* with their identity visible only to the original viewer.
+        d.assertLinkedExilePrivateInClientViews(p, d.player2, firstExile)
+        d.assertLinkedExilePrivateInClientViews(p, d.player2, secondExile)
 
         // Destroy only the first Spirit via a real engine spell. The other
         // token and its private exiled card must remain unaffected.
@@ -150,6 +154,7 @@ class UginTheIneffableScenarioTest {
         assertFalse(secondExile in d.getHand(p))
         assertEquals(listOf(secondExile), d.state.getEntity(secondSpirit)!!
             .get<LinkedExileComponent>()?.exiledIds)
+        d.assertLinkedExilePrivateInClientViews(p, d.player2, secondExile)
 
         // Resolve a separate leave event for the surviving token. Returning
         // the first card must not consume or overwrite the second token's link.
@@ -505,8 +510,29 @@ class UginTheIneffableScenarioTest {
         )
         val actualName = state.getEntity(linkedCard)!!
             .get<com.wingedsheep.engine.state.components.identity.CardComponent>()!!.name
-        val ownerCard = transformer.transform(state, owner).cards[linkedCard]
-        val otherCard = transformer.transform(state, other).cards[linkedCard]
+        // Match LocalArgentumHost.sendStateFor's actual per-seat wire path:
+        // transform -> kotlinx serialization with the engine module -> JSON -> decode.
+        // A safe in-memory projection alone is insufficient if its serializer
+        // exposes hidden fields or fails to preserve the recipient-specific mask.
+        val wireJson = kotlinx.serialization.json.Json {
+            ignoreUnknownKeys = true
+            encodeDefaults = true
+            allowStructuredMapKeys = true
+            classDiscriminator = "type"
+            serializersModule = com.wingedsheep.engine.core.engineSerializersModule
+        }
+        fun wireRoundTrip(seat: com.wingedsheep.sdk.model.EntityId):
+            com.wingedsheep.engine.view.ClientGameState {
+            val projected = transformer.transform(state, seat)
+            val encoded = wireJson.encodeToString(
+                com.wingedsheep.engine.view.ClientGameState.serializer(), projected
+            )
+            return wireJson.decodeFromString(
+                com.wingedsheep.engine.view.ClientGameState.serializer(), encoded
+            )
+        }
+        val ownerCard = wireRoundTrip(owner).cards[linkedCard]
+        val otherCard = wireRoundTrip(other).cards[linkedCard]
         assertNotNull("Original Ugin controller must see the linked exile in client state", ownerCard)
         assertNotNull("Other seat must see a face-down exile placeholder", otherCard)
         assertEquals("Explicit Ugin look permission must expose identity to its grantee",
