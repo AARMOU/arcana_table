@@ -420,7 +420,7 @@ internal fun TableController.TableOverlays() {
         val won = argentumWon ?: argentumSnapshot?.winnerName?.let { it == players.getOrNull(localSeat)?.name }
         AlertDialog(
             onDismissRequest = { argentumGameOverDismissed = true },
-            title = { Text(when (won) { true -> "Victory"; false -> "Defeat"; null -> "Game over" }, fontWeight = FontWeight.Black, color = when (won) { true -> Mint; false -> Color(0xFFFFB4A8); null -> SoftWhite }) },
+            title = { Text(if (argentumMatchUnfinished) "Eliminated" else when (won) { true -> "Victory"; false -> "Defeat"; null -> "Game over" }, fontWeight = FontWeight.Black, color = if (argentumMatchUnfinished) Color(0xFFFFB4A8) else when (won) { true -> Mint; false -> Color(0xFFFFB4A8); null -> SoftWhite }) },
             text = {
                 Column {
                     Text(argentumGameOverText ?: argentumSnapshot?.winnerName?.let { "$it won." } ?: "The game has ended.", color = SoftWhite)
