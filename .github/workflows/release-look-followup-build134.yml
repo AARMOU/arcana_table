@@ -909,9 +909,17 @@ jobs:
           source_apk=android/app/build/outputs/apk/release/app-release-unsigned.apk
           preview_apk=android/app/build/outputs/apk/release/arcana-build134-release-look-test-signed.apk
           test -s "$source_apk"
-          test -s "$HOME/.android/debug.keystore"
+          # CI may sign AGP debug builds with a throwaway key outside $HOME;
+          # create an explicit temporary test certificate for this release-layout APK.
+          # This certificate must never be used for Play release/upload signing.
+          test_keystore="$RUNNER_TEMP/arcana-build134-test-only.jks"
+          keytool -genkeypair -noprompt -keystore "$test_keystore" \
+            -storepass android -keypass android -alias androiddebugkey \
+            -keyalg RSA -keysize 2048 -validity 30 \
+            -dname "CN=Arcana CI test preview only, OU=Build verification, O=Arcana Table, C=US"
+          test -s "$test_keystore"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" sign \
-            --ks "$HOME/.android/debug.keystore" --ks-key-alias androiddebugkey \
+            --ks "$test_keystore" --ks-key-alias androiddebugkey \
             --ks-pass pass:android --key-pass pass:android \
             --out "$preview_apk" "$source_apk"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$preview_apk" > combined-evidence/release-look-test-cert.txt
