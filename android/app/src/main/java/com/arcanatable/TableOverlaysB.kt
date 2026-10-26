@@ -869,7 +869,9 @@ internal fun TableController.TableOverlaysB() {
         onReducedMotion = { value -> run { reducedSwipeMotion = value; optionPrefs.edit().putBoolean("reduced_swipe_motion", value).apply() } },
         onCardSizeScale = { value -> run { cardSizeScale = value; optionPrefs.edit().putFloat("card_size_scale", value).putFloat("layout_card_size_$layoutOrientationSuffix", value).apply() } },
         onClearAllData = { run { optionsOpen = false; clearAllConfirmOpen = true } },
-        onDismiss = { run { optionsOpen = false } }
+        onDismiss = { run { optionsOpen = false } },
+        tutorialStep = if (tutorialChapterId != null) tutorialStep else null,
+        onTutorialNext = { tutorialAdvance() }, onTutorialExit = { stopTutorial() }
     )
     if (layoutLabOpen) AdjustUiPage(
         orientationName = if (isLandscape) "LANDSCAPE" else "PORTRAIT",
