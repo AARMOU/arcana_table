@@ -16,7 +16,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: arcana-ai-difficulty-duel-${{ github.ref }}
+  group: arcana-ai-difficulty-duel-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 jobs:
   duel:

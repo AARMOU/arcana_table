@@ -114,6 +114,21 @@ class AiDifficultyTest {
     }
 
     @Test(timeout = 120000)
+    fun easyOverlookingOptionsStillOnlyMakesLegalPlays() {
+        repeat(12) { seed ->
+            val d = scenario("Shivan Dragon", "Murder", "Grizzly Bears")
+            d.putCreatureOnBattlefield(d.player2, "Shivan Dragon")
+            d.putCardInHand(d.player1, "Murder")
+            d.putCardInHand(d.player1, "Grizzly Bears")
+            d.giveMana(d.player1, Color.BLACK, 3)
+            d.giveMana(d.player1, Color.GREEN, 2)
+            val bot = OfflineAiPolicy.create(d.cardRegistry, d.player1, AiDifficulty.EASY)
+            val action = OfflineAiPolicy.chooseAction(bot, AiDifficulty.EASY, d.state, kotlin.random.Random(seed)) { d.legalActions(d.player1) }
+            assertNull("seed $seed chose $action", d.submit(action).error)
+        }
+    }
+
+    @Test(timeout = 120000)
     fun hardStillSavesTheDragonWithSpellskite() {
         for (level in listOf(AiDifficulty.HARD, AiDifficulty.BRUTAL)) {
             val d = scenario("Spellskite", "Shivan Dragon", "Murder")

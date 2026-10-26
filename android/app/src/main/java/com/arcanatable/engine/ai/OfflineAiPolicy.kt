@@ -6,10 +6,12 @@ import com.wingedsheep.ai.engine.budget.BudgetPolicy
 import com.wingedsheep.ai.engine.budget.BudgetTier
 import com.wingedsheep.ai.engine.budget.DecisionBudget
 import com.wingedsheep.ai.engine.budget.SearchAllowances
+import com.wingedsheep.engine.core.GameAction
 import com.wingedsheep.engine.legalactions.LegalAction
 import com.wingedsheep.engine.registry.CardRegistry
 import com.wingedsheep.engine.state.GameState
 import com.wingedsheep.sdk.model.EntityId
+import kotlin.random.Random
 
 /**
  * Mobile search limits; leaves the engine's reference and server profiles unchanged.
@@ -99,6 +101,25 @@ object OfflineAiPolicy : BudgetPolicy {
 
     fun create(registry: CardRegistry, player: EntityId, difficulty: AiDifficulty): AIPlayer =
         AIPlayer.create(registry, player, profileFor(difficulty))
+
+    /**
+     * One priority choice for an AI seat at [difficulty]. Levels with an [AiDifficulty.overlookChance]
+     * sometimes choose only from a random part of the [legal] actions (mana abilities aside); the
+     * result is always one of the engine's legal actions.
+     */
+    fun chooseAction(
+        bot: AIPlayer,
+        difficulty: AiDifficulty,
+        state: GameState,
+        random: Random = Random.Default,
+        legal: () -> List<LegalAction>,
+    ): GameAction {
+        if (difficulty.overlookChance <= 0.0 || random.nextDouble() >= difficulty.overlookChance) return bot.chooseAction(state)
+        val options = legal().filterNot { it.isManaAbility }
+        val kept = options.filter { it.actionType == "PassPriority" || random.nextBoolean() }
+        if (kept.isEmpty() || kept.size == options.size) return bot.chooseAction(state)
+        return bot.chooseFrom(state, kept).action
+    }
 
     override fun budgetFor(state: GameState, playerId: EntityId, meaningfulActions: List<LegalAction>): DecisionBudget =
         policyFor(AiDifficulty.NORMAL).budgetFor(state, playerId, meaningfulActions)

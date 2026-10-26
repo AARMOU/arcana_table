@@ -652,7 +652,11 @@ class LocalArgentumHost(
             if (!isPerson(priority)) {
                 val bot = ais[priority] ?: break
                 val startedChoice = System.nanoTime()
-                val chosen = timed("aiChoice") { aiGuarded("aiChoiceErrors") { OfflineAiPolicy.think { bot.chooseAction(current) } } }
+                val chosen = timed("aiChoice") { aiGuarded("aiChoiceErrors") { OfflineAiPolicy.think {
+                    OfflineAiPolicy.chooseAction(bot, seatOf(priority).difficulty, current) {
+                        enumerator.enumerate(current, priority, com.wingedsheep.engine.legalactions.EnumerationMode.FULL)
+                    }
+                } } }
                     ?: safePass(current, priority)
                 val choiceType = if (chosen is PassPriority) "aiChoicePass" else "aiChoiceAction"
                 phaseNanos[choiceType] = (phaseNanos[choiceType] ?: 0L) + System.nanoTime() - startedChoice

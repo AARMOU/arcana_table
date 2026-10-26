@@ -58,6 +58,9 @@ class AiDifficultyDuelTest {
                 val seed = 7919L * (pair + 1)
                 val services = EngineServices(registry)
                 val processor = ActionProcessor(services, computeUndo = false)
+                val enumerator = com.wingedsheep.engine.legalactions.LegalActionEnumerator(registry, services.manaSolver,
+                    services.costCalculator, services.predicateEvaluator, services.conditionEvaluator, services.turnManager)
+                val random = kotlin.random.Random(seed + swap)
                 val players = picked.mapIndexed { i, (_, cmd, cards) ->
                     val list = cards.toMutableList().also { it.removeAt(it.indexOfFirst { c -> c.equals(cmd, true) }) }
                     PlayerConfig("AI $i", Deck(list), startingLife = 40, commanderCardNames = listOf(cmd), playerId = EntityId("ai-$i"))
@@ -75,7 +78,9 @@ class AiDifficultyDuelTest {
                     val action = try {
                         OfflineAiPolicy.withThinkingBurst(lvl.getValue(actor).burstMillis) {
                             OfflineAiPolicy.think {
-                                if (decision != null) SubmitDecision(decision.playerId, bot.respondToDecision(state, decision)) else bot.chooseAction(state)
+                                if (decision != null) SubmitDecision(decision.playerId, bot.respondToDecision(state, decision)) else OfflineAiPolicy.chooseAction(bot, lvl.getValue(actor), state, random) {
+                                enumerator.enumerate(state, actor, com.wingedsheep.engine.legalactions.EnumerationMode.FULL)
+                            }
                             }
                         }
                     } catch (e: Throwable) { status = "ai-crash:${e.javaClass.simpleName}"; report.appendLine("  crash: $e at ${e.stackTrace.take(6).joinToString(" | ")}"); break }
