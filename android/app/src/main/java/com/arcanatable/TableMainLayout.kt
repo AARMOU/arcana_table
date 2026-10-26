@@ -448,7 +448,7 @@ internal fun TableController.TableMainLayout() {
                     onCombat = { run { if (argentumEnabled && boardIndex == localSeat) run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } else if (boardCanControl && boardIndex == activePlayer) combatDialogOpen = true } },
                     onTrackers = { if (boardCanControl) trackerPlayer = boardIndex },
                     onSearchLibrary = { run { if (boardCanControl) librarySearchPlayer = boardIndex } },
-                    onStack = { run { stackOpen = true } },
+                    onStack = { run { stackOpen = true; TutorialActions.tap("stack-button") } },
                     onOpenMore = { run {} },
             onCastCommander = { run {
                         if (boardCanControl) {
