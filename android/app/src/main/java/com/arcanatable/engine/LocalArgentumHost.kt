@@ -244,18 +244,24 @@ class LocalArgentumHost(
                 mulliganAction(BottomCards(from, (0 until ids.length()).map { EntityId(ids.getString(it)) }))
             }
             "concede" -> concede(from)
-            "guestLeft" -> if (isWifi && state?.gameOver == false) {
+            "guestLeft" -> if (isWifi && state?.gameOver != true) {
                 // Network transport (host) may name a seat; remote people may only
                 // leave their own seat. Old 1v1 callers omit seatId and mean seat two.
                 val departed = if (from == humanId) {
                     message.optString("seatId").takeIf(String::isNotBlank)?.let(::EntityId) ?: aiId
                 } else from
                 if (departed in guestEmits) {
-                    guestEmits.remove(departed)
-                    guestQuietOpponentTurns.remove(departed)
-                    emit(JSONObject().put("type", "error").put("code", "WIFI")
-                        .put("message", "${seatOf(departed).name} left the game."))
-                    concede(departed)
+                    // 1v1 keeps its old meaning (your friend left, you win). With three or
+                    // more seats, conceding would end or stall everyone else's game, so the
+                    // AI keeps playing the departed person's seat instead.
+                    if (allSeats.size > 2 && !message.optBoolean("concede")) handOverToAi(departed)
+                    else if (state != null) {
+                        guestEmits.remove(departed)
+                        guestQuietOpponentTurns.remove(departed)
+                        emit(JSONObject().put("type", "error").put("code", "WIFI")
+                            .put("message", "${seatOf(departed).name} left the game."))
+                        concede(departed)
+                    }
                 }
             }
             "requestUndo" -> undo(from)
@@ -285,6 +291,34 @@ class LocalArgentumHost(
         if (mulliganDone(seat)) return
         val mull = mulliganState(seat)
         if (mull != null && mull.hasKept) sendBottomCards(seat, mull.cardsToBottom) else sendMulliganDecision(seat)
+    }
+
+    /**
+     * A remote person dropped out of a 3–4 seat game. Their seat keeps its deck and becomes an
+     * AI seat, so the remaining players are never left waiting on someone who isn't there.
+     * Before the game starts, removing the guest is enough: startGame gives every non-person
+     * seat its own AI.
+     */
+    private fun handOverToAi(seat: EntityId) {
+        guestEmits.remove(seat)
+        guestQuietOpponentTurns.remove(seat)
+        interactiveEpochs.remove(seat)
+        val notice = "${seatOf(seat).name} left. The AI is playing their seat now."
+        for (person in people()) emitTo(person, JSONObject().put("type", "error").put("code", "WIFI").put("message", notice))
+        val current = state ?: return
+        if (current.gameOver || seat !in current.activePlayers) return
+        ais = ais + (seat to OfflineAiPolicy.create(registry, seat))
+        if (mulliganPhase) {
+            aiMulligans(seat)
+            if (people().all(::mulliganDone)) finishMulligans()
+            return
+        }
+        // A pay-life question the departed person never answered: the land stays tapped.
+        shockOffers.removeAll { it.player == seat }
+        // If the game was waiting on them, the new AI acts now; otherwise this returns at once.
+        val events = mutableListOf<GameEvent>()
+        drive(events)
+        sendState(events)
     }
 
     private fun concede(seat: EntityId) {
