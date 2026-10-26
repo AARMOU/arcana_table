@@ -1,0 +1,89 @@
+name: Eldrazi Temple exact mana restriction (upgraded Argentum)
+# #152 / #150: source-only compatibility lane; no app runtime JAR, deck, worker or release writes.
+on:
+  push:
+    branches: [gpt/eldrazi-temple-exact-mana-source-20261024]
+    paths:
+      - 'engine-upgrade/eldrazi-temple/**'
+      - '.github/workflows/eldrazi-temple-upgraded-source-tests.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: eldrazi-temple-upgraded-source-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  upgraded-restricted-mana:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - name: Checkout isolated Temple source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout exact current upgraded Argentum source
+        uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 7fb073337e4389cfabe2ebf4c6416633a7fc63d2
+          path: argentum-engine
+          persist-credentials: false
+      - name: Port restriction without modifying any shipped runtime or card
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C argentum-engine rev-parse HEAD)" = "7fb073337e4389cfabe2ebf4c6416633a7fc63d2"
+          python3 engine-upgrade/eldrazi-temple/port_to_upgraded.py argentum-engine
+          cp engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt \
+            argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          git -C argentum-engine diff --check
+          test -z "$(git status --porcelain)"
+          echo "Verified upgraded source SHA and isolated source-only modifications"
+      - name: Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Upgraded SDK tests and serialization compatibility
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:test
+      - name: Seven real-engine restricted-mana scenarios on upgraded source
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :rules-engine:test --tests 'com.wingedsheep.engine.scenarios.EldraziTempleManaRestrictionTest'
+      - name: Require actual upgraded SDK and seven Temple JUnit successes
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          base = Path("argentum-engine")
+          sdk = list((base/"mtg-sdk/build/test-results/test").glob("TEST-*.xml"))
+          engine = list((base/"rules-engine/build/test-results/test").glob("TEST-*.xml"))
+          if not sdk or not engine:
+              raise SystemExit("FAIL: upgraded SDK/engine XML absent")
+          counts = dict(tests=0, failures=0, errors=0, skipped=0)
+          temple = []
+          for p in sdk + engine:
+              root = ET.parse(p).getroot()
+              for key in counts:
+                  counts[key] += int(root.get(key, 0))
+              if "EldraziTempleManaRestrictionTest" in p.name:
+                  temple.append((p.name, {k:int(root.get(k,0)) for k in counts}))
+          print("Upgraded source SDK/engine:", counts, "Temple:", temple)
+          if counts["tests"] < 100 or counts["failures"] or counts["errors"]:
+              raise SystemExit("FAIL: missing or failing upgraded SDK/engine cases")
+          if len(temple) != 1 or temple[0][1] != dict(tests=7, failures=0, errors=0, skipped=0):
+              raise SystemExit("FAIL: seven upgraded Temple scenarios did not execute and pass")
+          PY
+      - name: Preserve read-only provenance and upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eldrazi-temple-upgraded-source-evidence
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            argentum-engine/mtg-sdk/build/test-results/test/TEST-*.xml
+            argentum-engine/rules-engine/build/test-results/test/TEST-*.xml
