@@ -109,6 +109,10 @@ internal class ArgentumDirectedLink(
                     }
                 } else welcomed()
             }
+            "relay-kicked" -> {
+                close()
+                onFailed("Your deck was rejected or the host removed your seat.")
+            }
             "relay-seats-ack" -> {
                 if (isHost && ownSeat == 0) welcomed()
             }
@@ -237,7 +241,10 @@ internal class ArgentumDirectedLink(
         return true
     }
 
-    fun configureAndClose() = close()
+    fun kickGuest(seat: Int): Boolean = isHost && seat in 1..3 &&
+        sendPacket(JSONObject().put("type", "relayKick").put("to", seat))
+
+
 
     fun close() {
         if (!ended.compareAndSet(false, true)) return
@@ -310,6 +317,7 @@ internal class ArgentumCloudMultiHost(
         return friendKinds.indices.filter { friendKinds[it] == "friend" }
             .all { index -> sendTo(seatId(index + 1), message) }
     }
+    fun rejectGuest(id: EntityId): Boolean = seatNumber(id)?.let(link::kickGuest) == true
     override fun send(message: JSONObject): Boolean = false // never broadcast masked state
     override fun close() = link.close()
 
