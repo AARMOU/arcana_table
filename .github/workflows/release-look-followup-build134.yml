@@ -662,6 +662,42 @@ jobs:
                 git add android/app/src/main/java/com/arcanatable/TableArgentum.kt \
                   android/app/src/main/java/com/arcanatable/TableDialogs.kt
                 test -z "$(git diff --name-only --diff-filter=U)"
+              elif [ "$label" = ugin-integration ] && \
+                 [ "$(git diff --name-only --diff-filter=U | sort)" = "$(printf '%s\n' \
+                    android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt \
+                    android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt)" ]; then
+                python3 - <<'PYUGIN'
+          from pathlib import Path
+          import re
+          root=Path('android/custom-cards/src')
+          registry=root/'main/kotlin/com/arcanatable/customcards/CustomCards.kt'
+          s=registry.read_text()
+          matches=list(re.finditer(r'^<<<<<<< ours\n(.*?)^=======\n(.*?)^>>>>>>> theirs\n',s,re.MULTILINE|re.DOTALL))
+          assert len(matches)==1,('registry conflicts',len(matches))
+          c=matches[0]; ours,theirs=c.group(1),c.group(2)
+          assert 'Entry(EldraziDisplacer' in ours and 'Entry(EldritchImmunity' in ours
+          assert 'Entry(UginTheIneffable, "CMM", "Eldrazi Incursion")' in theirs
+          assert 'Entry(UginTheIneffable' not in ours
+          s=s[:c.start()]+ours+theirs+s[c.end():]
+          assert s.count('Entry(UginTheIneffable, "CMM", "Eldrazi Incursion")')==1
+          registry.write_text(s)
+          tests=root/'test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt'
+          t=tests.read_text()
+          changes=list(re.finditer(r'^<<<<<<< ours\n(.*?)^=======\n(.*?)^>>>>>>> theirs\n',t,re.MULTILINE|re.DOTALL))
+          assert len(changes)>=2,('unexpected Ugin test conflicts',len(changes))
+          # B135 already had initial Ugin tests. #285 added deeper privacy,
+          # leave-the-battlefield and loyalty regressions. All overlapping hunks
+          # must be additive; do not discard any prior test body.
+          assert all(not x.group(1).strip() and x.group(2).strip() for x in changes), \
+              'Non-additive Ugin conflict requires manual review'
+          for c in reversed(changes): t=t[:c.start()]+c.group(2)+t[c.end():]
+          assert not re.search(r'^(?:<<<<<<< |=======|>>>>>>> )',t,re.MULTILINE)
+          tests.write_text(t)
+          print('PASS: preserved earlier Ugin tests, added all reviewed linked-exile regressions')
+          PYUGIN
+                git add android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt \
+                  android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt
+                test -z "$(git diff --name-only --diff-filter=U)"
               else
                 echo "::error title=Build 136 integration conflict::${label}: no unreviewed hunk dropped"
                 git status --short
