@@ -128,6 +128,168 @@ private suspend fun TableController.acceptWifiGuest(
     recordDiagnostic("Wi-Fi game started: you vs $guestName (${seat.commander})", DiagnosticCategory.ENGINE)
 }
 
+
+/** Debug-only four-player host path; regular two-player hosting above remains untouched. */
+internal fun TableController.startMultiWifiHost() {
+    if (!BuildConfig.DEBUG) { message = "Four-player Wi-Fi is not enabled in this release."; return }
+    if (offlineStarting || argentumEnabled || wifiServer != null) return
+    val count = wifiMultiSeatCount.coerceIn(2, 4)
+    val friends = (1 until count).filter(wifiMultiFriendSlots::contains)
+    if (friends.isEmpty()) { message = "Choose at least one friend seat."; return }
+    wifiMultiConfigOpen = false
+    offlineStarting = true
+    scope.launch {
+        try {
+            val (names, commander) = activeDeckCards()
+            val (setup, registry) = prepareOfflineSetup(names, commander, null, aiCount = count - 1)
+            if (setup.you.commander == null) {
+                message = "Choose a Commander deck before hosting a multiplayer game."
+                return@launch
+            }
+            val you = setup.you.copy(name = friendlyName(setup.you.commander))
+            val room = ArgentumWaitingLobby(you, listOf(setup.ai) + setup.extraAis, count)
+            for (index in 1 until count) {
+                room.setKind(index, if (index in friends) ArgentumWaitingLobby.Kind.FRIEND
+                else ArgentumWaitingLobby.Kind.AI)
+            }
+            val address = ArgentumLan.localAddress()
+            if (address.isBlank()) {
+                message = "Connect this phone to Wi-Fi before hosting."
+                return@launch
+            }
+            lateinit var server: ArgentumLanMultiServer
+            server = ArgentumLanMultiServer(friendlyName(commander), room.friendSeatIds(),
+                onGuest = { id, hello -> scope.launch {
+                    acceptMultiWifiGuest(server, room, id, hello, registry)
+                } },
+                onGuestMessage = { id, packet ->
+                    argentumSocket.runningLocalHost?.receive(packet, id)
+                },
+                onGuestLeft = { id -> scope.launch {
+                    if (wifiServer === server) {
+                        if (argentumSocket.runningLocalHost == null) {
+                            room.guestLeft(id)
+                            wifiMultiLobbyState = room.lobbyMessage()
+                            server.broadcastLobby(wifiMultiLobbyState!!)
+                        } else {
+                            argentumSocket.runningLocalHost?.receive(
+                                JSONObject().put("type", "guestLeft").put("seatId", id.value),
+                                com.arcanatable.engine.LocalArgentumHost.HUMAN_ID)
+                        }
+                    }
+                } },
+            )
+            server.start()
+            val bound = withContext(Dispatchers.IO) { server.awaitReady(10_000) }
+            if (!bound) {
+                message = "Couldn't start the Wi-Fi multiplayer host: ${server.bindError?.javaClass?.simpleName ?: "socket not ready"}"
+                server.close()
+                return@launch
+            }
+            wifiServer = server
+            wifiMultiLobby = room
+            wifiMultiSetup = setup
+            wifiMultiRegistry = registry
+            wifiMultiLobbyState = room.lobbyMessage()
+            wifiWaitingAddress = address
+            recordDiagnostic("Four-player Wi-Fi lobby open; requested ${room.seatCount} seats at $address",
+                DiagnosticCategory.CONNECTION)
+        } catch (error: Throwable) {
+            stopWifi()
+            message = "Multiplayer hosting failed: ${error.javaClass.simpleName}: ${error.message?.take(200)}"
+            recordDiagnostic("Multiplayer Wi-Fi host failed: ${error.javaClass.simpleName}: ${error.message}", DiagnosticCategory.ERROR)
+        } finally {
+            offlineStarting = false
+        }
+    }
+}
+
+/** Validate each seat before it may send game actions or receive its own private view. */
+private suspend fun TableController.acceptMultiWifiGuest(
+    server: ArgentumLanMultiServer,
+    room: ArgentumWaitingLobby,
+    id: com.wingedsheep.sdk.model.EntityId,
+    hello: JSONObject,
+    registry: com.wingedsheep.engine.registry.CardRegistry,
+) {
+    if (wifiServer !== server || wifiMultiLobby !== room) {
+        server.rejectGuest(id, "This game is no longer accepting guests.")
+        return
+    }
+    val name = hello.optString("name").ifBlank { "Friend" }.take(32)
+    val deck = hello.optJSONArray("deck") ?: JSONArray()
+    val names = (0 until deck.length()).map(deck::optString)
+    val commander = hello.optString("commander").takeUnless { it.isBlank() || it == "null" }
+    val (seat, notes) = withContext(Dispatchers.IO) {
+        com.arcanatable.engine.OfflineGameSetup.lanSeat(offlineLibrary(), registry, name, names, commander)
+    }
+    if (wifiServer !== server || wifiMultiLobby !== room) {
+        server.rejectGuest(id, "The host closed the room.")
+        return
+    }
+    if (seat == null || !room.seatGuestAt(id, seat)) {
+        server.rejectGuest(id, notes.firstOrNull() ?: "That deck or seat isn't available.")
+        return
+    }
+    if (!server.admitGuest(id)) {
+        room.guestLeft(id)
+        return
+    }
+    server.sendTo(id, JSONObject().put("type", "lanSeat").put("seat", id.value).put("name", seat.name))
+    notes.forEach { note -> server.sendTo(id, JSONObject().put("type", "error")
+        .put("code", "WIFI_NOTE").put("message", note)) }
+    wifiMultiLobbyState = room.lobbyMessage()
+    server.broadcastLobby(wifiMultiLobbyState!!)
+    recordDiagnostic("Multiplayer guest joined seat ${id.value}", DiagnosticCategory.CONNECTION)
+}
+
+/** Host alone decides when every requested friend has arrived and gameplay can start. */
+internal fun TableController.startMultiWifiGame() {
+    val room = wifiMultiLobby ?: return
+    val server = wifiServer as? ArgentumLanMultiServer ?: return
+    val registry = wifiMultiRegistry ?: return
+    val roster = room.start() ?: return
+    scope.launch {
+        try {
+            wifiRole = "host"
+            wifiWaitingAddress = null
+            argentumSocket.localHostFactory = { emit ->
+                com.arcanatable.engine.LocalArgentumHost(
+                    registry, roster.players[0], roster.opponent,
+                    extraOpponents = roster.extraOpponents, emit = emit
+                ).also { it.quietOpponentTurns = quietOpponentTurns }
+            }
+            argentumOffline = true
+            argentumDeckForLobby = null
+            argentumCommanderForLobby = null
+            argentumVsAiLobby = false
+            argentumLobbySubmitted = true
+            argentumLocalPlayersBackup = players.toList()
+            argentumEnabled = true
+            homeOpen = false
+            lobbyOpen = false
+            argentumSocket.connect(lobbyPlayerName)
+            var attempt = 0
+            while (argentumSocket.runningLocalHost == null && attempt++ < 20) delay(100)
+            val host = argentumSocket.runningLocalHost
+                ?: error("The local Argentum engine did not start.")
+            for ((id, seat) in roster.humanGuests) {
+                host.setGuest(id, seat) { packet -> server.sendTo(id, packet) }
+            }
+            argentumSocket.createCommanderPracticeLobby(vsAi = false)
+            wifiMultiLobbyState = null
+            recordDiagnostic("Wi-Fi Commander started with ${roster.players.size} seats and ${roster.humanGuests.size + 1} humans",
+                DiagnosticCategory.ENGINE)
+        } catch (error: Throwable) {
+            message = "Could not start the multiplayer engine: ${error.message ?: error.javaClass.simpleName}"
+            argentumSocket.close()
+            stopWifi()
+            argentumEnabled = false
+            homeOpen = true
+        }
+    }
+}
+
 /** Guest: look for a host on this network. */
 internal fun TableController.searchWifiHosts() {
     if (wifiSearching) return
