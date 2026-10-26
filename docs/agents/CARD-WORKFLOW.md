@@ -51,7 +51,7 @@ tools/cardkit/cardkit similar --text "Whenever this creature attacks, draw a car
 ```
 
 Matches marked `[custom]` link a Kotlin file **and its test** in this repo. Matches marked `[library]` link
-the card's source in upstream Argentum at the pinned commit (`61e71e5…`), which is the same DSL the app
+the card's source in upstream Argentum at the pinned commit (`36d0366…`), which is the same DSL the app
 compiles against.
 
 No Oracle text cached? `tools/cardkit/cardkit oracle fetch "Card Name"` (needs api.scryfall.com). If your

@@ -1,7 +1,18 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: arcana-weekly-bot
+ <41898282+github-actions[bot]@users.noreply.github.com>
+Date: Sat, 1 Jan 2000 00:00:00 +0000
+Subject: [PATCH] arcana: 0008-jvm-test-toolchain
+
+---
+ buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
 diff --git a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
+index 3374cddf82..9ade880ed3 100644
 --- a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
 +++ b/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts
-@@ -20,7 +20,6 @@
+@@ -20,7 +20,6 @@ kotlin {
      // Arcana: compile against the Java 17 API so the jars run on Android (no Java 21-only calls).
      compilerOptions {
          jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
@@ -9,7 +20,7 @@ diff --git a/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts b/buildSrc/src/main/
      }
  }
  
-@@ -37,6 +36,9 @@
+@@ -37,6 +36,9 @@ val kotlinCompileThrottle =
  
  tasks.withType<KotlinCompile>().configureEach {
      usesService(kotlinCompileThrottle)

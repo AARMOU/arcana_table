@@ -57,6 +57,9 @@
    "BLOODSTAIN": [
     "BLOODSTAIN: String"
    ],
+   "BOOK": [
+    "BOOK: String"
+   ],
    "BORE": [
     "BORE: String"
    ],
@@ -135,8 +138,14 @@
    "EGG": [
     "EGG: String"
    ],
+   "EMBER": [
+    "EMBER: String"
+   ],
    "ENERGY": [
     "ENERGY: String"
+   ],
+   "ENLIGHTENED": [
+    "ENLIGHTENED: String"
    ],
    "EXALTED": [
     "EXALTED: String"
@@ -165,6 +174,9 @@
    "FIRST_STRIKE": [
     "FIRST_STRIKE: String"
    ],
+   "FLAME": [
+    "FLAME: String"
+   ],
    "FLOOD": [
     "FLOOD: String"
    ],
@@ -182,6 +194,9 @@
    ],
    "GROWTH": [
     "GROWTH: String"
+   ],
+   "HARMONY": [
+    "HARMONY: String"
    ],
    "HARNESS": [
     "HARNESS: String"
@@ -366,6 +381,9 @@
    "REACH": [
     "REACH: String"
    ],
+   "REFINE": [
+    "REFINE: String"
+   ],
    "REJECTION": [
     "REJECTION: String"
    ],
@@ -377,6 +395,9 @@
    ],
    "REVIVAL": [
     "REVIVAL: String"
+   ],
+   "RITUAL": [
+    "RITUAL: String"
    ],
    "SCREAM": [
     "SCREAM: String"
@@ -410,6 +431,9 @@
    ],
    "STORAGE": [
     "STORAGE: String"
+   ],
+   "STUDY": [
+    "STUDY: String"
    ],
    "STUN": [
     "STUN: String"
@@ -453,8 +477,14 @@
    "VITALITY": [
     "VITALITY: String"
    ],
+   "VOID": [
+    "VOID: String"
+   ],
    "VOW": [
     "VOW: String"
+   ],
+   "VOYAGE": [
+    "VOYAGE: String"
    ],
    "WIND": [
     "WIND: String"
@@ -541,7 +571,7 @@
    ],
    "targets": [
     "targets(TargetRequirement): List<EffectTarget.BoundVariable>",
-    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
+    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
    ],
    "timing": [
     "timing: TimingRule"
@@ -1204,6 +1234,9 @@
    "CreatureDiedThisTurn": [
     "CreatureDiedThisTurn: Condition"
    ],
+   "CreatureNotNamedDiedThisTurn": [
+    "CreatureNotNamedDiedThisTurn(String, Player): Condition"
+   ],
    "CreaturesAttackedThisTurn": [
     "CreaturesAttackedThisTurn(Int, GameObjectFilter): Condition"
    ],
@@ -1441,6 +1474,9 @@
    "ScriedOrSurveiledThisTurn": [
     "ScriedOrSurveiledThisTurn: Condition"
    ],
+   "SelfAlternativeCostWasPaid": [
+    "SelfAlternativeCostWasPaid: Condition"
+   ],
    "SneakCostWasPaid": [
     "SneakCostWasPaid: Condition"
    ],
@@ -1663,6 +1699,9 @@
    ],
    "WasEvidenceCollected": [
     "WasEvidenceCollected: Condition"
+   ],
+   "WasForetold": [
+    "WasForetold: Condition"
    ],
    "WasKicked": [
     "WasKicked: Condition"
@@ -1892,7 +1931,7 @@
     "ExilePermanents(GameObjectFilter, Int, Boolean, VariableCostMeasure, Int, Integer): AbilityCost"
    ],
    "ExilePermanentsFixed": [
-    "ExilePermanentsFixed(Int, GameObjectFilter, Boolean): AbilityCost"
+    "ExilePermanentsFixed(Int, GameObjectFilter, Boolean, Boolean): AbilityCost"
    ],
    "ExileSelf": [
     "ExileSelf: AbilityCost"
@@ -2013,6 +2052,9 @@
    ],
    "Unattach": [
     "Unattach: AbilityCost"
+   ],
+   "UnattachGrantingPermanent": [
+    "UnattachGrantingPermanent: AbilityCost"
    ],
    "Untap": [
     "Untap: AbilityCost"
@@ -2300,7 +2342,7 @@
    ],
    "targets": [
     "targets(TargetRequirement): List<EffectTarget.BoundVariable>",
-    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
+    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
    ]
   },
   "com.wingedsheep.sdk.dsl.DynamicAmountOperatorsKt": {
@@ -2528,7 +2570,7 @@
     "domain(Player): DynamicAmount"
    ],
    "dungeonsCompleted": [
-    "dungeonsCompleted(Player, String): DynamicAmount"
+    "dungeonsCompleted(Player, String, Boolean): DynamicAmount"
    ],
    "enchantedCreaturePower": [
     "enchantedCreaturePower(): DynamicAmount"
@@ -2816,6 +2858,9 @@
    "triggerExcessDamageAmount": [
     "triggerExcessDamageAmount(): DynamicAmount"
    ],
+   "triggerHighestDieResult": [
+    "triggerHighestDieResult(): DynamicAmount"
+   ],
    "triggerLifeGained": [
     "triggerLifeGained(): DynamicAmount"
    ],
@@ -2981,6 +3026,9 @@
    "AddCombatPhaseRestrictedTo": [
     "AddCombatPhaseRestrictedTo(GameObjectFilter): Effect"
    ],
+   "AddCombatPhaseWithBeginningTrigger": [
+    "AddCombatPhaseWithBeginningTrigger(Effect): Effect"
+   ],
    "AddCounters": [
     "AddCounters(String, Int, EffectTarget): Effect"
    ],
@@ -3019,8 +3067,8 @@
     "AddMana(Color, DynamicAmount, ManaRestriction, Set<? extends ManaSpellRider>, ManaExpiry): Effect"
    ],
    "AddManaInAnyCombination": [
-    "AddManaInAnyCombination(Int, Set<? extends Color>, ManaRestriction): Effect",
-    "AddManaInAnyCombination(DynamicAmount, Set<? extends Color>, ManaRestriction): Effect"
+    "AddManaInAnyCombination(Int, Set<? extends Color>, ManaRestriction, ManaExpiry): Effect",
+    "AddManaInAnyCombination(DynamicAmount, Set<? extends Color>, ManaRestriction, ManaExpiry): Effect"
    ],
    "AddManaOfChoice": [
     "AddManaOfChoice(ManaColorSet, Int, ManaRestriction, EffectTarget, Boolean, Set<? extends ManaSpellRider>): Effect",
@@ -3110,8 +3158,8 @@
     "BecomeCopyOfLinkedExile(EffectTarget): Effect"
    ],
    "BecomeCreature": [
-    "BecomeCreature(EffectTarget, DynamicAmount, DynamicAmount, Set<? extends Keyword>, Set<String>, Set<String>, Set<String>, Set<String>, String, Duration, DynamicAmount, DynamicAmount): Effect",
-    "BecomeCreature(EffectTarget, Int, Int, Set<? extends Keyword>, Set<String>, Set<String>, Set<String>, Set<String>, String, Duration): Effect"
+    "BecomeCreature(EffectTarget, DynamicAmount, DynamicAmount, Set<? extends Keyword>, Set<String>, Set<String>, Set<String>, Set<String>, String, Duration, DynamicAmount, DynamicAmount, Set<String>): Effect",
+    "BecomeCreature(EffectTarget, Int, Int, Set<? extends Keyword>, Set<String>, Set<String>, Set<String>, Set<String>, String, Duration, Set<String>): Effect"
    ],
    "BecomeCreatureType": [
     "BecomeCreatureType(EffectTarget, Duration, List<String>): Effect"
@@ -3198,17 +3246,20 @@
     "CastAnyNumberFromCollection(String): Effect"
    ],
    "CastAnyNumberFromCollectionWithoutPayingCost": [
-    "CastAnyNumberFromCollectionWithoutPayingCost(String): Effect"
+    "CastAnyNumberFromCollectionWithoutPayingCost(String, String): Effect"
    ],
    "CastFaceDownFromCollection": [
     "CastFaceDownFromCollection(String, Boolean, String): Effect"
    ],
    "CastFromCollection": [
-    "CastFromCollection(String, AfterResolveDestination, Chooser, String, String): Effect",
-    "CastFromCollection(String, String, AfterResolveDestination, Chooser, String): Effect"
+    "CastFromCollection(String, String, AfterResolveDestination, Chooser, String, Int): Effect"
+   ],
+   "CastFromCollection-tWY3-HA": [
+    "CastFromCollection-tWY3-HA(String, AfterResolveDestination, Chooser, String, String, Int): Effect"
    ],
    "CastFromCollectionByPaying": [
-    "CastFromCollectionByPaying(String, AdditionalCost, String): Effect"
+    "CastFromCollectionByPaying(String, AdditionalCost, String): Effect",
+    "CastFromCollectionByPaying(String, String, String): Effect"
    ],
    "CastFromCollectionWithoutPayingCost": [
     "CastFromCollectionWithoutPayingCost(String, AfterResolveDestination, Chooser, String): Effect",
@@ -3283,7 +3334,7 @@
     "ChooseNumberForSource(Int, Int, ChoiceSlot, String): Effect"
    ],
    "ChooseNumberThen": [
-    "ChooseNumberThen(Effect, Int, Int, String): Effect",
+    "ChooseNumberThen(Effect, Int, Int, String, Boolean): Effect",
     "ChooseNumberThen(Effect, DynamicAmount, Int, String): Effect"
    ],
    "ChooseOpponent": [
@@ -3370,6 +3421,9 @@
    ],
    "CounterSpellToLibrary": [
     "CounterSpellToLibrary(LibraryChoicePosition...): Effect"
+   ],
+   "CounterTargetingSourceUnlessPays": [
+    "CounterTargetingSourceUnlessPays(WardCost): Effect"
    ],
    "CounterTriggeringAbility": [
     "CounterTriggeringAbility(): Effect"
@@ -3483,8 +3537,8 @@
     "CreateShard(Int, EffectTarget): Effect"
    ],
    "CreateToken": [
-    "CreateToken(Int, Int, Set<? extends Color>, Set<String>, Set<? extends Keyword>, Int, EffectTarget, String, String, Boolean, Boolean, Boolean, Boolean, List<? extends StaticAbility>, Step, Step, Boolean, List<TriggeredAbility>, List<ActivatedAbility>, DynamicAmount, DynamicAmount, Map<CounterType, Integer>, Boolean, List<KeywordAbility.Numeric>, EnteringAttackDefender, EffectTarget): CreateTokenEffect",
-    "CreateToken(DynamicAmount, Int, Int, Set<? extends Color>, Set<String>, Set<? extends Keyword>, EffectTarget, String, String, Boolean, Boolean, Boolean, Boolean, List<? extends StaticAbility>, Step, Step, Boolean, List<TriggeredAbility>, List<ActivatedAbility>, DynamicAmount, DynamicAmount, Map<CounterType, Integer>, Boolean, List<KeywordAbility.Numeric>, EnteringAttackDefender, EffectTarget): CreateTokenEffect"
+    "CreateToken(Int, Int, Set<? extends Color>, Set<String>, Set<? extends Keyword>, Int, EffectTarget, String, String, Boolean, Boolean, Boolean, Boolean, List<? extends StaticAbility>, Step, Step, Boolean, List<TriggeredAbility>, List<ActivatedAbility>, DynamicAmount, DynamicAmount, Map<CounterType, Integer>, Boolean, List<KeywordAbility.Numeric>, EnteringAttackDefender, EffectTarget, List<CollectionSlot>): CreateTokenEffect",
+    "CreateToken(DynamicAmount, Int, Int, Set<? extends Color>, Set<String>, Set<? extends Keyword>, EffectTarget, String, String, Boolean, Boolean, Boolean, Boolean, List<? extends StaticAbility>, Step, Step, Boolean, List<TriggeredAbility>, List<ActivatedAbility>, DynamicAmount, DynamicAmount, Map<CounterType, Integer>, Boolean, List<KeywordAbility.Numeric>, EnteringAttackDefender, EffectTarget, List<CollectionSlot>): CreateTokenEffect"
    ],
    "CreateTokenCopyOfChosenPermanent": [
     "CreateTokenCopyOfChosenPermanent(GameObjectFilter): Effect"
@@ -3496,8 +3550,8 @@
     "CreateTokenCopyOfSelf(Int, Integer, Integer, Boolean, CopyExceptions, Step, Set<String>): Effect"
    ],
    "CreateTokenCopyOfTarget": [
-    "CreateTokenCopyOfTarget(EffectTarget, Int, Integer, Integer, Boolean, Boolean, List<TriggeredAbility>, Set<? extends Keyword>, Set<? extends Supertype>, Set<? extends Supertype>, Set<? extends Color>, Set<? extends Color>, Set<Subtype>, Set<Subtype>, Set<? extends CardType>, List<ActivatedAbility>, List<? extends StaticAbility>, Step, Boolean, Set<String>, Step, Boolean, EffectTarget, CopyExceptions, Boolean, EffectTarget, EffectTarget, EnteringAttackDefender, DynamicAmount, DynamicAmount): Effect",
-    "CreateTokenCopyOfTarget(EffectTarget, DynamicAmount, Integer, Integer, Boolean, Boolean, List<TriggeredAbility>, Set<? extends Keyword>, Set<? extends Supertype>, Set<? extends Supertype>, Set<? extends Color>, Set<? extends Color>, Set<Subtype>, Set<Subtype>, Set<? extends CardType>, List<ActivatedAbility>, List<? extends StaticAbility>, Step, Boolean, Set<String>, Step, Boolean, EffectTarget, CopyExceptions, Boolean, EffectTarget, EffectTarget, EnteringAttackDefender, DynamicAmount, DynamicAmount): Effect"
+    "CreateTokenCopyOfTarget(EffectTarget, Int, Integer, Integer, Boolean, Boolean, List<TriggeredAbility>, Set<? extends Keyword>, Set<? extends Supertype>, Set<? extends Supertype>, Set<? extends Color>, Set<? extends Color>, Set<Subtype>, Set<Subtype>, Set<? extends CardType>, List<ActivatedAbility>, List<? extends StaticAbility>, Step, Boolean, Set<String>, Step, Boolean, EffectTarget, CopyExceptions, Boolean, EffectTarget, EffectTarget, EnteringAttackDefender, DynamicAmount, DynamicAmount, Map<CounterType, ? extends DynamicAmount>): Effect",
+    "CreateTokenCopyOfTarget(EffectTarget, DynamicAmount, Integer, Integer, Boolean, Boolean, List<TriggeredAbility>, Set<? extends Keyword>, Set<? extends Supertype>, Set<? extends Supertype>, Set<? extends Color>, Set<? extends Color>, Set<Subtype>, Set<Subtype>, Set<? extends CardType>, List<ActivatedAbility>, List<? extends StaticAbility>, Step, Boolean, Set<String>, Step, Boolean, EffectTarget, CopyExceptions, Boolean, EffectTarget, EffectTarget, EnteringAttackDefender, DynamicAmount, DynamicAmount, Map<CounterType, ? extends DynamicAmount>): Effect"
    ],
    "CreateTokenOfChosenColorAndType": [
     "CreateTokenOfChosenColorAndType(DynamicAmount, DynamicAmount, Int): Effect"
@@ -3580,7 +3634,7 @@
     "DistributeDamageAmongCollection(DynamicAmount, String, EffectTarget, Chooser): Effect"
    ],
    "DividedDamage": [
-    "DividedDamage(Int, Int, Int, DynamicAmount): Effect"
+    "DividedDamage(Int, Int, Int, DynamicAmount, List<EffectTarget.BoundVariable>): Effect"
    ],
    "DoubleAllCounters": [
     "DoubleAllCounters(EffectTarget): Effect"
@@ -3643,6 +3697,9 @@
    "Endure": [
     "Endure(DynamicAmount, EffectTarget): Effect",
     "Endure(Int, EffectTarget): Effect"
+   ],
+   "EnterTapped": [
+    "EnterTapped(): Effect"
    ],
    "ExchangeControl": [
     "ExchangeControl(EffectTarget, EffectTarget): Effect"
@@ -3868,11 +3925,11 @@
     "GrantKeywordToAttackersBlockedBy(Keyword, EffectTarget, Duration): Effect"
    ],
    "GrantKeywordToSpell": [
-    "GrantKeywordToSpell(Keyword, EffectTarget): Effect"
+    "GrantKeywordToSpell(Keyword, EffectTarget, Duration): Effect"
    ],
    "GrantMayPlayFromExile": [
-    "GrantMayPlayFromExile(String, MayPlayExpiry, Boolean, Condition, Boolean, Effect, AfterResolveDestination, Boolean, Integer, Boolean, Color, Integer, Integer, Boolean, Boolean): Effect",
-    "GrantMayPlayFromExile(String, MayPlayExpiry, Boolean, Condition, Boolean, Effect, AfterResolveDestination, Boolean, Integer, Boolean, Color, Integer, EffectTarget, Boolean, Integer, Boolean, Boolean): Effect"
+    "GrantMayPlayFromExile(String, MayPlayExpiry, Boolean, Condition, Boolean, Effect, AfterResolveDestination, Boolean, Integer, Boolean, Color, Integer, Integer, ManaSpentAsAnyColor, Boolean): Effect",
+    "GrantMayPlayFromExile(String, MayPlayExpiry, Boolean, Condition, Boolean, Effect, AfterResolveDestination, Boolean, Integer, Boolean, Color, Integer, EffectTarget, Boolean, Integer, ManaSpentAsAnyColor, Boolean): Effect"
    ],
    "GrantNextSpellAffinity": [
     "GrantNextSpellAffinity(GameObjectFilter, CardType): Effect"
@@ -3887,7 +3944,7 @@
     "GrantPlayWithAdditionalCost(String, AdditionalCost): Effect"
    ],
    "GrantPlayWithCostIncrease": [
-    "GrantPlayWithCostIncrease(String, Int): Effect"
+    "GrantPlayWithCostIncrease(String, Int, GameObjectFilter): Effect"
    ],
    "GrantPlayWithoutPayingCost": [
     "GrantPlayWithoutPayingCost(String, MayPlayExpiry): Effect"
@@ -4023,7 +4080,7 @@
     "MarkExileControllerGraveyardOnDeath(EffectTarget): Effect"
    ],
    "MarkExileOnDeath": [
-    "MarkExileOnDeath(EffectTarget): Effect"
+    "MarkExileOnDeath(EffectTarget, Duration): Effect"
    ],
    "MarkMustAttackNextCombat": [
     "MarkMustAttackNextCombat(EffectTarget): Effect"
@@ -4063,7 +4120,7 @@
     "Meld(GameObjectFilter, String, Boolean): Effect"
    ],
    "Modal": [
-    "Modal(List<Mode>, Int, Int, Boolean, String, CostAtom, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, Boolean): Effect"
+    "Modal(List<Mode>, Int, Int, Boolean, String, CostAtom, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, Boolean, Boolean, Boolean): Effect"
    ],
    "ModifyStats": [
     "ModifyStats(Int, Int, EffectTarget, Duration): Effect",
@@ -4074,7 +4131,7 @@
     "Monstrosity(DynamicAmount): Effect"
    ],
    "Move": [
-    "Move(EffectTarget, Zone, ZonePlacement, Boolean, EffectTarget, Zone, FaceDownMode, Boolean, Integer, String, GameObjectFilter, EnteringAttackDefender): Effect"
+    "Move(EffectTarget, Zone, ZonePlacement, Boolean, EffectTarget, Zone, FaceDownMode, Boolean, Integer, String, GameObjectFilter, List<EntryCounter>, EnteringAttackDefender): Effect"
    ],
    "MoveAllCounters": [
     "MoveAllCounters(EffectTarget, EffectTarget): Effect"
@@ -4200,7 +4257,7 @@
     "PreventNextDamageLeavingAmount(DynamicAmount, EffectTarget, GameObjectFilter, Boolean, Duration): Effect"
    ],
    "Proliferate": [
-    "Proliferate(EffectTarget): Effect"
+    "Proliferate(EffectTarget, String): Effect"
    ],
    "Provoke": [
     "Provoke(EffectTarget): Effect"
@@ -4385,7 +4442,7 @@
     "ReturnSelfFromGraveyardTransformed(Boolean): Effect"
    ],
    "ReturnSelfToBattlefieldAttached": [
-    "ReturnSelfToBattlefieldAttached(EffectTarget, Boolean): Effect"
+    "ReturnSelfToBattlefieldAttached(EffectTarget, Boolean, EffectTarget): Effect"
    ],
    "ReturnSpellOrPermanentToOwnersHand": [
     "ReturnSpellOrPermanentToOwnersHand(EffectTarget): Effect"
@@ -4409,7 +4466,7 @@
     "RevealHand(EffectTarget): Effect"
    ],
    "RollDice": [
-    "RollDice(DynamicAmount, Int, EffectTarget, Map<String, ? extends Set<Integer>>): Effect"
+    "RollDice(DynamicAmount, Int, EffectTarget, Map<String, ? extends Set<Integer>>, DynamicAmount, String): Effect"
    ],
    "Sacrifice": [
     "Sacrifice(GameObjectFilter, Int, EffectTarget): Effect",
@@ -5087,7 +5144,7 @@
     "loot(Int, Int): CompositeEffect"
    ],
    "putFromHand": [
-    "putFromHand(GameObjectFilter, Int, Boolean, Boolean, Boolean, String): CompositeEffect"
+    "putFromHand(GameObjectFilter, Int, Boolean, Boolean, Boolean, String, EnteringAttackDefender): CompositeEffect"
    ],
    "putFromHandCards": [
     "putFromHandCards: String"
@@ -5234,7 +5291,7 @@
    ],
    "targets": [
     "targets(TargetRequirement): List<EffectTarget.BoundVariable>",
-    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
+    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
    ],
    "xDefinedAs": [
     "xDefinedAs: DynamicAmount"
@@ -5319,7 +5376,7 @@
     "incubate(DynamicAmount): CompositeEffect"
    ],
    "learn": [
-    "learn(): CompositeEffect"
+    "learn(): LearnEffect"
    ],
    "recruit": [
     "recruit(): CompositeEffect"
@@ -5467,7 +5524,7 @@
     "becomesTapped(TapReason, Boolean): TriggerSpec"
    ],
    "becomesTarget": [
-    "becomesTarget(GameObjectFilter, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean): TriggerSpec"
+    "becomesTarget(GameObjectFilter, Boolean, Boolean, Boolean, Boolean, Boolean, Boolean, Player, Boolean, Boolean): TriggerSpec"
    ],
    "becomesUnattached": [
     "becomesUnattached(GameObjectFilter, Player): TriggerSpec"
@@ -5528,6 +5585,9 @@
    ],
    "entersAttacking": [
     "entersAttacking(): TriggerSpec"
+   ],
+   "entersTapped": [
+    "entersTapped(): TriggerSpec"
    ],
    "evolves": [
     "evolves(): TriggerSpec"
@@ -5613,7 +5673,7 @@
    ],
    "targets": [
     "targets(TargetRequirement): List<EffectTarget.BoundVariable>",
-    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
+    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
    ]
   },
   "com.wingedsheep.sdk.dsl.OpusDslKt": {
@@ -5753,7 +5813,7 @@
     "forEachPlayerCollecting(Player, Function1<? super PipelineBuilder, ? extends List<CollectionSlot>>): List<CollectionSlot>"
    ],
    "gather": [
-    "gather(CardSource, Boolean, String, Boolean, LookAudience): String",
+    "gather(CardSource, Boolean, String, Boolean, LookAudience, Player): String",
     "gather(GameObjectFilter, Player, Boolean, Boolean, Boolean, Boolean, String): String"
    ],
    "gatherSubtypes": [
@@ -5765,12 +5825,15 @@
    "ifNotEmpty": [
     "ifNotEmpty(String, GameObjectFilter, Int, Boolean, Function1<? super PipelineBuilder, Unit>): PipelineBuilder.ConditionalHandle"
    ],
+   "ifThen": [
+    "ifThen(Condition, Function1<? super PipelineBuilder, Unit>): Unit"
+   ],
    "mill": [
     "mill(DynamicAmount, Player): String",
     "mill(Int, Player): String"
    ],
    "move": [
-    "move(String, CardDestination, CardOrder, Boolean, Boolean, MoveType, Boolean, Boolean, FaceDownMode, Boolean, Boolean, Boolean, String, Boolean, GameObjectFilter, EffectTarget): Unit"
+    "move(String, CardDestination, CardOrder, Boolean, Boolean, MoveType, Boolean, Boolean, FaceDownMode, Boolean, Boolean, Boolean, String, Boolean, GameObjectFilter, EffectTarget, EnteringAttackDefender): Unit"
    ],
    "moveTracked-": [
     "moveTracked-(String, CardDestination, CardOrder, Boolean, Boolean, MoveType, Boolean, Boolean, FaceDownMode, Boolean, Boolean, Boolean, String, Boolean, GameObjectFilter, EffectTarget, String): String"
@@ -5784,11 +5847,17 @@
    "repeatCollecting": [
     "repeatCollecting(RepeatCondition, Function1<? super PipelineBuilder, ? extends List<CollectionSlot>>): List<CollectionSlot>"
    ],
+   "repeatProcess": [
+    "repeatProcess(Function1<? super PipelineBuilder, ? extends RepeatCondition>): Unit"
+   ],
    "reveal": [
     "reveal(String, Boolean, Zone, Zone): Unit"
    ],
    "rollDice": [
     "rollDice(DynamicAmount, Int, EffectTarget, List<? extends Set<Integer>>): List<NumberSlot>"
+   ],
+   "rollDiceResult": [
+    "rollDiceResult(DynamicAmount, Int, EffectTarget, DynamicAmount): String"
    ],
    "run": [
     "run(Effect): Unit"
@@ -5867,6 +5936,9 @@
    "namedFromVariable-e-ebbyo": [
     "namedFromVariable-e-ebbyo(GameObjectFilter, String): GameObjectFilter"
    ],
+   "notNamedFromVariable-e-ebbyo": [
+    "notNamedFromVariable-e-ebbyo(GameObjectFilter, String): GameObjectFilter"
+   ],
    "withChosenSubtype-e-ebbyo": [
     "withChosenSubtype-e-ebbyo(GroupFilter, String): GroupFilter"
    ],
@@ -5888,7 +5960,7 @@
   },
   "com.wingedsheep.sdk.dsl.PlayerTriggerSubject": {
    "activatesAbility": [
-    "activatesAbility(GameObjectFilter, Recipient, Boolean, Int, Boolean, Boolean, Boolean, TapSymbolInCost, Keyword): TriggerSpec"
+    "activatesAbility(GameObjectFilter, Recipient, Boolean, Int, OnceOnlyAbilityKind, Boolean, Boolean, TapSymbolInCost, Keyword): TriggerSpec"
    ],
    "attackTriggersAbility": [
     "attackTriggersAbility(): TriggerSpec"
@@ -5965,6 +6037,9 @@
    "forages": [
     "forages(): TriggerSpec"
    ],
+   "foretells": [
+    "foretells(): TriggerSpec"
+   ],
    "fullyUnlocksARoom": [
     "fullyUnlocksARoom(): TriggerSpec"
    ],
@@ -6001,6 +6076,9 @@
    "mills": [
     "mills(GameObjectFilter, Boolean): TriggerSpec"
    ],
+   "permanentEnteringTriggersAbility": [
+    "permanentEnteringTriggersAbility(): TriggerSpec"
+   ],
    "permanentTurnedFaceUp": [
     "permanentTurnedFaceUp(GameObjectFilter): TriggerSpec"
    ],
@@ -6019,8 +6097,11 @@
    "revealsFirstDraw": [
     "revealsFirstDraw(GameObjectFilter): TriggerSpec"
    ],
+   "rollsDice": [
+    "rollsDice(): TriggerSpec"
+   ],
    "rollsDie": [
-    "rollsDie(Integer, Integer): TriggerSpec"
+    "rollsDie(Integer, Integer, Integer): TriggerSpec"
    ],
    "sacrifices": [
     "sacrifices(GameObjectFilter, Boolean): TriggerSpec"
@@ -6108,7 +6189,7 @@
    ],
    "targets": [
     "targets(TargetRequirement): List<EffectTarget.BoundVariable>",
-    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
+    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
    ]
   },
   "com.wingedsheep.sdk.dsl.ScavengeDslKt": {
@@ -6246,7 +6327,7 @@
    ],
    "targets": [
     "targets(TargetRequirement): List<EffectTarget.BoundVariable>",
-    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
+    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
    ],
    "tiered": [
     "tiered(Function1<? super TieredBuilder, Unit>): Unit"
@@ -6294,7 +6375,7 @@
     "activeZones: Set<Zone>"
    ],
    "build": [
-    "build(): StaticAbility"
+    "build(): List<StaticAbility>"
    ],
    "condition": [
     "condition: Condition"
@@ -6373,7 +6454,7 @@
    ],
    "targets": [
     "targets(TargetRequirement): default List<EffectTarget.BoundVariable>",
-    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): default List<EffectTarget.BoundVariable>"
+    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): default List<EffectTarget.BoundVariable>"
    ]
   },
   "com.wingedsheep.sdk.dsl.TargetList": {
@@ -6393,7 +6474,7 @@
    ],
    "targets": [
     "targets(TargetRequirement): List<EffectTarget.BoundVariable>",
-    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
+    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
    ]
   },
   "com.wingedsheep.sdk.dsl.TargetedEffectBuilder": {
@@ -6416,7 +6497,7 @@
    ],
    "targets": [
     "targets(TargetRequirement): List<EffectTarget.BoundVariable>",
-    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
+    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
    ]
   },
   "com.wingedsheep.sdk.dsl.Targets": {
@@ -6432,6 +6513,9 @@
    ],
    "AnyOtherThanEnchantedCreature": [
     "AnyOtherThanEnchantedCreature: TargetRequirement"
+   ],
+   "AnyUpTo": [
+    "AnyUpTo(DynamicAmount): TargetRequirement"
    ],
    "CreatureOrPlaneswalker": [
     "CreatureOrPlaneswalker: TargetRequirement"
@@ -6535,7 +6619,7 @@
    ],
    "targets": [
     "targets(TargetRequirement): List<EffectTarget.BoundVariable>",
-    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
+    "targets(TargetFilter, Int, Integer, Boolean, Boolean, DynamicAmount, DynamicAmount, Boolean, Boolean, OwnerDistribution, CardNumericProperty, CardNumericProperty, Boolean, Boolean, DynamicAmount, Boolean, Boolean, Boolean, Boolean, TargetChooser): List<EffectTarget.BoundVariable>"
    ],
    "trigger": [
     "trigger: TriggerSpec"
@@ -6906,6 +6990,10 @@
     "enteredThisTurn(): GameObjectFilter",
     "enteredThisTurn(): Any"
    ],
+   "enteredThisTurnUnderYourControl": [
+    "enteredThisTurnUnderYourControl(): GameObjectFilter",
+    "enteredThisTurnUnderYourControl(): Any"
+   ],
    "equipped": [
     "equipped(): GameObjectFilter",
     "equipped(): Any"
@@ -6931,6 +7019,10 @@
    "faceUp": [
     "faceUp(): GameObjectFilter",
     "faceUp(): Any"
+   ],
+   "foretold": [
+    "foretold(): GameObjectFilter",
+    "foretold(): Any"
    ],
    "hasDealtCombatDamage": [
     "hasDealtCombatDamage(): GameObjectFilter",
@@ -7151,6 +7243,10 @@
     "notTargetedByAbilityFromSameNamedSource(): GameObjectFilter",
     "notTargetedByAbilityFromSameNamedSource(): Any"
    ],
+   "notTriggeringEntity": [
+    "notTriggeringEntity(): GameObjectFilter",
+    "notTriggeringEntity(): Any"
+   ],
    "ofChosenCardTypeComponent": [
     "ofChosenCardTypeComponent(ChoiceSlot): GameObjectFilter",
     "ofChosenCardTypeComponent(ChoiceSlot): Any"
@@ -7320,6 +7416,10 @@
    "sharingNameWith": [
     "sharingNameWith(EffectTarget.SingleEntity): GameObjectFilter",
     "sharingNameWith(EffectTarget.SingleEntity): Any"
+   ],
+   "sharingNameWithCardInYour": [
+    "sharingNameWithCardInYour(Zone, GameObjectFilter): GameObjectFilter",
+    "sharingNameWithCardInYour(Zone, GameObjectFilter): Any"
    ],
    "sharingNameWithLinkedExile": [
     "sharingNameWithLinkedExile(): GameObjectFilter",
@@ -7870,10 +7970,10 @@
     "protectionFrom(Color...): KeywordAbility"
    ],
    "protectionFromSubtype": [
-    "protectionFromSubtype(String): KeywordAbility"
+    "protectionFromSubtype(String, String): KeywordAbility"
    ],
    "protectionFromSupertype": [
-    "protectionFromSupertype(String): KeywordAbility"
+    "protectionFromSupertype(String, String): KeywordAbility"
    ],
    "prototype": [
     "prototype(String, Int, Int): KeywordAbility"
@@ -8114,6 +8214,9 @@
    ],
    "landYouControl": [
     "landYouControl: TargetFilter"
+   ],
+   "loyaltyAbilityOnStack": [
+    "loyaltyAbilityOnStack: TargetFilter"
    ],
    "nonbasicLand": [
     "nonbasicLand: TargetFilter"
@@ -8432,8 +8535,10 @@
   "CantPlayLandsThisTurn",
   "CantSearchLibraries",
   "CardsPutIntoExileThisTurn",
+  "CastAnyNumberFromCollectionWithoutPayingCost",
   "CastFaceDownFromCollection",
   "CastFromCollection",
+  "CastFromCollection-tWY3-HA",
   "CastFromCollectionByPaying",
   "CastFromCollectionWithoutPayingCost",
   "CastUpToNFromCollectionWithoutPayingCost",
@@ -8525,6 +8630,7 @@
   "CreatedTokenThisTurn",
   "CreatureCardPutIntoYourGraveyardThisTurn",
   "CreatureCardsPutIntoGraveyardsThisTurn",
+  "CreatureNotNamedDiedThisTurn",
   "CreaturesAttackedThisTurn",
   "CreaturesEnteredThisTurn",
   "DealDamage",
@@ -8635,6 +8741,7 @@
   "GrantNextSpellAffinity",
   "GrantNextSpellFreeCast",
   "GrantNextSpellKeyword",
+  "GrantPlayWithCostIncrease",
   "GrantPlayWithoutPayingCost",
   "GrantPlayerAction",
   "GrantPlayerProtection",
@@ -8675,6 +8782,7 @@
   "MakeNextSpellUncounterable",
   "MakePlotted",
   "ManaSpentToCastIncludes",
+  "MarkExileOnDeath",
   "MarkSpellExileWithCounters",
   "MarkSpellPlotOnResolve",
   "MassAnimate",
@@ -9054,6 +9162,8 @@
   "playerCounterCount",
   "playsLand",
   "plusOneCountersPutOnYourCreaturesThisTurn",
+  "protectionFromSubtype",
+  "protectionFromSupertype",
   "pumpAndGrantToAll",
   "putFromHand",
   "putIntoExile",
@@ -9069,6 +9179,7 @@
   "revealUntilMatchToHand",
   "revealsFirstDraw",
   "rollDice",
+  "rollDiceResult",
   "rollsDie",
   "room",
   "rummage",
