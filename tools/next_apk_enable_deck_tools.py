@@ -52,8 +52,8 @@ def transform(home: str, builder: str, picker: str) -> tuple[str, str, str]:
         raise ValueError("Existing DeckManagerDialog -> savedDecks editor dispatch missing")
     if 'onDecksChanged = { updated -> savedDecks = updated; saveSavedDecks(context, updated) }' not in result_picker:
         raise ValueError("Deck editor does not persist through shared saved-decks storage")
-    if result_home.count('onClick = onImport,') != 1:
-        raise ValueError("Home Import new must use the EXISTING importer exactly once")
+    if result_home.count(NEW_HOME) != 1:
+        raise ValueError("Home Import new must dispatch to existing importer once")
     if 'enabled = !argentumActive' not in result_home:
         raise ValueError("Cannot open import while current Argentum game is active")
     if 'BuildConfig.DEBUG' in result_builder[result_builder.index('internal object DeckBuilderFlag'):result_builder.index('internal object DeckBuilderFlag') + 150]:
