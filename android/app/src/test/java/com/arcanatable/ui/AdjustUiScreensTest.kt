@@ -59,6 +59,9 @@ class AdjustUiScreensTest {
             switch.performScrollTo()
             switch.assertIsOff()
             switch.performClick()
+            // UiTestSupport.settle disables automatic Compose frame advancement for Robolectric.
+            // Drive a frame so the hoisted state reaches the Switch before asserting.
+            UiTestSupport.settle(rule, 200)
             switch.assertIsOn()
             rule.onNodeWithTag("diagnostics-test-connection").performScrollTo().performClick()
             rule.onNodeWithTag("diagnostics-reconnect").performScrollTo().performClick()
