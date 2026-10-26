@@ -28,6 +28,18 @@ Record **PASS / FAIL / BLOCKED / NOT RUN** for every row. A test not run is not 
 | D09 | Open diagnostic/notification controls; rotate/fold, background/foreground, resume | Preferences persist, notifications and overlays are bounded, no modal is stranded or duplicated. |
 | D10 | Review the original launcher icon, round icon, and the 20-chapter tutorial/glossary on device | Installed visuals and tutorial content match the reviewed source, not merely the CI-side ZIP inspection. |
 
+## Exact preview evidence and unresolved test exclusions (2026-10-26)
+
+This is a **historical, SHA-pinned evidence record**, not a fresh build authorization or a substitute for device acceptance.
+
+- Owner-authorized debug-preview source: `2ec96ac9246ddce1412f89bf4f39f5676d309b8d`, [run 40273659781](https://github.com/AARMOU/arcana_table/actions/runs/40273659781), job `121411708015` **success**. Uploaded debug APK artifact `12630376500` and source/test evidence artifact `12630381547`; the APK is the **debug-signed** `com.arcanatable.argentum` versionCode 134 preview, not a signed production `com.arcanatable` release. Recorded APK SHA-256: `573d41ceeff5e568f555f0000850b170f3eb1a354352fea877d78f8172b7f274`. Verify the downloaded byte stream and installed package again before testing.
+- Independently audited JUnit evidence in [issue #81](https://github.com/AARMOU/arcana_table/issues/81#issuecomment-6412670594): **1,018 passed, four skipped, zero failed/error** across 351 available XML suites. This count is not 1,022 executed/passed and does not prove any physical UI or network session.
+- **Skipped `LiveArgentumGameTest.playRealArgentumGameThroughArcanaUi`:** do not claim full live UI/engine gameplay from unit CI; capture a device-backed match with actual stack/priority, zone changes and terminal-state evidence (D06), or mark this acceptance item **BLOCKED** with the exact instrumentation prerequisite.
+- **Skipped `LiveArgentumGameTest.unsupportedCardOpensReviewAndSandboxFallback`:** do not infer a passing fallback flow. Determine whether this is even an allowed production path under **premade decks only / import disabled**. If in scope, exercise a safely isolated debug-only negative scenario and capture the visible result; if excluded, record a reasoned release-scope exclusion rather than treating a skip as a pass.
+- **Skipped `OnlineRelayTest.hostAndGuestTalkThroughTheRelay` and `OnlineRelayTest.droppedPhonesReconnectAndCatchUp`:** explicitly **out of scope** for the first **offline/two-player** Build 134 candidate; these are not passed tests and do not block the offline release *if* production UI/network capabilities remain absent (D07). Route multiplayer acceptance to its existing #268 owner; do not spawn a second worker, deploy a relay, or silently fold multiplayer into the release candidate.
+
+For every skip, preserve its name, classification (**REQUIRED DEVICE EVIDENCE / EXPLICIT RELEASE-SCOPE EXCLUSION / BLOCKED**), owner, and evidence reference in the final acceptance report. A skipped required case without replacement evidence is a **HOLD**, even when the parent workflow is green. The Fold smoke and production-scope checks are still **NOT RUN** in this record.
+
 ## Evidence record for each physical run
 
 Use a private evidence store for any screenshots, diagnostic logs, device identifiers, or sensitive card/game state. Post **links and sanitized summaries only** to #81.
