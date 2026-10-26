@@ -237,10 +237,10 @@ internal fun TableController.TableOverlays() {
                     argentumEndPreviousRequested = true
                     argentumSocket.connect(lobbyPlayerName)
                 },
-                onPlay = { playSheetOpen = true },
-                onChangeDeck = { deckPickerOpen = true },
+                onPlay = { TutorialActions.tap("home-play"); playSheetOpen = true },
+                onChangeDeck = { TutorialActions.tap("home-change-deck"); deckPickerOpen = true },
                 onImport = { selectedPlayer = localSeat; importError = null; importOpen = true },
-                onSettings = { optionsOpen = true },
+                onSettings = { TutorialActions.tap("home-settings"); optionsOpen = true },
                 onReturnToTable = { run { homeOpen = false } },
             )
             if (playSheetOpen) PlaySheet(
@@ -461,9 +461,9 @@ internal fun TableController.TableOverlays() {
         } ?: "Argentum dealt your opening seven.",
         selectable = false, selection = emptySet(), onToggle = {},
         primaryLabel = "KEEP ${players.getOrNull(localSeat)?.hand?.size ?: 7}", primaryEnabled = !argentumAwaitingUpdate,
-        onPrimary = { if (argentumSocket.keepHand()) { argentumMulliganPrompt = false; argentumAwaitingUpdate = true; recordDiagnostic("Kept opening hand", DiagnosticCategory.ACTION) } },
+        onPrimary = { if (argentumSocket.keepHand()) { argentumMulliganPrompt = false; argentumAwaitingUpdate = true; tutorialKeepPending = tutorialPracticeActive; recordDiagnostic("Kept opening hand", DiagnosticCategory.ACTION) } },
         secondaryLabel = "MULLIGAN", secondaryEnabled = !argentumAwaitingUpdate,
-        onSecondary = { if (argentumSocket.mulligan()) { argentumAwaitingUpdate = true; recordDiagnostic("Took a mulligan", DiagnosticCategory.ACTION) } },
+        onSecondary = { if (argentumSocket.mulligan()) { argentumAwaitingUpdate = true; tutorialMulliganPending = tutorialPracticeActive; recordDiagnostic("Took a mulligan", DiagnosticCategory.ACTION) } },
     )
 
     argentumBottomCardIds?.let { ids ->
@@ -501,6 +501,7 @@ internal fun TableController.TableOverlays() {
             argentumActionChoices = emptyList(); argentumActionCard = null; chooseArgentumLegalAction(info)
         },
         onChoose = { info -> argentumActionChoices = emptyList(); argentumActionCard = null; argentumStackUse = null; chooseArgentumLegalAction(info) },
+        tutorialCue = tutorialStep?.takeIf { tutorialChapterId != null }?.let { it.title to it.hint },
         onSecretNudge = { if (wifiRole != null) argentumSocket.send("arcanaNudge") },
             onDismiss = { argentumActionChoices = emptyList(); argentumActionCard = null }
     )
@@ -918,6 +919,7 @@ internal fun TableController.TableOverlays() {
                     Text("DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
                     HandSheet(
                         cards = players.getOrNull(handSeat.coerceIn(players.indices))?.hand.orEmpty(), isLandscape = isLandscape,
+                        tutorialCue = tutorialStep?.takeIf { tutorialChapterId != null }?.let { it.title to it.hint },
                         availableHeight = LocalConfiguration.current.screenHeightDp.dp * effectiveHandFraction,
                         stackCount = visibleStackCount,
                         highlightedCardId = highlightedHandCardId,
