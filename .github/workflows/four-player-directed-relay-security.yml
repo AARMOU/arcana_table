@@ -1,0 +1,46 @@
+name: Four-player directed relay security
+
+on:
+  pull_request:
+    paths:
+      - 'android/cloud-room/**'
+      - '.github/workflows/four-player-directed-relay-security.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  directed-relay:
+    name: Typecheck + local 4-seat security proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Worker build dependencies
+        working-directory: android/cloud-room
+        run: npm install --no-audit --no-fund
+      - name: Strict TypeScript check
+        working-directory: android/cloud-room
+        run: npm run typecheck
+      - name: Prove directed relay privacy without deployment
+        working-directory: android/cloud-room
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/wrangler dev --local --port 8787 --ip 127.0.0.1 > /tmp/arcana-relay-local.log 2>&1 &
+          WORKER_PID=$!
+          trap 'kill "$WORKER_PID" 2>/dev/null || true' EXIT
+          READY=0
+          for attempt in $(seq 1 60); do
+            if curl --silent --fail http://127.0.0.1:8787/health >/dev/null; then READY=1; break; fi
+            sleep 1
+          done
+          if [ "$READY" -ne 1 ]; then
+            cat /tmp/arcana-relay-local.log
+            exit 1
+          fi
+          node scripts/verify-directed-relay.mjs
