@@ -242,6 +242,23 @@ jobs:
           grep -F 'every probed card must remain in the shipped library' "$path"
           git diff --check -- "$path"
           echo "DeckSupportTest upstream migration fix PR #233: $TEST_FIX_SHA" > combined-evidence/decksupport-regression-fix.txt
+      - name: Align merged QA home fixture with the current welcome invitation
+        shell: bash
+        run: |
+          python3 - <<'PYFIXTURE'
+          from pathlib import Path
+          path = Path('android/app/src/test/java/com/arcanatable/ui/HomeScreenSizesTest.kt')
+          value = path.read_text()
+          before = 'rule.onNodeWithText("Dismiss").performClick()'
+          after = 'rule.onNodeWithText("NOT NOW").performClick()'
+          assert value.count(before) == 1 and value.count(after) == 0, 'Unknown welcome fixture'
+          assert 'scenariosOpenFromHeaderWithoutHuntingBelowDeck' in value
+          assert value.count('@Test') == 5
+          assert 'test-scenario-ulalek-own-stack' in value and 'test-scenario-eldrazi-displacer-blink' in value
+          value = value.replace(before, after, 1)
+          path.write_text(value)
+          print('PASS: current welcome label; all five layout and QA picker checks retained')
+          PYFIXTURE
       - name: Verify Android regex guard on the exact merged app source
         shell: bash
         run: |
