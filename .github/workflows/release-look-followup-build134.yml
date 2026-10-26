@@ -1,4 +1,4 @@
-name: Build 134 lobby + tutorial release-look APKs (prepared; not run)
+name: Build 134 no-goose lobby + tutorial + imports/editor test APKs
 # Owner-authorized follow-up after successful integrated Build 134 run 40353390125.
 # Build both full-feature, mascot-free debug and release-layout test-signed APKs.
 # No production signing, branch promotion, Cloudflare deploy, or Play publication.
@@ -395,6 +395,40 @@ jobs:
           printf 'claude-fullscreen-ready-lobby %s (PR283)\n' "$LOBBY_SHA" >> combined-evidence/next-apk-source-pins.txt
           printf '%s\n' 'Worker deployment is a separate gate: deployed PR268 relay lacks PR283 reconfigure support.' > combined-evidence/lobby-worker-deployment-gate.txt
           echo 'PASS: Claude full-screen lobby + host seat reconfiguration staged onto Build134 runner; no remote writes'
+      - name: Integrate Claude's already-green quiet import-notices PR287 (runner-only)
+        shell: bash
+        env:
+          CLAUDE_QUIET_SHA: 82eb18a96ddf80a9bd31b7adf2cc244b588e2f25
+          CLAUDE_DEV_BASE_SHA: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin "$CLAUDE_QUIET_SHA"
+          test "$(git rev-parse FETCH_HEAD)" = "$CLAUDE_QUIET_SHA"
+          git merge-base --is-ancestor "$CLAUDE_DEV_BASE_SHA" "$CLAUDE_QUIET_SHA"
+          # This lane changes the actual combined Android source on a disposable
+          # GitHub runner. The original Claude PR and shared branch are untouched.
+          if ! git merge --no-ff --no-edit -m "Runner-only Build134: verified Claude quieter import notifications" "$CLAUDE_QUIET_SHA" > combined-evidence/quiet-notices-merge.log 2>&1; then
+            echo '::error title=Quiet-import conflict::Stop until exact differences reviewed.'
+            git diff --name-only --diff-filter=U | tee combined-evidence/quiet-notices-conflicts.txt
+            cat combined-evidence/quiet-notices-merge.log
+            python3 - <<'PYHUNKS'
+          import subprocess
+          from pathlib import Path
+          for path in subprocess.check_output(['git','diff','--name-only','--diff-filter=U'],text=True).splitlines():
+              lines=Path(path).read_text().splitlines()
+              print('===',path,'===')
+              for start,line in enumerate(lines):
+                  if not line.startswith('<<<<<<< '): continue
+                  end=next((i for i in range(start+1,len(lines)) if lines[i].startswith('>>>>>>> ')),len(lines)-1)
+                  print('\\n'.join(f'{j+1}: {lines[j]}' for j in range(max(0,start-5),min(len(lines),end+6))))
+          PYHUNKS
+            exit 1
+          fi
+          git merge-base --is-ancestor "$CLAUDE_QUIET_SHA" HEAD
+          test -z "$(git diff --name-only --diff-filter=U)"
+          git diff --check -- android/app
+          printf 'quiet-import-notices %s (PR287)\n' "$CLAUDE_QUIET_SHA" >> combined-evidence/next-apk-source-pins.txt
+          echo 'PASS: imported exact Claude #287 with earlier release/online sources preserved'
       - name: Enforce owner-requested mascot-free home on integrated source
         shell: bash
         run: |
@@ -451,6 +485,19 @@ jobs:
           grep -F 'CURRENT NO-GOOSE TEST PREVIEW' android/app/src/main/java/com/arcanatable/TableDialogs.kt
           grep -F 'NEXT APK · PREPARED BUT NOT YET BUILT' android/app/src/main/java/com/arcanatable/TableDialogs.kt
           printf '%s\n' 'Build 122–134 cumulative in-app changelog plus staged-next-build warnings: PASS' > combined-evidence/build121-changelog-acceptance.txt
+      - name: Verify owner-requested Import new and Deck Editor enablement contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/tests -p 'test_next_apk_enable_deck_tools.py' -v
+      - name: Enable existing deck tools in combined next-test source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/next_apk_enable_deck_tools.py
+          python3 tools/next_apk_enable_deck_tools.py --verify-only
+          git diff --check -- android/app/src/main/java/com/arcanatable/HomeScreen.kt android/app/src/main/java/com/arcanatable/DeckBuilder.kt
+          printf '%s\n' 'Home Import new and Deck Editor enabled in both TEST variants: SOURCE PASS; on-device QA outstanding' > combined-evidence/import-editor-candidate.txt
       - uses: actions/setup-node@v4
         if: ${{ github.event_name == 'push' || inputs.include_online_multiplayer }}
         with:
