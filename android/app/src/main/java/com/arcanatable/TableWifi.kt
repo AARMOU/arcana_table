@@ -461,7 +461,7 @@ internal fun TableController.joinMultiOnlineGame(code: String) {
         .put("commander", commander)
     val guest = ArgentumCloudMultiGuest(lobbyCloudEndpoint, clean, friendlyName(commander))
     argentumSocket.attachLanGuest(guest)
-    guest.connect(hello) { failure -> scope.launch {
+    guest.connect { failure -> scope.launch {
         wifiConnecting = false
         if (failure != null) {
             guest.close()
@@ -483,6 +483,15 @@ internal fun TableController.joinMultiOnlineGame(code: String) {
         homeOpen = false
         lobbyOpen = false
         argentumSocket.connect(lobbyPlayerName)
+        // The session receiver is active before the host can validate or reply.
+        if (!guest.send(hello)) {
+            argentumSocket.close()
+            stopWifi()
+            argentumEnabled = false
+            homeOpen = true
+            message = "Could not submit your Commander deck to the online host."
+            return@launch
+        }
         message = "Joined online Commander; waiting for host and other players."
         recordDiagnostic("Joined directed-relay multiplayer room", DiagnosticCategory.CONNECTION)
     } }
