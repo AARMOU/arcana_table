@@ -115,4 +115,55 @@ class FourPlayerHumanHostTest {
             host.shutdown()
         }
     }
+
+    /**
+     * A friend who drops between START and the first deal must not leave a "person" seat that
+     * never acts: the AI plays it, and the remaining people get their opening hands and views.
+     */
+    @Test fun guestWhoLeavesBeforeTheDealIsPlayedByTheAi() {
+        val library = OfflineCardLibrary({ path ->
+            File("src/main/assets/$path").takeIf(File::exists)?.inputStream()
+        })
+        val registry = CardRegistry().apply { register(library.load(setOf("Mountain", "Forest", "Island", "Swamp"))) }
+        val messages = LinkedBlockingQueue<Packet>()
+        val ids = mapOf(
+            "host" to LocalArgentumHost.HUMAN_ID,
+            "second" to LocalArgentumHost.AI_ID,
+            "third" to EntityId("offline-ai-2"),
+            "fourth" to EntityId("offline-ai-3"),
+        )
+        val host = LocalArgentumHost(
+            registry, seat("Host", "Mountain"), seat("Second", "Forest"), paceMs = 0,
+            extraOpponents = listOf(seat("Third", "Island"), seat("Fourth", "Swamp")),
+            emit = { messages.put(Packet("host", it)) },
+        )
+        try {
+            host.setGuest(ids.getValue("second"), seat("second", "Forest")) { messages.put(Packet("second", it)) }
+            host.setGuest(ids.getValue("third"), seat("third", "Island")) { messages.put(Packet("third", it)) }
+            host.setGuest(ids.getValue("fourth"), seat("fourth", "Swamp")) { messages.put(Packet("fourth", it)) }
+            host.receive(JSONObject().put("type", "guestLeft").put("seatId", ids.getValue("fourth").value), ids.getValue("host"))
+            host.receive(JSONObject().put("type", "connect"))
+            host.receive(JSONObject().put("type", "createQuickGameLobby"))
+
+            val views = mutableSetOf<String>()
+            var fourthAfterLeaving = 0
+            var leftNotice = false
+            var guard = 0
+            while (views.size < 3 && guard++ < 160) {
+                val packet = messages.poll(5, TimeUnit.SECONDS) ?: break
+                val type = packet.body.optString("type")
+                if (packet.seat == "fourth" && type != "connected") fourthAfterLeaving++
+                when (type) {
+                    "mulliganDecision" -> host.receive(JSONObject().put("type", "keepHand"), ids.getValue(packet.seat))
+                    "stateUpdate" -> views += packet.seat
+                    "error" -> if (packet.seat == "host" && packet.body.optString("message").contains("AI is playing")) leftNotice = true
+                }
+            }
+            assertEquals("every remaining person gets a view", setOf("host", "second", "third"), views)
+            assertEquals("the departed phone receives nothing after leaving", 0, fourthAfterLeaving)
+            assertTrue("host is told the AI took the seat", leftNotice)
+        } finally {
+            host.shutdown()
+        }
+    }
 }
