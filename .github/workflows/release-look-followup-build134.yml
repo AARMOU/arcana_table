@@ -1288,7 +1288,7 @@ jobs:
           test -s "$apk"
           test -s android/app/build/outputs/bundle/release/app-release.aab
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > combined-evidence/release-badging.txt
-          grep -F "package: name='com.arcanatable' versionCode='135'" combined-evidence/release-badging.txt
+          grep -F "package: name='com.arcanatable' versionCode='136'" combined-evidence/release-badging.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml > combined-evidence/release-manifest.txt
           grep -F 'android:icon' combined-evidence/release-manifest.txt
           grep -F 'android:roundIcon' combined-evidence/release-manifest.txt
@@ -1325,7 +1325,7 @@ jobs:
           apk=android/app/build/outputs/apk/debug/app-debug.apk
           test -s "$apk"
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > combined-evidence/next-apk-package.txt
-          grep -F "package: name='com.arcanatable.argentum' versionCode='135'" combined-evidence/next-apk-package.txt
+          grep -F "package: name='com.arcanatable.argentum' versionCode='136'" combined-evidence/next-apk-package.txt
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" > combined-evidence/next-apk-debug-signing.txt
           grep -F 'Signer #1 certificate SHA-256 digest:' combined-evidence/next-apk-debug-signing.txt
           python3 tools/verify_launcher_branding.py
@@ -1354,7 +1354,7 @@ jobs:
             --out "$preview_apk" "$source_apk"
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$preview_apk" > combined-evidence/release-look-test-cert.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$preview_apk" > combined-evidence/release-look-badging.txt
-          grep -F "package: name='com.arcanatable' versionCode='135'" combined-evidence/release-look-badging.txt
+          grep -F "package: name='com.arcanatable' versionCode='136'" combined-evidence/release-look-badging.txt
           sha256sum "$preview_apk" > combined-evidence/release-look-test-apk.sha256
           echo 'TEST SIGNATURE ONLY: production layout, no dev goose; release feature limits may differ from full-feature debug; not Play Store signed.' > combined-evidence/release-look-scope.txt
       - name: Upload production-layout release-look APK (TEST signature)
