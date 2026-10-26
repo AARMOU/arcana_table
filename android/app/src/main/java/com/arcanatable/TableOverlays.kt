@@ -391,9 +391,9 @@ internal fun TableController.TableOverlays() {
         dismissButton = { TextButton(onClick = { argentumJoinDialogOpen = false }) { Text("CANCEL") } }
     )
 
-    // Start-up problems that were not already shown as a pop-up (deck validation, connecting,
-    // resuming). In-game errors never reach here.
-    if (argentumLastError != null && argentumSnapshot == null && homeOpen && message == null) AlertDialog(
+    // Start-up problems (deck validation, connecting, resuming). In-game errors never reach here,
+    // and errors already shown as a pop-up are not stored for it.
+    if (argentumLastError != null && argentumSnapshot == null && homeOpen) AlertDialog(
         onDismissRequest = { argentumLastError = null },
         title = { Text("Couldn't start the game") },
         text = { Text(argentumLastError.orEmpty()) },
