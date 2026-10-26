@@ -1,11 +1,11 @@
-name: Build 135 no-goose lobby + tutorial + import/editor test APKs
+name: Build 136 all-upgrades, 4p lobby, combat, advanced deck + Ugin test APKs
 # Owner-authorized follow-up after successful integrated Build 134 run 40353390125.
 # Build both full-feature, mascot-free debug and release-layout test-signed APKs.
 # No production signing, branch promotion, Cloudflare deploy, or Play publication.
 # Reproducible isolated integration candidate: no production branch is mutated.
 on:
   push:
-    branches: [gpt/build134-next-deck-tools-candidate-20261026]
+    branches: [gpt/build136-everything-integrated-20261026]
     paths:
       - '.github/workflows/release-look-followup-build134.yml'
       - 'tools/next_apk_resolve_conflicts.py'
@@ -22,7 +22,7 @@ on:
         required: true
         default: true
 concurrency:
-  group: arcana-release-look-b134-${{ github.ref }}
+  group: arcana-build136-everything-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -518,6 +518,77 @@ jobs:
           grep -F 'fun releaseHasNoScenarios()' android/app/src/testRelease/java/com/arcanatable/ReleaseHasNoTestScenariosTest.kt
           git diff --check -- android/app/src/main/java/com/arcanatable/ReleaseFeatures.kt android/app/src/test android/app/src/testRelease
           printf '%s\n' 'Release-look TEST scope: Import new, saved decks, deck editor, 2–4 seats; debug scenarios strictly omitted' > combined-evidence/test-release-scope.txt
+      - name: Integrate every owner-requested B136 feature from exact PR heads
+        shell: bash
+        env:
+          DECK_BASE: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f
+          DECK_SHA: 5a64b631b9d7185c7fb4102a58afa9aa237746c0
+          LOBBY_BASE: 79dcd0c58837305fcd1f8790fbf052af214d204b
+          LOBBY_FIX_SHA: 492059920c81df12391a28aa9b9ca093b1a6a703
+          OUTCOME_SHA: abaf13ad913025762db889bde1bf92907cd5a133
+          UGIN_BASE: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f
+          UGIN_SHA: 49f7f7389b940accf2e2321130407e579cb2ee4c
+          TEMPLE_SHA: e57c462d17075ad3d1f2eee249d75edb04b2572a
+        run: |
+          set -euo pipefail
+          git config user.name arcana-build136-integration
+          git config user.email arcana-build136-integration@users.noreply.github.com
+          # Earlier steps assemble the B135 runner tree without modifying any remote branches.
+          git add -A
+          git diff --cached --quiet || git commit --no-gpg-sign -m 'Runner only: pin verified Build 135 source before B136 ports'
+          integrate_diff() {
+            local label="$1" base="$2" head="$3"
+            shift 3
+            git fetch --no-tags origin "$base" "$head"
+            test "$(git rev-parse "$head")" = "$head"
+            git merge-base --is-ancestor "$base" "$head"
+            git diff --binary "$base" "$head" -- "$@" > "combined-evidence/b136-${label}.patch"
+            test -s "combined-evidence/b136-${label}.patch"
+            if ! git apply --3way --index "combined-evidence/b136-${label}.patch"; then
+              echo "::error title=Build 136 integration conflict::${label}: no unreviewed hunk dropped"
+              git status --short
+              exit 1
+            fi
+            git diff --cached --check
+            git commit --no-gpg-sign -m "Runner-only B136: ${label} at ${head}"
+            printf '%s %s\n' "$label" "$head" >> combined-evidence/next-apk-source-pins.txt
+          }
+          integrate_diff advanced-deck-library "$DECK_BASE" "$DECK_SHA"
+          integrate_diff unified-multiplayer-lobby "$LOBBY_BASE" "$LOBBY_FIX_SHA"
+          # Full delta from the Claude #283 base includes both #293 and stacked #294.
+          integrate_diff combat-outcome-and-commander-tracker "$LOBBY_BASE" "$OUTCOME_SHA"
+          # Only Ugin source/tests; rebuild/export indexes against the final pinned runtime.
+          integrate_diff ugin-integration "$UGIN_BASE" "$UGIN_SHA" \
+            android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt \
+            android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt \
+            android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt \
+            android/app/src/test/java/com/arcanatable/UginExportedRuntimeTest.kt
+          git fetch --no-tags origin "$TEMPLE_SHA"
+          test "$(git rev-parse "$TEMPLE_SHA")" = "$TEMPLE_SHA"
+          git show "$TEMPLE_SHA:engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt" > engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt
+          git add engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt
+          git diff --cached --quiet || git commit --no-gpg-sign -m "Runner-only B136: exact Temple projected-subtype regression"
+          printf '%s %s\n' "eldrazi-temple-projected-subtypes" "$TEMPLE_SHA" >> combined-evidence/next-apk-source-pins.txt
+          python3 - <<'PYART'
+          from pathlib import Path
+          home = Path('android/app/src/main/java/com/arcanatable/HomeScreen.kt')
+          src = home.read_text()
+          old = '(if (BuildConfig.DEBUG) 70.dp else 120.dp) else if (wide) (if (BuildConfig.DEBUG) 175.dp else 280.dp) else (if (BuildConfig.DEBUG) 120.dp else 230.dp)'
+          assert src.count(old) == 1, 'Home screen art layout changed; review new source'
+          src = src.replace(old, '120.dp else if (wide) 280.dp else 230.dp', 1)
+          home.write_text(src)
+          assert old not in src and 'else if (wide) 280.dp else 230.dp' in src
+          print('PASS: debug QA and release-look both show large commander artwork')
+          PYART
+          git add android/app/src/main/java/com/arcanatable/HomeScreen.kt
+          git commit --no-gpg-sign -m 'B136: keep large commander artwork in debug and release'
+          grep -F 'Multiplayer lobby screen displayed:' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+          grep -F 'commanderDamageTrackerRows(' android/app/src/main/java/com/arcanatable/TableDialogs.kt
+          grep -F 'class UginTheIneffableScenarioTest' android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt
+          test -f android/app/src/main/java/com/arcanatable/CardFilters.kt
+          test -f android/app/src/main/java/com/arcanatable/DeckBuilderFilters.kt
+          git diff --check
+          echo 'All requested B136 app features source-integrated; run engine/Android gates next' > combined-evidence/b136-integration-summary.txt
       - uses: actions/setup-node@v4
         if: ${{ github.event_name == 'push' || inputs.include_online_multiplayer }}
         with:
@@ -732,6 +803,31 @@ jobs:
               with report.open('a') as f: f.write('APPLIED ' + str(patch) + '\n')
           PY
           git -C combined-argentum diff --check
+      - name: Apply exact Eldrazi Temple battlefield subtype semantics and guard against regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYTEMPLE'
+          from pathlib import Path
+          p=Path('combined-argentum/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt')
+          s=p.read_text()
+          old='    val subtypes = paymentSubtypesOf(cardComponent) + projected.getSubtypes(sourceId)'
+          new=(
+              '    // The projected battlefield subtypes are authoritative after layer 4.\n'
+              '    // Printed source types must not leak back after a Frog-style replacement.\n'
+              '    val isBattlefieldSource = sourceId in projected.getBaseState().getBattlefield()\n'
+              '    val subtypes = if (isBattlefieldSource) projected.getSubtypes(sourceId)\n'
+              '        else paymentSubtypesOf(cardComponent)'
+          )
+          if old in s:
+              assert s.count(old)==1, 'Unexpected Temple subtype occurrences'
+              p.write_text(s.replace(old,new,1))
+              s=p.read_text()
+          assert 'val subtypes = if (isBattlefieldSource) projected.getSubtypes(sourceId)' in s, 'Projected subtype fix missing'
+          assert 'isAbilitySourceColorless =' in s, 'Temple source color restriction missing'
+          print('PASS: first-party projected battlefield subtype restriction verified')
+          PYTEMPLE
+          git -C combined-argentum diff --check
       - name: Strictly apply Azlask colorless-death LKI patch on upgraded Argentum
         shell: bash
         run: |
@@ -856,6 +952,21 @@ jobs:
           set -o pipefail
           ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test \
             2>&1 | tee ../combined-evidence/combined-custom-cards.log
+      - name: Prove source-built Ugin and additional Eldrazi Temple regression executed
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYREG'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root=Path('android/custom-cards/build/test-results/test')
+          xml=list(root.glob('TEST-*UginTheIneffableScenarioTest.xml'))
+          assert len(xml)==1,('Ugin scenario test suite missing',xml)
+          x=ET.parse(xml[0]).getroot()
+          assert int(x.get('tests',0))>=22 and all(int(x.get(k,0))==0 for k in ('failures','errors','skipped')),x.attrib
+          print('PASS: Ugin real engine scenarios',x.attrib)
+          PYREG
+          grep -F 'Ugin, the Ineffable' android/app/src/main/assets/argentum/custom-cards.index.tsv
       - name: Enforce 94 original Eldrazi slots and Azlask scenarios on packaged card assets
         shell: bash
         run: |
@@ -895,11 +1006,22 @@ jobs:
           old_code = 'versionCode = 131'
           old_name = 'versionName = "0.33.9-build131-argentum-upgrade"'
           assert text.count(old_code) == 1 and text.count(old_name) == 1
-          text = text.replace(old_code, 'versionCode = 135', 1)
-          text = text.replace(old_name, 'versionName = "0.33.13-build135-lobby-decks-tutorial"', 1)
+          text = text.replace(old_code, 'versionCode = 136', 1)
+          text = text.replace(old_name, 'versionName = "0.33.14-build136-everything-test"', 1)
           p.write_text(text)
           print('PASS: isolated TEST Build 135 identity, production untouched')
           PY
+      - name: Require reviewed post-B135 debug regression tests to compile and run
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --max-workers=2 \
+            :app:testDebugUnitTest --tests 'com.arcanatable.ArgentumBackendTest' \
+            --tests 'com.arcanatable.GameOutcomeDetailsTest' \
+            --tests 'com.arcanatable.ui.HomeScreenSizesTest' \
+            --tests 'com.arcanatable.ui.DeckBuilderUiTest' \
+            --tests 'com.arcanatable.UginExportedRuntimeTest'
       - name: Run full Android app unit tests and strict Eldrazi Commander AI tests
         working-directory: android
         shell: bash
@@ -1050,7 +1172,7 @@ jobs:
         run: |
           set -euo pipefail
           source_apk=android/app/build/outputs/apk/release/app-release-unsigned.apk
-          preview_apk=android/app/build/outputs/apk/release/arcana-build135-release-look-test-signed.apk
+          preview_apk=android/app/build/outputs/apk/release/arcana-build136-release-look-test-signed.apk
           test -s "$source_apk"
           # CI may sign AGP debug builds with a throwaway key outside $HOME;
           # create an explicit temporary test certificate for this release-layout APK.
@@ -1074,15 +1196,15 @@ jobs:
         if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: arcana-b134-release-look-no-goose-test-signed
+          name: arcana-b136-release-look-no-goose-test-signed
           retention-days: 14
           if-no-files-found: error
-          path: android/app/build/outputs/apk/release/arcana-build135-release-look-test-signed.apk
+          path: android/app/build/outputs/apk/release/arcana-build136-release-look-test-signed.apk
       - name: Upload owner-approved debug test APK
         if: success()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: arcana-b134-full-feature-no-goose-debug
+          name: arcana-b136-full-feature-no-goose-debug
           retention-days: 14
           if-no-files-found: error
           path: android/app/build/outputs/apk/debug/app-debug.apk
