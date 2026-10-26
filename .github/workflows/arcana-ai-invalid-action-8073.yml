@@ -1,0 +1,81 @@
+name: AI Invalid Action 8073 Reproducer
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/arcana-ai-invalid-action-8073.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  replay-invalid-action:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ARCANA_AI_BENCHMARK: '1'
+      ARCANA_AI_GAMES_PER_MODE: '2'
+      ARCANA_AI_GAME_MODE: '2'
+      ARCANA_AI_PAIR_START: '80'
+      ARCANA_AI_MAX_ACTIONS: '6000'
+      ARCANA_AI_MAX_GAME_MS: '45000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Add temporary error details ONLY on this throwaway CI runner
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("android/app/src/test/java/com/arcanatable/AiStrengthBenchmarkTest.kt")
+          original=p.read_text()
+          old="            if (result.error != null) {\n                invalid++"
+          new='''            if (result.error != null) {
+                println("[ai-invalid-repro] seed=$seed pair=$pair mode=$mode actor=$actor " +
+                    "side=$side turn=${state.turnNumber} step=${state.step} " +
+                    "pending=${decision?.javaClass?.simpleName ?: "none"} action=$action " +
+                    "engineError=${result.error}")
+                invalid++'''
+          assert original.count(old)==1, "Benchmark error instrumentation location changed"
+          p.write_text(original.replace(old,new))
+          print("Temporary diagnostic instrumentation inserted. Repo file remains unchanged.")
+          PY
+      - name: Replay the original failing seed 8073 as both profile-seat arrangements
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.AiStrengthBenchmarkTest'
+      - name: Require reproducible evidence and print exact engine rejection
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          result=Path("android/app/build/reports/ai-strength/comparison.json")
+          assert result.exists(), "No benchmark output"
+          gs=json.loads(result.read_text())["games"]
+          assert len(gs)==2 and all(g["mode"]==2 and g["seed"]==8073 and g["pair"]==80 for g in gs), gs
+          invalid=[g for g in gs if g["status"]=="invalid-action"]
+          print("replay outcomes:", [(g["status"],g["turns"],g["actions"],g["candidateSeatsZeroBased"]) for g in gs])
+          assert invalid, "This exact-head runtime did not reproduce the previously seen invalid action"
+          xml=Path("android/app/build/test-results/testDebugUnitTest/TEST-com.arcanatable.AiStrengthBenchmarkTest.xml")
+          assert xml.exists(), "JUnit stdout missing"
+          root=ET.parse(xml).getroot()
+          output="\n".join((n.text or "") for n in root.iter("system-out"))
+          evidence=[line for line in output.splitlines() if "[ai-invalid-repro]" in line]
+          assert evidence, "An invalid action occurred, but no engine diagnostic was recorded"
+          for line in evidence:
+              print("EXACT REJECTION:", line[:1600])
+          print("CONFIRMED: exact seed 8073 produces rejected engine action; not a live-app claim.")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-invalid-action-seed-8073-evidence
+          retention-days: 14
+          path: |
+            android/app/build/reports/ai-strength/
+            android/app/build/test-results/testDebugUnitTest/
