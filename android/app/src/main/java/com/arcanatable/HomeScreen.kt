@@ -109,7 +109,7 @@ fun ArcanaHomeScreen(
         Column(Modifier.widthIn(max = if (LocalConfiguration.current.screenHeightDp < 520) 820.dp else if (wide) 560.dp else 460.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("ARCANA TABLE", color = SoftWhite, fontSize = 20.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
-                IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).clip(CircleShape).border(1.dp, PanelLight, CircleShape)) {
+                IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).tutorialTarget("home-settings").clip(CircleShape).border(1.dp, PanelLight, CircleShape)) {
                     Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = SoftWhite)
                 }
             }
@@ -146,7 +146,7 @@ fun ArcanaHomeScreen(
             val deckPanel: @Composable (Modifier) -> Unit = { mod ->
                 Column(mod) {
                     Text("YOUR DECK", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.padding(bottom = 6.dp))
-                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).border(1.dp, PanelLight, RoundedCornerShape(20.dp)).background(Panel).testTag("home-deck")) {
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).border(1.dp, PanelLight, RoundedCornerShape(20.dp)).background(Panel).testTag("home-deck").tutorialTarget("home-deck")) {
                         Box(Modifier.fillMaxWidth().height(if (short) (if (BuildConfig.DEBUG) 70.dp else 120.dp) else if (wide) (if (BuildConfig.DEBUG) 175.dp else 280.dp) else (if (BuildConfig.DEBUG) 120.dp else 230.dp)).background(Color(0xFF22302C))) {
                             if (commanderArt != null) CardArt(commanderArt, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, fallbackName = deck?.commander)
                             Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Color(0xB3101615)).padding(horizontal = 16.dp, vertical = 10.dp)) {
@@ -155,7 +155,7 @@ fun ArcanaHomeScreen(
                             }
                         }
                         Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            OutlinedButton(onClick = onChangeDeck, enabled = !argentumActive, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Change deck", color = SoftWhite, fontWeight = FontWeight.Bold) }
+                            OutlinedButton(onClick = onChangeDeck, enabled = !argentumActive, modifier = Modifier.weight(1f).heightIn(min = 48.dp).tutorialTarget("home-change-deck")) { Text("Change deck", color = SoftWhite, fontWeight = FontWeight.Bold) }
                             // Import is parked for now (plumbing kept in onImport): greyed, tap says so.
                             val homeContext = androidx.compose.ui.platform.LocalContext.current
                             OutlinedButton(
@@ -174,7 +174,7 @@ fun ArcanaHomeScreen(
                 ) { Text("RETURN TO TABLE", fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
                 else Button(
                     onClick = onPlay, enabled = !working && !resumeAvailable && !offlineResumeAvailable,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp).testTag("home-play"),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp).testTag("home-play").tutorialTarget("home-play"),
                     colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
                 ) { Text(if (working) (workingLabel ?: "PREPARING…") else "PLAY", fontSize = if (working) 15.sp else 22.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp) }
             }
@@ -215,7 +215,7 @@ fun ArcanaHomeScreen(
 /** After PLAY: offline vs AI (with the AI's deck) or online with Argentum. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun PlaySheet(
+internal fun PlaySheet(
     deckName: String?,
     aiDecks: List<DeckChoice>,
     aiDeckId: String?,
@@ -231,6 +231,7 @@ fun PlaySheet(
     onWifiJoin: () -> Unit = {},
     onOnlineHost: () -> Unit = {},
     onOnlineJoin: () -> Unit = {},
+    tutorialStep: ArcanaLessonStep? = null, onTutorialNext: () -> Unit = {}, onTutorialExit: () -> Unit = {},
 ) {
     var online by remember { mutableStateOf(false) }
     // Play with a friend: null = not chosen; 1 host on Wi-Fi, 2 join on Wi-Fi, 3 host online, 4 join online.
@@ -239,6 +240,13 @@ fun PlaySheet(
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("How do you want to play?", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
+            tutorialStep?.let { step ->
+                TutorialInlineCue(step.title, step.body + "  " + step.hint)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
+                    if (step.actionKind == "next") TextButton(onClick = onTutorialNext) { Text("NEXT", color = Mint) }
+                }
+            }
             Text(deckName?.let { "Your deck: $it" } ?: "No deck yet: offline uses a quick Portal duel.", color = Muted, fontSize = 14.sp)
             PlayOption("Offline vs AI", "Runs on your phone. No internet needed.", selected = !online && friendMode == null, onClick = { online = false; friendMode = null }, tag = "play-offline-option") {
                 Text("PLAYERS", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
@@ -303,10 +311,17 @@ private fun DeckChip(label: String, selected: Boolean, onClick: () -> Unit) {
 /** Pick from precons, Arcana decks, Argentum EDHREC decks, and then your other decks. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit, onDeckBuilder: (() -> Unit)? = null) {
+internal fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit, onDeckBuilder: (() -> Unit)? = null, tutorialStep: ArcanaLessonStep? = null, onTutorialNext: () -> Unit = {}, onTutorialExit: () -> Unit = {}) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text("Choose your deck", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
+            tutorialStep?.let { step ->
+                TutorialInlineCue(step.title, step.body + "  " + step.hint)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
+                    if (step.actionKind == "next") TextButton(onClick = onTutorialNext) { Text("NEXT", color = Mint) }
+                }
+            }
             listOf(
                 DeckChoiceCategory.PRECON to "WOTC PRECONS",
                 DeckChoiceCategory.ARCANA to "ARCANA",

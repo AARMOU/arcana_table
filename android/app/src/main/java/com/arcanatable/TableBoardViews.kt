@@ -472,7 +472,7 @@ internal fun PlayerBoard(
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp))
                         .background(PanelLight).padding(horizontal = 10.dp, vertical = 7.dp)
-                        .testTag("argentum-mana-summary"),
+                        .testTag("argentum-mana-summary").tutorialTarget("argentum-mana-summary"),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -490,7 +490,7 @@ internal fun PlayerBoard(
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().tutorialTarget("quick-actions").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             // In an Argentum game only controls that work are shown: Argentum owns draws, tokens,
             // mana, steps and shuffles, so those manual shortcuts would be silent no-ops.
             if (engineGame) {
@@ -503,7 +503,7 @@ internal fun PlayerBoard(
                             Modifier.height(40.dp).clip(RoundedCornerShape(9.dp)).background(PanelLight)
                                 .border(if (commander.id in playableIds) 2.dp else 0.dp, if (commander.id in playableIds) Mint else PanelLight, RoundedCornerShape(9.dp))
                                 .combinedClickable(onClick = { if (castable) onCastCommander() else onPublicPreview(commander) }, onLongClick = { onPublicPreview(commander) })
-                                .padding(end = 10.dp).testTag("commander-chip"),
+                                .padding(end = 10.dp).testTag("commander-chip").tutorialTarget("commander-chip"),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             CardFace(commander, Modifier.width(29.dp), onClick = { if (castable) onCastCommander() else onPublicPreview(commander) }, onLongClick = { onPublicPreview(commander) }, showCounters = false)
@@ -580,13 +580,13 @@ internal fun PlayerBoard(
             "BATTLEFIELD" to {
         if (!engineGame) Text("BATTLEFIELD  ·  grouped by type  ·  tap to tap/untap  ·  long-press to inspect", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp, modifier = Modifier.padding(start = 3.dp))
         if (player.battlefield.isEmpty()) {
-            Box(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)).background(Panel), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().weight(1f).tutorialTarget("battlefield-row").clip(RoundedCornerShape(12.dp)).background(Panel), contentAlignment = Alignment.Center) {
                 Text("Your battlefield is empty", color = Muted, fontSize = 12.sp)
             }
         } else {
             LazyColumn(
                 state = battlefieldListState,
-                modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)).background(Panel)
+                modifier = Modifier.fillMaxWidth().weight(1f).tutorialTarget("battlefield-row").tutorialTarget("table-zoom").clip(RoundedCornerShape(12.dp)).background(Panel)
                     .pinchToZoom(boardZoom) { saveBoardZoom(zoomContext, zoomConfig.screenWidthDp, zoomConfig.screenHeightDp, it) }
                     .padding(5.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(3.dp)
@@ -631,7 +631,7 @@ internal fun BattlefieldCard(card: GameCard, tileWidth: androidx.compose.ui.unit
     val activatedAbilities = remember(card.id, card.oracleText) { cardActivatedAbilityLines(card) }
     val cardHeight = tileWidth / 0.72f
     Box(Modifier.width(if (card.tapped) cardHeight else tileWidth).height(cardHeight), contentAlignment = Alignment.Center) {
-        CardFace(card, Modifier.width(tileWidth), onClick = onTap, onLongClick = onPreview, animateTapped = true, glow = glow)
+        CardFace(card, Modifier.width(tileWidth).tutorialTarget("battlefield-card:${card.name}"), onClick = onTap, onLongClick = onPreview, animateTapped = true, glow = glow, tutorialZone = "battlefield")
         card.chosenCreatureType?.takeIf { it.isNotBlank() }?.let { chosenType ->
             Text(
                 "TYPE · $chosenType",
@@ -685,15 +685,21 @@ internal fun OverviewCard(card: GameCard, width: androidx.compose.ui.unit.Dp, on
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: () -> Unit, onLongClick: () -> Unit, showCounters: Boolean = true, animateTapped: Boolean = false, glow: Boolean = false) {
+internal fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: () -> Unit, onLongClick: () -> Unit, showCounters: Boolean = true, animateTapped: Boolean = false, glow: Boolean = false, tutorialZone: String? = null) {
     val rotation by animateFloatAsState(targetValue = if (animateTapped && card.tapped) 90f else 0f, animationSpec = tween(260), label = "card-tap")
     // Argentum games: holding any card shows it large (CardZoom.kt) instead of the older long-press actions.
     val zoom = LocalCardZoom.current
-    val holdAction: () -> Unit = if (zoom.enabled) ({ zoom.hold(card) }) else onLongClick
+    val holdAction: () -> Unit = {
+        if (zoom.enabled) zoom.hold(card) else onLongClick()
+        if (tutorialZone != null) TutorialActions.hold("$tutorialZone-card:${card.name}")
+    }
     Box(
         modifier.aspectRatio(0.72f).graphicsLayer(rotationZ = rotation).clip(RoundedCornerShape(8.dp)).background(card.color)
             .border(if (glow) 2.5.dp else if (card.tapped) 2.dp else 1.dp, if (glow) Mint else if (card.tapped) Mint else Color.White.copy(alpha = 0.28f), RoundedCornerShape(8.dp))
-            .combinedClickable(onClick = onClick, onLongClick = holdAction)
+            .combinedClickable(onClick = {
+                if (tutorialZone != null) TutorialActions.tap("$tutorialZone-card:${card.name}")
+                onClick()
+            }, onLongClick = holdAction)
             .then(if (zoom.enabled) Modifier.cardZoomRelease(zoom) else Modifier)
     ) {
         if (card.isFaceDown) {
@@ -758,11 +764,21 @@ internal fun cardArtDescription(label: String?, fallbackName: String?): String =
 internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeight: androidx.compose.ui.unit.Dp, highlightedCardId: Int?, handRevealed: Boolean, canAdvance: Boolean, canControl: Boolean, commanderCanCast: Boolean, actionOrder: List<String>, stackCount: Int, onToggleReveal: (Boolean) -> Unit, onClose: () -> Unit, onDraw: () -> Unit, onCombat: () -> Unit, onNextStep: () -> Unit, onPassTurn: () -> Unit, onStack: () -> Unit, onCastCommander: () -> Unit, onMoreAction: (String) -> Unit, onSelect: (GameCard) -> Unit, onDragDrop: (GameCard, Offset) -> Unit,
     argentumMode: Boolean = false, argentumPrimaryLabel: String? = null, legalActionCount: Int = 0, onUndo: (() -> Unit)? = null,
     arrangement: HandArrangement = HandArrangement.AUTO_FIT, cardScale: Float = 1f, playableIds: Set<Int> = emptySet(),
-    canRespond: Boolean = false, commanderAffordable: Boolean = false) {
+    canRespond: Boolean = false, commanderAffordable: Boolean = false,
+    tutorialCue: Pair<String, String>? = null,
+    tutorialStep: ArcanaLessonStep? = null,
+    onTutorialNext: () -> Unit = {}, onTutorialExit: () -> Unit = {}) {
     val handScrollState = rememberScrollState()
     var moreOpen by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 8.dp)) {
+        tutorialCue?.let { TutorialInlineCue(it.first, it.second) }
+        tutorialStep?.let { step ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
+                if (step.actionKind == "next") TextButton(onClick = onTutorialNext) { Text("NEXT", color = Mint) }
+            }
+        }
         Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("YOUR HAND  ·  ${cards.size} CARDS", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f))
             IconButton(onClick = onClose, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close hand", tint = SoftWhite) }
@@ -832,6 +848,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
                 CardFace(
                     card,
                     Modifier.width(cardWidth).height(cardHeight)
+                        .tutorialTarget("hand-card:${card.name}")
                         .onGloballyPositioned { coordinates = it }
                         // Argentum games: holding a hand card previews it (no drag-to-play there).
                         .then(if (argentumMode) Modifier else Modifier.pointerInput(card.id) {
@@ -848,7 +865,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
                         })
                         .then(if (cards.firstOrNull()?.id == card.id) Modifier else Modifier)
                         .then(if (card.id == highlightedCardId) Modifier.border(3.dp, Mint, RoundedCornerShape(8.dp)) else Modifier),
-                    onClick = { onSelect(card) }, onLongClick = { onSelect(card) }, showCounters = false, glow = card.id in playableIds
+                    onClick = { onSelect(card) }, onLongClick = { onSelect(card) }, showCounters = false, glow = card.id in playableIds, tutorialZone = "hand"
                 )
             }
             } }
