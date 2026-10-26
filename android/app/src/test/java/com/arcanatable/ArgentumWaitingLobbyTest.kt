@@ -14,6 +14,7 @@ import org.robolectric.RobolectricTestRunner
 
 /** No socket or runtime JAR changes: prove admission before wiring to the actual Wi-Fi host. */
 @RunWith(RobolectricTestRunner::class)
+@org.robolectric.annotation.Config(sdk = [34])
 class ArgentumWaitingLobbyTest {
     private fun seat(name: String, card: String) = LocalSeat(name, List(40) { card }, null)
     private fun lobby(size: Int) = ArgentumWaitingLobby(
