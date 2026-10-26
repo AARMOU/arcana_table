@@ -434,8 +434,12 @@ internal class TableController(
                 now.battlefield.any { it.name == "Forest" && it.id !in oldForests })
                 tutorialSignal("event", "LandPlayed")
             if (now.manaPool.values.sum() > old.manaPool.values.sum()) tutorialSignal("event", "ManaAdded")
-            if (wasInHand("Elvish Mystic") && !isInHand("Elvish Mystic") &&
-                (current.stack.any { it.name == "Elvish Mystic" } || nowInPlay("Elvish Mystic"))) tutorialSignal("event", "SpellCast")
+            val spellName = tutorialStep?.takeIf { it.event == "SpellCast" }
+                ?.target?.removePrefix("hand-card:")
+            if (!spellName.isNullOrBlank() && wasInHand(spellName) && !isInHand(spellName) &&
+                (current.stack.any { it.name == spellName } || nowInPlay(spellName) ||
+                    now.graveyard.any { it.name == spellName }))
+                tutorialSignal("event", "SpellCast")
             if (old.battlefield.none { it.name == "Elvish Mystic" } && nowInPlay("Elvish Mystic")) tutorialSignal("event", "SpellResolved")
             if (previous.stepKey == "DECLARE_ATTACKERS" && current.stepKey != previous.stepKey) tutorialSignal("event", "AttackersDeclared")
             val oldOpp = previous.players.getOrNull(1 - previous.viewingPlayer)
