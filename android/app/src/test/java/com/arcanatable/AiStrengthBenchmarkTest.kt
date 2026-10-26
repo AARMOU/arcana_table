@@ -40,11 +40,24 @@ import kotlin.math.sqrt
 class AiStrengthBenchmarkTest {
     private data class DeckSpec(val id: String, val commander: String, val cards: List<String>)
     private data class Sample(val side: String, val tier: String, val turn: Int, val nanos: Long)
+    // No card identity, hand, deck order, target ID or raw action text in this trace.
+    private data class ReplayMark(
+        val index: Int, val turn: Int, val step: String, val actor: String,
+        val actionKind: String, val decisionKind: String,
+        val battlefieldSize: Int, val stackSize: Int, val remainingPlayers: Int,
+        val tier: String, val nanos: Long,
+    ) {
+        fun stateAndChoice() = "$index/$turn/$step/$actor/$actionKind/$decisionKind/$battlefieldSize/$stackSize/$remainingPlayers"
+        fun printable() = "n=$index turn=$turn step=$step actor=$actor action=$actionKind " +
+            "decision=$decisionKind battlefield=$battlefieldSize stack=$stackSize players=$remainingPlayers " +
+            "tier=$tier millis=${nanos / 1_000_000.0}"
+    }
     private data class GameResult(
         val mode: Int, val seed: Long, val pair: Int, val candidateSeats: List<Int>,
         val decks: List<String>, val status: String, val winnerSide: String?,
         val turns: Int, val actions: Int, val invalidActions: Int, val priorityPasses: Int,
         val wallMs: Long, val samples: List<Sample>, val actionSequenceSha256: String,
+        val marks: List<ReplayMark>, val rejectedKind: String?,
     )
 
     /** Observe the actual decision tier while delegating unchanged limits to the mobile policy. */
@@ -116,6 +129,26 @@ class AiStrengthBenchmarkTest {
                     println("[ai-replay] mode=$mode pair=$pair seed=$seed swap=$swap " +
                         "first=${result.actionSequenceSha256} second=${second.actionSequenceSha256} " +
                         "actions=${result.actions}/${second.actions} status=${result.status}/${second.status}")
+                    val compared = minOf(result.marks.size, second.marks.size)
+                    val mismatch = (0 until compared).firstOrNull {
+                        result.marks[it].stateAndChoice() != second.marks[it].stateAndChoice()
+                    } ?: compared.takeIf { result.marks.size != second.marks.size }
+                    if (mismatch != null) {
+                        val beginning = maxOf(0, mismatch - 3)
+                        val ending = minOf(maxOf(result.marks.size, second.marks.size), mismatch + 4)
+                        println("[ai-replay-divergence] firstCoarseMismatchIndex=$mismatch " +
+                            "firstRejected=${result.rejectedKind ?: "none"} " +
+                            "secondRejected=${second.rejectedKind ?: "none"}")
+                        for (i in beginning until ending) {
+                            println("[ai-replay-trace] n=$i first=" +
+                                (result.marks.getOrNull(i)?.printable() ?: "END") +
+                                " | second=" + (second.marks.getOrNull(i)?.printable() ?: "END"))
+                        }
+                    } else if (result.actionSequenceSha256 != second.actionSequenceSha256) {
+                        println("[ai-replay-divergence] fullActionHashesDifferButCoarseChoicesMatch; " +
+                            "entity IDs, action parameters or hidden state may differ. " +
+                            "Do NOT conclude the AI changed its chosen action from this hash alone.")
+                    }
                     assertEquals("Action stream diverged: mode=$mode pair=$pair seed=$seed swap=$swap",
                         result.actionSequenceSha256, second.actionSequenceSha256)
                     assertEquals("Game status diverged", result.status, second.status)
@@ -185,6 +218,8 @@ class AiStrengthBenchmarkTest {
         var passes = 0
         var failure: String? = null
         val actionsDigest = MessageDigest.getInstance("SHA-256")
+        val marks = mutableListOf<ReplayMark>()
+        var rejectedKind: String? = null
         while (!state.gameOver && state.turnNumber <= 60 && actions < maxActions &&
             (System.nanoTime() - start) / 1_000_000 < maxWallMs) {
             val decision = state.pendingDecision
@@ -199,7 +234,14 @@ class AiStrengthBenchmarkTest {
                     else bots.getValue(actor).chooseAction(state)
                 }
             }
-            samples += Sample(side, observer.takeTier(), state.turnNumber, System.nanoTime() - before)
+            val elapsedNanos = System.nanoTime() - before
+            val tier = observer.takeTier()
+            samples += Sample(side, tier, state.turnNumber, elapsedNanos)
+            marks += ReplayMark(actions, state.turnNumber, state.step.toString(),
+                actor.value, action.javaClass.simpleName,
+                decision?.javaClass?.simpleName ?: "none",
+                state.getBattlefield().size, state.stack.size, state.activePlayers.size,
+                tier, elapsedNanos)
             if (action is com.wingedsheep.engine.core.PassPriority) passes++
             // Hash submitted actions in order. Expose no hidden card identities in report.
             actionsDigest.update(
@@ -208,6 +250,10 @@ class AiStrengthBenchmarkTest {
             )
             val result = processor.process(state, action).result
             if (result.error != null) {
+                rejectedKind = result.error.javaClass.simpleName + " " + action.javaClass.simpleName +
+                    " turn=" + state.turnNumber + " step=" + state.step +
+                    " actor=" + actor.value
+                println("[ai-replay-rejected] $rejectedKind")
                 invalid++
                 failure = "invalid-action"
                 break // Never hide an engine/AI error by silently submitting a substitute action.
@@ -228,7 +274,8 @@ class AiStrengthBenchmarkTest {
         return GameResult(mode, seed, pair, candidateSeats, decks.map { it.id }, status,
             if (status == "decisive") winner else null, state.turnNumber, actions, invalid,
             passes, elapsed, samples,
-            actionsDigest.digest().joinToString("") { "%02x".format(it) })
+            actionsDigest.digest().joinToString("") { "%02x".format(it) },
+            marks, rejectedKind)
     }
 
     private fun json(results: List<GameResult>, eligible: Int, excluded: List<String>): JSONObject {
@@ -244,7 +291,9 @@ class AiStrengthBenchmarkTest {
                 .put("winnerSide", g.winnerSide ?: JSONObject.NULL)
                 .put("turns", g.turns).put("actions", g.actions)
                 .put("invalidActions", g.invalidActions).put("priorityPasses", g.priorityPasses)
-                .put("wallMs", g.wallMs).put("actionSequenceSha256", g.actionSequenceSha256).put("decisions", JSONArray(g.samples.map { d ->
+                .put("wallMs", g.wallMs).put("actionSequenceSha256", g.actionSequenceSha256)
+                .put("rejectedKind", g.rejectedKind ?: JSONObject.NULL)
+                .put("decisions", JSONArray(g.samples.map { d ->
                     JSONObject().put("side", d.side).put("tier", d.tier)
                         .put("turn", d.turn).put("nanos", d.nanos)
                 }))
