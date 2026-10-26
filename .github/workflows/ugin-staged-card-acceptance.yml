@@ -1,0 +1,142 @@
+name: Ugin staged source + deterministic export acceptance
+# #153 / #150: single GPT-owned Ugin integration candidate. No runtime JAR or main writes.
+on:
+  push:
+    branches: [gpt/ugin-staged-card-20261026]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ugin-staged-card-acceptance
+  cancel-in-progress: true
+
+jobs:
+  ugin-staged:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - name: Checkout exact staged source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 10
+          persist-credentials: false
+      - name: Fail closed on provenance, scope, and frozen tested card source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f" HEAD
+          test "$(git hash-object android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt)" = "f4bab3f7666c7fe49cb0bf4110a56195508ba282"
+          test "$(git hash-object android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt)" = "670a31ee699f41a524820fe16f01199892fa1aae"
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          expected = {
+              ".github/workflows/ugin-staged-card-acceptance.yml",
+              "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt",
+              "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt",
+              "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt",
+          }
+          changed = set(subprocess.check_output(["git","diff","--name-only","9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f","HEAD"],text=True).splitlines())
+          assert changed == expected, ("Unexpected branch changes", sorted(changed ^ expected))
+          registry = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt").read_text()
+          assert registry.count('Entry(UginTheIneffable, "CMM", "Eldrazi Incursion")') == 1
+          print("Frozen Ugin source and single Incursion registry entry verified at", subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip())
+          PY
+          git diff --check "9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f" HEAD
+          sha256sum android/app/libs/argentum-*.jar > /tmp/ugin-jars-before.sha
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install Android 36 SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="$(printenv ANDROID_HOME || true)"
+          if [ -z "$sdk_root" ]; then sdk_root="/usr/local/lib/android/sdk"; fi
+          sdkmanager_path="$(find "$sdk_root/cmdline-tools" -maxdepth 3 -type f -name sdkmanager | sort -V | tail -1)"
+          test -n "$sdkmanager_path" && test -x "$sdkmanager_path"
+          "$sdkmanager_path" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export registered Ugin and run engine + Android regressions
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test :app:testDebugUnitTest
+      - name: Assert exact original-deck delta and real executable test results
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess, json, hashlib
+          import xml.etree.ElementTree as ET
+          base = "9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f"
+          assets = "android/app/src/main/assets/argentum/"
+          def index_names(s):
+              return {line.split("\t",1)[0].strip() for line in s.splitlines() if line.strip()}
+          def original(path):
+              return subprocess.check_output(["git","show",base+":"+path],text=True)
+          before_custom = index_names(original(assets+"custom-cards.index.tsv"))
+          after_custom = index_names(Path(assets+"custom-cards.index.tsv").read_text())
+          before_all = index_names(original(assets+"all-cards.index.tsv"))
+          after_all = index_names(Path(assets+"all-cards.index.tsv").read_text())
+          assert after_all == before_all, "Upstream card index changed"
+          assert after_custom - before_custom == {"Ugin, the Ineffable"}, sorted(after_custom - before_custom)
+          assert before_custom - after_custom == set(), "Existing custom card lost"
+          manifest = json.loads(Path("investigation/argentum-six-precons/deck-manifest.json").read_text())
+          basics = {"Plains","Island","Swamp","Mountain","Forest","Wastes"}
+          counts = {}
+          for d in manifest["decks"]:
+              if d["name"] not in ("Eldrazi Incursion","Eldrazi Unbound"):
+                  continue
+              assert sum(c["quantity"] for c in d["cards"]) == 100
+              def count(custom):
+                  return sum(c["quantity"] for c in d["cards"] if c["name"] in before_all or c["name"] in custom or c["name"] in basics)
+              counts[d["name"]] = [count(before_custom),count(after_custom)]
+          assert counts == {"Eldrazi Incursion":[76,77],"Eldrazi Unbound":[75,76]}, counts
+          ugin_xml = Path("android/custom-cards/build/test-results/test/TEST-com.arcanatable.customcards.UginTheIneffableScenarioTest.xml")
+          assert ugin_xml.is_file(), "Ugin executable JUnit XML missing"
+          cases = list(ET.parse(ugin_xml).getroot().iter("testcase"))
+          names = [c.get("name") for c in cases]
+          assert len(cases) == 22 and len(names) == len(set(names)), ("Ugin 22-test contract",names)
+          required = {"plusOneCannotBeActivatedTwiceInOneTurn","minusThreeCannotFollowPlusOneInSameTurn","stolenSpiritKeepsPrivateLinkAndReturnsCardToOriginalOwner","simultaneousBoardWipeReturnsEachSpiritLinkedCardExactlyOnce","devoidSpellGetsUginDiscountWithoutWaivingPrintedBlue","uginDiscountCannotPayRequiredColorlessSymbol"}
+          assert required <= set(names), sorted(required-set(names))
+          assert all(all(c.find(k) is None for k in ("failure","error","skipped")) for c in cases), "Ugin failure or skip"
+          def check_xml(root):
+              n = 0
+              for p in root.glob("TEST-*.xml"):
+                  suite = ET.parse(p).getroot()
+                  assert int(suite.get("failures",0)) == 0 and int(suite.get("errors",0)) == 0, p
+                  n += len(list(suite.iter("testcase")))
+              return n
+          custom = check_xml(Path("android/custom-cards/build/test-results/test"))
+          android = check_xml(Path("android/app/build/test-results/testDebugUnitTest"))
+          assert custom >= 22 and android >= 300, ("Truncated regression suites",custom,android)
+          summary = {"head":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),"base":base,"ugin_source_blob":"f4bab3f7666c7fe49cb0bf4110a56195508ba282","ugin_test_blob":"670a31ee699f41a524820fe16f01199892fa1aae","indexed_before_after":counts,"ugin_executed":len(cases),"custom_cases":custom,"android_cases":android,"integrated_to_development":False}
+          Path("ugin-staged-proof.json").write_text(json.dumps(summary,indent=2,sort_keys=True)+"\n")
+          print(json.dumps(summary,sort_keys=True))
+          PY
+      - name: Prove deterministic export and unchanged Argentum runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/ugin-export-first.sha
+          (cd android && ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards)
+          sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/ugin-export-second.sha
+          diff -u /tmp/ugin-export-first.sha /tmp/ugin-export-second.sha
+          sha256sum android/app/libs/argentum-*.jar > /tmp/ugin-jars-after.sha
+          diff -u /tmp/ugin-jars-before.sha /tmp/ugin-jars-after.sha
+          git diff --exit-code -- android/app/libs android/app/src/main/assets/argentum/all-cards.index.tsv
+          echo "Generated custom card assets are REVIEW ARTIFACTS only; no merge or runtime replacement."
+      - name: Upload exact generated card assets and executable proof for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ugin-staged-review-assets-and-junit
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ugin-staged-proof.json
+            android/app/src/main/assets/argentum/custom-cards.jsonl
+            android/app/src/main/assets/argentum/custom-cards.index.tsv
+            android/custom-cards/build/test-results/test/TEST-*.xml
+            android/app/build/test-results/testDebugUnitTest/TEST-*.xml
