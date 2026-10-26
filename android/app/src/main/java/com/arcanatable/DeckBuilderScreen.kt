@@ -482,8 +482,10 @@ private fun LibraryPane(
     LaunchedEffect(baseQuery, filters) {
         delay(if (query.isBlank()) 0 else 220) // debounce typing
         result = withContext(Dispatchers.Default) { lib.search(baseQuery, filters, limit = 400) }
-        if (grid) gridState.scrollToItem(0) else listState.scrollToItem(0)
     }
+    // New results start at the top. requestScrollToItem applies on the next layout pass, on the UI
+    // thread; scrolling from the search coroutine could measure off the main thread.
+    LaunchedEffect(result) { listState.requestScrollToItem(0); gridState.requestScrollToItem(0) }
     Column(modifier) {
         OutlinedTextField(query, onQuery, Modifier.fillMaxWidth().testTag("library-search"), singleLine = true,
             label = { Text("Search ${lib.size} playable cards") },
