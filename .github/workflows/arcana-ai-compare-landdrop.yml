@@ -1,0 +1,100 @@
+name: AI Two-Player Land-Drop Head-to-Head
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/arcana-ai-compare-landdrop.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  paired-2p-comparison:
+    name: Current AI vs land-drop candidate (20 paired games)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ARCANA_AI_BENCHMARK: '1'
+      ARCANA_AI_GAME_MODE: '2'
+      ARCANA_AI_PAIR_START: '0'
+      ARCANA_AI_GAMES_PER_MODE: '20'
+      ARCANA_AI_MAX_ACTIONS: '6000'
+      ARCANA_AI_MAX_GAME_MS: '45000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Enable only the experimental land-drop flag on disposable runner
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("android/app/src/test/java/com/arcanatable/AiStrengthBenchmarkTest.kt")
+          s=p.read_text()
+          edits=[
+            ('val candidate = OfflineAiPolicy.profile.copy(id = "arcana-ai-candidate-control", budgetPolicy = observer)',
+             'val candidate = OfflineAiPolicy.profile.copy(id = "arcana-ai-candidate-landdrop", budgetPolicy = observer, landDropIsNotCardLoss = true)'),
+            ('.put("candidateProfile", "arcana-ai-candidate-control")',
+             '.put("candidateProfile", "arcana-ai-candidate-landdrop")'),
+            ('.put("candidateIdenticalToBaseline", true)',
+             '.put("candidateIdenticalToBaseline", false)'),
+            ('# Arcana AI benchmark — control vs control',
+             '# Arcana AI benchmark — current vs land-drop candidate'),
+            ('Both profiles are the **same** current Arcana AI. This is a control baseline, not improved AI.',
+             'Candidate differs by one setting: landDropIsNotCardLoss=true; budgets and all other settings are unchanged.')
+          ]
+          for before, after in edits:
+              assert s.count(before)==1, "Benchmark moved or unexpected count: "+before
+              s=s.replace(before,after)
+          p.write_text(s)
+          print("Candidate uses current mobile profile with ONE land-drop flag changed.")
+          print("Benchmark source is instrumented only on this ephemeral CI runner.")
+          PY
+      - name: Run actual paired two-player Commander games
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.AiStrengthBenchmarkTest'
+      - name: Print complete strength and latency results without claiming significance
+        run: |
+          python3 - <<'PY'
+          import json, math, collections
+          from pathlib import Path
+          r=json.loads(Path("android/app/build/reports/ai-strength/comparison.json").read_text())
+          gs=r["games"]
+          assert len(gs)==20 and all(g["mode"]==2 for g in gs)
+          assert r["candidateIdenticalToBaseline"] is False
+          assert r["candidateProfile"]=="arcana-ai-candidate-landdrop"
+          assert all(g["actions"]>0 for g in gs)
+          pairs=collections.Counter(g["pair"] for g in gs)
+          assert len(pairs)==10 and all(n==2 for n in pairs.values()),pairs
+          wins=collections.Counter(g["winnerSide"] for g in gs if g["status"]=="decisive")
+          statuses=collections.Counter(g["status"] for g in gs)
+          print("MODE: 1v1 Commander, same ten seeds/decks with profiles swapped between seats")
+          print("ONLY CANDIDATE CHANGE: landDropIsNotCardLoss=true")
+          print("GAMES:",len(gs),"decisive:",sum(wins.values()),"status:",dict(statuses))
+          print("WINS: candidate:",wins["candidate"],"baseline:",wins["baseline"])
+          decisive=wins["candidate"]+wins["baseline"]
+          print("CANDIDATE DECISIVE WIN RATE:",f"{100*wins['candidate']/decisive:.1f}%" if decisive else "unmeasurable (zero decisive)")
+          for side in ["baseline","candidate"]:
+              ms=sorted(d["nanos"]/1e6 for g in gs for d in g["decisions"] if d["side"]==side)
+              def pct(q):
+                  return round(ms[max(0,math.ceil(q*len(ms))-1)],2) if ms else None
+              print(side,"decisions:",len(ms),"p50_ms:",pct(.50),"p95_ms:",pct(.95),"p99_ms:",pct(.99),"max_ms:",round(ms[-1],2) if ms else None)
+              assert ms, "Missing timings for "+side
+          print("INVALID-ACTION GAMES:",[(g["pair"],g["seed"]) for g in gs if g["status"]=="invalid-action"])
+          print("HEADLESS JVM, not Fold performance; 20 games do not establish statistical superiority.")
+          with open("/tmp/ai_result_summary.txt","w") as f:
+              f.write(f"Paired 2p games: {len(gs)}; candidate wins: {wins['candidate']}; baseline wins: {wins['baseline']}; status: {dict(statuses)}\n")
+          PY
+          cat /tmp/ai_result_summary.txt >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-landdrop-paired-two-player-evidence
+          retention-days: 14
+          path: |
+            android/app/build/reports/ai-strength/
+            android/app/build/test-results/testDebugUnitTest/
