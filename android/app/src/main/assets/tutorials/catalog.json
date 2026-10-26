@@ -893,8 +893,8 @@
       "section": "Learn Magic",
       "minutes": 5,
       "startScreen": "board",
-      "description": "See how spells resolve and practice responding at the right time.",
-      "scenario": "response-to-targeted-spell",
+      "description": "Practice casting a targeted instant, checking the stack, and passing priority.",
+      "scenario": "fixed-stack-instant",
       "availability": [
         "release:offline-two-player"
       ],
@@ -907,7 +907,7 @@
             "kind": "tap"
           },
           "title": "Open the stack",
-          "body": "The stack holds spells and many abilities waiting to resolve.",
+          "body": "Open the stack panel. Your opponent is passive in this exercise; you'll put a real spell on the stack next.",
           "hint": "Tap STACK"
         },
         {
@@ -935,25 +935,25 @@
         {
           "id": "opponent-cast",
           "screen": "board",
-          "target": "incoming-play",
+          "target": "hand-handle",
           "advance": {
             "kind": "next"
           },
-          "title": "An opponent casts a spell",
-          "body": "A spell targeting your creature has been added to the stack. You may have an opportunity to respond.",
+          "title": "Prepare your instant",
+          "body": "You control Grizzly Bears and two untapped Forests. Close the stack panel, then open your hand to cast an instant.",
           "hint": "Next"
         },
         {
           "id": "respond",
           "screen": "board",
-          "target": "hand-card:Snakeskin Veil",
+          "target": "hand-card:Giant Growth",
           "advance": {
             "kind": "event",
             "event": "SpellCast"
           },
-          "title": "Cast an instant in response",
-          "body": "A Shock targets your Grizzly Bears. Cast Snakeskin Veil using green mana to give it hexproof before Shock resolves.",
-          "hint": "Choose Cast"
+          "title": "Cast Giant Growth",
+          "body": "Choose Giant Growth in your hand, then target your Grizzly Bears. Argentum validates the target and adds the spell to the stack.",
+          "hint": "Choose Cast and target your Bears"
         },
         {
           "id": "inspect-stack",
@@ -963,7 +963,7 @@
             "kind": "next"
           },
           "title": "Check the new order",
-          "body": "Your response is on top, so it normally resolves before the opposing spell.",
+          "body": "Giant Growth is now on the stack. If a player casts another instant, it will normally resolve before Giant Growth.",
           "hint": "Next"
         },
         {
@@ -975,8 +975,8 @@
             "event": "PriorityPassed"
           },
           "title": "Pass to resolve",
-          "body": "Each player must pass in succession before the top item resolves. Watch the result.",
-          "hint": "Tap Pass"
+          "body": "Pass priority so the training opponent can pass too. Argentum then resolves Giant Growth and your Bears get +3/+3 until end of turn.",
+          "hint": "Use PASS PRIORITY"
         },
         {
           "id": "close",
@@ -986,7 +986,7 @@
             "kind": "tap"
           },
           "title": "Return to your battlefield",
-          "body": "Close the stack panel to return to the game view. The stack still exists until resolved.",
+          "body": "Close the stack panel and return to the battlefield. You used real Argentum rules and priorities.",
           "hint": "Done"
         }
       ]
