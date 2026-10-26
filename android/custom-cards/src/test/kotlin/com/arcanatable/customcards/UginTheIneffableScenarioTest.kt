@@ -476,15 +476,24 @@ class UginTheIneffableScenarioTest {
             d.castSpell(thief, theftSpell, listOf(spirit)).error)
         d.resolveAll()
 
-        assertTrue("Spirit is no longer controlled by its creator",
-            d.permanentsNamed(owner, "Spirit").isEmpty())
-        assertEquals("The stolen token stays the same linked game object",
-            listOf(spirit), d.permanentsNamed(thief, "Spirit"))
+        // GainControl is a Layer.CONTROL floating effect. Battlefield ZoneKey
+        // remains keyed to the original zone holder, so permanentsNamed(player)
+        // is NOT a valid control-change assertion. Inspect projected control.
+        assertEquals("The real engine must transfer Spirit control to the thief",
+            thief, d.projected.getController(spirit))
+        assertEquals("The stolen token must retain its original identity",
+            "Spirit", d.getCardName(spirit))
         assertEquals("Control change cannot rewrite the per-token exile link",
             listOf(linkedCard), d.state.getEntity(spirit)!!
                 .get<LinkedExileComponent>()?.exiledIds)
         assertTrue("The linked card stays in its owner's exile until the token leaves",
             linkedCard in d.getExile(owner))
+        val privateViewers = d.state.getEntity(linkedCard)!!
+            .get<MayLookAtInExileComponent>()?.playerIds.orEmpty()
+        assertTrue("Original viewer retains permission after Spirit is stolen",
+            owner in privateViewers)
+        assertFalse("New controller must not gain permission to see face-down exile",
+            thief in privateViewers)
 
         val removal = com.wingedsheep.sdk.dsl.card("Stolen Ugin Spirit Removal Probe") {
             manaCost = "{0}"
@@ -502,7 +511,8 @@ class UginTheIneffableScenarioTest {
         assertNull(d.castSpell(thief, removalSpell, listOf(spirit)).error)
         d.resolveAll()
 
-        assertTrue(d.permanentsNamed(thief, "Spirit").isEmpty())
+        assertFalse("Stolen Spirit must leave the battlefield after real removal",
+            spirit in d.state.getZone(owner, Zone.BATTLEFIELD))
         assertFalse(linkedCard in d.getExile(owner))
         assertEquals("Stolen Spirit must return the linked card to its actual owner once",
             1, d.getHand(owner).count { it == linkedCard })
