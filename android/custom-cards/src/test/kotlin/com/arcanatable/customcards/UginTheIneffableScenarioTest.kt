@@ -446,6 +446,46 @@ class UginTheIneffableScenarioTest {
     }
 
 
+    @Test fun devoidSpellIsDiscountedButDevoidPermanentCannotBeDestroyedByMinusThree() {
+        val devoidEldrazi = com.wingedsheep.sdk.dsl.card("Ugin Devoid Eldrazi Probe") {
+            manaCost = "{2}{G}"
+            colorIdentity = "G"
+            typeLine = "Creature — Eldrazi"
+            power = 2
+            toughness = 2
+            keywords(com.wingedsheep.sdk.core.Keyword.DEVOID)
+        }
+        val d = customScenario(UginTheIneffable)
+        val p = d.player1
+        d.registerCard(devoidEldrazi)
+        val ugin = d.castUgin()
+        val creature = d.putCardInHand(p, devoidEldrazi.name)
+
+        // Devoid changes the spell's color, not its colored mana requirement
+        // or its commander color identity. Ugin removes {2}, not {G}.
+        assertNotNull("Ugin must not erase Devoid Eldrazi's printed {G}",
+            d.castSpell(p, creature).error)
+        assertTrue(creature in d.getHand(p))
+        d.giveMana(p, com.wingedsheep.sdk.core.Color.GREEN, 1)
+        assertNull("Ugin must reduce the Devoid spell's generic {2} to zero",
+            d.castSpell(p, creature).error)
+        d.resolveAll()
+        val permanent = d.findPermanent(p, devoidEldrazi.name)
+        assertNotNull("The Devoid Eldrazi must resolve as a creature", permanent)
+
+        // The same colorless characteristic that earned the discount must
+        // make the permanent an illegal target for Ugin's -3 ability.
+        val ability = d.cardRegistry.getCard("Ugin, the Ineffable")!!.script.activatedAbilities[1]
+        val attempted = d.submit(com.wingedsheep.engine.core.ActivateAbility(
+            p, ugin, ability.id,
+            targets = listOf(com.wingedsheep.engine.state.components.stack.ChosenTarget.Permanent(permanent!!))
+        ))
+        assertNotNull("Ugin -3 cannot target a Devoid permanent despite green identity", attempted.error)
+        assertEquals("Rejected loyalty activation cannot spend counters", 4, d.loyalty(ugin))
+        assertNotNull("Rejected destruction cannot remove the Devoid Eldrazi",
+            d.findPermanent(p, devoidEldrazi.name))
+    }
+
     @Test fun uginDiscountCannotPayRequiredColorlessSymbol() {
         val probe = com.wingedsheep.sdk.dsl.card("Ugin Explicit Colorless Cost Probe") {
             manaCost = "{2}{C}"
