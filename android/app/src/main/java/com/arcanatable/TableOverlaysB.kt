@@ -807,7 +807,7 @@ internal fun TableController.TableOverlaysB() {
     if (tutorialHubOpen) TutorialHubDialog(
         onDismiss = { tutorialHubOpen = false },
         onPractice = { startTutorialPractice(it) },
-        onCoach = { startTutorialCoach(it) },
+        onCoach = { id, index -> startTutorialCoach(id, index) },
         practiceEnabled = !argentumEnabled && !offlineStarting
     )
     if (optionsOpen) OptionsPage(
