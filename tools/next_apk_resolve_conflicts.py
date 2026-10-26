@@ -112,16 +112,16 @@ def resolve_ai(head_sha: str) -> None:
         match = matches[0]
         ours, theirs = match.group("ours"), match.group("theirs")
         if name == CONTROLLER:
-            old_count = '    var offlineAiCount by run { mutableStateOf(ReleaseFeatures.aiCount(optionPrefs.getInt("offline_ai_count", 1))) }\\n'
-            new_count = '    var offlineAiCount by run { mutableStateOf(optionPrefs.getInt("offline_ai_count", 1).coerceIn(1, 3)) }\\n'
+            old_count = '    var offlineAiCount by run { mutableStateOf(ReleaseFeatures.aiCount(optionPrefs.getInt("offline_ai_count", 1))) }\n'
+            new_count = '    var offlineAiCount by run { mutableStateOf(optionPrefs.getInt("offline_ai_count", 1).coerceIn(1, 3)) }\n'
             if ours != old_count or not theirs.startswith(new_count):
                 raise RuntimeError("Unexpected saved-count/AI-difficulty collision")
             if theirs.count("fun setOfflineAiDifficulty(") != 1:
                 raise RuntimeError("Missing difficulty persistence")
             replacement = old_count + theirs[len(new_count):]
         elif name == OVERLAYS:
-            old_count = '                onAiCount = { offlineAiCount = ReleaseFeatures.aiCount(it); optionPrefs.edit().putInt("offline_ai_count", offlineAiCount).apply() },\\n'
-            new_count = '                onAiCount = { offlineAiCount = it; optionPrefs.edit().putInt("offline_ai_count", it).apply() },\\n'
+            old_count = '                onAiCount = { offlineAiCount = ReleaseFeatures.aiCount(it); optionPrefs.edit().putInt("offline_ai_count", offlineAiCount).apply() },\n'
+            new_count = '                onAiCount = { offlineAiCount = it; optionPrefs.edit().putInt("offline_ai_count", it).apply() },\n'
             if not ours.startswith(old_count) or not theirs.startswith(new_count):
                 raise RuntimeError("Unexpected release seat gating/source overlay collision")
             if ours.count('TutorialActions.tap("setup-start")') != 1:
@@ -129,12 +129,12 @@ def resolve_ai(head_sha: str) -> None:
             if theirs.count('aiDifficulties = offlineAiDifficulties,') != 1 or theirs.count('onAiDifficulty = ') != 1:
                 raise RuntimeError("Difficulty controls missing")
             difficulty = (
-                "                aiDifficulties = offlineAiDifficulties,\\n"
-                "                onAiDifficulty = { seat, level -> setOfflineAiDifficulty(seat, level) },\\n"
+                "                aiDifficulties = offlineAiDifficulties,\n"
+                "                onAiDifficulty = { seat, level -> setOfflineAiDifficulty(seat, level) },\n"
             )
             replacement = old_count + difficulty + ours[len(old_count):]
         else:
-            old_head = '                val chosen = if (tutorialPassiveOpponent) safePass(current, priority)\\n'
+            old_head = '                val chosen = if (tutorialPassiveOpponent) safePass(current, priority)\n'
             new_head = '                val chosen = timed("aiChoice")'
             if not ours.startswith(old_head) or not theirs.startswith(new_head):
                 raise RuntimeError("Unexpected training AI / guarded AI collision")
@@ -148,7 +148,7 @@ def resolve_ai(head_sha: str) -> None:
                 raise RuntimeError("Guarded AI recovery is missing or modified")
             # Tutorial's deliberately passive training bot still passes, while
             # normal games use Claude's difficulty-aware guarded action selection.
-            replacement = old_head + "                    else (" + theirs[len('                val chosen = '):].rstrip("\\n") + ")\\n"
+            replacement = old_head + "                    else (" + theirs[len('                val chosen = '):].rstrip("\n") + ")\n"
         result = original[:match.start()] + replacement + original[match.end():]
         if any(tag in result for tag in ("<<<<<<<", "=======", ">>>>>>>")):
             raise RuntimeError(f"Remaining AI merge markers in {name}")
