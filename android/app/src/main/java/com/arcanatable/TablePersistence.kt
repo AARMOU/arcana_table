@@ -168,7 +168,8 @@ internal fun loadActiveDeck(context: android.content.Context): String? =
     runCatching { context.getSharedPreferences("arcana-saved-decks", android.content.Context.MODE_PRIVATE).getString("activeDeck", null) }.getOrNull()
 
 internal fun saveSavedDecks(context: android.content.Context, decks: List<SavedDeck>) {
-    val data = JSONArray().apply { decks.forEach { put(JSONObject().put("name", it.name).put("text", it.text).put("commander", it.commander ?: JSONObject.NULL)) } }
+    val data = JSONArray().apply { decks.forEach { put(JSONObject().put("name", it.name).put("text", it.text).put("commander", it.commander ?: JSONObject.NULL)
+        .put("updatedAt", it.updatedAt).put("tags", JSONArray(it.tags))) } }
     runCatching { context.getSharedPreferences("arcana-saved-decks", android.content.Context.MODE_PRIVATE).edit().putString("savedDecks", data.toString()).apply() }
 }
 
@@ -186,7 +187,9 @@ internal fun loadSavedDecks(context: android.content.Context): List<SavedDeck> =
         data.optJSONObject(index)?.let { item ->
             val name = item.optString("name").trim()
             val text = item.optString("text").trim()
-            if (name.isBlank() || text.isBlank()) null else SavedDeck(name, text, item.optString("commander").takeIf { it.isNotBlank() && it != "null" })
+            if (name.isBlank() || text.isBlank()) null else SavedDeck(name, text, item.optString("commander").takeIf { it.isNotBlank() && it != "null" },
+                updatedAt = item.optLong("updatedAt", 0L),
+                tags = item.optJSONArray("tags")?.let { t -> (0 until t.length()).mapNotNull { i -> t.optString(i).trim().takeIf { it.isNotEmpty() } } }.orEmpty())
         }
     }
 }.getOrDefault(emptyList())

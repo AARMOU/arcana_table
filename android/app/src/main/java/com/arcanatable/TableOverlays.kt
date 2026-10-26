@@ -640,10 +640,31 @@ internal fun TableController.TableOverlays() {
                             Text(decision.optString("filterDescription"), color = Muted, fontSize = 11.sp)
                             if (options.length() == 0) Text("No matching cards. Confirm to finish the search.", color = Muted, fontSize = 12.sp)
                             else {
-                                val libraryItems = (0 until options.length()).map { index ->
-                                    val id = options.optString(index)
-                                    libraryPick(id, libraryInfo?.optJSONObject(id), ArgentumDecisions.cardName(decision, id) { argentumSnapshot?.targets?.get(it)?.name })
+                                val allLibraryItems = remember(decision) {
+                                    (0 until options.length()).map { index ->
+                                        val id = options.optString(index)
+                                        libraryPick(id, libraryInfo?.optJSONObject(id), ArgentumDecisions.cardName(decision, id) { argentumSnapshot?.targets?.get(it)?.name })
+                                    }
                                 }
+                                // Type chips and sorting only arrange what Argentum offered; picks stay visible.
+                                var libraryChip by remember(decision) { mutableStateOf<LibraryChip?>(null) }
+                                var librarySort by remember(decision) { mutableStateOf(LibrarySort.TYPE) }
+                                val chips = remember(allLibraryItems) { LibraryChip.present(allLibraryItems.map { it.typeLine }) }
+                                if (allLibraryItems.size > 1) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    listOf(LibrarySort.TYPE, LibrarySort.NAME).forEach { sort ->
+                                        FilterChip(librarySort == sort, { librarySort = sort }, label = { Text(sort.label) }, modifier = Modifier.testTag("library-sort-${sort.name}"))
+                                    }
+                                    chips.forEach { (chip, n) ->
+                                        FilterChip(libraryChip == chip, { libraryChip = if (libraryChip == chip) null else chip }, label = { Text("${chip.label} $n") },
+                                            modifier = Modifier.testTag("library-chip-${chip.name}"))
+                                    }
+                                }
+                                val libraryItems = arrangeLibrary(allLibraryItems, libraryChip, librarySort, keep = { it.id in argentumDecisionSelection },
+                                    name = { it.name }, typeLine = { it.typeLine }, manaValue = { null })
+                                    .map { (group, item) -> item.copy(group = group, groupOrder = LIBRARY_GROUP_ORDER.indexOf(group).coerceAtLeast(0)) }
+                                if (maxSel > 1) Text("${argentumDecisionSelection.size} of up to $maxSel chosen", color = if (argentumDecisionSelection.isEmpty()) Muted else Mint,
+                                    fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 CardPickGrid(libraryItems, argentumDecisionSelection.toSet(), isEnabled = { it in argentumDecisionSelection || argentumDecisionSelection.size < maxSel || maxSel == 1 }, onTap = { id ->
                                     argentumDecisionSelection = when {
                                         id in argentumDecisionSelection -> argentumDecisionSelection - id
@@ -740,7 +761,11 @@ internal fun TableController.TableOverlays() {
                     }) { Text("CONFIRM") }
                     "SearchLibraryDecision" -> TextButton(enabled = argentumDecisionSelection.size in decision.optInt("minSelections", 0)..decision.optInt("maxSelections", 1), onClick = {
                         submitArgentumDecision(ArgentumDecisions.cardsSelectedResponse(argentumDecisionSelection))
-                    }) { Text("CONFIRM") }
+                    }, modifier = Modifier.testTag("library-confirm")) {
+                        // Finding nothing is a legal answer to most tutors; say so instead of a bare CONFIRM.
+                        Text(if (argentumDecisionSelection.isEmpty() && decision.optInt("minSelections", 0) == 0) "FIND NOTHING"
+                            else if (argentumDecisionSelection.size > 1) "CONFIRM ${argentumDecisionSelection.size}" else "CONFIRM")
+                    }
                     "OrderObjectsDecision", "ReorderLibraryDecision" -> TextButton(enabled = argentumOrderSelection.isNotEmpty(), onClick = {
                         submitArgentumDecision(ArgentumDecisions.orderedResponse(argentumOrderSelection))
                     }) { Text("CONFIRM ORDER") }

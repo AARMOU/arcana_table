@@ -349,4 +349,12 @@ data class StackAction(
     val targetsConfirmed: Boolean = targetCount == null
 )
 
-internal data class SavedDeck(val name: String, val text: String, val commander: String? = null)
+internal data class SavedDeck(
+    val name: String,
+    val text: String,
+    val commander: String? = null,
+    /** Last edit, epoch millis; 0 for decks saved before this was recorded. */
+    val updatedAt: Long = 0L,
+    /** Player-made labels for sorting the deck library ("Casual", "Testing"). */
+    val tags: List<String> = emptyList(),
+)

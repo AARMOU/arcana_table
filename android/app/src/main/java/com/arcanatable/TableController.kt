@@ -1469,7 +1469,7 @@ internal class TableController(
                 // Your own deck always goes into your deck list and becomes the deck you play.
                 if (importSaveToLibrary || (saveAsMine && selectedPlayer == localSeat)) {
                     val savedName = importSaveName.trim().ifBlank { importedCommander?.name ?: importedTarget?.name ?: "Saved deck" }
-                    val saved = SavedDeck(savedName, text.trim(), importedCommander?.name)
+                    val saved = SavedDeck(savedName, text.trim(), importedCommander?.name, updatedAt = System.currentTimeMillis())
                     if (selectedPlayer == localSeat) { activeDeckId = savedName; saveActiveDeck(context, savedName) }
                     savedDecks = listOf(saved) + savedDecks.filterNot { it.name.equals(savedName, ignoreCase = true) }
                     saveSavedDecks(context, savedDecks)

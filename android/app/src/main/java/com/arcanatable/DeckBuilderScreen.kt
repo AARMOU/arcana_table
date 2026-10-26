@@ -1,4 +1,4 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 
 package com.arcanatable
 
@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -28,6 +29,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -67,8 +71,19 @@ internal fun DeckManagerDialog(
     var importText by rememberSaveable { mutableStateOf("") }
     var pendingImport by rememberSaveable { mutableStateOf<String?>(null) }
     var renaming by remember { mutableStateOf<SavedDeck?>(null) }
-    var deleting by remember { mutableStateOf<SavedDeck?>(null) }
+    var tagging by remember { mutableStateOf<SavedDeck?>(null) }
     var menuFor by remember { mutableStateOf<String?>(null) }
+    var libQuery by rememberSaveable { mutableStateOf("") }
+    var libSort by rememberSaveable { mutableStateOf(DeckLibrarySort.RECENT) }
+    var libTag by rememberSaveable { mutableStateOf<String?>(null) }
+    var recentlyDeleted by remember { mutableStateOf<Pair<SavedDeck, Int>?>(null) }
+    // Tiles fill in color, legality and art once the offline card library has loaded.
+    var summaryCatalog by remember { mutableStateOf<SupportedCardCatalog?>(null) }
+    LaunchedEffect(Unit) { summaryCatalog = runCatching { loadCatalog() }.getOrNull() }
+    val summaries by produceState(emptyMap<String, DeckSummary>(), decks, summaryCatalog) {
+        value = withContext(Dispatchers.Default) { decks.associate { it.name to summarizeDeck(it, summaryCatalog) } }
+    }
+    LaunchedEffect(recentlyDeleted) { if (recentlyDeleted != null) { delay(8_000); recentlyDeleted = null } }
 
     val editTarget = editing
     if (editTarget != null) {
@@ -80,7 +95,8 @@ internal fun DeckManagerDialog(
             allDecks = decks,
             loadCatalog = loadCatalog,
             onSave = { original, deck ->
-                onDecksChanged(SavedDeckOps.upsert(decks, original, deck))
+                val previous = decks.firstOrNull { it.name == original }
+                onDecksChanged(SavedDeckOps.upsert(decks, original, deck.copy(tags = previous?.tags.orEmpty(), updatedAt = System.currentTimeMillis())))
                 editing = deck.name
                 pendingImport = null
             },
@@ -89,6 +105,12 @@ internal fun DeckManagerDialog(
         return
     }
 
+    val tags = remember(decks) { SavedDeckOps.allTags(decks) }
+    // A tag that no deck carries any more (after untagging or deleting) stops filtering.
+    val activeTag = libTag?.takeIf { t -> tags.any { it.equals(t, true) } }
+    val shown = remember(decks, libQuery, activeTag, libSort, summaries) { SavedDeckOps.visible(decks, libQuery, activeTag, libSort, summaries) }
+    val now = remember(decks) { System.currentTimeMillis() }
+
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxSize(), color = Ink) {
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp)) {
@@ -96,7 +118,7 @@ internal fun DeckManagerDialog(
                     IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = SoftWhite) }
                     Column(Modifier.weight(1f)) {
                         Text("DECK BUILDER", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 18.sp, letterSpacing = 1.5.sp)
-                        Text("Developer preview · your saved decks", color = Muted, fontSize = 11.sp)
+                        Text("Developer preview · ${decks.size} saved deck${if (decks.size == 1) "" else "s"}", color = Muted, fontSize = 11.sp)
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -104,35 +126,61 @@ internal fun DeckManagerDialog(
                         colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { Text("NEW DECK", fontWeight = FontWeight.Bold) }
                     OutlinedButton(onClick = { importText = ""; importing = true }, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) { Text("PASTE A LIST", color = SoftWhite, fontWeight = FontWeight.Bold) }
                 }
-                if (decks.isEmpty()) {
-                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                if (decks.isNotEmpty()) {
+                    OutlinedTextField(libQuery, { libQuery = it }, Modifier.fillMaxWidth().testTag("deck-library-search"), singleLine = true,
+                        placeholder = { Text("Search decks, commanders or cards", color = Muted) },
+                        trailingIcon = { if (libQuery.isNotEmpty()) IconButton(onClick = { libQuery = "" }) { Icon(Icons.Filled.Close, "Clear deck search", tint = Muted) } })
+                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                        var sortMenu by remember { mutableStateOf(false) }
+                        Box {
+                            FilterChip(true, { sortMenu = true }, label = { Text("${libSort.label} ▾") }, modifier = Modifier.testTag("deck-library-sort"))
+                            DropdownMenu(sortMenu, { sortMenu = false }) {
+                                DeckLibrarySort.entries.forEach { s -> DropdownMenuItem(text = { Text(s.label + if (s == libSort) "  ✓" else "") }, onClick = { libSort = s; sortMenu = false }) }
+                            }
+                        }
+                        if (tags.isNotEmpty()) {
+                            FilterChip(activeTag == null, { libTag = null }, label = { Text("All") })
+                            tags.forEach { t -> FilterChip(activeTag.equals(t, true), { libTag = if (activeTag.equals(t, true)) null else t }, label = { Text(t) }) }
+                        }
+                    }
+                }
+                when {
+                    decks.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
                         Text("No saved decks yet.\nStart a new deck or paste a list from ManaBox, Moxfield, Archidekt or Arena.", color = Muted, fontSize = 13.sp, lineHeight = 19.sp)
                     }
-                } else LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(decks, key = { it.name }) { deck ->
-                        val entries = remember(deck.text) { parseDeckListDetailed(deck.text) }
-                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel).clickable { editing = deck.name }.padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Column(Modifier.weight(1f)) {
-                                Text(deck.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(listOfNotNull(
-                                    entries.commanders.joinToString(" + ") { it.name }.ifBlank { null },
-                                    "${entries.playableEntries.sumOf { it.count }} cards",
-                                ).joinToString(" · "), color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            }
-                            TextButton(onClick = { editing = deck.name }, modifier = Modifier.heightIn(min = 48.dp)) { Text("EDIT", color = Mint, fontWeight = FontWeight.Bold) }
-                            Box {
-                                IconButton(onClick = { menuFor = deck.name }, modifier = Modifier.size(48.dp)) { Icon(Icons.Filled.MoreVert, "More for ${deck.name}", tint = Muted) }
-                                DropdownMenu(expanded = menuFor == deck.name, onDismissRequest = { menuFor = null }) {
-                                    DropdownMenuItem(text = { Text("Play this deck") }, onClick = { menuFor = null; onPlay(deck) })
-                                    DropdownMenuItem(text = { Text("Rename") }, onClick = { menuFor = null; renaming = deck })
-                                    DropdownMenuItem(text = { Text("Duplicate") }, onClick = { menuFor = null; onDecksChanged(SavedDeckOps.duplicate(decks, deck)) })
-                                    DropdownMenuItem(text = { Text("Copy list") }, onClick = { menuFor = null; copyDeckText(context, deck.name, deck.text) })
-                                    DropdownMenuItem(text = { Text("Share list") }, onClick = { menuFor = null; shareDeckText(context, deck.name, deck.text) })
-                                    DropdownMenuItem(text = { Text("Delete…", color = Color(0xFFE9978B)) }, onClick = { menuFor = null; deleting = deck })
+                    shown.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text("No decks match.", color = Muted, fontSize = 13.sp)
+                    }
+                    else -> LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        items(shown, key = { it.name }) { deck ->
+                            DeckTile(deck, summaries[deck.name], now, onOpen = { editing = deck.name }) {
+                                Box {
+                                    IconButton(onClick = { menuFor = deck.name }, modifier = Modifier.size(48.dp)) { Icon(Icons.Filled.MoreVert, "More for ${deck.name}", tint = Muted) }
+                                    DropdownMenu(expanded = menuFor == deck.name, onDismissRequest = { menuFor = null }) {
+                                        DropdownMenuItem(text = { Text("Play this deck") }, onClick = { menuFor = null; onPlay(deck) })
+                                        DropdownMenuItem(text = { Text("Rename") }, onClick = { menuFor = null; renaming = deck })
+                                        DropdownMenuItem(text = { Text("Tags…") }, onClick = { menuFor = null; tagging = deck })
+                                        DropdownMenuItem(text = { Text("Duplicate") }, onClick = { menuFor = null; onDecksChanged(SavedDeckOps.duplicate(decks, deck)) })
+                                        DropdownMenuItem(text = { Text("Copy list") }, onClick = { menuFor = null; copyDeckText(context, deck.name, deck.text) })
+                                        DropdownMenuItem(text = { Text("Share list") }, onClick = { menuFor = null; shareDeckText(context, deck.name, deck.text) })
+                                        DropdownMenuItem(text = { Text("Delete", color = Color(0xFFE9978B)) }, onClick = {
+                                            menuFor = null
+                                            recentlyDeleted = deck to decks.indexOf(deck)
+                                            onDecksChanged(SavedDeckOps.delete(decks, deck))
+                                        })
+                                    }
                                 }
                             }
                         }
+                        item { Spacer(Modifier.height(24.dp)) }
+                    }
+                }
+                recentlyDeleted?.let { (deck, index) ->
+                    Row(Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(12.dp)).background(PanelLight).padding(start = 14.dp, end = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text("Deleted ${deck.name}", color = SoftWhite, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { onDecksChanged(SavedDeckOps.restore(decks, deck, index)); recentlyDeleted = null },
+                            modifier = Modifier.heightIn(min = 48.dp).testTag("deck-undo-delete")) { Text("UNDO", color = Mint, fontWeight = FontWeight.Black) }
                     }
                 }
             }
@@ -157,12 +205,69 @@ internal fun DeckManagerDialog(
             confirmButton = { TextButton(enabled = value.isNotBlank(), onClick = { onDecksChanged(SavedDeckOps.rename(decks, deck, value)); renaming = null }) { Text("SAVE") } },
             dismissButton = { TextButton(onClick = { renaming = null }) { Text("CANCEL") } })
     }
-    deleting?.let { deck ->
-        AlertDialog(onDismissRequest = { deleting = null }, title = { Text("Delete ${deck.name}?") },
-            text = { Text("This removes the saved deck from this phone. It can't be undone. Copy the list first if you might want it back.") },
-            confirmButton = { TextButton(onClick = { onDecksChanged(SavedDeckOps.delete(decks, deck)); deleting = null }) { Text("DELETE", color = Color(0xFFE9978B)) } },
-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("KEEP") } })
+    tagging?.let { deck ->
+        var chosen by remember(deck) { mutableStateOf(deck.tags) }
+        var newTag by remember(deck) { mutableStateOf("") }
+        val options = (tags + chosen).distinctBy { it.lowercase() }
+        fun addNew() { newTag.trim().takeIf { it.isNotEmpty() }?.let { t -> if (chosen.none { it.equals(t, true) }) chosen = chosen + t }; newTag = "" }
+        AlertDialog(onDismissRequest = { tagging = null }, title = { Text("Tags for ${deck.name}") },
+            text = {
+                Column {
+                    if (options.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        options.forEach { t ->
+                            val on = chosen.any { it.equals(t, true) }
+                            FilterChip(on, { chosen = if (on) chosen.filterNot { it.equals(t, true) } else chosen + t }, label = { Text(t) })
+                        }
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
+                        OutlinedTextField(newTag, { newTag = it.take(24) }, Modifier.weight(1f), singleLine = true, label = { Text("New tag") }, placeholder = { Text("Casual, Testing…") })
+                        TextButton(onClick = ::addNew, enabled = newTag.isNotBlank(), modifier = Modifier.heightIn(min = 48.dp)) { Text("ADD") }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { addNew(); onDecksChanged(SavedDeckOps.setTags(decks, deck, chosen)); tagging = null }) { Text("SAVE") } },
+            dismissButton = { TextButton(onClick = { tagging = null }) { Text("CANCEL") } })
     }
+}
+
+/** One saved deck: commander art, colors, size, whether it's ready to play, tags and last edit. */
+@Composable
+private fun DeckTile(deck: SavedDeck, summary: DeckSummary?, now: Long, onOpen: () -> Unit, menu: @Composable () -> Unit) {
+    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel).clickable(onClick = onOpen).padding(start = 8.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)
+        .testTag("deck-tile-${deck.name}"), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(width = 50.dp, height = 70.dp).clip(RoundedCornerShape(6.dp)).background(PanelLight), contentAlignment = Alignment.Center) {
+            val art = summary?.commanderImageUrl
+            if (art != null) CardArt(art, Modifier.fillMaxSize(), ContentScale.Crop, fallbackName = summary?.commanders?.firstOrNull())
+            else Text(deck.name.take(1).uppercase(), color = Muted, fontWeight = FontWeight.Black, fontSize = 20.sp)
+        }
+        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+            Text(deck.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val commanders = summary?.commanders ?: listOfNotNull(deck.commander)
+            Text(commanders.joinToString(" + ").ifBlank { "No commander yet" }, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                summary?.identity?.let { id ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        if (id.isEmpty()) ColorDot('C') else "WUBRG".filter { it in id }.forEach { ColorDot(it) }
+                    }
+                }
+                Text("${summary?.cards ?: "…"}/100", color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
+                when (val n = summary?.problems) {
+                    null -> Text("checking…", color = Muted, fontSize = 11.sp)
+                    0 -> Text("Ready", color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    else -> Text("$n to fix", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            val meta = listOfNotNull(deck.tags.takeIf { it.isNotEmpty() }?.joinToString(" · ") { "#$it" }, editedAgo(deck.updatedAt, now))
+            if (meta.isNotEmpty()) Text(meta.joinToString("  ·  "), color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
+        }
+        TextButton(onClick = onOpen, modifier = Modifier.heightIn(min = 48.dp)) { Text("EDIT", color = Mint, fontWeight = FontWeight.Bold) }
+        menu()
+    }
+}
+
+@Composable
+private fun ColorDot(c: Char) {
+    Box(Modifier.size(14.dp).clip(CircleShape).background(pipColor(c)).border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape))
 }
 
 private enum class EditorTab { LIBRARY, DECK, STATS }
@@ -281,6 +386,9 @@ private fun DeckEditorScreen(
                             onRemoveCommander = { name -> edit { it.removeCommander(name) } },
                             onSideboard = { name -> edit { it.moveToSideboard(name) } },
                             onMain = { name -> edit { it.moveToMain(name) } },
+                            onMaybe = { name -> edit { it.moveToMaybeboard(name) } },
+                            onFromMaybe = { name -> edit { it.moveFromMaybeboard(name) } },
+                            onRemoveMaybe = { name -> edit { it.removeFromMaybeboard(name) } },
                             onReplace = { replacing = it },
                             onPreview = { previewName = it })
                     }
@@ -306,7 +414,8 @@ private fun DeckEditorScreen(
     }
 
     previewName?.let { name ->
-        CardPreviewDialog(name, cat, draft, onAdd = { edit { it.add(name) } }, onCommander = { edit { it.setCommander(name) } }, onDismiss = { previewName = null })
+        CardPreviewDialog(name, cat, draft, onAdd = { edit { it.add(name) } }, onCommander = { edit { it.setCommander(name) } },
+            onMaybe = { edit { it.addToMaybeboard(name) } }, onDismiss = { previewName = null })
     }
     replacing?.let { name ->
         ReplacementDialog(name, lib, draft, identity, onChoose = { choice -> edit { it.replace(name, choice) }; replacing = null }, onDismiss = { replacing = null })
@@ -326,22 +435,24 @@ private fun DeckEditorScreen(
 
 // ---- Library pane ---------------------------------------------------------------------------
 
-private data class QuickFilters(
-    val type: String? = null,
-    val colors: Set<Char> = emptySet(),
-    val colorless: Boolean = false,
-    val maxMv: Int? = null,
-    val fitsCommander: Boolean = true,
-    val commandersOnly: Boolean = false,
-)
+/** Deck-context search terms layered on the FILTERS panel: commanders first, then what fits. */
+private fun contextQuery(commandersOnly: Boolean, fitsCommander: Boolean, identity: Set<Char>, hasCommander: Boolean): String = when {
+    commandersOnly -> "is:commander"
+    fitsCommander && hasCommander -> "id:" + (if (identity.isEmpty()) "c" else "WUBRG".filter { it in identity }.lowercase())
+    else -> ""
+}
 
-private fun QuickFilters.toQuery(identity: Set<Char>, hasCommander: Boolean): String = buildList {
-    type?.let { add("t:$it") }
-    if (colorless) add("c:c") else if (colors.isNotEmpty()) add("c:" + "WUBRG".filter { it in colors }.lowercase())
-    maxMv?.let { add(if (it >= 7) "mv>=7" else "mv<=$it") }
-    if (commandersOnly) add("is:commander")
-    else if (fitsCommander && hasCommander) add("id:" + (if (identity.isEmpty()) "c" else "WUBRG".filter { it in identity }.lowercase()))
-}.joinToString(" ")
+private val QUICK_TYPES = listOf("creature", "instant", "sorcery", "artifact", "enchantment", "planeswalker", "land", "legendary")
+
+/** The quick mana-value chip writes one mana value condition; other stat filters are left alone. */
+private fun CardFilters.withQuickMv(max: Int?): CardFilters {
+    val others = stats.filterNot { it.stat == StatField.MANA_VALUE }
+    return copy(stats = others + listOfNotNull(max?.let { if (it >= 7) StatRange(StatField.MANA_VALUE, StatOp.GTE, 7.0) else StatRange(StatField.MANA_VALUE, StatOp.LTE, it.toDouble()) }))
+}
+
+private fun CardFilters.quickMvLabel(): String? = stats.singleOrNull { it.stat == StatField.MANA_VALUE }?.let { s ->
+    when (s.op) { StatOp.LTE -> "MV ≤${fmtNumber(s.value)}"; StatOp.GTE -> "MV ${fmtNumber(s.value)}+"; else -> s.label.replace("Mana value", "MV") }
+}
 
 @Composable
 private fun LibraryPane(
@@ -355,17 +466,23 @@ private fun LibraryPane(
     onCommander: (String) -> Unit,
     onPreview: (String) -> Unit,
 ) {
-    var filters by remember { mutableStateOf(QuickFilters(commandersOnly = draft.commanders.isEmpty())) }
+    var filters by rememberSaveable(stateSaver = CardFiltersSaver) { mutableStateOf(CardFilters()) }
+    var commandersOnly by rememberSaveable { mutableStateOf(draft.commanders.isEmpty()) }
+    var fitsCommander by rememberSaveable { mutableStateOf(true) }
+    var grid by rememberSaveable { mutableStateOf(false) }
+    var sheetOpen by remember { mutableStateOf(false) }
     var result by remember { mutableStateOf<CardLibrary.Result?>(null) }
     var showHelp by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
+    val gridState = rememberLazyGridState()
     val hasCommander = draft.commanders.isNotEmpty()
     // Start a new deck by showing commanders; once one is chosen, show what fits it instead.
-    LaunchedEffect(hasCommander) { if (hasCommander && filters.commandersOnly) filters = filters.copy(commandersOnly = false, fitsCommander = true) }
-    val filterQuery = filters.toQuery(identity, hasCommander)
-    LaunchedEffect(query, filterQuery) {
+    LaunchedEffect(hasCommander) { if (hasCommander && commandersOnly) { commandersOnly = false; fitsCommander = true } }
+    val baseQuery = "$query ${contextQuery(commandersOnly, fitsCommander, identity, hasCommander)}".trim()
+    LaunchedEffect(baseQuery, filters) {
         delay(if (query.isBlank()) 0 else 220) // debounce typing
-        result = withContext(Dispatchers.Default) { lib.search("$query $filterQuery".trim(), limit = 400) }
+        result = withContext(Dispatchers.Default) { lib.search(baseQuery, filters, limit = 400) }
+        if (grid) gridState.scrollToItem(0) else listState.scrollToItem(0)
     }
     Column(modifier) {
         OutlinedTextField(query, onQuery, Modifier.fillMaxWidth().testTag("library-search"), singleLine = true,
@@ -373,61 +490,90 @@ private fun LibraryPane(
             placeholder = { Text("name, or t:creature o:draw mv<=3") },
             trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Filled.Close, "Clear search", tint = Muted) } })
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            FilterChip(filters.commandersOnly, { filters = filters.copy(commandersOnly = !filters.commandersOnly) }, label = { Text("Commanders") })
-            if (hasCommander) FilterChip(filters.fitsCommander && !filters.commandersOnly, { filters = filters.copy(fitsCommander = !filters.fitsCommander, commandersOnly = false) }, label = { Text("Fits ${identityLabel(identity)}") })
-            var typeMenu by remember { mutableStateOf(false) }
-            Box {
-                FilterChip(filters.type != null, { typeMenu = true }, label = { Text(filters.type?.replaceFirstChar(Char::uppercaseChar) ?: "Type ▾") })
-                DropdownMenu(typeMenu, { typeMenu = false }) {
-                    DropdownMenuItem(text = { Text("Any type") }, onClick = { filters = filters.copy(type = null); typeMenu = false })
-                    listOf("creature", "instant", "sorcery", "artifact", "enchantment", "planeswalker", "land", "legendary").forEach { t ->
-                        DropdownMenuItem(text = { Text(t.replaceFirstChar(Char::uppercaseChar)) }, onClick = { filters = filters.copy(type = t); typeMenu = false })
-                    }
-                }
-            }
+            val active = filters.activeCount
+            FilterChip(active > 0, { sheetOpen = true }, modifier = Modifier.testTag("open-filters"),
+                leadingIcon = { Icon(Icons.Filled.Tune, null, Modifier.size(18.dp)) },
+                label = { Text(if (active > 0) "FILTERS · $active" else "FILTERS", fontWeight = FontWeight.Bold) })
+            FilterChip(commandersOnly, { commandersOnly = !commandersOnly }, label = { Text("Commanders") })
+            if (hasCommander) FilterChip(fitsCommander && !commandersOnly, { fitsCommander = !fitsCommander; commandersOnly = false }, label = { Text("Fits ${identityLabel(identity)}") })
             "WUBRG".forEach { c ->
-                FilterChip(c in filters.colors, { filters = filters.copy(colors = if (c in filters.colors) filters.colors - c else filters.colors + c, colorless = false) },
+                FilterChip(!filters.colorless && c in filters.colors, { filters = filters.copy(colorless = false, colors = if (c in filters.colors) filters.colors - c else filters.colors + c) },
                     label = { Text(c.toString(), fontWeight = FontWeight.Bold) })
             }
             FilterChip(filters.colorless, { filters = filters.copy(colorless = !filters.colorless, colors = emptySet()) }, label = { Text("C") })
+            var typeMenu by remember { mutableStateOf(false) }
+            Box {
+                FilterChip(filters.typeTerms.isNotEmpty(), { typeMenu = true }, label = { Text(filters.typeTerms.singleOrNull()?.replaceFirstChar(Char::uppercaseChar) ?: if (filters.typeTerms.isEmpty()) "Type ▾" else "${filters.typeTerms.size} types") })
+                DropdownMenu(typeMenu, { typeMenu = false }) {
+                    DropdownMenuItem(text = { Text("Any type") }, onClick = { filters = filters.copy(typeTerms = emptyList()); typeMenu = false })
+                    QUICK_TYPES.forEach { t ->
+                        DropdownMenuItem(text = { Text(t.replaceFirstChar(Char::uppercaseChar)) }, onClick = { filters = filters.copy(typeTerms = listOf(t)); typeMenu = false })
+                    }
+                }
+            }
             var mvMenu by remember { mutableStateOf(false) }
             Box {
-                FilterChip(filters.maxMv != null, { mvMenu = true }, label = { Text(filters.maxMv?.let { if (it >= 7) "MV 7+" else "MV ≤$it" } ?: "Mana value ▾") })
+                FilterChip(filters.stats.any { it.stat == StatField.MANA_VALUE }, { mvMenu = true }, label = { Text(filters.quickMvLabel() ?: "Mana value ▾") })
                 DropdownMenu(mvMenu, { mvMenu = false }) {
-                    DropdownMenuItem(text = { Text("Any") }, onClick = { filters = filters.copy(maxMv = null); mvMenu = false })
-                    (1..6).forEach { n -> DropdownMenuItem(text = { Text("$n or less") }, onClick = { filters = filters.copy(maxMv = n); mvMenu = false }) }
-                    DropdownMenuItem(text = { Text("7 or more") }, onClick = { filters = filters.copy(maxMv = 7); mvMenu = false })
+                    DropdownMenuItem(text = { Text("Any") }, onClick = { filters = filters.withQuickMv(null); mvMenu = false })
+                    (1..6).forEach { n -> DropdownMenuItem(text = { Text("$n or less") }, onClick = { filters = filters.withQuickMv(n); mvMenu = false }) }
+                    DropdownMenuItem(text = { Text("7 or more") }, onClick = { filters = filters.withQuickMv(7); mvMenu = false })
                 }
             }
             TextButton(onClick = { showHelp = !showHelp }) { Text(if (showHelp) "HIDE TIPS" else "SEARCH TIPS", color = Mint, fontSize = 11.sp) }
         }
         if (showHelp) Text(
-            "t:creature · o:draw · c:ub (colors) · id:ub (fits commander) · mv<=3 · pow>=4 · k:flying · r:mythic · s:cmm · is:legendary · is:commander · -t:land to exclude. Combine freely.",
+            "t:creature · o:draw · c:ub (colors) · id:ub (fits commander) · mv<=3 · pow>=4 · k:flying · r:mythic · s:cmm · is:legendary · is:commander · -t:land to exclude. Combine freely, or use FILTERS.",
             color = Muted, fontSize = 11.sp, lineHeight = 15.sp, modifier = Modifier.padding(bottom = 6.dp))
+        val chips = filters.summaryChips()
+        if (chips.isNotEmpty()) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            chips.forEach { (label, without) -> RemovableChip(label) { filters = without } }
+            TextButton(onClick = { filters = filters.cleared() }, modifier = Modifier.heightIn(min = 40.dp)) { Text("CLEAR", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+        }
         val r = result
         when {
             r == null -> Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Mint) }
             r.cards.isEmpty() -> Column(Modifier.fillMaxWidth().padding(20.dp)) {
                 Text("No playable cards match.", color = SoftWhite, fontWeight = FontWeight.Bold)
-                Text(if (filterQuery.isNotBlank()) "Try removing a filter chip. Only cards this build of Arcana can play are listed." else "Only cards this build of Arcana can play are listed.", color = Muted, fontSize = 12.sp)
+                Text(if (filters.activeCount > 0 || commandersOnly || fitsCommander) "Try removing a filter. Only cards this build of Arcana can play are listed." else "Only cards this build of Arcana can play are listed.", color = Muted, fontSize = 12.sp)
                 r.errors.forEach { Text(it, color = CounterGold, fontSize = 12.sp) }
             }
             else -> {
-                Text(buildString {
-                    append(if (r.total > r.cards.size) "Showing ${r.cards.size} of ${r.total}" else "${r.total} card${if (r.total == 1) "" else "s"}")
-                    if (r.fuzzy) append(" · closest names (check spelling)")
-                }, color = if (r.fuzzy) CounterGold else Muted, fontSize = 11.sp)
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text(buildString {
+                        append(if (r.total > r.cards.size) "Showing ${r.cards.size} of ${r.total}" else "${r.total} card${if (r.total == 1) "" else "s"}")
+                        if (r.fuzzy) append(" · closest names (check spelling)")
+                    }, color = if (r.fuzzy) CounterGold else Muted, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                    var sortMenu by remember { mutableStateOf(false) }
+                    Box {
+                        TextButton(onClick = { sortMenu = true }, modifier = Modifier.heightIn(min = 44.dp).testTag("results-sort")) {
+                            Text("${filters.sort.label} ${if (filters.descending) "↓" else "↑"}", color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        DropdownMenu(sortMenu, { sortMenu = false }) {
+                            CardSort.entries.forEach { s ->
+                                DropdownMenuItem(text = { Text(s.label + if (s == filters.sort) "  ✓" else "") }, onClick = { filters = filters.copy(sort = s); sortMenu = false })
+                            }
+                            HorizontalDivider()
+                            DropdownMenuItem(text = { Text(if (filters.descending) "↑ Ascending" else "↓ Descending") }, onClick = { filters = filters.copy(descending = !filters.descending); sortMenu = false })
+                        }
+                    }
+                    IconButton(onClick = { grid = !grid }, modifier = Modifier.size(44.dp).testTag("results-view")) {
+                        Icon(if (grid) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView, if (grid) "Show as list" else "Show as card grid", tint = Mint)
+                    }
+                }
                 r.errors.forEach { Text(it, color = CounterGold, fontSize = 11.sp) }
-                LazyColumn(Modifier.fillMaxSize().padding(top = 4.dp), state = listState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                fun inDeck(card: SupportedCard) = draft.countOf(card.name) + if (draft.commanders.any { it.equals(card.name, true) }) 1 else 0
+                if (grid) LibraryGrid(r.cards, ::inDeck, gridState, onAdd = { onAdd(it.name) }, onPreview = { onPreview(it.name) }, modifier = Modifier.fillMaxSize().padding(top = 4.dp))
+                else LazyColumn(Modifier.fillMaxSize().padding(top = 4.dp), state = listState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(r.cards, key = { it.name }) { card ->
-                        val inDeck = draft.countOf(card.name) + if (draft.commanders.any { it.equals(card.name, true) }) 1 else 0
-                        LibraryRow(card, inDeck, canCommand = CardLibrary.isCommanderEligible(card),
+                        LibraryRow(card, inDeck(card), canCommand = CardLibrary.isCommanderEligible(card),
                             onAdd = { onAdd(card.name) }, onCommander = { onCommander(card.name) }, onPreview = { onPreview(card.name) })
                     }
                 }
             }
         }
     }
+    if (sheetOpen) CardFilterSheet(lib, baseQuery, filters, onChange = { filters = it }, onDismiss = { sheetOpen = false })
 }
 
 @Composable
@@ -438,7 +584,12 @@ private fun LibraryRow(card: SupportedCard, inDeck: Int, canCommand: Boolean, on
         Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
             Text(card.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(listOf(card.manaCost.ifBlank { "—" }, card.typeLine).joinToString("  ·  "), color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (card.custom) Text("Arcana custom card", color = Muted, fontSize = 10.sp)
+            Text(listOfNotNull(
+                card.power?.let { "$it/${card.toughness}" },
+                card.setCode,
+                card.rarity?.lowercase()?.replaceFirstChar(Char::uppercaseChar) ?: "Common".takeIf { card.setCode != null },
+                "Arcana custom card".takeIf { card.custom },
+            ).joinToString(" · "), color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (inDeck > 0) Text("×$inDeck", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(end = 4.dp))
         if (canCommand) TextButton(onClick = onCommander, modifier = Modifier.heightIn(min = 48.dp)) { Text("CMDR", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
@@ -464,6 +615,9 @@ private fun DeckPane(
     onRemoveCommander: (String) -> Unit,
     onSideboard: (String) -> Unit,
     onMain: (String) -> Unit,
+    onMaybe: (String) -> Unit,
+    onFromMaybe: (String) -> Unit,
+    onRemoveMaybe: (String) -> Unit,
     onReplace: (String) -> Unit,
     onPreview: (String) -> Unit,
 ) {
@@ -504,7 +658,7 @@ private fun DeckPane(
                 DeckRow(line, cat.find(line.name), line.name.lowercase() in flagged, canCommand = cat.find(line.name)?.let { CardLibrary.isCommanderEligible(it) } == true,
                     hasOneCommander = draft.commanders.size == 1,
                     onCount = { onCount(line.name, it) }, onCommander = { onCommander(line.name) }, onPartner = { onPartner(line.name) },
-                    onSideboard = { onSideboard(line.name) }, onReplace = { onReplace(line.name) }, onPreview = { onPreview(line.name) })
+                    onSideboard = { onSideboard(line.name) }, onMaybe = { onMaybe(line.name) }, onReplace = { onReplace(line.name) }, onPreview = { onPreview(line.name) })
             }
         }
         if (draft.sideboard.isNotEmpty()) {
@@ -513,6 +667,20 @@ private fun DeckPane(
                 Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Panel).padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text("${line.count}× ${line.name}", color = SoftWhite, fontSize = 13.sp, modifier = Modifier.weight(1f))
                     TextButton(onClick = { onMain(line.name) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("TO DECK", color = Mint, fontSize = 11.sp) }
+                }
+            }
+        }
+        if (draft.maybeboard.isNotEmpty()) {
+            item { Text("MAYBEBOARD · ${draft.maybeboard.sumOf { it.count }} (considering; not in the 100)", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 12.dp)) }
+            items(draft.maybeboard, key = { "m-${it.name}" }) { line ->
+                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Panel).clickable { onPreview(line.name) }.padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
+                        Text("${line.count}× ${line.name}", color = SoftWhite, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        cat.find(line.name)?.let { Text(it.manaCost.ifBlank { it.typeLine.substringBefore(" —") }, color = Muted, fontSize = 10.sp, maxLines = 1) }
+                            ?: Text("Not in this build's library", color = CounterGold, fontSize = 10.sp)
+                    }
+                    TextButton(onClick = { onFromMaybe(line.name) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("TO DECK", color = Mint, fontSize = 11.sp) }
+                    IconButton(onClick = { onRemoveMaybe(line.name) }, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Remove ${line.name} from maybeboard", tint = Muted) }
                 }
             }
         }
@@ -529,7 +697,7 @@ private fun DeckPane(
 
 @Composable
 private fun DeckRow(line: DeckLine, card: SupportedCard?, flagged: Boolean, canCommand: Boolean, hasOneCommander: Boolean,
-                    onCount: (Int) -> Unit, onCommander: () -> Unit, onPartner: () -> Unit, onSideboard: () -> Unit, onReplace: () -> Unit, onPreview: () -> Unit) {
+                    onCount: (Int) -> Unit, onCommander: () -> Unit, onPartner: () -> Unit, onSideboard: () -> Unit, onMaybe: () -> Unit, onReplace: () -> Unit, onPreview: () -> Unit) {
     var menu by remember { mutableStateOf(false) }
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
         .background(if (flagged) Color(0xFF392B21) else Panel)
@@ -549,6 +717,7 @@ private fun DeckRow(line: DeckLine, card: SupportedCard?, flagged: Boolean, canC
             DropdownMenu(menu, { menu = false }) {
                 if (canCommand) DropdownMenuItem(text = { Text("Make commander") }, onClick = { menu = false; onCommander() })
                 if (canCommand && hasOneCommander) DropdownMenuItem(text = { Text("Add as second commander") }, onClick = { menu = false; onPartner() })
+                DropdownMenuItem(text = { Text("Move to maybeboard") }, onClick = { menu = false; onMaybe() })
                 DropdownMenuItem(text = { Text("Move to sideboard") }, onClick = { menu = false; onSideboard() })
                 DropdownMenuItem(text = { Text("Suggest replacements") }, onClick = { menu = false; onReplace() })
                 DropdownMenuItem(text = { Text("Remove all copies") }, onClick = { menu = false; onCount(0) })
@@ -607,6 +776,21 @@ private fun StatsPanel(s: DeckStats, issues: List<DeckIssue>) {
                 Text(" $n", color = Muted, fontSize = 11.sp, modifier = Modifier.width(36.dp))
             }
         }
+        val needs = s.pips.filter { it.value > 0 || (s.landSources[it.key] ?: 0) > 0 }.keys
+        if (needs.isNotEmpty()) {
+            Text("MANA SOURCES · lands that make each color", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            needs.forEach { c ->
+                val pips = s.pips[c] ?: 0
+                val lands = s.landSources[c] ?: 0
+                val short = pips > 0 && lands == 0
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(c.toString(), color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.width(18.dp))
+                    Text("$lands land${if (lands == 1) "" else "s"} for $pips symbol${if (pips == 1) "" else "s"}", color = if (short) CounterGold else SoftWhite, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    if (short) Text("no source", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+            Text("A guide from land types and rules text; mana rocks and dorks aren't counted.", color = Muted, fontSize = 10.sp)
+        }
         Text("BY TYPE", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         DECK_GROUP_ORDER.mapNotNull { g -> s.byType[g]?.let { g to it } }.forEach { (g, n) -> Text("$g  $n", color = SoftWhite, fontSize = 12.sp) }
         if (s.unsupported > 0) Text("${s.unsupported} card${if (s.unsupported == 1) "" else "s"} not in this build's library (not counted above)", color = CounterGold, fontSize = 12.sp)
@@ -633,12 +817,12 @@ private fun CurveBars(curve: List<Int>, modifier: Modifier, labels: Boolean = fa
     }
 }
 
-private fun pipColor(c: Char) = when (c) { 'W' -> Color(0xFFF2E8C9); 'U' -> Color(0xFF6FA8DC); 'B' -> Color(0xFF8E7F99); 'R' -> Color(0xFFE07A5F); 'G' -> Color(0xFF6DBE7B); else -> Color.Gray }
+private fun pipColor(c: Char) = when (c) { 'W' -> Color(0xFFF2E8C9); 'U' -> Color(0xFF6FA8DC); 'B' -> Color(0xFF8E7F99); 'R' -> Color(0xFFE07A5F); 'G' -> Color(0xFF6DBE7B); 'C' -> Color(0xFFB0B4B8); else -> Color.Gray }
 
 // ---- Card preview & replacements ------------------------------------------------------------
 
 @Composable
-private fun CardPreviewDialog(name: String, cat: SupportedCardCatalog, draft: DeckDraft, onAdd: () -> Unit, onCommander: () -> Unit, onDismiss: () -> Unit) {
+private fun CardPreviewDialog(name: String, cat: SupportedCardCatalog, draft: DeckDraft, onAdd: () -> Unit, onCommander: () -> Unit, onMaybe: () -> Unit, onDismiss: () -> Unit) {
     val card = cat.find(name)
     Dialog(onDismissRequest = onDismiss) {
         Surface(shape = RoundedCornerShape(16.dp), color = Panel) {
@@ -656,6 +840,8 @@ private fun CardPreviewDialog(name: String, cat: SupportedCardCatalog, draft: De
                     Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (CardLibrary.isCommanderEligible(card) && draft.commanders.none { it.equals(card.name, true) })
                             OutlinedButton(onClick = { onCommander(); onDismiss() }, modifier = Modifier.heightIn(min = 48.dp)) { Text("MAKE COMMANDER", color = CounterGold) }
+                        if (draft.maybeboard.none { it.name.equals(card.name, true) } && draft.countOf(card.name) == 0)
+                            OutlinedButton(onClick = { onMaybe(); onDismiss() }, modifier = Modifier.heightIn(min = 48.dp)) { Text("MAYBE", color = SoftWhite) }
                         Button(onClick = { onAdd() }, modifier = Modifier.heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) {
                             Text("ADD${draft.countOf(card.name).takeIf { it > 0 }?.let { " (×$it)" }.orEmpty()}")
                         }

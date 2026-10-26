@@ -144,7 +144,13 @@ internal fun LibrarySearchDialog(
     onDismiss: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
-    var selectedCardId by remember { mutableIntStateOf(-1) }
+    var selectedIds by remember { mutableStateOf(setOf<Int>()) }
+    var chip by remember { mutableStateOf<LibraryChip?>(null) }
+    var sort by remember { mutableStateOf(LibrarySort.TYPE) }
+    // A card left the library during this search: offer the shuffle a tutor needs on the way out.
+    var movedOut by remember { mutableStateOf(false) }
+    var shuffledSinceMove by remember { mutableStateOf(false) }
+    var askShuffle by remember { mutableStateOf(false) }
     // The general browse/search control is not permission to inspect the
     // library's actual stack. Keep a randomized presentation list separate
     // from player.library so selecting a card never changes draw order.
@@ -154,14 +160,24 @@ internal fun LibrarySearchDialog(
             shuffled.drop(1) + shuffled.first()
         } else shuffled
     }
-    val matches = remember(unorderedLibrary, query) {
+    val searched = remember(unorderedLibrary, query) {
         unorderedLibrary.filter { card ->
             query.isBlank() || card.name.contains(query.trim(), ignoreCase = true) || card.type.contains(query.trim(), ignoreCase = true) || card.oracleText.orEmpty().contains(query.trim(), ignoreCase = true)
         }
     }
-    val selected = unorderedLibrary.firstOrNull { it.id == selectedCardId }
+    val chips = remember(unorderedLibrary) { LibraryChip.present(unorderedLibrary.map { it.type }) }
+    val matches = remember(searched, chip, sort, selectedIds) {
+        arrangeLibrary(searched, chip, sort, keep = { it.id in selectedIds }, name = { it.name }, typeLine = { it.type }, manaValue = { it.manaValue })
+    }
+    val selected = unorderedLibrary.filter { it.id in selectedIds }
+    fun close() { if (movedOut && !shuffledSinceMove) askShuffle = true else onDismiss() }
+    fun moveSelected(action: (GameCard) -> Unit, leavesLibrary: Boolean) {
+        selected.forEach(action)
+        if (leavesLibrary) { movedOut = true; shuffledSinceMove = false }
+        selectedIds = emptySet()
+    }
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = ::close,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
@@ -175,35 +191,43 @@ internal fun LibrarySearchDialog(
                         Text("${player.name} · LIBRARY", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         Text("${player.library.size} cards · randomized display · library order hidden", color = Muted, fontSize = 10.sp)
                     }
-                    TextButton(onClick = onShuffle, modifier = Modifier.heightIn(min = 44.dp)) { Text("SHUFFLE", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close library", tint = Muted) }
+                    TextButton(onClick = { onShuffle(); shuffledSinceMove = true }, modifier = Modifier.heightIn(min = 44.dp)) { Text("SHUFFLE", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+                    IconButton(onClick = ::close, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close library", tint = Muted) }
                 }
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 6.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp),
                     singleLine = true,
                     label = { Text("Search name, type, or rules text") },
                     placeholder = { Text("Blank search shows the full library") }
                 )
-                if (selected != null) {
-                    Text("SELECTED · ${selected.name}", color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    LibrarySort.entries.forEach { s -> FilterChip(sort == s, { sort = s }, label = { Text(s.label, fontSize = 11.sp) }) }
+                    chips.forEach { (c, n) -> FilterChip(chip == c, { chip = if (chip == c) null else c }, label = { Text("${c.label} $n", fontSize = 11.sp) }) }
+                }
+                if (selected.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (selected.size == 1) "SELECTED · ${selected.single().name}" else "${selected.size} SELECTED", color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { selectedIds = emptySet() }, modifier = Modifier.heightIn(min = 40.dp)) { Text("CLEAR", color = Muted, fontSize = 9.sp) }
+                    }
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         listOf(
-                            "TO HAND" to onTakeToHand,
-                            "TO BATTLEFIELD" to onPutBattlefield,
-                            "TO GRAVEYARD" to onPutGraveyard,
-                            "EXILE" to onPutExile,
-                            "TOP" to onMoveToTop,
-                            "BOTTOM" to onMoveToBottom
-                        ).forEach { (label, action) ->
-                            TextButton(onClick = { action(selected); selectedCardId = -1 }, modifier = Modifier.heightIn(min = 44.dp)) {
+                            Triple("TO HAND", onTakeToHand, true),
+                            Triple("TO BATTLEFIELD", onPutBattlefield, true),
+                            Triple("TO GRAVEYARD", onPutGraveyard, true),
+                            Triple("EXILE", onPutExile, true),
+                            Triple("TOP", onMoveToTop, false),
+                            Triple("BOTTOM", onMoveToBottom, false)
+                        ).forEach { (label, action, leaves) ->
+                            TextButton(onClick = { moveSelected(action, leaves) }, modifier = Modifier.heightIn(min = 44.dp)) {
                                 Text(label, color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                             }
                         }
                     }
                 } else {
-                    Text("Select a card to move it. Long press a card to inspect it.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(vertical = 5.dp))
+                    Text("Tap cards to select one or more, then move them. Long press a card to inspect it.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(vertical = 5.dp))
                 }
                 HorizontalDivider(color = PanelLight)
                 when {
@@ -214,32 +238,49 @@ internal fun LibrarySearchDialog(
                         contentPadding = PaddingValues(vertical = 5.dp),
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        items(matches.size, key = { matches[it].id }) { index ->
-                            val card = matches[index]
-                            val isSelected = card.id == selectedCardId
-                            Row(
-                                Modifier.fillMaxWidth()
-                                    .clip(RoundedCornerShape(9.dp))
-                                    .background(if (isSelected) PanelLight else Panel)
-                                    .border(if (isSelected) 1.dp else 0.dp, if (isSelected) Mint else Panel, RoundedCornerShape(9.dp))
-                                    .combinedClickable(onClick = { selectedCardId = card.id }, onLongClick = { onPreview(card) })
-                                    .padding(horizontal = 7.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                CardFace(card, Modifier.width(37.dp), onClick = { selectedCardId = card.id }, onLongClick = { onPreview(card) }, showCounters = false)
-                                Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                                    Text(card.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(card.type, color = Muted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        matches.forEachIndexed { index, (group, card) ->
+                            if (sort != LibrarySort.NAME && (index == 0 || matches[index - 1].first != group)) item(key = "h-$group") {
+                                Text("${group.uppercase()} · ${matches.count { it.first == group }}", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Black,
+                                    modifier = Modifier.padding(top = 6.dp, bottom = 2.dp))
+                            }
+                            item(key = card.id) {
+                                val isSelected = card.id in selectedIds
+                                Row(
+                                    Modifier.fillMaxWidth()
+                                        .clip(RoundedCornerShape(9.dp))
+                                        .background(if (isSelected) PanelLight else Panel)
+                                        .border(if (isSelected) 1.dp else 0.dp, if (isSelected) Mint else Panel, RoundedCornerShape(9.dp))
+                                        .combinedClickable(onClick = { selectedIds = if (isSelected) selectedIds - card.id else selectedIds + card.id }, onLongClick = { onPreview(card) })
+                                        .padding(horizontal = 7.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CardFace(card, Modifier.width(37.dp), onClick = { selectedIds = if (isSelected) selectedIds - card.id else selectedIds + card.id }, onLongClick = { onPreview(card) }, showCounters = false)
+                                    Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                                        Text(card.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(listOfNotNull(card.manaCost?.takeIf { it.isNotBlank() }, card.type, card.power?.let { "$it/${card.toughness}" }).joinToString("  ·  "),
+                                            color = Muted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                    if (isSelected) Text("✓", color = Mint, fontSize = 13.sp, fontWeight = FontWeight.Black)
                                 }
-                                if (isSelected) Text("SELECTED", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
-                Text("Draw and common turn commands are in the hand tray.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(top = 5.dp))
+                Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Draw and common turn commands are in the hand tray.", color = Muted, fontSize = 9.sp, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { onShuffle(); onDismiss() }, modifier = Modifier.heightIn(min = 44.dp)) { Text("DONE · SHUFFLE", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+                }
             }
         }
     }
+    if (askShuffle) AlertDialog(
+        onDismissRequest = { askShuffle = false },
+        title = { Text("Shuffle your library?") },
+        text = { Text("You moved cards out of ${player.name}'s library. Searching usually ends with a shuffle.") },
+        confirmButton = { TextButton(onClick = { askShuffle = false; onShuffle(); onDismiss() }) { Text("SHUFFLE") } },
+        dismissButton = { TextButton(onClick = { askShuffle = false; onDismiss() }) { Text("DON'T SHUFFLE") } },
+        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
+    )
 }
 
 @Composable

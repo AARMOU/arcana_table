@@ -7,6 +7,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.test.ExperimentalTestApi
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.SemanticsMatcher
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.hasContentDescription
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -81,6 +86,54 @@ class DeckBuilderUiTest {
         UiTestSupport.settle(rule, 500)
         assertTrue(rule.onAllNodesWithText("Sol Ring").fetchSemanticsNodes().isNotEmpty())
         UiTestSupport.screenshot(rule.activity, "deck-builder-$name")
+    }
+
+    /** Deck library tiles, search, delete with undo; then the FILTERS panel and the card grid. */
+    @Test @Config(sdk = [34], qualifiers = "w344dp-h882dp-port-xxhdpi") fun libraryTilesAndFiltersPanel() {
+        var decks by mutableStateOf(listOf(
+            SavedDeck("Goblins", "Commander\n1 Krenko, Mob Boss\nDeck\n1 Sol Ring\n", "Krenko, Mob Boss", updatedAt = System.currentTimeMillis(), tags = listOf("Casual")),
+            SavedDeck("Lands", "Deck\n1 Forest\n", updatedAt = 1L),
+        ))
+        rule.setContent {
+            DeckManagerDialog(decks = decks, loadCatalog = { catalog }, onDecksChanged = { decks = it }, onPlay = {}, onDismiss = {})
+        }
+        rule.waitUntil(120_000) { rule.onAllNodes(hasText("Ready") or hasText("to fix", substring = true)).fetchSemanticsNodes().size >= 2 }
+        rule.onNodeWithTag("deck-tile-Goblins").assertExists()
+        rule.onNodeWithText("#Casual", substring = true).assertExists()
+
+        rule.onNodeWithTag("deck-library-search").performTextInput("forest")
+        rule.waitForIdle()
+        assertTrue(rule.onAllNodes(hasTestTag("deck-tile-Goblins")).fetchSemanticsNodes().isEmpty())
+        rule.onNodeWithTag("deck-library-search").performTextReplacement("")
+        rule.waitForIdle()
+        UiTestSupport.screenshot(rule.activity, "deck-library-tiles")
+
+        rule.onNodeWithContentDescription("More for Lands").performClick()
+        rule.onNodeWithText("Delete").performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("Goblins"), decks.map { it.name })
+        rule.onNodeWithTag("deck-undo-delete").performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("Goblins", "Lands"), decks.map { it.name })
+
+        rule.onNodeWithTag("deck-new").performClick()
+        rule.waitUntil(120_000) { rule.onAllNodes(hasTestTag("open-filters")).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("open-filters").performClick()
+        rule.waitUntil(10_000) { rule.onAllNodes(hasTestTag("filter-oracle")).fetchSemanticsNodes().isNotEmpty() }
+        rule.onNodeWithTag("filter-oracle").performTextInput("flying")
+        rule.onNodeWithTag("filter-oracle-add").performClick()
+        rule.mainClock.advanceTimeBy(500)
+        rule.waitUntil(30_000) { rule.onAllNodes(hasText("SHOW", substring = true) and hasText("CARDS", substring = true)).fetchSemanticsNodes().isNotEmpty() }
+        UiTestSupport.screenshot(rule.activity, "deck-builder-filters")
+        rule.onNodeWithTag("filters-show").performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("Text: flying").assertExists()
+        rule.onNodeWithText("FILTERS · 1").assertExists()
+
+        rule.onNodeWithTag("results-view").performClick()
+        rule.mainClock.advanceTimeBy(500)
+        rule.waitUntil(30_000) { rule.onAllNodes(SemanticsMatcher("grid add button") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("grid-add-") == true }).fetchSemanticsNodes().isNotEmpty() }
+        UiTestSupport.screenshot(rule.activity, "deck-builder-grid")
     }
 
     @Test @Config(sdk = [34], qualifiers = "w344dp-h882dp-port-xxhdpi") fun foldCoverBuildsAndAutosaves() = buildDeck("fold-cover", folded = true)
