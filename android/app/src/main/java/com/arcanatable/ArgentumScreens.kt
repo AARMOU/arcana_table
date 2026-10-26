@@ -137,9 +137,10 @@ import org.json.JSONObject
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidManaAbilities: Boolean, busy: Boolean, manaChoices: List<JSONObject> = emptyList(), stackCount: (JSONObject) -> Int = { 1 }, onChooseMany: (JSONObject, Int) -> Unit = { _, _ -> }, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit, onSecretNudge: () -> Unit = {}) {
+internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidManaAbilities: Boolean, busy: Boolean, manaChoices: List<JSONObject> = emptyList(), stackCount: (JSONObject) -> Int = { 1 }, onChooseMany: (JSONObject, Int) -> Unit = { _, _ -> }, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit, onSecretNudge: () -> Unit = {}, tutorialCue: Pair<String, String>? = null) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 24.dp)) {
+            tutorialCue?.let { TutorialInlineCue(it.first, it.second) }
             if (card != null) Row(verticalAlignment = Alignment.Top) {
                 Box(Modifier.width(118.dp).aspectRatio(0.716f).clip(RoundedCornerShape(8.dp)).background(card.color)) {
                     val url = card.imageUrl
