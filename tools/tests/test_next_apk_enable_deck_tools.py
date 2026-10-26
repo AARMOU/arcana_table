@@ -18,33 +18,33 @@ PICKER = (
 
 class DeckToolsCandidatePortTest(unittest.TestCase):
     def test_existing_importer_and_editor_dispatch_without_duplicate_logic(self):
-        home, flag, picker = transform(OLD_HOME, BUILDER, PICKER)
+        home, flag, picker = transform(OLD_HOME + "\\n" + OLD_PICKER, BUILDER, PICKER)
         self.assertIn(NEW_HOME, home)
         self.assertIn("onClick = onImport", home)
         self.assertIn("enabled = !argentumActive", home)
         self.assertIn(NEW_FLAG, flag)
-        self.assertIn(NEW_PICKER, picker)
+        self.assertIn(NEW_PICKER, home)
         self.assertNotIn("Not yet available", home)
         self.assertNotIn(OLD_FLAG, flag)
 
     def test_second_pass_noop(self):
-        once = transform(OLD_HOME, BUILDER, PICKER)
+        once = transform(OLD_HOME + "\\n" + OLD_PICKER, BUILDER, PICKER)
         self.assertEqual(transform(*once), once)
 
     def test_missing_importer_cannot_silently_enable(self):
         with self.assertRaisesRegex(ValueError, "dispatch missing"):
-            transform(OLD_HOME, BUILDER, PICKER.replace("importOpen = true", "importOpen = false"))
+            transform(OLD_HOME + "\\n" + OLD_PICKER, BUILDER, PICKER.replace("importOpen = true", "importOpen = false"))
 
     def test_missing_storage_cannot_silently_enable(self):
         with self.assertRaisesRegex(ValueError, "shared saved-decks storage"):
-            transform(OLD_HOME, BUILDER, PICKER.replace("saveSavedDecks(context, updated)", "Unit"))
+            transform(OLD_HOME + "\\n" + OLD_PICKER, BUILDER, PICKER.replace("saveSavedDecks(context, updated)", "Unit"))
 
     def test_unrecognized_ui_fails_closed(self):
         with self.assertRaisesRegex(ValueError, "Home Import new"):
-            transform(OLD_HOME.replace("Not yet available", "Unsupported"), BUILDER, PICKER)
+            transform((OLD_HOME + "\\n" + OLD_PICKER).replace("Not yet available", "Unsupported"), BUILDER, PICKER)
 
     def test_existing_gameplay_import_button_is_not_forced_active(self):
-        home, _, _ = transform(OLD_HOME, BUILDER, PICKER)
+        home, _, _ = transform(OLD_HOME + "\\n" + OLD_PICKER, BUILDER, PICKER)
         self.assertIn("enabled = !argentumActive", home)
 
 
