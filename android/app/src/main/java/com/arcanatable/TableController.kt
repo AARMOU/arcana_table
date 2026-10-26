@@ -404,6 +404,11 @@ internal class TableController(
     internal val tutorialChapters: List<ArcanaLesson> by lazy { loadTutorialLessons(context) }
     internal val tutorialLesson: ArcanaLesson? get() = tutorialChapters.firstOrNull { it.id == tutorialChapterId }
     internal val tutorialStep: ArcanaLessonStep? get() = tutorialLesson?.steps?.getOrNull(tutorialStepIndex)
+    /**
+     * The step index whose player view the lesson keeps: the table snaps back to TABLE when the
+     * game starts, the hand closes or the pager settles, which would hide what the step points at.
+     */
+    var tutorialHoldsPlayerView by mutableIntStateOf(-1)
     /** The game already did the current step's action (the lesson caught up); it only needs NEXT. */
     var tutorialStepSatisfied by mutableStateOf(false)
 
@@ -444,6 +449,7 @@ internal class TableController(
         tutorialPracticeActive = false
         tutorialGated = false
         tutorialStepSatisfied = false
+        tutorialHoldsPlayerView = -1
         tutorialRun = null
         tutorialEvents.reset()
         stackOpen = false
@@ -500,7 +506,10 @@ internal class TableController(
                     showHand = target.startsWith("hand-card:") || target == "hand-grid" || target == "hand-drawer-grip"
                 }
                 if (target == "your-tab" || target.startsWith("battlefield-") || target == "argentum-mana-summary" || target == "commander-chip" ||
-                    target.startsWith("quick-") || target == "stack-button" || target == "bottom-bar-pass-button") { showOverview = false; selectedPlayer = localSeat }
+                    target.startsWith("quick-") || target == "stack-button" || target == "bottom-bar-pass-button") {
+                    showOverview = false; selectedPlayer = localSeat
+                    tutorialHoldsPlayerView = tutorialStepIndex
+                } else tutorialHoldsPlayerView = -1
             }
             // A drill only shows the stack when something is on it; a tour shows it whenever asked.
             "stack" -> if (game && (!tutorialGated || argentumSnapshot?.stack?.isNotEmpty() == true)) {

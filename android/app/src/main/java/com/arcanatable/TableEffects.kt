@@ -370,6 +370,13 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
         observedChatCount = chatMessages.size
         if (chatOpen) unreadChatCount = 0
     }
+    // A lesson step about your own board keeps your player view while that step is showing.
+    LaunchedEffect(showOverview, tutorialHoldsPlayerView, tutorialStepIndex) {
+        if (showOverview && tutorialChapterId != null && tutorialHoldsPlayerView == tutorialStepIndex) {
+            delay(50)
+            if (showOverview && tutorialHoldsPlayerView == tutorialStepIndex) { showOverview = false; selectedPlayer = localSeat }
+        }
+    }
     LaunchedEffect(gameStartedOnline) {
         if (gameStartedOnline) {
             homeOpen = false; showOverview = true; showHand = false; lobbyOpen = false

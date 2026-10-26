@@ -36,8 +36,7 @@ internal class TutorialRun(val lesson: ArcanaLesson, val practice: Boolean, star
         if (!practice || kind != "event" || current.actionKind != "event" || key !in CATCH_UP_EVENTS) return false
         val ahead = catchUpIndex(key) ?: return false
         // Land on the step the game just did, shown as done, so its explanation is never jumped over.
-        moveTo(ahead)
-        if (!finished && index == ahead) satisfied = true
+        moveTo(ahead, landDone = true)
         return true
     }
 
@@ -55,10 +54,12 @@ internal class TutorialRun(val lesson: ArcanaLesson, val practice: Boolean, star
         val CATCH_UP_EVENTS = setOf("SpellCast", "SpellResolved", "AttackersDeclared", "CombatDamageDealt", "TurnAdvanced")
     }
 
-    private fun moveTo(target: Int) {
+    private fun moveTo(target: Int, landDone: Boolean = false) {
         satisfied = false
         if (target > lesson.steps.lastIndex) { finished = true; return }
         index = target
+        // Landed on a step the game already did: show it as done and wait for NEXT.
+        if (landDone) { satisfied = true; return }
         // Combat and stack resolution can finish while an explanation is open.
         if (practice && milestones.completes(step)) moveTo(index + 1)
     }
