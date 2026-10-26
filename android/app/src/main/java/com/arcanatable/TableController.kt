@@ -387,88 +387,60 @@ internal class TableController(
     var tutorialStepIndex by mutableStateOf(0)
     var tutorialPracticeActive by mutableStateOf(false)
     var tutorialLoading by mutableStateOf(false)
-    var tutorialStartTurn by mutableStateOf(0)
-    var tutorialPassPending by mutableStateOf(false)
+    /** Snapshot-to-event detection for practice lessons (TutorialProgress.kt, shared with tests). */
+    internal val tutorialEvents = TutorialEventDetector()
+    var tutorialPassPending: Boolean
+        get() = tutorialEvents.passPending
+        set(value) { tutorialEvents.passPending = value }
     var tutorialMulliganPending by mutableStateOf(false)
-    var tutorialKeepPending by mutableStateOf(false)
-    private val tutorialMilestones = TutorialMilestones()
+    var tutorialKeepPending: Boolean
+        get() = tutorialEvents.keepPending
+        set(value) { tutorialEvents.keepPending = value }
+    /** The running lesson; [tutorialStepIndex] mirrors its position for the UI. */
+    private var tutorialRun: TutorialRun? = null
     internal val tutorialChapters: List<ArcanaLesson> by lazy { loadTutorialLessons(context) }
     internal val tutorialLesson: ArcanaLesson? get() = tutorialChapters.firstOrNull { it.id == tutorialChapterId }
     internal val tutorialStep: ArcanaLessonStep? get() = tutorialLesson?.steps?.getOrNull(tutorialStepIndex)
 
     fun tutorialAdvance() {
-        val lesson = tutorialLesson ?: return
-        if (tutorialStepIndex < lesson.steps.lastIndex) {
-            tutorialStepIndex++
-            tutorialRouteScreen()
-            // Combat and stack resolution can finish while an explanation is open.
-            // Consume only confirmed milestones, preserving all informational steps.
-            if (tutorialPracticeActive && tutorialMilestones.completes(tutorialStep)) tutorialAdvance()
-        } else {
-            val preferences = context.getSharedPreferences("arcana_tutorials", Context.MODE_PRIVATE)
-            val completed = preferences.getStringSet("practiced_chapters", emptySet()).orEmpty().toMutableSet()
-            if (tutorialPracticeActive) completed.add(lesson.id)
-            preferences.edit().putStringSet("practiced_chapters", completed).apply()
-            stopTutorial()
-        }
+        val run = tutorialRun ?: return
+        run.next()
+        syncTutorialRun(run)
     }
 
     fun tutorialSignal(kind: String, key: String) {
-        if (tutorialPracticeActive && kind == "event") tutorialMilestones.observe(key)
-        val step = tutorialStep ?: return
-        if (TutorialStepGate.accepts(step, kind, key)) tutorialAdvance()
+        val run = tutorialRun ?: return
+        if (run.signal(kind, key)) syncTutorialRun(run)
+    }
+
+    private fun syncTutorialRun(run: TutorialRun) {
+        if (run.finished) {
+            val preferences = context.getSharedPreferences("arcana_tutorials", Context.MODE_PRIVATE)
+            val completed = preferences.getStringSet("practiced_chapters", emptySet()).orEmpty().toMutableSet()
+            if (run.practice) completed.add(run.lesson.id)
+            preferences.edit().putStringSet("practiced_chapters", completed).apply()
+            stopTutorial()
+            return
+        }
+        tutorialStepIndex = run.index
+        tutorialRouteScreen()
     }
 
     fun tutorialSnapshot(previous: ArgentumTableSnapshot?, current: ArgentumTableSnapshot) {
         if (!tutorialPracticeActive) return
-        if (tutorialStartTurn == 0) tutorialStartTurn = current.turnNumber
-        val old = previous?.players?.getOrNull(previous.viewingPlayer)
-        val now = current.players.getOrNull(current.viewingPlayer) ?: return
-        if (old != null) {
-            fun wasInHand(name: String) = old.hand.any { it.name == name }
-            fun isInHand(name: String) = now.hand.any { it.name == name }
-            fun nowInPlay(name: String) = now.battlefield.any { it.name == name }
-            val oldForests = old.battlefield.filter { it.name == "Forest" }.map { it.id }.toSet()
-            if (old.hand.count { it.name == "Forest" } > now.hand.count { it.name == "Forest" } &&
-                now.battlefield.any { it.name == "Forest" && it.id !in oldForests })
-                tutorialSignal("event", "LandPlayed")
-            if (now.manaPool.values.sum() > old.manaPool.values.sum()) tutorialSignal("event", "ManaAdded")
-            val spellName = tutorialStep?.takeIf { it.event == "SpellCast" }
-                ?.target?.removePrefix("hand-card:")
-            if (!spellName.isNullOrBlank() && wasInHand(spellName) && !isInHand(spellName) &&
-                (current.stack.any { it.name == spellName } || nowInPlay(spellName) ||
-                    now.graveyard.any { it.name == spellName }))
-                tutorialSignal("event", "SpellCast")
-            if (old.battlefield.none { it.name == "Elvish Mystic" } && nowInPlay("Elvish Mystic")) tutorialSignal("event", "SpellResolved")
-            if (previous.stepKey == "DECLARE_ATTACKERS" && current.stepKey != previous.stepKey) tutorialSignal("event", "AttackersDeclared")
-            val oldOpp = previous.players.getOrNull(1 - previous.viewingPlayer)
-            val newOpp = current.players.getOrNull(1 - current.viewingPlayer)
-            if (oldOpp != null && newOpp != null && newOpp.life < oldOpp.life) tutorialSignal("event", "CombatDamageDealt")
-        }
-        if (tutorialPassPending && previous != null && current.interactionEpoch != previous.interactionEpoch) {
-            tutorialPassPending = false
-            tutorialSignal("event", "PriorityPassed")
-        }
-        if (current.turnNumber > tutorialStartTurn || current.activePlayer != current.viewingPlayer && previous?.activePlayer == previous?.viewingPlayer) {
-            tutorialSignal("event", "TurnAdvanced")
-        }
-        if (tutorialKeepPending) {
-            tutorialKeepPending = false
-            tutorialSignal("event", "HandKept")
-        }
+        tutorialEvents.detect(previous, current, { tutorialStep }) { tutorialSignal("event", it) }
     }
 
     fun stopTutorial() {
         val wasPractice = tutorialPracticeActive
         tutorialPracticeActive = false
-        tutorialMilestones.clear()
+        tutorialRun = null
+        tutorialEvents.reset()
         stackOpen = false
         tutorialChapterId = null
         tutorialStepIndex = 0
         tutorialLoading = false
-        tutorialPassPending = false
         tutorialMulliganPending = false
-        tutorialKeepPending = false
         if (wasPractice && argentumEnabled) closeArgentumSession(false)
         tutorialHubOpen = true
     }
@@ -502,6 +474,7 @@ internal class TableController(
         tutorialChapterId = id
         tutorialStepIndex = startingIndex.coerceIn(0, lesson.steps.lastIndex)
         tutorialPracticeActive = false
+        tutorialRun = TutorialRun(lesson, practice = false, startIndex = tutorialStepIndex)
         tutorialRouteScreen()
     }
 
@@ -517,8 +490,8 @@ internal class TableController(
         tutorialHubOpen = false
         tutorialChapterId = id
         tutorialStepIndex = 0
-        tutorialStartTurn = 0
-        tutorialMilestones.clear()
+        tutorialEvents.reset()
+        tutorialRun = tutorialChapters.firstOrNull { it.id == id }?.let { TutorialRun(it, practice = true) }
         tutorialPracticeActive = true
         tutorialLoading = true
         offlineStarting = true

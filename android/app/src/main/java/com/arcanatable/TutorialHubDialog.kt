@@ -66,7 +66,11 @@ internal data class ArcanaLesson(
 )
 
 internal fun loadTutorialLessons(context: Context): List<ArcanaLesson> = runCatching {
-    val json = context.assets.open("tutorials/catalog.json").bufferedReader().use { it.readText() }
+    parseTutorialLessons(context.assets.open("tutorials/catalog.json").bufferedReader().use { it.readText() })
+}.getOrDefault(emptyList())
+
+/** The bundled catalog as lessons; shared with the tests that walk each lesson. */
+internal fun parseTutorialLessons(json: String): List<ArcanaLesson> = run {
     val chapters = JSONObject(json).getJSONArray("chapters")
     (0 until chapters.length()).map { index ->
         val chapter = chapters.getJSONObject(index)
@@ -92,7 +96,7 @@ internal fun loadTutorialLessons(context: Context): List<ArcanaLesson> = runCatc
             }
         )
     }
-}.getOrDefault(emptyList())
+}
 
 private val TutorialFelt = Color(0xFF101B18)
 private val TutorialPanel = Color(0xFF1B2A25)
