@@ -44,6 +44,8 @@ def extract_steps(contents: str) -> dict[str, str]:
         if not tag.startswith("- name: "):
             continue
         name = tag[len("- name: "):]
+        if name not in NAMES:
+            continue
         span = contents[head.end(): heads[index + 1].start() if index + 1 < len(heads) else len(contents)]
         prefix = "        run: |\n"
         start = span.find(prefix)
