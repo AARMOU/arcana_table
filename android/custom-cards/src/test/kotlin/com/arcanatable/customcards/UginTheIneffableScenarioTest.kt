@@ -224,6 +224,42 @@ class UginTheIneffableScenarioTest {
             d.getGraveyardCardNames(p).containsAll(graveyardBefore))
     }
 
+    @Test fun spiritExiledByRealSpellReturnsItsLinkedCardExactlyOnce() {
+        val d = customScenario(UginTheIneffable, "Sol Ring")
+        val owner = d.player1
+        val ugin = d.putPermanentOnBattlefield(owner, "Ugin, the Ineffable")
+        assertNull(d.activate(owner, ugin, index = 0).error)
+        d.resolveAll()
+        val spirit = d.permanentsNamed(owner, "Spirit").single()
+        val linkedCard = d.getExile(owner).single()
+        val handBefore = d.getHand(owner).size
+
+        // Exiling a token is a genuine leave-the-battlefield event, not a death.
+        // The linked card must return even though the token cannot exist in exile.
+        val exileSpell = com.wingedsheep.sdk.dsl.card("Ugin Spirit Exile Probe") {
+            manaCost = "{0}"
+            typeLine = "Instant"
+            spell {
+                effect = com.wingedsheep.sdk.dsl.Effects.Move(
+                    target(com.wingedsheep.sdk.scripting.filters.unified.TargetFilter(
+                        com.wingedsheep.sdk.scripting.GameObjectFilter.Creature
+                    )),
+                    Zone.EXILE
+                )
+            }
+        }
+        d.registerCard(exileSpell)
+        val spell = d.putCardInHand(owner, exileSpell.name)
+        assertNull(d.castSpell(owner, spell, listOf(spirit)).error)
+        d.resolveAll()
+
+        assertTrue("Spirit token must leave the battlefield", d.permanentsNamed(owner, "Spirit").isEmpty())
+        assertFalse("Linked card must no longer be exiled", linkedCard in d.getExile(owner))
+        assertEquals("Linked card must return to its owner's hand once",
+            1, d.getHand(owner).count { it == linkedCard })
+        assertEquals(handBefore + 1, d.getHand(owner).size)
+    }
+
     private fun GameTestDriver.loyalty(id: com.wingedsheep.sdk.model.EntityId) =
         state.getEntity(id)!!.get<com.wingedsheep.engine.state.components.battlefield.CountersComponent>()
             ?.getCount(com.wingedsheep.sdk.core.CounterType.LOYALTY) ?: 0
