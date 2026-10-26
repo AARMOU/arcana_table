@@ -1567,7 +1567,7 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   then `run(Effects.GainLife(dealt.amount))` (Creeping Bloodsucker, Syphon Soul) — never a fixed
   `GainLife(n)`, which ignores prevention and the opponent count.
 - `DamageCantBePreventedThisTurn(target)` — the per-recipient form of the turn-wide shutoff (Whippoorwill).
-- `RedirectNextDamage(protectedTargets, redirectTo, amount?, scope, creaturesOnly, optional, fromSource?)`,
+- `RedirectNextDamage(protectedTargets, redirectTo, amount?, scope, protectedFilter?, optional, fromSource?, duration = EndOfTurn)`,
   `RedirectCombatDamageToController(target = Self)`, `ReflectCombatDamage(target = Controller)`,
   `RemoveDamageShield(target)` — the redirect / reflect / shield-removal effects.
 - `DealDamageExcessToController(amount, target, damageSource?)` — deal damage to a creature; any amount beyond
@@ -2117,7 +2117,7 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   the old effect. No additional card-authoring flag is needed. It can't be transformed (CR 712.4c) and never
   matches `transformed()` (CR 701.27g). The upkeep / end-step / beginning-of-combat meld triggers keep their
   intervening "if" as the trigger condition; the ownership half is checked by the effect as it resolves.
-- `ReturnSelfFromGraveyardTransformed(tapped = false)` — "Return this card from your graveyard to the
+- `ReturnSelfFromGraveyardTransformed(tapped = false, underYourControl = false)` — "Return this card from your graveyard to the
   battlefield transformed" (Garland, Knight of Cornelia). Returns the *source card* from the graveyard
   to the battlefield with its back face up; pair with `activateFromZone = Zone.GRAVEYARD` on the owning
   activated ability, **or wire it to `Triggers.self.dies()`** for the "when this dies, return it transformed"
@@ -2129,8 +2129,10 @@ uses `Patterns.Exile.impulse()`; playing the card follows ordinary costs and tim
   transformed"). Because the graveyard→battlefield move preserves the entity id, "...with N counters
   on it" (Ojer Pakpatiq's three time counters) composes as `Composite(ReturnSelfFromGraveyardTransformed(
   tapped = true), AddCounters(counter, n, EffectTarget.Self))` — the following `Self` still resolves to
-  the returned permanent. Raw type `ReturnSelfFromZoneTransformedEffect(fromZone, tapped)` generalizes
-  to other source zones.
+  the returned permanent. `underYourControl = true` is "...return this card to the battlefield transformed
+  **under your control**" (Journey to Eternity): the back face enters under the ability's controller rather
+  than the card's owner (the same `controllerOverride` axis as `PutOntoBattlefieldFromGraveyard`). Raw type
+  `ReturnSelfFromZoneTransformedEffect(fromZone, tapped, controllerOverride)` generalizes to other source zones.
 - `ReturnCreaturesPutInGraveyardThisTurn(player)` — Patriarch's Bidding shape.
 - `ReturnSameNamedFromGraveyard(target = ContextTarget(0))` — return the target graveyard card and
   **every other card with the same name** in the controller's graveyard to the battlefield **tapped**
@@ -3909,9 +3911,11 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
   ability sources carry their original identity through noncombat damage. Redirection retains damage
   source, combat status and unpreventability; an absent/invalid recipient leaves the shield unused.
   Jade Monolith and Beacon of Destiny.
-- `RedirectNextDamageEffect(protectedTargets, redirectTo, amount, scope)` — redirection shield (CR 614.9):
-  while active, damage that would be dealt to any of `protectedTargets` this turn is dealt to `redirectTo`
-  instead. Installed as a `Duration.EndOfTurn` floating effect and checked during damage resolution.
+- `RedirectNextDamageEffect(protectedTargets, redirectTo, amount, scope, protectedFilter, optional, fromSource, duration)` —
+  redirection shield (CR 614.9): while active, damage that would be dealt to any of `protectedTargets` (or to
+  any permanent matching `protectedFilter`, see below) is dealt to `redirectTo` instead. Installed as a
+  floating effect lasting `duration` (`Duration.EndOfTurn` by default — "this turn") and checked during
+  damage resolution; a `redirectTo` permanent that leaves the battlefield ends it (CR 400.7).
   `amount` caps the redirected damage (`null` = redirect all). **`scope` decides when an unlimited shield is
   used up** (a capacity shield, `amount != null`, is always used up once its capacity hits 0 — CR 615.7):
   - `RedirectScope.NEXT_INSTANCE` (default) — one source's damage instance, then gone.
@@ -3921,7 +3925,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
     attacker hitting the protected player/creature — not just the first. "The next time damage would be dealt
     to X and/or you…" (Glarecaster). The shield survives the per-assignment apply loop (`inBatch=true`) and is
     consumed once afterwards by `CombatDamageManager.consumeBatchRedirectShields`.
-  - `RedirectScope.CONTINUOUS` — never self-consumed; redirects every instance until end of turn.
+  - `RedirectScope.CONTINUOUS` — never self-consumed; redirects every instance until its `duration` ends.
     "All damage that would be dealt to it this turn…" (Karona's Zealot).
   **`fromSource`** keys the shield to the damage of one *object* — resolved at resolution, so the same
   card returning later is a new source the shield doesn't know (CR 400.7). Shimian Night Stalker's "{B},
@@ -10990,12 +10994,18 @@ in the declare-blockers step, even before the turn-based block action has comple
   that slot's own requirement, and not already chosen for another slot of the same "target" word
   (CR 115.3) — is a candidate, and the controller picks which one changes when there are several.
   Only the chosen-new-target form (`to = null`) no-ops on a spell with more than one target.
-- `RedirectNextDamageEffect(protectedTargets, redirectTo, amount, scope, creaturesOnly = false, optional = false, fromSource = null)` —
-  **`creaturesOnly`** protects the *class* of creatures rather than a fixed list of entities: Blood
-  of the Martyr's "if damage would be dealt to any creature". Checked against projected state at
-  damage time, so a creature that entered after the shield resolved is covered and a player never
-  is — an empty `protectedTargets` otherwise means "anything", players included. Pair it with
-  `RedirectScope.CONTINUOUS` for the turn-long form. **`optional`** makes it a printed "you may"
+- `RedirectNextDamageEffect(protectedTargets, redirectTo, amount, scope, protectedFilter = null, optional = false, fromSource = null, duration = EndOfTurn)` —
+  **`protectedFilter`** protects a *class* of permanents rather than a fixed list of entities: Blood
+  of the Martyr's "if damage would be dealt to any creature" (`GameObjectFilter.Creature`), Ascent of
+  the Worthy's "all damage that would be dealt to creatures you control" (`Creature.youControl()`,
+  "you" being the shield's controller, so a chosen creature that changes control still soaks the
+  damage). Matched against projected state at damage time, so a permanent that entered after the
+  shield resolved is covered, a player never is, and damage already headed for `redirectTo` stays
+  there — an empty `protectedTargets` otherwise means "anything", players included. Pair it with
+  `RedirectScope.CONTINUOUS` for the "all damage" form. **`duration`** is how long the shield lasts:
+  "this turn" by default, `Duration.UntilYourNextTurn` for Ascent of the Worthy. A shield whose
+  recipient has left the battlefield redirects nothing (Ascent of the Worthy ruling). The
+  client badges a filter shield's recipient ("Takes damage"), since it protects no listed entity. **`optional`** makes it a printed "you may"
   (Blood of the Martyr): the shield's controller is asked **once per damage instance** the shield
   covers, *before* any of that damage is dealt, so a sweeper hitting four creatures asks four times
   and each answer stands on its own. The question is raised by `OptionalDamageRedirect`'s pre-pass —
@@ -16012,7 +16022,7 @@ forbids `DynamicAmount.X` in card definitions.
   (CR 903.4f): an effect reads 0, and a `Costs.PayLife` priced from it is unpayable (War Room).
   Not `EntityNumericProperty.ColorCount` (one object's current colors) nor an `AggregateBattlefield`
   distinct-colors count (colors among permanents) — identity is fixed before the game (CR 903.4a).
-- `DevotionTo(colors, player = You)` — a player's **devotion** to one or more colors (CR 700.5):
+- `DevotionTo(colors, player = You, ofChosenColor = false)` — a player's **devotion** to one or more colors (CR 700.5):
   the number of mana symbols of those colors among the mana costs of permanents the player controls.
   One color = "devotion to red"; several = devotion to that combination ("white and black"), where a
   symbol matching more than one listed color is counted once. Every colored symbol contributes —
@@ -16023,6 +16033,13 @@ forbids `DynamicAmount.X` in card definitions.
   (Clive, Ifrit's Dominant). For the pips inside **one object's** cost ("a spell with one or more
   blue mana symbols in its mana cost") use `DynamicAmounts.coloredManaSymbolsOf(entity, …)` — same
   counting rule (`ManaCost.coloredSymbolCount`), different scope.
+  `ofChosenColor = true` adds the color chosen earlier in the same resolution ("your devotion to
+  **that color**"): the color a wrapping `ChooseColorThen` picked, or — inside
+  `AddManaOfChoiceEffect`, whose amount is evaluated with the color it is adding — the mana color
+  just chosen, at activation or through its own prompt. Facade `DynamicAmounts.devotionToChosenColor()`;
+  Nykthos, Shrine to Nyx and Nyx Lotus are `Effects.AddAnyColorMana(DynamicAmounts.devotionToChosenColor())`.
+  With no color in context it reads only `colors`; the mana auto-payer sizes such an ability per color
+  (a color it would add nothing of isn't offered), so auto-pay and the AI use Nykthos like any land.
 - `UnlockedDoors(player = You, distinctNames = false)` — the number of unlocked doors among Rooms
   `player` controls (CR 709.5). Reads per-face door state, so a single Room with **both** doors
   unlocked counts as **two** — an entity-level `AggregateBattlefield`/`Count` cannot see this. With

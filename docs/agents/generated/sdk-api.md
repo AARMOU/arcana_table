@@ -964,6 +964,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `damageReceivedThisTurn(Player): DynamicAmount`*
 - `descendedThisTurn(Player): DynamicAmount`*
 - `devotionTo(Color...): DynamicAmount`
+- `devotionToChosenColor(): DynamicAmount`
 - `diedBatchTotalPower(): DynamicAmount`
 - `differentlyNamedLandsYouControl(Player): DynamicAmount`*
 - `distinctBendsThisTurn(Player): DynamicAmount`*
@@ -1608,7 +1609,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `RecordValueAsEntered(DynamicAmount): Effect`
 - `RedirectCombatDamageToController(EffectTarget): Effect`*
 - `RedirectDamageFromChosenSource(EffectTarget, EffectTarget, Duration): Effect`*
-- `RedirectNextDamage(List<? extends EffectTarget>, EffectTarget, Integer, RedirectScope, Boolean, Boolean, EffectTarget): Effect`*
+- `RedirectNextDamage(List<? extends EffectTarget>, EffectTarget, Integer, RedirectScope, GameObjectFilter, Boolean, EffectTarget, Duration): Effect`*
 - `RedistributeLifeTotals(): Effect`
 - `ReduceMaximumHandSize(Int, EffectTarget): Effect`*
 - `ReduceMaximumHandSize(DynamicAmount, EffectTarget): Effect`*
@@ -1651,7 +1652,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `ReturnOneFromLinkedExile(): Effect`
 - `ReturnSameNamedFromGraveyard(EffectTarget): Effect`
 - `ReturnSelfFromExileTransformed: Effect`
-- `ReturnSelfFromGraveyardTransformed(Boolean): Effect`*
+- `ReturnSelfFromGraveyardTransformed(Boolean, Boolean): Effect`*
 - `ReturnSelfToBattlefieldAttached(EffectTarget, Boolean, EffectTarget): Effect`*
 - `ReturnSpellOrPermanentToOwnersHand(EffectTarget): Effect`
 - `ReturnSpellToOwnersHand(): Effect`
@@ -2987,6 +2988,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `paired(): GameObjectFilter`
 - `paired(): Any`
 - `permanentNounPhrase$argentum_engine_mtg_sdk(Boolean, String): String`
+- `pluralPermanentDescription: String`
 - `power(Int): GameObjectFilter`
 - `power(Int): Any`
 - `powerAtLeast(Int): GameObjectFilter`

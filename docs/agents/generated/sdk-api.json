@@ -2544,6 +2544,9 @@
    "devotionTo": [
     "devotionTo(Color...): DynamicAmount"
    ],
+   "devotionToChosenColor": [
+    "devotionToChosenColor(): DynamicAmount"
+   ],
    "diedBatchTotalPower": [
     "diedBatchTotalPower(): DynamicAmount"
    ],
@@ -4320,7 +4323,7 @@
     "RedirectDamageFromChosenSource(EffectTarget, EffectTarget, Duration): Effect"
    ],
    "RedirectNextDamage": [
-    "RedirectNextDamage(List<? extends EffectTarget>, EffectTarget, Integer, RedirectScope, Boolean, Boolean, EffectTarget): Effect"
+    "RedirectNextDamage(List<? extends EffectTarget>, EffectTarget, Integer, RedirectScope, GameObjectFilter, Boolean, EffectTarget, Duration): Effect"
    ],
    "RedistributeLifeTotals": [
     "RedistributeLifeTotals(): Effect"
@@ -4439,7 +4442,7 @@
     "ReturnSelfFromExileTransformed: Effect"
    ],
    "ReturnSelfFromGraveyardTransformed": [
-    "ReturnSelfFromGraveyardTransformed(Boolean): Effect"
+    "ReturnSelfFromGraveyardTransformed(Boolean, Boolean): Effect"
    ],
    "ReturnSelfToBattlefieldAttached": [
     "ReturnSelfToBattlefieldAttached(EffectTarget, Boolean, EffectTarget): Effect"
@@ -7292,6 +7295,9 @@
    ],
    "permanentNounPhrase$argentum_engine_mtg_sdk": [
     "permanentNounPhrase$argentum_engine_mtg_sdk(Boolean, String): String"
+   ],
+   "pluralPermanentDescription": [
+    "pluralPermanentDescription: String"
    ],
    "power": [
     "power(Int): GameObjectFilter",

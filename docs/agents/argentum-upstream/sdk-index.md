@@ -643,7 +643,7 @@ Families:
 - `DynamicAmount.CraftedMaterialsTotalPower` — Total printed power of the cards exiled to craft the source permanent (CR 702.167c).
 - `DynamicAmount.CreaturesThatCrewedOrSaddledThisTurn` — Number of distinct creatures that crewed (CR 702.122) or saddled (CR 702.171) the source permanent this turn.
 - `DynamicAmount.CreaturesWithSubtypeDiedThisTurn(subtype: Subtype, player: Player)` — The number of creatures with subtype that died (were put into a graveyard from the battlefield) this turn while under player's control.
-- `DynamicAmount.DevotionTo(colors: List<Color>, player: Player)` — A player's **devotion** to one or more colors (CR 700.5): the number of mana symbols of colors among the mana costs of permanents that player controls.
+- `DynamicAmount.DevotionTo(colors: List<Color>, player: Player, ofChosenColor: Boolean)` — A player's **devotion** to one or more colors (CR 700.5): the number of mana symbols of colors among the mana costs of permanents that player controls.
 - `DynamicAmount.DistinctCardTypesInCollections(collections: List<String>)` — Number of distinct *card types* among the cards in the named pipeline collections (the union of every collection, de-duplicated by card type).
 - `DynamicAmount.DistinctColorsManaSpent(payment: ManaPayment)` — The number of distinct *colors* of mana spent to cast the source spell (0–5).
 - `DynamicAmount.DistinctEntitiesInCollections(collections: List<String>)` — Number of *distinct* entities across several named pipeline collections.
@@ -1009,7 +1009,7 @@ Families:
 - `RecordValueAsEnteredEffect(amount: DynamicAmount)` — Record amount on the entering permanent as the value it entered with — the non-choice sibling of PayAnyAmountOfLifeAsEntersEffect, read back the same way through com.wingedsheep.sdk.scripting.value…
 - `RedirectCombatDamageToControllerEffect(target: EffectTarget)`
 - `RedirectDamageFromChosenSourceEffect(protectedTarget: EffectTarget, redirectTo: EffectTarget, duration: Duration)` — Choose a damage source on resolution and redirect its next damage instance to another recipient.
-- `RedirectNextDamageEffect(protectedTargets: List<EffectTarget>, redirectTo: EffectTarget, amount: Int?, scope: RedirectScope, creaturesOnly: Boolean, optional: Boolean, fromSource: EffectTarget?)` — Redirect damage that would be dealt to the protected targets this turn.
+- `RedirectNextDamageEffect(protectedTargets: List<EffectTarget>, redirectTo: EffectTarget, amount: Int?, scope: RedirectScope, protectedFilter: GameObjectFilter?, optional: Boolean, fromSource: EffectTarget?, duration: Duration)` — Redirect damage that would be dealt to the protected targets (or a filtered class) for a duration.
 - `RedistributeLifeTotalsEffect` — "Redistribute any number of players' life totals." (Reverse the Sands).
 - `ReduceMaximumHandSizeEffect(amount: DynamicAmount, target: EffectTarget)` — Reduces the target player's maximum hand size by amount for the rest of the game ("your maximum hand size is reduced by three for the rest of the game" — Inspired Idea).
 - `ReflectCombatDamageEffect(target: EffectTarget)` — Creates a delayed trigger for the rest of the turn that reflects combat damage.
@@ -1038,7 +1038,7 @@ Families:
 - `ReturnOneFromLinkedExileEffect` — Return one card from the source's linked exile (LinkedExileComponent) to the battlefield.
 - `ReturnSameNamedFromGraveyardEffect(target: EffectTarget)` — Return the target graveyard card and every other card with the same name in the controller's graveyard to the battlefield tapped under the controller's control.
 - `ReturnSelfFromExileTransformedEffect` — Return the source of a Craft activated ability (CR 702.167a) from exile to the battlefield transformed under its owner's control.
-- `ReturnSelfFromZoneTransformedEffect(fromZone: Zone, tapped: Boolean)` — Return the source **card** from a non-battlefield zone to the battlefield with its back face up — "Return this card from your graveyard to the battlefield transformed" (Garland, Knight of Cornelia).
+- `ReturnSelfFromZoneTransformedEffect(fromZone: Zone, tapped: Boolean, controllerOverride: EffectTarget?)` — Return the source **card** from a non-battlefield zone to the battlefield with its back face up — "Return this card from your graveyard to the battlefield transformed" (Garland, Knight of Cornelia).
 - `ReturnSelfToBattlefieldAttachedEffect(target: EffectTarget, transformed: Boolean, controllerOverride: EffectTarget?)` — Returns the source permanent (typically an Aura) from its current zone to the battlefield attached to the specified target.
 - `ReturnSpellOrPermanentToOwnersHandEffect(target: EffectTarget)` — Return a single target — which may be a **spell on the stack** or a **permanent on the battlefield** — to its owner's hand.
 - `ReturnSpellToOwnersHandEffect` — Remove a target spell from the stack and put it into its owner's hand.
