@@ -14,6 +14,9 @@ import com.arcanatable.TableController
 import com.arcanatable.TutorialCoachState
 import com.arcanatable.chooseArgentumLegalAction
 import com.arcanatable.sendArgentumPriority
+import com.arcanatable.submitArgentumAction
+import com.arcanatable.openArgentumCombat
+import com.arcanatable.openArgentumActions
 import com.arcanatable.TutorialPracticeScenarios
 import com.arcanatable.TutorialTargets
 import org.junit.Assert.assertTrue
@@ -108,22 +111,28 @@ class TutorialAuditUiTest {
                 } else {
                     how = "gated-${step.actionKind}"
                     when (step.actionKind) {
-                        "tap", "hold" -> t.tutorialSignal(step.actionKind, resolved ?: step.target.orEmpty())
-                        // Play the drill for real: land, mana, cast, pass. Anything else is forced.
-                        "event" -> if (!playFor(t, step.event.orEmpty())) { how += "-forced"; t.tutorialAdvance() }
+                        "tap", "hold" -> { tapLikeThePlayer(t, step.target.orEmpty()); t.tutorialSignal(step.actionKind, resolved ?: step.target.orEmpty()) }
+                        // Play the drill for real: land, mana, cast, pass, attack.
+                        "event" -> {
+                            val played = playFor(t, step.event.orEmpty()) { t.tutorialLesson == null || t.tutorialStepIndex != index }
+                            if (!played) { how += "-forced"; t.tutorialAdvance() }
+                        }
                     }
                     UiTestSupport.awaitReal(rule, 20_000, "engine after ${step.id}") { !t.argentumAwaitingUpdate }
                 }
                 UiTestSupport.settle(rule, 400)
                 val moved = t.tutorialLesson == null || t.tutorialStepIndex != index
-                if (!moved) { how += "-STUCK"; t.tutorialAdvance(); UiTestSupport.settle(rule, 300) }
+                // An action step the engine didn't confirm is forced on (the engine walkthrough test covers
+                // those); a step that NEXT or its own control couldn't move is a real problem.
+                if (!moved && step.actionKind == "event") { how += "-forced"; t.tutorialAdvance(); UiTestSupport.settle(rule, 300) }
+                else if (!moved) { how += "-STUCK"; t.tutorialAdvance(); UiTestSupport.settle(rule, 300) }
                 val flags = buildList {
                     if (!coach) add("NO-COACH")
                     if (coachCount > 1) add("DUPLICATE-COACH($coachCount)")
                     if (coach && !coachOnTop) add("COACH-BEHIND-WINDOW")
                     if (!screenOk) add("SCREEN(want=$wantScreen got=$screen)")
                     if (!targetOk) add("NO-TARGET(${step.target})")
-                    if (!moved) add("STUCK")
+                    if (!moved && step.actionKind != "event") add("STUCK")
                 }
                 val line = "$chapter #${index + 1} ${step.id} [${step.actionKind}] screen=$screen target=${step.target} -> $how ${if (flags.isEmpty()) "OK" else flags.joinToString(" ")}"
                 report.appendLine(line)
@@ -146,20 +155,88 @@ class TutorialAuditUiTest {
     /** True when the coach card is drawn in [top], the window the player is looking at. */
     private fun coachInTopWindow(top: android.view.View): Boolean = TutorialCoachState.drawnIn === top
 
-    /** Does the real move a drill step waits for, through the same calls the table's buttons make. */
-    private fun playFor(t: TableController, event: String): Boolean {
-        val actions = t.argentumSnapshot?.legalActions.orEmpty()
-        fun pick(match: (org.json.JSONObject) -> Boolean): Boolean {
-            val info = actions.firstOrNull(match) ?: return false
-            t.chooseArgentumLegalAction(info); return true
+    /** What the highlighted control's own handler does (the same state changes as a real tap). */
+    private fun tapLikeThePlayer(t: TableController, target: String) {
+        when (target) {
+            "hand-handle" -> t.showHand = !t.showHand
+            "stack-button" -> t.stackOpen = true
+            "stack-close" -> t.stackOpen = false
+            "game-menu" -> { t.topMenuSection = null; t.topMenuExpanded = true }
+            "menu-game-tools" -> t.topMenuSection = "tools"
+            "home-settings" -> t.optionsOpen = true
+            "home-change-deck" -> t.deckPickerOpen = true
+            "home-play" -> t.playSheetOpen = true
+            "setting-adjust-ui" -> { t.optionsOpen = false; t.layoutLabOpen = true }
+            "table-tab" -> t.showOverview = true
+            "your-tab" -> { t.showOverview = false; t.selectedPlayer = t.localSeat }
+            "opponent-tab" -> { t.showOverview = false; t.selectedPlayer = 1 - t.localSeat }
+            else -> if (target.startsWith("hand-card:")) {
+                // Tapping a card in hand opens its legal-actions sheet.
+                val snap = t.argentumSnapshot
+                val hand = snap?.players?.getOrNull(snap.viewingPlayer)?.hand.orEmpty()
+                val name = target.removePrefix("hand-card:")
+                (hand.firstOrNull { it.name == name } ?: hand.firstOrNull())?.let { t.openArgentumActions(it) }
+            }
         }
+        UiTestSupport.settle(rule, 300)
+    }
+
+    /**
+     * Does the real move a drill step waits for, through the same calls the table's buttons make,
+     * repeating passes (each only once Argentum offers one) until [moved].
+     */
+    private fun playFor(t: TableController, event: String, moved: () -> Boolean): Boolean {
+        fun legal() = t.argentumSnapshot?.legalActions.orEmpty()
         fun type(i: org.json.JSONObject) = i.optJSONObject("action")?.optString("type").orEmpty()
         fun desc(i: org.json.JSONObject) = i.optString("description")
+        fun pick(match: (org.json.JSONObject) -> Boolean): Boolean {
+            val info = legal().firstOrNull(match) ?: return false
+            val snap = t.argentumSnapshot ?: return false
+            if (info.optBoolean("requiresTargets")) {
+                // Target your own creature, as the lesson says (Giant Growth on Grizzly Bears).
+                val you = snap.players[snap.viewingPlayer]
+                val creature = you.battlefield.firstOrNull { "creature" in it.type.lowercase() } ?: return false
+                val serverId = snap.serverCardIds[creature.id] ?: return false
+                val action = org.json.JSONObject(info.getJSONObject("action").toString())
+                    .put("targets", org.json.JSONArray().put(org.json.JSONObject().put("type", "Permanent").put("entityId", serverId)))
+                return t.submitArgentumAction(action, com.arcanatable.ArgentumActions.epochFor(info, snap.interactionEpoch) ?: return false)
+            }
+            t.chooseArgentumLegalAction(info); return true
+        }
+        fun passUntilMoved(): Boolean {
+            repeat(8) {
+                runCatching { UiTestSupport.awaitReal(rule, 15_000, "a pass to be offered") { moved() || (!t.argentumAwaitingUpdate && legal().any { type(it) == "PassPriority" }) } }
+                    .onFailure { return moved() }
+                if (moved()) return true
+                t.sendArgentumPriority()
+                runCatching { UiTestSupport.awaitReal(rule, 15_000, "pass confirmed") { !t.argentumAwaitingUpdate } }
+                UiTestSupport.settle(rule, 300)
+                if (moved()) return true
+            }
+            return moved()
+        }
         return when (event) {
-            "LandPlayed" -> pick { type(it) != "PassPriority" && "Forest" in desc(it) && "Add" !in desc(it) }
-            "ManaAdded" -> pick { "Add {G}" in desc(it) || type(it).contains("Mana") }
+            "LandPlayed" -> pick { type(it) == "PlayLand" }
+            "ManaAdded" -> pick { type(it).contains("Activate") && ("Add" in desc(it) || "mana" in desc(it).lowercase()) }
             "SpellCast" -> pick { type(it) == "CastSpell" && ("Elvish Mystic" in desc(it) || "Giant Growth" in desc(it)) }
-            "SpellResolved", "PriorityPassed", "TurnAdvanced" -> { t.sendArgentumPriority(); true }
+            "AttackersDeclared" -> {
+                // Pass into combat, then declare Grizzly Bears on the real attack board.
+                repeat(4) {
+                    if (moved()) return true
+                    if (legal().any { type(it) == "DeclareAttackers" }) {
+                        t.openArgentumCombat(); UiTestSupport.settle(rule, 500)
+                        val plan = t.argentumAttackPlan ?: return false
+                        t.submitArgentumAction(plan.buildAction(plan.options.associate { it.attackerId to it.targets.first() }),
+                            com.arcanatable.ArgentumActions.epochFor(plan.legalAction, t.argentumSnapshot?.interactionEpoch) ?: return false)
+                        t.argentumAttackPlan = null
+                        runCatching { UiTestSupport.awaitReal(rule, 15_000, "attack confirmed") { moved() } }
+                        return moved()
+                    }
+                    if (!passUntilMoved() && legal().none { type(it) == "DeclareAttackers" }) return moved()
+                }
+                moved()
+            }
+            "SpellResolved", "PriorityPassed", "TurnAdvanced" -> passUntilMoved()
             else -> false
         }
     }

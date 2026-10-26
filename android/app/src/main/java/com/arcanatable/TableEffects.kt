@@ -277,7 +277,8 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
     }
     LaunchedEffect(argentumTurnKey) {
         val (_, active) = argentumTurnKey ?: return@LaunchedEffect
-        if (active != localSeat || !autoOpenHand || !argentumEnabled) return@LaunchedEffect
+        // A lesson decides when the hand opens; opening it here would cover what the lesson points at.
+        if (active != localSeat || !autoOpenHand || !argentumEnabled || tutorialChapterId != null) return@LaunchedEffect
         delay(350)
         if (argentumPendingDecision == null && argentumAttackPlan == null && argentumBlockPlan == null &&
             argentumActionChoices.isEmpty() && !gameEndedOnline) showHand = true

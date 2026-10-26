@@ -140,18 +140,6 @@
           "hint": "Next"
         },
         {
-          "id": "pass",
-          "screen": "board",
-          "target": "bottom-bar-pass-button",
-          "advance": {
-            "kind": "event",
-            "event": "PriorityPassed"
-          },
-          "title": "Keep the turn moving",
-          "body": "Tap Pass again. When every player passes with nothing on the stack, the game moves on to the next step.",
-          "hint": "Tap Pass"
-        },
-        {
           "id": "combat-skip",
           "screen": "board",
           "target": "bottom-bar-pass-button",
@@ -160,8 +148,20 @@
             "event": "AttackersDeclared"
           },
           "title": "No attack this time",
-          "body": "Elvish Mystic arrived this turn, so it can't attack yet. Keep tapping Pass; if the game asks for attackers, confirm with none.",
-          "hint": "Keep passing"
+          "body": "Elvish Mystic arrived this turn, so it can't attack yet. Tap Pass: with no creature able to attack, the game moves straight past combat.",
+          "hint": "Tap Pass"
+        },
+        {
+          "id": "pass",
+          "screen": "board",
+          "target": "bottom-bar-pass-button",
+          "advance": {
+            "kind": "event",
+            "event": "PriorityPassed"
+          },
+          "title": "Keep the turn moving",
+          "body": "You're in your second main phase. Tap Pass again: when every player passes with nothing on the stack, the game moves on to the next step.",
+          "hint": "Tap Pass"
         },
         {
           "id": "finish-turn",
@@ -1787,12 +1787,12 @@
         {
           "id": "reset",
           "screen": "menu",
-          "target": "menu-reset",
+          "target": null,
           "advance": {
             "kind": "next"
           },
           "title": "Resetting is destructive",
-          "body": "Reset game and Reset and clear all data end your match or erase your data. Lessons never use them; only choose them when you mean it.",
+          "body": "Room & game holds Reset game and Reset and clear all data. They end your match or erase your data. Lessons never use them; only choose them when you mean it.",
           "hint": "Next"
         },
         {

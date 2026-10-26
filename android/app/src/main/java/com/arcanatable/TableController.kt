@@ -493,7 +493,7 @@ internal class TableController(
                     showHand = target.startsWith("hand-card:") || target == "hand-grid" || target == "hand-drawer-grip"
                 }
                 if (target == "your-tab" || target.startsWith("battlefield-") || target == "argentum-mana-summary" || target == "commander-chip" ||
-                    target.startsWith("quick-") || target == "stack-button") { showOverview = false; selectedPlayer = localSeat }
+                    target.startsWith("quick-") || target == "stack-button" || target == "bottom-bar-pass-button") { showOverview = false; selectedPlayer = localSeat }
             }
             // A drill only shows the stack when something is on it; a tour shows it whenever asked.
             "stack" -> if (game && (!tutorialGated || argentumSnapshot?.stack?.isNotEmpty() == true)) {
@@ -567,6 +567,12 @@ internal class TableController(
                     val built = withContext(Dispatchers.IO) { TutorialPracticeScenarios.build(scenario, offlineLibrary()) }
                     launchOfflineCheckpoint(built.seats, built.registry, built.checkpoint.toString())
                 }
+                // Route the first step only once the board has loaded: loading the players resets the
+                // view to TABLE, which would otherwise undo it.
+                var waited = 0
+                while (argentumSnapshot == null && !argentumMulliganPrompt && waited++ < 100) delay(100)
+                delay(600)
+                tutorialRouteScreen()
                 recordDiagnostic("Tutorial practice started: $id ($scenario)", DiagnosticCategory.ENGINE)
             } catch (failed: Throwable) {
                 argentumSocket.close()

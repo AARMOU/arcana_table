@@ -32,6 +32,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -237,7 +238,9 @@ internal fun PlaySheet(
     // Play with a friend: null = not chosen; 1 host on Wi-Fi, 2 join on Wi-Fi, 3 host online, 4 join online.
     var friendMode by remember { mutableStateOf<Int?>(null) }
     var showAllDecks by remember { mutableStateOf(false) }
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
+    // During a lesson the sheet opens fully, so every control a step points at is on screen.
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = tutorialStep != null)) {
         Box {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("How do you want to play?", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
@@ -312,7 +315,9 @@ private fun DeckChip(label: String, selected: Boolean, onClick: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit, onDeckBuilder: (() -> Unit)? = null, tutorialStep: ArcanaLessonStep? = null, onTutorialNext: () -> Unit = {}, onTutorialExit: () -> Unit = {}) {
-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
+    // During a lesson the sheet opens fully, so every control a step points at is on screen.
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = tutorialStep != null)) {
         Box {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text("Choose your deck", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
