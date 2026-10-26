@@ -1,0 +1,130 @@
+name: Deploy Claude's lobby-capable Arcana Cloudflare relay (owner approved)
+# Owner explicitly authorized production lobby Worker deployment on 2026-10-26.
+# Deploys ONLY the exact Worker files in Claude PR #283 after local tests.
+# No Android APK, branch merge, Play signing or repo secret changes.
+on:
+  push:
+    branches: [gpt/owner-approved-claude-lobby-worker-deploy-20261026]
+    paths:
+      - '.github/workflows/deploy-claude-lobby-worker-20261026.yml'
+  workflow_dispatch:
+concurrency:
+  group: arcana-cloudflare-relay-production
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  deploy:
+    if: github.repository == 'AARMOU/arcana_table'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID || secrets.CF_ACCOUNT_ID || vars.CLOUDFLARE_ACCOUNT_ID }}
+      WRANGLER_SEND_METRICS: 'false'
+      LOBBY_SOURCE_SHA: 79dcd0c58837305fcd1f8790fbf052af214d204b
+      MULTIPLAYER_BASE_SHA: 6641f1883f54ca3a13c8faa7ef0b01b05976ef74
+      EXPECTED_WORKER_URL: https://arcana-table-rooms.arcanamtg.workers.dev
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Require exact independently green Claude lobby Worker revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$MULTIPLAYER_BASE_SHA" "$LOBBY_SOURCE_SHA"
+          git merge-base --is-ancestor "$LOBBY_SOURCE_SHA" HEAD
+          for path in \
+            android/cloud-room/src/index.ts \
+            android/cloud-room/scripts/verify-directed-relay.mjs \
+            android/cloud-room/wrangler.toml \
+            android/cloud-room/package.json \
+            android/cloud-room/package-lock.json; do
+            git show "$LOBBY_SOURCE_SHA:$path" | cmp - "$path"
+          done
+          grep -F 'name = "arcana-table-rooms"' android/cloud-room/wrangler.toml
+          grep -F 'request: "relaySeats"' android/cloud-room/src/index.ts
+          grep -F 'occupied(index)' android/cloud-room/src/index.ts
+          grep -F 'occupiedToAi' android/cloud-room/scripts/verify-directed-relay.mjs
+          echo "PASS: production Worker files byte-identical to Claude lobby PR #283 at $LOBBY_SOURCE_SHA"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: android/cloud-room/package-lock.json
+      - name: Install and strictly typecheck pinned Cloudflare Worker
+        working-directory: android/cloud-room
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          npm run typecheck
+      - name: Run local private WebSocket and host seat-reconfiguration regressions
+        working-directory: android/cloud-room
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/wrangler dev --local --port 8787 --ip 127.0.0.1 > "$RUNNER_TEMP/claude-lobby-relay-local.log" 2>&1 &
+          relay_pid=$!
+          trap 'kill "$relay_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:8787/health >/dev/null; then ready=1; break; fi
+            sleep 1
+          done
+          if [ "$ready" != 1 ]; then cat "$RUNNER_TEMP/claude-lobby-relay-local.log"; exit 1; fi
+          node scripts/verify-directed-relay.mjs
+      - name: Confirm production Cloudflare credentials are connected
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${CLOUDFLARE_API_TOKEN:-}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            echo '::error title=Cloudflare auth unavailable::Expected existing CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID GitHub Actions secrets.'
+            exit 1
+          fi
+          echo 'PASS: existing GitHub Cloudflare credentials are present (values hidden)'
+      - name: Deploy lobby-compatible Worker to existing Arcana service
+        shell: bash
+        working-directory: android/cloud-room
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/wrangler deploy --keep-vars 2>&1 | tee "$RUNNER_TEMP/arcana-claude-lobby-deploy.log"
+          python3 - <<'PY'
+          import os,re
+          from pathlib import Path
+          log=Path(os.environ["RUNNER_TEMP"],"arcana-claude-lobby-deploy.log").read_text(errors="replace")
+          urls=re.findall(r'https://[A-Za-z0-9.-]+\.workers\.dev',log)
+          expected=os.environ["EXPECTED_WORKER_URL"]
+          if not urls or urls[-1].rstrip("/") != expected:
+              raise SystemExit(f"Deployed URL identity mismatch: expected {expected}, got {urls[-1] if urls else 'none'}")
+          print("PASS: Wrangler deployed updated code to original Arcana workers.dev service: "+expected)
+          PY
+      - name: Validate LIVE public health + private seat edits and reconnects
+        shell: bash
+        working-directory: android/cloud-room
+        run: |
+          set -euo pipefail
+          curl -fLsS --retry 5 --retry-delay 2 "$EXPECTED_WORKER_URL/health" -o "$RUNNER_TEMP/arcana-lobby-health.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          h=json.loads(Path(os.environ["RUNNER_TEMP"],"arcana-lobby-health.json").read_text())
+          assert h.get("ok") is True, h
+          assert h.get("service")=="arcana-table-rooms", h
+          assert h.get("protocol")==1 and h.get("relay")==1, h
+          print("PASS: original public Cloudflare Worker responds correctly")
+          PY
+          ARCANA_RELAY_TEST_ORIGIN="$EXPECTED_WORKER_URL" node scripts/verify-directed-relay.mjs
+          {
+            echo '## Arcana lobby Worker updated: VERIFIED LIVE'
+            echo
+            echo "Endpoint: $EXPECTED_WORKER_URL"
+            echo
+            echo "Source: Claude lobby PR #283 at $LOBBY_SOURCE_SHA"
+            echo
+            echo 'Local and PUBLIC live WebSocket directed-relay security, host reconfiguration, occupied-seat protection and reconnect: PASS'
+            echo
+            echo 'No Android APK built. Real-phone gameplay remains a separate acceptance gate.'
+          } >> "$GITHUB_STEP_SUMMARY"
