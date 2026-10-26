@@ -46,7 +46,7 @@ class HomeScreenSizesTest {
         rule.onNodeWithText("Join on Wi-Fi").assertExists()
         rule.onNodeWithText("Host 2–4 players online").assertDoesNotExist()
         rule.onNodeWithText("HOST ONLINE LOBBY").assertExists()
-        rule.onNodeWithText("Join online").performClick()
+        rule.onNodeWithText("Join online").performScrollTo().performClick()
         UiTestSupport.settle(rule)
         rule.onNodeWithTag("play-start").assertExists()
         rule.onNodeWithText("JOIN ONLINE LOBBY").assertExists()
