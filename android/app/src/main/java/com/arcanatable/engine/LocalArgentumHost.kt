@@ -265,9 +265,9 @@ class LocalArgentumHost(
                 else guestQuietOpponentTurns[from] = enabled
             }
             "arcanaNudge" -> if (isWifi) {
-                val current = state
-                val target = current?.pendingDecision?.let { current.actorFor(it.playerId) }
-                    ?: current?.priorityPlayerId
+                val target = state?.let { current ->
+                    current.pendingDecision?.let { current.actorFor(it.playerId) } ?: current.priorityPlayerId
+                }
                 if (target != null && target != from && isPerson(target))
                     emitTo(target, JSONObject().put("type", "arcanaNudge"))
             }
