@@ -233,7 +233,7 @@ private fun CombatBoardFrame(
  * Argentum lists can be used, and Argentum validates the result (flying, menace, ...).
  */
 @Composable
-fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit) {
+fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, busy: Boolean, warning: String? = null, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit) {
     var selection by remember(plan) { mutableStateOf(plan.mandatory.filterKeys { it in plan.blockers }) }
     var pending by remember(plan) { mutableStateOf<String?>(null) }
     val attackers = plan.attackers.map(piece)
@@ -267,7 +267,7 @@ fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, 
             if (cap <= 1 || next.size >= cap) pending = null
         },
         summary = blockSummary(attackers, blockers, selection),
-        warning = null,
+        warning = warning,
         confirmLabel = if (selection.isEmpty()) "NO BLOCKS" else "BLOCK WITH ${selection.size}",
         confirmEnabled = !busy,
         onConfirm = { onConfirm(plan.buildAction(selection)) },
