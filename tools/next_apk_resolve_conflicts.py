@@ -162,10 +162,67 @@ def resolve_ai(head_sha: str) -> None:
     subprocess.check_call(["git", "diff", "--cached", "--check", "--", CONTROLLER, OVERLAYS, AI_HOST])
     print("PASS: retained release AI-seat limit/tutorial passive opponent and Claude's difficulty + action recovery")
 
+
+ONLINE_SHA = "6641f1883f54ca3a13c8faa7ef0b01b05976ef74"
+ARGENTUM = "android/app/src/main/java/com/arcanatable/TableArgentum.kt"
+
+
+def resolve_online(head_sha: str) -> None:
+    if head_sha != ONLINE_SHA:
+        raise RuntimeError(f"Unreviewed online PR head {head_sha}; expected {ONLINE_SHA}")
+    paths = sorted(run("git", "diff", "--name-only", "--diff-filter=U").splitlines())
+    if paths != sorted((ARGENTUM, OVERLAYS)):
+        raise RuntimeError(f"Unexpected online conflicts: {paths!r}")
+    for name in paths:
+        path = Path(name)
+        original = path.read_text()
+        matches = list(CONFLICT.finditer(original))
+        if len(matches) != 1 or matches[0].group("head") != ONLINE_SHA:
+            raise RuntimeError(f"Unexpected {name} online collision")
+        match = matches[0]
+        ours, theirs = match.group("ours"), match.group("theirs")
+        if name == ARGENTUM:
+            tutorial = "            if (argentumOffline && !offlineRestoreRequested && !tutorialPracticeActive && wifiRole == null) {\n"
+            old = "            if (argentumOffline && !offlineRestoreRequested && wifiRole == null) {\n"
+            lobby_reset = "            wifiGuestWaiting = false\n            wifiGuestLobbyState = null\n"
+            if ours != tutorial or theirs != lobby_reset + old:
+                raise RuntimeError("Unexpected tutorial/new-lobby state collision")
+            replacement = lobby_reset + tutorial
+        else:
+            tutorial_next = (
+                "                tutorialStep = if (tutorialChapterId != null) tutorialStep else null,\n"
+                "                onTutorialNext = { tutorialAdvance() }, onTutorialExit = { stopTutorial() },\n"
+            )
+            old_join = '                onOnlineJoin = { playSheetOpen = false; run { onlineCodeInput = ""; onlineJoinOpen = true } },\n'
+            if not ours.startswith(old_join):
+                raise RuntimeError("Unknown old online join callback")
+            # Preserve tutorial arguments but take incoming online multi host/join callbacks.
+            if ours[len(old_join):] != "".join(tutorial_next):
+                raise RuntimeError("Missing tutorial screen inputs")
+            for required in ("onOnlineMultiHost = ", "onOnlineMultiJoin = ", "onOnlineJoin = ", "wifiMultiOnlineJoin = false"):
+                if theirs.count(required) != 1:
+                    raise RuntimeError(f"Incoming online callbacks changed: {required}")
+            replacement = theirs + "".join(tutorial_next)
+        result = original[:match.start()] + replacement + original[match.end():]
+        if any(tag in result for tag in ("<<<<<<<", "=======", ">>>>>>>")):
+            raise RuntimeError(f"Remaining multiplayer merge markers in {name}")
+        path.write_text(result)
+        subprocess.check_call(["git", "add", name])
+        print("Reviewed online conflict resolution:", name)
+
+    remaining = run("git", "diff", "--name-only", "--diff-filter=U")
+    if remaining:
+        raise RuntimeError(f"Unresolved online conflicts: {remaining}")
+    subprocess.check_call(["git", "diff", "--cached", "--check", "--", ARGENTUM, OVERLAYS])
+    print("PASS: retained tutorial-start guard and hooks, plus directed online host/join and lobby reset")
+
+
 if __name__ == "__main__":
-    if len(sys.argv) != 3 or sys.argv[1] not in ("table", "ai"):
-        raise SystemExit("usage: next_apk_resolve_conflicts.py table|ai <exact-pr-head>")
+    if len(sys.argv) != 3 or sys.argv[1] not in ("table", "ai", "online"):
+        raise SystemExit("usage: next_apk_resolve_conflicts.py table|ai|online <exact-pr-head>")
     if sys.argv[1] == "table":
         resolve_table(sys.argv[2])
-    else:
+    elif sys.argv[1] == "ai":
         resolve_ai(sys.argv[2])
+    else:
+        resolve_online(sys.argv[2])
