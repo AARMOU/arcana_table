@@ -9,7 +9,7 @@ on:
     paths: ['.github/workflows/release-upgraded-source-validation.yml']
   workflow_dispatch:
 concurrency:
-  group: arcana-release-upgraded-source-${{ github.ref }}
+  group: arcana-release-upgraded-priority-${{ github.ref }}
   cancel-in-progress: true
 permissions:
   contents: read
@@ -100,7 +100,7 @@ jobs:
       - name: Finish local merged source and integrate exact development head
         shell: bash
         env:
-          DEV_SHA: 7ef06ec3645714529c44e258497ce3d679c5d020
+          DEV_SHA: 1751f1893cc4706572d4f4382e6b0a137bf46536
         run: |
           set -euo pipefail
           git add -u
@@ -196,7 +196,9 @@ jobs:
                    '        }')
           conflict = '<<<<<<< HEAD\n' + priority + '\n=======\n' + guard + '\n>>>>>>> ' + os.environ['DEV_SHA']
           assert value.count('<<<<<<< HEAD') == value.count(conflict) == 1, 'Unknown controller conflict'
-          value = value.replace(conflict, guard + '\n' + priority, 1)
+          # Tutorial checkpoints must not replace the player's normal own-stack preference.
+          restore = '        if (!tutorialPracticeActive) ' + priority.strip()
+          value = value.replace(conflict, guard + '\n' + restore, 1)
           assert not any(marker in value for marker in ('<<<<<<<', '=======', '>>>>>>>'))
           path.write_text(value)
           print('PASS: release seat validation precedes restoring own-stack preference')
@@ -666,7 +668,7 @@ jobs:
           PY
       - name: Release must not expose debug test scenarios
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest' --tests 'com.arcanatable.LauncherBrandingTest' --tests 'com.arcanatable.TutorialPracticeScenariosTest'
+        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest' --tests 'com.arcanatable.LauncherBrandingTest' --tests 'com.arcanatable.TutorialPracticeScenariosTest' --tests 'com.arcanatable.TutorialPriorityHostTest'
       - name: Require tutorial tests actually executed on upgraded engine
         shell: bash
         run: |
@@ -681,6 +683,12 @@ jobs:
               assert int(suite.get('tests', 0)) == 4, (variant, suite.attrib)
               assert all(int(suite.get(k, 0)) == 0 for k in ('failures', 'errors', 'skipped')), suite.attrib
               print('PASS:', variant, 'four real-engine tutorial setup tests')
+              priority = list(root.glob('TEST-*TutorialPriorityHostTest.xml'))
+              assert len(priority) == 1, (variant, 'missing real-host priority test XML')
+              suite = ET.parse(priority[0]).getroot()
+              assert int(suite.get('tests', 0)) == 2, (variant, suite.attrib)
+              assert all(int(suite.get(k, 0)) == 0 for k in ('failures', 'errors', 'skipped')), suite.attrib
+              print('PASS:', variant, 'real learner pass + ordinary-game auto-pass both executed')
           PYTUTORIAL
       - name: Compile and lint unsigned release package for source validation
         working-directory: android
