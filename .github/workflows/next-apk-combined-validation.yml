@@ -324,6 +324,11 @@ jobs:
                 echo "::error title=Multiplayer source conflict::Unknown overlap with release/tutor/AI source; stop."
                 git diff --name-only --diff-filter=U | tee combined-evidence/next-apk-online-conflicts.txt
                 cat combined-evidence/next-apk-online-merge.log
+                while IFS= read -r conflict_path; do
+                  test -z "$conflict_path" && continue
+                  echo "=== $conflict_path exact unresolved hunks ==="
+                  awk '/^<<<<<<< / {inside=1} inside {print} /^>>>>>>> / {inside=0}' "$conflict_path" | head -160
+                done < <(git diff --name-only --diff-filter=U)
                 exit 1
               fi
             fi
