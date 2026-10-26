@@ -804,6 +804,7 @@ internal fun TableController.TableOverlaysB() {
         }
     }
 
+    if (tutorialHubOpen) TutorialHubDialog(onDismiss = { tutorialHubOpen = false })
     if (optionsOpen) OptionsPage(
         darkMode = darkMode, timerVisible = turnTimerVisible,
         backgroundAlertsEnabled = backgroundAlertsEnabled,
@@ -834,6 +835,7 @@ internal fun TableController.TableOverlaysB() {
         onViewDiagnostics = { optionsOpen = false; diagnosticViewerOpen = true },
         onExportDiagnostics = { exportDiagnosticLog() },
         onWhatsNew = { optionsOpen = false; changelogOpen = true },
+        onTutorials = { optionsOpen = false; tutorialHubOpen = true },
         engineTrialResult = engineTrialResult,
         onEngineSelfTest = {
             engineTrialResult = "Running an AI-vs-AI game on this phone…"
