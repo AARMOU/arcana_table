@@ -399,6 +399,7 @@ internal class TableController(
         val lesson = tutorialLesson ?: return
         if (tutorialStepIndex < lesson.steps.lastIndex) {
             tutorialStepIndex++
+            tutorialRouteScreen()
             val next = tutorialStep
             val mine = argentumSnapshot?.players?.getOrNull(localSeat)
             // A quick state burst can resolve the creature before the player reads the
@@ -468,12 +469,30 @@ internal class TableController(
         tutorialHubOpen = true
     }
 
-    fun startTutorialCoach(id: String) {
-        if (tutorialChapters.none { it.id == id }) return
+    fun tutorialRouteScreen() {
+        if (tutorialPracticeActive) {
+            if (tutorialStep?.screen == "stack" && argentumSnapshot?.stack?.isNotEmpty() == true) stackOpen = true
+            else if (tutorialStep?.screen == "board") stackOpen = false
+            return
+        }
+        when (tutorialStep?.screen) {
+            "home" -> { homeOpen = true; optionsOpen = false; playSheetOpen = false; deckPickerOpen = false }
+            "setup" -> { homeOpen = true; optionsOpen = false; playSheetOpen = true }
+            "settings", "diagnostics", "layout" -> { homeOpen = true; playSheetOpen = false; optionsOpen = true }
+            "decks" -> { homeOpen = true; optionsOpen = false; deckPickerOpen = true }
+            "board" -> if (argentumEnabled) { homeOpen = false; optionsOpen = false }
+            "stack" -> if (argentumEnabled) stackOpen = true
+            "menu" -> { if (argentumEnabled) homeOpen = false; topMenuSection = null; topMenuExpanded = true }
+        }
+    }
+
+    fun startTutorialCoach(id: String, startingIndex: Int = 0) {
+        val lesson = tutorialChapters.firstOrNull { it.id == id } ?: return
         tutorialHubOpen = false
         tutorialChapterId = id
-        tutorialStepIndex = 0
+        tutorialStepIndex = startingIndex.coerceIn(0, lesson.steps.lastIndex)
         tutorialPracticeActive = false
+        tutorialRouteScreen()
     }
 
     fun startTutorialPractice(id: String) {
