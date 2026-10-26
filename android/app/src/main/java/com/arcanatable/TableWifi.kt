@@ -325,6 +325,9 @@ internal fun TableController.startMultiOnlineHost() {
                     if (wifiServer === host) {
                         if (argentumSocket.runningLocalHost == null) {
                             room.guestLeft(id)
+                            // Release only this seat's server-side claim; rotate its
+                            // credential before another phone may join this slot.
+                            host.rejectGuest(id)
                             wifiMultiLobbyState = room.lobbyMessage()
                             host.broadcastLobby(wifiMultiLobbyState!!)
                         } else argentumSocket.runningLocalHost?.receive(
