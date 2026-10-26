@@ -11,6 +11,21 @@
 5. Preserve first-release production scope: **two-player**, premade decks, offline AI; deck import and four-player are not exposed. The separate #268 internet-multiplayer work is excluded from this candidate.
 6. Record the actual installed APK SHA-256 and package name. The preview is separately debug-signed (`com.arcanatable.argentum`); the Play release is `com.arcanatable`. Never conflate preview signing with the original Play upload key.
 
+## Source-join drift and candidate identity gate (2026-10-26)
+
+The original Build 134 preview and a later **all-latest** candidate are different acceptance targets. Never carry the preview's test results or packaging identity forward to a newly assembled source tree.
+
+| Lane | Exact evidence | What it proves / does not prove |
+| --- | --- | --- |
+| Frozen Build 134 source gate | Draft [#260](https://github.com/AARMOU/arcana_table/pull/260) at `b32e499a65f0a4a9b70367a67ea00f91eef8dbaa`; [run 40269834547](https://github.com/AARMOU/arcana_table/actions/runs/40269834547) | Passed the original `c38f1453`-based Argentum/Eldrazi 94-indexed-slot source and unsigned packaging gates. It is not a validation of a subsequent weekly engine. |
+| Existing installable preview | [run 40273659781](https://github.com/AARMOU/arcana_table/actions/runs/40273659781), source `2ec96ac9246ddce1412f89bf4f39f5676d309b8d` | Debug APK was uploaded and hash-checked. Physical Fold gameplay remains untested; this artifact must not be relabeled as a new all-latest build. |
+| New development engine | `gpt/arcana-integration-next@f9bfdfdea4608839ad7e98ffda89de807bf5d077`, upstream `ffebf419be4d4bc0ead60548df474d0847619c4f`; [weekly run 40345172596](https://github.com/AARMOU/arcana_table/actions/runs/40345172596) | Weekly development gates passed. This does **not** certify downstream Build 134 Eldrazi patches, 94 indexed original slots, app/AI/tutorial compatibility, or an APK. |
+| Proposed next-APK source-only join | Draft [#278](https://github.com/AARMOU/arcana_table/pull/278) at `6c455fe70f76cd6e39c716ee5e94ceb077544986`; [run 40348094390](https://github.com/AARMOU/arcana_table/actions/runs/40348094390), artifact `12661708873` | Source conflict reconciliation and a patch artifact succeeded. **No engine binary replacement, Android compilation, APK packaging, installation or online session** was proven by this source-only run. |
+
+**Fail-closed promotion rule:** For a new candidate, record the exact combined source SHA, merged source pins, upstream engine SHA, installed four-JAR hashes, compiled debug/release test XML, Eldrazi coverage evidence, tutorial and release-feature checks, and final package/certificate metadata **from that same combined run**. If the compiler still rebuilds `c38f1453` while the source join claims `ffebf419be`, mark **HOLD — engine/runtime mismatch**; never call the candidate current-engine validated. A source-only patch cannot substitute for compilation. Do not manually dispatch an APK build or alter the active #278 ownership lane under this protocol.
+
+**Scope separation:** This document certifies only the frozen **two-player / premade / no-import** Build 134 release baseline. A later owner-directed 2–4-player online preview is a **different candidate**: it requires its own explicit release-scope decision, release-capability-policy reconciliation, matching combined build, per-seat hidden-information and cross-network/reconnect acceptance, and separate Worker deployment authorization. Neither its source-only success nor an isolated #268 CI pass waives these gates. Preserve both plans without silently widening the already validated Build 134 baseline.
+
 ## Physical acceptance matrix — perform on the actual installed candidate
 
 Record **PASS / FAIL / BLOCKED / NOT RUN** for every row. A test not run is not a pass. Run both on the Fold's cover display and unfolded display where relevant; additionally exercise portrait/landscape. Preserve reproducible steps and sanitized diagnostics for failures.
@@ -47,8 +62,10 @@ Use a private evidence store for any screenshots, diagnostic logs, device identi
 ```text
 Date/time (UTC):
 Tester:
-Candidate source SHA:
-Upstream Argentum SHA / installed JAR SHA-256:
+Candidate lane (frozen B134 / newer all-latest) and exact combined source SHA:
+Pinned constituent branch SHAs / engine version actually compiled:
+Upstream Argentum SHA / installed four-JAR SHA-256:
+Source-only vs compiled-and-packaged evidence classification:
 #260 workflow run + job + conclusion + artifact evidence:
 #254 invocation authorization + run ID (if approved):
 Installed APK SHA-256 / application ID / versionCode:
