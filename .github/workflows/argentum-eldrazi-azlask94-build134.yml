@@ -766,7 +766,7 @@ jobs:
           "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/signing-info.txt
           sha256sum android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/apk.sha256
           git rev-parse HEAD > combined-evidence/local-arcana-head.txt
-          echo 'Combined release source (PR #261 exact-head; includes #259/#250/#256): 1751f1893cc4706572d4f4382e6b0a137bf46536' > combined-evidence/source-provenance.txt
+          echo 'Combined release source (PR #265 exact-head; includes #261/#259/#250/#256): 1751f1893cc4706572d4f4382e6b0a137bf46536' > combined-evidence/source-provenance.txt
           echo 'Original Arcana logo Git blob: 45959a18f72d01e2ba1a71fe52767e864b221178' >> combined-evidence/source-provenance.txt
           echo 'DeckSupportTest fix (PR #233): 6cf456733fd2c870d4db6888caa067399336f357' >> combined-evidence/source-provenance.txt
           echo 'Argentum upstream: c38f145359c342a04f951b7ba48f741bcb1627ac' >> combined-evidence/source-provenance.txt
