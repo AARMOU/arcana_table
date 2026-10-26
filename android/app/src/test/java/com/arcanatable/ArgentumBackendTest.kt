@@ -84,4 +84,55 @@ class ArgentumBackendTest {
         assertEquals(2, projected.players[1].library.size)
         assertEquals("Sol Ring", projected.players[0].battlefield.single().name)
     }
+    @Test fun commanderDamageProjectionAndTrackerUseCommanderNameNotSeatId() {
+        val state = JSONObject().apply {
+            put("viewingPlayerId", "p1")
+            put("activePlayerId", "p2")
+            put("players", JSONArray()
+                .put(JSONObject().put("playerId", "p1").put("name", "You").put("life", 8)
+                    .put("commanderDamage", JSONArray().put(JSONObject()
+                        .put("commanderName", "Animar, Soul of Elements").put("commanderId", "cmd-2").put("amount", 20))))
+                .put(JSONObject().put("playerId", "p2").put("name", "AI · Animar").put("life", 41)))
+            put("cards", JSONObject().put("cmd-2", JSONObject()
+                .put("id", "cmd-2").put("name", "Animar, Soul of Elements")
+                .put("typeLine", "Legendary Creature — Elemental")
+                .put("ownerId", "p2").put("controllerId", "p2").put("isCommander", true)))
+            put("zones", JSONArray().put(JSONObject()
+                .put("zoneId", JSONObject().put("zoneType", "COMMAND").put("ownerId", "p2"))
+                .put("cardIds", JSONArray().put("cmd-2")).put("size", 1)))
+        }
+        val projected = ArgentumTableSnapshot.parse(state)
+        assertEquals("Animar, Soul of Elements", projected.players[1].commanderName)
+        val rows = commanderDamageTrackerRows(projected.players[0].commanderDamageReceived,
+            listOf(CommanderDamageTrackerSource(projected.players[1].id, projected.players[1].name,
+                projected.players[1].commanderName)))
+        assertEquals(1, rows.size)
+        assertEquals("Animar, Soul of Elements", rows.single().key)
+        assertEquals(20, rows.single().amount)
+    }
+
+    @Test fun commanderDamageTrackerPreservesLegacySeatAndSeparatePartnerCommanderCounts() {
+        val sources = listOf(CommanderDamageTrackerSource("p2", "Opponent", "First Commander"))
+        val manual = commanderDamageTrackerRows(mapOf("p2" to 7), sources)
+        assertEquals("p2", manual.single().key)
+        assertEquals(7, manual.single().amount)
+
+        val engine = commanderDamageTrackerRows(mapOf("First Commander" to 13, "Partner Commander" to 9), sources)
+        assertEquals(2, engine.size)
+        assertEquals("First Commander", engine[0].key)
+        assertEquals(13, engine[0].amount)
+        assertEquals("Partner Commander", engine[1].key)
+        assertEquals(9, engine[1].amount)
+        assertTrue(engine.none { it.amount >= 21 })
+    }
+
+    @Test fun commanderDamageTrackerDoesNotHideUnknownEngineSource() {
+        val rows = commanderDamageTrackerRows(mapOf("Unknown Commander" to 21),
+            listOf(CommanderDamageTrackerSource("p2", "Opponent", null)))
+        assertEquals(2, rows.size)
+        assertEquals(0, rows[0].amount)
+        assertEquals("Unknown Commander", rows[1].key)
+        assertEquals(21, rows[1].amount)
+    }
+
 }
