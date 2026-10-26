@@ -385,7 +385,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             gameTimerRunning = true
             turnTimerRunning = true
             setArgentumGameActive(true)
-            argentumGameOverDismissed = false; argentumGameOverText = null; argentumWon = null
+            argentumGameOverDismissed = false; argentumGameOverText = null; argentumWon = null; argentumMatchUnfinished = false
             recordDiagnostic("Argentum game started", DiagnosticCategory.ENGINE)
         }
         "stateUpdate" -> {
@@ -441,7 +441,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 turnNumber = snapshot.turnNumber
                 phaseIndex = phaseSteps.indexOfFirst { it.equals(snapshot.stepName, true) }.takeIf { it >= 0 }
                     ?: phaseSteps.indexOfFirst { it.equals(snapshot.phaseName, true) }.takeIf { it >= 0 } ?: 3
-                gameEndedOnline = snapshot.gameOver
+                if (!argentumMatchUnfinished) gameEndedOnline = snapshot.gameOver
                 if (snapshot.gameOver && argentumOffline && wifiRole == null) {
                     OfflineCheckpointStore.clear(context)
                     offlineResumeAvailable = false
@@ -519,6 +519,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
         }
         "mulliganComplete" -> { argentumMulliganPrompt = false; argentumAwaitingUpdate = false }
         "gameOver" -> {
+            argentumMatchUnfinished = incoming.optBoolean("matchUnfinished")
             setArgentumGameActive(false)
             gameEndedOnline = true
             argentumAwaitingUpdate = false
@@ -750,6 +751,7 @@ internal fun TableController.closeArgentumSession(concede: Boolean) {
     argentumLobbySubmitted = false
     gameStartedOnline = false
     gameEndedOnline = false
+    argentumMatchUnfinished = false
     gameTimerRunning = false
     turnTimerRunning = false
     homeOpen = true
