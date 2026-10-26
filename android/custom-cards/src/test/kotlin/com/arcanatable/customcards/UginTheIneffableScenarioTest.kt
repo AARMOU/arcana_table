@@ -489,6 +489,40 @@ class UginTheIneffableScenarioTest {
     }
 
 
+    /**
+     * Exercise the same per-seat ClientStateTransformer used by LocalArgentumHost,
+     * not just the raw MayLookAtInExileComponent. A stolen Spirit must never
+     * disclose its linked face-down card's identity, rules text or art to the thief.
+     */
+    private fun GameTestDriver.assertLinkedExilePrivateInClientViews(
+        owner: com.wingedsheep.sdk.model.EntityId,
+        other: com.wingedsheep.sdk.model.EntityId,
+        linkedCard: com.wingedsheep.sdk.model.EntityId
+    ) {
+        val transformer = com.wingedsheep.engine.view.ClientStateTransformer(
+            cardRegistry,
+            predicateEvaluator = com.wingedsheep.engine.handlers.PredicateEvaluator(cardRegistry = null)
+        )
+        val actualName = state.getEntity(linkedCard)!!
+            .get<com.wingedsheep.engine.state.components.identity.CardComponent>()!!.name
+        val ownerCard = transformer.transform(state, owner).cards[linkedCard]
+        val otherCard = transformer.transform(state, other).cards[linkedCard]
+        assertNotNull("Original Ugin controller must see the linked exile in client state", ownerCard)
+        assertNotNull("Other seat must see a face-down exile placeholder", otherCard)
+        assertEquals("Explicit Ugin look permission must expose identity to its grantee",
+            actualName, ownerCard!!.name)
+        assertTrue("The exiled card remains face down even to its permitted viewer",
+            ownerCard.isFaceDown)
+        assertTrue("The other seat must receive a masked face-down card",
+            otherCard!!.isFaceDown)
+        assertNotEquals("Other seat must not receive the actual card name",
+            actualName, otherCard.name)
+        assertEquals("No mana cost may leak through the client DTO", "", otherCard.manaCost)
+        assertEquals("No rules text may leak through the client DTO", "", otherCard.oracleText)
+        assertNull("No revealed identity may leak through the client DTO", otherCard.revealedName)
+        assertNull("No revealed art may leak through the client DTO", otherCard.revealedImageUri)
+    }
+
     @Test fun stolenSpiritKeepsPrivateLinkAndReturnsCardToOriginalOwner() {
         val d = customScenario(UginTheIneffable, "Sol Ring")
         val owner = d.player1
@@ -499,6 +533,7 @@ class UginTheIneffableScenarioTest {
         val spirit = d.permanentsNamed(owner, "Spirit").single()
         val linkedCard = d.getExile(owner).single()
         val ownerHandBefore = d.getHand(owner).size
+        d.assertLinkedExilePrivateInClientViews(owner, thief, linkedCard)
 
         val theft = com.wingedsheep.sdk.dsl.card("Ugin Spirit Control Change Probe") {
             manaCost = "{0}"
@@ -537,6 +572,8 @@ class UginTheIneffableScenarioTest {
             owner in privateViewers)
         assertFalse("New controller must not gain permission to see face-down exile",
             thief in privateViewers)
+        // Assert the actual recipient-specific app projection, not only raw grants.
+        d.assertLinkedExilePrivateInClientViews(owner, thief, linkedCard)
 
         val removal = com.wingedsheep.sdk.dsl.card("Stolen Ugin Spirit Removal Probe") {
             manaCost = "{0}"
