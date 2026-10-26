@@ -368,8 +368,6 @@ jobs:
           assert u.count(assertion) == 1, 'Existing home coverage changed; review before build'
           assert u.count('import androidx.compose.ui.test.assertIsDisplayed') == 1
           u = u.replace(assertion, 'rule.onNodeWithTag("dev-goose-banner").assertDoesNotExist()', 1)
-          u = u.replace('import androidx.compose.ui.test.assertIsDisplayed',
-                        'import androidx.compose.ui.test.assertDoesNotExist\nimport androidx.compose.ui.test.assertIsDisplayed', 1)
           test.write_text(u)
           assert 'DevBuildGooseBanner()' not in p.read_text()
           assert 'assertDoesNotExist()' in test.read_text()
