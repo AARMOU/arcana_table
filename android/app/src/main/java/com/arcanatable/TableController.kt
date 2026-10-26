@@ -487,7 +487,7 @@ internal class TableController(
             "decks" -> { homeOpen = true; optionsOpen = false; deckPickerOpen = true }
             "board" -> if (argentumEnabled) { homeOpen = false; optionsOpen = false }
             "stack" -> if (argentumEnabled) stackOpen = true
-            "menu" -> { if (argentumEnabled) homeOpen = false; topMenuSection = null; topMenuExpanded = true }
+            "menu" -> { if (argentumEnabled) homeOpen = false; topMenuSection = null; topMenuExpanded = tutorialStep?.target != "game-menu" }
         }
     }
 
