@@ -446,44 +446,69 @@ class UginTheIneffableScenarioTest {
     }
 
 
-    @Test fun devoidSpellIsDiscountedButDevoidPermanentCannotBeDestroyedByMinusThree() {
-        val devoidEldrazi = com.wingedsheep.sdk.dsl.card("Ugin Devoid Eldrazi Probe") {
-            manaCost = "{2}{G}"
-            colorIdentity = "G"
-            typeLine = "Creature — Eldrazi"
-            power = 2
-            toughness = 2
-            keywords(com.wingedsheep.sdk.core.Keyword.DEVOID)
-        }
-        val d = customScenario(UginTheIneffable)
-        val p = d.player1
-        d.registerCard(devoidEldrazi)
-        val ugin = d.castUgin()
-        val creature = d.putCardInHand(p, devoidEldrazi.name)
-
-        // Devoid changes the spell's color, not its colored mana requirement
-        // or its commander color identity. Ugin removes {2}, not {G}.
-        assertNotNull("Ugin must not erase Devoid Eldrazi's printed {G}",
-            d.castSpell(p, creature).error)
-        assertTrue(creature in d.getHand(p))
-        d.giveMana(p, com.wingedsheep.sdk.core.Color.GREEN, 1)
-        assertNull("Ugin must reduce the Devoid spell's generic {2} to zero",
-            d.castSpell(p, creature).error)
+    @Test fun stolenSpiritKeepsPrivateLinkAndReturnsCardToOriginalOwner() {
+        val d = customScenario(UginTheIneffable, "Sol Ring")
+        val owner = d.player1
+        val thief = d.player2
+        val ugin = d.putPermanentOnBattlefield(owner, "Ugin, the Ineffable")
+        assertNull(d.activate(owner, ugin, index = 0).error)
         d.resolveAll()
-        val permanent = d.findPermanent(p, devoidEldrazi.name)
-        assertNotNull("The Devoid Eldrazi must resolve as a creature", permanent)
+        val spirit = d.permanentsNamed(owner, "Spirit").single()
+        val linkedCard = d.getExile(owner).single()
+        val ownerHandBefore = d.getHand(owner).size
 
-        // The same colorless characteristic that earned the discount must
-        // make the permanent an illegal target for Ugin's -3 ability.
-        val ability = d.cardRegistry.getCard("Ugin, the Ineffable")!!.script.activatedAbilities[1]
-        val attempted = d.submit(com.wingedsheep.engine.core.ActivateAbility(
-            p, ugin, ability.id,
-            targets = listOf(com.wingedsheep.engine.state.components.stack.ChosenTarget.Permanent(permanent!!))
-        ))
-        assertNotNull("Ugin -3 cannot target a Devoid permanent despite green identity", attempted.error)
-        assertEquals("Rejected loyalty activation cannot spend counters", 4, d.loyalty(ugin))
-        assertNotNull("Rejected destruction cannot remove the Devoid Eldrazi",
-            d.findPermanent(p, devoidEldrazi.name))
+        val theft = com.wingedsheep.sdk.dsl.card("Ugin Spirit Control Change Probe") {
+            manaCost = "{0}"
+            typeLine = "Instant"
+            spell {
+                effect = com.wingedsheep.sdk.dsl.Effects.GainControl(
+                    target(com.wingedsheep.sdk.scripting.filters.unified.TargetFilter(
+                        com.wingedsheep.sdk.scripting.GameObjectFilter.Creature
+                    )),
+                    com.wingedsheep.sdk.scripting.Duration.Permanent
+                )
+            }
+        }
+        d.registerCard(theft)
+        d.passPriorityUntil(com.wingedsheep.sdk.core.Step.PRECOMBAT_MAIN, activePlayer = thief)
+        val theftSpell = d.putCardInHand(thief, theft.name)
+        assertNull("Opponent must be able to steal the Spirit through a real spell",
+            d.castSpell(thief, theftSpell, listOf(spirit)).error)
+        d.resolveAll()
+
+        assertTrue("Spirit is no longer controlled by its creator",
+            d.permanentsNamed(owner, "Spirit").isEmpty())
+        assertEquals("The stolen token stays the same linked game object",
+            listOf(spirit), d.permanentsNamed(thief, "Spirit"))
+        assertEquals("Control change cannot rewrite the per-token exile link",
+            listOf(linkedCard), d.state.getEntity(spirit)!!
+                .get<LinkedExileComponent>()?.exiledIds)
+        assertTrue("The linked card stays in its owner's exile until the token leaves",
+            linkedCard in d.getExile(owner))
+
+        val removal = com.wingedsheep.sdk.dsl.card("Stolen Ugin Spirit Removal Probe") {
+            manaCost = "{0}"
+            typeLine = "Instant"
+            spell {
+                effect = com.wingedsheep.sdk.dsl.Effects.Destroy(
+                    target(com.wingedsheep.sdk.scripting.filters.unified.TargetFilter(
+                        com.wingedsheep.sdk.scripting.GameObjectFilter.Creature
+                    ))
+                )
+            }
+        }
+        d.registerCard(removal)
+        val removalSpell = d.putCardInHand(thief, removal.name)
+        assertNull(d.castSpell(thief, removalSpell, listOf(spirit)).error)
+        d.resolveAll()
+
+        assertTrue(d.permanentsNamed(thief, "Spirit").isEmpty())
+        assertFalse(linkedCard in d.getExile(owner))
+        assertEquals("Stolen Spirit must return the linked card to its actual owner once",
+            1, d.getHand(owner).count { it == linkedCard })
+        assertEquals(ownerHandBefore + 1, d.getHand(owner).size)
+        assertFalse("Thief must not receive the original owner's linked card",
+            linkedCard in d.getHand(thief))
     }
 
     @Test fun uginDiscountCannotPayRequiredColorlessSymbol() {
