@@ -35,6 +35,8 @@ jobs:
               "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt",
               "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt",
               "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt",
+              "android/app/src/main/assets/argentum/custom-cards.jsonl",
+              "android/app/src/main/assets/argentum/custom-cards.index.tsv",
           }
           changed = set(subprocess.check_output(["git","diff","--name-only","9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f","HEAD"],text=True).splitlines())
           assert changed == expected, ("Unexpected branch changes", sorted(changed ^ expected))
@@ -115,6 +117,14 @@ jobs:
           Path("ugin-staged-proof.json").write_text(json.dumps(summary,indent=2,sort_keys=True)+"\n")
           print(json.dumps(summary,sort_keys=True))
           PY
+      - name: Generate Cardkit pattern-index review files without changing shipped docs
+        shell: bash
+        run: |
+          set -euo pipefail
+          tools/cardkit/cardkit patterns
+          git diff -- docs/agents/generated/pattern-index.json docs/agents/generated/pattern-index.md > ugin-pattern-index.patch
+          test -s ugin-pattern-index.patch
+          wc -c ugin-pattern-index.patch
       - name: Prove deterministic export and unchanged Argentum runtime
         shell: bash
         run: |
@@ -138,5 +148,8 @@ jobs:
             ugin-staged-proof.json
             android/app/src/main/assets/argentum/custom-cards.jsonl
             android/app/src/main/assets/argentum/custom-cards.index.tsv
+            docs/agents/generated/pattern-index.json
+            docs/agents/generated/pattern-index.md
+            ugin-pattern-index.patch
             android/custom-cards/build/test-results/test/TEST-*.xml
             android/app/build/test-results/testDebugUnitTest/TEST-*.xml
