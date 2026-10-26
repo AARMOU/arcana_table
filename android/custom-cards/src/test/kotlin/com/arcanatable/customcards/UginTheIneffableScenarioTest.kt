@@ -270,7 +270,6 @@ class UginTheIneffableScenarioTest {
         val spirit = d.permanentsNamed(owner, "Spirit").single()
         val linkedCard = d.getExile(owner).single()
         val ownerHandBefore = d.getHand(owner).size
-        val opponentHandBefore = d.getHand(opponent).size
 
         // The token's controller and the player removing it are different.
         // Ugin's "your hand" means the exiled card's owner, never the remover.
@@ -287,6 +286,10 @@ class UginTheIneffableScenarioTest {
         }
         d.registerCard(removal)
         d.passPriorityUntil(com.wingedsheep.sdk.core.Step.PRECOMBAT_MAIN, activePlayer = opponent)
+        // Advancing to the opponent's turn includes their normal draw. Snapshot
+        // *after* that turn transition so the assertion isolates spell
+        // consumption rather than mistakenly treating the draw as a leak.
+        val opponentHandBefore = d.getHand(opponent).size
         val spell = d.putCardInHand(opponent, removal.name)
         assertNull("Opponent must be able to destroy the Spirit",
             d.castSpell(opponent, spell, listOf(spirit)).error)
