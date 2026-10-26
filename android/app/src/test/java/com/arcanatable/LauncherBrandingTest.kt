@@ -19,9 +19,12 @@ class LauncherBrandingTest {
         val context = ApplicationProvider.getApplicationContext<Context>()
         val info = context.packageManager.getApplicationInfo(context.packageName, 0)
         assertEquals(R.mipmap.ic_launcher, info.icon)
-        assertEquals(R.mipmap.ic_launcher_round, info.roundIcon)
+        // ApplicationInfo has no roundIcon property in the Android SDK API.
+        // The manifest's android:roundIcon reference is checked by the source gate.
+        val roundRes = context.resources.getIdentifier("ic_launcher_round", "mipmap", context.packageName)
+        assertEquals(R.mipmap.ic_launcher_round, roundRes)
         val standard = context.getDrawable(info.icon)
-        val round = context.getDrawable(info.roundIcon)
+        val round = context.getDrawable(roundRes)
         assertTrue("Standard icon must be adaptive", standard is AdaptiveIconDrawable)
         assertTrue("Round icon must be adaptive", round is AdaptiveIconDrawable)
         assertNotNull((standard as AdaptiveIconDrawable).foreground)
