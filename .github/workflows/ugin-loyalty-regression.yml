@@ -1,7 +1,7 @@
 name: Ugin loyalty regression — Eldrazi candidate
 on:
   push:
-    branches: [gpt/ugin-loyalty-per-turn-regressions-20261025, gpt/ugin-exact-generic-discount-20261025]
+    branches: [gpt/ugin-loyalty-per-turn-regressions-20261025, gpt/ugin-exact-generic-discount-20261025, gpt/ugin-colorless-symbol-regressions-20261025]
     paths:
       - '.github/workflows/ugin-loyalty-regression.yml'
       - 'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt'
@@ -20,9 +20,17 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - name: Install pinned Android SDK
-        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      # Hosted Ubuntu already includes Android command-line tools. The legacy
+      # setup-android@v3 action invokes "sdkmanager tools", a removed package,
+      # and fails before tests execute (run 40253632829). Install only needed SDKs.
+      - name: Install pinned Android SDK using hosted command-line tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          sdkmanager_path="$(find "$sdk_root/cmdline-tools" -maxdepth 3 -type f -name sdkmanager | sort -V | tail -1)"
+          test -n "$sdkmanager_path" && test -x "$sdkmanager_path"
+          "$sdkmanager_path" 'platforms;android-36' 'build-tools;36.0.0'
       - name: Execute all Ugin real-engine regressions
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.UginTheIneffableScenarioTest'
@@ -35,9 +43,9 @@ jobs:
           assert p.is_file(), 'Missing Ugin scenario XML'
           root = ET.parse(p).getroot()
           cases = {c.get('name'): c for c in root.iter('testcase')}
-          required = {'plusOneCannotBeActivatedTwiceInOneTurn', 'minusThreeCannotFollowPlusOneInSameTurn', 'colorlessThreeGenericSpellCostsExactlyOneWithUgin', 'uginDoesNotReduceFourGenericSpellToOne', 'uginDoesNotDiscountColoredSpellsGenericComponent'}
+          required = {'plusOneCannotBeActivatedTwiceInOneTurn', 'minusThreeCannotFollowPlusOneInSameTurn', 'colorlessThreeGenericSpellCostsExactlyOneWithUgin', 'uginDoesNotReduceFourGenericSpellToOne', 'uginDoesNotDiscountColoredSpellsGenericComponent', 'uginDiscountCannotPayRequiredColorlessSymbol', 'uginGenericDiscountStopsAtZero', 'uginDiscountNeverAppliesToOpponentsColorlessSpells', 'spiritWithNoExiledCardLeavesWithoutCreatingOrReturningOne', 'spiritExiledByRealSpellReturnsItsLinkedCardExactlyOnce', 'opponentRemovalReturnsLinkedCardToOriginalOwner', 'stolenSpiritKeepsPrivateLinkAndReturnsCardToOriginalOwner', 'spiritBouncedByRealSpellReturnsLinkedCardToHand', 'simultaneousBoardWipeReturnsEachSpiritLinkedCardExactlyOnce', 'devoidSpellGetsUginDiscountWithoutWaivingPrintedBlue'}
           assert required <= cases.keys(), ('Missing new tests', sorted(required - cases.keys()))
-          assert len(cases) >= 12, ('Unexpectedly few Ugin tests', len(cases))
+          assert len(cases) >= 22, ('Unexpectedly few Ugin tests', len(cases))
           for name, case in cases.items():
               assert not any(case.find(x) is not None for x in ('failure','error','skipped')), ('Nonpassing Ugin test', name)
           print('Ugin real-engine scenarios passed:', len(cases))
