@@ -234,10 +234,26 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
         }
     }
         TableEffects(darkMode)
+        SideEffect { TutorialActions.onGesture = { target, kind -> tutorialSignal(kind, target) } }
+        DisposableEffect(t) {
+            onDispose { TutorialActions.onGesture = null }
+        }
         Box(Modifier.fillMaxSize().background(Ink)) {
             TableMainLayout()
             TableOverlays()
             TableOverlaysB()
+            tutorialLesson?.let { lesson ->
+                if (!tutorialHubOpen && !(tutorialPracticeActive && tutorialLoading)) {
+                    TutorialCoachOverlay(
+                        lesson = lesson,
+                        index = tutorialStepIndex,
+                        practice = tutorialPracticeActive,
+                        onNext = { tutorialAdvance() },
+                        onSkip = { stopTutorial() },
+                        avoidTableOverlay = showHand || argentumActionChoices.isNotEmpty() || stackOpen
+                    )
+                }
+            }
             SnackbarHost(
                 hostState = automaticActionSnackbar,
                 modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 12.dp, vertical = 4.dp),
