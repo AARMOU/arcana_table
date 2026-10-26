@@ -1,0 +1,268 @@
+name: Arcana Fast Test APK — manual only (seed or build)
+# Absolutely NO push/pull_request/schedule trigger. A future owner must explicitly
+# dispatch this on an approved branch, then supply a verified seed run to build.
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "seed-engine builds verified JAR/cards only; fast-apk consumes a seed to produce debug APK"
+        type: choice
+        options:
+          - seed-engine
+          - fast-apk
+        required: true
+        default: seed-engine
+      verified_seed_run:
+        description: "Required for fast-apk: successful seed-engine GitHub Actions run ID; ignored in seed mode"
+        required: false
+        type: string
+      version_code:
+        description: "Fast debug APK integer versionCode (>=136). No production signing."
+        required: false
+        type: string
+        default: "137"
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  # Seed and fast artifact consumers can run separately; never cancel a seed.
+  group: arcana-fast-apk-${{ github.ref }}-${{ inputs.mode }}
+  cancel-in-progress: false
+
+jobs:
+  verify-engine-seed:
+    name: Rebuild + prove reusable engine/card snapshot (NO APK)
+    if: github.repository == 'AARMOU/arcana_table' && inputs.mode == 'seed-engine'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Checkout the requested source branch, read-only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Reconcile exact B136 lobby, AI, tutorial, deck, combat and Ugin source pins
+        shell: bash
+        run: python3 tools/fast_apk_snapshot.py source
+      - name: Capture engine/card source fingerprint BEFORE rebuilding generated outputs
+        shell: bash
+        run: python3 tools/fast_apk_snapshot.py fingerprint
+      - name: Verify exact approved upstream patch artifact and SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/fast_apk_snapshot.py preflight
+      - name: Checkout exact Argentum upstream for strict patch application
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: c38f145359c342a04f951b7ba48f741bcb1627ac
+          path: combined-argentum
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: false
+      - name: Strict full engine build, restricted mana, Ulalek and SDK scenarios
+        shell: bash
+        run: python3 tools/fast_apk_snapshot.py engine
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install matching Android compile SDK and build tools
+        shell: bash
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export and validate 94-slot Eldrazi and ALL custom-card scenarios
+        shell: bash
+        run: python3 tools/fast_apk_snapshot.py cards
+      - name: Seal exact four JARs and five card/index outputs with SHA-256
+        shell: bash
+        run: python3 tools/fast_apk_snapshot.py seal --bundle fast-engine-bundle
+      - name: Publish immutable verified engine snapshot (no APK)
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcana-fast-engine-b136-pinned
+          path: fast-engine-bundle/
+          retention-days: 21
+          if-no-files-found: error
+      - name: Record snapshot identity and no-APK evidence
+        shell: bash
+        run: |
+          {
+            echo '## Seed complete — NO APK was compiled'
+            echo
+            echo 'Recorded source, patch SHA-256, four JAR hashes, five card/index hashes and full engine/custom-card scenario evidence.'
+            echo "Copy this workflow run ID for a later explicit fast-apk request: $GITHUB_RUN_ID"
+            echo
+            echo 'A fast build rejects changed engine/card source, expired/missing seed or corrupt bytes.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  fast-debug-apk:
+    name: Compile/test DEBUG APK from exactly verified engine snapshot
+    if: github.repository == 'AARMOU/arcana_table' && inputs.mode == 'fast-apk'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout owner-requested source, read-only
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Reconcile exact B136 app/lobby/tutorial/deck/combat/Ugin without rebuilding engine
+        shell: bash
+        run: python3 tools/fast_apk_snapshot.py source
+      - name: Require successful seed workflow run from THIS repository
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FAST_SEED_RUN_ID: ${{ inputs.verified_seed_run }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$FAST_SEED_RUN_ID" =~ ^[0-9]{5,15}$ ]]; then
+            echo '::error::Fast APK needs a real successful seed-engine run ID; no unverified engine fallback'
+            exit 1
+          fi
+          curl --fail --silent --show-error --retry 2 \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/runs/$FAST_SEED_RUN_ID" \
+            -o "$RUNNER_TEMP/arcana-fast-seed-run.json"
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path(os.environ['RUNNER_TEMP'],'arcana-fast-seed-run.json').read_text())
+          assert r.get('conclusion')=='success', 'Seed workflow not successful'
+          assert r.get('event')=='workflow_dispatch', 'Seed was not manual'
+          assert r.get('name')=='Arcana Fast Test APK — manual only (seed or build)', 'Wrong producer workflow'
+          assert r.get('repository',{}).get('full_name')==os.environ['GITHUB_REPOSITORY'], 'Wrong repository'
+          print('PASS: approved manually dispatched seed ran successfully in this exact repository')
+          PY
+      - name: Download exact previously validated four-JAR and five-card snapshot
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ inputs.verified_seed_run }}
+          name: arcana-fast-engine-b136-pinned
+          path: fast-engine-bundle
+      - name: Verify every SHA-256 and current engine/card source input fingerprint
+        shell: bash
+        env:
+          FAST_SEED_RUN_ID: ${{ inputs.verified_seed_run }}
+        run: python3 tools/fast_apk_snapshot.py restore --bundle fast-engine-bundle
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-disabled: false
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android compile SDK
+        shell: bash
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Stamp isolated FAST TEST version without changing repository
+        shell: bash
+        env:
+          FAST_VERSION_CODE: ${{ inputs.version_code }}
+        run: python3 tools/fast_apk_snapshot.py version --version-code "$FAST_VERSION_CODE"
+      - name: Targeted Import/Editor, fold UI, tutorial and resilience tests + signed DEBUG APK
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --max-workers=2 \
+            :app:assembleDebug :app:testDebugUnitTest \
+            --tests 'com.arcanatable.ui.HomeScreenSizesTest' \
+            --tests 'com.arcanatable.ui.DeckBuilderUiTest' \
+            --tests 'com.arcanatable.DeckSupportTest' \
+            --tests 'com.arcanatable.ReleaseFeaturesTest' \
+            --tests 'com.arcanatable.TutorialPracticeScenariosTest' \
+            --tests 'com.arcanatable.TutorialPriorityHostTest' \
+            --tests 'com.arcanatable.ui.ArgentumResilienceUiTest' \
+            --tests 'com.arcanatable.GameOutcomeDetailsTest' \
+            --tests 'com.arcanatable.ArgentumBackendTest' \
+            --tests 'com.arcanatable.UginExportedRuntimeTest'
+      - name: Fail if any focused Android test did not execute cleanly
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root=Path('android/app/build/test-results/testDebugUnitTest')
+          names=['HomeScreenSizesTest','DeckBuilderUiTest','DeckSupportTest','ReleaseFeaturesTest',
+                 'TutorialPracticeScenariosTest','TutorialPriorityHostTest','ArgentumResilienceUiTest',
+                 'GameOutcomeDetailsTest','ArgentumBackendTest','UginExportedRuntimeTest']
+          for name in names:
+              xml=list(root.glob('TEST-*'+name+'.xml'))
+              assert len(xml)==1,(name,xml)
+              tree=ET.parse(xml[0]).getroot()
+              assert int(tree.get('tests','0'))>0,(name,'no tests')
+              for key in ('failures','errors','skipped'):
+                  assert int(tree.get(key,'0'))==0,(name,key,tree.attrib)
+          print('PASS: all ten focused Android/Compose suites ran, 0 failures/errors/skips')
+          PY
+      - name: Verify package, original logo, tutorials and debug-only signature
+        shell: bash
+        env:
+          FAST_VERSION_CODE: ${{ inputs.version_code }}
+        run: |
+          set -euo pipefail
+          apk=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > fast-debug-badging.txt
+          grep -F "package: name='com.arcanatable.argentum' versionCode='$FAST_VERSION_CODE'" fast-debug-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" > fast-debug-signature.txt
+          grep -F 'Signer #1 certificate SHA-256 digest:' fast-debug-signature.txt
+          python3 tools/verify_launcher_branding.py
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import json
+          apk=Path('android/app/build/outputs/apk/debug/app-debug.apk')
+          with ZipFile(apk) as z:
+              for asset in ('catalog.json','glossary.json'):
+                  assert z.read('assets/tutorials/'+asset)==Path('android/app/src/main/assets/tutorials',asset).read_bytes()
+              assert len(json.loads(z.read('assets/tutorials/catalog.json'))['chapters'])==20
+              for name in ('all-cards.index.tsv','custom-cards.index.tsv'):
+                  assert z.read('assets/argentum/'+name)==Path('android/app/src/main/assets/argentum',name).read_bytes()
+          print('PASS: original UI logo, tutorial assets and source-matched card indexes')
+          PY
+          sha256sum "$apk" > fast-debug-apk.sha256
+          echo 'DEBUG TEST APK ONLY: No full regression certification, no release-lint, no AAB, no Play Store upload-key signing.' > fast-scope.txt
+      - name: Upload the signed fast-debug TEST APK as soon as checks pass
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcana-fast-debug-b${{ inputs.version_code }}-test-only
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            fast-debug-apk.sha256
+            fast-debug-signature.txt
+            fast-debug-badging.txt
+            fast-engine-bundle/manifest.json
+            fast-scope.txt
+          retention-days: 14
+          if-no-files-found: error
+      - name: Mark test-only output and release certification still required
+        shell: bash
+        run: |
+          {
+            echo '## Fast debug APK ready for device TESTING only'
+            echo
+            echo "Version code: ${{ inputs.version_code }}"
+            echo "Reused verified engine/card seed run: ${{ inputs.verified_seed_run }}"
+            echo
+            echo 'Not certified for production; full strict Build 136 pipeline remains separate and mandatory.'
+          } >> "$GITHUB_STEP_SUMMARY"
