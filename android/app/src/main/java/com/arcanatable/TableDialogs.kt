@@ -712,7 +712,7 @@ internal fun OptionsPage(
     onFollowActivePlayer: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, onCardSizeScale: (Float) -> Unit,
     quietOpponentTurns: Boolean = false, onQuietOpponentTurns: (Boolean) -> Unit = {},
     onTestConnection: () -> Unit, onReconnect: (() -> Unit)?, onViewDiagnostics: () -> Unit, onExportDiagnostics: () -> Unit,
-    onWhatsNew: () -> Unit,
+    onWhatsNew: () -> Unit, onTutorials: () -> Unit,
     engineTrialResult: String? = null, onEngineSelfTest: (() -> Unit)? = null,
     onClearAllData: () -> Unit, onDismiss: () -> Unit
 ) {
@@ -770,6 +770,7 @@ internal fun OptionsPage(
                 }
                 LinkRow("Diagnostic log", "Search $diagnosticCount recorded events", onClick = onViewDiagnostics)
                 LinkRow("Export diagnostic log", "Save a text file to share when something goes wrong", onClick = onExportDiagnostics)
+                LinkRow("Learn & tutorials", "20 chapters, 160 lessons and a Magic glossary · works offline", onClick = onTutorials)
                 LinkRow("What's new", "Version $versionLabel", onClick = onWhatsNew)
                 if (onEngineSelfTest != null) LinkRow(
                     "Run engine self-test",
