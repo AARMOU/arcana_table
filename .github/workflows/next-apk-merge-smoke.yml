@@ -40,6 +40,19 @@ jobs:
             git fetch --no-tags origin "$sha"
             test "$(git rev-parse FETCH_HEAD)" = "$sha"
             if ! git merge --no-ff --no-edit -m "Temporary source smoke: $name" "$sha" >/tmp/next-apk-merge.log 2>&1; then
+              if [ "$name" = "table" ]; then
+                # Source is an exact reviewed branch blob, NOT arbitrary incoming PR code.
+                git fetch --no-tags origin "$GITHUB_SHA"
+                test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+                git show "$GITHUB_SHA:tools/next_apk_resolve_conflicts.py" > /tmp/next-apk-resolver.py
+                if python3 /tmp/next-apk-resolver.py table "$sha"; then
+                  git commit --no-gpg-sign -m "Runner-only: reconcile known table/source overlap"
+                  git merge-base --is-ancestor "$sha" HEAD
+                  echo "PASS: reviewed table tutorial/release conflict resolution"
+                  echo "::endgroup::"
+                  continue
+                fi
+              fi
               echo "::error title=Source join blocked at $name::Conflicting files require reviewed reconciliation; the workflow did not compile an APK or change a remote branch."
               cat /tmp/next-apk-merge.log
               git diff --name-only --diff-filter=U
