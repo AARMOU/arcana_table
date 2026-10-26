@@ -1034,6 +1034,13 @@ internal fun TableController.TableOverlaysB() {
             Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val stackItems = argentumSnapshot?.stack.orEmpty()
                 Text(if (stackItems.isEmpty()) "The Argentum stack is empty." else "ON THE STACK · ${stackItems.size}", color = Mint, fontWeight = FontWeight.Bold)
+                tutorialStep?.takeIf { tutorialPracticeActive || tutorialChapterId != null }?.let { step ->
+                    TutorialInlineCue(step.title, step.body + "  " + step.hint)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { stopTutorial(); stackOpen = false }) { Text("EXIT LESSON") }
+                        if (step.actionKind == "next") TextButton(onClick = { tutorialAdvance() }) { Text("NEXT") }
+                    }
+                }
                 StackCardList(stackItems)
                 Text("Argentum controls priority and resolves the stack. Arcana displays the server state and offers only server-provided actions.", color = Muted, fontSize = 12.sp)
                 TextButton(onClick = { stackOpen = false; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } }, enabled = argentumSnapshot?.legalActions?.isNotEmpty() == true) {
