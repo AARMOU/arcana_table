@@ -55,13 +55,16 @@ class AdjustUiScreensTest {
         UiTestSupport.settle(rule, 300)
         UiTestSupport.screenshot(rule.activity, "options-$name")
         if (exerciseControls) {
+            // This isolated settings dialog has no perpetual game clock. The shared settle()
+            // helper disables autoAdvance for gameplay; leaving it off during semantics
+            // interactions can make Robolectric/Espresso spin until it exhausts the heap.
+            rule.mainClock.autoAdvance = true
             val switch = rule.onNodeWithTag("engine-processing-toggle")
             switch.performScrollTo()
             switch.assertIsOff()
             switch.performClick()
-            // UiTestSupport.settle disables automatic Compose frame advancement for Robolectric.
-            // Drive a frame so the hoisted state reaches the Switch before asserting.
-            UiTestSupport.settle(rule, 200)
+            // Let the Switch animation finish and the hoisted state recompose before asserting.
+            rule.waitForIdle()
             switch.assertIsOn()
             rule.onNodeWithTag("diagnostics-test-connection").performScrollTo().performClick()
             rule.onNodeWithTag("diagnostics-reconnect").performScrollTo().performClick()
