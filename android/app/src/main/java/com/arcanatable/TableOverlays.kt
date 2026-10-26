@@ -182,10 +182,18 @@ internal fun TableController.TableOverlays() {
                 }
             )
             if (quickUiTipsOpen) QuickUiTipsDialog(
-                onDismiss = { quickUiTipsOpen = false },
-                onDontRemind = {
-                    optionPrefs.edit().putBoolean("quick_ui_tips_disabled", true).apply()
+                onDismiss = {
+                    optionPrefs.edit().putBoolean("tutorial_offer_seen", true).apply()
                     quickUiTipsOpen = false
+                },
+                onDontRemind = {
+                    optionPrefs.edit().putBoolean("tutorial_offer_seen", true).putBoolean("quick_ui_tips_disabled", true).apply()
+                    quickUiTipsOpen = false
+                },
+                onOpenTutorials = {
+                    optionPrefs.edit().putBoolean("tutorial_offer_seen", true).apply()
+                    quickUiTipsOpen = false
+                    tutorialHubOpen = true
                 },
             )
             val deckChoices = remember(savedDecks, premadeDecks, preconDecks) {
