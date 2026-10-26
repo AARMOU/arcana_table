@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ui.DeckBuilderUiTest" tests="3" skipped="0" failures="1" errors="0" timestamp="2026-10-26T19:44:34.963Z" hostname="runnervmtai0g" time="4.117">
+  <properties/>
+  <testcase name="foldCoverBuildsAndAutosaves" classname="com.arcanatable.ui.DeckBuilderUiTest" time="1.612"/>
+  <testcase name="libraryTilesAndFiltersPanel" classname="com.arcanatable.ui.DeckBuilderUiTest" time="1.427">
+    <failure message="java.lang.IllegalArgumentException: Detected multithreaded access to SnapshotStateObserver: previousThreadId=67), currentThread={id=90, name=DefaultDispatcher-worker-2 @coroutine#3023}. Note that observation on multiple threads in layout/draw is not supported. Make sure your measure/layout/draw for each Owner (AndroidComposeView) is executed on the same thread." type="java.lang.IllegalArgumentException">java.lang.IllegalArgumentException: Detected multithreaded access to SnapshotStateObserver: previousThreadId=67), currentThread={id=90, name=DefaultDispatcher-worker-2 @coroutine#3023}. Note that observation on multiple threads in layout/draw is not supported. Make sure your measure/layout/draw for each Owner (AndroidComposeView) is executed on the same thread.
+	at androidx.compose.runtime.PreconditionsKt.throwIllegalArgumentException(Preconditions.kt:26)
+	at androidx.compose.runtime.snapshots.SnapshotStateObserver.observeReads(SnapshotStateObserver.kt:665)
+	at androidx.compose.ui.node.MeasurePassDelegate.remeasure-BRTryo0(MeasurePassDelegate.kt:1064)
+	at androidx.compose.ui.node.LayoutNode.remeasure-_Sx5XlM$ui(LayoutNode.kt:1281)
+	at androidx.compose.ui.node.MeasureAndLayoutDelegate.doRemeasure-sdFAvZA(MeasureAndLayoutDelegate.kt:378)
+	at androidx.compose.ui.node.MeasureAndLayoutDelegate.measureAndLayout-0kLqBqw(MeasureAndLayoutDelegate.kt:490)
+	at androidx.compose.ui.platform.AndroidComposeView.measureAndLayout-0kLqBqw(AndroidComposeView.android.kt:1747)
+	at androidx.compose.ui.node.LayoutNode.forceRemeasure(LayoutNode.kt:1356)
+	at androidx.compose.foundation.lazy.LazyListState.snapToItemIndexInternal$foundation(LazyListState.kt:443)
+	at androidx.compose.foundation.lazy.LazyListState$scrollToItem$2.invokeSuspend(LazyListState.kt:390)
+	at androidx.compose.foundation.lazy.LazyListState$scrollToItem$2.invoke(LazyListState.kt)
+	at androidx.compose.foundation.lazy.LazyListState$scrollToItem$2.invoke(LazyListState.kt)
+	at androidx.compose.foundation.gestures.DefaultScrollableState$scroll$2$1.invokeSuspend(ScrollableState.kt:211)
+	at androidx.compose.foundation.gestures.DefaultScrollableState$scroll$2$1.invoke(ScrollableState.kt)
+	at androidx.compose.foundation.gestures.DefaultScrollableState$scroll$2$1.invoke(ScrollableState.kt)
+	at androidx.compose.foundation.MutatorMutex$mutateWith$2.invokeSuspend(MutatorMutex.kt:167)
+	at androidx.compose.foundation.MutatorMutex$mutateWith$2.invoke(MutatorMutex.kt)
+	at androidx.compose.foundation.MutatorMutex$mutateWith$2.invoke(MutatorMutex.kt)
+	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatched(Undispatched.kt:66)
+	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
+	at kotlinx.coroutines.CoroutineScopeKt.coroutineScope(CoroutineScope.kt:848)
+	at androidx.compose.foundation.MutatorMutex.mutateWith(MutatorMutex.kt:160)
+	at androidx.compose.foundation.gestures.DefaultScrollableState$scroll$2.invokeSuspend(ScrollableState.kt:208)
+	at androidx.compose.foundation.gestures.DefaultScrollableState$scroll$2.invoke(ScrollableState.kt)
+	at androidx.compose.foundation.gestures.DefaultScrollableState$scroll$2.invoke(ScrollableState.kt)
+	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatched(Undispatched.kt:66)
+	at kotlinx.coroutines.intrinsics.UndispatchedKt.startUndispatchedOrReturn(Undispatched.kt:43)
+	at kotlinx.coroutines.CoroutineScopeKt.coroutineScope(CoroutineScope.kt:848)
+	at androidx.compose.foundation.gestures.DefaultScrollableState.scroll(ScrollableState.kt:207)
+	at androidx.compose.foundation.lazy.LazyListState.scroll(LazyListState.kt:464)
+	at androidx.compose.foundation.gestures.ScrollableState.scroll$default(ScrollableState.kt:53)
+	at androidx.compose.foundation.lazy.LazyListState.scrollToItem(LazyListState.kt:390)
+	at androidx.compose.foundation.lazy.LazyListState.scrollToItem$default(LazyListState.kt:389)
+	at com.arcanatable.DeckBuilderScreenKt$LibraryPane$2$1.invokeSuspend(DeckBuilderScreen.kt:485)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)
+	at androidx.compose.ui.test.ApplyingContinuationInterceptor$SendApplyContinuation.resumeWith(ApplyingContinuationInterceptor.kt:52)
+	at androidx.compose.ui.test.FrameDeferringContinuationInterceptor$FrameDeferredContinuation.resumeWith(FrameDeferringContinuationInterceptor.jvm.kt:187)
+	at kotlinx.coroutines.internal.DispatchedContinuationKt.resumeCancellableWithInternal(DispatchedContinuation.kt:278)
+	at kotlinx.coroutines.DispatchedCoroutine.afterResume(Builders.common.kt:588)
+	at kotlinx.coroutines.AbstractCoroutine.resumeWith(AbstractCoroutine.kt:101)
+	at kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:47)
+	at kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler.runSafely(CoroutineScheduler.kt:586)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.executeTask(CoroutineScheduler.kt:807)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.runWorker(CoroutineScheduler.kt:717)
+	at kotlinx.coroutines.scheduling.CoroutineScheduler$Worker.run(CoroutineScheduler.kt:704)
+</failure>
+  </testcase>
+  <testcase name="foldUnfoldedBuildsAndAutosaves" classname="com.arcanatable.ui.DeckBuilderUiTest" time="1.078"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
