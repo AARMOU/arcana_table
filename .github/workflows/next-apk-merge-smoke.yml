@@ -29,12 +29,13 @@ jobs:
         shell: bash
         env:
           WEEKLY: bfce3f0d24c3a8cad28a5a729df3dbba16dd079b
+          NEW_ENGINE_DEV: f9bfdfdea4608839ad7e98ffda89de807bf5d077
           TABLE: 44105eead435b0e3b759b7d631a659990b7388e3
           AI: e99b4954ad80885af0e338f7df87b1b4587bc5df
           ONLINE: 6641f1883f54ca3a13c8faa7ef0b01b05976ef74
         run: |
           set -euo pipefail
-          for entry in "weekly:$WEEKLY" "table:$TABLE" "ai:$AI" "online:$ONLINE"; do
+          for entry in "weekly:$WEEKLY" "new-engine:$NEW_ENGINE_DEV" "table:$TABLE" "ai:$AI" "online:$ONLINE"; do
             name="${entry%%:*}"
             sha="${entry#*:}"
             echo "::group::Merge $name exact head $sha"
@@ -69,7 +70,7 @@ jobs:
             echo "$name merged into disposable runner worktree only"
             echo "::endgroup::"
           done
-          echo "PASS: latest weekly, UI, AI and online source branches merge cleanly on final Build 134 source (NOT compiled)"
+          echo "PASS: latest upstream Argentum, weekly policy, UI, AI and online source branches merge cleanly on final Build 134 source (NOT compiled)"
           git diff --check
       - name: Export reproducible joined source diff (NO APK)
         shell: bash
@@ -84,6 +85,8 @@ jobs:
           Build134 release source: 1751f1893cc4706572d4f4382e6b0a137bf46536
           Build134 upgraded engine + Eldrazi compatibility gate: b32e499a65f0a4a9b70367a67ea00f91eef8dbaa
           Weekly collision reconciliation PR273: bfce3f0d24c3a8cad28a5a729df3dbba16dd079b
+          New green weekly engine development merge: f9bfdfdea4608839ad7e98ffda89de807bf5d077
+          New upstream Argentum pin: ffebf419be4d4bc0ead60548df474d0847619c4f
           Correct table UI PR277: 44105eead435b0e3b759b7d631a659990b7388e3
           AI difficulty PR270: e99b4954ad80885af0e338f7df87b1b4587bc5df
           Four-player directed online PR268: 6641f1883f54ca3a13c8faa7ef0b01b05976ef74
