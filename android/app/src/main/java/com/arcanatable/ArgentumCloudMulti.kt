@@ -40,6 +40,8 @@ internal class ArgentumDirectedLink(
     @Volatile private var socket: WebSocket? = null
     @Volatile var ownSeat: Int = -1
         private set
+    /** Worker-generated random credential, never shared with other seats or room snapshots. */
+    @Volatile private var seatToken: String? = null
     @Volatile private var ready = false
     @Volatile private var droppedAt = 0L
     private var retryCount = 0
@@ -68,7 +70,10 @@ internal class ArgentumDirectedLink(
                 val packet = JSONObject().put("type", if (isHost && !firstWelcome.get()) "create" else "join")
                     .put("code", code).put("password", "arcana-argentum-$code")
                     .put("name", playerName.take(24))
-                if (ownSeat >= 0) packet.put("preferredSeat", ownSeat)
+                if (ownSeat >= 0) {
+                    packet.put("preferredSeat", ownSeat)
+                    seatToken?.let { packet.put("seatToken", it) }
+                }
                 webSocket.send(packet.toString())
             }
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -101,6 +106,13 @@ internal class ArgentumDirectedLink(
                     onFailed("The room assigned an unexpected player seat.")
                     return
                 }
+                val credential = packet.optString("seatToken").takeIf { it.isNotBlank() && it != "null" }
+                if (credential == null || (seatToken != null && seatToken != credential)) {
+                    close()
+                    onFailed("The room did not verify your private player seat.")
+                    return
+                }
+                seatToken = credential
                 ownSeat = assigned
                 if (isHost && !firstWelcome.get()) {
                     if (!sendPacket(JSONObject().put("type", "relaySeats")
