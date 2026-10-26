@@ -217,9 +217,16 @@ internal fun TableController.TableMainLayout() {
             Box(Modifier) {
                 IconButton(onClick = { run { topMenuSection = null; topMenuExpanded = true; TutorialActions.tap("game-menu") } }, modifier = Modifier.size(46.dp).tutorialTarget("game-menu")) { Icon(Icons.Filled.MoreVert, "App menu", tint = SoftWhite) }
                 DropdownMenu(expanded = topMenuExpanded, onDismissRequest = { topMenuExpanded = false; topMenuSection = null }) {
+                    tutorialStep?.takeIf { it.screen == "menu" }?.let { step ->
+                        DropdownMenuItem(
+                            text = { Column { Text("TUTORIAL · " + step.title, color = Mint, fontWeight = FontWeight.Bold); Text(step.body, fontSize = 11.sp) } },
+                            onClick = { if (step.actionKind == "next") tutorialAdvance() },
+                            enabled = step.actionKind == "next"
+                        )
+                    }
                     if (topMenuSection == null) {
                         DropdownMenuItem(text = { Text("Learn & tutorials") }, onClick = { topMenuExpanded = false; topMenuSection = null; tutorialHubOpen = true })
-                                                DropdownMenuItem(text = { Text("Game tools") }, modifier = Modifier, onClick = { run { topMenuSection = "tools" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                                                DropdownMenuItem(text = { Text("Game tools") }, modifier = Modifier, onClick = { run { topMenuSection = "tools"; TutorialActions.tap("menu-game-tools") } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("Room & game") }, modifier = Modifier, onClick = { run { topMenuSection = "game" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("What's new") }, onClick = { topMenuExpanded = false; changelogOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("Adjust UI") }, onClick = { topMenuExpanded = false; topMenuSection = null; layoutLabOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
