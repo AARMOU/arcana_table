@@ -371,21 +371,19 @@ jobs:
           test "$(git rev-parse FETCH_HEAD)" = "$LOBBY_SHA"
           git merge-base --is-ancestor "$ONLINE_BASE_SHA" "$LOBBY_SHA"
           if ! git merge --no-ff --no-edit -m "Runner-only Build134: reviewed Claude multiplayer lobby PR283" "$LOBBY_SHA" > combined-evidence/next-apk-lobby-merge.log 2>&1; then
-            echo '::error title=Lobby needs manual integration::Unrecognized overlapping changes; no build permitted.'
-            git diff --name-only --diff-filter=U | tee combined-evidence/next-apk-lobby-conflicts.txt
-            cat combined-evidence/next-apk-lobby-merge.log
-            python3 - <<'PYCONFLICT'
-          from pathlib import Path
-          for rel in Path('combined-evidence/next-apk-lobby-conflicts.txt').read_text().splitlines():
-              value = Path(rel).read_text()
-              chunks = value.splitlines()
-              indices = [i for i,line in enumerate(chunks) if line.startswith('<<<<<<< ')]
-              print('=== ',rel,' ===')
-              for at in indices:
-                  end = next((j for j in range(at+1,len(chunks)) if chunks[j].startswith('>>>>>>> ')),len(chunks)-1)
-                  print('\\n'.join(f'{k+1:04d}: {chunks[k]}' for k in range(max(0,at-7),min(len(chunks),end+8))))
-          PYCONFLICT
-            exit 1
+            # Exactly one independently reviewed overlap: Claude resets wifiGuestSeatId
+            # while the release tutorial must retain !tutorialPracticeActive.
+            # Never choose one side wholesale or silently lose either behavior.
+            if python3 tools/next_apk_lobby_resolve_conflict.py "$LOBBY_SHA"; then
+              git add android/app/src/main/java/com/arcanatable/TableArgentum.kt
+              git diff --cached --check -- android/app
+              git commit --no-gpg-sign -m "Runner-only: preserve tutorial state and Claude lobby guest reset"
+            else
+              echo '::error title=Lobby needs manual integration::Unexpected overlapping changes; no build permitted.'
+              git diff --name-only --diff-filter=U | tee combined-evidence/next-apk-lobby-conflicts.txt
+              cat combined-evidence/next-apk-lobby-merge.log
+              exit 1
+            fi
           fi
           git merge-base --is-ancestor "$LOBBY_SHA" HEAD
           test -z "$(git diff --name-only --diff-filter=U)"
