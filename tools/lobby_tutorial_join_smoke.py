@@ -26,6 +26,7 @@ NAMES = [
     "Populate What's new with verified changes since Build 121 (after source merges)",
     "Verify owner-requested Import new and Deck Editor enablement contract",
     "Enable existing deck tools in combined next-test source",
+    "Apply owner-approved next TEST-release 2–4 seats and saved-deck scope (runner only)",
 ]
 PINS = {
     "UPGRADE": "e66eca84125c3180c676702a72ae6cd080f85797",
@@ -109,6 +110,11 @@ def main() -> None:
     assert "BUILD 123 · LARGE END-STEP AI FIX" in dialog and "BUILD 122 · FIXES AND QUICK UI TIPS" in dialog
     assert Path("combined-evidence/build121-changelog-acceptance.txt").is_file()
     assert Path("combined-evidence/import-editor-candidate.txt").is_file()
+    assert Path("combined-evidence/test-release-scope.txt").is_file()
+    scope = Path("android/app/src/main/java/com/arcanatable/ReleaseFeatures.kt").read_text()
+    assert 'val deckImportEnabled: Boolean get() = true' in scope
+    assert 'val multiplayerPreviewEnabled: Boolean get() = true' in scope
+    assert 'requested.coerceIn(1, 3)' in scope
     assert "quiet-import-notices" in pins
     assert "onClick = onImport" in Path("android/app/src/main/java/com/arcanatable/HomeScreen.kt").read_text()
     print("PASS: source-only next-build join includes Claude lobby + HAND tutorial + no-goose, exact pins", flush=True)
