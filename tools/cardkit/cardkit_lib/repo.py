@@ -25,7 +25,7 @@ SCAFFOLD_MARK = "CARDKIT-SCAFFOLD"
 TODO_MARK = "CARDKIT-TODO"
 
 UPSTREAM_REPO = "wingedsheep/argentum-engine"
-UPSTREAM_COMMIT = "ffebf419be4d4bc0ead60548df474d0847619c4f"
+UPSTREAM_COMMIT = "7fb073337e4389cfabe2ebf4c6416633a7fc63d2"
 
 
 def rel(path: Path) -> str:
