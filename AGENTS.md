@@ -71,3 +71,17 @@ tools/cardkit/cardkit check
 tools/cardkit/cardkit docs-check
 git diff --check
 ```
+
+## Android regular expression compatibility
+
+Android's ICU-backed `java.util.regex` parser is stricter than desktop Java. In app and
+custom-card code, escape literal closing braces and brackets in regex patterns
+(`\\}` and `\\]` as seen by the regex engine; `\\\\}` and `\\\\]` in regular Kotlin
+string literals). Avoid `\\-` inside regex character classes: put a literal `-` at
+the beginning or end of the class instead. Numeric quantifiers such as `{2,4}` are fine.
+
+Before proposing an Android build, run `python3 tools/check_android_regex.py` and
+`python3 -m unittest discover -s tools/tests -p 'test_android_regex.py'`.
+These checks scan literal `Regex(...)` and `Pattern.compile(...)` expressions; dynamic
+patterns still need Android runtime coverage. Desktop-only unit tests do not establish
+that a pattern compiles on Android. The October 25 deck editor crash exposed this gap.

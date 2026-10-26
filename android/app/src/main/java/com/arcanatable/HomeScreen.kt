@@ -303,7 +303,7 @@ private fun DeckChip(label: String, selected: Boolean, onClick: () -> Unit) {
 /** Pick from precons, Arcana decks, Argentum EDHREC decks, and then your other decks. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit) {
+fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit, onDeckBuilder: (() -> Unit)? = null) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text("Choose your deck", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
@@ -331,6 +331,12 @@ fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckCho
                 }
             }
             OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth().padding(top = 16.dp).heightIn(min = 52.dp)) { Text("Import a new deck", color = SoftWhite, fontWeight = FontWeight.Bold) }
+            // Developer builds only (DeckBuilderFlag): search the library and build or edit decks.
+            onDeckBuilder?.let { open ->
+                OutlinedButton(onClick = open, modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 52.dp).testTag("open-deck-builder")) {
+                    Text("Deck builder · developer preview", color = Mint, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }
