@@ -20,7 +20,7 @@ on:
         description: "Fast debug APK integer versionCode (>=136). No production signing."
         required: false
         type: string
-        default: "137"
+        default: "136"
 
 permissions:
   contents: read
