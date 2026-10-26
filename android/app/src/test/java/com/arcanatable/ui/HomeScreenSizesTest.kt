@@ -2,6 +2,7 @@ package com.arcanatable.ui
 
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -35,7 +36,10 @@ class HomeScreenSizesTest {
     fun multiplayerOnlyShowsUnifiedLobbyRoutes() {
         UiTestSupport.settle(rule)
         rule.onNodeWithTag("home-play").performClick()
-        rule.onNodeWithTag("play-wifi-option").performClick()
+        UiTestSupport.settle(rule)
+        // Offline deck choices fill the first viewport on narrow portrait phones.
+        rule.onNodeWithTag("play-wifi-option").performScrollTo().performClick()
+        UiTestSupport.settle(rule)
         rule.onNodeWithText("Host online").assertExists()
         rule.onNodeWithText("Join online").assertExists()
         rule.onNodeWithText("Host on Wi-Fi").assertExists()
