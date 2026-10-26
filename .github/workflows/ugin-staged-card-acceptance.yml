@@ -88,6 +88,46 @@ jobs:
           assert before_custom - after_custom == set(), "Existing custom card lost"
           exported_custom_rows = Path(assets+"custom-cards.index.tsv").read_text().splitlines()
           assert sum(row == "Ugin, the Ineffable\tcard" for row in exported_custom_rows) == 1, "Ugin must appear exactly once as a card in the shipped candidate index"
+          # The Android host consumes the exported JSONL, not the Kotlin card object
+          # exercised by the engine tests. Fail closed if export loses linked exile.
+          jsonl_path = Path(assets+"custom-cards.jsonl")
+          records = [json.loads(line) for line in jsonl_path.read_text().splitlines() if line.strip()]
+          ugin_records = [record for record in records if record.get("name") == "Ugin, the Ineffable"]
+          assert len(ugin_records) == 1, ("Duplicate/missing Ugin JSONL records", len(ugin_records))
+          ugin = ugin_records[0]
+          assert (ugin.get("manaCost"), ugin.get("typeLine"), ugin.get("startingLoyalty")) == ("{6}", "Legendary Planeswalker — Ugin", 4)
+          assert ugin.get("colorIdentityOverride") == [], "Ugin must remain colorless"
+          script = ugin["script"]
+          assert script["staticAbilities"] == [{
+              "type":"ModifySpellCost",
+              "target":{"type":"YouCast","filter":{"cardPredicates":["IsColorless"]}},
+              "modification":{"type":"ReduceGeneric","amount":2}
+          }], "Ugin cost reduction changed in Android-exported script"
+          abilities = script["activatedAbilities"]
+          assert sorted(a["cost"]["change"] for a in abilities) == [-3, 1], "Ugin loyalty modes missing"
+          plus = next(a for a in abilities if a["cost"]["change"] == 1)
+          effects = plus["effect"]["effects"]
+          gather = next(e for e in effects if e["type"] == "GatherCards")
+          exile = next(e for e in effects if e["type"] == "MoveCollection")
+          spirit = next(e for e in effects if e["type"] == "CreateToken")
+          link = next(e for e in effects if e["type"] == "LinkCollectionToPermanent")
+          assert gather["source"]["type"] == "TopOfLibrary" and gather["source"]["count"] == {"type":"Fixed","amount":1}
+          assert exile["from"] == gather["storeAs"] and exile["destination"] == {"type":"ToZone","zone":"Exile"}
+          assert exile["faceDown"] == "HIDDEN" and exile["lookableInExile"] is True
+          assert link["from"] == gather["storeAs"] and link["permanent"] == {"type":"PipelineTarget","collectionName":"createdTokens"}, "Per-token exile linkage lost"
+          assert (spirit["power"],spirit["toughness"],spirit["colors"],spirit["creatureTypes"]) == (2,2,[],["Spirit"])
+          triggers = spirit["triggeredAbilities"]
+          assert len(triggers) == 1 and triggers[0]["trigger"] == {"type":"ZoneChangeEvent","from":"Battlefield"}
+          returns = triggers[0]["effect"]["effects"]
+          linked = next(e for e in returns if e["type"] == "GatherCards")
+          hand = next(e for e in returns if e["type"] == "MoveCollection")
+          assert linked["source"] == "FromLinkedExile"
+          assert hand["from"] == linked["storeAs"] and hand["destination"] == {"type":"ToZone","zone":"Hand"}
+          assert hand["underOwnersControl"] is True, "Linked card must return to owner, not token controller"
+          minus = next(a for a in abilities if a["cost"]["change"] == -3)
+          assert minus["targetRequirements"][0]["filter"]["baseFilter"]["cardPredicates"] == ["IsPermanent","IsColored"]
+          assert minus["effect"]["byDestruction"] is True, "Ugin -3 must destroy rather than exile"
+          print("Android JSONL export retains Ugin's linked Spirit exile, owner return, loyalty and color rules")
           manifest = json.loads(Path("investigation/argentum-six-precons/deck-manifest.json").read_text())
           basics = {"Plains","Island","Swamp","Mountain","Forest","Wastes"}
           counts = {}
