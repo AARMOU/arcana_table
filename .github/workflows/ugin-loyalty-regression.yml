@@ -20,9 +20,17 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - name: Install pinned Android SDK
-        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      # Hosted Ubuntu already includes Android command-line tools. The legacy
+      # setup-android@v3 action invokes "sdkmanager tools", a removed package,
+      # and fails before tests execute (run 40253632829). Install only needed SDKs.
+      - name: Install pinned Android SDK using hosted command-line tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          sdkmanager_path="$(find "$sdk_root/cmdline-tools" -maxdepth 3 -type f -name sdkmanager | sort -V | tail -1)"
+          test -n "$sdkmanager_path" && test -x "$sdkmanager_path"
+          "$sdkmanager_path" 'platforms;android-36' 'build-tools;36.0.0'
       - name: Execute all Ugin real-engine regressions
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.UginTheIneffableScenarioTest'
