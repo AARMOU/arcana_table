@@ -692,7 +692,7 @@ class LocalArgentumHost(
             val current = state ?: return
             if (current.gameOver || shockOffers.isNotEmpty()) break
             // Everyone at this phone (and the Wi-Fi guest) is out: stop instead of watching the AIs finish.
-            if (people().none { it in current.activePlayers }) { peopleOut(); break }
+            if (people().none { it in current.activePlayers }) { peopleOut(events.toList()); events.clear(); break }
             if ((current.turnNumber to current.step) != lastShown) flush(paceMs / 3)
             else if (System.nanoTime() - lastProgressNanos >= 1_000_000_000L) flush(0)
             val decision = current.pendingDecision
@@ -887,12 +887,22 @@ class LocalArgentumHost(
 
     private var peopleOutSent = false
 
-    /** Every person has lost while AIs play on: the game is over for them. */
-    private fun peopleOut() {
+    /**
+     * Every human-controlled seat has been eliminated. Stop the local engine for these viewers,
+     * but do not fabricate a completed game or discard the authoritative elimination events.
+     */
+    private fun peopleOut(pendingEvents: List<GameEvent> = emptyList()) {
         if (peopleOutSent) return
+        // This captures the final PlayerLostEvent before any state snapshot clears a burst.
+        sendState(pendingEvents, interactive = false)
+        val current = state ?: return
         peopleOutSent = true
-        sendState(emptyList(), interactive = false)
-        people().forEach { emitTo(it, JSONObject().put("type", "gameOver").put("winnerId", JSONObject.NULL).put("reason", "YOU_LOST")) }
+        val evidence = observedLossEvents.toList()
+        people().forEach { seat ->
+            emitTo(seat, GameOutcomeDetails.toHumanEliminatedMessage(
+                current, seat, { seatOf(it).name }, evidence,
+            ) { registry.getCard(it) != null })
+        }
     }
 
     private fun finishIfOver(events: List<GameEvent>) {
@@ -906,6 +916,9 @@ class LocalArgentumHost(
 
     /** Sends every person their own view of the game. */
     private fun sendState(events: List<GameEvent>, interactive: Boolean = true) {
+        // Never overwrite a terminal human-elimination notice with a later non-terminal progress
+        // snapshot from the still-alive AI-only state.
+        if (peopleOutSent) return
         // Retain elimination events across the host's intermediate AI/progress flushes. A
         // PlayerLostEvent and the final GameEndedEvent need not be delivered in one update.
         observedLossEvents += events.filterIsInstance<com.wingedsheep.engine.core.PlayerLostEvent>()
