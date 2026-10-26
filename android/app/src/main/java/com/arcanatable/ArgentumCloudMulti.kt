@@ -22,9 +22,13 @@ internal class ArgentumDirectedLink(
     val code: String,
     private val isHost: Boolean,
     private val playerName: String,
-    private val seatKinds: List<String> = emptyList(),
+    seatKinds: List<String> = emptyList(),
     private val graceMs: Long = 90_000L,
 ) {
+    /** Opponent seat kinds ("friend"/"ai"); the host may change unoccupied seats before START. */
+    @Volatile private var seatKinds: List<String> = seatKinds.toList()
+    /** Callback for a host's in-lobby seat change, answered by the Worker's ack or rejection. */
+    @Volatile private var pendingSeats: Pair<List<String>, (Boolean, String?) -> Unit>? = null
     var onReady: () -> Unit = {}
     var onFailed: (String) -> Unit = {}
     var onClosed: () -> Unit = {}
@@ -128,7 +132,12 @@ internal class ArgentumDirectedLink(
                 onFailed("Your deck was rejected or the host removed your seat.")
             }
             "relay-seats-ack" -> {
-                if (isHost && ownSeat == 0) welcomed()
+                val pending = pendingSeats
+                if (pending != null && firstWelcome.get()) {
+                    pendingSeats = null
+                    seatKinds = pending.first
+                    pending.second(true, null)
+                } else if (isHost && ownSeat == 0) welcomed()
             }
             "relay" -> {
                 val from = packet.optInt("from", -1)
@@ -180,6 +189,12 @@ internal class ArgentumDirectedLink(
             }
             "rejected" -> {
                 val reason = packet.optString("reason", "The room rejected an action.")
+                val pending = pendingSeats
+                if (pending != null && packet.optString("request") == "relaySeats") {
+                    pendingSeats = null
+                    pending.second(false, reason)
+                    return
+                }
                 if (!ready) {
                     if (droppedAt != 0L && isHost) {
                         // A room whose last phone left can expire; retry as creator.
@@ -213,6 +228,11 @@ internal class ArgentumDirectedLink(
     private fun disconnected() {
         if (ended.get()) return
         ready = false
+        // A seat change in flight is never answered once the socket is gone; report it.
+        pendingSeats?.let { pending ->
+            pendingSeats = null
+            pending.second(false, "The connection to the room service dropped.")
+        }
         if (!firstWelcome.get()) {
             close()
             onFailed("Could not connect to the multiplayer room service.")
@@ -266,6 +286,22 @@ internal class ArgentumDirectedLink(
         synchronized(this) { outgoing.remove(seat) }
     }
 
+    /**
+     * Host only, before START: change which opponent seats wait for friends and how many there
+     * are. The Worker refuses if an occupied seat would be removed or turned into an AI seat;
+     * [done] reports the outcome. Seat kinds change here only after the Worker agrees.
+     */
+    fun reconfigureSeats(kinds: List<String>, done: (Boolean, String?) -> Unit): Boolean {
+        if (!isHost || !ready || kinds.size !in 1..3 || kinds.any { it != "friend" && it != "ai" } ||
+            pendingSeats != null) return false
+        pendingSeats = kinds.toList() to done
+        if (!sendPacket(JSONObject().put("type", "relaySeats").put("kinds", org.json.JSONArray(kinds)))) {
+            pendingSeats = null
+            return false
+        }
+        return true
+    }
+
     fun kickGuest(seat: Int): Boolean {
         if (!isHost || seat !in 1..3) return false
         forget(seat)
@@ -316,7 +352,7 @@ internal class ArgentumCloudMultiHost(
     private val onNotice: (String) -> Unit = {},
 ) : ArgentumHostLink {
     val code = ArgentumCloudLink.newCode()
-    private val friendKinds = kinds.toList()
+    @Volatile private var friendKinds = kinds.toList()
     private val link = ArgentumDirectedLink(endpoint, code, true, hostName, kinds)
     var onRoomReady: () -> Unit = {}
 
@@ -346,6 +382,13 @@ internal class ArgentumCloudMultiHost(
             .all { index -> sendTo(seatId(index + 1), message) }
     }
     fun rejectGuest(id: EntityId): Boolean = seatNumber(id)?.let(link::kickGuest) == true
+
+    /** Change opponent seat kinds before START; [done] runs on the link thread with the result. */
+    fun reconfigure(kinds: List<String>, done: (Boolean, String?) -> Unit): Boolean =
+        link.reconfigureSeats(kinds) { ok, reason ->
+            if (ok) friendKinds = kinds.toList()
+            done(ok, reason)
+        }
     override fun send(message: JSONObject): Boolean = false // never broadcast masked state
     override fun close() = link.close()
 

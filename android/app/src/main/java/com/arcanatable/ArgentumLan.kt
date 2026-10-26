@@ -260,7 +260,7 @@ class ArgentumLanGuest : ArgentumGuestLink {
  */
 class ArgentumLanMultiServer(
     private val hostName: String,
-    private val guestSeats: List<com.wingedsheep.sdk.model.EntityId>,
+    guestSeats: List<com.wingedsheep.sdk.model.EntityId>,
     private val onGuest: (com.wingedsheep.sdk.model.EntityId, JSONObject) -> Unit,
     private val onGuestMessage: (com.wingedsheep.sdk.model.EntityId, JSONObject) -> Unit,
     private val onGuestLeft: (com.wingedsheep.sdk.model.EntityId) -> Unit,
@@ -279,6 +279,8 @@ class ArgentumLanMultiServer(
 
     private val running = AtomicBoolean(false)
     private val guard = Any()
+    /** Seats that accept a phone; the host may change unconnected seats before START. */
+    private var guestSeats: List<com.wingedsheep.sdk.model.EntityId> = guestSeats.toList()
     private val links = linkedMapOf<com.wingedsheep.sdk.model.EntityId, LanLink>()
     private val greeted = mutableSetOf<com.wingedsheep.sdk.model.EntityId>()
     private val admitted = mutableSetOf<com.wingedsheep.sdk.model.EntityId>()
@@ -377,6 +379,22 @@ class ArgentumLanMultiServer(
                 }
             }
         }, "argentum-lan-multi-announce").apply { isDaemon = true }.start()
+    }
+
+    /**
+     * Host only, before START: replace the seats that accept a phone. Refused (false) if a seat
+     * with a connected or connecting phone would stop accepting one.
+     */
+    fun updateGuestSeats(seats: List<com.wingedsheep.sdk.model.EntityId>): Boolean = synchronized(guard) {
+        val valid = setOf(
+            com.arcanatable.engine.LocalArgentumHost.AI_ID,
+            com.wingedsheep.sdk.model.EntityId("offline-ai-2"),
+            com.wingedsheep.sdk.model.EntityId("offline-ai-3"),
+        )
+        if (seats.size > 3 || seats.distinct().size != seats.size || seats.any { it !in valid } ||
+            links.keys.any { it !in seats }) return@synchronized false
+        guestSeats = seats.toList()
+        true
     }
 
     /** Validated hello only. Guest messages sent before this are silently ignored. */
