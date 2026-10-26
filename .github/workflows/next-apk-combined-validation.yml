@@ -1,9 +1,12 @@
-name: Next APK combined-source validation (manual, no publishing)
+name: Next APK Build 134 combined test APK (no release)
 # Follow-up to #223: prepare only a throwaway merged worktree and test whether
 # legacy Eldrazi engine source patches apply to the newly upgraded Argentum.
 # No jar publication, branch mutation, APK signing or deploy.
 # Reproducible isolated integration candidate: no production branch is mutated.
 on:
+  push:
+    branches: [gpt/next-apk-combined-preflight-20261026]
+    paths: ['.github/workflows/next-apk-combined-validation.yml']
   workflow_dispatch:
     inputs:
       include_online_multiplayer:
@@ -272,7 +275,7 @@ jobs:
           WEEKLY_SHA: bfce3f0d24c3a8cad28a5a729df3dbba16dd079b
           TABLE_UI_SHA: 44105eead435b0e3b759b7d631a659990b7388e3
           ONLINE_SHA: 6641f1883f54ca3a13c8faa7ef0b01b05976ef74
-          INCLUDE_ONLINE: ${{ inputs.include_online_multiplayer }}
+          INCLUDE_ONLINE: ${{ github.event_name == 'push' || inputs.include_online_multiplayer }}
         run: |
           set -euo pipefail
           mkdir -p combined-evidence
@@ -342,11 +345,11 @@ jobs:
           git rev-parse HEAD > combined-evidence/next-apk-local-merge-head.txt
           cat combined-evidence/next-apk-source-pins.txt
       - uses: actions/setup-node@v4
-        if: ${{ inputs.include_online_multiplayer }}
+        if: ${{ github.event_name == 'push' || inputs.include_online_multiplayer }}
         with:
           node-version: '24'
       - name: Verify integrated four-player Worker typecheck and private directed transport
-        if: ${{ inputs.include_online_multiplayer }}
+        if: ${{ github.event_name == 'push' || inputs.include_online_multiplayer }}
         shell: bash
         working-directory: android/cloud-room
         timeout-minutes: 15
@@ -847,6 +850,35 @@ jobs:
           python3 tools/verify_launcher_branding.py
           sha256sum "$apk" android/app/build/outputs/bundle/release/app-release.aab > combined-evidence/unsigned-release-package.sha256
           echo 'Manual latest-source validation only: unsigned APK/AAB are not uploaded, signed or distributed. No Worker deployment.' > combined-evidence/validation-scope.txt
+      - name: Assemble signed debug TEST APK from the same validated source
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --max-workers=2 :app:assembleDebug \
+            2>&1 | tee ../combined-evidence/next-apk-debug-build.log
+      - name: Verify final test APK identity and SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > combined-evidence/next-apk-package.txt
+          grep -F "package: name='com.arcanatable.argentum' versionCode='134'" combined-evidence/next-apk-package.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" > combined-evidence/next-apk-debug-signing.txt
+          grep -F 'Signer #1 certificate SHA-256 digest:' combined-evidence/next-apk-debug-signing.txt
+          python3 tools/verify_launcher_branding.py
+          sha256sum "$apk" > combined-evidence/next-apk-debug.sha256
+          cat combined-evidence/next-apk-debug.sha256
+          echo 'Debug test APK only: no production upload-key signing, no Worker deployment, no Play Store release.' > combined-evidence/next-apk-distribution-scope.txt
+      - name: Upload owner-approved debug test APK
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: arcana-next-apk-build134-ai-ui-online-debug
+          retention-days: 14
+          if-no-files-found: error
+          path: android/app/build/outputs/apk/debug/app-debug.apk
       - name: Capture unresolved three-way source conflicts for manual port
         if: failure()
         shell: bash
