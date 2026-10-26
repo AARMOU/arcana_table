@@ -1,4 +1,4 @@
-name: Build 134 tutorial-fixed release-look APKs (prepared; not run)
+name: Build 134 lobby + tutorial release-look APKs (prepared; not run)
 # Owner-authorized follow-up after successful integrated Build 134 run 40353390125.
 # Build both full-feature, mascot-free debug and release-layout test-signed APKs.
 # No production signing, branch promotion, Cloudflare deploy, or Play publication.
@@ -351,6 +351,50 @@ jobs:
           fi
           git rev-parse HEAD > combined-evidence/next-apk-local-merge-head.txt
           cat combined-evidence/next-apk-source-pins.txt
+      - name: Integrate Claude's exact lobby revision after four-player transport (runner-only)
+        shell: bash
+        env:
+          ONLINE_BASE_SHA: 6641f1883f54ca3a13c8faa7ef0b01b05976ef74
+          LOBBY_SHA: 79dcd0c58837305fcd1f8790fbf052af214d204b
+          INCLUDE_ONLINE: ${{ github.event_name == 'push' || inputs.include_online_multiplayer }}
+        run: |
+          set -euo pipefail
+          if [ "$INCLUDE_ONLINE" != "true" ]; then
+            echo 'Claude lobby not staged because online multiplayer was excluded'
+            exit 0
+          fi
+          # Claude owns the original branch; DO NOT push, merge or modify it.
+          # The exact PR #283 diff is stacked ON TOP OF #268, and must land
+          # on the disposable combined source AFTER PR #268.
+          git merge-base --is-ancestor "$ONLINE_BASE_SHA" HEAD
+          git fetch --no-tags origin "$LOBBY_SHA"
+          test "$(git rev-parse FETCH_HEAD)" = "$LOBBY_SHA"
+          git merge-base --is-ancestor "$ONLINE_BASE_SHA" "$LOBBY_SHA"
+          if ! git merge --no-ff --no-edit -m "Runner-only Build134: reviewed Claude multiplayer lobby PR283" "$LOBBY_SHA" > combined-evidence/next-apk-lobby-merge.log 2>&1; then
+            # Exactly one independently reviewed overlap: Claude resets wifiGuestSeatId
+            # while the release tutorial must retain !tutorialPracticeActive.
+            # Never choose one side wholesale or silently lose either behavior.
+            if python3 tools/next_apk_lobby_resolve_conflict.py "$LOBBY_SHA"; then
+              git add android/app/src/main/java/com/arcanatable/TableArgentum.kt
+              git diff --cached --check -- android/app
+              git commit --no-gpg-sign -m "Runner-only: preserve tutorial state and Claude lobby guest reset"
+            else
+              echo '::error title=Lobby needs manual integration::Unexpected overlapping changes; no build permitted.'
+              git diff --name-only --diff-filter=U | tee combined-evidence/next-apk-lobby-conflicts.txt
+              cat combined-evidence/next-apk-lobby-merge.log
+              exit 1
+            fi
+          fi
+          git merge-base --is-ancestor "$LOBBY_SHA" HEAD
+          test -z "$(git diff --name-only --diff-filter=U)"
+          git diff --check -- android/app android/cloud-room
+          test -s android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+          grep -F 'fun reconfigureSeats(' android/app/src/main/java/com/arcanatable/ArgentumCloudMulti.kt
+          grep -F 'fun canStart()' android/app/src/main/java/com/arcanatable/ArgentumWaitingLobby.kt
+          grep -F 'relaySeats' android/cloud-room/src/index.ts
+          printf 'claude-fullscreen-ready-lobby %s (PR283)\n' "$LOBBY_SHA" >> combined-evidence/next-apk-source-pins.txt
+          printf '%s\n' 'Worker deployment is a separate gate: deployed PR268 relay lacks PR283 reconfigure support.' > combined-evidence/lobby-worker-deployment-gate.txt
+          echo 'PASS: Claude full-screen lobby + host seat reconfiguration staged onto Build134 runner; no remote writes'
       - name: Enforce owner-requested mascot-free home on integrated source
         shell: bash
         run: |
