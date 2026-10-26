@@ -299,6 +299,7 @@ internal class TableController(
     var localDeckSyncConfirmed by run { mutableStateOf(false) }
     // Structured, redacted diagnostic log (DiagnosticLog.kt). Legacy free-text entries are migrated on load.
     val diagnosticLog = run { DiagnosticLog().apply { restore(optionPrefs.getString("diagnostic_events", "").orEmpty()) } }
+    val argentumZoneTrace = ArgentumZoneTrace()
     var diagnosticRevision by run { mutableIntStateOf(0) }
     var diagnosticViewerOpen by run { mutableStateOf(false) }
     var diagnosticExportSelection by run { mutableStateOf<List<DiagnosticEntry>?>(null) }

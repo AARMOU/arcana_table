@@ -385,6 +385,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 if (argentumLocalPlayersBackup == null) argentumLocalPlayersBackup = loadSavedPlayers(context) ?: players.toList()
                 val snapshot = ArgentumTableSnapshot.parse(state, incoming.optJSONArray("legalActions") ?: JSONArray(), incoming.optString("interactionEpoch").takeUnless { it.isBlank() || it == "null" })
                 val nextDecision = incoming.optJSONObject("pendingDecision")
+                argentumZoneTrace.observe(state).forEach { recordDiagnostic(it, DiagnosticCategory.ENGINE) }
                 argentumLastStateJson = state
                 if (nextDecision?.optString("id") != argentumPendingDecision?.optString("id")) {
                     argentumDecisionSelection = emptySet()
@@ -727,6 +728,7 @@ internal fun TableController.closeArgentumSession(concede: Boolean) {
     argentumEnabled = false
     argentumOffline = false
     setArgentumGameActive(false)
+    argentumZoneTrace.reset()
     argentumSnapshot = null
     argentumPendingDecision = null
     argentumActionChoices = emptyList(); argentumActionCard = null; argentumComposer = null
