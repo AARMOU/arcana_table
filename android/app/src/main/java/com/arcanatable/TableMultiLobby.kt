@@ -95,7 +95,11 @@ internal fun lobbyStatusLine(state: JSONObject?, isHost: Boolean): String {
 /** Shows the multiplayer lobby when this phone is hosting or waiting in a 2–4 player room. */
 @Composable
 internal fun TableController.MultiplayerLobbyScreen() {
-    val hosting = wifiMultiLobby != null && wifiMultiLobbyState != null &&
+    // Read observable state FIRST. wifiMultiLobby and wifiServer are plain fields;
+    // checking either before this state short-circuits Compose's initial read,
+    // so publishing a ready host room never recomposes the first lobby screen.
+    val hostLobbyState = wifiMultiLobbyState
+    val hosting = hostLobbyState != null && wifiMultiLobby != null &&
         (wifiServer is ArgentumLanMultiServer || wifiServer is ArgentumCloudMultiHost)
     val guesting = wifiGuestWaiting && wifiRole in setOf("guest", "online-guest")
     if (!hosting && !guesting) return
@@ -107,7 +111,7 @@ internal fun TableController.MultiplayerLobbyScreen() {
             DiagnosticCategory.CONNECTION,
         )
     }
-    val state = if (hosting) wifiMultiLobbyState else wifiGuestLobbyState
+    val state = if (hosting) hostLobbyState else wifiGuestLobbyState
     val seats = lobbySeats(state)
     val context = LocalContext.current
     var removeTarget by remember { mutableStateOf<LobbySeat?>(null) }
