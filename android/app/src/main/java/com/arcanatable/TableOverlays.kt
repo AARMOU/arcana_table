@@ -248,6 +248,9 @@ internal fun TableController.TableOverlays() {
                 onJoinRoom = { playSheetOpen = false; run { argentumLastError = null; argentumJoinCode = ""; argentumJoinDialogOpen = true } },
                 onDismiss = { playSheetOpen = false },
                 onWifiHost = { playSheetOpen = false; run { startWifiHost() } },
+                onWifiMultiHost = { playSheetOpen = false; run {
+                    if (BuildConfig.DEBUG) wifiMultiConfigOpen = true
+                } },
                 onWifiJoin = { playSheetOpen = false; run { wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() } },
                 onOnlineHost = { playSheetOpen = false; run { startWifiHost(online = true) } },
                 onOnlineJoin = { playSheetOpen = false; run { onlineCodeInput = ""; onlineJoinOpen = true } },
