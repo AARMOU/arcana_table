@@ -135,6 +135,7 @@ internal fun TableController.startMultiWifiHost() {
     val count = wifiMultiSeatCount.coerceIn(2, 4)
     val friends = (1 until count).filter(wifiMultiFriendSlots::contains)
     if (friends.isEmpty()) { message = "Choose at least one friend seat."; return }
+    recordDiagnostic("Multiplayer lobby host requested: Wi-Fi; seats=$count; friendSeats=${friends.size}", DiagnosticCategory.ACTION)
     wifiMultiConfigOpen = false
     offlineStarting = true
     scope.launch {
@@ -195,8 +196,7 @@ internal fun TableController.startMultiWifiHost() {
             wifiMultiRegistry = registry
             wifiMultiLobbyState = room.lobbyMessage()
             wifiWaitingAddress = address
-            recordDiagnostic("Four-player Wi-Fi lobby open; requested ${room.seatCount} seats at $address",
-                DiagnosticCategory.CONNECTION)
+            recordDiagnostic("Multiplayer lobby opened: Wi-Fi; seats=${room.seatCount}", DiagnosticCategory.CONNECTION)
         } catch (error: Throwable) {
             stopWifi()
             message = "Multiplayer hosting failed: ${error.javaClass.simpleName}: ${error.message?.take(200)}"
@@ -242,7 +242,7 @@ private suspend fun TableController.acceptMultiWifiGuest(
     notes.forEach { note -> server.sendTo(id, JSONObject().put("type", "error")
         .put("code", "WIFI_NOTE").put("message", note)) }
     publishMultiLobby()
-    recordDiagnostic("Multiplayer guest joined seat ${id.value}", DiagnosticCategory.CONNECTION)
+    recordDiagnostic("Multiplayer lobby guest joined: Wi-Fi; seat=${id.value}", DiagnosticCategory.CONNECTION)
 }
 
 /** Host alone decides when every requested friend has arrived and gameplay can start. */
@@ -282,7 +282,7 @@ internal fun TableController.startMultiWifiGame() {
             releaseMultiStartDepartures(host)
             argentumSocket.createCommanderPracticeLobby(vsAi = false)
             wifiMultiLobbyState = null
-            recordDiagnostic("Wi-Fi Commander started with ${roster.players.size} seats and ${roster.humanGuests.size + 1} humans",
+            recordDiagnostic("Multiplayer lobby game started: Wi-Fi; seats=${roster.players.size}; humans=${roster.humanGuests.size + 1}",
                 DiagnosticCategory.ENGINE)
         } catch (error: Throwable) {
             wifiMultiStartDepartures = null
@@ -302,6 +302,7 @@ internal fun TableController.startMultiOnlineHost() {
     val count = wifiMultiSeatCount.coerceIn(2, 4)
     val friends = (1 until count).filter(wifiMultiFriendSlots::contains)
     if (friends.isEmpty()) { message = "Choose at least one friend seat."; return }
+    recordDiagnostic("Multiplayer lobby host requested: internet; seats=$count; friendSeats=${friends.size}", DiagnosticCategory.ACTION)
     wifiMultiConfigOpen = false
     offlineStarting = true
     scope.launch {
@@ -368,6 +369,7 @@ internal fun TableController.startMultiOnlineHost() {
             wifiMultiSetup = setup
             wifiMultiRegistry = registry
             wifiMultiLobbyState = room.lobbyMessage()
+            recordDiagnostic("Multiplayer lobby opened: internet; seats=${room.seatCount}", DiagnosticCategory.CONNECTION)
             host.start()
         } catch (error: Throwable) {
             stopWifi()
@@ -406,7 +408,7 @@ private suspend fun TableController.acceptMultiOnlineGuest(
     notes.forEach { host.sendTo(id, JSONObject().put("type", "error")
         .put("code", "WIFI_NOTE").put("message", it)) }
     publishMultiLobby()
-    recordDiagnostic("Remote human admitted to ${id.value}", DiagnosticCategory.CONNECTION)
+    recordDiagnostic("Multiplayer lobby guest joined: internet; seat=${id.value}", DiagnosticCategory.CONNECTION)
 }
 
 internal fun TableController.startMultiOnlineGame() {
@@ -445,7 +447,7 @@ internal fun TableController.startMultiOnlineGame() {
             releaseMultiStartDepartures(engine)
             argentumSocket.createCommanderPracticeLobby(vsAi = false)
             wifiMultiLobbyState = null
-            recordDiagnostic("Internet Commander started with ${roster.players.size} seats",
+            recordDiagnostic("Multiplayer lobby game started: internet; seats=${roster.players.size}; humans=${roster.humanGuests.size + 1}",
                 DiagnosticCategory.ENGINE)
         } catch (e: Throwable) {
             wifiMultiStartDepartures = null
@@ -462,6 +464,7 @@ internal fun TableController.startMultiOnlineGame() {
 internal fun TableController.joinMultiOnlineGame(code: String) {
     val clean = ArgentumCloudLink.cleanCode(code)
     if (wifiConnecting || argentumEnabled || clean.length !in 6..8) return
+    recordDiagnostic("Multiplayer lobby join requested: internet", DiagnosticCategory.ACTION)
     wifiConnecting = true
     val (names, commander) = activeDeckCards()
     if (commander == null) {
@@ -506,7 +509,7 @@ internal fun TableController.joinMultiOnlineGame(code: String) {
             return@launch
         }
         message = "Joined online Commander; waiting for host and other players."
-        recordDiagnostic("Joined directed-relay multiplayer room", DiagnosticCategory.CONNECTION)
+        recordDiagnostic("Multiplayer lobby joined: internet; awaiting host roster", DiagnosticCategory.CONNECTION)
     } }
 }
 
@@ -668,7 +671,7 @@ private fun TableController.markMultiGuestReady(
     if (wifiMultiLobby !== room || argentumSocket.runningLocalHost != null) return
     if (room.setReady(id, ready)) {
         publishMultiLobby()
-        recordDiagnostic("Lobby seat ${id.value} ${if (ready) "ready" else "not ready"}", DiagnosticCategory.CONNECTION)
+        recordDiagnostic("Multiplayer lobby guest readiness: seat=${id.value}; ready=$ready", DiagnosticCategory.CONNECTION)
     }
 }
 
