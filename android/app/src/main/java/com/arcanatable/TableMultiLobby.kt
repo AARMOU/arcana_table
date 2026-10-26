@@ -25,6 +25,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -99,6 +100,13 @@ internal fun TableController.MultiplayerLobbyScreen() {
     val guesting = wifiGuestWaiting && wifiRole in setOf("guest", "online-guest")
     if (!hosting && !guesting) return
     val online = if (hosting) wifiServer is ArgentumCloudMultiHost else wifiRole == "online-guest"
+    // A room being ready is not evidence this full-screen lobby reached the device.
+    LaunchedEffect(hosting, online) {
+        recordDiagnostic(
+            "Multiplayer lobby screen displayed: ${if (online) "internet" else "Wi-Fi"}; ${if (hosting) "host" else "guest"}",
+            DiagnosticCategory.CONNECTION,
+        )
+    }
     val state = if (hosting) wifiMultiLobbyState else wifiGuestLobbyState
     val seats = lobbySeats(state)
     val context = LocalContext.current
