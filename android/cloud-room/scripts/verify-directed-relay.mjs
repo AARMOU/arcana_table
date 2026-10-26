@@ -64,10 +64,13 @@ try {
   const aliceHello = await alice.wait(msg("welcome"));
   assert.equal(aliceHello.seat, 1);
   assert.equal(aliceHello.relay, 1);
+  assert.match(aliceHello.seatToken, /^[a-f0-9-]{30,}$/, "each seat needs a private reconnect token");
 
   const charlie = await open("charlie");
   charlie.send({ type: "join", code, password, name: "Charlie" });
-  assert.equal((await charlie.wait(msg("welcome"))).seat, 3, "AI seat 2 must remain reserved");
+  const charlieHello = await charlie.wait(msg("welcome"));
+  assert.equal(charlieHello.seat, 3, "AI seat 2 must remain reserved");
+  assert.notEqual(charlieHello.seatToken, aliceHello.seatToken);
 
   const extra = await open("extra");
   extra.send({ type: "join", code, password, name: "Extra" });
@@ -106,7 +109,34 @@ try {
   host.send({ type: "relay", to: 3, seq: 2, data: "STILL_CONNECTED" });
   assert.equal((await charlie.wait(msg("relay"))).data, "STILL_CONNECTED");
 
-  console.log("PASS: Worker relay v1; AI seat reservation; private directed messages; legacy snapshot blocked; invalid guest kick.");
+  // Kicked clients must not reclaim a new person's seat using old credentials.
+  const stale = await open("stale-token");
+  stale.send({ type: "join", code, password, name: "Impersonator", preferredSeat: 1,
+    seatToken: aliceHello.seatToken });
+  assert.match((await stale.wait(msg("rejected"))).reason, /seat.*verif/i);
+
+  // On an ordinary network drop, even a fresh room-code holder must NOT
+  // steal the disconnected guest's already-claimed private hand.
+  charlie.socket.close();
+  await host.wait((p) => p.type === "state" && p.payload?.players?.[3]?.isOnline === false);
+  const thief = await open("thief");
+  thief.send({ type: "join", code, password, name: "Thief", preferredSeat: 3,
+    seatToken: "NOT_CHARLIE_TOKEN" });
+  assert.match((await thief.wait(msg("rejected"))).reason, /seat.*verif/i);
+  const freshWithoutSeat = await open("new-without-seat");
+  freshWithoutSeat.send({ type: "join", code, password, name: "Newbie" });
+  // The only free seat is a claimed one (seat 3). This is NOT an invitation.
+  // Seat 1 was kicked, so that seat is legitimately reusable before game start.
+  assert.equal((await freshWithoutSeat.wait(msg("welcome"))).seat, 1);
+
+  const restored = await open("charlie-returning");
+  restored.send({ type: "join", code, password, name: "Charlie", preferredSeat: 3,
+    seatToken: charlieHello.seatToken });
+  assert.equal((await restored.wait(msg("welcome"))).seat, 3);
+  host.send({ type: "relay", to: 3, seq: 3, data: "CHARLIE_ONLY_AFTER_RECONNECT" });
+  assert.equal((await restored.wait(msg("relay"))).data, "CHARLIE_ONLY_AFTER_RECONNECT");
+
+  console.log("PASS: relay privacy, AI slot reservation, seat token authentication, reconnect, no shared snapshots.");
 } finally {
   for (const socket of sockets) try { socket.close(); } catch { /* done */ }
 }
