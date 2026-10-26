@@ -1,0 +1,37 @@
+name: Build 134 lobby + tutorial exact-source join (no APK, no deploy)
+on:
+  push:
+    branches: [gpt/lobby-tutorial-build134-staging-20261026]
+    paths:
+      - '.github/workflows/lobby-tutorial-build134-source-join.yml'
+      - '.github/workflows/release-look-followup-build134.yml'
+      - 'tools/lobby_tutorial_join_smoke.py'
+      - 'tools/next_apk_tutorial_hand_fix.py'
+      - 'tools/tests/test_next_apk_tutorial_hand_fix.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  source-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact lobby + tutorial and no-goose integration without compiling
+        run: python3 tools/lobby_tutorial_join_smoke.py
+      - name: Upload source-merge evidence only
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: lobby-tutorial-build134-source-only
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            combined-evidence/next-apk-*merge.log
+            combined-evidence/next-apk-source-pins.txt
+            combined-evidence/next-apk-lobby-conflicts.txt
+            combined-evidence/tutorial-hand-step2-acceptance.txt
+            combined-evidence/lobby-worker-deployment-gate.txt
