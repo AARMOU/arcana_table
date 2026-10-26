@@ -165,45 +165,67 @@ def resolve_ai(head_sha: str) -> None:
 
 ONLINE_SHA = "6641f1883f54ca3a13c8faa7ef0b01b05976ef74"
 ARGENTUM = "android/app/src/main/java/com/arcanatable/TableArgentum.kt"
+MULTI_HOST = "android/app/src/main/java/com/arcanatable/engine/LocalArgentumHost.kt"
 
 
 def resolve_online(head_sha: str) -> None:
     if head_sha != ONLINE_SHA:
         raise RuntimeError(f"Unreviewed online PR head {head_sha}; expected {ONLINE_SHA}")
     paths = sorted(run("git", "diff", "--name-only", "--diff-filter=U").splitlines())
-    if paths != sorted((ARGENTUM, OVERLAYS)):
+    if paths != sorted((ARGENTUM, OVERLAYS, MULTI_HOST)):
         raise RuntimeError(f"Unexpected online conflicts: {paths!r}")
     for name in paths:
         path = Path(name)
         original = path.read_text()
         matches = list(CONFLICT.finditer(original))
-        if len(matches) != 1 or matches[0].group("head") != ONLINE_SHA:
-            raise RuntimeError(f"Unexpected {name} online collision")
-        match = matches[0]
-        ours, theirs = match.group("ours"), match.group("theirs")
-        if name == ARGENTUM:
-            tutorial = "            if (argentumOffline && !offlineRestoreRequested && !tutorialPracticeActive && wifiRole == null) {\n"
-            old = "            if (argentumOffline && !offlineRestoreRequested && wifiRole == null) {\n"
-            lobby_reset = "            wifiGuestWaiting = false\n            wifiGuestLobbyState = null\n"
-            if ours != tutorial or theirs != lobby_reset + old:
-                raise RuntimeError("Unexpected tutorial/new-lobby state collision")
-            replacement = lobby_reset + tutorial
-        else:
-            tutorial_next = (
-                "                tutorialStep = if (tutorialChapterId != null) tutorialStep else null,\n"
-                "                onTutorialNext = { tutorialAdvance() }, onTutorialExit = { stopTutorial() },\n"
-            )
-            old_join = '                onOnlineJoin = { playSheetOpen = false; run { onlineCodeInput = ""; onlineJoinOpen = true } },\n'
-            if not ours.startswith(old_join):
-                raise RuntimeError("Unknown old online join callback")
-            # Preserve tutorial arguments but take incoming online multi host/join callbacks.
-            if ours[len(old_join):] != "".join(tutorial_next):
-                raise RuntimeError("Missing tutorial screen inputs")
-            for required in ("onOnlineMultiHost = ", "onOnlineMultiJoin = ", "onOnlineJoin = ", "wifiMultiOnlineJoin = false"):
-                if theirs.count(required) != 1:
-                    raise RuntimeError(f"Incoming online callbacks changed: {required}")
-            replacement = theirs + "".join(tutorial_next)
-        result = original[:match.start()] + replacement + original[match.end():]
+        required = 2 if name == MULTI_HOST else 1
+        if len(matches) != required or any(m.group("head") != ONLINE_SHA for m in matches):
+            raise RuntimeError(f"Unexpected {name} online collision: {len(matches)} hunks")
+        changes = []
+        for index, match in enumerate(matches):
+            ours, theirs = match.group("ours"), match.group("theirs")
+            if name == MULTI_HOST:
+                if index == 0:
+                    old_wifi = "    val isWifi: Boolean get() = guestEmit != null\n"
+                    new_wifi = "    val isWifi: Boolean get() = networkSession\n"
+                    if not ours.endswith(old_wifi) or theirs != new_wifi:
+                        raise RuntimeError("Unexpected networkSession/own-stack collision")
+                    if ours.count("private val ownStackResponders") != 1 or ours.count("var respondToOwnStack: Boolean") != 1:
+                        raise RuntimeError("Ulalek respond-to-own-stack controls missing")
+                    replacement = ours[:-len(old_wifi)] + new_wifi
+                else:
+                    flag = '            "setQuietOpponentTurns" -> '
+                    if ours.count(flag) != 1 or theirs.count(flag) != 1:
+                        raise RuntimeError("Unexpected per-guest quiet-opponent change")
+                    prefix = ours[:ours.index(flag)]
+                    if prefix.count('"setRespondToOwnStack" ->') != 1 or prefix.count('ownStackResponders.add(from)') != 1:
+                        raise RuntimeError("Respond-to-own-stack per-seat setting missing")
+                    if theirs.count('guestQuietOpponentTurns[from] = enabled') != 1 or theirs.count('emitTo(target,') != 1:
+                        raise RuntimeError("Directed private guest nudge logic missing")
+                    replacement = prefix + theirs
+            elif name == ARGENTUM:
+                tutorial = "            if (argentumOffline && !offlineRestoreRequested && !tutorialPracticeActive && wifiRole == null) {\n"
+                old = "            if (argentumOffline && !offlineRestoreRequested && wifiRole == null) {\n"
+                lobby_reset = "            wifiGuestWaiting = false\n            wifiGuestLobbyState = null\n"
+                if ours != tutorial or theirs != lobby_reset + old:
+                    raise RuntimeError("Unexpected tutorial/lobby state collision")
+                replacement = lobby_reset + tutorial
+            else:
+                tutorial_next = (
+                    "                tutorialStep = if (tutorialChapterId != null) tutorialStep else null,\n"
+                    "                onTutorialNext = { tutorialAdvance() }, onTutorialExit = { stopTutorial() },\n"
+                )
+                old_join = '                onOnlineJoin = { playSheetOpen = false; run { onlineCodeInput = ""; onlineJoinOpen = true } },\n'
+                if ours != old_join + "".join(tutorial_next):
+                    raise RuntimeError("Unexpected tutorial/onOnlineJoin callback collision")
+                for required_callback in ("onOnlineMultiHost = ", "onOnlineMultiJoin = ", "onOnlineJoin = ", "wifiMultiOnlineJoin = false"):
+                    if theirs.count(required_callback) != 1:
+                        raise RuntimeError(f"Incoming online callback changed: {required_callback}")
+                replacement = theirs + "".join(tutorial_next)
+            changes.append((match.start(), match.end(), replacement))
+        result = original
+        for left, right, replacement in reversed(changes):
+            result = result[:left] + replacement + result[right:]
         if any(tag in result for tag in ("<<<<<<<", "=======", ">>>>>>>")):
             raise RuntimeError(f"Remaining multiplayer merge markers in {name}")
         path.write_text(result)
@@ -213,8 +235,8 @@ def resolve_online(head_sha: str) -> None:
     remaining = run("git", "diff", "--name-only", "--diff-filter=U")
     if remaining:
         raise RuntimeError(f"Unresolved online conflicts: {remaining}")
-    subprocess.check_call(["git", "diff", "--cached", "--check", "--", ARGENTUM, OVERLAYS])
-    print("PASS: retained tutorial-start guard and hooks, plus directed online host/join and lobby reset")
+    subprocess.check_call(["git", "diff", "--cached", "--check", "--", ARGENTUM, OVERLAYS, MULTI_HOST])
+    print("PASS: retained tutorial start hooks, Ulalek own-stack controls, private directed relay and lobby reset")
 
 
 if __name__ == "__main__":
