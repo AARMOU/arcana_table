@@ -237,10 +237,10 @@ internal fun TableController.TableOverlays() {
                     argentumEndPreviousRequested = true
                     argentumSocket.connect(lobbyPlayerName)
                 },
-                onPlay = { TutorialActions.tap("home-play"); playSheetOpen = true },
-                onChangeDeck = { TutorialActions.tap("home-change-deck"); deckPickerOpen = true },
+                onPlay = { playSheetOpen = true; TutorialActions.tap("home-play") },
+                onChangeDeck = { deckPickerOpen = true; TutorialActions.tap("home-change-deck") },
                 onImport = { selectedPlayer = localSeat; importError = null; importOpen = true },
-                onSettings = { TutorialActions.tap("home-settings"); optionsOpen = true },
+                onSettings = { optionsOpen = true; TutorialActions.tap("home-settings") },
                 onReturnToTable = { run { homeOpen = false } },
             )
             if (playSheetOpen) PlaySheet(
