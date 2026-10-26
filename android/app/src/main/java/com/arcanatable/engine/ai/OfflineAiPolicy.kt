@@ -102,6 +102,9 @@ object OfflineAiPolicy : BudgetPolicy {
     fun create(registry: CardRegistry, player: EntityId, difficulty: AiDifficulty): AIPlayer =
         AIPlayer.create(registry, player, profileFor(difficulty))
 
+    /** How many choices were made from a reduced set of options (diagnostics and duel reports). */
+    val overlooked = java.util.concurrent.atomic.AtomicLong()
+
     /**
      * One priority choice for an AI seat at [difficulty]. Levels with an [AiDifficulty.overlookChance]
      * sometimes choose only from a random part of the [legal] actions (mana abilities aside); the
@@ -119,6 +122,7 @@ object OfflineAiPolicy : BudgetPolicy {
         val options = legal().filter { it.affordable && !it.isManaAbility }
         val kept = options.filter { it.actionType == "PassPriority" || random.nextDouble() < difficulty.considerShare }
         if (kept.isEmpty() || kept.size == options.size) return bot.chooseAction(state)
+        overlooked.incrementAndGet()
         return bot.chooseFrom(state, kept).action
     }
 
