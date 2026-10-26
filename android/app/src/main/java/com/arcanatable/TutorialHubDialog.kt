@@ -46,13 +46,17 @@ import org.json.JSONObject
 
 // Read-only, offline tutorial library. Engine-backed action coaching will be a separate
 // integration: do not claim that clicking Next performs an Argentum action.
-private data class ArcanaLessonStep(
+internal data class ArcanaLessonStep(
+    val id: String,
+    val screen: String,
+    val target: String?,
+    val event: String?,
     val title: String,
     val body: String,
     val hint: String,
     val actionKind: String
 )
-private data class ArcanaLesson(
+internal data class ArcanaLesson(
     val id: String,
     val title: String,
     val section: String,
@@ -61,7 +65,7 @@ private data class ArcanaLesson(
     val steps: List<ArcanaLessonStep>
 )
 
-private fun loadTutorialLessons(context: Context): List<ArcanaLesson> = runCatching {
+internal fun loadTutorialLessons(context: Context): List<ArcanaLesson> = runCatching {
     val json = context.assets.open("tutorials/catalog.json").bufferedReader().use { it.readText() }
     val chapters = JSONObject(json).getJSONArray("chapters")
     (0 until chapters.length()).map { index ->
@@ -76,6 +80,10 @@ private fun loadTutorialLessons(context: Context): List<ArcanaLesson> = runCatch
             steps = (0 until stepArray.length()).map { n ->
                 val step = stepArray.getJSONObject(n)
                 ArcanaLessonStep(
+                    id = step.getString("id"),
+                    screen = step.optString("screen"),
+                    target = step.optString("target").takeUnless { it.isBlank() || it == "null" },
+                    event = step.getJSONObject("advance").optString("event").takeUnless { it.isBlank() },
                     title = step.getString("title"),
                     body = step.getString("body"),
                     hint = step.optString("hint"),
@@ -93,7 +101,12 @@ private val TutorialMuted = Color(0xFFA5B6AD)
 private val TutorialGold = Color(0xFFE6B65C)
 
 @Composable
-internal fun TutorialHubDialog(onDismiss: () -> Unit) {
+internal fun TutorialHubDialog(
+    onDismiss: () -> Unit,
+    onPractice: (String) -> Unit = {},
+    onCoach: (String) -> Unit = {},
+    practiceEnabled: Boolean = false
+) {
     val context = LocalContext.current
     val chapters = remember(context) { loadTutorialLessons(context) }
     val prefs = remember(context) { context.getSharedPreferences("arcana_tutorials", Context.MODE_PRIVATE) }
@@ -141,7 +154,7 @@ internal fun TutorialHubDialog(onDismiss: () -> Unit) {
                     }
                 } else if (current == null) {
                     Text("Learn to play", color = TutorialText, fontSize = 25.sp, fontWeight = FontWeight.Bold)
-                    Text("20 short chapters about Commander and the Arcana controls. Read them in any order; your game stays untouched.",
+                    Text("20 short chapters, real-control walkthroughs, and engine-backed practice games. Your saved game is never overwritten.",
                         color = TutorialMuted, fontSize = 13.sp)
 
                     val intro = chapters.firstOrNull { it.id == "first-turn" }
@@ -152,11 +165,12 @@ internal fun TutorialHubDialog(onDismiss: () -> Unit) {
                         ) {
                             Text("START HERE", color = TutorialGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             Text("Your first turn", color = TutorialText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            Text("A guided explanation of a real Commander turn. Interactive in-game practice is planned for a later build.",
+                            Text("Play a real, isolated Argentum practice turn. You can also read every step without leaving your game.",
                                 color = TutorialMuted, fontSize = 12.sp)
-                            Button(onClick = { chapterId = intro.id; stepIndex = 0 }, modifier = Modifier.heightIn(min = 48.dp)) {
-                                Text("READ FIRST TURN")
-                            }
+                            Button(
+                                onClick = { if (practiceEnabled) onPractice(intro.id) else { chapterId = intro.id; stepIndex = 0 } },
+                                modifier = Modifier.heightIn(min = 48.dp)
+                            ) { Text(if (practiceEnabled) "PLAY THE FIRST TURN" else "READ FIRST TURN") }
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -211,8 +225,18 @@ internal fun TutorialHubDialog(onDismiss: () -> Unit) {
                     Text(current.section.uppercase() + "  /  " + current.minutes + " MIN",
                         color = TutorialGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     Text(current.title, color = TutorialText, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                    Text("STEP " + (stepIndex + 1).toString() + " OF " + current.steps.size.toString(),
-                        color = TutorialMuted, fontSize = 11.sp)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text("STEP " + (stepIndex + 1).toString() + " OF " + current.steps.size.toString(),
+                            color = TutorialMuted, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { onCoach(current.id) }) {
+                            Text("SHOW ON SCREEN", color = TutorialGold, fontSize = 11.sp)
+                        }
+                        if (practiceEnabled && current.id in TutorialPracticeScenarios.supported) {
+                            TextButton(onClick = { onPractice(current.id) }) {
+                                Text("PRACTICE", color = TutorialGold, fontSize = 11.sp)
+                            }
+                        }
+                    }
                     val step = current.steps.getOrNull(stepIndex)
                     if (step != null) {
                         Column(
@@ -228,7 +252,7 @@ internal fun TutorialHubDialog(onDismiss: () -> Unit) {
                                 Text("TRY: " + step.hint, color = TutorialGold, fontSize = 12.sp)
                             }
                             if (step.actionKind != "next") {
-                                Text("This is a read-along lesson. The action is not performed here; try it in a game when you're ready.",
+                                Text("Use SHOW ON SCREEN to highlight the control in Arcana, or PRACTICE for supported engine-backed drills.",
                                     color = TutorialMuted, fontSize = 12.sp)
                             }
                         }
