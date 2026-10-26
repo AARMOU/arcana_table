@@ -1,5 +1,13 @@
 package com.wingedsheep.engine.scenarios
 
+import com.wingedsheep.engine.mechanics.layers.ProjectedState
+import com.wingedsheep.engine.mechanics.layers.ProjectedValues
+import com.wingedsheep.engine.state.components.identity.CardComponent
+import com.wingedsheep.engine.support.GameTestDriver
+import com.wingedsheep.engine.support.TestCards
+import com.wingedsheep.sdk.core.Step
+import com.wingedsheep.sdk.dsl.card
+import com.wingedsheep.sdk.model.Deck
 import com.wingedsheep.engine.mechanics.mana.ManaPool
 import com.wingedsheep.engine.mechanics.mana.SpellPaymentContext
 import com.wingedsheep.engine.mechanics.mana.isSatisfiedBy
@@ -74,4 +82,34 @@ class EldraziTempleManaRestrictionTest : FunSpec({
         restored shouldBe restricted
         restricted.description.contains("colorless Eldrazi") shouldBe true
     }
+    test("battlefield subtype replacement rejects mana spent on a former Eldrazi's ability") {
+        val sourceCard = card("Temple Projected Eldrazi Source Probe") {
+            manaCost = "{2}"
+            typeLine = "Creature — Eldrazi"
+            power = 2
+            toughness = 2
+        }
+        val driver = GameTestDriver()
+        driver.registerCards(TestCards.all + listOf(sourceCard))
+        driver.initMirrorMatch(Deck.of("Forest" to 40))
+        driver.passPriorityUntil(Step.PRECOMBAT_MAIN)
+        val sourceId = driver.putCreatureOnBattlefield(driver.player1, sourceCard.name)
+        val printed = driver.state.getEntity(sourceId)!!.get<CardComponent>()!!
+
+        // Model the authoritative post-layer-4 characteristic directly. An
+        // Eldrazi that became only a Frog is not an Eldrazi ability source.
+        fun projectedContext(subtypes: Set<String>): SpellPaymentContext {
+            val projection = ProjectedState(
+                driver.state,
+                mapOf(sourceId to ProjectedValues(
+                    types = setOf("CREATURE"), subtypes = subtypes, colors = emptySet()
+                ))
+            )
+            return buildAbilityPaymentContext(printed, projection, sourceId, ability = null)
+        }
+        restricted.isSatisfiedBy(projectedContext(setOf("Eldrazi"))) shouldBe true
+        restricted.isSatisfiedBy(projectedContext(setOf("Frog"))) shouldBe false
+        restricted.isSatisfiedBy(projectedContext(emptySet())) shouldBe false
+    }
+
 })
