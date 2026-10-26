@@ -100,7 +100,7 @@ jobs:
       - name: Finish local merged source and integrate exact development head
         shell: bash
         env:
-          DEV_SHA: bd6e5790282c341812e21b4bbbdddd3703984ac4
+          DEV_SHA: 7ef06ec3645714529c44e258497ce3d679c5d020
         run: |
           set -euo pipefail
           git add -u
@@ -120,7 +120,7 @@ jobs:
             path=android/app/src/main/java/com/arcanatable/TableDialogs.kt
             # Only the *known* two-line Eldrazi priority preference collides with
             # PR #250's Help & Diagnostics improvements. Any other conflict fails closed.
-            expected=$(printf '%s\n' android/app/src/main/java/com/arcanatable/HomeScreen.kt "$path")
+            expected=$(printf '%s\n' android/app/src/main/java/com/arcanatable/HomeScreen.kt android/app/src/main/java/com/arcanatable/TableController.kt "$path")
             if [ "$(cat combined-evidence/latest-development-conflicts.txt)" != "$expected" ]; then
               echo "::error title=Unknown integration conflict::Unexpected conflicting paths"
               cat combined-evidence/latest-development-conflicts.txt
@@ -174,7 +174,23 @@ jobs:
           Path('android/app/src/main/java/com/arcanatable/HomeScreen.kt').write_text(merged)
           print('PASS: debug QA entry and tutorial settings target both retained')
           PYHOME
-            git add "$path" "$home"
+            python3 - <<'PYCONTROLLER'
+          import os
+          from pathlib import Path
+          path = Path('android/app/src/main/java/com/arcanatable/TableController.kt')
+          value = path.read_text()
+          priority = '        respondToOwnStack = JSONObject(checkpoint).optBoolean("respondToOwnStack")'
+          guard = ('        require(ReleaseFeatures.multiplayerPreviewEnabled || seats.size == 2) {\n'
+                   '            "This release can resume two-player games only. Your saved game was preserved."\n'
+                   '        }')
+          conflict = '<<<<<<< HEAD\n' + priority + '\n=======\n' + guard + '\n>>>>>>> ' + os.environ['DEV_SHA']
+          assert value.count('<<<<<<< HEAD') == value.count(conflict) == 1, 'Unknown controller conflict'
+          value = value.replace(conflict, guard + '\n' + priority, 1)
+          assert not any(marker in value for marker in ('<<<<<<<', '=======', '>>>>>>>'))
+          path.write_text(value)
+          print('PASS: release seat validation precedes restoring own-stack preference')
+          PYCONTROLLER
+            git add "$path" "$home" android/app/src/main/java/com/arcanatable/TableController.kt
             test -z "$(git diff --name-only --diff-filter=U)"
             git diff --cached --check -- "$path"
             echo "$path: merged Eldrazi priority preference with current Help & Diagnostics" > combined-evidence/latest-development-reconciliation.txt
@@ -660,7 +676,7 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
-          ./gradlew --no-daemon --max-workers=2 :app:lintRelease :app:assembleRelease \
+          ./gradlew --no-daemon --max-workers=2 :app:lintRelease :app:assembleRelease :app:bundleRelease \
             2>&1 | tee ../combined-evidence/release-compile-lint.log
       - name: Verify original logo and tutorial assets inside unsigned release package
         shell: bash
@@ -668,6 +684,9 @@ jobs:
           set -euo pipefail
           apk=android/app/build/outputs/apk/release/app-release-unsigned.apk
           test -s "$apk"
+          test -s android/app/build/outputs/bundle/release/app-release.aab
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > combined-evidence/release-badging.txt
+          grep -F "package: name='com.arcanatable' versionCode='134'" combined-evidence/release-badging.txt
           "$ANDROID_HOME/build-tools/36.0.0/aapt" dump xmltree "$apk" AndroidManifest.xml > combined-evidence/release-manifest.txt
           grep -F 'android:icon' combined-evidence/release-manifest.txt
           grep -F 'android:roundIcon' combined-evidence/release-manifest.txt
@@ -682,11 +701,14 @@ jobs:
                   assert archive.read('assets/tutorials/' + asset) == expected, asset
               catalog = json.loads(archive.read('assets/tutorials/catalog.json'))
               assert len(catalog['chapters']) == 20
-          print('PASS: 20-chapter curriculum and glossary are byte-identical in unsigned release APK')
+          with ZipFile('android/app/build/outputs/bundle/release/app-release.aab') as archive:
+              for asset in ('catalog.json', 'glossary.json'):
+                  assert archive.read('base/assets/tutorials/' + asset) == Path('android/app/src/main/assets/tutorials', asset).read_bytes()
+          print('PASS: 20-chapter curriculum and glossary are byte-identical in unsigned release APK and AAB')
           PYPACKAGE
           python3 tools/verify_launcher_branding.py
-          sha256sum "$apk" > combined-evidence/unsigned-release-package.sha256
-          echo 'Validation only: unsigned APK is not uploaded, signed or distributed.' > combined-evidence/validation-scope.txt
+          sha256sum "$apk" android/app/build/outputs/bundle/release/app-release.aab > combined-evidence/unsigned-release-package.sha256
+          echo 'Validation only: unsigned APK/AAB are not uploaded, signed or distributed.' > combined-evidence/validation-scope.txt
       - name: Capture unresolved three-way source conflicts for manual port
         if: failure()
         shell: bash
