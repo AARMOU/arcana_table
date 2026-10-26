@@ -14,6 +14,7 @@ interface RoomRecord {
   passwordHash: string;
   state: RoomState;
   seats: Array<{ name: string; token: string; online: boolean; isComputer?: boolean }>;
+  relayMode?: boolean;
 }
 
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), {
@@ -114,7 +115,10 @@ export class GameRoom extends DurableObject<Env> {
     const seat = attachment.seat;
     switch (packet.type) {
       case "ping": this.send(socket, { type: "pong" }); break;
-      case "state": await this.acceptSnapshot(seat, String(packet.payload ?? "")); break;
+      case "state":
+        if (this.room.relayMode) this.send(socket, { type: "rejected", reason: "Snapshots are forbidden in directed Argentum rooms." });
+        else await this.acceptSnapshot(seat, String(packet.payload ?? ""));
+        break;
       case "relay": this.directRelay(socket, seat, packet); break;
       case "relayKick": this.kickRelayGuest(socket, seat, packet); break;
       case "relaySeats": await this.configureRelaySeats(socket, seat, packet); break;
@@ -255,6 +259,7 @@ export class GameRoom extends DurableObject<Env> {
         name: this.room.seats[index].name, isOnline: false, isComputer, deckLoaded: isComputer,
       };
     }
+    this.room.relayMode = true;
     this.room.seats.length = kinds.length + 1;
     this.room.state.players.length = kinds.length + 1;
     await this.save();
