@@ -611,13 +611,13 @@ internal fun TableController.stopWifi() {
 /** Host's "waiting for your friend" card and the guest's "find a host" dialog. */
 @Composable
 internal fun TableController.WifiDialogs() {
-    if (wifiMultiConfigOpen && BuildConfig.DEBUG) {
+    if (wifiMultiConfigOpen) {
         AlertDialog(
             onDismissRequest = { wifiMultiConfigOpen = false },
-            title = { Text("Host Wi-Fi Commander · Preview") },
+            title = { Text(if (wifiMultiOnline) "Host online Commander" else "Host Wi-Fi Commander") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Choose 2–4 seats. Each can be a friend or an AI opponent. Every phone must use this Wi-Fi.")
+                    Text(if (wifiMultiOnline) "Choose 2–4 seats. Friends can join across different networks using the room code." else "Choose 2–4 seats. Friends must use the same Wi-Fi.")
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         (2..4).forEach { size ->
                             TextButton(onClick = {
@@ -644,7 +644,7 @@ internal fun TableController.WifiDialogs() {
             },
             confirmButton = { TextButton(
                 enabled = (1 until wifiMultiSeatCount).any(wifiMultiFriendSlots::contains),
-                onClick = { startMultiWifiHost() }
+                onClick = { if (wifiMultiOnline) startMultiOnlineHost() else startMultiWifiHost() }
             ) { Text("HOST LOBBY") } },
             dismissButton = { TextButton(onClick = { wifiMultiConfigOpen = false }) { Text("CANCEL") } },
         )
@@ -686,7 +686,7 @@ internal fun TableController.WifiDialogs() {
             )
         }
     }
-    if (wifiGuestWaiting && wifiRole == "guest") {
+    if (wifiGuestWaiting && wifiRole in setOf("guest", "online-guest")) {
         AlertDialog(
             onDismissRequest = {},
             title = { Text("Waiting for the host") },
@@ -711,24 +711,35 @@ internal fun TableController.WifiDialogs() {
         )
     }
     onlineRoomCode?.let { code ->
+        val current = wifiMultiLobbyState
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("Waiting for your friend") },
+            title = { Text(if (current != null) "Online Commander lobby" else "Waiting for your friend") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Tell your friend this room code. On their phone: PLAY → Play with a friend → Join online.")
+                    Text("Share this code with your friends. They choose Join 2–4 players online.")
                     Text(code, fontSize = androidx.compose.ui.unit.TextUnit(34f, androidx.compose.ui.unit.TextUnitType.Sp), fontWeight = androidx.compose.ui.text.font.FontWeight.Black, letterSpacing = androidx.compose.ui.unit.TextUnit(6f, androidx.compose.ui.unit.TextUnitType.Sp))
-                    Text("Keep this screen open until they join.")
+                    if (current != null) {
+                        val seats = current.optJSONArray("seats") ?: JSONArray()
+                        for (i in 0 until seats.length()) {
+                            val seat = seats.getJSONObject(i)
+                            Text("${i + 1}. ${seat.optString("name")} · ${seat.optString("kind")}")
+                        }
+                        Text("Waiting for ${current.optInt("openSeats")} more friend(s).")
+                    } else Text("Keep this screen open until the other player joins.")
                 }
             },
-            confirmButton = {},
+            confirmButton = {
+                if (current != null) TextButton(enabled = current.optBoolean("canStart"),
+                    onClick = { startMultiOnlineGame() }) { Text("START GAME") }
+            },
             dismissButton = { TextButton(onClick = { stopWifi() }) { Text("CANCEL") } },
         )
     }
     if (onlineJoinOpen) {
         AlertDialog(
             onDismissRequest = { if (!wifiConnecting) onlineJoinOpen = false },
-            title = { Text("Join online") },
+            title = { Text(if (wifiMultiOnlineJoin) "Join online Commander" else "Join online") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(if (wifiConnecting) "Connecting…" else "Type the room code shown on your friend's phone.")
@@ -736,7 +747,7 @@ internal fun TableController.WifiDialogs() {
                         label = { Text("Room code") }, singleLine = true)
                 }
             },
-            confirmButton = { TextButton(enabled = !wifiConnecting && onlineCodeInput.length >= 6, onClick = { joinOnlineGame(onlineCodeInput) }) { Text("JOIN") } },
+            confirmButton = { TextButton(enabled = !wifiConnecting && onlineCodeInput.length >= 6, onClick = { if (wifiMultiOnlineJoin) joinMultiOnlineGame(onlineCodeInput) else joinOnlineGame(onlineCodeInput) }) { Text("JOIN") } },
             dismissButton = { TextButton(enabled = !wifiConnecting, onClick = { onlineJoinOpen = false }) { Text("CLOSE") } },
         )
     }
