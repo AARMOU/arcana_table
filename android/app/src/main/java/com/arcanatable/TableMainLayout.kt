@@ -250,7 +250,7 @@ internal fun TableController.TableMainLayout() {
                                 DropdownMenuItem(text = { Text("MTG rules") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; rulesOpen = true } })
                             }
                             "game" -> {
-                                if (argentumOffline && wifiRole == null && argentumSnapshot != null && !gameEndedOnline)
+                                if (argentumOffline && !tutorialPracticeActive && wifiRole == null && argentumSnapshot != null && !gameEndedOnline)
                                     DropdownMenuItem(text = { Text("Save full offline game") }, onClick = {
                                         topMenuExpanded = false
                                         topMenuSection = null
