@@ -412,6 +412,7 @@ internal class TableController(
     var argentumLastStateJson by run { mutableStateOf<JSONObject?>(null) }
     var argentumAttackPlan by run { mutableStateOf<ArgentumAttackPlan?>(null) }
     var argentumBlockPlan by run { mutableStateOf<ArgentumBlockPlan?>(null) }
+    val argentumBlockGuard = ArgentumBlockSubmissionGuard()
     var argentumDeferredDecisionId by run { mutableStateOf<String?>(null) }
     var argentumOrderSelection by run { mutableStateOf<List<String>>(emptyList()) }
     var argentumModeSelection by run { mutableStateOf<Set<Int>>(emptySet()) }
@@ -569,7 +570,10 @@ internal class TableController(
     val gameInProgress get() = if (argentumEnabled) argentumSnapshot != null && argentumStatus == ArgentumConnectionStatus.CONNECTED && argentumSnapshot?.gameOver != true
         else if (onlineMode) gameStartedOnline && roomConnected && !gameEndedOnline else localGameStarted
     val visibleStackCount get() = if (argentumEnabled) argentumSnapshot?.targets?.values?.count { it.type == "Spell" } ?: 0 else stackActions.size
-    val argentumLegalTypes get() = argentumSnapshot?.legalActions.orEmpty().mapNotNull { it.optJSONObject("action")?.optString("type") }.toSet()
+    val argentumLegalTypes get() = argentumSnapshot?.legalActions.orEmpty()
+        .mapNotNull { it.optJSONObject("action")?.optString("type") }
+        .filterNot { it == "DeclareBlockers" && argentumBlockGuard.submitted }
+        .toSet()
     // Display ids of cards Argentum offers an action for (play, cast, activate) — drawn with a glow.
     val argentumPlayableIds: Set<Int> get() = argentumSnapshot?.let { snap ->
         val byServer = snap.serverCardIds.entries.associate { it.value to it.key }
