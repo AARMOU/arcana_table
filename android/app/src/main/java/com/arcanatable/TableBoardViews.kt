@@ -767,12 +767,20 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
     argentumMode: Boolean = false, argentumPrimaryLabel: String? = null, legalActionCount: Int = 0, onUndo: (() -> Unit)? = null,
     arrangement: HandArrangement = HandArrangement.AUTO_FIT, cardScale: Float = 1f, playableIds: Set<Int> = emptySet(),
     canRespond: Boolean = false, commanderAffordable: Boolean = false,
-    tutorialCue: Pair<String, String>? = null) {
+    tutorialCue: Pair<String, String>? = null,
+    tutorialStep: ArcanaLessonStep? = null,
+    onTutorialNext: () -> Unit = {}, onTutorialExit: () -> Unit = {}) {
     val handScrollState = rememberScrollState()
     var moreOpen by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 8.dp)) {
         tutorialCue?.let { TutorialInlineCue(it.first, it.second) }
+        tutorialStep?.let { step ->
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
+                if (step.actionKind == "next") TextButton(onClick = onTutorialNext) { Text("NEXT", color = Mint) }
+            }
+        }
         Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("YOUR HAND  ·  ${cards.size} CARDS", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f))
             IconButton(onClick = onClose, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close hand", tint = SoftWhite) }
