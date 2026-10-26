@@ -524,7 +524,7 @@ jobs:
           DECK_BASE: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f
           DECK_SHA: 5a64b631b9d7185c7fb4102a58afa9aa237746c0
           LOBBY_BASE: 79dcd0c58837305fcd1f8790fbf052af214d204b
-          LOBBY_FIX_SHA: b162ea69060a50030c55d32f176464cedeeaa57d
+          LOBBY_FIX_SHA: f8a9fce622659a747ea17d91508d5ddd10e634d0
           OUTCOME_SHA: abaf13ad913025762db889bde1bf92907cd5a133
           UGIN_BASE: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f
           UGIN_SHA: 49f7f7389b940accf2e2321130407e579cb2ee4c
@@ -748,6 +748,10 @@ jobs:
           git add android/app/src/main/java/com/arcanatable/HomeScreen.kt
           git commit --no-gpg-sign -m 'B136: keep large commander artwork in debug and release'
           grep -F 'Multiplayer lobby screen displayed:' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+          # Build 136 regression: the old guard skipped the observable host state,
+          # so the real Wi-Fi/internet room existed but its screen never mounted.
+          grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+          test -s android/app/src/test/java/com/arcanatable/MultiplayerLobbyVisibilityTest.kt
           grep -F 'commanderDamageTrackerRows(' android/app/src/main/java/com/arcanatable/TableDialogs.kt
           grep -F 'class UginTheIneffableScenarioTest' android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt
           test -f android/app/src/main/java/com/arcanatable/CardFilters.kt
