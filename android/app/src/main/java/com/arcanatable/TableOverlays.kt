@@ -247,10 +247,14 @@ internal fun TableController.TableOverlays() {
                 deckName = activeDeck?.name,
                 aiDecks = premadeDecks.map { DeckChoice(it.id, it.name, it.commander, builtIn = true) },
                 aiDeckId = offlineAiDeckId,
-                onAiDeck = { offlineAiDeckId = it },
+                onAiDeck = { offlineAiDeckId = it; TutorialActions.tap("setup-ai-deck") },
                 aiCount = offlineAiCount,
                 onAiCount = { offlineAiCount = it; optionPrefs.edit().putInt("offline_ai_count", it).apply() },
-                onOffline = { playSheetOpen = false; run { startOfflineGame() } },
+                onOffline = {
+                    playSheetOpen = false
+                    if (tutorialChapterId != null && !tutorialPracticeActive) TutorialActions.tap("setup-start")
+                    else run { startOfflineGame() }
+                },
                 onOnline = { playSheetOpen = false; run { startArgentumPractice(vsAi = true) } },
                 onCreateRoom = { playSheetOpen = false; run { startArgentumPractice(vsAi = false) } },
                 onJoinRoom = { playSheetOpen = false; run { argentumLastError = null; argentumJoinCode = ""; argentumJoinDialogOpen = true } },
@@ -264,6 +268,9 @@ internal fun TableController.TableOverlays() {
             )
             val pickDeck: (DeckChoice) -> Unit = { choice ->
                     deckPickerOpen = false
+                    if (tutorialChapterId != null && !tutorialPracticeActive) {
+                        TutorialActions.tap("deck-select")
+                    } else {
                     activeDeckId = choice.id; saveActiveDeck(context, choice.id)
                     recordDiagnostic("Deck chosen: ${choice.name}", DiagnosticCategory.ACTION)
                     // Also put it on your table (card art, online play). Offline games read the choice directly.
@@ -271,6 +278,7 @@ internal fun TableController.TableOverlays() {
                         ?: savedDecks.firstOrNull { it.name == choice.id }?.text
                         ?: premadeDecks.firstOrNull { "builtin:${it.id}" == choice.id }?.let { d -> "Commander\n1 ${d.commander}\nDeck\n" + d.cards.filterNot { it == d.commander }.groupingBy { it }.eachCount().entries.joinToString("\n") { (n, c) -> "$c $n" } }
                     if (text != null) { selectedPlayer = localSeat; importDeck(text, saveAsMine = false) }
+                    }
             }
             if (deckPickerOpen) DeckPickerSheet(deckChoices, activeDeckId,
                 onPick = pickDeck,
