@@ -524,7 +524,7 @@ jobs:
           DECK_BASE: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f
           DECK_SHA: 5a64b631b9d7185c7fb4102a58afa9aa237746c0
           LOBBY_BASE: 79dcd0c58837305fcd1f8790fbf052af214d204b
-          LOBBY_FIX_SHA: 492059920c81df12391a28aa9b9ca093b1a6a703
+          LOBBY_FIX_SHA: 3c8bedaaae80aa113841d9ec9bf14f90464989d8
           OUTCOME_SHA: abaf13ad913025762db889bde1bf92907cd5a133
           UGIN_BASE: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f
           UGIN_SHA: 49f7f7389b940accf2e2321130407e579cb2ee4c
@@ -571,6 +571,54 @@ jobs:
           print('PASS: exact advanced library multi-select + B135 action-label reconciliation')
           PYDECK
                 git add android/app/src/main/java/com/arcanatable/TableDialogs.kt
+                test -z "$(git diff --name-only --diff-filter=U)"
+              elif [ "$label" = unified-multiplayer-lobby ] && \
+                 [ "$(git diff --name-only --diff-filter=U | sort)" = "$(printf '%s\n' \
+                    android/app/src/main/java/com/arcanatable/HomeScreen.kt \
+                    android/app/src/main/java/com/arcanatable/TableOverlays.kt \
+                    android/app/src/test/java/com/arcanatable/ui/HomeScreenSizesTest.kt)" ]; then
+                python3 - <<'PYLOBBY'
+          from pathlib import Path
+          import re
+          base=Path('android/app/src')
+          replacements={
+              'main/java/com/arcanatable/HomeScreen.kt':'home',
+              'main/java/com/arcanatable/TableOverlays.kt':'overlays',
+              'test/java/com/arcanatable/ui/HomeScreenSizesTest.kt':'tests',
+          }
+          for relative,kind in replacements.items():
+              p=base/relative
+              s=p.read_text()
+              matches=list(re.finditer(r'^<<<<<<< ours\n(.*?)^=======\n(.*?)^>>>>>>> theirs\n',s,re.MULTILINE|re.DOTALL))
+              assert len(matches)==1,(kind,'unreviewed conflicts',len(matches))
+              c=matches[0]; ours,theirs=c.group(1),c.group(2)
+              if kind=='home':
+                  assert 'onOnlineHost: () -> Unit = {}' in ours
+                  assert 'onOnlineJoin: () -> Unit = {}' in ours
+                  assert 'tutorialStep: ArcanaLessonStep?' in ours and not theirs.strip()
+                  resolved=''.join(row for row in ours.splitlines(keepends=True)
+                      if 'onOnlineHost: () -> Unit' not in row and 'onOnlineJoin: () -> Unit' not in row)
+              elif kind=='overlays':
+                  assert 'onOnlineJoin = { playSheetOpen = false' in ours
+                  assert 'tutorialStep = if (tutorialChapterId' in ours
+                  assert 'onTutorialNext = { tutorialAdvance() }' in ours
+                  assert not theirs.strip()
+                  resolved=ours[ours.index('                tutorialStep = if (tutorialChapterId'):]
+              else:
+                  assert 'fun scenariosOpenFromHeaderWithoutHuntingBelowDeck()' in ours
+                  assert 'fun multiplayerOnlyShowsUnifiedLobbyRoutes()' in theirs
+                  assert 'test-scenario-ulalek-own-stack' in ours
+                  assert 'performScrollTo()' in theirs, 'Use revised Fold-portrait lobby UI test'
+                  # A closing method brace is the shared context after this one-hunk conflict.
+                  resolved=ours.rstrip('\n')+'\n    }\n'+theirs.lstrip('\n')
+              s=s[:c.start()]+resolved+s[c.end():]
+              assert not re.search(r'^(?:<<<<<<< |=======|>>>>>>> )',s,re.MULTILINE)
+              p.write_text(s)
+              print('PASS: retained reviewed '+kind+' tutorial and lobby semantics')
+          PYLOBBY
+                git add android/app/src/main/java/com/arcanatable/HomeScreen.kt \
+                  android/app/src/main/java/com/arcanatable/TableOverlays.kt \
+                  android/app/src/test/java/com/arcanatable/ui/HomeScreenSizesTest.kt
                 test -z "$(git diff --name-only --diff-filter=U)"
               else
                 echo "::error title=Build 136 integration conflict::${label}: no unreviewed hunk dropped"
