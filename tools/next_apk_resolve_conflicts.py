@@ -45,7 +45,13 @@ def resolve_table(head_sha: str) -> None:
         if name == HELPERS:
             # Release tutorial's instrumented ZoneChip must survive while the
             # increased 44dp touch target from #277 must also apply.
-            if ours.strip() != ".heightIn(min = 34.dp).wrapContentHeight(Alignment.CenterVertically)":
+            if not (
+                'val target = when (name.uppercase()) {' in ours
+                and '.tutorialTarget(target)' in ours
+                and 'TutorialActions.tap(target); onClick()' in ours
+                and ours.count('min = 34.dp') == 1
+                and 'Text("$name  $count"' in ours
+            ):
                 raise RuntimeError("Unexpected instrumented ZoneChip branch")
             if not (
                 'Text("$name  $count"' in theirs
