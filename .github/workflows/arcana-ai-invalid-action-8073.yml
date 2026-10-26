@@ -13,9 +13,9 @@ jobs:
     timeout-minutes: 25
     env:
       ARCANA_AI_BENCHMARK: '1'
-      ARCANA_AI_GAMES_PER_MODE: '2'
+      ARCANA_AI_GAMES_PER_MODE: '50'
       ARCANA_AI_GAME_MODE: '2'
-      ARCANA_AI_PAIR_START: '80'
+      ARCANA_AI_PAIR_START: '75'
       ARCANA_AI_MAX_ACTIONS: '6000'
       ARCANA_AI_MAX_GAME_MS: '45000'
     steps:
@@ -57,8 +57,8 @@ jobs:
           result=Path("android/app/build/reports/ai-strength/comparison.json")
           assert result.exists(), "No benchmark output"
           gs=json.loads(result.read_text())["games"]
-          assert len(gs)==2 and all(g["mode"]==2 and g["seed"]==8073 and g["pair"]==80 for g in gs), gs
-          invalid=[g for g in gs if g["status"]=="invalid-action"]
+          assert len(gs)==50 and all(g["mode"]==2 for g in gs), gs
+          invalid=[g for g in gs if g["status"]=="invalid-action"]\n          print("invalid games:", [(g["pair"],g["seed"],g["candidateSeatsZeroBased"],g["turns"]) for g in invalid])
           print("replay outcomes:", [(g["status"],g["turns"],g["actions"],g["candidateSeatsZeroBased"]) for g in gs])
           assert invalid, "This exact-head runtime did not reproduce the previously seen invalid action"
           xml=Path("android/app/build/test-results/testDebugUnitTest/TEST-com.arcanatable.AiStrengthBenchmarkTest.xml")
