@@ -18,9 +18,9 @@ import java.io.File
  */
 class TutorialPracticeScenariosTest {
     private val assets = File("src/main/assets")
-    private fun library() = OfflineCardLibrary { path ->
+    private fun library() = OfflineCardLibrary(open = { path ->
         File(assets, path).takeIf(File::exists)?.inputStream()
-    }
+    })
 
     private val codec = Json {
         ignoreUnknownKeys = true
