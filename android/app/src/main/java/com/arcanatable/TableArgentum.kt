@@ -305,6 +305,13 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
     // Outside an Argentum session, never let pushed game messages take over the table.
     if (!argentumEnabled && incoming.optString("type") !in setOf("connected", "reconnected", "error", "sessionReplaced")) return
     when (incoming.optString("type")) {
+        "lanSeat" -> {
+            // A transport-level seat acknowledgement, not an engine credential.
+            recordDiagnostic("Wi-Fi seat accepted by host", DiagnosticCategory.CONNECTION)
+        }
+        "lanLobby" -> {
+            if (wifiRole == "guest") wifiGuestLobbyState = incoming
+        }
         "offlineCheckpoint" -> {
             if (argentumOffline && wifiRole == null) {
                 val data = incoming.optJSONObject("checkpoint")
@@ -360,6 +367,8 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             }
         }
         "gameStarted" -> {
+            wifiGuestWaiting = false
+            wifiGuestLobbyState = null
             if (argentumOffline && !offlineRestoreRequested && wifiRole == null) {
                 OfflineCheckpointStore.clear(context)
                 offlineResumeAvailable = false

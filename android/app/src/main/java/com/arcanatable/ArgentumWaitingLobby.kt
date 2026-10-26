@@ -52,6 +52,19 @@ internal class ArgentumWaitingLobby(
         return ids[index]
     }
 
+    /** Reserve the transport-assigned seat after the specific phone's deck validated. */
+    fun seatGuestAt(seatId: EntityId, seat: LocalSeat): Boolean {
+        val index = ids.indexOf(seatId)
+        if (started || index !in 1 until seatCount || kinds[index - 1] != Kind.FRIEND ||
+            index in admitted || seat.name.isBlank() || seat.deck.isEmpty()) return false
+        admitted[index] = seat
+        return true
+    }
+
+    /** Stable slots chosen by the host for separate remote TCP connections. */
+    fun friendSeatIds(): List<EntityId> =
+        (1 until seatCount).filter { kinds[it - 1] == Kind.FRIEND }.map(ids::get)
+
     /** An unstarted guest may leave without affecting any other reserved seat. */
     fun guestLeft(seatId: EntityId): Boolean {
         if (started) return false

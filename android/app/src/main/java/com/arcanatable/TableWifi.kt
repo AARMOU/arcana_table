@@ -128,6 +128,187 @@ private suspend fun TableController.acceptWifiGuest(
     recordDiagnostic("Wi-Fi game started: you vs $guestName (${seat.commander})", DiagnosticCategory.ENGINE)
 }
 
+
+/** Debug-only four-player host path; regular two-player hosting above remains untouched. */
+internal fun TableController.startMultiWifiHost() {
+    if (!BuildConfig.DEBUG) { message = "Four-player Wi-Fi is not enabled in this release."; return }
+    if (offlineStarting || argentumEnabled || wifiServer != null) return
+    val count = wifiMultiSeatCount.coerceIn(2, 4)
+    val friends = (1 until count).filter(wifiMultiFriendSlots::contains)
+    if (friends.isEmpty()) { message = "Choose at least one friend seat."; return }
+    wifiMultiConfigOpen = false
+    offlineStarting = true
+    scope.launch {
+        try {
+            val (names, commander) = activeDeckCards()
+            val (setup, registry) = prepareOfflineSetup(names, commander, null, aiCount = count - 1)
+            if (setup.you.commander == null) {
+                message = "Choose a Commander deck before hosting a multiplayer game."
+                return@launch
+            }
+            val you = setup.you.copy(name = friendlyName(setup.you.commander))
+            val room = ArgentumWaitingLobby(you, listOf(setup.ai) + setup.extraAis, count)
+            for (index in 1 until count) {
+                room.setKind(index, if (index in friends) ArgentumWaitingLobby.Kind.FRIEND
+                else ArgentumWaitingLobby.Kind.AI)
+            }
+            val address = ArgentumLan.localAddress()
+            if (address.isBlank()) {
+                message = "Connect this phone to Wi-Fi before hosting."
+                return@launch
+            }
+            lateinit var server: ArgentumLanMultiServer
+            server = ArgentumLanMultiServer(friendlyName(commander), room.friendSeatIds(),
+                onGuest = { id, hello -> scope.launch {
+                    acceptMultiWifiGuest(server, room, id, hello, registry)
+                } },
+                onGuestMessage = { id, packet ->
+                    argentumSocket.runningLocalHost?.receive(packet, id)
+                },
+                onGuestLeft = { id -> scope.launch {
+                    if (wifiServer === server) {
+                        val starting = wifiMultiStartDepartures
+                        if (starting != null) starting += id
+                        else if (argentumSocket.runningLocalHost == null) {
+                            room.guestLeft(id)
+                            wifiMultiLobbyState = room.lobbyMessage()
+                            server.broadcastLobby(wifiMultiLobbyState!!)
+                        } else {
+                            argentumSocket.runningLocalHost?.receive(
+                                JSONObject().put("type", "guestLeft").put("seatId", id.value),
+                                com.arcanatable.engine.LocalArgentumHost.HUMAN_ID)
+                        }
+                    }
+                } },
+            )
+            server.start()
+            val bound = withContext(Dispatchers.IO) { server.awaitReady(10_000) }
+            if (!bound) {
+                message = "Couldn't start the Wi-Fi multiplayer host: ${server.bindError?.javaClass?.simpleName ?: "socket not ready"}"
+                server.close()
+                return@launch
+            }
+            wifiServer = server
+            wifiMultiLobby = room
+            wifiMultiSetup = setup
+            wifiMultiRegistry = registry
+            wifiMultiLobbyState = room.lobbyMessage()
+            wifiWaitingAddress = address
+            recordDiagnostic("Four-player Wi-Fi lobby open; requested ${room.seatCount} seats at $address",
+                DiagnosticCategory.CONNECTION)
+        } catch (error: Throwable) {
+            stopWifi()
+            message = "Multiplayer hosting failed: ${error.javaClass.simpleName}: ${error.message?.take(200)}"
+            recordDiagnostic("Multiplayer Wi-Fi host failed: ${error.javaClass.simpleName}: ${error.message}", DiagnosticCategory.ERROR)
+        } finally {
+            offlineStarting = false
+        }
+    }
+}
+
+/** Validate each seat before it may send game actions or receive its own private view. */
+private suspend fun TableController.acceptMultiWifiGuest(
+    server: ArgentumLanMultiServer,
+    room: ArgentumWaitingLobby,
+    id: com.wingedsheep.sdk.model.EntityId,
+    hello: JSONObject,
+    registry: com.wingedsheep.engine.registry.CardRegistry,
+) {
+    if (wifiServer !== server || wifiMultiLobby !== room) {
+        server.rejectGuest(id, "This game is no longer accepting guests.")
+        return
+    }
+    val name = hello.optString("name").ifBlank { "Friend" }.take(32)
+    val deck = hello.optJSONArray("deck") ?: JSONArray()
+    val names = (0 until deck.length()).map(deck::optString)
+    val commander = hello.optString("commander").takeUnless { it.isBlank() || it == "null" }
+    val (seat, notes) = withContext(Dispatchers.IO) {
+        com.arcanatable.engine.OfflineGameSetup.lanSeat(offlineLibrary(), registry, name, names, commander)
+    }
+    if (wifiServer !== server || wifiMultiLobby !== room) {
+        server.rejectGuest(id, "The host closed the room.")
+        return
+    }
+    if (seat == null || !room.seatGuestAt(id, seat)) {
+        server.rejectGuest(id, notes.firstOrNull() ?: "That deck or seat isn't available.")
+        return
+    }
+    if (!server.admitGuest(id)) {
+        room.guestLeft(id)
+        return
+    }
+    server.sendTo(id, JSONObject().put("type", "lanSeat").put("seat", id.value).put("name", seat.name))
+    notes.forEach { note -> server.sendTo(id, JSONObject().put("type", "error")
+        .put("code", "WIFI_NOTE").put("message", note)) }
+    wifiMultiLobbyState = room.lobbyMessage()
+    server.broadcastLobby(wifiMultiLobbyState!!)
+    recordDiagnostic("Multiplayer guest joined seat ${id.value}", DiagnosticCategory.CONNECTION)
+}
+
+/** Host alone decides when every requested friend has arrived and gameplay can start. */
+internal fun TableController.startMultiWifiGame() {
+    val room = wifiMultiLobby ?: return
+    val server = wifiServer as? ArgentumLanMultiServer ?: return
+    val registry = wifiMultiRegistry ?: return
+    val roster = room.start() ?: return
+    wifiMultiStartDepartures = mutableSetOf()
+    scope.launch {
+        try {
+            wifiRole = "host"
+            wifiWaitingAddress = null
+            argentumSocket.localHostFactory = { emit ->
+                com.arcanatable.engine.LocalArgentumHost(
+                    registry, roster.players[0], roster.opponent,
+                    extraOpponents = roster.extraOpponents, emit = emit
+                ).also { it.quietOpponentTurns = quietOpponentTurns }
+            }
+            argentumOffline = true
+            argentumDeckForLobby = null
+            argentumCommanderForLobby = null
+            argentumVsAiLobby = false
+            argentumLobbySubmitted = true
+            argentumLocalPlayersBackup = players.toList()
+            argentumEnabled = true
+            homeOpen = false
+            lobbyOpen = false
+            argentumSocket.connect(lobbyPlayerName)
+            var attempt = 0
+            while (argentumSocket.runningLocalHost == null && attempt++ < 20) delay(100)
+            val host = argentumSocket.runningLocalHost
+                ?: error("The local Argentum engine did not start.")
+            for ((id, seat) in roster.humanGuests) {
+                host.setGuest(id, seat) { packet -> server.sendTo(id, packet) }
+            }
+            releaseMultiStartDepartures(host)
+            argentumSocket.createCommanderPracticeLobby(vsAi = false)
+            wifiMultiLobbyState = null
+            recordDiagnostic("Wi-Fi Commander started with ${roster.players.size} seats and ${roster.humanGuests.size + 1} humans",
+                DiagnosticCategory.ENGINE)
+        } catch (error: Throwable) {
+            wifiMultiStartDepartures = null
+            message = "Could not start the multiplayer engine: ${error.message ?: error.javaClass.simpleName}"
+            argentumSocket.close()
+            stopWifi()
+            argentumEnabled = false
+            homeOpen = true
+        }
+    }
+}
+
+/**
+ * Friends who dropped while START was binding seats: the engine registered them as people, so
+ * tell it they left (it hands each seat to the AI) instead of leaving seats nobody will play.
+ * Runs on the main thread after every setGuest call is queued, so the engine sees them in order.
+ */
+internal fun TableController.releaseMultiStartDepartures(host: com.arcanatable.engine.LocalArgentumHost) {
+    val departed = wifiMultiStartDepartures.orEmpty().toList()
+    wifiMultiStartDepartures = null
+    for (id in departed) {
+        host.receive(JSONObject().put("type", "guestLeft").put("seatId", id.value),
+            com.arcanatable.engine.LocalArgentumHost.HUMAN_ID)
+    }
+}
+
 /** Guest: look for a host on this network. */
 internal fun TableController.searchWifiHosts() {
     if (wifiSearching) return
@@ -165,6 +346,8 @@ internal fun TableController.joinWifiGame(address: String) {
             withContext(Dispatchers.IO) { guest.connect(address, hello) }
             wifiJoinOpen = false
             wifiRole = "guest"
+            wifiGuestWaiting = true
+            wifiGuestLobbyState = null
             argentumOffline = true
             argentumDeckForLobby = null
             argentumCommanderForLobby = null
@@ -238,21 +421,115 @@ internal fun TableController.stopWifi() {
     wifiWaitingAddress = null
     onlineRoomCode = null
     wifiRole = null
+    wifiMultiLobby = null
+    wifiMultiSetup = null
+    wifiMultiRegistry = null
+    wifiMultiLobbyState = null
+    wifiGuestLobbyState = null
+    wifiGuestWaiting = false
+    wifiMultiStartDepartures = null
 }
 
 /** Host's "waiting for your friend" card and the guest's "find a host" dialog. */
 @Composable
 internal fun TableController.WifiDialogs() {
+    if (wifiMultiConfigOpen && BuildConfig.DEBUG) {
+        AlertDialog(
+            onDismissRequest = { wifiMultiConfigOpen = false },
+            title = { Text("Host Wi-Fi Commander · Preview") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Choose 2–4 seats. Each can be a friend or an AI opponent. Every phone must use this Wi-Fi.")
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        (2..4).forEach { size ->
+                            TextButton(onClick = {
+                                wifiMultiSeatCount = size
+                                wifiMultiFriendSlots = wifiMultiFriendSlots.filter { it < size }
+                                    .toSet().ifEmpty { setOf(1) }
+                            }) { Text(if (wifiMultiSeatCount == size) "[$size]" else "$size") }
+                        }
+                    }
+                    (1 until wifiMultiSeatCount).forEach { seat ->
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text("Seat ${seat + 1}")
+                            TextButton(onClick = {
+                                wifiMultiFriendSlots = if (seat in wifiMultiFriendSlots)
+                                    wifiMultiFriendSlots - seat else wifiMultiFriendSlots + seat
+                            }) {
+                                Text(if (seat in wifiMultiFriendSlots) "Friend · change to AI"
+                                    else "AI · change to friend")
+                            }
+                        }
+                    }
+                    Text("When each selected friend has joined, tap Start Game on this phone.")
+                }
+            },
+            confirmButton = { TextButton(
+                enabled = (1 until wifiMultiSeatCount).any(wifiMultiFriendSlots::contains),
+                onClick = { startMultiWifiHost() }
+            ) { Text("HOST LOBBY") } },
+            dismissButton = { TextButton(onClick = { wifiMultiConfigOpen = false }) { Text("CANCEL") } },
+        )
+    }
     wifiWaitingAddress?.let { address ->
+        val current = wifiMultiLobbyState
+        if (current != null) {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text("Wi-Fi Commander · ${current.optInt("seatCount")} players") },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("Other phones: PLAY → Play with a friend → Join on Wi-Fi.")
+                        Text("Host address: $address")
+                        val seats = current.optJSONArray("seats") ?: JSONArray()
+                        for (i in 0 until seats.length()) {
+                            val seat = seats.getJSONObject(i)
+                            Text("${i + 1}. ${seat.optString("name")} · ${seat.optString("kind")}")
+                        }
+                        Text("Waiting for ${current.optInt("openSeats")} friend(s).")
+                    }
+                },
+                confirmButton = { TextButton(
+                    enabled = current.optBoolean("canStart"),
+                    onClick = { startMultiWifiGame() }
+                ) { Text("START GAME") } },
+                dismissButton = { TextButton(onClick = { stopWifi() }) { Text("CANCEL") } },
+            )
+        } else {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text("Waiting for your friend") },
+                text = {
+                    Text("Keep this screen open. On the other phone: PLAY → Wi-Fi with a friend → Join a game.\n\n" +
+                        "If it doesn't find you, type this address there:\n$address")
+                },
+                confirmButton = {},
+                dismissButton = { TextButton(onClick = { stopWifi() }) { Text("CANCEL") } },
+            )
+        }
+    }
+    if (wifiGuestWaiting && wifiRole == "guest") {
         AlertDialog(
             onDismissRequest = {},
-            title = { Text("Waiting for your friend") },
+            title = { Text("Waiting for the host") },
             text = {
-                Text("Keep this screen open. On the other phone: PLAY → Wi-Fi with a friend → Join a game.\n\n" +
-                    "If it doesn't find you, type this address there:\n$address")
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text("The host starts Commander when everyone's seated.")
+                    wifiGuestLobbyState?.optJSONArray("seats")?.let { roster ->
+                        for (i in 0 until roster.length()) {
+                            val seat = roster.getJSONObject(i)
+                            Text("${i + 1}. ${seat.optString("name")} · ${seat.optString("kind")}")
+                        }
+                    }
+                }
             },
             confirmButton = {},
-            dismissButton = { TextButton(onClick = { stopWifi() }) { Text("CANCEL") } },
+            dismissButton = { TextButton(onClick = {
+                argentumSocket.close()
+                stopWifi()
+                argentumEnabled = false
+                homeOpen = true
+            }) { Text("LEAVE LOBBY") } },
         )
     }
     onlineRoomCode?.let { code ->
