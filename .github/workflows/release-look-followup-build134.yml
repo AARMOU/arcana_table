@@ -374,6 +374,17 @@ jobs:
             echo '::error title=Lobby needs manual integration::Unrecognized overlapping changes; no build permitted.'
             git diff --name-only --diff-filter=U | tee combined-evidence/next-apk-lobby-conflicts.txt
             cat combined-evidence/next-apk-lobby-merge.log
+            python3 - <<'PYCONFLICT'
+          from pathlib import Path
+          for rel in Path('combined-evidence/next-apk-lobby-conflicts.txt').read_text().splitlines():
+              value = Path(rel).read_text()
+              chunks = value.splitlines()
+              indices = [i for i,line in enumerate(chunks) if line.startswith('<<<<<<< ')]
+              print('=== ',rel,' ===')
+              for at in indices:
+                  end = next((j for j in range(at+1,len(chunks)) if chunks[j].startswith('>>>>>>> ')),len(chunks)-1)
+                  print('\\n'.join(f'{k+1:04d}: {chunks[k]}' for k in range(max(0,at-7),min(len(chunks),end+8))))
+          PYCONFLICT
             exit 1
           fi
           git merge-base --is-ancestor "$LOBBY_SHA" HEAD
