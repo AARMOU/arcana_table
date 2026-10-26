@@ -7,6 +7,7 @@ rules hazards. Never converts a SUPPORTED heuristic into a worker authorization.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 from pathlib import Path
@@ -70,7 +71,7 @@ def main() -> None:
     names = [x["name"] for x in missing]
     assert set(names) <= set(TRIAGE), "new missing card requires explicit safety triage"
     cmd = [str(ROOT / "tools/cardkit/cardkit"), "classify", *names, "--json"]
-    classified = json.loads(subprocess.check_output(cmd, cwd=ROOT, text=True))
+    classified = json.loads(subprocess.check_output(cmd, cwd=ROOT, text=True)) if names else []
     by_name = {v["name"]: v for v in classified}
     assert set(by_name) == set(names)
     rows = []
@@ -88,7 +89,16 @@ def main() -> None:
         })
     indexed = sum(x["quantity"] for x in incursion["cards"] if x["name"] in index)
     indexed_unbound = sum(x["quantity"] for x in unbound["cards"] if x["name"] in index)
+    integration_commit = subprocess.check_output(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+    ).strip()
+    input_hashes = {
+        str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in [MANIFEST, *INDEXES]
+    }
     result = {
+        "integrationCommit": integration_commit,
+        "inputSha256": input_hashes,
         "basis": "current checkout; two shipped indexes + exact official manifest + offline Cardkit Oracle",
         "incursionIndexedSlots": indexed,
         "incursionMissingSlots": 100 - indexed,
@@ -103,7 +113,7 @@ def main() -> None:
     lines = [
         "# Eldrazi Incursion — exact 100-card Cardkit gap triage",
         "",
-        f"Current checkout: **{indexed}/100 indexed**, {100-indexed} missing; "
+        f"Integration commit `{integration_commit}`: **{indexed}/100 indexed**, {100-indexed} missing; "
         f"Eldrazi Unbound **{indexed_unbound}/100 indexed**.",
         "",
         "Cardkit SUPPORTED is only a similarity heuristic. None of these missing cards "
@@ -124,7 +134,7 @@ def main() -> None:
         "",
     ]
     OUTPUT.with_suffix(".md").write_text("\n".join(lines))
-    print(f"Eldrazi Incursion {indexed}/100; Unbound {indexed_unbound}/100; "
+    print(f"Integration {integration_commit}: Eldrazi Incursion {indexed}/100; Unbound {indexed_unbound}/100; "
           f"Cardkit classified {len(rows)} missing names")
     for row in rows:
         print(f"{row['cardkitReadiness']:<25} {row['name']:<32} {row['engineeringLane']}")
