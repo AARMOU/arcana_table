@@ -43,9 +43,9 @@ jobs:
           assert p.is_file(), 'Missing Ugin scenario XML'
           root = ET.parse(p).getroot()
           cases = {c.get('name'): c for c in root.iter('testcase')}
-          required = {'plusOneCannotBeActivatedTwiceInOneTurn', 'minusThreeCannotFollowPlusOneInSameTurn', 'colorlessThreeGenericSpellCostsExactlyOneWithUgin', 'uginDoesNotReduceFourGenericSpellToOne', 'uginDoesNotDiscountColoredSpellsGenericComponent', 'uginDiscountCannotPayRequiredColorlessSymbol', 'uginGenericDiscountStopsAtZero', 'uginDiscountNeverAppliesToOpponentsColorlessSpells', 'spiritWithNoExiledCardLeavesWithoutCreatingOrReturningOne', 'spiritExiledByRealSpellReturnsItsLinkedCardExactlyOnce'}
+          required = {'plusOneCannotBeActivatedTwiceInOneTurn', 'minusThreeCannotFollowPlusOneInSameTurn', 'colorlessThreeGenericSpellCostsExactlyOneWithUgin', 'uginDoesNotReduceFourGenericSpellToOne', 'uginDoesNotDiscountColoredSpellsGenericComponent', 'uginDiscountCannotPayRequiredColorlessSymbol', 'uginGenericDiscountStopsAtZero', 'uginDiscountNeverAppliesToOpponentsColorlessSpells', 'spiritWithNoExiledCardLeavesWithoutCreatingOrReturningOne', 'spiritExiledByRealSpellReturnsItsLinkedCardExactlyOnce', 'opponentRemovalReturnsLinkedCardToOriginalOwner'}
           assert required <= cases.keys(), ('Missing new tests', sorted(required - cases.keys()))
-          assert len(cases) >= 17, ('Unexpectedly few Ugin tests', len(cases))
+          assert len(cases) >= 18, ('Unexpectedly few Ugin tests', len(cases))
           for name, case in cases.items():
               assert not any(case.find(x) is not None for x in ('failure','error','skipped')), ('Nonpassing Ugin test', name)
           print('Ugin real-engine scenarios passed:', len(cases))
