@@ -35,6 +35,7 @@ jobs:
               "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt",
               "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt",
               "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt",
+              "android/app/src/test/java/com/arcanatable/UginExportedRuntimeTest.kt",
               "android/app/src/main/assets/argentum/custom-cards.jsonl",
               "android/app/src/main/assets/argentum/custom-cards.index.tsv",
               "docs/agents/generated/pattern-index.json",
@@ -157,6 +158,16 @@ jobs:
           custom = check_xml(Path("android/custom-cards/build/test-results/test"))
           android = check_xml(Path("android/app/build/test-results/testDebugUnitTest"))
           assert custom >= 22 and android >= 300, ("Truncated regression suites",custom,android)
+          # The Android app deserializes committed JSONL, not Kotlin card objects.
+          # Fail closed unless both actual runtime/initializer tests executed.
+          runtime_xml = Path("android/app/build/test-results/testDebugUnitTest/TEST-com.arcanatable.UginExportedRuntimeTest.xml")
+          assert runtime_xml.is_file(), "Exported Ugin Android runtime JUnit XML missing"
+          runtime_cases = list(ET.parse(runtime_xml).getroot().iter("testcase"))
+          assert {c.get("name") for c in runtime_cases} == {
+              "exportedUginLoadsIntoAndroidRuntimeRegistry",
+              "exportedUginCanInitializeRealArgentumGame",
+          }, ("Missing Android CardLoader/game initialization tests", runtime_cases)
+          assert all(all(c.find(k) is None for k in ("failure","error","skipped")) for c in runtime_cases), "Exported Ugin runtime failure/skip"
           summary = {"head":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),"base":base,"ugin_source_blob":"f4bab3f7666c7fe49cb0bf4110a56195508ba282","ugin_test_blob":"670a31ee699f41a524820fe16f01199892fa1aae","indexed_before_after":counts,"ugin_executed":len(cases),"custom_cases":custom,"android_cases":android,"integrated_to_development":False}
           Path("ugin-staged-proof.json").write_text(json.dumps(summary,indent=2,sort_keys=True)+"\n")
           print(json.dumps(summary,sort_keys=True))
