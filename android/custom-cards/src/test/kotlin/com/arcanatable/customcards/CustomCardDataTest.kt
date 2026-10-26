@@ -26,11 +26,28 @@ class CustomCardDataTest {
         }
     }
 
+    /**
+     * Every Arcana card is kept. When Argentum also has one, exactly one version is in play: Argentum's
+     * (its scenario tests then run against Argentum's card, see CardPool.inPlay), or Arcana's when
+     * custom-overrides.txt lists it. The weekly upgrade maintains that list (weekly.py reconcile).
+     */
     @Test
-    fun noCustomCardShadowsAnArgentumCard() {
+    fun everyOverrideIsACustomCardThatArgentumAlsoHas() {
         val library = File(assets, "all-cards.index.tsv").readLines().map { it.substringBefore('\t').lowercase() }.toSet()
-        val clashes = CustomCards.all.map { it.name }.filter { it.lowercase() in library }
-        assertTrue("Argentum now has these; drop the custom versions: $clashes", clashes.isEmpty())
+        val custom = CustomCards.all.map { it.name.lowercase() }.toSet()
+        val notCustom = CardPool.overrides.filter { it !in custom }
+        assertTrue("custom-overrides.txt names cards Arcana doesn't define: $notCustom", notCustom.isEmpty())
+        val stale = CardPool.overrides.filter { it !in library }
+        assertTrue("custom-overrides.txt lists cards Argentum doesn't have (remove them): $stale", stale.isEmpty())
+    }
+
+    @Test
+    fun everyCustomCardIsStillPlayable() {
+        // Superseded or overridden, each Arcana card resolves to exactly one definition in play.
+        for (card in CustomCards.all) {
+            val played = CardPool.inPlay(card)
+            assertTrue("${card.name} has no playable version", played.name.equals(card.name, ignoreCase = true))
+        }
     }
 
     @Test

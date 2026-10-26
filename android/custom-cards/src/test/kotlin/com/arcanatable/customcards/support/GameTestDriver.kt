@@ -105,17 +105,18 @@ class GameTestDriver {
     // =========================================================================
 
     /**
-     * Register a card definition for use in tests.
+     * Register a card definition for use in tests. A custom card that Argentum's library now supersedes
+     * is registered as Argentum's version, so the test checks the card the app actually plays.
      */
     fun registerCard(card: CardDefinition) {
-        cardRegistry.register(card)
+        cardRegistry.register(CardPool.inPlay(card))
     }
 
     /**
-     * Register multiple card definitions.
+     * Register multiple card definitions (each as the app plays it; see [registerCard]).
      */
     fun registerCards(cards: Iterable<CardDefinition>) {
-        cardRegistry.register(cards)
+        cardRegistry.register(cards.map(CardPool::inPlay))
     }
 
     /**

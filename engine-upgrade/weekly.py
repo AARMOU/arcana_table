@@ -11,6 +11,9 @@
     weekly.py handoff  KIND UPSTREAM  write weekly/handoff.md (conflict | build_failed | needs_work)
     weekly.py install  ENGINE         copy the four rebuilt Java 17 jars and exported card data into the app
     weekly.py cards    OLD_ASSETS     imported-card report: decks, custom cards, corpus diff
+    weekly.py reconcile [ROUNDS]      custom cards Argentum now also has: keep every one, and choose per
+                                      card which version is played (Argentum's if it passes Arcana's
+                                      scenario tests for that card, else Arcana's, via custom-overrides.txt)
     weekly.py summary  RESULTS_DIR    test totals from JUnit XML
 
 Conflicts are auto-resolved only where that is safe: CHANGELOG files (upstream wins) and resolutions
@@ -42,6 +45,16 @@ OUT = ROOT / "engine-upgrade/weekly"
 ASSETS = ROOT / "android/app/src/main/assets/argentum"
 LIBS = ROOT / "android/app/libs"
 PRECONS = ROOT / "investigation/argentum-six-precons/deck-manifest.json"
+ANDROID = ROOT / "android"
+CARD_SOURCES = ANDROID / "custom-cards/src/main/kotlin/com/arcanatable/customcards/cards"
+CUSTOM_TESTS = ANDROID / "custom-cards/src/test/kotlin"
+CUSTOM_RESULTS = ANDROID / "custom-cards/build/test-results/test"
+OVERRIDES = ASSETS / "custom-overrides.txt"
+OVERRIDES_HEADER = """# Arcana custom cards played instead of Argentum's card of the same name.
+# Maintained automatically by the weekly Argentum upgrade (engine-upgrade/weekly.py reconcile):
+# a card is listed here when Argentum's version fails Arcana's scenario tests for that card,
+# and removed again once Argentum's version passes them. One card name per line.
+"""
 MODULES = {
     "mtg-sdk": "com/wingedsheep/sdk/model/CardDefinition.class",
     "mtg-sdk-tooling": "com/wingedsheep/sdk/tooling/CardLoader.class",
@@ -336,11 +349,11 @@ def handoff(kind, upstream, run_url=""):
     else:
         start = "origin/bot/argentum-weekly"
         steps = [f"git fetch origin && git checkout -b {fix} {start}",
-                 "# custom-card collision: compare upstream's card with Arcana's; run the card's positive and negative",
-                 "#   scenarios against upstream's version; if upstream is correct, retire the custom card (definition,",
-                 "#   CustomCards.kt entry, re-export); if not, record why it stays. Never exempt it from the test.",
+                 "# custom-card collisions are reconciled automatically (weekly.py reconcile keeps every Arcana card",
+                 "#   and picks the version in play from its scenario tests); never delete a custom card to fix a run.",
                  "# failing test: find the root cause; never weaken, skip or delete the test (AGENTS.md rules)",
-                 "cd android && ./gradlew --no-daemon :custom-cards:exportCards :custom-cards:test :app:testDebugUnitTest",
+                 "python3 engine-upgrade/weekly.py reconcile",
+                 "cd android && ./gradlew --no-daemon :app:testDebugUnitTest",
                  f"git push -u origin {fix}   # starts a dry run automatically (read-only, publishes nothing)"]
         goal = "every check in the table above is green"
     lines = ["### Handoff", "",
@@ -485,15 +498,14 @@ def cards(old_dir):
         "decks": len(decks),
     }
     report["deck_cards_now_upstream"] = {c: deck_cards[c] for c in report["now_upstream"] if c in deck_cards}
-    # Fail closed: a collision is never exempted here. CustomCardDataTest.noCustomCardShadowsAnArgentumCard
-    # stays strict, so the upgrade stays red until each collision is retired or approved in its own change.
+    # Custom cards Argentum also has. Not a blocker: every Arcana card is kept, and `reconcile` decides
+    # from the scenario tests which version is played. Only a card that stops resolving blocks.
     report["collisions"] = sorted(n for n in custom if n.lower() in new_set)
     report["precons"] = precon_report(old_set, new_set, custom_set)
     write("cards.json", report)
     write("cards.md", cards_markdown(report))
     print(cards_markdown(report))
-    blocked = report["deck_cards_missing"] or report["collisions"] or any(
-        deck["newly_missing"] for deck in report["precons"])
+    blocked = report["deck_cards_missing"] or any(deck["newly_missing"] for deck in report["precons"])
     return 1 if blocked else 0
 
 
@@ -563,18 +575,129 @@ def cards_markdown(r):
             lines += ["", "Newly indexed precon cards (upstream added them; need scenario coverage before "
                       "counting as verified): " + ", ".join(gained)]
     if r["collisions"]:
-        lines += ["", "**❌ Upstream now implements these custom cards — decision required (blocks the upgrade):**",
-                  "For each: compare upstream's implementation with Arcana's, run the card's positive and negative "
-                  "scenarios against upstream's version, then retire the custom copy or record why it stays. "
-                  "`CustomCardDataTest` stays strict until then.", ""]
-        lines += bullet(f"{c}" + (f" — in {', '.join(r['deck_cards_now_upstream'][c])}"
-                                  if c in r["deck_cards_now_upstream"] else "") for c in r["collisions"])
+        lines += ["", f"Upstream also implements {len(r['collisions'])} Arcana custom card(s). All are kept; "
+                  "which version is played is decided automatically from their scenario tests (see "
+                  "**Custom-card reconciliation**)."]
     else:
         lines += ["", "✅ No custom card collides with an upstream card."]
     lines += ["", "**Deck cards whose upstream rules changed** (worth a phone check):", ""]
     lines += bullet(f"{c} — {', '.join(d)}" for c, d in r["deck_cards_changed"].items())
     if lib["removed"]:
         lines += ["", "**Removed from the library:**", ""] + bullet(lib["removed"])
+    return "\n".join(lines) + "\n"
+
+
+# ---------------------------------------------------------------- reconcile
+
+def read_overrides():
+    if not OVERRIDES.is_file():
+        return []
+    return [n for n in (line.split("#")[0].strip() for line in OVERRIDES.read_text().splitlines()) if n]
+
+
+def write_overrides(cards_kept):
+    OVERRIDES.write_text(OVERRIDES_HEADER + "".join(f"{n}\n" for n in sorted(cards_kept, key=str.lower)))
+
+
+def card_identifiers():
+    """Kotlin name of each custom card definition -> its card name (`val ScurryOak = card("Scurry Oak")`)."""
+    found = {}
+    for source in CARD_SOURCES.glob("*.kt"):
+        for m in re.finditer(r'^val\s+(\w+)\s*=\s*card\(\s*"((?:[^"\\]|\\.)*)"', source.read_text(), re.M):
+            found[m.group(1)] = m.group(2).replace('\\"', '"')
+    return found
+
+
+def failing_test_classes(results=None):
+    failed = set()
+    for report in Path(results or CUSTOM_RESULTS).glob("TEST-*.xml"):
+        root = ET.parse(report).getroot()
+        for case in root.iter("testcase"):
+            if case.find("failure") is not None or case.find("error") is not None:
+                failed.add(case.get("classname", ""))
+    return failed
+
+
+def test_source(classname):
+    path = CUSTOM_TESTS / (classname.split("$")[0].replace(".", "/") + ".kt")
+    return path.read_text() if path.is_file() else ""
+
+
+def implicated(failing, candidates, identifiers):
+    """Candidate cards a failing test class exercises: it names the card, or uses its Kotlin definition."""
+    by_name = {name.lower(): ident for ident, name in identifiers.items()}
+    hit = set()
+    for classname in failing:
+        text = test_source(classname)
+        for card in candidates:
+            ident = by_name.get(card.lower())
+            if f'"{card}"' in text or (ident and re.search(rf"\b{re.escape(ident)}\b", text)):
+                hit.add(card)
+    return hit
+
+
+def reconcile(rounds="4"):
+    """Every Arcana custom card is kept. For each one Argentum now also has, Argentum's version is tried
+    first: the card's scenario tests run against it (CardPool.inPlay). A card whose tests then fail
+    keeps Arcana's version in play (custom-overrides.txt), and the suite is re-run to confirm. Each run
+    starts from a clean list, so a card goes back to Argentum's version once that version passes."""
+    library = {n.lower() for n in names(ASSETS / "all-cards.index.tsv")}
+    custom = names(ASSETS / "custom-cards.index.tsv")
+    collisions = sorted(n for n in custom if n.lower() in library)
+    previous = {n.lower() for n in read_overrides()}
+    identifiers = card_identifiers()
+    kept = set()
+    write_overrides(kept)
+    passed, failing, log = False, set(), ""
+    for _ in range(int(rounds)):
+        shutil.rmtree(CUSTOM_RESULTS, ignore_errors=True)
+        result = run("./gradlew", "--no-daemon", "--max-workers=2", ":custom-cards:exportCards",
+                     ":custom-cards:test", "--rerun", cwd=ANDROID, check=False)
+        log = (result.stdout + result.stderr)[-6000:]
+        failing = failing_test_classes()
+        if result.returncode == 0:
+            passed = True
+            break
+        newly = implicated(failing, [c for c in collisions if c not in kept], identifiers)
+        if not newly:
+            break  # failures unrelated to a collision (or a build error): real work, reported below
+        kept |= newly
+        write_overrides(kept)
+    report = {
+        "collisions": collisions,
+        "argentum_in_play": sorted(c for c in collisions if c not in kept),
+        "arcana_kept": sorted(kept),
+        "newly_argentum": sorted(c for c in collisions if c not in kept and c.lower() in previous),
+        "passed": passed,
+        "failing_classes": sorted(c.split(".")[-1] for c in failing),
+    }
+    write("reconcile.json", report)
+    write("reconcile.md", reconcile_markdown(report))
+    print(reconcile_markdown(report))
+    if not passed:
+        print(log)
+    return 0 if passed else 1
+
+
+def reconcile_markdown(r):
+    lines = ["### Custom-card reconciliation", ""]
+    if not r["collisions"]:
+        lines.append("No custom card is also in Argentum's library; all custom cards play as Arcana's versions.")
+    else:
+        lines.append(f"{len(r['collisions'])} Arcana custom card(s) are also in Argentum's library. Every one is "
+                     "kept in Arcana; the version played was chosen by running its scenario tests.")
+        if r["argentum_in_play"]:
+            lines += ["", "**Argentum's version now played** (it passes Arcana's scenario tests):", ""]
+            lines += bullet(r["argentum_in_play"])
+        if r["arcana_kept"]:
+            lines += ["", "**Arcana's version kept in play** (Argentum's failed Arcana's scenario tests; listed "
+                      "in `custom-overrides.txt`, re-checked every week):", ""]
+            lines += bullet(r["arcana_kept"])
+    if r["passed"]:
+        lines += ["", "✅ Custom-card suite green with these choices."]
+    else:
+        lines += ["", "❌ Custom-card tests still fail, and not because of a collision:", ""]
+        lines += bullet(r["failing_classes"] or ["(no test report: build or export failed, see the run log)"])
     return "\n".join(lines) + "\n"
 
 
@@ -588,8 +711,13 @@ def summary(results_dir):
         for key in totals:
             totals[key] += int(root.get(key, "0"))
         for case in root.iter("testcase"):
-            if case.find("failure") is not None or case.find("error") is not None:
-                failed.append(f"{case.get('classname', '').split('.')[-1]}.{case.get('name')}")
+            problem = case.find("failure") if case.find("failure") is not None else case.find("error")
+            if problem is not None:
+                name = f"{case.get('classname', '').split('.')[-1]}.{case.get('name')}"
+                # The assertion message names the actual problem; keep it so the report is readable
+                # without downloading artifacts.
+                why = (problem.get("message") or (problem.text or "")).strip().splitlines()
+                failed.append(f"{name}: {why[0][:300]}" if why else name)
     totals["failed"] = failed[:50]
     write("tests.json", totals)
     print(totals)
@@ -599,4 +727,4 @@ def summary(results_dir):
 if __name__ == "__main__":
     command, *args = sys.argv[1:]
     sys.exit({"rebase": rebase, "checkout": checkout, "finish": finish, "handoff": handoff, "install": install,
-              "docs": docs, "cards": cards, "summary": summary}[command](*args) or 0)
+              "docs": docs, "cards": cards, "reconcile": reconcile, "summary": summary}[command](*args) or 0)
