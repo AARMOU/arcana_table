@@ -819,11 +819,14 @@ internal fun TableController.TableOverlays() {
     }
     argentumBlockPlan?.let { plan ->
         ArgentumBlockBoard(plan, ::argentumPiece, busy = argentumAwaitingUpdate,
+            warning = argentumLastError?.takeIf { it.contains("block", ignoreCase = true) },
             onConfirm = { action ->
                 val epoch = ArgentumActions.epochFor(plan.legalAction, argentumSnapshot?.interactionEpoch)
                 if (epoch != null && submitArgentumAction(action, epoch)) {
+                    argentumLastError = null
                     recordDiagnostic("Declared ${action.optJSONObject("blockers")?.length() ?: 0} blocker(s)", DiagnosticCategory.ACTION)
-                    argentumBlockPlan = null
+                    // Do not discard 11–24 selections until Argentum accepts the assignment.
+                    // INVALID_ACTION returns to this same board with selections intact.
                 } else message = "Could not send the block declaration. Refresh and try again."
             },
             onDismiss = { argentumBlockPlan = null })
