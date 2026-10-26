@@ -525,7 +525,7 @@ jobs:
           DECK_SHA: 5a64b631b9d7185c7fb4102a58afa9aa237746c0
           LOBBY_BASE: 79dcd0c58837305fcd1f8790fbf052af214d204b
           LOBBY_FIX_SHA: cdcfe759501d044c73b35cba4e6838ffa1ef8b82
-          OUTCOME_SHA: abaf13ad913025762db889bde1bf92907cd5a133
+          OUTCOME_SHA: c7f95db09560be4249d89b1288f2dccebe14a45e
           UGIN_BASE: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f
           UGIN_SHA: 49f7f7389b940accf2e2321130407e579cb2ee4c
           TEMPLE_SHA: e57c462d17075ad3d1f2eee249d75edb04b2572a
@@ -752,6 +752,9 @@ jobs:
           # so the real Wi-Fi/internet room existed but its screen never mounted.
           grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
           test -s android/app/src/test/java/com/arcanatable/MultiplayerLobbyVisibilityTest.kt
+          test -s android/app/src/main/java/com/arcanatable/ArgentumBlockSubmissionGuard.kt
+          test -s android/app/src/test/java/com/arcanatable/ArgentumBlockSubmissionGuardTest.kt
+          grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' android/app/src/main/java/com/arcanatable/TableArgentum.kt
           grep -F 'commanderDamageTrackerRows(' android/app/src/main/java/com/arcanatable/TableDialogs.kt
           grep -F 'class UginTheIneffableScenarioTest' android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt
           test -f android/app/src/main/java/com/arcanatable/CardFilters.kt
@@ -1190,7 +1193,9 @@ jobs:
             --tests 'com.arcanatable.GameOutcomeDetailsTest' \
             --tests 'com.arcanatable.ui.HomeScreenSizesTest' \
             --tests 'com.arcanatable.ui.DeckBuilderUiTest' \
-            --tests 'com.arcanatable.UginExportedRuntimeTest'
+            --tests 'com.arcanatable.UginExportedRuntimeTest' \
+            --tests 'com.arcanatable.MultiplayerLobbyVisibilityTest' \
+            --tests 'com.arcanatable.ArgentumBlockSubmissionGuardTest'
       - name: Run full Android app unit tests and strict Eldrazi Commander AI tests
         working-directory: android
         shell: bash
