@@ -1,0 +1,95 @@
+name: Arcana AI Difficulty Duels
+# Plays AI-vs-AI Commander games between difficulty levels on the bundled real Argentum engine,
+# each deck pair twice with the levels swapped between seats. Test-only: changes no app code,
+# assets, signing or releases. Reports are uploaded as artifacts and summarised on the run page.
+on:
+  pull_request:
+    paths:
+      - android/app/src/main/java/com/arcanatable/engine/ai/**
+      - android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AiDifficulty*.kt
+      - .github/workflows/arcana-ai-difficulty-duel.yml
+  workflow_dispatch:
+    inputs:
+      pairs:
+        description: Deck pairs per shard (each pair is two games)
+        default: '4'
+permissions:
+  contents: read
+concurrency:
+  group: arcana-ai-difficulty-duel-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: true
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: AI difficulty unit tests
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.AiDifficultyTest' --tests 'com.arcanatable.customcards.AiRetargetingSearchTest'
+      - name: Report failures as annotations
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          for f in glob.glob('android/custom-cards/build/test-results/test/*.xml'):
+              for case in ET.parse(f).getroot().iter('testcase'):
+                  for bad in list(case.findall('failure')) + list(case.findall('error')):
+                      text = (bad.get('message') or '') + ' | ' + ' | '.join((bad.text or '').strip().splitlines()[:8])
+                      print(f"::error title={case.get('name')}::" + text[:1500].replace('%', '%25').replace('\n', '%0A'))
+          PY
+  duel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { levels: 'HARD,NORMAL', start: 0 }
+          - { levels: 'HARD,NORMAL', start: 4 }
+          - { levels: 'BRUTAL,HARD', start: 0 }
+          - { levels: 'NORMAL,EASY', start: 0 }
+          - { levels: 'NORMAL,EASY', start: 4 }
+          - { levels: 'NORMAL,NORMAL', start: 0 }
+    name: ${{ matrix.levels }} pairs from ${{ matrix.start }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Play duels
+        working-directory: android
+        env:
+          ARCANA_AI_DUEL: '1'
+          ARCANA_AI_DUEL_LEVELS: ${{ matrix.levels }}
+          ARCANA_AI_DUEL_PAIRS: ${{ github.event.inputs.pairs || '4' }}
+          ARCANA_AI_DUEL_PAIR_START: ${{ matrix.start }}
+          ARCANA_AI_DUEL_MAX_GAME_MS: '900000'
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.AiDifficultyDuelTest' -i | grep -E '^(pair=|RESULT|LATENCY|eligible|  crash)' || true
+      - name: Summarise
+        if: always()
+        run: |
+          f=$(ls android/custom-cards/build/reports/ai-difficulty/*.txt 2>/dev/null | head -1)
+          if [ -z "$f" ]; then echo "No report produced" >> "$GITHUB_STEP_SUMMARY"; exit 1; fi
+          { echo '### ${{ matrix.levels }} (pairs from ${{ matrix.start }})'; echo '```'; cat "$f"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+          # Also as an annotation, so the results are readable from the checks API.
+          statuses=$(grep -oE 'status=[^ ]+' "$f" | sort | uniq -c | tr -s ' ' | tr '\n' ';')
+          body=$(grep -E '^(RESULT|LATENCY|eligible|HESITATED|pair=)|crash' "$f" | sed -E 's/ actions=[0-9]+ ms=[0-9]+//' | head -30 | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::notice title=Duel ${{ matrix.levels }} from ${{ matrix.start }}::${body}%0Astatuses:${statuses}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ai-difficulty-${{ strategy.job-index }}
+          path: android/custom-cards/build/reports/ai-difficulty/
+          if-no-files-found: warn

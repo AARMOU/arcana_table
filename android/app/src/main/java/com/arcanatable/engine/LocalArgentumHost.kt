@@ -2,6 +2,7 @@ package com.arcanatable.engine
 
 import com.arcanatable.engine.costs.CounterRemovalCost
 import com.wingedsheep.ai.engine.AIPlayer
+import com.arcanatable.engine.ai.AiDifficulty
 import com.arcanatable.engine.ai.OfflineAiPolicy
 import com.arcanatable.OfflineCheckpointStore
 import com.arcanatable.engine.priority.OfflineHumanAutoPass
@@ -66,7 +67,13 @@ import java.util.concurrent.Executors
 
 
 /** One seat of an offline game: who sits there and what they play. */
-data class LocalSeat(val name: String, val deck: List<String>, val commander: String?)
+/** One seat. [difficulty] only matters when the AI plays the seat. */
+data class LocalSeat(
+    val name: String,
+    val deck: List<String>,
+    val commander: String?,
+    val difficulty: AiDifficulty = AiDifficulty.DEFAULT,
+)
 
 /**
  * Offline Argentum: the real rules engine and AI, run inside Arcana behind the same `/game`
@@ -372,7 +379,7 @@ class LocalArgentumHost(
         interactiveEpochs.clear()
         lastGameOutcomeEvents = emptyList()
         observedLossEvents.clear()
-        ais = allSeats.filterNot(::isPerson).associateWith { OfflineAiPolicy.create(registry, it) }
+        ais = allSeats.filterNot(::isPerson).associateWith { OfflineAiPolicy.create(registry, it, seatOf(it).difficulty) }
         for (seat in people()) {
             emitTo(seat, JSONObject().put("type", "quickGameLobbyState").put("lobbyId", "offline")
                 .put("youPlayerId", seat.value).put("vsAi", true)
@@ -395,7 +402,7 @@ class LocalArgentumHost(
             seed = gameSeed,
         )
         val result = initializer.initializeGame(config)
-        ais = allSeats.filterNot(::isPerson).associateWith { OfflineAiPolicy.create(registry, it) }
+        ais = allSeats.filterNot(::isPerson).associateWith { OfflineAiPolicy.create(registry, it, seatOf(it).difficulty) }
         state = result.state
         gameLogs.clear()
         logSnapshots.clear()
@@ -601,7 +608,9 @@ class LocalArgentumHost(
      * AI does something or the game moves to a new step, the table gets that state ([flush]), so
      * the AI's turn and your auto-passed combat steps play out instead of being skipped.
      */
-    private fun drive(events: MutableList<GameEvent>) = OfflineAiPolicy.withThinkingBurst {
+    private fun drive(events: MutableList<GameEvent>) = OfflineAiPolicy.withThinkingBurst(
+        OfflineAiPolicy.burstMillisFor(ais.keys.map { seatOf(it).difficulty })
+    ) {
         driveBurst(events)
     }
 
@@ -629,8 +638,13 @@ class LocalArgentumHost(
                 val actor = current.actorFor(decision.playerId)
                 if (isPerson(actor)) break
                 val bot = ais[actor] ?: break
-                val response = timed("aiDecision") { OfflineAiPolicy.think { bot.respondToDecision(current, decision) } }
-                if (!apply(SubmitDecision(decision.playerId, response), events, actor)) break
+                val response = timed("aiDecision") { aiGuarded("aiDecisionErrors") { OfflineAiPolicy.think { bot.respondToDecision(current, decision) } } }
+                    ?: retryDecisionWithNormal(actor, current, decision)
+                    ?: break
+                if (!apply(SubmitDecision(decision.playerId, response), events, actor)) {
+                    countDiagnostic("aiRejectedDecisions")
+                    break
+                }
                 flush(paceMs)
                 continue
             }
@@ -638,11 +652,18 @@ class LocalArgentumHost(
             if (!isPerson(priority)) {
                 val bot = ais[priority] ?: break
                 val startedChoice = System.nanoTime()
-                val chosen = timed("aiChoice") { OfflineAiPolicy.think { bot.chooseAction(current) } }
+                val chosen = timed("aiChoice") { aiGuarded("aiChoiceErrors") { OfflineAiPolicy.think {
+                    OfflineAiPolicy.chooseAction(bot, seatOf(priority).difficulty, current) {
+                        enumerator.enumerate(current, priority, com.wingedsheep.engine.legalactions.EnumerationMode.FULL)
+                    }
+                } } }
+                    ?: safePass(current, priority)
                 val choiceType = if (chosen is PassPriority) "aiChoicePass" else "aiChoiceAction"
                 phaseNanos[choiceType] = (phaseNanos[choiceType] ?: 0L) + System.nanoTime() - startedChoice
                 countDiagnostic(if (chosen is PassPriority) "aiPassChoices" else "aiActionChoices")
-                val acted = apply(chosen, events, priority) || apply(safePass(current, priority), events, priority)
+                val acted = apply(chosen, events, priority) ||
+                    retryRejectedAiChoice(bot, current, priority, chosen, events) ||
+                    apply(safePass(current, priority), events, priority)
                 if (!acted) break
                 if (chosen !is PassPriority) flush(paceMs)
                 continue
@@ -664,6 +685,38 @@ class LocalArgentumHost(
             if (!shouldPass) break
             if (!apply(safePass(current, priority), events, priority)) break
         }
+    }
+
+    /**
+     * Runs one AI call; an exception inside the AI's own search (for example a crash while it
+     * simulates combat) is counted and returns null, so the game falls back instead of stopping.
+     */
+    private inline fun <T : Any> aiGuarded(counter: String, work: () -> T): T? = try {
+        work()
+    } catch (error: StackOverflowError) {
+        countDiagnostic(counter); null
+    } catch (error: RuntimeException) {
+        countDiagnostic(counter); null
+    }
+
+    /** A pending decision the chosen AI couldn't answer: ask a Normal-level AI for the seat once. */
+    private fun retryDecisionWithNormal(actor: EntityId, state: GameState, decision: PendingDecision) =
+        if (seatOf(actor).difficulty == AiDifficulty.NORMAL) null
+        else aiGuarded("aiDecisionErrors") { OfflineAiPolicy.think { OfflineAiPolicy.create(registry, actor).respondToDecision(state, decision) } }
+
+    /**
+     * The engine turned down the AI's choice. Instead of passing straight away, let the same AI pick
+     * again from the legal actions without the rejected one (once), so it still makes a real play.
+     */
+    private fun retryRejectedAiChoice(bot: AIPlayer, state: GameState, player: EntityId, rejected: GameAction, events: MutableList<GameEvent>): Boolean {
+        if (rejected is PassPriority) return false
+        countDiagnostic("aiRejectedActions")
+        val legal = runCatching { enumerator.enumerate(state, player, com.wingedsheep.engine.legalactions.EnumerationMode.FULL) }.getOrNull() ?: return false
+        val others = legal.filter { it.action != rejected }
+        if (others.isEmpty()) return false
+        val retry = aiGuarded("aiChoiceErrors") { OfflineAiPolicy.think { bot.chooseFrom(state, others) } } ?: return false
+        if (retry.action is PassPriority) return false
+        return apply(retry.action, events, player).also { if (it) countDiagnostic("aiRejectedRecovered") }
     }
 
     private fun safePass(state: GameState, player: EntityId): GameAction = when {
