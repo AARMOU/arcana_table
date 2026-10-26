@@ -102,7 +102,7 @@ internal class ArgentumDirectedLink(
                     return
                 }
                 ownSeat = assigned
-                if (isHost) {
+                if (isHost && !firstWelcome.get()) {
                     if (!sendPacket(JSONObject().put("type", "relaySeats")
                             .put("kinds", org.json.JSONArray(seatKinds)))) {
                         onFailed("Could not configure the online room.")
