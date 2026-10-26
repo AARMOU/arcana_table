@@ -109,7 +109,7 @@ fun ArcanaHomeScreen(
         Column(Modifier.widthIn(max = if (LocalConfiguration.current.screenHeightDp < 520) 820.dp else if (wide) 560.dp else 460.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text("ARCANA TABLE", color = SoftWhite, fontSize = 20.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
-                IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).clip(CircleShape).border(1.dp, PanelLight, CircleShape)) {
+                IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).tutorialTarget("home-settings").clip(CircleShape).border(1.dp, PanelLight, CircleShape)) {
                     Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = SoftWhite)
                 }
             }
@@ -146,7 +146,7 @@ fun ArcanaHomeScreen(
             val deckPanel: @Composable (Modifier) -> Unit = { mod ->
                 Column(mod) {
                     Text("YOUR DECK", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.padding(bottom = 6.dp))
-                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).border(1.dp, PanelLight, RoundedCornerShape(20.dp)).background(Panel).testTag("home-deck")) {
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).border(1.dp, PanelLight, RoundedCornerShape(20.dp)).background(Panel).testTag("home-deck").tutorialTarget("home-deck")) {
                         Box(Modifier.fillMaxWidth().height(if (short) (if (BuildConfig.DEBUG) 70.dp else 120.dp) else if (wide) (if (BuildConfig.DEBUG) 175.dp else 280.dp) else (if (BuildConfig.DEBUG) 120.dp else 230.dp)).background(Color(0xFF22302C))) {
                             if (commanderArt != null) CardArt(commanderArt, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, fallbackName = deck?.commander)
                             Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Color(0xB3101615)).padding(horizontal = 16.dp, vertical = 10.dp)) {
@@ -155,7 +155,7 @@ fun ArcanaHomeScreen(
                             }
                         }
                         Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            OutlinedButton(onClick = onChangeDeck, enabled = !argentumActive, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Change deck", color = SoftWhite, fontWeight = FontWeight.Bold) }
+                            OutlinedButton(onClick = onChangeDeck, enabled = !argentumActive, modifier = Modifier.weight(1f).heightIn(min = 48.dp).tutorialTarget("home-change-deck")) { Text("Change deck", color = SoftWhite, fontWeight = FontWeight.Bold) }
                             // Import is parked for now (plumbing kept in onImport): greyed, tap says so.
                             val homeContext = androidx.compose.ui.platform.LocalContext.current
                             OutlinedButton(
@@ -174,7 +174,7 @@ fun ArcanaHomeScreen(
                 ) { Text("RETURN TO TABLE", fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
                 else Button(
                     onClick = onPlay, enabled = !working && !resumeAvailable && !offlineResumeAvailable,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp).testTag("home-play"),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp).testTag("home-play").tutorialTarget("home-play"),
                     colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
                 ) { Text(if (working) (workingLabel ?: "PREPARING…") else "PLAY", fontSize = if (working) 15.sp else 22.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp) }
             }
