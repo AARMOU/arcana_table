@@ -420,7 +420,7 @@ internal fun TableController.TableOverlaysB() {
         },
         confirmButton = {
             TextButton(onClick = { reconnectToRoom() }, enabled = !reconnecting) {
-                Text(if (reconnecting) "TRYING…" else "AUTO RECONNECT", color = if (reconnecting) Muted else Mint)
+                Text(if (reconnecting) "TRYING…" else "RECONNECT", color = if (reconnecting) Muted else Mint)
             }
         },
         dismissButton = {
@@ -435,7 +435,7 @@ internal fun TableController.TableOverlaysB() {
                     onlineStatus = "Disconnected"
                 }
                 connectionLostReason = null
-            }) { Text(if (reconnecting) "CANCEL" else "LATER", color = Muted) }
+            }) { Text(if (reconnecting) "CANCEL" else "STAY OFFLINE", color = Muted) }
         },
         containerColor = Panel,
         titleContentColor = SoftWhite,
@@ -574,10 +574,12 @@ internal fun TableController.TableOverlaysB() {
             onDismissRequest = { if (!importAutoFixInProgress) importReviewOpen = false },
             title = { Text("Review imported cards") },
             text = { Text(importReviewMessage, color = Muted, fontSize = 12.sp) },
+            // All actions stack in one right-aligned column, so the dismiss button
+            // is not stranded beside a multi-row group.
             confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    Row {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (cardsNeedingReview.isNotEmpty()) TextButton(
+                            modifier = Modifier.heightIn(min = 48.dp),
                             enabled = !importAutoFixInProgress,
                             onClick = {
                                 val groupedCards = cardsNeedingReview.groupBy { it.name }
@@ -654,6 +656,7 @@ internal fun TableController.TableOverlaysB() {
                             }
                         ) { Text(if (importAutoFixInProgress) "FIXING…" else "AUTO FIX", color = Mint) }
                         if (importOverflowCardIds.isNotEmpty()) TextButton(
+                            modifier = Modifier.heightIn(min = 48.dp),
                             enabled = !importAutoFixInProgress,
                             onClick = {
                                 val overflow = importOverflowCardIds
@@ -663,13 +666,15 @@ internal fun TableController.TableOverlaysB() {
                                 importReviewMessage = "Removed ${overflow.size} card(s) over the deck limit."
                             }
                         ) { Text("TRIM EXCESS", color = Mint) }
-                    }
-                    if (cardsNeedingReview.isNotEmpty()) TextButton(onClick = { if (!importAutoFixInProgress) { importReviewOpen = false; deckEditorOpen = true } }, enabled = !importAutoFixInProgress) {
+                    if (cardsNeedingReview.isNotEmpty()) TextButton(onClick = { if (!importAutoFixInProgress) { importReviewOpen = false; deckEditorOpen = true } }, enabled = !importAutoFixInProgress, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text("OPEN EDITOR", color = Mint)
+                    }
+                    val reviewFinished = cardsNeedingReview.isEmpty() && importOverflowCardIds.isEmpty()
+                    TextButton(onClick = { if (!importAutoFixInProgress) importReviewOpen = false }, enabled = !importAutoFixInProgress, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(if (reviewFinished) "CLOSE" else "LATER", color = SoftWhite)
                     }
                 }
             },
-            dismissButton = { TextButton(onClick = { if (!importAutoFixInProgress) importReviewOpen = false }, enabled = !importAutoFixInProgress) { Text("LATER") } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
@@ -905,7 +910,8 @@ internal fun TableController.TableOverlaysB() {
         title = { Text("Reset this game?") },
         text = { Text("This will shuffle each player's non-token cards into a new library, deal a new opening hand, reset life and timers, and clear the current board and game log. Player names, decks, and commanders will stay.") },
         confirmButton = { TextButton(onClick = { resetGame() }) { Text("RESET GAME", color = Color(0xFFE9978B)) } },
-        dismissButton = { TextButton(onClick = { resetConfirmOpen = false }) { Text("CANCEL") } }
+        dismissButton = { TextButton(onClick = { resetConfirmOpen = false }) { Text("CANCEL") } },
+        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
     )
 
     if (onlineMode && endProposalBy >= 0 && localSeat !in endVotes && !gameEndedOnline) {
@@ -919,11 +925,14 @@ internal fun TableController.TableOverlaysB() {
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
-    if (onlineMode && gameEndedOnline && !argentumEnabled) AlertDialog(
-        onDismissRequest = {},
+    LaunchedEffect(gameEndedOnline) { if (!gameEndedOnline) gameEndedNoticeDismissed = false }
+    // Its buttons must dismiss it, or it would sit on top of the lobby it opens.
+    if (onlineMode && gameEndedOnline && !argentumEnabled && !gameEndedNoticeDismissed) AlertDialog(
+        onDismissRequest = { gameEndedNoticeDismissed = true },
         title = { Text("Game ended by unanimous vote") },
         text = { Text("Every player agreed to end the game. The table is now read-only.") },
-        confirmButton = { TextButton(onClick = { homeOpen = true; showOverview = true; lobbyOpen = true }) { Text("ROOM LOBBY", color = Mint) } },
+        confirmButton = { TextButton(onClick = { gameEndedNoticeDismissed = true; homeOpen = true; showOverview = true; lobbyOpen = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("OPEN LOBBY", color = Mint) } },
+        dismissButton = { TextButton(onClick = { gameEndedNoticeDismissed = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("VIEW TABLE", color = SoftWhite) } },
         containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
     )
 
@@ -972,16 +981,16 @@ internal fun TableController.TableOverlaysB() {
                 }
             },
             confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    if (prompt.isShockLand) TextButton(onClick = { placeLand(enterTapped = false, payTwoLife = true) }, enabled = life >= 2) {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (prompt.isShockLand) TextButton(onClick = { placeLand(enterTapped = false, payTwoLife = true) }, enabled = life >= 2, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text("PAY 2 LIFE · ENTER UNTAPPED", color = if (life >= 2) Mint else Muted)
-                    } else TextButton(onClick = { placeLand(enterTapped = false) }) {
+                    } else TextButton(onClick = { placeLand(enterTapped = false) }, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text("ENTER UNTAPPED", color = Mint)
                     }
-                    TextButton(onClick = { placeLand(enterTapped = true) }) { Text("ENTER TAPPED", color = Mint) }
+                    TextButton(onClick = { placeLand(enterTapped = true) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("ENTER TAPPED", color = Mint) }
+                    TextButton(onClick = { landEntryPrompt = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
                 }
             },
-            dismissButton = { TextButton(onClick = { landEntryPrompt = null }) { Text("CANCEL", color = Muted) } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
@@ -1008,12 +1017,12 @@ internal fun TableController.TableOverlaysB() {
                 }
             },
             confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    TextButton(onClick = { castFromPayment(owner, card, commanderCast) }, enabled = payable != null && costKnown) { Text("PAY FROM MANA POOL", color = if (payable != null && costKnown) Mint else Muted) }
-                    TextButton(onClick = { castFromPayment(owner, card, commanderCast, manualPayment = true) }) { Text("I PAID MANUALLY", color = CounterGold) }
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = { castFromPayment(owner, card, commanderCast) }, enabled = payable != null && costKnown, modifier = Modifier.heightIn(min = 48.dp)) { Text("PAY FROM MANA POOL", color = if (payable != null && costKnown) Mint else Muted) }
+                    TextButton(onClick = { castFromPayment(owner, card, commanderCast, manualPayment = true) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("I PAID MANUALLY", color = CounterGold) }
+                    TextButton(onClick = { paymentCard = null; paymentSourceZone = null; handActionCard = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
                 }
             },
-            dismissButton = { TextButton(onClick = { paymentCard = null; paymentSourceZone = null; handActionCard = null }) { Text("CANCEL") } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = SoftWhite
         )
     }
@@ -1093,7 +1102,7 @@ internal fun TableController.TableOverlaysB() {
 
     if (concedePlayer in players.indices) AlertDialog(
         onDismissRequest = { concedePlayer = -1 },
-        title = { Text("Concede and leave the game?") },
+        title = { Text("Concede this game?") },
         text = { Text("${players[concedePlayer].name} will be marked eliminated and cannot take further game actions. This does not close the room for other players.") },
         confirmButton = { TextButton(onClick = { concede(concedePlayer); concedePlayer = -1 }) { Text("CONCEDE", color = Color(0xFFE9978B)) } },
         dismissButton = { TextButton(onClick = { concedePlayer = -1 }) { Text("CANCEL") } },
@@ -1143,7 +1152,7 @@ internal fun TableController.TableOverlaysB() {
             title = { Text("Choose mana · ${prompt.cardName}") },
             text = { Text("Which mana did this permanent produce?") },
             confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     prompt.options.forEach { option ->
                         TextButton(onClick = {
                             updatePlayer(prompt.playerIndex) { player ->
@@ -1153,13 +1162,13 @@ internal fun TableController.TableOverlaysB() {
                             }
                             logAction(prompt.playerIndex, "added ${option.label} mana")
                             manaChoicePrompt = null
-                        }, modifier = Modifier.heightIn(min = 44.dp)) {
+                        }, modifier = Modifier.heightIn(min = 48.dp)) {
                             ManaSymbolText(option.label, color = Mint, fontSize = 14.sp)
                         }
                     }
+                    TextButton(onClick = { manaChoicePrompt = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
                 }
             },
-            dismissButton = { TextButton(onClick = { manaChoicePrompt = null }) { Text("CANCEL", color = Muted) } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
@@ -1197,7 +1206,8 @@ internal fun TableController.TableOverlaysB() {
             else -> "${prompt.cardName} triggered: ${prompt.triggerText}. Choose any modes, targets, and other decisions on the card, resolve it manually, then confirm. Effect: ${prompt.effectText}"
         }
         AlertDialog(
-            onDismissRequest = { if (prompt.kind == "RHYSTIC" || prompt.kind == "TITHE") resolveTrigger(prompt, paid = false) },
+            // A tap outside must not make the pay-or-not decision for anyone.
+            onDismissRequest = {},
             title = { Text(if (prompt.kind == "RHYSTIC" || prompt.kind == "TITHE") "Triggered choice · ${prompt.cardName}" else "Triggered ability · ${prompt.cardName}") },
             text = { Column {
                 Text(promptText, color = SoftWhite)
@@ -1224,8 +1234,8 @@ internal fun TableController.TableOverlaysB() {
                 }
                 TextButton(onClick = { resolveTrigger(prompt, paid = prompt.kind == "RHYSTIC" || prompt.kind == "TITHE", targetIndex = selectedTriggerTarget.takeIf { it >= 0 }) }, enabled = enabled) {
                     Text(when (prompt.kind) {
-                        "RHYSTIC" -> "PAY {1}"
-                        "TITHE" -> "PAY {2}"
+                        "RHYSTIC" -> "${players[prompt.eventPlayerIndex].name} PAYS {1}"
+                        "TITHE" -> "${players[prompt.eventPlayerIndex].name} PAYS {2}"
                         "AUTO_EFFECT" -> "RESOLVE EFFECT"
                         "TARGET_EFFECT" -> "APPLY TO TARGET"
                         else -> "DONE · MANUAL RESOLUTION"
@@ -1234,8 +1244,8 @@ internal fun TableController.TableOverlaysB() {
             },
             dismissButton = {
                 when (prompt.kind) {
-                    "RHYSTIC" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("DRAW CARD") }
-                    "TITHE" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("CREATE TREASURE") }
+                    "RHYSTIC" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("DON'T PAY · ${players[prompt.controllerIndex].name} DRAWS") }
+                    "TITHE" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("DON'T PAY · ${players[prompt.controllerIndex].name} GETS TREASURE") }
                     "AUTO_EFFECT", "TARGET_EFFECT" -> TextButton(onClick = { resolveTrigger(prompt, paid = false, targetIndex = selectedTriggerTarget.takeIf { it >= 0 }, manual = true) }) { Text("RESOLVE MANUALLY", color = Muted) }
                 }
             },
