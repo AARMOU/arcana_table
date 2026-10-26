@@ -72,8 +72,16 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
-@@ -40,9 +40,16 @@
-     val subtypes = paymentSubtypesOf(cardComponent) + projected.getSubtypes(sourceId)
+@@ -40,9 +40,23 @@
+-    val subtypes = paymentSubtypesOf(cardComponent) + projected.getSubtypes(sourceId)
++    // The projected battlefield subtype set is authoritative after layer 4. Unioning
++    // printed subtypes back in would let a former Eldrazi spend Temple mana even
++    // after a type-changing effect removes Eldrazi from that ability's source.
++    // Outside the battlefield there is no layer projection; retain printed and
++    // changeling-derived subtypes for abilities activated from other zones.
++    val isBattlefieldSource = sourceId in projected.getBaseState().getBattlefield()
++    val subtypes = if (isBattlefieldSource) projected.getSubtypes(sourceId)
++        else paymentSubtypesOf(cardComponent)
      return SpellPaymentContext(
          isAbilityActivation = true,
 -        abilitySourceCardTypes = cardTypes,
@@ -82,12 +90,12 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/
 +        abilitySourceCardTypes = cardTypes,
 +        // Battlefield color-changing effects are authoritative; other zones use printed
 +        // characteristics because the layer projector does not project those entities.
-+        isAbilitySourceColorless = if (sourceId in projected.getBaseState().getBattlefield()) {
++        isAbilitySourceColorless = if (isBattlefieldSource) {
 +            projected.getColors(sourceId).isEmpty()
 +        } else {
 +            cardComponent.colors.isEmpty()
 +        },
-+        isAbilitySourceOnBattlefield = sourceId in projected.getBaseState().getBattlefield(),
++        isAbilitySourceOnBattlefield = isBattlefieldSource,
 +        subtypes = subtypes,
          isEquipAbilityActivation = ability?.isEquipAbility == true,
          hasXInCost = ability?.cost?.extractManaCost()?.hasX == true,
