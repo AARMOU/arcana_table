@@ -1,0 +1,133 @@
+name: Ugin current-engine integration preflight (runner-only)
+# GPT #153 / #150: prove Ugin's exact existing candidate against the newest
+# integrated Argentum runtime, without committing registry, assets or JARs.
+on:
+  push:
+    branches: [gpt/ugin-current-engine-compat-20261026]
+    paths:
+      - '.github/workflows/ugin-current-engine-compat.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ugin-current-engine-compat
+  cancel-in-progress: true
+
+jobs:
+  ugin-upgraded-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - name: Checkout isolated exact integration base
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout existing GPT-owned Ugin candidate at frozen tested SHA
+        uses: actions/checkout@v4
+        with:
+          repository: AARMOU/arcana_table
+          ref: 78f43099a880c8f68b426cb9b9957e7dd599d452
+          path: ugin-source
+          persist-credentials: false
+      - name: Fail closed on unexpected source ancestry or card drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD^)" = "9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f"
+          test "$(git -C ugin-source rev-parse HEAD)" = "78f43099a880c8f68b426cb9b9957e7dd599d452"
+          test ! -e android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt
+          test ! -e android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt
+          test -f android/app/libs/argentum-mtg-sdk.jar
+          test -f android/app/libs/argentum-rules-engine.jar
+          sha256sum android/app/libs/argentum-*.jar > /tmp/ugin-runtime-before.sha
+          echo "Integration base: $(git rev-parse HEAD^)"
+          echo "Ugin tested source: $(git -C ugin-source rev-parse HEAD)"
+      - name: Inject Ugin source and 22 scenarios into throwaway runner only
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp ugin-source/android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/
+          cp ugin-source/android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt android/custom-cards/src/test/kotlin/com/arcanatable/customcards/
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt")
+          s = p.read_text()
+          needle = "val entries: List<Entry> = listOf(\n"
+          assert s.count(needle) == 1, "Unexpected registry layout; manual integration review required"
+          assert "Entry(UginTheIneffable," not in s, "Ugin already registered; stop rather than duplicate"
+          p.write_text(s.replace(needle, needle + '        Entry(UginTheIneffable, "CMM", "Six WotC precons"),\n', 1))
+          PY
+      - name: Install Java 17 and Android 36 SDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install pinned Android SDK using hosted tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          sdkmanager_path="$(find "$sdk_root/cmdline-tools" -maxdepth 3 -type f -name sdkmanager | sort -V | tail -1)"
+          test -n "$sdkmanager_path" && test -x "$sdkmanager_path"
+          "$sdkmanager_path" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export Ugin and execute real-engine plus Android regression suites
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test :app:testDebugUnitTest
+      - name: Verify actual 22 Ugin cases and Android test evidence
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          path = Path("android/custom-cards/build/test-results/test/TEST-com.arcanatable.customcards.UginTheIneffableScenarioTest.xml")
+          assert path.is_file(), "Ugin JUnit XML missing"
+          root = ET.parse(path).getroot()
+          cases = [x for x in root.iter("testcase")]
+          names = [x.get("name") for x in cases]
+          assert len(cases) >= 22 and len(names) == len(set(names)), ("Ugin case count/uniqueness", names)
+          required = {
+              "plusOneCannotBeActivatedTwiceInOneTurn",
+              "minusThreeCannotFollowPlusOneInSameTurn",
+              "spiritWithNoExiledCardLeavesWithoutCreatingOrReturningOne",
+              "stolenSpiritKeepsPrivateLinkAndReturnsCardToOriginalOwner",
+              "simultaneousBoardWipeReturnsEachSpiritLinkedCardExactlyOnce",
+              "devoidSpellGetsUginDiscountWithoutWaivingPrintedBlue",
+              "uginDiscountCannotPayRequiredColorlessSymbol",
+          }
+          assert required <= set(names), ("Missing mandatory Ugin cases", sorted(required - set(names)))
+          for case in cases:
+              assert all(case.find(k) is None for k in ("failure", "error", "skipped")), case.get("name")
+          app_xml = list(Path("android/app/build/test-results/testDebugUnitTest").glob("TEST-*.xml"))
+          assert app_xml, "Android debug test XML missing"
+          app_count = 0
+          for f in app_xml:
+              suite = ET.parse(f).getroot()
+              assert int(suite.get("failures", 0)) == 0 and int(suite.get("errors", 0)) == 0, f
+              app_count += int(suite.get("tests", 0))
+          assert app_count > 0, "No Android debug tests executed"
+          print(f"Ugin exact-current-runtime: {len(cases)} Ugin tests, {app_count} Android debug tests, no failures")
+          PY
+      - name: Require deterministic runner-only export and unchanged runtime binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'Ugin, the Ineffable' android/app/src/main/assets/argentum/custom-cards.index.tsv
+          sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/ugin-export-before.sha
+          (cd android && ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards)
+          sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/ugin-export-after.sha
+          diff -u /tmp/ugin-export-before.sha /tmp/ugin-export-after.sha
+          sha256sum android/app/libs/argentum-*.jar > /tmp/ugin-runtime-after.sha
+          diff -u /tmp/ugin-runtime-before.sha /tmp/ugin-runtime-after.sha
+          git diff --exit-code -- android/app/libs
+          echo "Ugin registry/export was modified ONLY in the throwaway runner."
+      - name: Preserve CI proof, not distributable assets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ugin-upgraded-runtime-test-xml
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            android/custom-cards/build/test-results/test/TEST-*UginTheIneffable*.xml
+            android/app/build/test-results/testDebugUnitTest/TEST-*.xml
