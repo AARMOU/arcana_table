@@ -141,6 +141,8 @@ private fun CombatBoardFrame(
     extraButton: (@Composable () -> Unit)? = null,
     onDismiss: () -> Unit,
     topExtra: (@Composable () -> Unit)? = null,
+    /** The running lesson's instruction; the board covers the coach card, so it shows here. */
+    tutorialCue: Pair<String, String>? = null,
 ) {
     val config = LocalConfiguration.current
     val combatScale = LocalContext.current.getSharedPreferences("arcana_options", android.content.Context.MODE_PRIVATE)
@@ -178,6 +180,7 @@ private fun CombatBoardFrame(
                 Column(Modifier.fillMaxSize().padding(12.dp)) {
                     Text(title, color = SoftWhite, fontSize = 15.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
                     Text(hint, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
+                    tutorialCue?.let { (cueTitle, cueText) -> Box(Modifier.padding(bottom = 8.dp)) { TutorialInlineCue(cueTitle, cueText) } }
                     val topSection: @Composable () -> Unit = {
                         Text(topLabel, color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
                         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -233,7 +236,7 @@ private fun CombatBoardFrame(
  * Argentum lists can be used, and Argentum validates the result (flying, menace, ...).
  */
 @Composable
-fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit) {
+fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, tutorialCue: Pair<String, String>? = null) {
     var selection by remember(plan) { mutableStateOf(plan.mandatory.filterKeys { it in plan.blockers }) }
     var pending by remember(plan) { mutableStateOf<String?>(null) }
     val attackers = plan.attackers.map(piece)
@@ -273,6 +276,7 @@ fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, 
         onConfirm = { onConfirm(plan.buildAction(selection)) },
         extraButton = { if (selection.isNotEmpty()) TextButton(onClick = { selection = plan.mandatory.filterKeys { it in plan.blockers }; pending = null }) { Text("CLEAR", color = Muted) } },
         onDismiss = onDismiss,
+        tutorialCue = tutorialCue,
     )
 }
 
@@ -282,7 +286,7 @@ fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, 
  * creature, then the player or planeswalker it attacks.
  */
 @Composable
-fun ArgentumAttackBoard(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, opponentBlockers: List<Pair<String, List<GameCard>>> = emptyList()) {
+fun ArgentumAttackBoard(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, opponentBlockers: List<Pair<String, List<GameCard>>> = emptyList(), tutorialCue: Pair<String, String>? = null) {
     var selection by remember(plan) { mutableStateOf(plan.options.filter { it.mandatory }.associate { it.attackerId to it.targets.first() }) }
     var pending by remember(plan) { mutableStateOf<String?>(null) }
     val targets = plan.options.flatMap { it.targets }.distinct()
@@ -344,6 +348,7 @@ fun ArgentumAttackBoard(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece
         },
         onDismiss = onDismiss,
         topExtra = if (opponentBlockers.isEmpty()) null else ({ OpponentBlockersStrip(opponentBlockers) }),
+        tutorialCue = tutorialCue,
     )
 }
 

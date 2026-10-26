@@ -35,6 +35,8 @@ class TutorialWalkthroughTest {
         var mulligan: JSONObject? = null
         var bottom: JSONObject? = null
         val trace = mutableListOf<String>()
+        /** Every step the learner was shown. */
+        val seen = linkedSetOf<String>()
 
         /** Reads messages until Argentum waits on the learner again. */
         fun settle(timeoutSeconds: Long = 30) {
@@ -122,6 +124,7 @@ class TutorialWalkthroughTest {
             while (!table.run.finished) {
                 check(actions++ < 120) { "Lesson $lessonId never finished\n${table.trace.joinToString("\n")}" }
                 val step = table.run.step!!
+                table.seen += step.id
                 val before = step.id
                 table.trace += "STEP ${table.run.index + 1} ${step.id} (${step.actionKind}${step.event?.let { ":$it" }.orEmpty()})"
                 when (step.actionKind) {
@@ -143,6 +146,9 @@ class TutorialWalkthroughTest {
                 }
             }
             assertTrue(table.run.finished)
+            // Following every instruction, nothing may be skipped: each explanation was on screen.
+            val skipped = table.run.lesson.steps.map { it.id }.filterNot { it in table.seen }
+            assertTrue("Lesson $lessonId skipped steps a learner should see: $skipped\n${table.trace.joinToString("\n")}", skipped.isEmpty())
             println("Lesson $lessonId completed:\n${table.trace.joinToString("\n")}")
         } finally {
             table.host.shutdown()

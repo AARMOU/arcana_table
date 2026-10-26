@@ -22,6 +22,8 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.composed
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,8 +45,11 @@ import androidx.compose.ui.unit.sp
 internal object TutorialTargets {
     val bounds = mutableStateMapOf<String, Rect>()
 }
-internal fun Modifier.tutorialTarget(id: String): Modifier =
-    this.onGloballyPositioned { TutorialTargets.bounds[id] = it.boundsInRoot() }
+internal fun Modifier.tutorialTarget(id: String): Modifier = composed {
+    // A control that leaves the screen must not leave its highlight behind on an empty spot.
+    DisposableEffect(id) { onDispose { TutorialTargets.bounds.remove(id) } }
+    onGloballyPositioned { TutorialTargets.bounds[id] = it.boundsInRoot() }
+}
 
 /** Activity-local actions emitted by real control handlers, not by touching the coach overlay. */
 /** Pure gate: only a corresponding engine event or gesture may complete an actionable step. */

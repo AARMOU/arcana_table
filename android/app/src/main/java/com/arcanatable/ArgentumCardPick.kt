@@ -171,7 +171,7 @@ fun androidx.compose.foundation.layout.BoxScope.StackPile(stack: List<ArgentumSt
     val cardWidth = 72.dp
     val peek = 22.dp
     val shown = stack.take(5).reversed() // oldest first, so the top item is drawn last (in front)
-    Column(Modifier.align(Alignment.CenterEnd).padding(end = 8.dp).width(cardWidth + 8.dp).testTag("stack-pile"), horizontalAlignment = Alignment.CenterHorizontally) {
+    Column(Modifier.align(Alignment.CenterEnd).padding(end = 8.dp).width(cardWidth + 8.dp).testTag("stack-pile").tutorialTarget("argentum-stack"), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("STACK · ${stack.size}", color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.6.sp,
             modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xE6101615)).clickable(onClick = onOpenStack).padding(horizontal = 6.dp, vertical = 3.dp))
         Box(Modifier.width(cardWidth).padding(top = 4.dp)) {

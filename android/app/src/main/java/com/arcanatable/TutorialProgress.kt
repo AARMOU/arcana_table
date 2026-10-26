@@ -6,9 +6,11 @@ package com.arcanatable
  *
  * Gated steps in a practice lesson only advance on the matching gesture or Argentum event.
  * A real game can get ahead of the text, though: the learner can cast before tapping a land for
- * mana, or Argentum can skip a combat step nobody can use. When an event satisfies a LATER
- * gated step, and only explanation or gesture steps lie between, the lesson catches up to it
- * instead of waiting forever for something that already happened.
+ * mana, or Argentum can skip a combat step nobody can use. So while the lesson WAITS on an
+ * event, a later game milestone that makes that wait pointless moves it on to the step after
+ * the milestone, instead of leaving the learner stuck with no NEXT button. Explanations the
+ * learner is reading are never skipped: milestones that happen meanwhile complete their step
+ * when the learner reaches it, and a priority pass never counts for a later pass prompt.
  */
 internal class TutorialRun(val lesson: ArcanaLesson, val practice: Boolean, startIndex: Int = 0) {
     var index: Int = startIndex.coerceIn(0, (lesson.steps.size - 1).coerceAtLeast(0))
@@ -28,7 +30,7 @@ internal class TutorialRun(val lesson: ArcanaLesson, val practice: Boolean, star
         if (practice && kind == "event") milestones.observe(key)
         val current = step ?: return false
         if (TutorialStepGate.accepts(current, kind, key)) { moveTo(index + 1); return true }
-        if (!practice || kind != "event") return false
+        if (!practice || kind != "event" || current.actionKind != "event" || key !in CATCH_UP_EVENTS) return false
         val ahead = catchUpIndex(key) ?: return false
         moveTo(ahead + 1)
         return true
@@ -41,6 +43,11 @@ internal class TutorialRun(val lesson: ArcanaLesson, val practice: Boolean, star
             if (s.actionKind == "event") return j.takeIf { s.event == event }
         }
         return null
+    }
+
+    private companion object {
+        /** Game progress that can't be undone, so it can stand in for an earlier wait. */
+        val CATCH_UP_EVENTS = setOf("SpellCast", "SpellResolved", "AttackersDeclared", "CombatDamageDealt", "TurnAdvanced")
     }
 
     private fun moveTo(target: Int) {
@@ -67,6 +74,11 @@ internal class TutorialEventDetector {
         if (startTurn == 0) startTurn = current.turnNumber
         val old = previous?.players?.getOrNull(previous.viewingPlayer)
         val now = current.players.getOrNull(current.viewingPlayer) ?: return
+        // The pass you just made comes first, then what it caused (a resolution, a new step).
+        if (passPending && previous != null && current.interactionEpoch != previous.interactionEpoch) {
+            passPending = false
+            emit("PriorityPassed")
+        }
         if (previous != null && old != null) {
             fun isLand(c: GameCard) = "land" in c.type.lowercase()
             val oldIds = (old.battlefield + old.graveyard + old.exile).map { it.id }.toSet()
@@ -92,10 +104,6 @@ internal class TutorialEventDetector {
             val oldOpp = previous.players.getOrNull(1 - previous.viewingPlayer)
             val newOpp = current.players.getOrNull(1 - current.viewingPlayer)
             if (oldOpp != null && newOpp != null && newOpp.life < oldOpp.life) emit("CombatDamageDealt")
-        }
-        if (passPending && previous != null && current.interactionEpoch != previous.interactionEpoch) {
-            passPending = false
-            emit("PriorityPassed")
         }
         // Your turn ended: a later turn number, or the opponent became the active player.
         if (current.turnNumber > startTurn || (previous != null && current.activePlayer != current.viewingPlayer && previous.activePlayer == previous.viewingPlayer))

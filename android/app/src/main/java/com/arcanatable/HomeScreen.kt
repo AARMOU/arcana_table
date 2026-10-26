@@ -120,7 +120,7 @@ fun ArcanaHomeScreen(
                 Text("ARGENTUM GAME MAY STILL BE RUNNING", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
                 Text("Arcana closed or lost its connection during a game. It won't reconnect on its own; resume when you're ready.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onResume, modifier = Modifier.weight(1f).heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { Text("RESUME GAME", fontWeight = FontWeight.Black) }
+                    Button(onClick = onResume, modifier = Modifier.weight(1f).heightIn(min = 48.dp).tutorialTarget("home-resume"), colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { Text("RESUME GAME", fontWeight = FontWeight.Black) }
                     OutlinedButton(onClick = onDismissResume, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("END THAT GAME") }
                 }
             }
@@ -132,7 +132,7 @@ fun ArcanaHomeScreen(
                 Text("Restore the complete Argentum engine state, including the stack, pending decisions and private zones.",
                     color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onResumeOffline, modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                    Button(onClick = onResumeOffline, modifier = Modifier.weight(1f).heightIn(min = 48.dp).tutorialTarget("home-resume"),
                         colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) {
                         Text("RESUME", fontWeight = FontWeight.Black)
                     }

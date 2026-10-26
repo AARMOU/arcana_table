@@ -160,7 +160,7 @@
             "event": "AttackersDeclared"
           },
           "title": "No attack this time",
-          "body": "Elvish Mystic arrived this turn, so it can't attack yet. If Arcana asks you to declare attackers, choose none; otherwise the game moves straight past combat.",
+          "body": "Elvish Mystic arrived this turn, so it can't attack yet. If you see DECLARE ATTACKERS, confirm with no attackers; otherwise the game moves straight past combat.",
           "hint": "Keep passing"
         },
         {
@@ -415,7 +415,7 @@
           },
           "title": "Try one mulligan",
           "body": "This practice hand is almost all lands, so it has nothing to cast. Tap Mulligan to shuffle it away and draw a new seven.",
-          "hint": "Tap Mulligan"
+          "hint": "Tap MULLIGAN"
         },
         {
           "id": "bottom",
@@ -437,8 +437,8 @@
             "event": "HandKept"
           },
           "title": "Keep this hand",
-          "body": "Tap Keep Hand. If Arcana asks, choose the card to put on the bottom of your library.",
-          "hint": "Tap Keep Hand"
+          "body": "Tap KEEP. If Arcana asks, choose the card to put on the bottom of your library.",
+          "hint": "Tap KEEP"
         },
         {
           "id": "zoom-dismiss",
@@ -1034,7 +1034,7 @@
             "event": "AttackersDeclared"
           },
           "title": "Declare attackers",
-          "body": "Choose Grizzly Bears as an attacker and confirm. Attacking taps the creature.",
+          "body": "Tap DECLARE ATTACKERS, choose Grizzly Bears, then confirm. Attacking taps the creature.",
           "hint": "Declare Grizzly Bears"
         },
         {
@@ -1064,12 +1064,11 @@
           "screen": "board",
           "target": "combat-damage",
           "advance": {
-            "kind": "event",
-            "event": "CombatDamageDealt"
+            "kind": "next"
           },
           "title": "Damage happens",
-          "body": "Keep passing. Your unblocked Bears deal 2 damage, equal to their power, to your opponent.",
-          "hint": "Tap Pass"
+          "body": "With no blockers, your Bears dealt combat damage straight to your opponent: 2 damage, equal to their power.",
+          "hint": "Next"
         },
         {
           "id": "life",

@@ -823,7 +823,8 @@ internal fun TableController.TableOverlays() {
                     argentumAttackPlan = null
                 } else message = "Could not send the attack declaration. Refresh and try again."
             },
-            onDismiss = { argentumAttackPlan = null })
+            onDismiss = { argentumAttackPlan = null },
+            tutorialCue = tutorialStep?.takeIf { tutorialChapterId != null }?.let { it.title to it.body },)
     }
     argentumBlockPlan?.let { plan ->
         ArgentumBlockBoard(plan, ::argentumPiece, busy = argentumAwaitingUpdate,
