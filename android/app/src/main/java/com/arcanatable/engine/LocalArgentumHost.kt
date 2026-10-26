@@ -649,6 +649,10 @@ class LocalArgentumHost(
                 if (chosen !is PassPriority) flush(paceMs)
                 continue
             }
+            // Practice must expose the real priority window after casting. Ordinary own-stack
+            // auto-pass would otherwise resolve the lesson's spell before the learner can
+            // inspect it or explicitly pass. The engine still validates every submitted action.
+            if (tutorialPassiveOpponent && current.stack.isNotEmpty()) break
             // Human auto-pass needs only engine PriorityActions, not the FULL/enriched UI menu.
             // Interactive state updates still build and send the original complete legal-action DTO.
             val shouldPass = OfflineHumanAutoPass.shouldPass(
