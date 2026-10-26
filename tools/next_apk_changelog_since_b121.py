@@ -35,7 +35,7 @@ ENTRIES: list[tuple[str, list[str]]] = [
         "Your First Turn tutorial: the Table-view HAND button advances step two to Play a land, matching Player view. Full Fold and real-engine lesson acceptance remain pending.",
         "Re-enable Import new and the updated Deck Editor for normal users: REQUESTED, NOT IMPLEMENTED OR VERIFIED IN THE NEXT APK YET. Existing developer-only editor/importer must be connected and tested first."
     ]),
-    ("BUILD 133 · ELDR AZI AND ENGINE CANDIDATE", [
+    ("BUILD 133 · ELDRAZI AND ENGINE CANDIDATE", [
         "Combined newer Argentum source and Eldrazi Incursion's 94th original indexed slot (Azlask) with real-card scenarios and strict terminal AI/deck testing.",
         "Build 133 attempts exposed a shock-fetch/Android unit-test regression; fixes and passing exact-source tests were required before any subsequent preview. A test attempt is not a released upgrade."
     ]),
@@ -67,7 +67,7 @@ def compose_entries() -> str:
     ]
     for title, bullets in ENTRIES:
         lines.append('                Text(' + json.dumps(title, ensure_ascii=False) + ', color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)')
-        lines.append('                Text(' + json.dumps("\\n".join("• " + item for item in bullets), ensure_ascii=False) + ', color = SoftWhite, fontSize = 12.sp)')
+        lines.append('                Text(' + json.dumps("\n".join("• " + item for item in bullets), ensure_ascii=False) + ', color = SoftWhite, fontSize = 12.sp)')
     lines += [END]
     return "\n".join(lines) + "\n"
 
@@ -98,7 +98,7 @@ def validate(source: str) -> None:
         assert source.count(json.dumps(title, ensure_ascii=False)) == 1, title
     assert 'BUILD 122 · FIXES AND QUICK UI TIPS' in source
     assert 'BUILD 123 · LARGE END-STEP AI FIX' in source
-    assert 'changelogOpen' not in source or True  # Keep navigation in the caller untouched.
+    assert 'What\'s new · Build ${BuildConfig.VERSION_CODE}' in source
 
 
 def main() -> None:
