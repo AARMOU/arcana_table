@@ -31,7 +31,7 @@ class AiFirstStrikeDecisionBaselineTest {
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
         assertNull(d.declareAttackers(d.player1, listOf(bear), d.player2).error)
         d.passPriorityUntil(Step.DECLARE_BLOCKERS)
-        assertNull(d.declareBlockers(d.player2, mapOf(bear to listOf(knight))).error)
+        assertNull(d.declareBlockers(d.player2, mapOf(knight to listOf(bear))).error)
         d.passPriorityUntil(Step.POSTCOMBAT_MAIN)
         assertFalse("An ordinary 2/2 must die before hitting a 2/2 first striker",
             bear in d.state.getBattlefield())
