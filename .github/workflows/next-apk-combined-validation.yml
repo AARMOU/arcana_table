@@ -297,7 +297,7 @@ jobs:
               # Only one exact reviewed source collision may be auto-reconciled.
               # The helper keeps BOTH release tutorial/seat guards and Claude's
               # newer touch targets/menu text. Unknown conflicts stop the build.
-              if [ "$label" = "table-ui" ] && python3 tools/next_apk_resolve_conflicts.py table "$sha"; then
+              if { [ "$label" = "table-ui" ] || [ "$label" = "ai-difficulty" ]; } && python3 tools/next_apk_resolve_conflicts.py "$([ "$label" = "table-ui" ] && echo table || echo ai)" "$sha"; then
                 git commit --no-gpg-sign -m "Runner-only: reconcile table UI with Build 134 release source"
               else
                 echo "::error title=APK integration conflict::$label requires reviewed source reconciliation; not certified."
