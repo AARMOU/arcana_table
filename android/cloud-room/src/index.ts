@@ -292,6 +292,8 @@ export class GameRoom extends DurableObject<Env> {
       };
     }
     this.room.relayMode = true;
+    // No legacy outbox may survive mode negotiation or enter a broadcast.
+    for (const player of this.room.state.players) delete player.arcanaRelay;
     // Host seat must also be claimed so its private token authorizes reconnect.
     this.room.seats[0].claimed = true;
     this.room.seats.length = kinds.length + 1;
@@ -432,6 +434,7 @@ export class GameRoom extends DurableObject<Env> {
     const state = structuredClone(source);
     state.players = state.players.map((player, index) => {
       const copy = { ...player };
+      if (this.room?.relayMode) delete copy.arcanaRelay;
       if (index !== viewer) {
         copy.library = [];
         if (copy.handRevealedToAll !== true) copy.hand = [];
