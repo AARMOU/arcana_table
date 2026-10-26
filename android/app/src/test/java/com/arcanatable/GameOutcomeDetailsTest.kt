@@ -118,6 +118,50 @@ class GameOutcomeDetailsTest {
         assertTrue(ArgentumOutcomeLog.banner(noWinner, null, emptyMap()).contains("No winner."))
     }
 
+    @Test fun lastHumanEliminatedFromFourPlayerPodDoesNotDeclareWinnerOrDraw() {
+        val ai2 = EntityId("offline-ai-2")
+        val ai3 = EntityId("offline-ai-3")
+        val state = GameState(
+            turnOrder = listOf(winner, loser, ai2, ai3),
+            activePlayers = setOf(loser, ai2, ai3),
+            winnerId = null,
+            gameOver = false,
+        )
+        val packet = GameOutcomeDetails.toHumanEliminatedMessage(
+            state, winner, names,
+            listOf(PlayerLostEvent(winner, GameEndReason.LIFE_ZERO, "Combat damage reduced life to 0.")),
+        )
+        assertEquals("gameOver", packet.getString("type"))
+        assertEquals("YOU_LOST", packet.getString("reason"))
+        assertTrue(packet.getBoolean("matchUnfinished"))
+        assertEquals(3, packet.getInt("activePlayersRemaining"))
+        assertTrue(packet.isNull("winnerId"))
+        assertEquals("offline-you", packet.getString("eliminatedPlayerId"))
+        assertEquals("LIFE_ZERO", packet.getString("engineReason"))
+        assertEquals("Combat damage reduced life to 0.", packet.getString("winCondition"))
+        assertEquals("LIFE_ZERO", packet.getJSONArray("losers").getJSONObject(0).getString("reason"))
+        assertTrue(packet.getString("message").contains("3 other player(s) were still active"))
+        assertTrue(ArgentumOutcomeLog.diagnostic(packet, emptyMap()).contains("match unfinished"))
+        assertTrue(ArgentumOutcomeLog.banner(packet, "offline-you", emptyMap()).contains("You were eliminated"))
+        assertFalse(ArgentumOutcomeLog.banner(packet, "offline-you", emptyMap()).contains("No winner."))
+    }
+
+    @Test fun unknownEliminationReasonIsMarkedUnknownRatherThanBlamingAnotherPlayer() {
+        val ai2 = EntityId("offline-ai-2")
+        val state = GameState(
+            turnOrder = listOf(winner, loser, ai2),
+            activePlayers = setOf(loser, ai2),
+            winnerId = null,
+            gameOver = false,
+        )
+        val previous = PlayerLostEvent(ai2, GameEndReason.CARD_EFFECT, "Old card effect.")
+        val packet = GameOutcomeDetails.toHumanEliminatedMessage(state, winner, names, listOf(previous))
+        assertEquals("UNKNOWN", packet.getString("engineReason"))
+        assertTrue(packet.isNull("winCondition"))
+        assertFalse(packet.getString("message").contains("Old card effect"))
+        assertTrue(packet.getBoolean("matchUnfinished"))
+    }
+
     @Test fun legacyOnlinePacketStillProvidesAnEndMessage() {
         val packet = JSONObject().put("winnerId", "seat-2").put("reason", "YOU_LOST")
         assertTrue(ArgentumOutcomeLog.banner(packet, "seat-1", mapOf("seat-2" to "Opponent")).contains("Opponent won."))
