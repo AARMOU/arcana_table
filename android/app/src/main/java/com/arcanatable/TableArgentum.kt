@@ -164,7 +164,7 @@ internal fun TableController.argentumName(id: String): String =
 internal fun TableController.openArgentumCombat(): Boolean {
     val actions = argentumSnapshot?.legalActions.orEmpty()
     actions.firstNotNullOfOrNull { ArgentumAttackPlan.from(it) }?.let { argentumAttackPlan = it; recordDiagnostic("Opened attack declaration (${it.options.size} possible attackers)", DiagnosticCategory.ACTION); return true }
-    actions.firstNotNullOfOrNull { ArgentumBlockPlan.from(it, argentumLastStateJson) }?.let { argentumBlockPlan = it; recordDiagnostic("Opened block declaration (${it.blockers.size} possible blockers)", DiagnosticCategory.ACTION); return true }
+    actions.firstNotNullOfOrNull { ArgentumBlockPlan.from(it, argentumLastStateJson) }?.let { argentumBlockPlan = it; argentumLastError = null; recordDiagnostic("Opened block declaration (${it.blockers.size} possible blockers)", DiagnosticCategory.ACTION); return true }
     return false
 }
 
@@ -385,7 +385,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             gameTimerRunning = true
             turnTimerRunning = true
             setArgentumGameActive(true)
-            argentumGameOverDismissed = false; argentumGameOverText = null; argentumWon = null
+            argentumGameOverDismissed = false; argentumGameOverText = null; argentumWon = null; argentumMatchUnfinished = false
             recordDiagnostic("Argentum game started", DiagnosticCategory.ENGINE)
         }
         "stateUpdate" -> {
@@ -396,6 +396,37 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 argentumLastCompletedEngineMs = incoming.optLong("engineMs", -1).takeIf { it >= 0 }
                 if (argentumLocalPlayersBackup == null) argentumLocalPlayersBackup = loadSavedPlayers(context) ?: players.toList()
                 val snapshot = ArgentumTableSnapshot.parse(state, incoming.optJSONArray("legalActions") ?: JSONArray(), incoming.optString("interactionEpoch").takeUnless { it.isBlank() || it == "null" })
+                // One transition-specific diagnostic, not a continuous life-total trace.
+                // These values come from consecutive authoritative masked snapshots.
+                val currentYou = snapshot.players.getOrNull(snapshot.viewingPlayer)
+                val previousYou = currentYou?.let { player ->
+                    argentumSnapshot?.players?.firstOrNull { it.id == player.id }
+                }
+                if (currentYou?.isEliminated == true && previousYou?.isEliminated == false) {
+                    recordDiagnostic(
+                        "Argentum player elimination: life ${previousYou.life} → ${currentYou.life}; commanderDamage=${currentYou.commanderDamageReceived}",
+                        DiagnosticCategory.ENGINE,
+                    )
+                }
+                // Combat-stage evidence is critical for distinguishing ordinary damage from
+                // first-strike or commander-damage elimination while life remains above zero.
+                // Emit only when this viewer's authoritative values change, not for each snapshot.
+                if (currentYou != null && previousYou != null &&
+                    snapshot.stepKey in setOf("FIRST_STRIKE_COMBAT_DAMAGE", "COMBAT_DAMAGE") &&
+                    (currentYou.life != previousYou.life ||
+                        currentYou.commanderDamageReceived != previousYou.commanderDamageReceived)) {
+                    recordDiagnostic(
+                        "Argentum combat ${snapshot.stepKey}: life ${previousYou.life} → ${currentYou.life}; " +
+                            "commanderDamage ${previousYou.commanderDamageReceived} → ${currentYou.commanderDamageReceived}; " +
+                            "eliminated=${currentYou.isEliminated}",
+                        DiagnosticCategory.ENGINE,
+                    )
+                }
+                // Close the retained block board only when combat has truly moved on.
+                // A rejected INVALID_ACTION during DECLARE_BLOCKERS must not wipe selections.
+                if (argentumBlockPlan != null && !snapshot.stepKey.equals("DECLARE_BLOCKERS", ignoreCase = true)) {
+                    argentumBlockPlan = null
+                }
                 val nextDecision = incoming.optJSONObject("pendingDecision")
                 argentumLastStateJson = state
                 if (nextDecision?.optString("id") != argentumPendingDecision?.optString("id")) {
@@ -441,7 +472,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 turnNumber = snapshot.turnNumber
                 phaseIndex = phaseSteps.indexOfFirst { it.equals(snapshot.stepName, true) }.takeIf { it >= 0 }
                     ?: phaseSteps.indexOfFirst { it.equals(snapshot.phaseName, true) }.takeIf { it >= 0 } ?: 3
-                gameEndedOnline = snapshot.gameOver
+                if (!argentumMatchUnfinished) gameEndedOnline = snapshot.gameOver
                 if (snapshot.gameOver && argentumOffline && wifiRole == null) {
                     OfflineCheckpointStore.clear(context)
                     offlineResumeAvailable = false
@@ -519,6 +550,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
         }
         "mulliganComplete" -> { argentumMulliganPrompt = false; argentumAwaitingUpdate = false }
         "gameOver" -> {
+            argentumMatchUnfinished = incoming.optBoolean("matchUnfinished")
             setArgentumGameActive(false)
             gameEndedOnline = true
             argentumAwaitingUpdate = false
@@ -750,6 +782,7 @@ internal fun TableController.closeArgentumSession(concede: Boolean) {
     argentumLobbySubmitted = false
     gameStartedOnline = false
     gameEndedOnline = false
+    argentumMatchUnfinished = false
     gameTimerRunning = false
     turnTimerRunning = false
     homeOpen = true

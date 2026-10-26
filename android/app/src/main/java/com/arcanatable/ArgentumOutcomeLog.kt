@@ -18,14 +18,21 @@ internal object ArgentumOutcomeLog {
                 if (reason == null) name else "$name ($reason)"
             }
         }
+        val matchUnfinished = packet.optBoolean("matchUnfinished")
         val parts = mutableListOf(
-            "Argentum game over: winner=$winner",
+            if (matchUnfinished) "Argentum human eliminated (match unfinished): winner=none"
+                else "Argentum game over: winner=$winner",
             "losers=${losers.ifEmpty { listOf("not supplied") }.joinToString(", ")}",
             "result=${packet.optString("reason", "UNKNOWN")}"
         )
+        if (matchUnfinished) {
+            parts += "remainingPlayers=${packet.optInt("activePlayersRemaining")}"
+            known(packet.optString("eliminatedPlayerName"))?.let { parts += "eliminated=$it" }
+            if (!packet.isNull("eliminationLife")) parts += "life=${packet.optInt("eliminationLife")}"
+        }
         known(packet.optString("engineReason"))?.let { parts += "engineReason=$it" }
         known(packet.optString("sourceCard"))?.let { parts += "source=$it" }
-        known(packet.optString("winCondition"))?.let { parts += "condition=$it" }
+        known(packet.optString("winCondition"))?.let { parts += "${if (matchUnfinished) "eliminationDetail" else "condition"}=$it" }
         val artifact = known(packet.optString("artifactName"))
         if (artifact != null && !packet.isNull("artifactCount")) {
             parts += "verifiedArtifactGroup=$artifact x${packet.optInt("artifactCount")}"

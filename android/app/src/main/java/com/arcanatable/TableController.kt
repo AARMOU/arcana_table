@@ -469,6 +469,7 @@ internal class TableController(
     var argentumMulliganInfo by run { mutableStateOf<Triple<Int, Boolean, Int>?>(null) } // count, on the play, cards to bottom
     var argentumGameOverText by run { mutableStateOf<String?>(null) }
     var argentumWon by run { mutableStateOf<Boolean?>(null) }
+    var argentumMatchUnfinished by run { mutableStateOf(false) }
     var argentumBudgetCounts by run { mutableStateOf<Map<Int, Int>>(emptyMap()) }
     var argentumReplacementPick by run { mutableStateOf(0 to 0) }
     val argentumReportedUnsupported = run { mutableSetOf<String>() }
