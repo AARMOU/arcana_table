@@ -381,7 +381,8 @@ internal class TableController(
     var changelogOpen by run { mutableStateOf(false) }
     var lobbyOpen by run { mutableStateOf(false) }
     var homeOpen by run { mutableStateOf(true) }
-    var quickUiTipsOpen by mutableStateOf(!optionPrefs.getBoolean("quick_ui_tips_disabled", false))
+    var quickUiTipsOpen by mutableStateOf(!optionPrefs.getBoolean("tutorial_offer_seen", false))
+    var tutorialHubOpen by mutableStateOf(false)
     var lobbyCreated by run { mutableStateOf(false) }
     var lobbyJoinMode by run { mutableStateOf(false) }
     var lobbyReadyPlayers by run { mutableStateOf(emptySet<Int>()) }
