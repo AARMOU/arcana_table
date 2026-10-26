@@ -156,19 +156,19 @@ internal fun TableController.TableMainLayout() {
                 // Your own tab always comes right after TABLE, then everyone else in seat order.
                 val tabOrder = players.indices.sortedBy { if (it == localSeat) -1 else it }
                 tabOrder.forEach { index -> val player = players[index]
-                    Box(Modifier.testTag(if (onlineMode && index == localSeat) "player-tab-you" else "player-tab-$index")) {
+                    Box(Modifier.testTag(if (onlineMode && index == localSeat) "player-tab-you" else "player-tab-$index").tutorialTarget(if (index == localSeat) "your-tab" else "opponent-tab")) {
                         val snap = argentumSnapshot
                         if (compactArgentumTable && snap != null) ArgentumSeatTab(
                             seat = ArgentumSeatChip(player.name, player.life, isYou = index == localSeat, isActive = index == snap.activePlayer, hasPriority = index == snap.priorityPlayer),
                             turnLabel = if (index == snap.activePlayer) TurnColors.label(index == localSeat, player.name, player.isComputer) else null,
                             artUrl = player.commanderCard?.let { it.artCropUrl ?: it.imageUrl }, artLabel = player.commanderCard?.name,
                             selected = !showOverview && selectedPlayer == index,
-                            onClick = { run { selectedPlayer = index; showOverview = false } }
+                            onClick = { run { selectedPlayer = index; showOverview = false; TutorialActions.tap(if (index == localSeat) "your-tab" else "opponent-tab") } }
                         ) else PlayerViewTab(
                             name = if (onlineMode && index == localSeat) "YOU" else player.name,
                             commander = player.commanderCard,
                             selected = !showOverview && selectedPlayer == index,
-                            onClick = { run { selectedPlayer = index; showOverview = false; showHand = false } }
+                            onClick = { run { selectedPlayer = index; showOverview = false; showHand = false; TutorialActions.tap(if (index == localSeat) "your-tab" else "opponent-tab") } }
                         )
                     }
                 }
@@ -182,10 +182,10 @@ internal fun TableController.TableMainLayout() {
                 Box(Modifier.size(9.dp).clip(CircleShape).background(dotColor).semantics { contentDescription = "Argentum ${argentumStatus.name.lowercase()}" })
                 Spacer(Modifier.width(8.dp))
                 if (tabsInTopBar) {
-                    PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.width(320.dp), accent = turnAccent)
+                    PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.width(320.dp).tutorialTarget("phase-tracker"), accent = turnAccent)
                     Spacer(Modifier.width(8.dp))
                     seatTabs(Modifier.weight(1f))
-                } else PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.weight(1f), accent = turnAccent)
+                } else PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.weight(1f).tutorialTarget("phase-tracker"), accent = turnAccent)
                 Spacer(Modifier.width(6.dp))
             } else Column {
                 Text("ARCANA TABLE", color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
@@ -198,7 +198,7 @@ internal fun TableController.TableMainLayout() {
             if (!compactArgentumTable) Spacer(Modifier.weight(1f))
             Box(Modifier) {
                 Text(if (compactArgentumTable) "T${turnNumber}${if (turnTimerVisible) " · " + formatClock(elapsedTurnSeconds) else ""}" else "GAME ${formatClock(elapsedGameSeconds)} · TURN ${if (turnTimerVisible) formatClock(elapsedTurnSeconds) else "HIDDEN"}", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.heightIn(min = 44.dp).wrapContentHeight(Alignment.CenterVertically).combinedClickable(enabled = !onlineMode || localSeat == 0, onClick = { run { timerMenuOpen = true } }, onLongClick = { turnTimerVisible = !turnTimerVisible }))
+                    modifier = Modifier.heightIn(min = 44.dp).tutorialTarget("turn-timer").wrapContentHeight(Alignment.CenterVertically).combinedClickable(enabled = !onlineMode || localSeat == 0, onClick = { run { timerMenuOpen = true } }, onLongClick = { turnTimerVisible = !turnTimerVisible }))
                 DropdownMenu(expanded = timerMenuOpen, onDismissRequest = { timerMenuOpen = false }) {
                     DropdownMenuItem(text = { Text(if (gameTimerRunning) "Stop session timer" else "Start session timer") }, onClick = { gameTimerRunning = !gameTimerRunning; timerMenuOpen = false })
                     DropdownMenuItem(text = { Text("Reset session timer") }, onClick = { elapsedGameSeconds = 0; timerMenuOpen = false })
@@ -215,7 +215,7 @@ internal fun TableController.TableMainLayout() {
                 if (unreadChatCount > 0) Box(Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 5.dp).size(9.dp).clip(CircleShape).background(Color(0xFFE35656)))
             }
             Box(Modifier) {
-                IconButton(onClick = { run { topMenuSection = null; topMenuExpanded = true } }, modifier = Modifier.size(46.dp)) { Icon(Icons.Filled.MoreVert, "App menu", tint = SoftWhite) }
+                IconButton(onClick = { run { topMenuSection = null; topMenuExpanded = true; TutorialActions.tap("game-menu") } }, modifier = Modifier.size(46.dp).tutorialTarget("game-menu")) { Icon(Icons.Filled.MoreVert, "App menu", tint = SoftWhite) }
                 DropdownMenu(expanded = topMenuExpanded, onDismissRequest = { topMenuExpanded = false; topMenuSection = null }) {
                     if (topMenuSection == null) {
                         DropdownMenuItem(text = { Text("Learn & tutorials") }, onClick = { topMenuExpanded = false; topMenuSection = null; tutorialHubOpen = true })
@@ -479,7 +479,7 @@ internal fun TableController.TableMainLayout() {
             Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 if (argentumEnabled && gameInProgress) HandPeekBar(
                     players.getOrNull(localSeat)?.hand?.size ?: 0,
-                    modifier = Modifier.weight(1f).testTag("hand-peek-table"),
+                    modifier = Modifier.weight(1f).testTag("hand-peek-table").tutorialTarget("hand-handle"),
                     onClick = { run { showHand = true } }
                 ) else Text("Tap a player to inspect their board", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
                 if (argentumEnabled) {
@@ -512,14 +512,14 @@ internal fun TableController.TableMainLayout() {
                     onClick = { run { if (argentumEnabled && passToMyTurnFrom != null) togglePassToMyTurn() else if (argentumEnabled) argentumPrimary() else passTurn() } },
                     enabled = if (argentumEnabled && passToMyTurnFrom != null) true else if (argentumEnabled) argentumPrimaryLabel != null && !argentumAwaitingUpdate else canPassTurnFromBoard,
                     canRespond = argentumCanRespond && respondGlow,
-                    modifier = Modifier.weight(1f).height(footerControlHeight).testTag("bottom-bar-pass-button"),
+                    modifier = Modifier.weight(1f).height(footerControlHeight).testTag("bottom-bar-pass-button").tutorialTarget("bottom-bar-pass-button"),
                     onLongClick = if (argentumEnabled) ({ run { togglePassToMyTurn() } }) else null
                 )
                 Box(Modifier.weight(1.3f)) {
                     HandPeekBar(
                         players[if (argentumEnabled) localSeat.coerceIn(players.indices) else selectedPlayer.coerceIn(players.indices)].hand.size,
-                        modifier = Modifier.fillMaxWidth().height(handControlHeight).testTag("hand-peek"),
-                        onClick = { run { if (canControlSelectedPlayer || argentumEnabled) showHand = true } }
+                        modifier = Modifier.fillMaxWidth().height(handControlHeight).testTag("hand-peek").tutorialTarget("hand-handle"),
+                        onClick = { run { if (canControlSelectedPlayer || argentumEnabled) { showHand = true; TutorialActions.tap("hand-handle") } } }
                     )
                 }
                 // Same box style as the pass button, so both fill their full height and line up.
