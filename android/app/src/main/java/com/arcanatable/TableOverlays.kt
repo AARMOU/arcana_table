@@ -247,24 +247,20 @@ internal fun TableController.TableOverlays() {
                 onCreateRoom = { playSheetOpen = false; run { startArgentumPractice(vsAi = false) } },
                 onJoinRoom = { playSheetOpen = false; run { argentumLastError = null; argentumJoinCode = ""; argentumJoinDialogOpen = true } },
                 onDismiss = { playSheetOpen = false },
-                onWifiHost = { playSheetOpen = false; run { startWifiHost() } },
                 onWifiMultiHost = { playSheetOpen = false; run {
+                    recordDiagnostic("Multiplayer: Wi-Fi host setup opened", DiagnosticCategory.ACTION)
                     wifiMultiOnline = false
                     wifiMultiConfigOpen = true
                 } },
-                onWifiJoin = { playSheetOpen = false; run { wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() } },
-                onOnlineHost = { playSheetOpen = false; run { startWifiHost(online = true) } },
+                onWifiJoin = { playSheetOpen = false; run { recordDiagnostic("Multiplayer: Wi-Fi join opened", DiagnosticCategory.ACTION); wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() } },
                 onOnlineMultiHost = { playSheetOpen = false; run {
+                    recordDiagnostic("Multiplayer: internet host setup opened", DiagnosticCategory.ACTION)
                     wifiMultiOnline = true
                     wifiMultiConfigOpen = true
                 } },
                 onOnlineMultiJoin = { playSheetOpen = false; run {
+                    recordDiagnostic("Multiplayer: internet join opened", DiagnosticCategory.ACTION)
                     wifiMultiOnlineJoin = true
-                    onlineCodeInput = ""
-                    onlineJoinOpen = true
-                } },
-                onOnlineJoin = { playSheetOpen = false; run {
-                    wifiMultiOnlineJoin = false
                     onlineCodeInput = ""
                     onlineJoinOpen = true
                 } },
