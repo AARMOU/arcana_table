@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
@@ -92,7 +93,7 @@ internal fun TutorialCoachOverlay(
     val gold = Color(0xFFE6B65C)
     val muted = Color(0xFFBAC6BE)
     val density = LocalDensity.current
-    BoxWithConstraints(Modifier.testTag("tutorial-coach")) {
+    BoxWithConstraints(Modifier.fillMaxSize().testTag("tutorial-coach")) {
         val maxW = maxWidth
         val maxH = maxHeight
         val rect = if (avoidTableOverlay) null else step.target?.let(TutorialTargets.bounds::get)
