@@ -472,6 +472,10 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             argentumAwaitingUpdate = false
             argentumMulliganPrompt = true
             argentumMulliganInfo = Triple(incoming.optInt("mulliganCount"), incoming.optBoolean("isOnThePlay"), incoming.optInt("cardsToPutOnBottom"))
+            if (tutorialMulliganPending) {
+                tutorialMulliganPending = false
+                tutorialSignal("event", "HandMulliganed")
+            }
             val handIds = incoming.optJSONArray("hand") ?: JSONArray()
             val cardInfo = incoming.optJSONObject("cards") ?: JSONObject()
             val hand = (0 until handIds.length()).mapNotNull { index ->
