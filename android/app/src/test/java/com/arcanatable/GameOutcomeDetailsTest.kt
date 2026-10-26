@@ -5,6 +5,9 @@ import com.wingedsheep.engine.core.GameEndReason
 import com.wingedsheep.engine.core.GameEndedEvent
 import com.wingedsheep.engine.core.PlayerLostEvent
 import com.wingedsheep.engine.state.GameState
+import com.wingedsheep.engine.state.ComponentContainer
+import com.wingedsheep.engine.state.components.player.PlayerLostComponent
+import com.wingedsheep.engine.state.components.player.LossReason
 import com.wingedsheep.sdk.model.EntityId
 import org.json.JSONArray
 import org.json.JSONObject
@@ -123,7 +126,7 @@ class GameOutcomeDetailsTest {
         val ai3 = EntityId("offline-ai-3")
         val state = GameState(
             turnOrder = listOf(winner, loser, ai2, ai3),
-            activePlayers = setOf(loser, ai2, ai3),
+            entities = mapOf(winner to ComponentContainer.of(PlayerLostComponent(LossReason.LIFE_ZERO))),
             winnerId = null,
             gameOver = false,
         )
@@ -148,9 +151,11 @@ class GameOutcomeDetailsTest {
 
     @Test fun unknownEliminationReasonIsMarkedUnknownRatherThanBlamingAnotherPlayer() {
         val ai2 = EntityId("offline-ai-2")
+        // Deliberately unavailable viewer state: a legacy/partial terminal notice must not
+        // borrow another player's card-effect reason.
         val state = GameState(
-            turnOrder = listOf(winner, loser, ai2),
-            activePlayers = setOf(loser, ai2),
+            turnOrder = listOf(loser, ai2),
+            entities = mapOf(ai2 to ComponentContainer.of(PlayerLostComponent(LossReason.CARD_EFFECT))),
             winnerId = null,
             gameOver = false,
         )
