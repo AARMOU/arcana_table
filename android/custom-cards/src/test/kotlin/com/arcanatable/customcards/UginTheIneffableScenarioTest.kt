@@ -305,4 +305,46 @@ class UginTheIneffableScenarioTest {
         assertNotNull(d.findPermanent(p, probe.name))
     }
 
+
+    @Test fun uginDiscountCannotPayRequiredColorlessSymbol() {
+        val probe = com.wingedsheep.sdk.dsl.card("Ugin Explicit Colorless Cost Probe") {
+            manaCost = "{2}{C}"
+            typeLine = "Artifact"
+        }
+        val d = customScenario(UginTheIneffable)
+        val p = d.player1
+        d.registerCard(probe)
+        d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        val artifact = d.putCardInHand(p, probe.name)
+
+        // The generic {2} is reduced to zero, but the printed {C} is not.
+        assertNotNull("Ugin must not erase an explicit {C} requirement",
+            d.castSpell(p, artifact).error)
+        assertTrue("A rejected cast must leave the card in hand", artifact in d.getHand(p))
+        assertNull(d.findPermanent(p, probe.name))
+
+        d.giveColorlessMana(p, 1)
+        assertNull("Exactly one real colorless mana must pay the remaining {C}",
+            d.castSpell(p, artifact).error)
+        d.resolveAll()
+        assertNotNull(d.findPermanent(p, probe.name))
+    }
+
+    @Test fun uginGenericDiscountStopsAtZero() {
+        val probe = com.wingedsheep.sdk.dsl.card("Ugin One Generic Floor Probe") {
+            manaCost = "{1}"
+            typeLine = "Artifact"
+        }
+        val d = customScenario(UginTheIneffable)
+        val p = d.player1
+        d.registerCard(probe)
+        d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        val artifact = d.putCardInHand(p, probe.name)
+
+        // A {2} generic reduction on a {1} spell cannot create negative cost.
+        assertNull("Ugin should make a one-generic colorless spell free",
+            d.castSpell(p, artifact).error)
+        d.resolveAll()
+        assertNotNull(d.findPermanent(p, probe.name))
+    }
 }
