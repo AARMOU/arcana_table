@@ -114,7 +114,7 @@ jobs:
           import xml.etree.ElementTree as ET
           suites = {
               "engine": ("argentum-engine", "EldraziTempleManaRestrictionTest", 5),
-              "android": ("android/custom-cards", "EldraziTempleScenarioTest", 14),
+              "android": ("android/custom-cards", "EldraziTempleScenarioTest", 16),
           }
           total = 0
           for name, (root, class_name, minimum) in suites.items():
@@ -132,6 +132,8 @@ jobs:
                       "restrictedManaPaysDevoidEldraziActivatedAbilityWithPrintedBlueCost",
                       "restrictedManaPaysGenericCostOfColorlessEldraziAbility",
                       "restrictedManaRejectsGenericCostOfColoredEldraziAbility",
+                      "restrictedManaPaysGenericCostOfDevoidEldraziSpellWithPrintedBlueCost",
+                      "restrictedManaRejectsGenericCostOfColoredEldraziSpell",
                   }
                   cases = {c.get("name") for c in elem.iter("testcase")}
                   assert required <= cases, f"Missing mandatory ability-payment cases: {sorted(required - cases)}"
