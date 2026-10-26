@@ -472,7 +472,7 @@ internal fun PlayerBoard(
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp))
                         .background(PanelLight).padding(horizontal = 10.dp, vertical = 7.dp)
-                        .testTag("argentum-mana-summary"),
+                        .testTag("argentum-mana-summary").tutorialTarget("argentum-mana-summary"),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -490,7 +490,7 @@ internal fun PlayerBoard(
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().tutorialTarget("quick-actions").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             // In an Argentum game only controls that work are shown: Argentum owns draws, tokens,
             // mana, steps and shuffles, so those manual shortcuts would be silent no-ops.
             if (engineGame) {
@@ -503,7 +503,7 @@ internal fun PlayerBoard(
                             Modifier.height(40.dp).clip(RoundedCornerShape(9.dp)).background(PanelLight)
                                 .border(if (commander.id in playableIds) 2.dp else 0.dp, if (commander.id in playableIds) Mint else PanelLight, RoundedCornerShape(9.dp))
                                 .combinedClickable(onClick = { if (castable) onCastCommander() else onPublicPreview(commander) }, onLongClick = { onPublicPreview(commander) })
-                                .padding(end = 10.dp).testTag("commander-chip"),
+                                .padding(end = 10.dp).testTag("commander-chip").tutorialTarget("commander-chip"),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             CardFace(commander, Modifier.width(29.dp), onClick = { if (castable) onCastCommander() else onPublicPreview(commander) }, onLongClick = { onPublicPreview(commander) }, showCounters = false)
@@ -580,13 +580,13 @@ internal fun PlayerBoard(
             "BATTLEFIELD" to {
         if (!engineGame) Text("BATTLEFIELD  ·  grouped by type  ·  tap to tap/untap  ·  long-press to inspect", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp, modifier = Modifier.padding(start = 3.dp))
         if (player.battlefield.isEmpty()) {
-            Box(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)).background(Panel), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().weight(1f).tutorialTarget("battlefield-row").clip(RoundedCornerShape(12.dp)).background(Panel), contentAlignment = Alignment.Center) {
                 Text("Your battlefield is empty", color = Muted, fontSize = 12.sp)
             }
         } else {
             LazyColumn(
                 state = battlefieldListState,
-                modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)).background(Panel)
+                modifier = Modifier.fillMaxWidth().weight(1f).tutorialTarget("battlefield-row").tutorialTarget("table-zoom").clip(RoundedCornerShape(12.dp)).background(Panel)
                     .pinchToZoom(boardZoom) { saveBoardZoom(zoomContext, zoomConfig.screenWidthDp, zoomConfig.screenHeightDp, it) }
                     .padding(5.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(3.dp)
