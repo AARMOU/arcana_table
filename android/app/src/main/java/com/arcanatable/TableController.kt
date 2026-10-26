@@ -506,7 +506,12 @@ internal class TableController(
             onStatus = { status -> argentumStatus = status; if (status != ArgentumConnectionStatus.CONNECTED) argentumAwaitingUpdate = false },
             onMessage = { argentumQueue.trySend(it) },
             // Pop-up only; the pre-game waiting screen also keeps it inline (never the home screen, which would repeat it).
-            onError = { if (argentumSnapshot == null && !homeOpen) argentumLastError = it; message = it; argentumAwaitingUpdate = false },
+            onError = {
+                // Stored errors are logged by the argentumLastError effect; log the rest here.
+                if (argentumSnapshot == null && !homeOpen) argentumLastError = it
+                else recordDiagnostic("Argentum problem: $it", DiagnosticCategory.ERROR)
+                message = it; argentumAwaitingUpdate = false
+            },
             // Reconnect on its own only while the player is looking at the app.
             canAutoReconnect = { appInForeground }
         )
