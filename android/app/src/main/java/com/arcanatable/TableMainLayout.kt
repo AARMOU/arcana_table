@@ -224,7 +224,7 @@ internal fun TableController.TableMainLayout() {
                         DropdownMenuItem(text = { Text("Adjust UI") }, onClick = { topMenuExpanded = false; topMenuSection = null; layoutLabOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("Options") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; optionsOpen = true } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                     } else {
-                        DropdownMenuItem(text = { Text("‹  MAIN MENU") }, modifier = Modifier, onClick = { run { topMenuSection = null } })
+                        DropdownMenuItem(text = { Text("‹ Main menu") }, modifier = Modifier, onClick = { run { topMenuSection = null } })
                         when (topMenuSection) {
                             "decks" -> {
                                 if (!argentumEnabled) DropdownMenuItem(text = { Text(if (players[if (onlineMode) localSeat else selectedPlayer].deckLoaded) "Replace imported deck" else "Import deck") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; if (onlineMode) selectedPlayer = localSeat; importError = null; importOpen = true } })
@@ -233,7 +233,7 @@ internal fun TableController.TableMainLayout() {
                             }
                             "tools" -> {
                                 if (!onlineMode) DropdownMenuItem(text = { Text("Add AI opponent · ${players.size}/4") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; addAiOpponent() } })
-                                if (!argentumEnabled && gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Add token") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; tokenTarget = selectedPlayer; tokenPickerOpen = true } })
+                                if (!argentumEnabled && gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Add token…") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; tokenTarget = selectedPlayer; tokenPickerOpen = true } })
                                 if (!argentumEnabled && gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Mana pool · ${trackedMana(selectedPlayer)}") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; manaTarget = selectedPlayer; manaPoolOpen = true } })
                                 if (!argentumEnabled && !gameEndedOnline && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Search / browse library") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; librarySearchPlayer = selectedPlayer } })
                                 if (argentumEnabled && gameInProgress) DropdownMenuItem(text = { Text("Argentum legal actions · ${ArgentumActions.visibleChoices(argentumSnapshot?.legalActions.orEmpty()).size}") }, onClick = { topMenuExpanded = false; topMenuSection = null; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } })
@@ -248,7 +248,7 @@ internal fun TableController.TableMainLayout() {
                                         topMenuSection = null
                                         saveOfflineGame()
                                     })
-                                DropdownMenuItem(text = { Text("Room home") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; homeOpen = true; showOverview = true; showHand = false } })
+                                DropdownMenuItem(text = { Text("Home screen") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; homeOpen = true; showOverview = true; showHand = false } })
                                 // Argentum server play parked for now (Build 113); plumbing kept.
                                 if (!onlineMode && !localGameStarted) DropdownMenuItem(text = { Text("Start Argentum game", color = Muted.copy(alpha = .6f)) }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; android.widget.Toast.makeText(context, "Not yet available", android.widget.Toast.LENGTH_SHORT).show() } })
                                 // Argentum server play parked for now (Build 113); plumbing kept.
@@ -354,7 +354,7 @@ internal fun TableController.TableMainLayout() {
                         showTurnTimer = turnTimerVisible,
                         onToggleTimer = { if (!onlineMode || localSeat == 0) turnTimerVisible = !turnTimerVisible },
                         onMoveUp = { if (!onlineMode) movePlayerCard(index, -1) }, onMoveDown = { if (!onlineMode) movePlayerCard(index, 1) },
-                        canReorder = !onlineMode,
+                        canReorder = !onlineMode, isLastSeat = index == players.lastIndex,
                          tableZoom = tableZoom,
                          onTableZoomEnd = { saveTableZoom(tableZoomContext, tableZoomConfig.screenWidthDp, tableZoomConfig.screenHeightDp, it) },
                         onOpen = { run { selectedPlayer = index; showOverview = false } },

@@ -155,7 +155,7 @@ internal fun HandPeekBar(cardCount: Int, modifier: Modifier = Modifier, onClick:
         modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(10.dp)).background(PanelLight)
             .combinedClickable(onClick = onClick).padding(horizontal = 11.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
     ) {
         Text("HAND  $cardCount", color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Black)
         Spacer(Modifier.width(6.dp))
@@ -301,7 +301,7 @@ internal fun SettingsToggle(title: String, detail: String, checked: Boolean, onC
 
 @Composable
 internal fun ZoneChip(name: String, count: Int, enabled: Boolean = true, onClick: () -> Unit) {
-    Text("$name  $count", color = if (enabled) SoftWhite else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.heightIn(min = 34.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(6.dp)).background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp))
+    Text("$name  $count", color = if (enabled) SoftWhite else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.heightIn(min = 44.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(6.dp)).background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp))
 }
 
 @Composable

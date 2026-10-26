@@ -525,6 +525,8 @@ internal class TableController(
     var endProposalBy by run { mutableIntStateOf(-1) }
     var endVotes by run { mutableStateOf(emptyMap<Int, Boolean>()) }
     var gameEndedOnline by run { mutableStateOf(false) }
+    // The "game ended" notice is dismissible; it reappears for the next ended game.
+    var gameEndedNoticeDismissed by run { mutableStateOf(false) }
     var localGameStarted by run { mutableStateOf(false) }
     fun setBackgroundAlerts(enabled: Boolean) {
         if (enabled && Build.VERSION.SDK_INT >= 33 && context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {

@@ -208,7 +208,7 @@ internal fun ManaSymbolText(text: String, color: Color, fontSize: androidx.compo
 }
 
 @Composable
-internal fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier = Modifier, compact: Boolean = false, isActivePlayer: Boolean = false, turnNumber: Int, phaseName: String, turnTime: Long?, showTurnTimer: Boolean, onToggleTimer: () -> Unit, onMoveUp: () -> Unit, onMoveDown: () -> Unit, onOpen: () -> Unit, onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit, tableZoom: MutableFloatState, onTableZoomEnd: (Float) -> Unit, canReorder: Boolean = true) {
+internal fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier = Modifier, compact: Boolean = false, isActivePlayer: Boolean = false, turnNumber: Int, phaseName: String, turnTime: Long?, showTurnTimer: Boolean, onToggleTimer: () -> Unit, onMoveUp: () -> Unit, onMoveDown: () -> Unit, onOpen: () -> Unit, onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit, tableZoom: MutableFloatState, onTableZoomEnd: (Float) -> Unit, canReorder: Boolean = true, isLastSeat: Boolean = false) {
     // A turn change must not expand or collapse a player's overview panel.
     var expanded by rememberSaveable(player.id) { mutableStateOf(false) }
     val paymentCards = player.battlefield.filter { card ->
@@ -341,13 +341,15 @@ internal fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier 
                 if (player.revealed.isNotEmpty()) ZoneChip("REVEALED", player.revealed.size) { onZone("Revealed") }
             }
         }
-        Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = if (expanded) "Collapse player details" else "Expand player details",
-            tint = Muted, modifier = Modifier.align(Alignment.CenterHorizontally).size(28.dp).clip(CircleShape).combinedClickable(onClick = { expanded = !expanded }))
+        // 48dp touch target around the 28dp chevron.
+        IconButton(onClick = { expanded = !expanded }, modifier = Modifier.align(Alignment.CenterHorizontally).size(48.dp)) {
+            Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = if (expanded) "Collapse player details" else "Expand player details", tint = Muted, modifier = Modifier.size(28.dp))
+        }
         // Seat order only changes on a local table; online games take their order from the room or engine.
         if (expanded && canReorder) {
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                TextButton(onClick = onMoveUp, enabled = index > 0, modifier = Modifier.heightIn(min = 48.dp)) { Text("MOVE ↑", color = Mint, fontSize = 9.sp) }
-                TextButton(onClick = onMoveDown, modifier = Modifier.heightIn(min = 48.dp)) { Text("MOVE ↓", color = Mint, fontSize = 9.sp) }
+                TextButton(onClick = onMoveUp, enabled = index > 0, modifier = Modifier.heightIn(min = 48.dp)) { Text("MOVE UP ↑", color = if (index > 0) Mint else Muted, fontSize = 9.sp) }
+                TextButton(onClick = onMoveDown, enabled = !isLastSeat, modifier = Modifier.heightIn(min = 48.dp)) { Text("MOVE DOWN ↓", color = if (!isLastSeat) Mint else Muted, fontSize = 9.sp) }
             }
         }
     }
@@ -438,7 +440,7 @@ internal fun PlayerBoard(
                         val trackerSummary = player.playerCounters.entries.joinToString(" · ") { "${it.key} ${it.value}" }
                         Text("Cast ${player.commanderCastCount} · tax +{${player.commanderCastCount * 2}}${if (trackerSummary.isNotBlank()) " · $trackerSummary" else ""}", color = Muted, fontSize = 7.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    TextButton(onClick = onCastCommander, enabled = (canControl || engineControlled) && !commanderUnavailable && !player.isEliminated, modifier = Modifier.heightIn(min = 32.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) { Text("CAST", color = if (canControl && !commanderUnavailable && !player.isEliminated) Mint else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = onCastCommander, enabled = (canControl || engineControlled) && !commanderUnavailable && !player.isEliminated, modifier = Modifier.heightIn(min = 44.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) { Text("CAST", color = if (canControl && !commanderUnavailable && !player.isEliminated) Mint else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
                 } else Text("PLAYER TRACKERS · ${player.playerCounters.entries.joinToString { "${it.key} ${it.value}" }.ifBlank { "none" }}", color = Muted, fontSize = 9.sp, modifier = Modifier.weight(1f))
                 val incomingDamage = player.commanderDamageReceived.entries.sumOf { it.value }
                 if (incomingDamage > 0) Text("CMD DMG $incomingDamage", color = if (player.commanderDamageReceived.values.any { it >= 21 }) Color(0xFFE9978B) else CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold)
@@ -453,7 +455,7 @@ internal fun PlayerBoard(
                 if (engineControlled && !player.isEliminated) Text("ARGENTUM RUNS THE RULES · USE ${if (isActivePlayer) "PASS PRIORITY / ACTIONS" else "ACTIONS WHEN OFFERED"}", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                 else if (player.isComputer || player.isEliminated) Text(if (player.isEliminated) "ELIMINATED · ${player.eliminationReason ?: "OUT"}" else if (player.deckLoaded) "AI TURN IN PROGRESS" else "IMPORT A DECK FOR THE AI", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(10.dp))
                 else {
-                    TextButton(onClick = onNextStep, enabled = isActivePlayer && canControl, modifier = Modifier.heightIn(min = 38.dp)) {
+                    TextButton(onClick = onNextStep, enabled = isActivePlayer && canControl, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text(if (!canControl) "OTHER PLAYER · READ ONLY" else if (isActivePlayer) "NEXT STEP  ›" else "WAITING FOR TURN", color = if (isActivePlayer && canControl) Mint else Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -652,8 +654,8 @@ internal fun BattlefieldCard(card: GameCard, tileWidth: androidx.compose.ui.unit
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(text = { Text(if (card.tapped) "Untap" else "Tap") }, onClick = { menuOpen = false; onAction("TAP") })
-                DropdownMenuItem(text = { Text("Add counter") }, onClick = { menuOpen = false; onAction("COUNTER") })
-                DropdownMenuItem(text = { Text("Create token") }, onClick = { menuOpen = false; onAction("TOKEN") })
+                DropdownMenuItem(text = { Text("Add counter…") }, onClick = { menuOpen = false; onAction("COUNTER") })
+                DropdownMenuItem(text = { Text("Add token…") }, onClick = { menuOpen = false; onAction("TOKEN") })
                 DropdownMenuItem(text = { Text("Move to graveyard") }, onClick = { menuOpen = false; onAction("GRAVEYARD") })
                 DropdownMenuItem(text = { Text("Exile") }, onClick = { menuOpen = false; onAction("EXILE") })
                 if (!card.isFaceDown && activatedAbilities.isNotEmpty()) {
@@ -790,7 +792,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
             if (!argentumMode && !canControl && actionOrder.none { it == "REVEAL" || it == "STACK" || it == "MORE" }) Text("WAITING", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
             DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
                 if (canControl) {
-                    DropdownMenuItem(text = { Text("Add token") }, modifier = Modifier, onClick = { moreOpen = false; onMoreAction("TOKEN") })
+                    DropdownMenuItem(text = { Text("Add token…") }, modifier = Modifier, onClick = { moreOpen = false; onMoreAction("TOKEN") })
                     DropdownMenuItem(text = { Text("Reveal top card") }, onClick = { moreOpen = false; onMoreAction("REVEAL") })
                     DropdownMenuItem(text = { Text("Shuffle library…") }, onClick = { moreOpen = false; onMoreAction("SHUFFLE") })
                     DropdownMenuItem(text = { Text("Player trackers and commander damage") }, onClick = { moreOpen = false; onMoreAction("TRACKERS") })
