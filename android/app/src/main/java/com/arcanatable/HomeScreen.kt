@@ -215,7 +215,7 @@ fun ArcanaHomeScreen(
 /** After PLAY: offline vs AI (with the AI's deck) or online with Argentum. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun PlaySheet(
+internal fun PlaySheet(
     deckName: String?,
     aiDecks: List<DeckChoice>,
     aiDeckId: String?,
@@ -311,7 +311,7 @@ private fun DeckChip(label: String, selected: Boolean, onClick: () -> Unit) {
 /** Pick from precons, Arcana decks, Argentum EDHREC decks, and then your other decks. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit, onDeckBuilder: (() -> Unit)? = null, tutorialStep: ArcanaLessonStep? = null, onTutorialNext: () -> Unit = {}, onTutorialExit: () -> Unit = {}) {
+internal fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit, onDeckBuilder: (() -> Unit)? = null, tutorialStep: ArcanaLessonStep? = null, onTutorialNext: () -> Unit = {}, onTutorialExit: () -> Unit = {}) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text("Choose your deck", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
