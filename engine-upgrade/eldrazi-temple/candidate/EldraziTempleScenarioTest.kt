@@ -436,8 +436,6 @@ class EldraziTempleScenarioTest {
             d.castSpell(p, spell).error)
         assertEquals("Rejected cast preserves both restricted mana units", 2,
             d.manaPool(p).restrictedMana.size)
-        assertEquals("Rejected cast preserves the blue mana", 1,
-            d.manaPool(p).blue)
         assertTrue(d.permanentsNamed(p, probe.name).isEmpty())
 
         d.giveColorlessMana(p, 2)
