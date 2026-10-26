@@ -6,6 +6,15 @@ This is the complete Arcana Table **Build 72 source tree** (`0.15.53`, version c
 
 The separate `ArcanaTable-build52-source/` folder is stale and should not be used as the project source. Its Gradle metadata still labels it Build 52 and its code is materially different.
 
+## Unreleased guide accuracy fixes (after Build 72)
+
+- Corrected guide text that misdescribed controls: hand card taps, Clear All Data, Continue to Table, Create/Join, the room service address, Randomize Order, Random Deck, priority passing, Next Step, saved decks, Ready Up, and reduced motion.
+- Added guide steps for the opening hand and for what appears inside a room; merged the MORE and Add Token steps.
+- The guide skips steps whose control is not on screen, and section counters count only the steps shown.
+- Guided taps no longer jump the guide into other sections or loop back; closing a screen returns to the step after the one that opened it. Guided taps on MORE and Share Room no longer open a menu or share sheet over the guide.
+- Section headers use readable names instead of internal ids.
+- The Options footer now describes both local Wi-Fi and Internet rooms; mulligan text no longer says the free mulligan is multiplayer-only.
+
 ## Changes in Build 71
 
 - Chat messages support long-press text selection and Android's copy action.

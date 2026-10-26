@@ -167,130 +167,161 @@ private data class TutorialStop(
     val explanation: String,
     val target: String,
     val view: String,
-    val executeAction: Boolean = true
+    // When false, tapping the highlighted control only advances the guide.
+    // Use it for controls that open dialogs, menus, or another guide section,
+    // so a tap never jumps the guide out of order.
+    val executeAction: Boolean = true,
+    // Availability key for a step that has no highlighted control. Steps with
+    // a target use the target as their availability key.
+    val requirement: String = ""
 )
+
+// Friendly section names for the guide header. Keys are the internal view ids.
+private val tutorialSectionNames = mapOf(
+    "HOME" to "HOME",
+    "LOBBY" to "GAME LOBBY",
+    "TABLE" to "TABLE",
+    "PLAYER" to "PLAYER BOARD",
+    "HAND" to "HAND",
+    "OPTIONS" to "OPTIONS",
+    "STACK" to "STACK",
+    "CHAT" to "CHAT",
+    "GAME_LOG" to "GAME LOG",
+    "MENU_MAIN" to "APP MENU",
+    "MENU_DECKS" to "DECKS MENU",
+    "MENU_TOOLS" to "GAME TOOLS MENU",
+    "MENU_GAME" to "ROOM & GAME MENU",
+    "DECK_IMPORT" to "DECK IMPORT",
+    "SAVED_DECKS" to "SAVED DECKS"
+)
+
+// Lets every guide overlay, including ones drawn inside dialogs, count only
+// the steps whose control is actually on screen.
+private val LocalTutorialStepAvailable = compositionLocalOf<(TutorialStop) -> Boolean> { { true } }
+
 private val tutorialStops = listOf(
-    TutorialStop("WELCOME TO ARCANA TABLE!", "Welcome to Arcana Table! Please follow this brief tutorial to show you everything Arcana has to offer!", "", "HOME", executeAction = false),
+    TutorialStop("WELCOME TO ARCANA TABLE!", "Welcome to Arcana Table! This guide walks through each screen one control at a time. Tap Next to continue, Back to revisit a step, or X to exit at any time.", "", "HOME", executeAction = false),
     TutorialStop("PLAY MAGIC TOGETHER", "Arcana Table lets you play Magic: The Gathering with up to four people, anywhere in the world!", "", "HOME", executeAction = false),
     TutorialStop("CREATE ROOM", "Create a new room. You choose the connection type, invite players, load decks, and start the game from the lobby.", "home-create", "HOME"),
 
     TutorialStop("CREATE ROOM", "Choose this to host a room.", "lobby-create", "LOBBY"),
-    TutorialStop("JOIN ROOM", "Choose this to enter a room.", "lobby-join", "LOBBY"),
-    TutorialStop("LOCAL WI-FI", "Play with devices on your Wi-Fi.", "lobby-local", "LOBBY"),
+    TutorialStop("JOIN ROOM", "Choose this to enter a room someone else is hosting.", "lobby-join", "LOBBY"),
+    TutorialStop("LOCAL WI-FI", "Play with phones on the same Wi-Fi network.", "lobby-local", "LOBBY"),
     TutorialStop("INTERNET", "Play with people on different networks using the secure room service.", "lobby-internet", "LOBBY"),
-    TutorialStop("ROOM SERVICE ADDRESS", "The Arcana room address is already filled in. You do not need to tap or change it. Continue past this step. Only edit it if you run your own room server and know its address.", "", "LOBBY", executeAction = false),
-    TutorialStop("CREATE OR JOIN", "Join Game needs a room code and password. Tap Next to continue without connecting.", "lobby-submit", "LOBBY", executeAction = false),
-    TutorialStop("CANCEL JOIN", "Stop the connection attempt.", "lobby-cancel", "LOBBY", executeAction = false),
-    TutorialStop("ROOM CODE", "Share this code and password so friends can join. Use Share Room to send the invite in one message.", "lobby-copy", "LOBBY", executeAction = false),
+    TutorialStop("ROOM SERVICE ADDRESS", "In Internet mode the room service address is already filled in. You do not need to tap or change it unless you run your own room server.", "", "LOBBY", executeAction = false, requirement = "lobby-internet-form"),
+    TutorialStop("CREATE OR JOIN", "With Create Room selected, this button reads CREATE LOBBY and needs a room password of at least 4 characters. With Join Room selected, it reads JOIN GAME and needs the host's room code and password. Tap Next to continue without connecting.", "lobby-submit", "LOBBY", executeAction = false),
+    TutorialStop("CANCEL JOIN", "Stop a connection attempt that is still in progress.", "lobby-cancel", "LOBBY", executeAction = false),
+    TutorialStop("INSIDE A ROOM", "Once a room is open, this screen shows the room code with Copy and Share, each player's Import Deck, Opening Hand, and Ready Up buttons, and the host's Add AI Opponent, Randomize Order, and Start Game controls.", "", "LOBBY", executeAction = false, requirement = "lobby-not-in-room"),
+    TutorialStop("ROOM CODE", "Copy the room code. Friends need it and the password to join; Share Room sends both in one message.", "lobby-copy", "LOBBY", executeAction = false),
     TutorialStop("SHARE ROOM", "Send the room code, password, and connection address with your phone's share menu.", "lobby-share", "LOBBY", executeAction = false),
-    TutorialStop("COPY ADDRESS", "Copy the host address for local players.", "lobby-copy-ip", "LOBBY", executeAction = false),
-    TutorialStop("IMPORT DECK", "Load a deck for this seat.", "lobby-import", "LOBBY"),
-    TutorialStop("READY UP", "Tell the host you are ready.", "lobby-ready", "LOBBY", executeAction = false),
-    TutorialStop("ADD AI OPPONENT", "Add a computer player.", "lobby-ai", "LOBBY", executeAction = false),
-    TutorialStop("RANDOMIZE ORDER", "Choose who takes the first turn.", "lobby-order", "LOBBY", executeAction = false),
+    TutorialStop("COPY ADDRESS", "Copy this phone's Wi-Fi address. Players joining over local Wi-Fi enter it as the host IP.", "lobby-copy-ip", "LOBBY", executeAction = false),
+    TutorialStop("IMPORT DECK", "Load a deck for your seat.", "lobby-import", "LOBBY", executeAction = false),
+    TutorialStop("OPENING HAND", "Review your opening seven. Keep it, or mulligan to shuffle it away and draw a new seven. Your first mulligan is free; when you keep, put one card on the bottom of your library for each mulligan after that.", "lobby-opening-hand", "LOBBY", executeAction = false),
+    TutorialStop("READY UP", "Mark your seat ready. You need an imported deck and a kept opening hand first.", "lobby-ready", "LOBBY", executeAction = false),
+    TutorialStop("ADD AI OPPONENT", "Host only: add a computer player, then import a deck for it.", "lobby-ai", "LOBBY", executeAction = false),
+    TutorialStop("RANDOMIZE ORDER", "Host only: shuffle the turn order at random. Goes First shows who starts.", "lobby-order", "LOBBY", executeAction = false),
     TutorialStop("EXPORT DIAGNOSTIC LOG", "Save connection details for troubleshooting.", "lobby-diagnostics", "LOBBY", executeAction = false),
-    TutorialStop("START GAME", "Begin once every player is ready.", "lobby-start", "LOBBY", executeAction = false),
-    TutorialStop("CLOSE ROOM", "Leave or close this room.", "lobby-leave", "LOBBY", executeAction = false),
-    TutorialStop("CLOSE LOBBY", "Return to the home screen.", "lobby-close", "LOBBY"),
+    TutorialStop("START GAME", "Host only: begin once every seat has a deck and is ready.", "lobby-start", "LOBBY", executeAction = false),
+    TutorialStop("LEAVE OR CLOSE ROOM", "Leave the room, or close it if you are the host. If you host a Wi-Fi game in progress, hosting passes to another connected player; an Internet room stays open for the others.", "lobby-leave", "LOBBY", executeAction = false),
+    TutorialStop("CLOSE LOBBY", "Close the lobby and go back. An open room stays open.", "lobby-close", "LOBBY"),
 
     TutorialStop("JOIN ROOM", "Join a friend's room. It opens this same lobby screen with Join Room already selected.", "home-join", "HOME"),
     TutorialStop("JOIN IS SELECTED", "This is the same lobby as Create Room. The Join Room choice is selected for you, so enter the host's room details.", "lobby-join", "LOBBY", executeAction = false),
     TutorialStop("RETURN HOME", "Close the lobby to continue the guide.", "lobby-close", "LOBBY"),
-    TutorialStop("CONTINUE TO TABLE", "Open the game table on this device. The Table view shows everyone; the player view gives you more controls.", "home-continue", "HOME"),
+    TutorialStop("CONTINUE TO TABLE", "Open the game table on this device. Outside a room, this also starts a local game and its timers. The Table view shows everyone; each player view gives you more controls.", "home-continue", "HOME"),
 
-    TutorialStop("SESSION TIMER", "Tap the timer to open timer controls.", "timer", "TABLE"),
-    TutorialStop("CHAT", "Open messages for your room.", "chat-button", "TABLE"),
-    TutorialStop("APP MENU", "Open decks, game tools, room controls, and options.", "main-menu", "TABLE"),
+    TutorialStop("SESSION TIMER", "Tap the timer to start, stop, or reset the session and turn timers. Long-press it to show or hide the turn timer.", "timer", "TABLE", executeAction = false),
+    TutorialStop("CHAT", "Open text chat for this table.", "chat-button", "TABLE", executeAction = false),
+    TutorialStop("APP MENU", "Open decks, game tools, room controls, and options.", "main-menu", "TABLE", executeAction = false),
     TutorialStop("TABLE VIEW", "See every player at once.", "table-tab", "TABLE"),
-    TutorialStop("PLAYER VIEW", "Open this player’s board.", "player-tab", "TABLE"),
-    TutorialStop("PLAYER BOARD", "Tap a player panel to inspect their board.", "player-card", "TABLE"),
-    TutorialStop("NEXT STEP", "Move to the next phase.", "table-next", "TABLE", executeAction = false),
-    TutorialStop("PASS TURN", "Finish your turn and pass play.", "table-pass", "TABLE", executeAction = false),
-    TutorialStop("IMPORT DECK", "Load a deck for the selected player.", "table-import", "TABLE"),
+    TutorialStop("NEXT STEP", "Move the turn to its next step. Mana pools empty each time the step changes.", "table-next", "TABLE", executeAction = false),
+    TutorialStop("PASS TURN", "Finish your turn. The game moves through your remaining steps and starts the next player's turn.", "table-pass", "TABLE", executeAction = false),
+    TutorialStop("IMPORT DECK", "Load a deck for the selected player.", "table-import", "TABLE", executeAction = false),
+    TutorialStop("PLAYER BOARD", "Tap a player's panel to open their board.", "player-card", "TABLE", executeAction = false),
+    TutorialStop("PLAYER VIEW", "Each tab opens one player's board. Tap the highlighted tab to continue.", "player-tab", "TABLE"),
 
-    TutorialStop("PLAYER STATUS", "See whose turn it is and the current phase.", "player-status", "PLAYER"),
-    TutorialStop("SESSION TIMER", "Tap the timer to open timer controls.", "timer", "PLAYER"),
-    TutorialStop("CHAT", "Open room messages.", "chat-button", "PLAYER"),
-    TutorialStop("APP MENU", "Open decks, game tools, room controls, and options.", "main-menu", "PLAYER"),
-    TutorialStop("LOWER LIFE", "Subtract one life.", "life-down", "PLAYER", executeAction = false),
+    TutorialStop("PLAYER STATUS", "See whose turn it is and the current step.", "player-status", "PLAYER"),
+    TutorialStop("SESSION TIMER", "Tap the timer to start, stop, or reset the session and turn timers. Long-press it to show or hide the turn timer.", "timer", "PLAYER", executeAction = false),
+    TutorialStop("CHAT", "Open text chat for this table.", "chat-button", "PLAYER", executeAction = false),
+    TutorialStop("APP MENU", "Open decks, game tools, room controls, and options.", "main-menu", "PLAYER", executeAction = false),
+    TutorialStop("LOWER LIFE", "Subtract one life. A player who reaches 0 life is eliminated.", "life-down", "PLAYER", executeAction = false),
     TutorialStop("RAISE LIFE", "Add one life.", "life-up", "PLAYER", executeAction = false),
-    TutorialStop("MANA POOL", "Tap the MANA status to track or spend mana.", "mana-status", "PLAYER"),
-    TutorialStop("CAST COMMANDER", "Cast your commander from the command zone.", "commander-cast", "PLAYER", executeAction = false),
-    TutorialStop("NEXT STEP", "Move to the next phase.", "next-step", "PLAYER", executeAction = false),
-    TutorialStop("PASS TURN", "Finish your turn and pass play.", "pass-turn", "PLAYER", executeAction = false),
-    TutorialStop("LIBRARY", "Search or browse this library.", "zone-library", "PLAYER"),
-    TutorialStop("HAND", "Open this player’s hand.", "hand-button", "PLAYER"),
-    TutorialStop("HAND ZONE", "Open the hand from this zone button.", "zone-hand", "PLAYER"),
-    TutorialStop("GRAVEYARD", "View cards in the graveyard.", "zone-graveyard", "PLAYER"),
-    TutorialStop("EXILE", "View exiled cards.", "zone-exile", "PLAYER"),
-    TutorialStop("REVEALED", "View cards revealed to the table.", "zone-revealed", "PLAYER"),
+    TutorialStop("MANA POOL", "Tap MANA to track the mana you produce. Casting spends from it, and it empties when the step changes.", "mana-status", "PLAYER", executeAction = false),
+    TutorialStop("CAST COMMANDER", "Cast your commander from the command zone. Commander tax adds {2} for each earlier cast.", "commander-cast", "PLAYER", executeAction = false),
+    TutorialStop("NEXT STEP", "Move the turn to its next step. Mana pools empty each time the step changes.", "next-step", "PLAYER", executeAction = false),
+    TutorialStop("PASS TURN", "Finish your turn. The game moves through your remaining steps and starts the next player's turn.", "pass-turn", "PLAYER", executeAction = false),
+    TutorialStop("LIBRARY", "Search or browse this library.", "zone-library", "PLAYER", executeAction = false),
+    TutorialStop("GRAVEYARD", "View cards in the graveyard.", "zone-graveyard", "PLAYER", executeAction = false),
+    TutorialStop("EXILE", "View exiled cards.", "zone-exile", "PLAYER", executeAction = false),
+    TutorialStop("REVEALED", "View cards revealed to the table.", "zone-revealed", "PLAYER", executeAction = false),
     TutorialStop("DRAW", "Draw one card.", "draw-action", "PLAYER", executeAction = false),
-    TutorialStop("COMBAT", "Set attackers, blockers, and damage.", "combat-action", "PLAYER", executeAction = false),
-    TutorialStop("MORE", "Open more player and game tools.", "more-actions", "PLAYER"),
-    TutorialStop("ADD TOKEN", "Open MORE, then choose Add token.", "token-action", "PLAYER", executeAction = false),
-    TutorialStop("STACK AND PRIORITY", "Open spells and abilities waiting to resolve.", "stack-open", "PLAYER"),
-    TutorialStop("BACK TO TABLE", "Return to the full table.", "player-back-table", "PLAYER"),
-    TutorialStop("TAP OR INSPECT A CARD", "Tap to tap or untap; long-press for details.", "battlefield", "PLAYER", executeAction = false),
+    TutorialStop("COMBAT", "Declare attackers, assign blockers, and enter damage. The app records combat; resolve its rules yourself.", "combat-action", "PLAYER", executeAction = false),
+    TutorialStop("MORE", "More tools: add a token, reveal the top card, shuffle, trackers and commander damage, concede, and more.", "more-actions", "PLAYER"),
+    TutorialStop("STACK AND PRIORITY", "Open spells and abilities waiting to resolve.", "stack-open", "PLAYER", executeAction = false),
+    TutorialStop("BATTLEFIELD", "Tap a card to tap or untap it; long-press to inspect it. Use ⋮ on a card for counters, tokens, abilities, and moving it to another zone.", "battlefield", "PLAYER", executeAction = false),
+    TutorialStop("HAND ZONE", "The HAND chip also opens your hand.", "zone-hand", "PLAYER", executeAction = false),
+    TutorialStop("BACK TO TABLE", "Return to the full table.", "player-back-table", "PLAYER", executeAction = false),
+    TutorialStop("HAND", "Open this player's hand. Tap it to continue.", "hand-button", "PLAYER"),
 
-    TutorialStop("CARD DETAILS", "Tap a card to see its actions; long-press for full text.", "hand-card", "HAND"),
-    TutorialStop("PLAY CARD ACTIONS", "Choose what to do with this card.", "hand-actions", "HAND", executeAction = false),
+    TutorialStop("CARD ACTIONS", "Tap or long-press a card to choose what to do with it. Long-press and drag a card onto the battlefield to play it.", "hand-card", "HAND"),
+    TutorialStop("PLAY CARD ACTIONS", "Play the card, play it face down, reveal, exile, or discard it, or choose Inspect to read its full text.", "hand-actions", "HAND", executeAction = false),
 
     TutorialStop("THEME", "Switch between light and dark.", "options-theme", "OPTIONS", executeAction = false),
-    TutorialStop("REDUCE SWIPE ANIMATION", "Use shorter screen transitions.", "options-motion", "OPTIONS", executeAction = false),
+    TutorialStop("REDUCE SWIPE ANIMATION", "Skip the animated slide when you switch view tabs.", "options-motion", "OPTIONS", executeAction = false),
     TutorialStop("CARD SIZE", "Choose how large cards appear.", "options-card-size", "OPTIONS", executeAction = false),
-    TutorialStop("RETURN TO TABLE", "Show the table after passing your turn.", "options-return-table", "OPTIONS", executeAction = false),
-    TutorialStop("OPEN HAND AFTER DRAW", "Show your hand after drawing.", "options-open-hand", "OPTIONS", executeAction = false),
-    TutorialStop("DRAW AUTOMATICALLY", "Draw when the draw step begins.", "options-auto-draw", "OPTIONS", executeAction = false),
-    TutorialStop("UNTAP AUTOMATICALLY", "Untap your permanents at turn start.", "options-auto-untap", "OPTIONS", executeAction = false),
+    TutorialStop("RETURN TO TABLE", "Show the full table after you pass your turn.", "options-return-table", "OPTIONS", executeAction = false),
+    TutorialStop("OPEN HAND AFTER DRAW", "Show your hand after the automatic draw-step draw.", "options-open-hand", "OPTIONS", executeAction = false),
+    TutorialStop("DRAW AUTOMATICALLY", "Draw a card when your turn reaches the draw step.", "options-auto-draw", "OPTIONS", executeAction = false),
+    TutorialStop("UNTAP AUTOMATICALLY", "Untap your permanents when your turn begins. A tapped permanent with a stun counter loses the counter instead.", "options-auto-untap", "OPTIONS", executeAction = false),
     TutorialStop("TURN TIMER DISPLAY", "Show or hide the turn timer.", "options-timer", "OPTIONS", executeAction = false),
-    TutorialStop("BACKGROUND ALERTS", "Get a notification when the game changes.", "options-alerts", "OPTIONS", executeAction = false),
-    TutorialStop("CLEAR ALL DATA", "Reset game settings; your decks and guide progress stay.", "clear-data", "OPTIONS", executeAction = false),
+    TutorialStop("BACKGROUND ALERTS", "Get a notification when your turn starts or another player makes a play while the app is in the background.", "options-alerts", "OPTIONS", executeAction = false),
+    TutorialStop("CLEAR ALL DATA", "Opens a confirmation first. Clearing ends the current game and room and erases chat, logs, players and their loaded decks, and settings. Saved decks and guide progress are kept.", "clear-data", "OPTIONS", executeAction = false),
     TutorialStop("DEVELOPER OPTIONS", "Open test tools.", "options-developer", "OPTIONS", executeAction = false),
     TutorialStop("CLOSE OPTIONS", "Return to the table.", "options-close", "OPTIONS"),
 
-    TutorialStop("CAST FROM HAND", "Open your hand to choose a spell.", "stack-cast", "STACK"),
-    TutorialStop("PUT ON STACK", "Add a manual ability or effect.", "stack-add", "STACK", executeAction = false),
-    TutorialStop("PASS PRIORITY", "Let the next player respond. The AI passes automatically when it has no response.", "stack-pass", "STACK", executeAction = false),
-    TutorialStop("RESOLVE TOP", "Resolve the top item after everyone passes. The newest item resolves first.", "stack-resolve", "STACK", executeAction = false),
-    TutorialStop("STACK ITEM", "Tap an item to inspect it. If the AI has no response, it passes so the stack can resolve.", "stack-item", "STACK"),
+    TutorialStop("CAST FROM HAND", "Open your hand to cast a spell.", "stack-cast", "STACK", executeAction = false),
+    TutorialStop("PUT ON STACK", "Add an ability or effect by name for the player with priority.", "stack-add", "STACK", executeAction = false),
+    TutorialStop("PASS PRIORITY", "Pass to the next player in turn order. AI players always pass; when an AI is the last to pass, the top item resolves automatically.", "stack-pass", "STACK", executeAction = false),
+    TutorialStop("RESOLVE TOP", "Once every player has passed in a row, resolve the top item. The newest item resolves first.", "stack-resolve", "STACK", executeAction = false),
+    TutorialStop("STACK ITEMS", "Spells and abilities waiting to resolve are listed here, newest on top. Tap a card image to preview it, or its text for details.", "stack-item", "STACK"),
     TutorialStop("CLOSE STACK", "Close the stack view.", "stack-close", "STACK"),
 
-    TutorialStop("SEND MESSAGE", "Send a message to the table.", "chat-send", "CHAT", executeAction = false),
-    TutorialStop("CHAT CLOSE", "Close the chat panel.", "chat-close", "CHAT"),
+    TutorialStop("SEND MESSAGE", "Send a message to everyone at the table.", "chat-send", "CHAT", executeAction = false),
+    TutorialStop("CLOSE CHAT", "Close the chat panel.", "chat-close", "CHAT"),
 
-    TutorialStop("CLOSE GAME LOG", "Return to the table.", "log-close", "GAME_LOG"),
+    TutorialStop("CLOSE GAME LOG", "The game log records every action. Close it to return to the table.", "log-close", "GAME_LOG"),
 
-    TutorialStop("DECKS MENU", "Open deck import, editing, and saved decks.", "menu-decks", "MENU_MAIN"),
-    TutorialStop("GAME TOOLS MENU", "Open tracking tools, the stack, log, and rules.", "menu-tools", "MENU_MAIN"),
-    TutorialStop("ROOM AND GAME MENU", "Open room, game, and reset controls.", "menu-game", "MENU_MAIN"),
-    TutorialStop("OPTIONS MENU", "Open preferences and Clear All Data.", "menu-options", "MENU_MAIN"),
-    TutorialStop("IMPORT DECK MENU", "Choose or paste a deck list.", "menu-import", "MENU_DECKS"),
-    TutorialStop("EDIT DECK MENU", "Change the selected deck.", "menu-edit", "MENU_DECKS"),
-    TutorialStop("SAVED DECKS MENU", "Load or remove a saved deck.", "menu-saved", "MENU_DECKS"),
-    TutorialStop("ADD AI", "Add a computer seat to a local game.", "menu-add-ai", "MENU_TOOLS", executeAction = false),
+    TutorialStop("DECKS MENU", "Open deck import, editing, and saved decks.", "menu-decks", "MENU_MAIN", executeAction = false),
+    TutorialStop("GAME TOOLS MENU", "Open tracking tools, the stack, log, and rules.", "menu-tools", "MENU_MAIN", executeAction = false),
+    TutorialStop("ROOM AND GAME MENU", "Open room, game, and reset controls.", "menu-game", "MENU_MAIN", executeAction = false),
+    TutorialStop("OPTIONS MENU", "Open preferences, including Clear All Data.", "menu-options", "MENU_MAIN", executeAction = false),
+    TutorialStop("IMPORT DECK MENU", "Choose or paste a deck list.", "menu-import", "MENU_DECKS", executeAction = false),
+    TutorialStop("EDIT DECK MENU", "Change the selected player's imported deck.", "menu-edit", "MENU_DECKS", executeAction = false),
+    TutorialStop("SAVED DECKS MENU", "Load or remove a saved deck.", "menu-saved", "MENU_DECKS", executeAction = false),
+    TutorialStop("ADD AI", "Add a computer seat to a local game, then import a deck for it.", "menu-add-ai", "MENU_TOOLS", executeAction = false),
     TutorialStop("ADD TOKEN", "Open the token picker.", "menu-add-token", "MENU_TOOLS", executeAction = false),
-    TutorialStop("MANA POOL", "Track colored mana for this player.", "menu-mana", "MENU_TOOLS", executeAction = false),
+    TutorialStop("MANA POOL", "Track mana for the selected player.", "menu-mana", "MENU_TOOLS", executeAction = false),
     TutorialStop("SEARCH LIBRARY", "Search or browse cards in the library.", "menu-search", "MENU_TOOLS", executeAction = false),
-    TutorialStop("STACK MENU", "Open spells and abilities awaiting responses.", "menu-stack", "MENU_TOOLS"),
-    TutorialStop("GAME LOG MENU", "Review the recorded game actions.", "menu-log", "MENU_TOOLS"),
-    TutorialStop("RULES MENU", "Search the Magic rules reference.", "menu-rules", "MENU_TOOLS"),
+    TutorialStop("STACK MENU", "Open spells and abilities awaiting responses.", "menu-stack", "MENU_TOOLS", executeAction = false),
+    TutorialStop("GAME LOG MENU", "Review the recorded game actions.", "menu-log", "MENU_TOOLS", executeAction = false),
+    TutorialStop("RULES MENU", "Search the official Magic Comprehensive Rules. The first use downloads them for offline reading.", "menu-rules", "MENU_TOOLS", executeAction = false),
     TutorialStop("EXPORT DIAGNOSTICS", "Save a connection log for troubleshooting.", "menu-export", "MENU_TOOLS", executeAction = false),
-    TutorialStop("ROOM HOME MENU", "Return to the home screen.", "menu-home", "MENU_GAME"),
-    TutorialStop("START GAME MENU", "Begin a new local game.", "menu-start-game", "MENU_GAME", executeAction = false),
-    TutorialStop("GAME LOBBY MENU", "Open room and player controls.", "menu-lobby", "MENU_GAME"),
-    TutorialStop("END GAME MENU", "Ask all players to agree to end the game.", "menu-end", "MENU_GAME", executeAction = false),
-    TutorialStop("LEAVE GAME MENU", "Open the lobby to leave or hand off the room.", "menu-leave", "MENU_GAME"),
+    TutorialStop("ROOM HOME MENU", "Return to the home screen.", "menu-home", "MENU_GAME", executeAction = false),
+    TutorialStop("START GAME MENU", "Start a local game with the current players.", "menu-start-game", "MENU_GAME", executeAction = false),
+    TutorialStop("GAME LOBBY MENU", "Open room and player controls.", "menu-lobby", "MENU_GAME", executeAction = false),
+    TutorialStop("END GAME MENU", "Online only: ask every player to agree to end the game.", "menu-end", "MENU_GAME", executeAction = false),
+    TutorialStop("LEAVE GAME MENU", "Online only: open the lobby to leave the room or hand off hosting.", "menu-leave", "MENU_GAME", executeAction = false),
     TutorialStop("RESET GAME MENU", "Start a fresh game with these decks.", "menu-reset", "MENU_GAME", executeAction = false),
-    TutorialStop("CLEAR GAME DATA MENU", "Open the confirmation before clearing data.", "menu-clear", "MENU_GAME", executeAction = false),
+    TutorialStop("CLEAR ALL DATA MENU", "Open the confirmation before clearing all app data.", "menu-clear", "MENU_GAME", executeAction = false),
 
-    TutorialStop("CHOOSE FILE", "Pick a deck list file.", "deck-choose-file", "DECK_IMPORT", executeAction = false),
-    TutorialStop("RANDOM DECK", "Load an example deck list.", "deck-random", "DECK_IMPORT", executeAction = false),
-    TutorialStop("LOAD SAVED DECK", "Open your saved deck list.", "deck-load-saved", "DECK_IMPORT"),
-    TutorialStop("IMPORT DECK", "Replace this player’s deck.", "deck-import", "DECK_IMPORT", executeAction = false),
+    TutorialStop("CHOOSE FILE", "Pick a .txt or .csv deck list file.", "deck-choose-file", "DECK_IMPORT", executeAction = false),
+    TutorialStop("RANDOM DECK", "Fetch a random Commander deck list online into the box. Review it, then tap Import.", "deck-random", "DECK_IMPORT", executeAction = false),
+    TutorialStop("LOAD SAVED DECK", "Open your saved deck list.", "deck-load-saved", "DECK_IMPORT", executeAction = false),
+    TutorialStop("IMPORT DECK", "Check every card name and replace this player's deck with the list.", "deck-import", "DECK_IMPORT", executeAction = false),
     TutorialStop("CANCEL IMPORT", "Close without replacing this deck.", "deck-cancel", "DECK_IMPORT", executeAction = false),
     TutorialStop("LOAD A SAVED DECK", "Put this deck into the import box.", "saved-load", "SAVED_DECKS", executeAction = false),
     TutorialStop("DELETE A SAVED DECK", "Remove this saved deck from the device.", "saved-delete", "SAVED_DECKS", executeAction = false),
-    TutorialStop("CLOSE SAVED DECKS", "Return to deck import.", "saved-close", "SAVED_DECKS")
+    TutorialStop("CLOSE SAVED DECKS", "Close the saved deck list.", "saved-close", "SAVED_DECKS")
 )
 
 data class GameCard(
@@ -921,7 +952,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             openingHandKept = false
         ) }
         publishOnlineSnapshot()
-        lobbyNotice = if (player.mulligansTaken == 0) "Shuffled your hand into your library and dealt a new one. This multiplayer mulligan is free." else "Shuffled your hand into your library and dealt a new one."
+        lobbyNotice = if (player.mulligansTaken == 0) "Shuffled your hand into your library and dealt a new one. Your first mulligan is free." else "Shuffled your hand into your library and dealt a new one."
         recordDiagnostic("Opening hand mulligan: seat ${index + 1}, total=${player.mulligansTaken + 1}")
     }
     fun keepOpeningHand(index: Int, bottomIds: List<Int>) {
@@ -1995,6 +2026,71 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         importSaveToLibrary = false
     }
 
+    // Whether a guide step's control is on screen in the current game state.
+    // These conditions mirror the ones that show each control, so the guide
+    // skips steps for controls the player cannot see instead of describing them.
+    fun tutorialStepAvailable(step: TutorialStop): Boolean {
+        // Read state directly rather than the composition-time onlineMode and
+        // gameInProgress values, so a guided tap that just changed the game
+        // (for example Continue to Table starting a local game) is seen at once.
+        val onlineMode = roomHost != null || roomClient != null || cloudRoomClient != null || connectionLost
+        val gameInProgress = if (onlineMode) gameStartedOnline && roomConnected && !gameEndedOnline else localGameStarted
+        val selected = players.getOrNull(selectedPlayer)
+        val local = players.getOrNull(localSeat)
+        val active = players.getOrNull(activePlayer)
+        val inRoom = lobbyCreated || roomConnected
+        val roomPanelShown = inRoom && !lobbyJoinMode
+        val roomFormShown = !inRoom || lobbyJoinMode
+        val connecting = onlineStatus == "Connecting"
+        val canAdvanceFromTable = gameInProgress && !gameEndedOnline && active?.isComputer == false && (!onlineMode || localSeat == activePlayer)
+        val boardCanControl = gameInProgress && (!onlineMode || selectedPlayer == localSeat) && !gameEndedOnline && selected?.isEliminated == false
+        val seatTools = !onlineMode || selectedPlayer == localSeat
+        return when (step.target.ifBlank { step.requirement }) {
+            "lobby-create", "lobby-join", "lobby-local", "lobby-internet" -> !inRoom && !connecting
+            "lobby-internet-form" -> roomFormShown && lobbyInternetMode
+            "lobby-submit" -> roomFormShown && !(connecting && !lobbyJoinMode)
+            "lobby-cancel" -> roomFormShown && connecting
+            "lobby-not-in-room" -> !roomPanelShown
+            "lobby-copy", "lobby-share", "lobby-ready", "lobby-diagnostics", "lobby-leave" -> roomPanelShown
+            "lobby-copy-ip" -> roomPanelShown && lobbyHostAddress.isNotBlank()
+            "lobby-import" -> roomPanelShown && local?.deckLoaded == false
+            "lobby-opening-hand" -> roomPanelShown && !gameStartedOnline && local != null && local.deckLoaded && !local.openingHandKept && !local.isComputer && (lobbyCreated || localDeckSyncConfirmed)
+            "lobby-ai" -> roomPanelShown && lobbyCreated && !gameStartedOnline && players.size < 4
+            "lobby-order" -> roomPanelShown && lobbyCreated
+            "lobby-start" -> roomPanelShown && lobbyCreated && !gameStartedOnline
+            "table-next", "table-pass" -> canAdvanceFromTable
+            "table-import" -> selected?.deckLoaded == false && !gameEndedOnline && seatTools
+            "stack-open" -> gameInProgress
+            "commander-cast" -> selected?.commanderCard != null
+            "next-step" -> gameInProgress && selected?.isComputer == false && selected?.isEliminated == false
+            "zone-graveyard" -> selected?.graveyard?.isNotEmpty() == true
+            "zone-exile" -> selected?.exile?.isNotEmpty() == true
+            "zone-revealed" -> selected?.revealed?.isNotEmpty() == true
+            "draw-action", "combat-action", "more-actions" -> boardCanControl
+            "battlefield" -> selected?.battlefield?.isNotEmpty() == true
+            "hand-card" -> selected?.hand?.isNotEmpty() == true
+            "hand-actions" -> handActionCard != null
+            "menu-edit" -> players.getOrNull(if (onlineMode) localSeat else selectedPlayer)?.deckLoaded == true
+            "menu-add-ai" -> !onlineMode
+            "menu-add-token", "menu-mana" -> gameInProgress && seatTools
+            "menu-search" -> !gameEndedOnline && seatTools
+            "menu-stack" -> gameInProgress
+            "menu-start-game" -> !onlineMode && !localGameStarted
+            "menu-end" -> onlineMode && gameStartedOnline && !gameEndedOnline
+            "menu-leave" -> onlineMode
+            "menu-reset" -> !onlineMode || localSeat == 0 && gameEndedOnline
+            "menu-clear" -> !onlineMode
+            "saved-load", "saved-delete" -> savedDecks.isNotEmpty()
+            else -> true
+        }
+    }
+
+    fun nextAvailableTutorialIndex(from: Int): Int? =
+        (from until tutorialStops.size).firstOrNull { tutorialStepAvailable(tutorialStops[it]) }
+
+    fun previousAvailableTutorialIndex(before: Int): Int? =
+        (before - 1 downTo 0).firstOrNull { tutorialStepAvailable(tutorialStops[it]) }
+
     fun changeTutorialStep(index: Int) {
         tutorialIndex = index.coerceIn(tutorialStops.indices)
         tutorialBounds.clear()
@@ -2035,6 +2131,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         homeOpen = false
         showOverview = true
         showHand = false
+        // The card-actions dialog belongs to the HAND section only.
+        if (view != "HAND") handActionCard = null
         when (view) {
             "HOME" -> homeOpen = true
             "LOBBY" -> lobbyOpen = true
@@ -2055,11 +2153,9 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     }
 
     fun goBackTutorial() {
-        val previous = tutorialIndex - 1
-        if (previous >= 0) {
-            changeTutorialStep(previous)
-            showTutorialView(tutorialStops[previous].view)
-        }
+        val previous = previousAvailableTutorialIndex(tutorialIndex) ?: return
+        changeTutorialStep(previous)
+        showTutorialView(tutorialStops[previous].view)
     }
 
     fun startTutorial() {
@@ -2097,25 +2193,28 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             val resultingView = currentTutorialView()
             val openedAnotherView = resultingView != step.view
             val isClosingView = target in setOf("lobby-close", "stack-close", "saved-close", "log-close", "chat-close", "options-close", "deck-cancel")
+            fun nextStepIn(view: String): Int? = (tutorialIndex + 1 until tutorialStops.size)
+                .firstOrNull { tutorialStops[it].view == view && tutorialStepAvailable(tutorialStops[it]) }
+            // The guide only moves forward from a tap. A tap that opened another
+            // screen continues at that screen's next steps; closing it returns to
+            // the step after the one that opened it. Never jump back to earlier
+            // steps, which used to send the guide around in loops.
             val nextIndex = when {
                 !openedAnotherView -> tutorialIndex + 1
-                isClosingView && tutorialParentIndices.isNotEmpty() -> {
-                    val parentIndex = tutorialParentIndices.removeAt(tutorialParentIndices.lastIndex)
-                    (tutorialIndex + 1 until tutorialStops.size).firstOrNull { tutorialStops[it].view == resultingView }
-                        ?: (parentIndex + 1).takeIf { it < tutorialStops.size }
-                        ?: tutorialStops.size
+                isClosingView -> {
+                    val parentIndex = tutorialParentIndices.removeLastOrNull()
+                    if (parentIndex == null) tutorialIndex + 1
+                    else nextStepIn(resultingView) ?: (parentIndex + 1).coerceAtLeast(tutorialIndex + 1)
                 }
-                openedAnotherView -> {
+                else -> {
                     tutorialParentIndices.add(tutorialIndex)
-                    (tutorialIndex + 1 until tutorialStops.size).firstOrNull { tutorialStops[it].view == resultingView }
-                        ?: tutorialStops.indexOfFirst { it.view == resultingView }.takeIf { it >= 0 }
-                        ?: tutorialIndex + 1
+                    nextStepIn(resultingView) ?: (tutorialIndex + 1)
                 }
-                else -> tutorialIndex + 1
             }
-            if (nextIndex < tutorialStops.size) {
-                changeTutorialStep(nextIndex)
-                val nextStep = tutorialStops[nextIndex]
+            val available = nextAvailableTutorialIndex(nextIndex)
+            if (available != null) {
+                changeTutorialStep(available)
+                val nextStep = tutorialStops[available]
                 if (currentTutorialView() != nextStep.view) showTutorialView(nextStep.view)
             } else tutorialOpen = false
         } else {
@@ -2127,8 +2226,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     fun advanceTutorial() {
         val step = tutorialStops.getOrNull(tutorialIndex) ?: return
         markTutorialSeen(step.view)
-        val next = tutorialIndex + 1
-        if (next < tutorialStops.size) {
+        val next = nextAvailableTutorialIndex(tutorialIndex + 1)
+        if (next != null) {
             changeTutorialStep(next)
             showTutorialView(tutorialStops[next].view)
         } else tutorialOpen = false
@@ -2276,6 +2375,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         }
     }
 
+    CompositionLocalProvider(LocalTutorialStepAvailable provides ::tutorialStepAvailable) {
     Box(Modifier.fillMaxSize().background(Ink)) {
     Column(
         Modifier.fillMaxSize().background(Ink)
@@ -2358,7 +2458,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             Row(Modifier.weight(1f).horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Box(Modifier.then(tutorialAnchor("table-tab"))) { ViewChip("TABLE", selected = showOverview, onClick = { guidedAction("table-tab") { showOverview = true; showHand = false } }) }
                 players.forEachIndexed { index, player ->
-                    Box(Modifier.then(tutorialAnchor("player-tab"))) {
+                    Box(Modifier.then(if (index == selectedPlayer) tutorialAnchor("player-tab") else Modifier)) {
                         PlayerViewTab(
                             name = if (onlineMode && index == localSeat) "YOU" else player.name,
                             commander = player.commanderCard,
@@ -2492,7 +2592,13 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 onTrackers = { if (boardCanControl) trackerPlayer = boardIndex },
                 onSearchLibrary = { guidedAction("zone-library") { if (boardCanControl) librarySearchPlayer = boardIndex } },
                 onStack = { guidedAction("stack-open") { stackOpen = true } },
-                onOpenMore = { guidedAction("more-actions") {} },
+                onOpenMore = {
+                    // During the guide, tapping MORE advances instead of opening a
+                    // menu that would sit on top of the guide panel.
+                    val guidedTap = tutorialOpen && tutorialStops.getOrNull(tutorialIndex)?.target == "more-actions"
+                    guidedAction("more-actions") {}
+                    !guidedTap
+                },
                 onCastCommander = { guidedAction("commander-cast") {
                     if (boardCanControl) {
                         val commander = players[boardIndex].commanderCard
@@ -3957,6 +4063,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         )
 }
 }
+}
 
 private fun samplePlayers(): List<TablePlayer> {
     val one = listOf(
@@ -4413,13 +4520,16 @@ private fun LobbyDialog(
                                 }, modifier = Modifier.then(tutorialAnchor("lobby-copy"))) { Text("COPY", color = Mint, fontWeight = FontWeight.Bold) }
                             }
                             TextButton(onClick = {
-                                val network = if (internetMode) "Internet room · $cloudEndpoint" else "Same Wi-Fi · ${hostAddress.ifBlank { "ask the host to share their IP" }}"
-                                val invite = "Join my Arcana Table game!\nRoom code: $roomCode\nPassword: $password\n$network"
-                                runCatching {
-                                    context.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                                        type = "text/plain"
-                                        putExtra(android.content.Intent.EXTRA_TEXT, invite)
-                                    }, "Share room invite"))
+                                // During the guide this tap only advances; it does not open the share sheet.
+                                if (tutorialStep?.target != "lobby-share") {
+                                    val network = if (internetMode) "Internet room · $cloudEndpoint" else "Same Wi-Fi · ${hostAddress.ifBlank { "ask the host to share their IP" }}"
+                                    val invite = "Join my Arcana Table game!\nRoom code: $roomCode\nPassword: $password\n$network"
+                                    runCatching {
+                                        context.startActivity(android.content.Intent.createChooser(android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                                            type = "text/plain"
+                                            putExtra(android.content.Intent.EXTRA_TEXT, invite)
+                                        }, "Share room invite"))
+                                    }
                                 }
                                 onTutorialTarget("lobby-share")
                             }, modifier = Modifier.align(Alignment.End).heightIn(min = 44.dp).then(tutorialAnchor("lobby-share"))) {
@@ -4464,7 +4574,7 @@ private fun LobbyDialog(
                                 }
                                 Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.End) {
                                     if (!player.deckLoaded && index == localSeat) TextButton(onClick = { onImportDeck(index) }, modifier = Modifier.heightIn(min = 48.dp).then(tutorialAnchor("lobby-import"))) { Text("IMPORT DECK", color = CounterGold, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-                                    if (!gameStarted && index == localSeat && deckReady && !player.openingHandKept && !player.isComputer) TextButton(onClick = { openingHandDialogOpen = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("OPENING HAND · ${player.hand.size}", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+                                    if (!gameStarted && index == localSeat && deckReady && !player.openingHandKept && !player.isComputer) TextButton(onClick = { if (tutorialStep?.target == "lobby-opening-hand") onTutorialTarget("lobby-opening-hand") else { openingHandDialogOpen = true } }, modifier = Modifier.heightIn(min = 48.dp).then(tutorialAnchor("lobby-opening-hand"))) { Text("OPENING HAND · ${player.hand.size}", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
                                     TextButton(onClick = { onToggleReady(index) }, enabled = canToggleReady || ready, modifier = Modifier.heightIn(min = 48.dp).then(tutorialAnchor("lobby-ready"))) { Text(if (gameStarted) "GAME STARTED" else if (index == localSeat && pendingReady != null) "SENDING…" else if (ready) "CANCEL READY" else if (!handDecisionMade && index == localSeat) "CHOOSE HAND" else if (canMarkReady) if (!deckConfirmed) "SYNCING…" else "READY UP" else "WAITING", color = if (canToggleReady || ready) Mint else Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
                                     if (isHost && index > 0 && !internetMode) TextButton(onClick = { removeTarget = index }, modifier = Modifier.heightIn(min = 48.dp)) { Text("REMOVE", color = Color(0xFFE9978B), fontSize = 9.sp, fontWeight = FontWeight.Bold) }
                                 }
@@ -4569,7 +4679,7 @@ private fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKee
         Surface(Modifier.fillMaxWidth(0.94f).heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.88f), shape = RoundedCornerShape(16.dp), color = Panel) {
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(18.dp)) {
                 Text("OPENING HAND · ${player.hand.size} CARDS", color = Mint, fontWeight = FontWeight.Black, fontSize = 15.sp)
-                Text("Mulligans taken: ${player.mulligansTaken} · First multiplayer mulligan is free", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
+                Text("Mulligans taken: ${player.mulligansTaken} · First mulligan is free", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 4.dp))
                 Text(
                     if (choosingBottomCards) "Select exactly $bottomCount card(s) to put on the bottom of your library, then confirm."
                     else "Tap a card to enlarge it. Keep this hand or mulligan; a mulligan shuffles your whole hand into your library, then deals a fresh seven.",
@@ -4669,7 +4779,7 @@ private fun OptionsPage(
                 Text("Saved decks and tutorial progress are kept when game data is cleared.", color = Muted, fontSize = 10.sp)
                 Text("TESTING", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 12.dp))
                 TextButton(onClick = onOpenDeveloperOptions, modifier = Modifier.fillMaxWidth().heightIn(min = 50.dp).then(tutorialAnchor("options-developer"))) { Text("Open Developer Options  ›", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
-                Text("Room tests connect devices on the same Wi-Fi network. Connections are not encrypted and cannot cross networks yet.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 14.dp))
+                Text("Local Wi-Fi rooms connect phones on the same network and are not encrypted. Internet rooms connect across networks through the secure room service.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(top = 14.dp))
             }
             tutorialStep?.let { step -> GuidedTutorialOverlay(step, tutorialIndex, tutorialTotal, tutorialBounds[step.target], onTutorialBack, onTutorialNext, onTutorialExit) }
             }
@@ -4791,7 +4901,9 @@ private fun GuidedTutorialOverlay(step: TutorialStop, index: Int, total: Int, ta
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val density = LocalDensity.current
         val accent = Color(0xFFFF3344)
-        val viewSteps = tutorialStops.filter { it.view == step.view }
+        val stepAvailable = LocalTutorialStepAvailable.current
+        // Count only the steps the player will actually see in this section.
+        val viewSteps = tutorialStops.filter { it.view == step.view && (it === step || stepAvailable(it)) }
         val viewIndex = (viewSteps.indexOf(step) + 1).coerceAtLeast(1)
         val targetBelowCenter = with(density) { targetBounds?.center?.y?.let { it > maxHeight.toPx() / 2f } ?: true }
         Canvas(
@@ -4841,7 +4953,7 @@ private fun GuidedTutorialOverlay(step: TutorialStop, index: Int, total: Int, ta
         ) {
             Column(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("${step.view} · $viewIndex/${viewSteps.size}", color = Mint, fontWeight = FontWeight.Black, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    Text("${tutorialSectionNames[step.view] ?: step.view} · $viewIndex/${viewSteps.size}", color = Mint, fontWeight = FontWeight.Black, fontSize = 12.sp, modifier = Modifier.weight(1f))
                     IconButton(onClick = onExit, modifier = Modifier.size(48.dp)) { Icon(Icons.Filled.Close, "Exit tutorial", tint = Muted) }
                 }
                 Text(step.title, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 20.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -5008,7 +5120,7 @@ private fun PlayerBoard(
     onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit, onTapCard: (Int) -> Unit,
     onCardAction: (GameCard, String) -> Unit, onReveal: () -> Unit, onShuffle: () -> Unit,
     onNextStep: () -> Unit, onOpenLog: () -> Unit, onOpenChat: () -> Unit, onCombat: () -> Unit,
-    onTrackers: () -> Unit, onStack: () -> Unit, onOpenMore: () -> Unit, onSearchLibrary: () -> Unit, onCastCommander: () -> Unit, onConcede: () -> Unit
+    onTrackers: () -> Unit, onStack: () -> Unit, onOpenMore: () -> Boolean, onSearchLibrary: () -> Unit, onCastCommander: () -> Unit, onConcede: () -> Unit
 ) {
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val screenHeightDp = LocalConfiguration.current.screenHeightDp
@@ -5121,13 +5233,13 @@ private fun PlayerBoard(
                 Box(Modifier.then(tutorialAnchor("draw-action"))) { ActionPill("DRAW", onDraw) }
                 Box(Modifier.then(tutorialAnchor("combat-action"))) { ActionPill("COMBAT", onCombat) }
                 Box(Modifier.then(tutorialAnchor("more-actions"))) {
-                    ActionPill("MORE  ⋮") { onOpenMore(); moreOpen = true }
+                    ActionPill("MORE  ⋮") { if (onOpenMore()) moreOpen = true }
                     DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
                         DropdownMenuItem(text = { Text("Add token") }, modifier = tutorialAnchor("token-action"), onClick = { moreOpen = false; onToken() })
                         DropdownMenuItem(text = { Text("Reveal top card") }, onClick = { moreOpen = false; onReveal() })
                         DropdownMenuItem(text = { Text("Shuffle library…") }, onClick = { moreOpen = false; shuffleConfirm = true })
                         DropdownMenuItem(text = { Text("Open game log") }, onClick = { moreOpen = false; onOpenLog() })
-                        DropdownMenuItem(text = { Text("Stack and priority · $stackCount") }, modifier = tutorialAnchor("stack-open"), onClick = { moreOpen = false; onStack() })
+                        DropdownMenuItem(text = { Text("Stack and priority · $stackCount") }, modifier = tutorialAnchor("more-stack"), onClick = { moreOpen = false; onStack() })
                         DropdownMenuItem(text = { Text("Player trackers and commander damage") }, onClick = { moreOpen = false; onTrackers() })
                         DropdownMenuItem(text = { Text("Search / browse library") }, onClick = { moreOpen = false; onSearchLibrary() })
                         DropdownMenuItem(text = { Text("Concede game…", color = Color(0xFFE9978B)) }, onClick = { moreOpen = false; onConcede() })
@@ -5667,7 +5779,7 @@ private fun StackPriorityDialog(players: List<TablePlayer>, stack: List<StackAct
                     Text("CAST FROM HAND", fontSize = 11.sp, fontWeight = FontWeight.Black)
                 }
                 TextButton(
-                    onClick = { manualAbilityOpen = !manualAbilityOpen },
+                    onClick = { if (tutorialStep?.target == "stack-add") onTutorialNext() else { manualAbilityOpen = !manualAbilityOpen } },
                     enabled = canAct || tutorialStep?.target == "stack-add",
                     modifier = Modifier.align(Alignment.End).heightIn(min = 34.dp).then(tutorialAnchor("stack-add"))
                 ) {
