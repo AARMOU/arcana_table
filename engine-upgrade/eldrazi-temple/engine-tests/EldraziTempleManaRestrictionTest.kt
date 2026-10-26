@@ -76,6 +76,23 @@ class EldraziTempleManaRestrictionTest : FunSpec({
         pool.canPay(cost) shouldBe false
     }
 
+    test("mixed unrestricted and Temple mana cannot launder an ineligible payment") {
+        val oneOfEach = ManaPool(
+            colorless = 1,
+            restrictedMana = listOf(RestrictedManaEntry(null, restricted))
+        )
+        val twoColorless = ManaCost.parse("{C}{C}")
+        // An ineligible payment has only one usable {C}; it cannot spend the
+        // Temple unit merely because an unrestricted unit is also present.
+        oneOfEach.canPay(twoColorless, coloredEldraziSpell) shouldBe false
+        oneOfEach.canPay(twoColorless, coloredEldraziAbility) shouldBe false
+        oneOfEach.canPay(twoColorless, colorlessOtherSpell) shouldBe false
+        oneOfEach.pay(twoColorless, coloredEldraziAbility) shouldBe null
+        // The same two units are legal for a colorless Eldrazi spell or ability.
+        oneOfEach.canPay(twoColorless, colorlessEldraziSpell) shouldBe true
+        oneOfEach.canPay(twoColorless, colorlessEldraziAbility) shouldBe true
+    }
+
     test("the restriction survives serialization and retains subtype identity") {
         val json = kotlinx.serialization.json.Json
         val serialized = json.encodeToString(ManaRestriction.serializer(), restricted)
@@ -99,11 +116,11 @@ class EldraziTempleManaRestrictionTest : FunSpec({
 
         // Model the authoritative post-layer-4 characteristic directly. An
         // Eldrazi that became only a Frog is not an Eldrazi ability source.
-        fun projectedContext(subtypes: Set<String>): SpellPaymentContext {
+        fun projectedContext(subtypes: Set<String>, colors: Set<String> = emptySet()): SpellPaymentContext {
             val projection = ProjectedState(
                 driver.state,
                 mapOf(sourceId to ProjectedValues(
-                    types = setOf("CREATURE"), subtypes = subtypes, colors = emptySet()
+                    types = setOf("CREATURE"), subtypes = subtypes, colors = colors
                 ))
             )
             return buildAbilityPaymentContext(printed, projection, sourceId, ability = null)
@@ -111,6 +128,13 @@ class EldraziTempleManaRestrictionTest : FunSpec({
         restricted.isSatisfiedBy(projectedContext(setOf("Eldrazi"))) shouldBe true
         restricted.isSatisfiedBy(projectedContext(setOf("Frog"))) shouldBe false
         restricted.isSatisfiedBy(projectedContext(emptySet())) shouldBe false
+        // Printed as colorless Eldrazi, but a continuous color-changing effect
+        // makes the battlefield ability source BLUE: Temple mana must be denied.
+        val nowBlue = projectedContext(setOf("Eldrazi"), setOf("BLUE"))
+        nowBlue.isAbilitySourceColorless shouldBe false
+        restricted.isSatisfiedBy(nowBlue) shouldBe false
+        ManaPool(restrictedMana = List(2) { RestrictedManaEntry(null, restricted) })
+            .canPay(ManaCost.parse("{C}{C}"), nowBlue) shouldBe false
     }
 
 })
