@@ -380,4 +380,73 @@ class EldraziTempleScenarioTest {
         assertEquals(0, d.manaPool(p).colorless)
     }
 
+
+    @Test fun restrictedManaPaysGenericCostOfDevoidEldraziSpellWithPrintedBlueCost() {
+        // Devoid makes the SPELL colorless, despite its printed {U} and blue
+        // commander color identity. Temple may pay {2}, never the {U} symbol.
+        val probe = com.wingedsheep.sdk.dsl.card("Temple Devoid Eldrazi Spell Probe") {
+            manaCost = "{2}{U}"
+            colorIdentity = "U"
+            typeLine = "Creature — Eldrazi"
+            power = 2
+            toughness = 2
+            keywords(com.wingedsheep.sdk.core.Keyword.DEVOID)
+        }
+        val d = customScenario(EldraziTemple)
+        val p = d.player1
+        d.registerCard(probe)
+        assertTrue(d.cardRegistry.requireCard(probe.name).colors.isEmpty())
+        val spell = d.putCardInHand(p, probe.name)
+        val temple = d.putPermanentOnBattlefield(p, "Eldrazi Temple")
+
+        assertNull(d.activate(p, temple, index = 1).error)
+        d.resolveAll()
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+        assertNotNull("Restricted colorless cannot pay a printed {U} symbol",
+            d.castSpell(p, spell).error)
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+
+        d.giveMana(p, Color.BLUE)
+        assertNull("Devoid Eldrazi spell is colorless and may use Temple for generic {2}",
+            d.castSpell(p, spell).error)
+        assertTrue(d.manaPool(p).restrictedMana.isEmpty())
+        d.resolveAll()
+        assertEquals(1, d.permanentsNamed(p, probe.name).size)
+    }
+
+    @Test fun restrictedManaRejectsGenericCostOfColoredEldraziSpell() {
+        // Eldrazi creature subtype is insufficient without Devoid/colorlessness.
+        val probe = com.wingedsheep.sdk.dsl.card("Temple Colored Eldrazi Spell Probe") {
+            manaCost = "{2}{U}"
+            colorIdentity = "U"
+            typeLine = "Creature — Eldrazi"
+            power = 2
+            toughness = 2
+        }
+        val d = customScenario(EldraziTemple)
+        val p = d.player1
+        d.registerCard(probe)
+        val spell = d.putCardInHand(p, probe.name)
+        val temple = d.putPermanentOnBattlefield(p, "Eldrazi Temple")
+
+        assertNull(d.activate(p, temple, index = 1).error)
+        d.resolveAll()
+        d.giveMana(p, Color.BLUE)
+        assertNotNull("Colored Eldrazi spell cannot spend Temple restricted mana for {2}",
+            d.castSpell(p, spell).error)
+        assertEquals("Rejected cast preserves both restricted mana units", 2,
+            d.manaPool(p).restrictedMana.size)
+        assertEquals("Rejected cast preserves the blue mana", 1,
+            d.manaPool(p).blue)
+        assertTrue(d.permanentsNamed(p, probe.name).isEmpty())
+
+        d.giveColorlessMana(p, 2)
+        assertNull("Two unrestricted mana plus blue must pay the same colored spell",
+            d.castSpell(p, spell).error)
+        d.resolveAll()
+        assertEquals(1, d.permanentsNamed(p, probe.name).size)
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+        assertEquals(0, d.manaPool(p).colorless)
+    }
+
 }
