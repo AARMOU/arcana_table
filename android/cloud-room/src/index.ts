@@ -116,6 +116,7 @@ export class GameRoom extends DurableObject<Env> {
       case "ping": this.send(socket, { type: "pong" }); break;
       case "state": await this.acceptSnapshot(seat, String(packet.payload ?? "")); break;
       case "relay": this.directRelay(socket, seat, packet); break;
+      case "relayKick": this.kickRelayGuest(socket, seat, packet); break;
       case "relaySeats": await this.configureRelaySeats(socket, seat, packet); break;
       case "ready": this.setReady(socket, seat, packet); break;
       case "deck-status": this.setDeck(socket, seat, packet); break;
@@ -207,6 +208,23 @@ export class GameRoom extends DurableObject<Env> {
       return;
     }
     this.sendToSeat(Number(to), { type: "relay", from, seq, data });
+  }
+
+  /** Kick an invalid/unvalidated guest without disturbing other players. */
+  private kickRelayGuest(socket: WebSocket, from: number, packet: Record<string, unknown>): void {
+    const seat = packet.to;
+    if (!this.room || from !== 0 || !Number.isInteger(seat) ||
+        Number(seat) < 1 || Number(seat) >= MAX_PLAYERS) {
+      this.send(socket, { type: "rejected", reason: "Only the host may reject a guest." });
+      return;
+    }
+    for (const peer of this.ctx.getWebSockets()) {
+      const attachment = peer.deserializeAttachment() as { seat?: number; authenticated?: boolean } | null;
+      if (attachment?.authenticated && attachment.seat === seat) {
+        this.send(peer, { type: "relay-kicked", reason: "Your deck was rejected by the host." });
+        try { peer.close(4000, "deck rejected"); } catch { /* disconnect handler cleans up */ }
+      }
+    }
   }
 
   /**
