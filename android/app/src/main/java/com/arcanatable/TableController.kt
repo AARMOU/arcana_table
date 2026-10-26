@@ -1753,7 +1753,7 @@ internal class TableController(
     fun addAiOpponent() {
         topMenuExpanded = false
         if (!ReleaseFeatures.multiplayerPreviewEnabled) {
-            message = "Four-player support is coming soon. This release supports two players."
+            message = "Extra AI opponents are coming soon. To play with 2–4 people, use Play with a friend."
             return
         }
         if (onlineMode && (!lobbyCreated || lobbyJoinMode || gameStartedOnline)) {

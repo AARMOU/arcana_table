@@ -257,7 +257,7 @@ internal fun PlaySheet(
                         DeckChip("4 players", aiCount == 3) { onAiCount(3) }
                     }
                 }
-                if (!ReleaseFeatures.multiplayerPreviewEnabled) Text("Four-player support coming soon.", color = Muted, fontSize = 12.sp)
+                if (!ReleaseFeatures.multiplayerPreviewEnabled) Text("3–4 player games against the AI are coming soon. To play with 2–4 people, use Play with a friend.", color = Muted, fontSize = 12.sp)
                 Text(if (aiCount > 1) "FIRST AI'S DECK (the others are random)" else "AI'S DECK", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
                 val shown = if (showAllDecks) aiDecks else aiDecks.filter { !it.builtIn || it.id in setOf("tokens_win", "artificer_v4", "ayula_bears", "sliver_overlord", "hazel_squirrels", "mabel_heir", "velociraptor_beefcake") || it.id == aiDeckId }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
