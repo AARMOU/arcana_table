@@ -5,10 +5,15 @@ name: Build 135 no-goose lobby + tutorial + import/editor test APKs
 # Reproducible isolated integration candidate: no production branch is mutated.
 on:
   push:
-    branches: [gpt/release-look-build134-20261026]
+    branches: [gpt/build134-next-deck-tools-candidate-20261026]
     paths:
       - '.github/workflows/release-look-followup-build134.yml'
       - 'tools/next_apk_resolve_conflicts.py'
+      - 'tools/next_apk_lobby_resolve_conflict.py'
+      - 'tools/next_apk_tutorial_hand_fix.py'
+      - 'tools/next_apk_changelog_since_b121.py'
+      - 'tools/next_apk_enable_deck_tools.py'
+      - 'tools/next_apk_release_scope_candidate.py'
   workflow_dispatch:
     inputs:
       include_online_multiplayer:
