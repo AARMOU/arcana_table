@@ -712,7 +712,7 @@ internal fun OptionsPage(
     onFollowActivePlayer: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, onCardSizeScale: (Float) -> Unit,
     quietOpponentTurns: Boolean = false, onQuietOpponentTurns: (Boolean) -> Unit = {},
     onTestConnection: () -> Unit, onReconnect: (() -> Unit)?, onViewDiagnostics: () -> Unit, onExportDiagnostics: () -> Unit,
-    onWhatsNew: () -> Unit, onTutorials: () -> Unit,
+    onWhatsNew: () -> Unit, onTutorials: () -> Unit = {},
     engineTrialResult: String? = null, onEngineSelfTest: (() -> Unit)? = null,
     onClearAllData: () -> Unit, onDismiss: () -> Unit
 ) {
