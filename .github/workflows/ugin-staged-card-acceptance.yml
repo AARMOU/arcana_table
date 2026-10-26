@@ -86,6 +86,8 @@ jobs:
           assert after_all == before_all, "Upstream card index changed"
           assert after_custom - before_custom == {"Ugin, the Ineffable"}, sorted(after_custom - before_custom)
           assert before_custom - after_custom == set(), "Existing custom card lost"
+          exported_custom_rows = Path(assets+"custom-cards.index.tsv").read_text().splitlines()
+          assert sum(row == "Ugin, the Ineffable\tcard" for row in exported_custom_rows) == 1, "Ugin must appear exactly once as a card in the shipped candidate index"
           manifest = json.loads(Path("investigation/argentum-six-precons/deck-manifest.json").read_text())
           basics = {"Plains","Island","Swamp","Mountain","Forest","Wastes"}
           counts = {}
@@ -132,13 +134,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          # A repeatable export can still differ from committed assets. Require both.
+          for path in android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv; do
+            git show "HEAD:$path" | cmp - "$path"
+          done
+          git diff --exit-code -- android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv
           sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/ugin-export-first.sha
           (cd android && ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards)
           sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/ugin-export-second.sha
           diff -u /tmp/ugin-export-first.sha /tmp/ugin-export-second.sha
           sha256sum android/app/libs/argentum-*.jar > /tmp/ugin-jars-after.sha
           diff -u /tmp/ugin-jars-before.sha /tmp/ugin-jars-after.sha
-          git diff --exit-code -- android/app/libs android/app/src/main/assets/argentum/all-cards.index.tsv
+          git diff --exit-code -- android/app/libs android/app/src/main/assets/argentum/all-cards.index.tsv android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv
           echo "Generated custom card assets are REVIEW ARTIFACTS only; no merge or runtime replacement."
       - name: Upload exact generated card assets and executable proof for review
         if: always()
