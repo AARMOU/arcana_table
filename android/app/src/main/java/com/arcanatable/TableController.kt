@@ -429,7 +429,10 @@ internal class TableController(
             fun wasInHand(name: String) = old.hand.any { it.name == name }
             fun isInHand(name: String) = now.hand.any { it.name == name }
             fun nowInPlay(name: String) = now.battlefield.any { it.name == name }
-            if (wasInHand("Forest") && !isInHand("Forest") && nowInPlay("Forest")) tutorialSignal("event", "LandPlayed")
+            val oldForests = old.battlefield.filter { it.name == "Forest" }.map { it.id }.toSet()
+            if (old.hand.count { it.name == "Forest" } > now.hand.count { it.name == "Forest" } &&
+                now.battlefield.any { it.name == "Forest" && it.id !in oldForests })
+                tutorialSignal("event", "LandPlayed")
             if (now.manaPool.values.sum() > old.manaPool.values.sum()) tutorialSignal("event", "ManaAdded")
             if (wasInHand("Elvish Mystic") && !isInHand("Elvish Mystic") &&
                 (current.stack.any { it.name == "Elvish Mystic" } || nowInPlay("Elvish Mystic"))) tutorialSignal("event", "SpellCast")
