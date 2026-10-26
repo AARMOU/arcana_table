@@ -269,6 +269,7 @@ jobs:
         shell: bash
         env:
           AI_SHA: e99b4954ad80885af0e338f7df87b1b4587bc5df
+          WEEKLY_SHA: bfce3f0d24c3a8cad28a5a729df3dbba16dd079b
           TABLE_UI_SHA: 44105eead435b0e3b759b7d631a659990b7388e3
           ONLINE_SHA: 6641f1883f54ca3a13c8faa7ef0b01b05976ef74
           INCLUDE_ONLINE: ${{ inputs.include_online_multiplayer }}
@@ -284,9 +285,10 @@ jobs:
           git commit --no-gpg-sign -m "Runner-only Build134 baseline: no remote writes"
           printf 'Build134 release source PR #265: 1751f1893cc4706572d4f4382e6b0a137bf46536\n' > combined-evidence/next-apk-source-pins.txt
           printf 'Build134 upgraded engine and Eldrazi gates: PR #260 b32e499a65f0a4a9b70367a67ea00f91eef8dbaa\n' >> combined-evidence/next-apk-source-pins.txt
-          # Table UI first, followed by per-seat AI. Both are real development
-          # branches; do not import the abandoned legacy-main UI PRs #275/#276.
-          for entry in "table-ui:$TABLE_UI_SHA" "ai-difficulty:$AI_SHA"; do
+          # Incorporate the merged weekly collision-reconciliation PR #273, then
+          # corrected table UI and per-seat AI at independently pinned heads.
+          # Never import abandoned legacy-main UI PRs #275/#276.
+          for entry in "weekly-automation:$WEEKLY_SHA" "table-ui:$TABLE_UI_SHA" "ai-difficulty:$AI_SHA"; do
             label="${entry%%:*}"
             sha="${entry#*:}"
             git fetch --no-tags origin "$sha"
@@ -318,6 +320,7 @@ jobs:
           fi
           test -z "$(git diff --name-only --diff-filter=U)"
           git diff --check
+          test -f android/app/src/main/assets/argentum/custom-overrides.txt
           test -f android/app/src/main/java/com/arcanatable/engine/ai/AiDifficulty.kt
           test -f android/app/src/test/java/com/arcanatable/ui/HomeScreenSizesTest.kt
           test -f android/app/src/main/java/com/arcanatable/TableDialogs.kt
