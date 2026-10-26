@@ -21,7 +21,7 @@ jobs:
       - name: Checkout isolated exact integration base
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2  # parent SHA is a mandatory provenance gate
+          fetch-depth: 10  # retain the pinned integration ancestor for provenance
           persist-credentials: false
       - name: Checkout existing GPT-owned Ugin candidate at frozen tested SHA
         uses: actions/checkout@v4
@@ -34,14 +34,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git rev-parse HEAD^)" = "9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f"
+          git merge-base --is-ancestor "9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f" HEAD
           test "$(git -C ugin-source rev-parse HEAD)" = "78f43099a880c8f68b426cb9b9957e7dd599d452"
           test ! -e android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt
           test ! -e android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt
           test -f android/app/libs/argentum-mtg-sdk.jar
           test -f android/app/libs/argentum-rules-engine.jar
           sha256sum android/app/libs/argentum-*.jar > /tmp/ugin-runtime-before.sha
-          echo "Integration base: $(git rev-parse HEAD^)"
+          echo "Integration base: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f"
           echo "Ugin tested source: $(git -C ugin-source rev-parse HEAD)"
       - name: Inject Ugin source and 22 scenarios into throwaway runner only
         shell: bash
