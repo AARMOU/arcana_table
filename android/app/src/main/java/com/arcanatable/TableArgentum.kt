@@ -307,10 +307,12 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
     when (incoming.optString("type")) {
         "lanSeat" -> {
             // A transport-level seat acknowledgement, not an engine credential.
+            wifiGuestSeatId = incoming.optString("seat").takeUnless { it.isBlank() || it == "null" }
             recordDiagnostic("Wi-Fi seat accepted by host", DiagnosticCategory.CONNECTION)
         }
         "lanLobby" -> {
-            if (wifiRole == "guest") wifiGuestLobbyState = incoming
+            // Wi-Fi and online guests both show the host's roster.
+            if (wifiRole == "guest" || wifiRole == "online-guest") wifiGuestLobbyState = incoming
         }
         "offlineCheckpoint" -> {
             if (argentumOffline && wifiRole == null) {
@@ -369,6 +371,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
         "gameStarted" -> {
             wifiGuestWaiting = false
             wifiGuestLobbyState = null
+            wifiGuestSeatId = null
             if (argentumOffline && !offlineRestoreRequested && wifiRole == null) {
                 OfflineCheckpointStore.clear(context)
                 offlineResumeAvailable = false

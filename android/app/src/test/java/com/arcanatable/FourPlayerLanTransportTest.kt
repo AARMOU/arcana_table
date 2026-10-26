@@ -121,4 +121,37 @@ class FourPlayerLanTransportTest {
             server.close()
         }
     }
+    @Test fun hostCanChangeOpenSeatsButNeverDropsAConnectedPhone() {
+        lateinit var server: ArgentumLanMultiServer
+        server = ArgentumLanMultiServer("Lobby host", listOf(ids[0], ids[1]),
+            onGuest = { seat, _ -> assertTrue(server.admitGuest(seat)); server.sendTo(seat, JSONObject().put("type", "lanSeat").put("seat", seat.value)) },
+            onGuestMessage = { _, _ -> },
+            onGuestLeft = { },
+        )
+        val guest = ArgentumLanGuest()
+        val inbox = LinkedBlockingQueue<JSONObject>()
+        try {
+            server.start()
+            assertTrue(server.awaitReady(10_000))
+            guest.onMessage = { inbox.put(it) }
+            guest.connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "Ana"))
+            assertEquals(ids[0].value, inbox.poll(5, TimeUnit.SECONDS)?.optString("seat"))
+
+            // Ana holds seat 1: it must keep accepting her.
+            assertFalse(server.updateGuestSeats(listOf(ids[1])))
+            assertFalse(server.updateGuestSeats(emptyList()))
+            // Open seats may change freely, within the three valid opponent seats.
+            assertTrue(server.updateGuestSeats(listOf(ids[0], ids[2])))
+            assertEquals(1, server.openSeats)
+            assertTrue(server.updateGuestSeats(listOf(ids[0])))
+            assertEquals(0, server.openSeats)
+            assertFalse(server.updateGuestSeats(listOf(ids[0], EntityId("offline-you"))))
+            assertFalse(server.updateGuestSeats(listOf(ids[0], ids[0])))
+            assertTrue(server.sendTo(ids[0], JSONObject().put("type", "lanLobby").put("still", "connected")))
+            assertEquals("connected", inbox.poll(5, TimeUnit.SECONDS)?.optString("still"))
+        } finally {
+            guest.close()
+            server.close()
+        }
+    }
 }

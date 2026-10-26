@@ -98,6 +98,23 @@ try {
   assert.equal(toHost.data, "ALICE_ACTION");
   assert.equal(charlie.has((p) => p.type === "relay" && p.data === "ALICE_ACTION"), false);
 
+  // Lobby edits before START: the host may change open seats and the seat count,
+  // but never turn an occupied seat (Alice = 1, Charlie = 3) into AI or drop it.
+  host.send({ type: "relaySeats", kinds: ["friend", "friend", "friend"] });
+  assert.deepEqual((await host.wait(msg("relay-seats-ack"))).kinds, ["friend", "friend", "friend"]);
+  host.send({ type: "relaySeats", kinds: ["ai", "ai", "friend"] });
+  const occupiedToAi = await host.wait(msg("rejected"));
+  assert.equal(occupiedToAi.request, "relaySeats");
+  assert.match(occupiedToAi.reason, /player is in that seat/i);
+  host.send({ type: "relaySeats", kinds: ["friend"] });
+  assert.equal((await host.wait(msg("rejected"))).request, "relaySeats", "an occupied seat must not be removed");
+  host.send({ type: "relaySeats", kinds: ["friend", "ai", "friend"] });
+  assert.deepEqual((await host.wait(msg("relay-seats-ack"))).kinds, ["friend", "ai", "friend"]);
+  host.send({ type: "relay", to: 1, seq: 90, data: "ALICE_AFTER_SEAT_EDIT" });
+  assert.equal((await alice.wait(msg("relay"))).data, "ALICE_AFTER_SEAT_EDIT", "seat edits must keep a seated guest connected");
+  host.send({ type: "relay", to: 3, seq: 91, data: "CHARLIE_AFTER_SEAT_EDIT" });
+  assert.equal((await charlie.wait(msg("relay"))).data, "CHARLIE_AFTER_SEAT_EDIT");
+
   alice.send({ type: "relaySeats", kinds: ["friend", "friend", "friend"] });
   assert.match((await alice.wait(msg("rejected"))).reason, /configuration/i);
 
@@ -148,7 +165,7 @@ try {
   hostBack.send({ type: "relay", to: 3, seq: 4, data: "HOST_RECONNECTED" });
   assert.equal((await restored.wait(msg("relay"))).data, "HOST_RECONNECTED");
 
-  console.log("PASS: relay privacy, AI slot reservation, seat token authentication, reconnect, no shared snapshots.");
+  console.log("PASS: relay privacy, AI slot reservation, pre-start seat edits, seat token authentication, reconnect, no shared snapshots.");
 } finally {
   for (const socket of sockets) try { socket.close(); } catch { /* done */ }
 }

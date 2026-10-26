@@ -265,18 +265,32 @@ export class GameRoom extends DurableObject<Env> {
   /**
    * The host declares AI-only slots before inviting guests. This prevents a
    * joining phone from occupying an AI seat and later seeing the wrong view.
-   * Once any guest has joined, seat assignments cannot be changed.
+   * Before the game starts the host may send it again to change the table:
+   * open seats can switch between friend and AI, and the number of seats can
+   * change, but a seat a guest holds (online or claimed) must stay a friend
+   * seat and keep its guest, name and credential.
    */
   private async configureRelaySeats(socket: WebSocket, from: number, packet: Record<string, unknown>): Promise<void> {
+    const reject = (reason: string) => this.send(socket, { type: "rejected", request: "relaySeats", reason });
     if (!this.room || from !== 0 || !Array.isArray(packet.kinds) ||
         packet.kinds.length < 1 || packet.kinds.length > MAX_PLAYERS - 1 ||
-        packet.kinds.some((kind) => kind !== "ai" && kind !== "friend") ||
-        this.room.seats.some((seat, index) => index > 0 && seat.online)) {
-      this.send(socket, { type: "rejected", reason: "Seat configuration cannot be changed." });
+        packet.kinds.some((kind) => kind !== "ai" && kind !== "friend")) {
+      reject("Seat configuration cannot be changed.");
       return;
     }
     const kinds = packet.kinds as string[];
+    const occupied = (index: number) => {
+      const seat = this.room?.seats[index];
+      return !!seat && !seat.isComputer && (seat.online || seat.claimed === true);
+    };
+    for (let index = 1; index < this.room.seats.length; index++) {
+      if (occupied(index) && kinds[index - 1] !== "friend") {
+        reject("A player is in that seat. Remove them before changing it.");
+        return;
+      }
+    }
     for (let index = 1; index <= kinds.length; index++) {
+      if (occupied(index)) continue;
       const isComputer = kinds[index - 1] === "ai";
       const previous = this.room.seats[index];
       this.room.seats[index] = {

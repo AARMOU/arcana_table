@@ -447,6 +447,10 @@ internal class TableController(
     var wifiMultiLobbyState by run { mutableStateOf<JSONObject?>(null) }
     var wifiGuestLobbyState by run { mutableStateOf<JSONObject?>(null) }
     var wifiGuestWaiting by run { mutableStateOf(false) }
+    /** Guest: the seat the host gave this phone ("lanSeat"); identifies "you" in the lobby roster. */
+    var wifiGuestSeatId by run { mutableStateOf<String?>(null) }
+    /** Host: an online seat change is waiting for the room service to confirm it. */
+    var multiLobbySeatChangePending by run { mutableStateOf(false) }
 
     /** A big message that flashes over the table and fades ("Your go", "Your move"). */
     var flashMessage by run { mutableStateOf<FlashText?>(null) }
