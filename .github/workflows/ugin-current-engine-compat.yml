@@ -150,7 +150,8 @@ jobs:
                       continue
                   fields = line.split("\t")
                   assert len(fields) == 2, ("Invalid index record", line)
-                  if fields[1] == "card":
+                  assert fields[1] in ("card", "basic", "token"), ("Unknown index kind", line)
+                  if fields[1] in ("card", "basic"):
                       result.append(fields[0])
               return result
 
@@ -178,6 +179,10 @@ jobs:
               "candidate_only": ugin,
               "decks": {},
           }
+          # Basic lands (including Wastes) are indexed as "basic", not "card".
+          # Tokens must not count toward original 100-card deck coverage.
+          expected_baseline = {"Eldrazi Incursion": 76, "Eldrazi Unbound": 75}
+          assert "Wastes" in before and "Wastes" in after, "Basic-land index entries missing"
           for name in ("Eldrazi Incursion", "Eldrazi Unbound"):
               deck = next(d for d in manifest["decks"] if d["name"] == name)
               cards = [c["name"] for c in deck["cards"] for _ in range(c["quantity"])]
@@ -185,6 +190,10 @@ jobs:
               assert cards.count(ugin) == 1, (name, "Ugin identity/quantity changed")
               missing_before = [n for n in cards if n not in set(before)]
               missing_after = [n for n in cards if n not in set(after)]
+              assert 100 - len(missing_before) == expected_baseline[name], (
+                  name, "Pinned original-deck baseline drift (check basic lands)",
+                  100 - len(missing_before), expected_baseline[name]
+              )
               assert missing_before.count(ugin) == 1, (name, "Ugin not missing from baseline")
               assert missing_after == [n for n in missing_before if n != ugin], (
                   name, "Unexpected original-card coverage change", missing_before, missing_after
