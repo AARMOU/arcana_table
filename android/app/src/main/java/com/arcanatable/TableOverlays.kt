@@ -928,6 +928,8 @@ internal fun TableController.TableOverlays() {
                     HandSheet(
                         cards = players.getOrNull(handSeat.coerceIn(players.indices))?.hand.orEmpty(), isLandscape = isLandscape,
                         tutorialCue = tutorialStep?.takeIf { tutorialChapterId != null }?.let { it.title to it.hint },
+                        tutorialStep = if (tutorialChapterId != null) tutorialStep else null,
+                        onTutorialNext = { tutorialAdvance() }, onTutorialExit = { stopTutorial() },
                         availableHeight = LocalConfiguration.current.screenHeightDp.dp * effectiveHandFraction,
                         stackCount = visibleStackCount,
                         highlightedCardId = highlightedHandCardId,
