@@ -547,6 +547,11 @@ jobs:
             if ! git apply --3way --index "combined-evidence/b136-${label}.patch"; then
               echo "::error title=Build 136 integration conflict::${label}: no unreviewed hunk dropped"
               git status --short
+              while IFS= read -r unresolved; do
+                test -n "$unresolved" || continue
+                echo "=== B136 EXACT CONFLICT: $unresolved ==="
+                awk '/^<<<<<<< / {inside=1} inside {print} /^>>>>>>> / {inside=0}' "$unresolved" | head -260
+              done < <(git diff --name-only --diff-filter=U)
               exit 1
             fi
             git diff --cached --check
