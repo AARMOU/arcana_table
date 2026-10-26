@@ -100,11 +100,11 @@ replace_once(
 insert_after_unique_line(
     "docs/sdk-index.md",
     "- `ManaRestriction.ColorlessSpellsOnly`",
-    '- `ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly(subtype: String)` — "Spend this mana only to cast colorless subtype spells or activate abilities of colorless subtype." Both the spell and the ability source must be colorless.\n',
+    '- `ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly(subtype: String)` — Restricted colorless mana for colorless subtype spells and activated abilities of colorless sources of that subtype.\n',
 )
 insert_after_unique_line(
     "mtg-sdk/src/test/resources/sdk-surface-baseline.txt",
-    "LoyaltyDamageFloor — ReplacementEffect",
+    "ManaRestriction.ClassLevelUpOnly — ManaRestriction",
     "ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly — ManaRestriction — Eldrazi Temple — ManaRestriction.ColorlessSpellsOnly, ManaRestriction.SubtypeSpellsOrAbilitiesOnly — ColorlessSpellsOnly rejects every ability activation; SubtypeSpellsOrAbilitiesOnly permits colored Eldrazi abilities, so neither can constrain both subtype and colorlessness of a source while also admitting spells\n",
 )
 print("Applied exact Eldrazi Temple mana-source port to upgraded Argentum source; no runtime jars touched.")
