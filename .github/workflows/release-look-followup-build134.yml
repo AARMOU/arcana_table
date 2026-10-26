@@ -524,7 +524,7 @@ jobs:
           DECK_BASE: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f
           DECK_SHA: 5a64b631b9d7185c7fb4102a58afa9aa237746c0
           LOBBY_BASE: 79dcd0c58837305fcd1f8790fbf052af214d204b
-          LOBBY_FIX_SHA: f8a9fce622659a747ea17d91508d5ddd10e634d0
+          LOBBY_FIX_SHA: cdcfe759501d044c73b35cba4e6838ffa1ef8b82
           OUTCOME_SHA: abaf13ad913025762db889bde1bf92907cd5a133
           UGIN_BASE: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f
           UGIN_SHA: 49f7f7389b940accf2e2321130407e579cb2ee4c
