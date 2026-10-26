@@ -29,13 +29,28 @@ jobs:
           ref: 7fb073337e4389cfabe2ebf4c6416633a7fc63d2
           path: argentum-engine
           persist-credentials: false
-      - name: Port restriction without modifying any shipped runtime or card
+      - name: Checkout frozen existing GPT-owned Temple land candidate (#161)
+        uses: actions/checkout@v4
+        with:
+          repository: AARMOU/arcana_table
+          ref: c2fb681f08c93549ed9a6f0b8a23dafb7ea06de9
+          path: temple-candidate
+          persist-credentials: false
+      - name: Port restriction and existing land candidate without touching shipped runtime
         shell: bash
         run: |
           set -euo pipefail
           test "$(git -C argentum-engine rev-parse HEAD)" = "7fb073337e4389cfabe2ebf4c6416633a7fc63d2"
           python3 engine-upgrade/eldrazi-temple/port_to_upgraded.py argentum-engine
           cp engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt \
+            argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          test "$(git -C temple-candidate rev-parse HEAD)" = "c2fb681f08c93549ed9a6f0b8a23dafb7ea06de9"
+          test "$(git -C temple-candidate hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt)" = "7cc5bfb19f004f0503047192c1ff34d6ab10e020"
+          test "$(git -C temple-candidate hash-object engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt)" = "f2b88843a34bf39dd5c54370f21c6bc85bb02426"
+          mkdir -p argentum-engine/rules-engine/src/test/kotlin/com/arcanatable/customcards/cards
+          cp temple-candidate/engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt \
+            argentum-engine/rules-engine/src/test/kotlin/com/arcanatable/customcards/cards/
+          cp temple-candidate/engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt \
             argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
           git -C argentum-engine diff --check
           git diff --quiet && git diff --cached --quiet  # upstream checkout is intentionally untracked in parent
@@ -48,10 +63,10 @@ jobs:
       - name: Upgraded SDK tests and serialization compatibility
         working-directory: argentum-engine
         run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:test
-      - name: Seven real-engine restricted-mana scenarios on upgraded source
+      - name: Primitive and real-land gameplay scenarios on upgraded source
         working-directory: argentum-engine
-        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :rules-engine:test --tests 'com.wingedsheep.engine.scenarios.EldraziTempleManaRestrictionTest'
-      - name: Require actual upgraded SDK and seven Temple JUnit successes
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :rules-engine:test --tests 'com.wingedsheep.engine.scenarios.EldraziTemple*'
+      - name: Require upgraded SDK, seven primitive and seven real-land JUnit successes
         if: always()
         shell: bash
         run: |
@@ -74,8 +89,16 @@ jobs:
           print("Upgraded source SDK/engine:", counts, "Temple:", temple)
           if counts["tests"] < 100 or counts["failures"] or counts["errors"]:
               raise SystemExit("FAIL: missing or failing upgraded SDK/engine cases")
-          if len(temple) != 1 or temple[0][1] != dict(tests=7, failures=0, errors=0, skipped=0):
-              raise SystemExit("FAIL: seven upgraded Temple scenarios did not execute and pass")
+          expected = {
+              "TEST-com.wingedsheep.engine.scenarios.EldraziTempleManaRestrictionTest.xml": 7,
+              "TEST-com.wingedsheep.engine.scenarios.EldraziTempleGameplayScenarioTest.xml": 7,
+          }
+          actual = {name: stats for name, stats in temple}
+          if set(actual) != set(expected):
+              raise SystemExit(f"FAIL: missing/duplicate Temple suite XML: {sorted(actual)}")
+          for name, count in expected.items():
+              if actual[name] != dict(tests=count, failures=0, errors=0, skipped=0):
+                  raise SystemExit(f"FAIL: Temple real-engine suite incomplete: {name}: {actual[name]}")
           PY
       - name: Preserve read-only provenance and upload evidence
         if: always()
