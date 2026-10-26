@@ -292,6 +292,8 @@ export class GameRoom extends DurableObject<Env> {
       };
     }
     this.room.relayMode = true;
+    // Host seat must also be claimed so its private token authorizes reconnect.
+    this.room.seats[0].claimed = true;
     this.room.seats.length = kinds.length + 1;
     this.room.state.players.length = kinds.length + 1;
     await this.save();
