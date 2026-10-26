@@ -545,14 +545,43 @@ jobs:
             git diff --binary "$base" "$head" -- "$@" > "combined-evidence/b136-${label}.patch"
             test -s "combined-evidence/b136-${label}.patch"
             if ! git apply --3way --index "combined-evidence/b136-${label}.patch"; then
-              echo "::error title=Build 136 integration conflict::${label}: no unreviewed hunk dropped"
-              git status --short
-              while IFS= read -r unresolved; do
+              # Exact known one-hunk conflict: B135 button wording vs Claude's
+              # new multi-select library action. Preserve both; reject other collisions.
+              if [ "$label" = advanced-deck-library ] && \
+                 [ "$(git diff --name-only --diff-filter=U)" = android/app/src/main/java/com/arcanatable/TableDialogs.kt ]; then
+                python3 - <<'PYDECK'
+          from pathlib import Path
+          import re
+          p=Path('android/app/src/main/java/com/arcanatable/TableDialogs.kt')
+          s=p.read_text()
+          conflicts=list(re.finditer(r'^<<<<<<< ours\n(.*?)^=======\n(.*?)^>>>>>>> theirs\n',s,re.MULTILINE|re.DOTALL))
+          assert len(conflicts)==1,('unexpected library conflicts',len(conflicts))
+          c=conflicts[0]
+          ours,theirs=c.group(1),c.group(2)
+          assert '"TO EXILE" to onPutExile' in ours
+          assert 'TextButton(onClick = { action(selected); selectedCardId = -1 }' in ours
+          assert 'Triple("EXILE", onPutExile, true)' in theirs
+          assert 'moveSelected(action, leaves)' in theirs
+          fixed=(theirs.replace('Triple("EXILE",','Triple("TO EXILE",')
+                       .replace('Triple("TOP",','Triple("TO TOP",')
+                       .replace('Triple("BOTTOM",','Triple("TO BOTTOM",'))
+          s=s[:c.start()]+fixed+s[c.end():]
+          assert not re.search(r'^<<<<<<< |^=======|^>>>>>>> ',s,re.MULTILINE)
+          p.write_text(s)
+          print('PASS: exact advanced library multi-select + B135 action-label reconciliation')
+          PYDECK
+                git add android/app/src/main/java/com/arcanatable/TableDialogs.kt
+                test -z "$(git diff --name-only --diff-filter=U)"
+              else
+                echo "::error title=Build 136 integration conflict::${label}: no unreviewed hunk dropped"
+                git status --short
+                while IFS= read -r unresolved; do
                 test -n "$unresolved" || continue
                 echo "=== B136 EXACT CONFLICT: $unresolved ==="
                 awk '/^<<<<<<< / {inside=1} inside {print} /^>>>>>>> / {inside=0}' "$unresolved" | head -260
-              done < <(git diff --name-only --diff-filter=U)
-              exit 1
+                done < <(git diff --name-only --diff-filter=U)
+                exit 1
+              fi
             fi
             git diff --cached --check
             git commit --no-gpg-sign -m "Runner-only B136: ${label} at ${head}"
