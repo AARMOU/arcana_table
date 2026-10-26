@@ -678,8 +678,13 @@ jobs:
           assert 'Entry(EldraziDisplacer' in ours and 'Entry(EldritchImmunity' in ours
           assert 'Entry(UginTheIneffable, "CMM", "Eldrazi Incursion")' in theirs
           assert 'Entry(UginTheIneffable' not in ours
-          s=s[:c.start()]+ours+theirs+s[c.end():]
-          assert s.count('Entry(UginTheIneffable, "CMM", "Eldrazi Incursion")')==1
+          entry='Entry(UginTheIneffable, "CMM", "Eldrazi Incursion")'
+          outside=s[:c.start()]+s[c.end():]
+          # B135's upgraded card base may already register Ugin. Keep that
+          # precise entry, while preserving Eldrazi Displacer/Immunity.
+          resolved=ours if entry in outside else ours+theirs
+          s=s[:c.start()]+resolved+s[c.end():]
+          assert s.count(entry)==1,('Ugin registration count',s.count(entry))
           registry.write_text(s)
           tests=root/'test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt'
           t=tests.read_text()
