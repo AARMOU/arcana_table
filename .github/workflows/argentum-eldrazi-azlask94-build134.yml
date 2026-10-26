@@ -3,8 +3,13 @@ name: Build 134 coherent release-source preview (owner approval required)
 # legacy Eldrazi engine source patches apply to the newly upgraded Argentum.
 # No production jar publication, branch mutation, production signing or deploy.
 # Reproducible isolated integration candidate: no production branch is mutated.
+# One-time owner-approved preview trigger on this isolated branch ONLY.
+# Review/validation steps and generated artifact remain exactly as staged in PR #254.
 on:
-  workflow_dispatch:
+  push:
+    branches: ['gpt/owner-approved-build134-preview-20261026-0515']
+    paths:
+      - '.github/workflows/argentum-eldrazi-azlask94-build134.yml'
 concurrency:
   group: arcana-b134-final-preview-${{ github.ref }}
   cancel-in-progress: true
