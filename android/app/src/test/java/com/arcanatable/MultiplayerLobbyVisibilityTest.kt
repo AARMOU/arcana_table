@@ -1,12 +1,10 @@
 package com.arcanatable
 
 import android.content.Context
-import androidx.compose.ui.test.assertDoesNotExist
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.junit4.createEmptyComposeRule
+import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.test.core.app.ApplicationProvider
-import com.arcanatable.engine.LocalArgentumHost
 import com.arcanatable.engine.LocalSeat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +29,7 @@ import org.robolectric.annotation.GraphicsMode
 @GraphicsMode(GraphicsMode.Mode.NATIVE)
 @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi")
 class MultiplayerLobbyVisibilityTest {
-    @get:Rule val rule = createEmptyComposeRule()
+    @get:Rule val rule = createComposeRule()
 
     private fun seat(name: String) = LocalSeat(name, List(40) { "Forest" }, null)
 
