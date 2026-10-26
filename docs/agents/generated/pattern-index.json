@@ -1533,7 +1533,7 @@
    ]
   },
   "Effects.CreateToken": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -1689,7 +1689,7 @@
    ]
   },
   "Effects.Destroy": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Immoral Bargain",
@@ -2189,6 +2189,17 @@
     }
    ]
   },
+  "Effects.LinkCollectionToPermanent": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Ugin, the Ineffable",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt",
+     "lines": 96,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.LoseLife": {
    "count": 10,
    "examples": [
@@ -2405,7 +2416,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -4008,7 +4019,7 @@
    ]
   },
   "Triggers.self.leaves": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Constricting Sliver",
@@ -4021,6 +4032,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BronzebeakForagers.kt",
      "lines": 67,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BronzebeakForagersScenarioTest.kt"
+    },
+    {
+     "card": "Ugin, the Ineffable",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt",
+     "lines": 96,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt"
     }
    ]
   },
@@ -4334,6 +4351,17 @@
     }
    ]
   },
+  "loyaltyAbility()": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Ugin, the Ineffable",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt",
+     "lines": 96,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt"
+    }
+   ]
+  },
   "ravenous()": {
    "count": 4,
    "examples": [
@@ -4498,7 +4526,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 52,
+   "count": 53,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -5776,7 +5804,7 @@
    ]
   },
   "ModifySpellCost": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Herald of Slaanesh",
@@ -5789,6 +5817,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
      "lines": 71,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimalAmuletScenarioTest.kt"
+    },
+    {
+     "card": "Ugin, the Ineffable",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt",
+     "lines": 96,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt"
     }
    ]
   },
@@ -6002,6 +6036,17 @@
     }
    ]
   },
+  "EffectTarget.PipelineTarget": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Ugin, the Ineffable",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt",
+     "lines": 96,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt"
+    }
+   ]
+  },
   "EffectTarget.PlayerRef": {
    "count": 21,
    "examples": [
@@ -6184,7 +6229,7 @@
    ]
   },
   "GameObjectFilter.Any": {
-   "count": 9,
+   "count": 10,
    "examples": [
     {
      "card": "Skittering Cicada",
@@ -6507,7 +6552,7 @@
    ]
   },
   "GameObjectFilter.Permanent": {
-   "count": 13,
+   "count": 14,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -6835,7 +6880,7 @@
    ]
   },
   "Player.You": {
-   "count": 33,
+   "count": 34,
    "examples": [
     {
      "card": "Defile",
@@ -7239,7 +7284,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 62,
+   "count": 63,
    "examples": [
     {
      "card": "Defile",
