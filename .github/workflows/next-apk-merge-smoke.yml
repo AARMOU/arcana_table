@@ -71,3 +71,31 @@ jobs:
           done
           echo "PASS: latest weekly, UI, AI and online source branches merge cleanly on final Build 134 source (NOT compiled)"
           git diff --check
+      - name: Export reproducible joined source diff (NO APK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=1751f1893cc4706572d4f4382e6b0a137bf46536
+          mkdir -p next-apk-source
+          git diff --binary "$base" HEAD > next-apk-source/integrated-source.patch
+          test -s next-apk-source/integrated-source.patch
+          git diff --name-status "$base" HEAD > next-apk-source/changed-files.txt
+          cat > next-apk-source/SOURCE-PINS.txt <<'EOF'
+          Build134 release source: 1751f1893cc4706572d4f4382e6b0a137bf46536
+          Build134 upgraded engine + Eldrazi compatibility gate: b32e499a65f0a4a9b70367a67ea00f91eef8dbaa
+          Weekly collision reconciliation PR273: bfce3f0d24c3a8cad28a5a729df3dbba16dd079b
+          Correct table UI PR277: 44105eead435b0e3b759b7d631a659990b7388e3
+          AI difficulty PR270: e99b4954ad80885af0e338f7df87b1b4587bc5df
+          Four-player directed online PR268: 6641f1883f54ca3a13c8faa7ef0b01b05976ef74
+          Source diff only. No engine binary replacement, APK build, Cloudflare deployment, signing or release.
+          EOF
+          sha256sum next-apk-source/integrated-source.patch > next-apk-source/integrated-source.sha256
+          git rev-parse HEAD > next-apk-source/temporary-join-commit.txt
+          cat next-apk-source/integrated-source.sha256
+      - name: Upload reviewed source-join patch (never executable artifact)
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: next-apk-combined-source-patch-no-build
+          path: next-apk-source/
+          retention-days: 14
+          if-no-files-found: error
