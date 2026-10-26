@@ -306,7 +306,7 @@ private val tutorialStops = listOf(
     TutorialStop("GAME LOG MENU", "Review the recorded game actions.", "menu-log", "MENU_TOOLS", executeAction = false),
     TutorialStop("RULES MENU", "Search the official Magic Comprehensive Rules. The first use downloads them for offline reading.", "menu-rules", "MENU_TOOLS", executeAction = false),
     TutorialStop("EXPORT DIAGNOSTICS", "Save a connection log for troubleshooting.", "menu-export", "MENU_TOOLS", executeAction = false),
-    TutorialStop("ROOM HOME MENU", "Return to the home screen.", "menu-home", "MENU_GAME", executeAction = false),
+    TutorialStop("HOME SCREEN MENU", "Return to the home screen.", "menu-home", "MENU_GAME", executeAction = false),
     TutorialStop("START GAME MENU", "Start a local game with the current players.", "menu-start-game", "MENU_GAME", executeAction = false),
     TutorialStop("GAME LOBBY MENU", "Open room and player controls.", "menu-lobby", "MENU_GAME", executeAction = false),
     TutorialStop("END GAME MENU", "Online only: ask every player to agree to end the game.", "menu-end", "MENU_GAME", executeAction = false),
@@ -670,6 +670,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
     var endProposalBy by remember { mutableIntStateOf(-1) }
     var endVotes by remember { mutableStateOf(emptyMap<Int, Boolean>()) }
     var gameEndedOnline by remember { mutableStateOf(false) }
+    var gameEndedNoticeDismissed by remember { mutableStateOf(false) }
+    LaunchedEffect(gameEndedOnline) { if (!gameEndedOnline) gameEndedNoticeDismissed = false }
     var localGameStarted by rememberSaveable { mutableStateOf(false) }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         backgroundAlertsEnabled = granted
@@ -1162,7 +1164,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             val oldTail = oldGameLog.lastOrNull()
             val additions = if (oldTail == null) emptyList() else state.gameLog.dropWhile { it != oldTail }.drop(1)
             additions.takeLast(4).filterNot { it.contains("${players.getOrNull(localSeat)?.name.orEmpty()} ") }.forEach { entry ->
-                postGameAlert(context, "Game play", entry.substringAfter("· ", entry))
+                postGameAlert(context, "Game activity", entry.substringAfter("· ", entry))
             }
         }
         chatMessages = state.chat.map { ChatMessage(it.author, it.text, it.timestamp) }
@@ -1183,7 +1185,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             pendingStackOpen = true
             if (backgroundAlertsEnabled && !appInForeground) {
                 val title = if (priorityArrivedForLocalPlayer) "Your priority" else "Stack update"
-                val detail = if (priorityArrivedForLocalPlayer) "It is your turn to respond on the stack." else "A spell or ability was added to the stack."
+                val detail = if (priorityArrivedForLocalPlayer) "You have priority on the stack. Respond or pass." else "A spell or ability was added to the stack."
                 postGameAlert(context, title, detail)
             }
             recordDiagnostic(if (priorityArrivedForLocalPlayer) "Stack priority arrived at local seat ${localSeat + 1}" else "Shared stack update received")
@@ -2068,7 +2070,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             "zone-revealed" -> selected?.revealed?.isNotEmpty() == true
             "draw-action", "combat-action", "more-actions" -> boardCanControl
             "battlefield" -> selected?.battlefield?.isNotEmpty() == true
-            "hand-card" -> selected?.hand?.isNotEmpty() == true
+            "hand-card" -> boardCanControl && selected?.hand?.isNotEmpty() == true
             "hand-actions" -> handActionCard != null
             "menu-edit" -> players.getOrNull(if (onlineMode) localSeat else selectedPlayer)?.deckLoaded == true
             "menu-add-ai" -> !onlineMode
@@ -2419,7 +2421,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         DropdownMenuItem(text = { Text("What's new") }, onClick = { topMenuExpanded = false; changelogOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("Options") }, modifier = tutorialAnchor("menu-options"), onClick = { guidedAction("menu-options") { topMenuExpanded = false; optionsOpen = true } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                     } else {
-                        DropdownMenuItem(text = { Text("‹  MAIN MENU") }, modifier = tutorialAnchor("menu-back"), onClick = { guidedAction("menu-back") { topMenuSection = null } })
+                        DropdownMenuItem(text = { Text("‹ Main menu") }, modifier = tutorialAnchor("menu-back"), onClick = { guidedAction("menu-back") { topMenuSection = null } })
                         when (topMenuSection) {
                             "decks" -> {
                                 DropdownMenuItem(text = { Text(if (players[if (onlineMode) localSeat else selectedPlayer].deckLoaded) "Replace imported deck" else "Import deck") }, modifier = tutorialAnchor("menu-import"), onClick = { guidedAction("menu-import") { topMenuExpanded = false; topMenuSection = null; if (onlineMode) selectedPlayer = localSeat; importError = null; importOpen = true } })
@@ -2428,7 +2430,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                             }
                             "tools" -> {
                                 if (!onlineMode) DropdownMenuItem(text = { Text("Add AI opponent · ${players.size}/4") }, modifier = tutorialAnchor("menu-add-ai"), onClick = { guidedAction("menu-add-ai") { topMenuExpanded = false; topMenuSection = null; addAiOpponent() } })
-                                if (gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Add token") }, modifier = tutorialAnchor("menu-add-token"), onClick = { guidedAction("menu-add-token") { topMenuExpanded = false; topMenuSection = null; tokenTarget = selectedPlayer; tokenPickerOpen = true } })
+                                if (gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Add token…") }, modifier = tutorialAnchor("menu-add-token"), onClick = { guidedAction("menu-add-token") { topMenuExpanded = false; topMenuSection = null; tokenTarget = selectedPlayer; tokenPickerOpen = true } })
                                 if (gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Mana pool · ${trackedMana(selectedPlayer)}") }, modifier = tutorialAnchor("menu-mana"), onClick = { guidedAction("menu-mana") { topMenuExpanded = false; topMenuSection = null; manaTarget = selectedPlayer; manaPoolOpen = true } })
                                 if (!gameEndedOnline && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Search / browse library") }, modifier = tutorialAnchor("menu-search"), onClick = { guidedAction("menu-search") { topMenuExpanded = false; topMenuSection = null; librarySearchPlayer = selectedPlayer } })
                                 if (gameInProgress) DropdownMenuItem(text = { Text("Stack and priority · ${stackActions.size}") }, modifier = tutorialAnchor("menu-stack"), onClick = { guidedAction("menu-stack") { topMenuExpanded = false; topMenuSection = null; stackOpen = true } })
@@ -2437,7 +2439,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                                 DropdownMenuItem(text = { Text("Export diagnostic log") }, modifier = tutorialAnchor("menu-export"), onClick = { guidedAction("menu-export") { topMenuExpanded = false; topMenuSection = null; exportDiagnosticLog() } })
                             }
                             "game" -> {
-                                DropdownMenuItem(text = { Text("Room home") }, modifier = tutorialAnchor("menu-home"), onClick = { guidedAction("menu-home") { topMenuExpanded = false; topMenuSection = null; homeOpen = true; showOverview = true; showHand = false } })
+                                DropdownMenuItem(text = { Text("Home screen") }, modifier = tutorialAnchor("menu-home"), onClick = { guidedAction("menu-home") { topMenuExpanded = false; topMenuSection = null; homeOpen = true; showOverview = true; showHand = false } })
                                 if (!onlineMode && !localGameStarted) DropdownMenuItem(text = { Text("Start game") }, modifier = tutorialAnchor("menu-start-game"), onClick = { guidedAction("menu-start-game") { topMenuExpanded = false; topMenuSection = null; resetGame(startImmediately = true, order = gameTurnOrder); logAction(activePlayer, "started the game") } })
                                 DropdownMenuItem(text = { Text("Game lobby") }, modifier = tutorialAnchor("menu-lobby"), onClick = { guidedAction("menu-lobby") { topMenuSection = null; openLobby(joining = false) } })
                                 if (onlineMode && gameStartedOnline && !gameEndedOnline) DropdownMenuItem(text = { Text("Propose ending the game") }, modifier = tutorialAnchor("menu-end"), onClick = { guidedAction("menu-end") {
@@ -2531,6 +2533,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                         showTurnTimer = turnTimerVisible,
                         onToggleTimer = { if (!onlineMode || localSeat == 0) turnTimerVisible = !turnTimerVisible },
                         onMoveUp = { if (!onlineMode) movePlayerCard(index, -1) }, onMoveDown = { if (!onlineMode) movePlayerCard(index, 1) },
+                        canReorder = !onlineMode, isLastSeat = index == players.lastIndex,
                         onOpen = { guidedAction("player-card") { selectedPlayer = index; showOverview = false } },
                         onZone = { zoneDialog = index to it },
                         onPreview = { preview = CardPreview(index, it, fromHand = false, canManipulate = gameInProgress && (!onlineMode || index == localSeat) && !gameEndedOnline) },
@@ -3407,7 +3410,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = { reconnectToRoom() }, enabled = !reconnecting) {
-                Text(if (reconnecting) "TRYING…" else "AUTO RECONNECT", color = if (reconnecting) Muted else Mint)
+                Text(if (reconnecting) "TRYING…" else "RECONNECT", color = if (reconnecting) Muted else Mint)
             }
         },
         dismissButton = {
@@ -3422,7 +3425,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                     onlineStatus = "Disconnected"
                 }
                 connectionLostReason = null
-            }) { Text(if (reconnecting) "CANCEL" else "LATER", color = Muted) }
+            }) { Text(if (reconnecting) "CANCEL" else "STAY OFFLINE", color = Muted) }
         },
         containerColor = Panel,
         titleContentColor = SoftWhite,
@@ -3525,10 +3528,12 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             onDismissRequest = { if (!importAutoFixInProgress) importReviewOpen = false },
             title = { Text("Review imported cards") },
             text = { Text(importReviewMessage, color = Muted, fontSize = 12.sp) },
+            // All actions stack in one right-aligned column, so the dismiss button
+            // is not stranded beside a multi-row group.
             confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    Row {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (cardsNeedingReview.isNotEmpty()) TextButton(
+                            modifier = Modifier.heightIn(min = 48.dp),
                             enabled = !importAutoFixInProgress,
                             onClick = {
                                 val groupedCards = cardsNeedingReview.groupBy { it.name }
@@ -3605,6 +3610,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                             }
                         ) { Text(if (importAutoFixInProgress) "FIXING…" else "AUTO FIX", color = Mint) }
                         if (importOverflowCardIds.isNotEmpty()) TextButton(
+                            modifier = Modifier.heightIn(min = 48.dp),
                             enabled = !importAutoFixInProgress,
                             onClick = {
                                 val overflow = importOverflowCardIds
@@ -3614,13 +3620,15 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                                 importReviewMessage = "Removed ${overflow.size} card(s) over the deck limit."
                             }
                         ) { Text("TRIM EXCESS", color = Mint) }
-                    }
-                    if (cardsNeedingReview.isNotEmpty()) TextButton(onClick = { if (!importAutoFixInProgress) { importReviewOpen = false; deckEditorOpen = true } }, enabled = !importAutoFixInProgress) {
+                    if (cardsNeedingReview.isNotEmpty()) TextButton(onClick = { if (!importAutoFixInProgress) { importReviewOpen = false; deckEditorOpen = true } }, enabled = !importAutoFixInProgress, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text("OPEN EDITOR", color = Mint)
+                    }
+                    val reviewFinished = cardsNeedingReview.isEmpty() && importOverflowCardIds.isEmpty()
+                    TextButton(onClick = { if (!importAutoFixInProgress) importReviewOpen = false }, enabled = !importAutoFixInProgress, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(if (reviewFinished) "CLOSE" else "LATER", color = SoftWhite)
                     }
                 }
             },
-            dismissButton = { TextButton(onClick = { if (!importAutoFixInProgress) importReviewOpen = false }, enabled = !importAutoFixInProgress) { Text("LATER") } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
@@ -3775,7 +3783,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
         title = { Text("Reset this game?") },
         text = { Text("This will shuffle each player's non-token cards into a new library, deal a new opening hand, reset life and timers, and clear the current board and game log. Player names, decks, and commanders will stay.") },
         confirmButton = { TextButton(onClick = { resetGame() }) { Text("RESET GAME", color = Color(0xFFE9978B)) } },
-        dismissButton = { TextButton(onClick = { resetConfirmOpen = false }) { Text("CANCEL") } }
+        dismissButton = { TextButton(onClick = { resetConfirmOpen = false }) { Text("CANCEL") } },
+        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
     )
 
     if (onlineMode && endProposalBy >= 0 && localSeat !in endVotes && !gameEndedOnline) {
@@ -3789,11 +3798,14 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
-    if (onlineMode && gameEndedOnline) AlertDialog(
-        onDismissRequest = {},
+    // Shown once per ended game. Its buttons must dismiss it, or it would sit
+    // on top of the lobby it opens.
+    if (onlineMode && gameEndedOnline && !gameEndedNoticeDismissed) AlertDialog(
+        onDismissRequest = { gameEndedNoticeDismissed = true },
         title = { Text("Game ended by unanimous vote") },
         text = { Text("Every player agreed to end the game. The table is now read-only.") },
-        confirmButton = { TextButton(onClick = { homeOpen = true; showOverview = true; lobbyOpen = true }) { Text("ROOM LOBBY", color = Mint) } },
+        confirmButton = { TextButton(onClick = { gameEndedNoticeDismissed = true; homeOpen = true; showOverview = true; lobbyOpen = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("OPEN LOBBY", color = Mint) } },
+        dismissButton = { TextButton(onClick = { gameEndedNoticeDismissed = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("VIEW TABLE", color = SoftWhite) } },
         containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
     )
 
@@ -3840,16 +3852,16 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 }
             },
             confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    if (prompt.isShockLand) TextButton(onClick = { placeLand(enterTapped = false, payTwoLife = true) }, enabled = life >= 2) {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (prompt.isShockLand) TextButton(onClick = { placeLand(enterTapped = false, payTwoLife = true) }, enabled = life >= 2, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text("PAY 2 LIFE · ENTER UNTAPPED", color = if (life >= 2) Mint else Muted)
-                    } else TextButton(onClick = { placeLand(enterTapped = false) }) {
+                    } else TextButton(onClick = { placeLand(enterTapped = false) }, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text("ENTER UNTAPPED", color = Mint)
                     }
-                    TextButton(onClick = { placeLand(enterTapped = true) }) { Text("ENTER TAPPED", color = Mint) }
+                    TextButton(onClick = { placeLand(enterTapped = true) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("ENTER TAPPED", color = Mint) }
+                    TextButton(onClick = { landEntryPrompt = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
                 }
             },
-            dismissButton = { TextButton(onClick = { landEntryPrompt = null }) { Text("CANCEL", color = Muted) } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
@@ -3872,12 +3884,12 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 }
             },
             confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    TextButton(onClick = { castFromPayment(owner, card, commanderCast) }, enabled = payable != null && costKnown) { Text("PAY FROM MANA POOL", color = if (payable != null && costKnown) Mint else Muted) }
-                    TextButton(onClick = { castFromPayment(owner, card, commanderCast, manualPayment = true) }) { Text("I PAID MANUALLY", color = CounterGold) }
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = { castFromPayment(owner, card, commanderCast) }, enabled = payable != null && costKnown, modifier = Modifier.heightIn(min = 48.dp)) { Text("PAY FROM MANA POOL", color = if (payable != null && costKnown) Mint else Muted) }
+                    TextButton(onClick = { castFromPayment(owner, card, commanderCast, manualPayment = true) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("I PAID MANUALLY", color = CounterGold) }
+                    TextButton(onClick = { paymentCard = null; handActionCard = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
                 }
             },
-            dismissButton = { TextButton(onClick = { paymentCard = null; handActionCard = null }) { Text("CANCEL") } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = SoftWhite
         )
     }
@@ -3923,7 +3935,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
 
     if (concedePlayer in players.indices) AlertDialog(
         onDismissRequest = { concedePlayer = -1 },
-        title = { Text("Concede and leave the game?") },
+        title = { Text("Concede this game?") },
         text = { Text("${players[concedePlayer].name} will be marked eliminated and cannot take further game actions. This does not close the room for other players.") },
         confirmButton = { TextButton(onClick = { concede(concedePlayer); concedePlayer = -1 }) { Text("CONCEDE", color = Color(0xFFE9978B)) } },
         dismissButton = { TextButton(onClick = { concedePlayer = -1 }) { Text("CANCEL") } },
@@ -3969,7 +3981,7 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             title = { Text("Choose mana · ${prompt.cardName}") },
             text = { Text("Which mana did this permanent produce?") },
             confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     prompt.options.forEach { option ->
                         TextButton(onClick = {
                             updatePlayer(prompt.playerIndex) { player ->
@@ -3979,13 +3991,13 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                             }
                             logAction(prompt.playerIndex, "added ${option.label} mana")
                             manaChoicePrompt = null
-                        }, modifier = Modifier.heightIn(min = 44.dp)) {
+                        }, modifier = Modifier.heightIn(min = 48.dp)) {
                             Text(option.label, color = Mint, fontWeight = FontWeight.Bold)
                         }
                     }
+                    TextButton(onClick = { manaChoicePrompt = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
                 }
             },
-            dismissButton = { TextButton(onClick = { manaChoicePrompt = null }) { Text("CANCEL", color = Muted) } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
@@ -4008,7 +4020,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             else -> "${prompt.cardName} triggered: ${prompt.triggerText}. Choose any modes, targets, and other decisions on the card, resolve it manually, then confirm. Effect: ${prompt.effectText}"
         }
         AlertDialog(
-            onDismissRequest = { if (prompt.kind == "RHYSTIC" || prompt.kind == "TITHE") resolveTrigger(prompt, paid = false) },
+            // A tap outside must not make the pay-or-not decision for anyone.
+            onDismissRequest = {},
             title = { Text(if (prompt.kind == "RHYSTIC" || prompt.kind == "TITHE") "Triggered choice · ${prompt.cardName}" else "Triggered ability · ${prompt.cardName}") },
             text = { Column {
                 Text(promptText, color = SoftWhite)
@@ -4035,8 +4048,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
                 }
                 TextButton(onClick = { resolveTrigger(prompt, paid = prompt.kind == "RHYSTIC" || prompt.kind == "TITHE", targetIndex = selectedTriggerTarget.takeIf { it >= 0 }) }, enabled = enabled) {
                     Text(when (prompt.kind) {
-                        "RHYSTIC" -> "PAY {1}"
-                        "TITHE" -> "PAY {2}"
+                        "RHYSTIC" -> "${players[prompt.eventPlayerIndex].name} PAYS {1}"
+                        "TITHE" -> "${players[prompt.eventPlayerIndex].name} PAYS {2}"
                         "AUTO_EFFECT" -> "RESOLVE EFFECT"
                         "TARGET_EFFECT" -> "APPLY TO TARGET"
                         else -> "DONE · MANUAL RESOLUTION"
@@ -4045,8 +4058,8 @@ private fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit) {
             },
             dismissButton = {
                 when (prompt.kind) {
-                    "RHYSTIC" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("DRAW CARD") }
-                    "TITHE" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("CREATE TREASURE") }
+                    "RHYSTIC" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("DON'T PAY · ${players[prompt.controllerIndex].name} DRAWS") }
+                    "TITHE" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("DON'T PAY · ${players[prompt.controllerIndex].name} GETS TREASURE") }
                     "AUTO_EFFECT", "TARGET_EFFECT" -> TextButton(onClick = { resolveTrigger(prompt, paid = false, targetIndex = selectedTriggerTarget.takeIf { it >= 0 }, manual = true) }) { Text("RESOLVE MANUALLY", color = Muted) }
                 }
             },
@@ -4138,9 +4151,9 @@ private fun LibrarySearchDialog(
                             "TO HAND" to onTakeToHand,
                             "TO BATTLEFIELD" to onPutBattlefield,
                             "TO GRAVEYARD" to onPutGraveyard,
-                            "EXILE" to onPutExile,
-                            "TOP" to onMoveToTop,
-                            "BOTTOM" to onMoveToBottom
+                            "TO EXILE" to onPutExile,
+                            "TO TOP" to onMoveToTop,
+                            "TO BOTTOM" to onMoveToBottom
                         ).forEach { (label, action) ->
                             TextButton(onClick = { action(selected); selectedCardId = -1 }, modifier = Modifier.heightIn(min = 44.dp)) {
                                 Text(label, color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
@@ -4283,7 +4296,7 @@ private fun HandPeekBar(cardCount: Int, modifier: Modifier = Modifier, onClick: 
         modifier.fillMaxWidth().heightIn(min = 60.dp).clip(RoundedCornerShape(10.dp)).background(PanelLight)
             .combinedClickable(onClick = onClick).padding(horizontal = 11.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
     ) {
         Text("HAND  $cardCount", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black)
         if (cardCount > 0) {
@@ -4649,13 +4662,14 @@ private fun LobbyDialog(
         AlertDialog(
             onDismissRequest = { removeTarget = -1 },
             title = { Text("Remove $targetName?") },
-            text = { Text("This removes the player and their seat from the online room.") },
+            text = { Text("This removes the player and their seat from this room.") },
             confirmButton = {
                 TextButton(onClick = { onRemovePlayer(removeTarget); removeTarget = -1 }) {
                     Text("REMOVE PLAYER", color = Color(0xFFE9978B), fontWeight = FontWeight.Bold)
                 }
             },
-            dismissButton = { TextButton(onClick = { removeTarget = -1 }) { Text("CANCEL") } }
+            dismissButton = { TextButton(onClick = { removeTarget = -1 }) { Text("CANCEL") } },
+            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
     if (openingHandDialogOpen && !gameStarted && localSeat in players.indices && players[localSeat].deckLoaded && !players[localSeat].openingHandKept) {
@@ -4697,7 +4711,7 @@ private fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKee
                             if (choosingBottomCards) {
                                 OutlinedButton(
                                     onClick = { selectedCardIds = if (selected) selectedCardIds - card.id else selectedCardIds + card.id },
-                                    modifier = Modifier.fillMaxWidth().padding(top = 3.dp).heightIn(min = 38.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(top = 3.dp).heightIn(min = 44.dp),
                                     contentPadding = PaddingValues(horizontal = 3.dp, vertical = 4.dp),
                                     border = BorderStroke(1.dp, if (selected) Mint else Muted)
                                 ) {
@@ -4714,11 +4728,12 @@ private fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKee
                         Button(onClick = { onKeep(selectedCardIds) }, enabled = selectedCardIds.size == bottomCount, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("CONFIRM KEEP") }
                     }
                 } else {
+                    // Two wide buttons per row so longer labels never wrap on a phone.
                     Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
-                        OutlinedButton(onClick = onMulligan, enabled = canMulliganAgain, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("MULLIGAN", color = if (canMulliganAgain) CounterGold else Muted) }
-                        Button(onClick = { if (bottomCount == 0) onKeep(emptyList()) else choosingBottomCards = true }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(if (bottomCount == 0) "KEEP HAND" else "KEEP · BOTTOM $bottomCount") }
+                        OutlinedButton(onClick = onMulligan, enabled = canMulliganAgain, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("MULLIGAN", color = if (canMulliganAgain) CounterGold else Muted, maxLines = 1) }
+                        Button(onClick = { if (bottomCount == 0) onKeep(emptyList()) else choosingBottomCards = true }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(if (bottomCount == 0) "KEEP HAND" else "KEEP · BOTTOM $bottomCount", maxLines = 1) }
                     }
+                    TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End).padding(top = 4.dp).heightIn(min = 48.dp)) { Text("DECIDE LATER", color = Muted) }
                 }
             }
         }
@@ -4850,7 +4865,7 @@ private fun RulesLookupDialog(onDismiss: () -> Unit) {
                                 .onFailure { status = "Download failed. Check your connection and try again." }
                             loading = false
                         }
-                    }, enabled = !loading, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (loading) "DOWNLOADING" else if (rulesText.isBlank()) "DOWNLOAD" else "UPDATE", color = Mint, fontSize = 8.sp) }
+                    }, enabled = !loading, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (loading) "DOWNLOADING…" else if (rulesText.isBlank()) "DOWNLOAD" else "UPDATE", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                 }
                 if (status.isNotBlank()) Text(status, color = if (rulesText.isNotBlank()) Mint else CounterGold, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 3.dp))
                 if (rulesText.isBlank()) {
@@ -4971,7 +4986,7 @@ private fun GuidedTutorialOverlay(step: TutorialStop, index: Int, total: Int, ta
 }
 
 @Composable
-private fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier = Modifier, compact: Boolean = false, cardSizeScale: Float = 1f, isActivePlayer: Boolean = false, turnNumber: Int, phaseName: String, turnTime: Long?, showTurnTimer: Boolean, tutorialAnchor: (String) -> Modifier, onToggleTimer: () -> Unit, onMoveUp: () -> Unit, onMoveDown: () -> Unit, onOpen: () -> Unit, onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit) {
+private fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier = Modifier, compact: Boolean = false, cardSizeScale: Float = 1f, isActivePlayer: Boolean = false, turnNumber: Int, phaseName: String, turnTime: Long?, showTurnTimer: Boolean, tutorialAnchor: (String) -> Modifier, onToggleTimer: () -> Unit, onMoveUp: () -> Unit, onMoveDown: () -> Unit, onOpen: () -> Unit, onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit, canReorder: Boolean = true, isLastSeat: Boolean = false) {
     val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val largeCardWidth = when {
         screenWidthDp >= 1300 -> (154 * cardSizeScale).dp
@@ -5096,12 +5111,16 @@ private fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier =
                 if (player.revealed.isNotEmpty()) ZoneChip("REVEALED", player.revealed.size) { onZone("Revealed") }
             }
         }
-        Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = if (expanded) "Collapse player details" else "Expand player details",
-            tint = Muted, modifier = Modifier.align(Alignment.CenterHorizontally).size(28.dp).clip(CircleShape).combinedClickable(onClick = { expanded = !expanded }))
-        if (expanded) {
+        // 48dp touch target around the 28dp chevron.
+        IconButton(onClick = { expanded = !expanded }, modifier = Modifier.align(Alignment.CenterHorizontally).size(48.dp)) {
+            Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = if (expanded) "Collapse player details" else "Expand player details", tint = Muted, modifier = Modifier.size(28.dp))
+        }
+        // Seat order can only be changed in a local game; the buttons look
+        // disabled when they cannot move this seat.
+        if (expanded && canReorder) {
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                TextButton(onClick = onMoveUp, enabled = index > 0, modifier = Modifier.heightIn(min = 48.dp)) { Text("MOVE ↑", color = Mint, fontSize = 9.sp) }
-                TextButton(onClick = onMoveDown, modifier = Modifier.heightIn(min = 48.dp)) { Text("MOVE ↓", color = Mint, fontSize = 9.sp) }
+                TextButton(onClick = onMoveUp, enabled = index > 0, modifier = Modifier.heightIn(min = 48.dp)) { Text("MOVE UP ↑", color = if (index > 0) Mint else Muted, fontSize = 9.sp) }
+                TextButton(onClick = onMoveDown, enabled = !isLastSeat, modifier = Modifier.heightIn(min = 48.dp)) { Text("MOVE DOWN ↓", color = if (!isLastSeat) Mint else Muted, fontSize = 9.sp) }
             }
         }
     }
@@ -5109,7 +5128,7 @@ private fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier =
 
 @Composable
 private fun ZoneChip(name: String, count: Int, enabled: Boolean = true, onClick: () -> Unit) {
-    Text("$name  $count", color = if (enabled) SoftWhite else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.heightIn(min = 34.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(6.dp)).background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp))
+    Text("$name  $count", color = if (enabled) SoftWhite else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.heightIn(min = 44.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(6.dp)).background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp))
 }
 
 @Composable
@@ -5166,7 +5185,7 @@ private fun PlayerBoard(
                         val trackerSummary = player.playerCounters.entries.joinToString(" · ") { "${it.key} ${it.value}" }
                         Text("Cast ${player.commanderCastCount} · tax +{${player.commanderCastCount * 2}}${if (trackerSummary.isNotBlank()) " · $trackerSummary" else ""}", color = Muted, fontSize = 7.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    TextButton(onClick = onCastCommander, enabled = canControl && !commanderUnavailable && !player.isEliminated, modifier = Modifier.heightIn(min = 32.dp).then(tutorialAnchor("commander-cast")), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) { Text("CAST", color = if (canControl && !commanderUnavailable && !player.isEliminated) Mint else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = onCastCommander, enabled = canControl && !commanderUnavailable && !player.isEliminated, modifier = Modifier.heightIn(min = 44.dp).then(tutorialAnchor("commander-cast")), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) { Text("CAST", color = if (canControl && !commanderUnavailable && !player.isEliminated) Mint else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
                 } else Text("PLAYER TRACKERS · ${player.playerCounters.entries.joinToString { "${it.key} ${it.value}" }.ifBlank { "none" }}", color = Muted, fontSize = 9.sp, modifier = Modifier.weight(1f))
                 val incomingDamage = player.commanderDamageReceived.entries.sumOf { it.value }
                 if (incomingDamage > 0) Text("CMD DMG $incomingDamage", color = if (player.commanderDamageReceived.values.any { it >= 21 }) Color(0xFFE9978B) else CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold)
@@ -5177,7 +5196,7 @@ private fun PlayerBoard(
                 Spacer(Modifier.weight(1f))
                 if (player.isComputer || player.isEliminated) Text(if (player.isEliminated) "ELIMINATED · ${player.eliminationReason ?: "OUT"}" else if (player.deckLoaded) "AI TURN IN PROGRESS" else "IMPORT A DECK FOR THE AI", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(10.dp))
                 else {
-                    TextButton(onClick = onNextStep, enabled = isActivePlayer && canControl, modifier = Modifier.heightIn(min = 38.dp).then(tutorialAnchor("next-step"))) {
+                    TextButton(onClick = onNextStep, enabled = isActivePlayer && canControl, modifier = Modifier.heightIn(min = 48.dp).then(tutorialAnchor("next-step"))) {
                         Text(if (!canControl) "OTHER PLAYER · READ ONLY" else if (isActivePlayer) "NEXT STEP  ›" else "WAITING FOR TURN", color = if (isActivePlayer && canControl) Mint else Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -5235,7 +5254,7 @@ private fun PlayerBoard(
                 Box(Modifier.then(tutorialAnchor("more-actions"))) {
                     ActionPill("MORE  ⋮") { if (onOpenMore()) moreOpen = true }
                     DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
-                        DropdownMenuItem(text = { Text("Add token") }, modifier = tutorialAnchor("token-action"), onClick = { moreOpen = false; onToken() })
+                        DropdownMenuItem(text = { Text("Add token…") }, modifier = tutorialAnchor("token-action"), onClick = { moreOpen = false; onToken() })
                         DropdownMenuItem(text = { Text("Reveal top card") }, onClick = { moreOpen = false; onReveal() })
                         DropdownMenuItem(text = { Text("Shuffle library…") }, onClick = { moreOpen = false; shuffleConfirm = true })
                         DropdownMenuItem(text = { Text("Open game log") }, onClick = { moreOpen = false; onOpenLog() })
@@ -5296,8 +5315,8 @@ private fun BattlefieldCard(card: GameCard, tileWidth: androidx.compose.ui.unit.
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(text = { Text(if (card.tapped) "Untap" else "Tap") }, onClick = { menuOpen = false; onAction("TAP") })
-                DropdownMenuItem(text = { Text("Add counter") }, onClick = { menuOpen = false; onAction("COUNTER") })
-                DropdownMenuItem(text = { Text("Create token") }, onClick = { menuOpen = false; onAction("TOKEN") })
+                DropdownMenuItem(text = { Text("Add counter…") }, onClick = { menuOpen = false; onAction("COUNTER") })
+                DropdownMenuItem(text = { Text("Add token…") }, onClick = { menuOpen = false; onAction("TOKEN") })
                 DropdownMenuItem(text = { Text("Move to graveyard") }, onClick = { menuOpen = false; onAction("GRAVEYARD") })
                 DropdownMenuItem(text = { Text("Exile") }, onClick = { menuOpen = false; onAction("EXILE") })
                 if (!card.isFaceDown && activatedAbilities.isNotEmpty()) {
@@ -5453,7 +5472,13 @@ private fun HandCardActionsDialog(card: GameCard, hasCommander: Boolean, isComma
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         pair.forEach { action ->
                             TextButton(onClick = { onAction(action) }, modifier = Modifier.weight(1f).heightIn(min = 46.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
-                                Text(action, color = if (action == "DISCARD" || action == "EXILE") Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold, fontSize = 9.sp, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                // Button text says where the card goes; the action key stays the same.
+                                val label = when (action) {
+                                    "REVEAL" -> "REVEAL · TO REVEALED"
+                                    "COMMAND ZONE" -> "TO COMMAND ZONE"
+                                    else -> action
+                                }
+                                Text(label, color = if (action == "DISCARD" || action == "EXILE") Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold, fontSize = 9.sp, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                             }
                         }
                         if (pair.size == 1) Spacer(Modifier.weight(1f))
@@ -5531,7 +5556,7 @@ private fun DeckEditorDialog(
                     TextButton(enabled = query.trim().length >= 2 && !searching, onClick = {
                         searching = true
                         scope.launch { results = Scryfall.searchCards(query.trim()); searching = false }
-                    }) { Text(if (searching) "SEARCHING" else "SEARCH ALL", color = Mint, fontSize = 9.sp) }
+                    }) { Text(if (searching) "SEARCHING…" else "SEARCH ALL", color = Mint, fontSize = 9.sp) }
                 })
                 LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(top = 7.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     if (results.isNotEmpty()) {
@@ -5549,7 +5574,7 @@ private fun DeckEditorDialog(
                                     replacementTarget = null
                                     results = emptyList()
                                     query = ""
-                                }, modifier = Modifier.heightIn(min = 40.dp)) { Text(if (replacementTarget == null) "+ ADD" else "REPLACE", color = Mint, fontWeight = FontWeight.Bold) }
+                                }, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (replacementTarget == null) "+ ADD" else "REPLACE", color = Mint, fontWeight = FontWeight.Bold) }
                             }
                         }
                     }
@@ -5569,7 +5594,7 @@ private fun DeckEditorDialog(
                                 }
                                 if (card.importIssue != null) {
                                     TextButton(onClick = { autoFix(card, listOf(card)) }, enabled = autoFixingCardId == null) {
-                                        Text(if (autoFixingCardId == card.id) "…" else "AUTO-FIX", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text(if (autoFixingCardId == card.id) "FIXING…" else "AUTO FIX", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                     }
                                     TextButton(onClick = { replacementTarget = card; query = card.name; results = emptyList() }) {
                                         Text("FIND", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold)
@@ -5604,12 +5629,12 @@ private fun DeckEditorDialog(
                                     TextButton(
                                         onClick = { autoFix(sample, copies) },
                                         enabled = autoFixingCardId == null,
-                                        modifier = Modifier.heightIn(min = 36.dp)
-                                    ) { Text(if (autoFixingCardId == sample.id) "TRYING…" else "AUTO-FIX", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+                                        modifier = Modifier.heightIn(min = 48.dp)
+                                    ) { Text(if (autoFixingCardId == sample.id) "FIXING…" else "AUTO FIX", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
                                 }
                             }
                             Box {
-                                TextButton(onClick = { menuCard = sample }, modifier = Modifier.heightIn(min = 40.dp)) { Text("⋮", color = Mint, fontSize = 18.sp) }
+                                IconButton(onClick = { menuCard = sample }, modifier = Modifier.size(48.dp)) { Icon(Icons.Filled.MoreVert, "${sample.name} options", tint = Mint) }
                                 DropdownMenu(expanded = menuCard?.id == sample.id, onDismissRequest = { menuCard = null }) {
                                     if (sample.importIssue != null) DropdownMenuItem(text = { Text("Search for correct card") }, onClick = { replacementTarget = sample; query = sample.name; results = emptyList(); menuCard = null })
                                     DropdownMenuItem(text = { Text("Remove one copy") }, onClick = { onRemove(sample); menuCard = null })
@@ -5623,7 +5648,7 @@ private fun DeckEditorDialog(
             }
         }
     }
-    renameCard?.let { card -> AlertDialog(onDismissRequest = { renameCard = null }, title = { Text("Rename card") }, text = { OutlinedTextField(renameValue, { renameValue = it }, singleLine = true, label = { Text("Card name") }) }, confirmButton = { TextButton(onClick = { if (renameValue.isNotBlank()) onRename(card, renameValue.trim()); renameCard = null }) { Text("SAVE") } }, dismissButton = { TextButton(onClick = { renameCard = null }) { Text("CANCEL") } }) }
+    renameCard?.let { card -> AlertDialog(onDismissRequest = { renameCard = null }, title = { Text("Rename card") }, text = { OutlinedTextField(renameValue, { renameValue = it }, singleLine = true, label = { Text("Card name") }) }, confirmButton = { TextButton(onClick = { if (renameValue.isNotBlank()) onRename(card, renameValue.trim()); renameCard = null }) { Text("SAVE") } }, dismissButton = { TextButton(onClick = { renameCard = null }) { Text("CANCEL") } }, containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted) }
 }
 
 private fun cardNameSimilarity(first: String, second: String): Double {
@@ -5672,9 +5697,9 @@ private fun PlayerTrackerDialog(player: TablePlayer, players: List<TablePlayer>,
                         val amount = player.commanderDamageReceived[source.id] ?: 0
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text("${source.name}${source.commanderName?.let { " · $it" }.orEmpty()}", color = SoftWhite, fontSize = 9.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            TextButton(onClick = { onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived.toMutableMap().apply { if (amount <= 1) remove(source.id) else put(source.id, amount - 1) })) }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text("−", color = SoftWhite) }
-                            Text("$amount", color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold)
-                            TextButton(onClick = { onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived + (source.id to amount + 1))) }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text("+", color = Mint) }
+                            TextButton(onClick = { onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived.toMutableMap().apply { if (amount <= 1) remove(source.id) else put(source.id, amount - 1) })) }, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Text("−", color = SoftWhite) }
+                            Text("$amount", color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp))
+                            TextButton(onClick = { onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived + (source.id to amount + 1))) }, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Text("+", color = Mint) }
                         }
                     }
                     item { Text("COUNTERS AND STATUS", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
@@ -5685,9 +5710,9 @@ private fun PlayerTrackerDialog(player: TablePlayer, players: List<TablePlayer>,
                         val toggle = name in listOf("Monarch", "Initiative", "City's Blessing", "Day/Night", "The Ring tempts you")
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(name, color = SoftWhite, fontSize = 10.sp, modifier = Modifier.weight(1f))
-                            TextButton(onClick = { val next = if (toggle) 0 else (old - 1).coerceAtLeast(0); onUpdate(player.copy(playerCounters = player.playerCounters.toMutableMap().apply { if (next == 0) remove(name) else put(name, next) })) }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text(if (toggle) "OFF" else "−", color = Muted) }
-                            Text(if (toggle) if (old > 0) "ON" else "OFF" else "$old", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            TextButton(onClick = { val next = if (toggle) if (old > 0) 0 else 1 else old + 1; onUpdate(player.copy(playerCounters = player.playerCounters.toMutableMap().apply { if (next == 0) remove(name) else put(name, next) })) }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text(if (toggle) "SET" else "+", color = Mint) }
+                            if (!toggle) TextButton(onClick = { val next = if (toggle) 0 else (old - 1).coerceAtLeast(0); onUpdate(player.copy(playerCounters = player.playerCounters.toMutableMap().apply { if (next == 0) remove(name) else put(name, next) })) }, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Text("−", color = SoftWhite) }
+                            Text(if (toggle) if (old > 0) "ON" else "OFF" else "$old", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp))
+                            TextButton(onClick = { val next = if (toggle) if (old > 0) 0 else 1 else old + 1; onUpdate(player.copy(playerCounters = player.playerCounters.toMutableMap().apply { if (next == 0) remove(name) else put(name, next) })) }, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Text(if (!toggle) "+" else if (old > 0) "TURN OFF" else "TURN ON", color = Mint) }
                         }
                     }
                     item {
@@ -5781,7 +5806,7 @@ private fun StackPriorityDialog(players: List<TablePlayer>, stack: List<StackAct
                 TextButton(
                     onClick = { if (tutorialStep?.target == "stack-add") onTutorialNext() else { manualAbilityOpen = !manualAbilityOpen } },
                     enabled = canAct || tutorialStep?.target == "stack-add",
-                    modifier = Modifier.align(Alignment.End).heightIn(min = 34.dp).then(tutorialAnchor("stack-add"))
+                    modifier = Modifier.align(Alignment.End).heightIn(min = 48.dp).then(tutorialAnchor("stack-add"))
                 ) {
                     Text(if (manualAbilityOpen) "HIDE MANUAL ENTRY" else "ADD MANUAL ABILITY", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 }
@@ -5857,7 +5882,7 @@ private fun CombatDialog(players: List<TablePlayer>, attackerIndex: Int, onDismi
                     Text("COMBAT · ${players.getOrNull(attackerIndex)?.name ?: "PLAYER"}", color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close combat", tint = Muted) }
                 }
-                Text("Select attackers, assign blockers, and enter damage. The app records declarations; resolve combat rules manually.", color = Muted, fontSize = 10.sp)
+                Text("Select attackers, choose who each attacks, assign blockers, and enter damage. Apply Combat logs the attack and deals unblocked damage to the defending player; resolve blocked combat yourself.", color = Muted, fontSize = 10.sp)
                 if (attackers.isEmpty()) Text("No untapped creatures are available to attack.", color = Muted, modifier = Modifier.padding(vertical = 10.dp))
                 LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(attackers.size, key = { attackers[it].id }) { index ->
@@ -5883,7 +5908,7 @@ private fun CombatDialog(players: List<TablePlayer>, attackerIndex: Int, onDismi
                                 val defaultDefender = players.indices.firstOrNull { it != attackerIndex && !players[it].isEliminated } ?: attackerIndex
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                     Box {
-                                        TextButton(onClick = { blockMenu = true }, modifier = Modifier.heightIn(min = 40.dp)) { Text("TARGET: ${players.getOrNull(defenders[card.id] ?: defaultDefender)?.name ?: "PLAYER"} ▾", color = Mint, fontSize = 9.sp) }
+                                        TextButton(onClick = { blockMenu = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("ATTACKING: ${players.getOrNull(defenders[card.id] ?: defaultDefender)?.name ?: "PLAYER"} ▾", color = Mint, fontSize = 9.sp) }
                                         DropdownMenu(expanded = blockMenu, onDismissRequest = { blockMenu = false }) {
                                             players.forEachIndexed { targetIndex, target ->
                                             if (targetIndex != attackerIndex && !target.isEliminated) DropdownMenuItem(text = { Text(target.name) }, onClick = {
@@ -5899,7 +5924,7 @@ private fun CombatDialog(players: List<TablePlayer>, attackerIndex: Int, onDismi
                                 }
                                 val defenderIndex = defenders[card.id] ?: defaultDefender
                                 if (players.getOrNull(defenderIndex)?.isComputer == true) Text("AI BLOCK PICK · CHANGE ANYTIME", color = Mint, fontSize = 8.sp, modifier = Modifier.padding(start = 8.dp, top = 3.dp))
-                                else Text("Blockers assigned", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(start = 8.dp, top = 3.dp))
+                                else Text("BLOCKERS", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(start = 8.dp, top = 3.dp))
                                 blockers.filter { it.first == (defenders[card.id] ?: defaultDefender) }.forEach { (owner, blocker) ->
                                     val reservedByOther = assignments.any { (attackerId, blockerIds) -> attackerId != card.id && blocker.id in blockerIds }
                                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 7.dp)) {
@@ -5916,8 +5941,9 @@ private fun CombatDialog(players: List<TablePlayer>, attackerIndex: Int, onDismi
                 }
                 Text("Blockers available: ${blockers.size}  ·  tapped creatures excluded", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(vertical = 6.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("CANCEL") }
-                    TextButton(onClick = {
+                    TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL") }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(modifier = Modifier.heightIn(min = 48.dp), onClick = {
                         if (selected.isNotEmpty()) {
                             val names = attackers.filter { it.id in selected }.joinToString { card ->
                                 val amount = damage[card.id].orEmpty().takeIf { it.isNotBlank() }?.let { " ($it damage)" }.orEmpty()
@@ -5930,7 +5956,7 @@ private fun CombatDialog(players: List<TablePlayer>, attackerIndex: Int, onDismi
                             onLog("declared attackers: $names")
                         }
                         onDismiss()
-                    }) { Text("LOG COMBAT", color = Mint, fontWeight = FontWeight.Bold) }
+                    }) { Text("APPLY COMBAT", color = Mint, fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -5965,7 +5991,7 @@ private fun CardZoneDialog(zone: String, player: String, cards: List<GameCard>, 
             Column(Modifier.padding(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("$player · $zone (${cards.size})", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close", tint = Muted) }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close $zone", tint = Muted) }
                 }
                 if (cards.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No cards here", color = Muted) }
                 else LazyVerticalGrid(columns = GridCells.Adaptive(90.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -6067,7 +6093,7 @@ private fun TokenPickerDialog(onDismiss: () -> Unit, onAdd: (ScryfallCard) -> Un
                 error?.let { Text(it, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(6.dp)) }
                 if (query.trim().length >= 2 && results.none { it.name.equals(query.trim(), ignoreCase = true) }) {
                     TextButton(onClick = { onAdd(ScryfallCard(query.trim(), "Custom token", null)) }, modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)) {
-                        Text("ADD CUSTOM TOKEN: ${query.trim()}", color = Mint, fontWeight = FontWeight.Bold)
+                        Text("ADD CUSTOM “${query.trim()}” TOKEN", color = Mint, fontWeight = FontWeight.Bold)
                     }
                 }
                 LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -6246,7 +6272,7 @@ private fun GameLogDialog(entries: List<String>, tutorialStep: TutorialStop?, tu
             Box(Modifier.fillMaxSize()) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("ACTIVITY LOG · ${entries.size}", color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text("GAME LOG · ${entries.size}", color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp).then(tutorialAnchor("log-close"))) { Icon(Icons.Filled.Close, "Close game log", tint = Muted) }
                 }
                 Text("Actions · mana payments · triggers · effects", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(bottom = 7.dp))

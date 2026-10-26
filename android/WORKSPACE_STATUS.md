@@ -15,6 +15,15 @@ The separate `ArcanaTable-build52-source/` folder is stale and should not be use
 - Section headers use readable names instead of internal ids.
 - The Options footer now describes both local Wi-Fi and Internet rooms; mulligan text no longer says the free mulligan is multiplayer-only.
 
+## Unreleased popup and menu fixes (after Build 72)
+
+- The "Game ended" notice can be dismissed; its Open Lobby button no longer leaves the notice stuck over the lobby.
+- Relabeled buttons to say what they do: Reconnect / Stay Offline, Apply Combat (it deals unblocked damage), Attacking (not Target), Rhystic Study and Smothering Tithe payer choices by player name, tracker Turn On / Turn Off, library and hand move buttons ("To …"), Decide Later on the opening hand, Close when an import review is finished, Game Log, and Home Screen.
+- Tapping outside a Rhystic Study or Smothering Tithe prompt no longer silently decides not to pay.
+- Multi-action prompts (land entry, casting payment, mana choice, import review) stack every button, including Cancel, in one aligned column.
+- Raised small touch targets to at least 44–48dp, added spacing in the hand bar and tracker rows, and themed the reset, remove-player, and rename dialogs to match the app.
+- Seat move buttons appear only in local games and disable at the ends; notification titles and the priority alert text are consistent.
+
 ## Changes in Build 71
 
 - Chat messages support long-press text selection and Android's copy action.
