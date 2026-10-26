@@ -371,7 +371,11 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
         if (chatOpen) unreadChatCount = 0
     }
     LaunchedEffect(gameStartedOnline) {
-        if (gameStartedOnline) { homeOpen = false; showOverview = true; showHand = false; lobbyOpen = false }
+        if (gameStartedOnline) {
+            homeOpen = false; showOverview = true; showHand = false; lobbyOpen = false
+            // A lesson that just started its practice game puts back the view its step needs.
+            if (tutorialChapterId != null) tutorialRouteScreen()
+        }
     }
     LaunchedEffect(gameEndedOnline) {
         if (gameEndedOnline) { gameTimerRunning = false; turnTimerRunning = false; showOverview = true; showHand = false }

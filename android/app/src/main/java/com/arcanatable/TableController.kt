@@ -404,6 +404,8 @@ internal class TableController(
     internal val tutorialChapters: List<ArcanaLesson> by lazy { loadTutorialLessons(context) }
     internal val tutorialLesson: ArcanaLesson? get() = tutorialChapters.firstOrNull { it.id == tutorialChapterId }
     internal val tutorialStep: ArcanaLessonStep? get() = tutorialLesson?.steps?.getOrNull(tutorialStepIndex)
+    /** The game already did the current step's action (the lesson caught up); it only needs NEXT. */
+    var tutorialStepSatisfied by mutableStateOf(false)
 
     fun tutorialAdvance() {
         val run = tutorialRun ?: return
@@ -428,6 +430,7 @@ internal class TableController(
             return
         }
         tutorialStepIndex = run.index
+        tutorialStepSatisfied = run.satisfied
         tutorialRouteScreen()
     }
 
@@ -440,6 +443,7 @@ internal class TableController(
         val wasPractice = tutorialPracticeActive
         tutorialPracticeActive = false
         tutorialGated = false
+        tutorialStepSatisfied = false
         tutorialRun = null
         tutorialEvents.reset()
         stackOpen = false
@@ -486,7 +490,10 @@ internal class TableController(
             "board" -> if (game) {
                 homeOpen = false; optionsOpen = false; layoutLabOpen = false; closeHomeSheets()
                 stackOpen = false; topMenuExpanded = false; topMenuSection = null
-                // A step about the legal-actions sheet keeps the sheet (and hand) the player just opened.
+                // A step about the legal-actions sheet keeps the sheet (and hand) the player just opened,
+                // or opens it for a card in hand when they moved on with NEXT instead of tapping one.
+                if (target == "legal-action-sheet" && argentumActionChoices.isEmpty() && !tutorialGated)
+                    players.getOrNull(localSeat)?.hand?.firstOrNull()?.let { openArgentumActions(it) }
                 if (target != "legal-action-sheet") {
                     argentumActionChoices = emptyList()
                     // The hand drawer opens for steps about cards in hand, and stays shut otherwise.

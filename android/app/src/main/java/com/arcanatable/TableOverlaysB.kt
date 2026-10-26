@@ -1041,7 +1041,7 @@ internal fun TableController.TableOverlaysB() {
                     val priorityName = snap?.let { s -> s.players.getOrNull(s.priorityPlayer)?.let { if (s.priorityPlayer == s.viewingPlayer) "You" else it.name } }
                     Text("PRIORITY · ${priorityName ?: "—"}", color = CounterGold, fontSize = 12.sp, fontWeight = FontWeight.Bold,
                         modifier = Modifier.tutorialTarget("priority-indicator"))
-                    Box(Modifier.fillMaxWidth().tutorialTarget("stack-items")) { StackCardList(stackItems) }
+                    Box(Modifier.fillMaxWidth().heightIn(min = 48.dp).tutorialTarget("stack-items")) { StackCardList(stackItems) }
                     Text("Argentum controls priority and resolves the stack. Arcana displays the server state and offers only server-provided actions.", color = Muted, fontSize = 12.sp)
                     TextButton(onClick = { stackOpen = false; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } }, enabled = argentumSnapshot?.legalActions?.isNotEmpty() == true) {
                         Text("VIEW LEGAL ACTIONS", color = Mint)

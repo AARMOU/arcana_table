@@ -17,12 +17,20 @@ class TutorialRunTest {
     @Test fun castingWithoutTappingForManaFirstDoesNotStrandTheLesson() {
         val r = run("first-turn", "make-mana")
         assertTrue(r.signal("event", "SpellCast"))
+        // The lesson lands on the step the learner just did, marked done, and NEXT moves on.
+        assertEquals("cast-elf", r.step?.id)
+        assertTrue(r.satisfied)
+        r.next()
         assertEquals("spell-stack", r.step?.id)
+        assertFalse(r.satisfied)
     }
 
     @Test fun skippedCombatDoesNotStrandTheLesson() {
         val r = run("first-turn", "combat-skip")
         assertTrue(r.signal("event", "TurnAdvanced"))
+        assertEquals("finish-turn", r.step?.id)
+        assertTrue(r.satisfied)
+        r.next()
         assertEquals("opponent", r.step?.id)
     }
 

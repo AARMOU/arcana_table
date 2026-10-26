@@ -244,7 +244,7 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
             TableOverlaysB()
             // The coach draws on whichever window is on top: here, or the dialog/sheet a step opened.
             val coachModel = tutorialLesson?.takeIf { !tutorialHubOpen && !(tutorialPracticeActive && tutorialLoading) }?.let { lesson ->
-                TutorialCoachModel(lesson, tutorialStepIndex, tutorialGated, onNext = { tutorialAdvance() }, onSkip = { stopTutorial() })
+                TutorialCoachModel(lesson, tutorialStepIndex, tutorialGated && !tutorialStepSatisfied, onNext = { tutorialAdvance() }, onSkip = { stopTutorial() })
             }
             SideEffect { TutorialCoachState.model = coachModel }
             TutorialLayer(base = true)

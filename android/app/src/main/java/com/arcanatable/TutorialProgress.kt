@@ -7,8 +7,8 @@ package com.arcanatable
  * Gated steps in a practice lesson only advance on the matching gesture or Argentum event.
  * A real game can get ahead of the text, though: the learner can cast before tapping a land for
  * mana, or Argentum can skip a combat step nobody can use. So while the lesson WAITS on an
- * event, a later game milestone that makes that wait pointless moves it on to the step after
- * the milestone, instead of leaving the learner stuck with no NEXT button. Explanations the
+ * event, a later game milestone that makes that wait pointless moves it on to the step that
+ * milestone completes, shown as done with a NEXT button, instead of leaving the learner stuck. Explanations the
  * learner is reading are never skipped: milestones that happen meanwhile complete their step
  * when the learner reaches it, and a priority pass never counts for a later pass prompt.
  */
@@ -16,6 +16,9 @@ internal class TutorialRun(val lesson: ArcanaLesson, val practice: Boolean, star
     var index: Int = startIndex.coerceIn(0, (lesson.steps.size - 1).coerceAtLeast(0))
         private set
     var finished: Boolean = false
+        private set
+    /** The current step's action already happened in the game; it stays up until NEXT. */
+    var satisfied: Boolean = false
         private set
     private val milestones = TutorialMilestones()
 
@@ -32,7 +35,9 @@ internal class TutorialRun(val lesson: ArcanaLesson, val practice: Boolean, star
         if (TutorialStepGate.accepts(current, kind, key)) { moveTo(index + 1); return true }
         if (!practice || kind != "event" || current.actionKind != "event" || key !in CATCH_UP_EVENTS) return false
         val ahead = catchUpIndex(key) ?: return false
-        moveTo(ahead + 1)
+        // Land on the step the game just did, shown as done, so its explanation is never jumped over.
+        moveTo(ahead)
+        if (!finished && index == ahead) satisfied = true
         return true
     }
 
@@ -51,6 +56,7 @@ internal class TutorialRun(val lesson: ArcanaLesson, val practice: Boolean, star
     }
 
     private fun moveTo(target: Int) {
+        satisfied = false
         if (target > lesson.steps.lastIndex) { finished = true; return }
         index = target
         // Combat and stack resolution can finish while an explanation is open.

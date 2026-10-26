@@ -136,7 +136,8 @@ class TutorialWalkthroughTest {
                         val any = table.you.let { if (zone == "hand-card") it.hand else it.battlefield }.firstOrNull()?.name
                         table.signal("hold", if (target.endsWith(":any") && any != null) "$zone:$any" else target)
                     }
-                    "event" -> learnerActsFor(table, step, attack)
+                    // The game already did it (the lesson caught up): the coach shows NEXT.
+                    "event" -> if (table.run.satisfied) table.run.next() else learnerActsFor(table, step, attack)
                 }
                 if (!table.run.finished && table.run.step?.id == before && step.actionKind != "next") {
                     // One more natural action (e.g. a second pass) before declaring the step stuck.

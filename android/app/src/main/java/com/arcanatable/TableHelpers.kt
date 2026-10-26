@@ -319,6 +319,9 @@ internal fun ZoneChip(name: String, count: Int, enabled: Boolean = true, onClick
 internal fun QuickActionChip(label: String, enabled: Boolean, onClick: () -> Unit) {
     val target = when {
         label.startsWith("STACK") -> "stack-button"
+        label.startsWith("GRAVEYARD") -> "quick-graveyard"
+        label.startsWith("EXILE") -> "quick-exile"
+        label.startsWith("LIBRARY") -> "quick-library"
         label.startsWith("GAME LOG") -> "quick-log"
         label.startsWith("PASS TO MY TURN") || label.startsWith("STOP AUTO-PASS") -> "quick-pass-to-turn"
         label.startsWith("HAND") -> "hand-handle"

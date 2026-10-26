@@ -140,18 +140,6 @@
           "hint": "Next"
         },
         {
-          "id": "combat-skip",
-          "screen": "board",
-          "target": "bottom-bar-pass-button",
-          "advance": {
-            "kind": "event",
-            "event": "AttackersDeclared"
-          },
-          "title": "No attack this time",
-          "body": "Elvish Mystic arrived this turn, so it can't attack yet. Tap Pass: with no creature able to attack, the game moves straight past combat.",
-          "hint": "Tap Pass"
-        },
-        {
           "id": "pass",
           "screen": "board",
           "target": "bottom-bar-pass-button",
@@ -160,8 +148,20 @@
             "event": "PriorityPassed"
           },
           "title": "Keep the turn moving",
-          "body": "You're in your second main phase. Tap Pass again: when every player passes with nothing on the stack, the game moves on to the next step.",
+          "body": "Tap Pass. When every player passes with nothing on the stack, the game moves on to the next step.",
           "hint": "Tap Pass"
+        },
+        {
+          "id": "combat-skip",
+          "screen": "board",
+          "target": "bottom-bar-pass-button",
+          "advance": {
+            "kind": "event",
+            "event": "AttackersDeclared"
+          },
+          "title": "No attack this time",
+          "body": "Elvish Mystic arrived this turn, so it can't attack yet. With no creature able to attack, the game moves straight past combat; if it ever asks for attackers, confirm with none.",
+          "hint": "Keep passing"
         },
         {
           "id": "finish-turn",
@@ -420,7 +420,7 @@
         {
           "id": "bottom",
           "screen": "mulligan",
-          "target": "mulligan-bottom-choice",
+          "target": null,
           "advance": {
             "kind": "next"
           },
@@ -844,7 +844,7 @@
         {
           "id": "resolved",
           "screen": "board",
-          "target": "argentum-stack",
+          "target": null,
           "advance": {
             "kind": "next"
           },
@@ -1028,13 +1028,13 @@
         {
           "id": "attack",
           "screen": "board",
-          "target": "combat-bottom",
+          "target": "bottom-bar-pass-button",
           "advance": {
             "kind": "event",
             "event": "AttackersDeclared"
           },
           "title": "Declare attackers",
-          "body": "When you pass into combat, the attack board opens. Tap Grizzly Bears to attack with it, then confirm. Attacking taps the creature.",
+          "body": "Tap Pass to go to attackers. On the attack board, tap Grizzly Bears, then confirm. Attacking taps the creature.",
           "hint": "Choose Grizzly Bears, then confirm"
         },
         {
@@ -1266,12 +1266,12 @@
         {
           "id": "library",
           "screen": "board",
-          "target": "quick-library",
+          "target": null,
           "advance": {
             "kind": "next"
           },
           "title": "Library",
-          "body": "Your library is your draw pile. Most cards in it stay hidden and in a meaningful order.",
+          "body": "Your library is your draw pile: the number on your seat shows how many cards are left. Cards in it stay hidden and in order.",
           "hint": "Next"
         },
         {
@@ -2017,7 +2017,7 @@
         {
           "id": "cost",
           "screen": "board",
-          "target": "mana-pips",
+          "target": "hand-card:any",
           "advance": {
             "kind": "next"
           },
@@ -2028,7 +2028,7 @@
         {
           "id": "target",
           "screen": "board",
-          "target": "targeting-selection",
+          "target": null,
           "advance": {
             "kind": "next"
           },
