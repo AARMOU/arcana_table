@@ -824,9 +824,11 @@ internal fun TableController.TableOverlays() {
                 val epoch = ArgentumActions.epochFor(plan.legalAction, argentumSnapshot?.interactionEpoch)
                 if (epoch != null && submitArgentumAction(action, epoch)) {
                     argentumLastError = null
+                    argentumBlockGuard.markSent()
                     recordDiagnostic("Declared ${action.optJSONObject("blockers")?.length() ?: 0} blocker(s)", DiagnosticCategory.ACTION)
-                    // Do not discard 11–24 selections until Argentum accepts the assignment.
-                    // INVALID_ACTION returns to this same board with selections intact.
+                    // The next authoritative snapshot either confirms this declaration
+                    // (hide the board and offer priority) or an INVALID_ACTION releases
+                    // the latch and preserves this plan's selections for correction.
                 } else message = "Could not send the block declaration. Refresh and try again."
             },
             onDismiss = { argentumBlockPlan = null })

@@ -164,7 +164,14 @@ internal fun TableController.argentumName(id: String): String =
 internal fun TableController.openArgentumCombat(): Boolean {
     val actions = argentumSnapshot?.legalActions.orEmpty()
     actions.firstNotNullOfOrNull { ArgentumAttackPlan.from(it) }?.let { argentumAttackPlan = it; recordDiagnostic("Opened attack declaration (${it.options.size} possible attackers)", DiagnosticCategory.ACTION); return true }
-    actions.firstNotNullOfOrNull { ArgentumBlockPlan.from(it, argentumLastStateJson) }?.let { argentumBlockPlan = it; argentumLastError = null; recordDiagnostic("Opened block declaration (${it.blockers.size} possible blockers)", DiagnosticCategory.ACTION); return true }
+    if (!argentumBlockGuard.submitted) {
+        actions.firstNotNullOfOrNull { ArgentumBlockPlan.from(it, argentumLastStateJson) }?.let {
+            argentumBlockPlan = it
+            argentumLastError = null
+            recordDiagnostic("Opened block declaration (${it.blockers.size} possible blockers)", DiagnosticCategory.ACTION)
+            return true
+        }
+    }
     return false
 }
 
@@ -243,6 +250,10 @@ internal fun TableController.openArgentumActions(card: GameCard) {
 internal fun TableController.chooseArgentumLegalAction(info: JSONObject) {
     val action = info.optJSONObject("action") ?: return
     val type = action.optString("type")
+    if (type == "DeclareBlockers" && argentumBlockGuard.submitted) {
+        message = "Blockers already submitted. Pass priority to continue combat."
+        return
+    }
     if (type == "DeclareAttackers" || type == "DeclareBlockers") { if (!openArgentumCombat()) message = "Argentum's combat declaration is no longer available."; return }
     if (!info.optBoolean("isAffordable", true)) {
         message = "Not enough spendable mana yet. Activate Treasure, Goose/Food, or other conditional mana sources first."
@@ -386,6 +397,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             turnTimerRunning = true
             setArgentumGameActive(true)
             argentumGameOverDismissed = false; argentumGameOverText = null; argentumWon = null; argentumMatchUnfinished = false
+            argentumBlockGuard.reset()
             recordDiagnostic("Argentum game started", DiagnosticCategory.ENGINE)
         }
         "stateUpdate" -> {
@@ -424,7 +436,13 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 }
                 // Close the retained block board only when combat has truly moved on.
                 // A rejected INVALID_ACTION during DECLARE_BLOCKERS must not wipe selections.
-                if (argentumBlockPlan != null && !snapshot.stepKey.equals("DECLARE_BLOCKERS", ignoreCase = true)) {
+                argentumBlockGuard.onStep(snapshot.stepKey)
+                if (argentumBlockPlan != null &&
+                    (!snapshot.stepKey.equals("DECLARE_BLOCKERS", ignoreCase = true) ||
+                        argentumBlockGuard.submitted)) {
+                    // The accepted state can remain DECLARE_BLOCKERS while priority passes.
+                    // Never reopen the stale declaration; after INVALID_ACTION, the guard
+                    // releases the latch so the retained assignments can be corrected.
                     argentumBlockPlan = null
                 }
                 val nextDecision = incoming.optJSONObject("pendingDecision")
@@ -574,6 +592,11 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             recordDiagnostic("Note from host: ${incoming.optString("message")}", DiagnosticCategory.ENGINE)
         } else {
             argentumLastError = incoming.optString("message", "Argentum returned an error."); message = argentumLastError; argentumAwaitingUpdate = false; argentumXChecking = null
+            argentumBlockGuard.onError(incoming.optString("code"), argentumLastError.orEmpty())
+            if (argentumBlockGuard.submitted && argentumLastError?.contains("Blockers have already been declared", ignoreCase = true) == true) {
+                argentumBlockPlan = null
+                message = "Blockers already declared. Pass priority to continue combat."
+            }
             recordDiagnostic("Argentum error ${incoming.optString("code")}: ${argentumLastError}", DiagnosticCategory.ERROR)
         }
     }
@@ -774,7 +797,7 @@ internal fun TableController.closeArgentumSession(concede: Boolean) {
     argentumSnapshot = null
     argentumPendingDecision = null
     argentumActionChoices = emptyList(); argentumActionCard = null; argentumComposer = null
-    argentumAttackPlan = null; argentumBlockPlan = null
+    argentumAttackPlan = null; argentumBlockPlan = null; argentumBlockGuard.reset()
     playPopup = null; playFeed = emptyList(); playBanner = null; recapText = null; aiRecaps = emptyList(); argentumStackUse = null; argentumAutoYes = emptyMap()
     argentumLocalPlayersBackup?.let { players = it; argentumLocalPlayersBackup = null }
     argentumDeckForLobby = null
