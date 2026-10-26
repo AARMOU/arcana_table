@@ -396,6 +396,18 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 argentumLastCompletedEngineMs = incoming.optLong("engineMs", -1).takeIf { it >= 0 }
                 if (argentumLocalPlayersBackup == null) argentumLocalPlayersBackup = loadSavedPlayers(context) ?: players.toList()
                 val snapshot = ArgentumTableSnapshot.parse(state, incoming.optJSONArray("legalActions") ?: JSONArray(), incoming.optString("interactionEpoch").takeUnless { it.isBlank() || it == "null" })
+                // One transition-specific diagnostic, not a continuous life-total trace.
+                // These values come from consecutive authoritative masked snapshots.
+                val currentYou = snapshot.players.getOrNull(snapshot.viewingPlayer)
+                val previousYou = currentYou?.let { player ->
+                    argentumSnapshot?.players?.firstOrNull { it.id == player.id }
+                }
+                if (currentYou?.isEliminated == true && previousYou?.isEliminated == false) {
+                    recordDiagnostic(
+                        "Argentum player elimination: life ${previousYou.life} → ${currentYou.life}; commanderDamage=${currentYou.commanderDamageReceived}",
+                        DiagnosticCategory.ENGINE,
+                    )
+                }
                 // Close the retained block board only when combat has truly moved on.
                 // A rejected INVALID_ACTION during DECLARE_BLOCKERS must not wipe selections.
                 if (argentumBlockPlan != null && !snapshot.stepKey.equals("DECLARE_BLOCKERS", ignoreCase = true)) {
