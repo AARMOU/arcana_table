@@ -679,7 +679,7 @@ internal class TableController(
     var followActivePlayer by run { mutableStateOf(optionPrefs.getBoolean("follow_active_player", true)) }
     var quietOpponentTurns by run { mutableStateOf(optionPrefs.getBoolean("quiet_opponent_turns", false)) }
     /** Offline games: how many AI opponents (1 = a duel, 3 = a four-player game). */
-    var offlineAiCount by run { mutableStateOf(optionPrefs.getInt("offline_ai_count", 1).coerceIn(1, 3)) }
+    var offlineAiCount by run { mutableStateOf(ReleaseFeatures.aiCount(optionPrefs.getInt("offline_ai_count", 1))) }
     var argentumPingResult by run { mutableStateOf<String?>(null) }
     var engineTrialResult by run { mutableStateOf<String?>(null) }
     var lastOpponentViewed by run { mutableIntStateOf(-1) }
@@ -1554,6 +1554,10 @@ internal class TableController(
     }
 
     fun importDeck(text: String, saveAsMine: Boolean = true) {
+        if (!ReleaseFeatures.deckImportEnabled && saveAsMine) {
+            importError = "Deck importing is coming soon. Choose a premade deck for this release."
+            return
+        }
         val initial = parseDeckListDetailed(text)
         if (initial.gameBlockers.isNotEmpty()) {
             importError = initial.gameBlockers.joinToString(" ") + " " +
@@ -1748,6 +1752,10 @@ internal class TableController(
 
     fun addAiOpponent() {
         topMenuExpanded = false
+        if (!ReleaseFeatures.multiplayerPreviewEnabled) {
+            message = "Extra AI opponents are coming soon. To play with 2–4 people, use Play with a friend."
+            return
+        }
         if (onlineMode && (!lobbyCreated || lobbyJoinMode || gameStartedOnline)) {
             message = "Only the host can add an AI player before the game starts."
             return
@@ -1802,7 +1810,7 @@ internal class TableController(
         val active = activeDeckId
         val precon = active?.takeIf { it.startsWith("precon:") }?.removePrefix("precon:")?.let { id -> preconDecks.firstOrNull { it.id == id } }
         val premade = active?.takeIf { it.startsWith("builtin:") }?.removePrefix("builtin:")?.let { id -> premadeDecks.firstOrNull { it.id == id } }
-        val saved = active?.let { a -> savedDecks.firstOrNull { it.name == a } }
+        val saved = active?.takeIf { ReleaseFeatures.deckImportEnabled }?.let { a -> savedDecks.firstOrNull { it.name == a } }
         return when {
             precon != null -> parseDeckList(precon.decklist).let { entries -> entries.flatMap { entry -> List(entry.count) { entry.name } } to precon.commander }
             premade != null -> premade.cards to premade.commander
@@ -1813,8 +1821,8 @@ internal class TableController(
                 // present in the compatibility parser's playable entries without a catalog.
                 (if (commander != null && names.none { it.equals(commander, true) }) names + commander else names) to commander
             }
-            else -> seat?.takeIf { it.deckLoaded }?.let { (it.library + it.hand).filterNot { c -> c.isToken || c.name == "Hidden card" }.map { c -> c.name } }.orEmpty() to
-                seat?.takeIf { it.deckLoaded }?.commanderName?.takeIf(String::isNotBlank)
+            else -> seat?.takeIf { it.deckLoaded && ReleaseFeatures.deckImportEnabled }?.let { (it.library + it.hand).filterNot { c -> c.isToken || c.name == "Hidden card" }.map { c -> c.name } }.orEmpty() to
+                seat?.takeIf { it.deckLoaded && ReleaseFeatures.deckImportEnabled }?.commanderName?.takeIf(String::isNotBlank)
         }
     }
 
@@ -1827,7 +1835,7 @@ internal class TableController(
                 try {
                     val library = offlineLibrary()
                     val decks = runCatching { context.assets.open("argentum/commander-decks.json").bufferedReader().use { it.readText() } }.getOrNull()
-                    result = com.arcanatable.engine.OfflineGameSetup.build(library, lobbyPlayerName.ifBlank { "You" }, names, commander, decks, aiDeckId = aiDeckId, aiCount = aiCount)
+                    result = com.arcanatable.engine.OfflineGameSetup.build(library, lobbyPlayerName.ifBlank { "You" }, names, commander, decks, aiDeckId = aiDeckId, aiCount = ReleaseFeatures.aiCount(aiCount))
                 } catch (t: Throwable) { failure = t }
             }, "argentum-offline-setup", 256L shl 20)
             worker.start(); worker.join()
@@ -1931,6 +1939,9 @@ internal class TableController(
         registry: com.wingedsheep.engine.registry.CardRegistry,
         checkpoint: String,
     ) {
+        require(ReleaseFeatures.multiplayerPreviewEnabled || seats.size == 2) {
+            "This release can resume two-player games only. Your saved game was preserved."
+        }
         argentumSocket.localHostFactory = { emit ->
             com.arcanatable.engine.LocalArgentumHost(
                 registry, seats[0], seats[1], emit = emit,
