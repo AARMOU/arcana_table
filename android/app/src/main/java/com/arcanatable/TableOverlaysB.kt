@@ -1053,7 +1053,7 @@ internal fun TableController.TableOverlaysB() {
                 Text("PASS PRIORITY", color = Mint)
             }
         },
-        dismissButton = { TextButton(onClick = { stackOpen = false }) { Text("CLOSE") } }
+        dismissButton = { TextButton(onClick = { stackOpen = false; TutorialActions.tap("stack-close") }) { Text("CLOSE") } }
     ) else if (stackOpen) StackPriorityDialog(
         players = players, stack = stackActions, priorityPlayer = priorityPlayer, passedCount = priorityPassed.size,
         eligibleCount = players.count { !it.isEliminated }, canResolve = stackActions.isNotEmpty() && stackActions.none { !it.targetsConfirmed } && players.filterNot { it.isEliminated }.all { it.id in priorityPassed },
