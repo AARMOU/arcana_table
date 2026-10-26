@@ -342,10 +342,10 @@ internal class ArgentumCloudMultiGuest(
     override var onMessage: (JSONObject) -> Unit = {}
     override var onClosed: () -> Unit = {}
 
-    fun connect(hello: JSONObject, done: (String?) -> Unit) {
+    /** Do not send the deck hello until the caller has activated its message listener. */
+    fun connect(done: (String?) -> Unit) {
         val finished = AtomicBoolean(false)
         link.onReady = {
-            link.sendTo(0, hello)
             if (finished.compareAndSet(false, true)) done(null)
         }
         link.onRelay = { from, packet -> if (from == 0) onMessage(packet) }
