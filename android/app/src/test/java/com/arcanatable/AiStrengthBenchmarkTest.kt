@@ -261,8 +261,9 @@ class AiStrengthBenchmarkTest {
                     .toByteArray(StandardCharsets.UTF_8)
             )
             val result = processor.process(state, action).result
-            if (result.error != null) {
-                rejectedKind = result.error.javaClass.simpleName + " " + action.javaClass.simpleName +
+            val rejection = result.error
+            if (rejection != null) {
+                rejectedKind = rejection.javaClass.simpleName + " " + action.javaClass.simpleName +
                     " turn=" + state.turnNumber + " step=" + state.step +
                     " actor=" + actor.value
                 println("[ai-replay-rejected] $rejectedKind")
