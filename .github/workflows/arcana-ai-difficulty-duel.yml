@@ -85,7 +85,7 @@ jobs:
           { echo '### ${{ matrix.levels }} (pairs from ${{ matrix.start }})'; echo '```'; cat "$f"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
           # Also as an annotation, so the results are readable from the checks API.
           statuses=$(grep -oE 'status=[^ ]+' "$f" | sort | uniq -c | tr -s ' ' | tr '\n' ';')
-          body=$(grep -E '^(RESULT|LATENCY|eligible|OVERLOOKED|pair=)|crash' "$f" | sed -E 's/ actions=[0-9]+ ms=[0-9]+//' | head -30 | sed ':a;N;$!ba;s/\n/%0A/g')
+          body=$(grep -E '^(RESULT|LATENCY|eligible|HESITATED|pair=)|crash' "$f" | sed -E 's/ actions=[0-9]+ ms=[0-9]+//' | head -30 | sed ':a;N;$!ba;s/\n/%0A/g')
           echo "::notice title=Duel ${{ matrix.levels }} from ${{ matrix.start }}::${body}%0Astatuses:${statuses}"
       - uses: actions/upload-artifact@v4
         if: always()

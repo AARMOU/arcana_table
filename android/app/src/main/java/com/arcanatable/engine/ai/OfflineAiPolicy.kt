@@ -6,7 +6,11 @@ import com.wingedsheep.ai.engine.budget.BudgetPolicy
 import com.wingedsheep.ai.engine.budget.BudgetTier
 import com.wingedsheep.ai.engine.budget.DecisionBudget
 import com.wingedsheep.ai.engine.budget.SearchAllowances
+import com.wingedsheep.engine.core.ActivateAbility
+import com.wingedsheep.engine.core.CastSpell
+import com.wingedsheep.engine.core.DeclareAttackers
 import com.wingedsheep.engine.core.GameAction
+import com.wingedsheep.engine.core.PassPriority
 import com.wingedsheep.engine.legalactions.LegalAction
 import com.wingedsheep.engine.registry.CardRegistry
 import com.wingedsheep.engine.state.GameState
@@ -102,13 +106,13 @@ object OfflineAiPolicy : BudgetPolicy {
     fun create(registry: CardRegistry, player: EntityId, difficulty: AiDifficulty): AIPlayer =
         AIPlayer.create(registry, player, profileFor(difficulty))
 
-    /** How many choices were made from a reduced set of options (diagnostics and duel reports). */
-    val overlooked = java.util.concurrent.atomic.AtomicLong()
+    /** How many plays an AI hesitated on (diagnostics and duel reports). */
+    val hesitated = java.util.concurrent.atomic.AtomicLong()
 
     /**
-     * One priority choice for an AI seat at [difficulty]. Levels with an [AiDifficulty.overlookChance]
-     * sometimes choose only from a random part of the [legal] actions (mana abilities aside); the
-     * result is always one of the engine's legal actions.
+     * One priority choice for an AI seat at [difficulty]. Levels with an [AiDifficulty.hesitateChance]
+     * sometimes hold a chosen spell or ability (pass instead, only when passing is one of the [legal]
+     * actions) or declare no attackers instead of a planned attack. Both are always legal.
      */
     fun chooseAction(
         bot: AIPlayer,
@@ -117,13 +121,20 @@ object OfflineAiPolicy : BudgetPolicy {
         random: Random = Random.Default,
         legal: () -> List<LegalAction>,
     ): GameAction {
-        if (difficulty.overlookChance <= 0.0 || random.nextDouble() >= difficulty.overlookChance) return bot.chooseAction(state)
-        // Only options the AI could actually take now: affordable, and not bare mana abilities.
-        val options = legal().filter { it.affordable && !it.isManaAbility }
-        val kept = options.filter { it.actionType == "PassPriority" || random.nextDouble() < difficulty.considerShare }
-        if (kept.isEmpty() || kept.size == options.size) return bot.chooseAction(state)
-        overlooked.incrementAndGet()
-        return bot.chooseFrom(state, kept).action
+        val chosen = bot.chooseAction(state)
+        if (difficulty.hesitateChance <= 0.0 || random.nextDouble() >= difficulty.hesitateChance) return chosen
+        return when (chosen) {
+            is DeclareAttackers -> if (chosen.attackers.isEmpty()) chosen
+                else DeclareAttackers(chosen.playerId, emptyMap()).also { hesitated.incrementAndGet() }
+            is CastSpell, is ActivateAbility -> {
+                val options = legal()
+                val manaOnly = options.any { it.action == chosen && it.isManaAbility }
+                val canPass = options.any { it.actionType == "PassPriority" }
+                val passer = state.priorityPlayerId
+                if (manaOnly || !canPass || passer == null) chosen else PassPriority(passer).also { hesitated.incrementAndGet() }
+            }
+            else -> chosen
+        }
     }
 
     override fun budgetFor(state: GameState, playerId: EntityId, meaningfulActions: List<LegalAction>): DecisionBudget =

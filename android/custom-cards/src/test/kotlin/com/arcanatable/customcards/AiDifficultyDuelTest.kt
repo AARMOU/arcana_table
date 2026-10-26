@@ -101,7 +101,7 @@ class AiDifficultyDuelTest {
                 println(report.lines().last { it.isNotBlank() })
             }
         }
-        report.appendLine("OVERLOOKED choices=${OfflineAiPolicy.overlooked.get()}")
+        report.appendLine("HESITATED plays=${OfflineAiPolicy.hesitated.get()}")
         report.appendLine("RESULT ${a.name}=$aWins ${b.name}=$bWins other=$other")
         lat.forEach { (k, v) -> v.sort(); report.appendLine("LATENCY $k n=${v.size} p50=${v[v.size / 2]} p95=${v[(v.size * 95) / 100]} max=${v.last()}") }
         val dir = File("build/reports/ai-difficulty").apply { mkdirs() }

@@ -27,23 +27,21 @@ enum class AiDifficulty(
     /** This seat's share of the thinking time for one host burst (until a person must act). */
     val burstMillis: Long,
     /**
-     * Chance that, for one priority choice, the AI only considers a random part of its options
-     * (it still picks the best of those). Search depth alone barely changes the plain AI, so this
-     * is what makes Easy beatable while every play stays legal.
+     * Chance that the AI hesitates on a play it chose: holds a spell or ability for later (passes
+     * instead) or skips a planned attack. It never makes an illegal play, only a slower one. Search
+     * depth alone barely changes the plain AI, so this is what makes Easy beatable.
      */
-    val overlookChance: Double = 0.0,
-    /** When overlooking, the share of options it still considers (passing is always one). */
-    val considerShare: Double = 1.0,
+    val hesitateChance: Double = 0.0,
 ) {
-    EASY("Easy", "Misses plays often. Good for learning.", 120, 200, 100, 400, overlookChance = 0.65, considerShare = 0.35),
+    EASY("Easy", "Holds back and misses attacks. Good for learning.", 250, 600, 150, 600, hesitateChance = 0.4),
     NORMAL("Normal", "The standard AI.", 250, 600, 150, 600),
     HARD("Hard", "Argentum's full strategy. Plays tight.", 800, 1_600, 300, 3_000),
-    BRUTAL("Brutal", "Hard, with deep search. Slow and punishing.", 1_800, 4_000, 600, 8_000);
+    BRUTAL("Brutal", "Hard, searching deeper. Slower.", 1_200, 2_400, 450, 5_000);
 
     /** Search work allowed for one decision at this level. */
     fun allowances(combat: Boolean, crowded: Boolean): SearchAllowances = when (this) {
-        EASY -> SearchAllowances.TRIVIAL_ALLOWANCES
-        NORMAL -> if (crowded) SearchAllowances.TRIVIAL_ALLOWANCES else SearchAllowances.forMillis(if (combat) combatMillis else normalMillis).copy(
+        // Easy searches exactly like Normal; it is weaker only through [hesitateChance].
+        EASY, NORMAL -> if (crowded) SearchAllowances.TRIVIAL_ALLOWANCES else SearchAllowances.forMillis(if (combat) combatMillis else normalMillis).copy(
             targetCandidates = 2,
             refineTargetsBySimulation = false,
             blockSimulations = 4,
@@ -56,15 +54,17 @@ enum class AiDifficulty(
             refineTargetsBySimulation = combat,
             blockSimulations = 10,
             attackSearchIterations = if (combat) 3 else 2,
-            rolloutPlayouts = if (combat) 8 else 4,
+            rolloutPlayouts = if (combat) 6 else 4,
         )
-        BRUTAL -> if (crowded) SearchAllowances.forMillis(crowdedMillis).copy(rolloutPlayouts = 2, blockSimulations = 6)
+        // Duels showed 24 rollouts and 6 attack passes reaching 17 s on one decision without
+        // beating Hard, so Brutal stays within about 1.5x Hard's work.
+        BRUTAL -> if (crowded) SearchAllowances.forMillis(crowdedMillis).copy(rolloutPlayouts = 1, blockSimulations = 6)
         else SearchAllowances.forMillis(if (combat) combatMillis else normalMillis).copy(
-            targetCandidates = 12,
+            targetCandidates = 6,
             refineTargetsBySimulation = true,
-            blockSimulations = 20,
-            attackSearchIterations = if (combat) 6 else 3,
-            rolloutPlayouts = if (combat) 24 else 12,
+            blockSimulations = 12,
+            attackSearchIterations = if (combat) 4 else 2,
+            rolloutPlayouts = if (combat) 9 else 6,
         )
     }
 

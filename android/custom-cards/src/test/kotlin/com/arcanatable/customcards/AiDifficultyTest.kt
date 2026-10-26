@@ -32,8 +32,11 @@ class AiDifficultyTest {
 
     @Test
     fun eachLevelSearchesAtLeastAsMuchAsTheOneBelow() {
+        // Easy searches exactly like Normal (it is weaker by hesitating, not by searching less).
+        for (combat in listOf(false, true)) for (crowded in listOf(false, true))
+            assertEquals(AiDifficulty.NORMAL.allowances(combat, crowded), AiDifficulty.EASY.allowances(combat, crowded))
         for (combat in listOf(false, true)) {
-            AiDifficulty.entries.zipWithNext().forEach { (lower, higher) ->
+            listOf(AiDifficulty.NORMAL, AiDifficulty.HARD, AiDifficulty.BRUTAL).zipWithNext().forEach { (lower, higher) ->
                 val a = lower.allowances(combat, crowded = false)
                 val b = higher.allowances(combat, crowded = false)
                 val what = "$lower -> $higher (combat=$combat)"
@@ -61,6 +64,20 @@ class AiDifficultyTest {
             assertSame(OfflineAiPolicy.policyFor(level), profile.budgetPolicy)
         }
         assertFalse(OfflineAiPolicy.profileFor(AiDifficulty.EASY).useCardIntent)
+        assertSame(OfflineAiPolicy.policyFor(AiDifficulty.EASY), OfflineAiPolicy.profileFor(AiDifficulty.EASY).budgetPolicy)
+    }
+
+    @Test
+    fun onlyEasyHesitatesAndBrutalStaysWithinHalfAgainHardsWork() {
+        assertTrue(AiDifficulty.EASY.hesitateChance > 0.0)
+        listOf(AiDifficulty.NORMAL, AiDifficulty.HARD, AiDifficulty.BRUTAL).forEach { assertEquals(0.0, it.hesitateChance, 0.0) }
+        for (combat in listOf(false, true)) {
+            val hard = AiDifficulty.HARD.allowances(combat, crowded = false)
+            val brutal = AiDifficulty.BRUTAL.allowances(combat, crowded = false)
+            assertTrue(brutal.rolloutPlayouts * 2 <= hard.rolloutPlayouts * 3)
+            assertTrue(brutal.attackSearchIterations * 2 <= hard.attackSearchIterations * 3)
+        }
+        assertTrue(AiDifficulty.BRUTAL.combatMillis * 2 <= AiDifficulty.HARD.combatMillis * 3)
     }
 
     @Test
@@ -114,7 +131,7 @@ class AiDifficultyTest {
     }
 
     @Test(timeout = 120000)
-    fun easyOverlookingOptionsStillOnlyMakesLegalPlays() {
+    fun easyHesitatingStillOnlyMakesLegalPlays() {
         repeat(12) { seed ->
             val d = scenario("Shivan Dragon", "Murder", "Grizzly Bears")
             d.putCreatureOnBattlefield(d.player2, "Shivan Dragon")
