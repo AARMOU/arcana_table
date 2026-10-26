@@ -714,7 +714,8 @@ internal fun OptionsPage(
     onTestConnection: () -> Unit, onReconnect: (() -> Unit)?, onViewDiagnostics: () -> Unit, onExportDiagnostics: () -> Unit,
     onWhatsNew: () -> Unit, onTutorials: () -> Unit = {},
     engineTrialResult: String? = null, onEngineSelfTest: (() -> Unit)? = null,
-    onClearAllData: () -> Unit, onDismiss: () -> Unit
+    onClearAllData: () -> Unit, onDismiss: () -> Unit,
+    tutorialStep: ArcanaLessonStep? = null, onTutorialNext: () -> Unit = {}, onTutorialExit: () -> Unit = {}
 ) {
     @Composable
     fun Section(title: String, top: androidx.compose.ui.unit.Dp = 14.dp) =
@@ -734,6 +735,15 @@ internal fun OptionsPage(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("OPTIONS", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 16.sp, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close options", tint = Muted) }
+                }
+                tutorialStep?.let { step ->
+                    TutorialInlineCue(step.title, step.body + "  " + step.hint)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
+                        if (step.actionKind == "next") TextButton(onClick = onTutorialNext) {
+                            Text("NEXT", color = Mint)
+                        }
+                    }
                 }
                 Section("APPEARANCE", top = 8.dp)
                 TextButton(onClick = onToggleTheme, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Theme  ·  ${if (darkMode) "Dark" else "Light"}", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
