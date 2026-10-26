@@ -99,8 +99,8 @@ replace_once(
 )
 insert_after_unique_line(
     "docs/sdk-index.md",
-    "- \`ManaRestriction.ColorlessSpellsOnly\`",
-    '- \`ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly(subtype: String)\` — "Spend this mana only to cast colorless subtype spells or activate abilities of colorless subtype." Both the spell and the ability source must be colorless.\n',
+    "- `ManaRestriction.ColorlessSpellsOnly`",
+    '- `ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly(subtype: String)` — "Spend this mana only to cast colorless subtype spells or activate abilities of colorless subtype." Both the spell and the ability source must be colorless.\n',
 )
 insert_after_unique_line(
     "mtg-sdk/src/test/resources/sdk-surface-baseline.txt",
