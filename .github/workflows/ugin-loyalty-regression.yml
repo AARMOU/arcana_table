@@ -43,7 +43,7 @@ jobs:
           assert p.is_file(), 'Missing Ugin scenario XML'
           root = ET.parse(p).getroot()
           cases = {c.get('name'): c for c in root.iter('testcase')}
-          required = {'plusOneCannotBeActivatedTwiceInOneTurn', 'minusThreeCannotFollowPlusOneInSameTurn', 'colorlessThreeGenericSpellCostsExactlyOneWithUgin', 'uginDoesNotReduceFourGenericSpellToOne', 'uginDoesNotDiscountColoredSpellsGenericComponent', 'uginDiscountCannotPayRequiredColorlessSymbol', 'uginGenericDiscountStopsAtZero', 'uginDiscountNeverAppliesToOpponentsColorlessSpells', 'spiritWithNoExiledCardLeavesWithoutCreatingOrReturningOne', 'spiritExiledByRealSpellReturnsItsLinkedCardExactlyOnce', 'opponentRemovalReturnsLinkedCardToOriginalOwner', 'devoidSpellIsDiscountedButDevoidPermanentCannotBeDestroyedByMinusThree'}
+          required = {'plusOneCannotBeActivatedTwiceInOneTurn', 'minusThreeCannotFollowPlusOneInSameTurn', 'colorlessThreeGenericSpellCostsExactlyOneWithUgin', 'uginDoesNotReduceFourGenericSpellToOne', 'uginDoesNotDiscountColoredSpellsGenericComponent', 'uginDiscountCannotPayRequiredColorlessSymbol', 'uginGenericDiscountStopsAtZero', 'uginDiscountNeverAppliesToOpponentsColorlessSpells', 'spiritWithNoExiledCardLeavesWithoutCreatingOrReturningOne', 'spiritExiledByRealSpellReturnsItsLinkedCardExactlyOnce', 'opponentRemovalReturnsLinkedCardToOriginalOwner', 'stolenSpiritKeepsPrivateLinkAndReturnsCardToOriginalOwner'}
           assert required <= cases.keys(), ('Missing new tests', sorted(required - cases.keys()))
           assert len(cases) >= 19, ('Unexpectedly few Ugin tests', len(cases))
           for name, case in cases.items():
