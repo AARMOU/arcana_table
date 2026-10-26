@@ -117,9 +117,41 @@ jobs:
           cat combined-evidence/latest-development-merge.log
           git diff --name-only --diff-filter=U > combined-evidence/latest-development-conflicts.txt
           if [ "$status" -ne 0 ] || [ -s combined-evidence/latest-development-conflicts.txt ]; then
-            echo "::error title=Integration conflict::Current development cannot merge without manual review"
-            cat combined-evidence/latest-development-conflicts.txt
-            exit 1
+            path=android/app/src/main/java/com/arcanatable/TableDialogs.kt
+            # Only the *known* two-line Eldrazi priority preference collides with
+            # PR #250's Help & Diagnostics improvements. Any other conflict fails closed.
+            if [ "$(cat combined-evidence/latest-development-conflicts.txt)" != "$path" ]; then
+              echo "::error title=Unknown integration conflict::Unexpected conflicting paths"
+              cat combined-evidence/latest-development-conflicts.txt
+              exit 1
+            fi
+            git show "HEAD:$path" > /tmp/eldrazi-table-dialogs.kt
+            git show "$DEV_SHA:$path" > /tmp/development-table-dialogs.kt
+            python3 - <<'PY'
+          from pathlib import Path
+          path = Path('android/app/src/main/java/com/arcanatable/TableDialogs.kt')
+          ours = Path('/tmp/eldrazi-table-dialogs.kt').read_text()
+          dev = Path('/tmp/development-table-dialogs.kt').read_text()
+          # Original 94-slot Eldrazi changes are these exact two additions.
+          param = '    respondToOwnStack: Boolean = false, onRespondToOwnStack: (Boolean) -> Unit = {},'
+          toggle = '                SettingsToggle("Respond to my spells and abilities", "Offline games: keep priority over your own stack when you have a legal response. Turn this on before casting to build Ulalek stacks.", respondToOwnStack, onRespondToOwnStack, Modifier)'
+          param_after = '    quietOpponentTurns: Boolean = false, onQuietOpponentTurns: (Boolean) -> Unit = {},'
+          toggle_before = '                SettingsToggle("Skip AI actions unless needed",'
+          assert ours.count(param) == 1 and ours.count(toggle) == 1, 'Eldrazi priority-stop UI changed'
+          assert dev.count(param) == dev.count(toggle) == 0, 'Duplicate priority UI unexpectedly on development'
+          assert dev.count(param_after) == 1 and dev.count(toggle_before) == 1
+          assert dev.count('Engine running notice') == 1 and dev.count('diagnostics-test-connection') == 1
+          merged = dev.replace(param_after, param + '\n' + param_after, 1)
+          merged = merged.replace(toggle_before, toggle + '\n' + toggle_before, 1)
+          assert merged.count(param) == 1 and merged.count(toggle) == 1
+          assert merged.count('Engine running notice') == 1
+          path.write_text(merged)
+          print('PASS: preserved legacy Eldrazi respond-to-own-stack toggle and new PR #250 Help & Diagnostics')
+          PY
+            git add "$path"
+            test -z "$(git diff --name-only --diff-filter=U)"
+            git diff --cached --check -- "$path"
+            echo "$path: merged Eldrazi priority preference with current Help & Diagnostics" > combined-evidence/latest-development-reconciliation.txt
           fi
           # Historical .patch and rerere preimage files intentionally contain conflict markers/whitespace.
           # Validate staged application/source code, but never rewrite patch/rerere evidence.
