@@ -122,6 +122,85 @@ jobs:
           diff -u /tmp/ugin-runtime-before.sha /tmp/ugin-runtime-after.sha
           git diff --exit-code -- android/app/libs
           echo "Ugin registry/export was modified ONLY in the throwaway runner."
+      - name: Prove exact original Eldrazi deck coverage delta without substitutions
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- investigation/argentum-six-precons/deck-manifest.json android/app/src/main/assets/argentum/all-cards.index.tsv
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          from subprocess import check_output
+
+          manifest_path = "investigation/argentum-six-precons/deck-manifest.json"
+          index_paths = (
+              "android/app/src/main/assets/argentum/all-cards.index.tsv",
+              "android/app/src/main/assets/argentum/custom-cards.index.tsv",
+          )
+          ugin = "Ugin, the Ineffable"
+
+          def committed(path):
+              return check_output(["git", "show", f"HEAD:{path}"])
+
+          def card_names(contents):
+              result = []
+              for line in contents.decode("utf-8").splitlines():
+                  if not line.strip():
+                      continue
+                  fields = line.split("\t")
+                  assert len(fields) == 2, ("Invalid index record", line)
+                  if fields[1] == "card":
+                      result.append(fields[0])
+              return result
+
+          manifest_bytes = committed(manifest_path)
+          manifest = json.loads(manifest_bytes)
+          before_raw = {p: committed(p) for p in index_paths}
+          after_raw = {p: Path(p).read_bytes() for p in index_paths}
+          before = [n for p in index_paths for n in card_names(before_raw[p])]
+          after = [n for p in index_paths for n in card_names(after_raw[p])]
+          assert ugin not in before, "Ugin already integrated in baseline; do not double-count"
+          assert after.count(ugin) == 1, "Ugin must be exported exactly once"
+          assert set(after) - set(before) == {ugin}, "Unexpected added or substituted index cards"
+          assert set(before) <= set(after), "Export dropped an existing indexed card"
+          assert before_raw[index_paths[0]] == after_raw[index_paths[0]], "Upstream card index drift"
+          assert Path(manifest_path).read_bytes() == manifest_bytes, "Original deck manifest drift"
+
+          report = {
+              "baseline_manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+              "baseline_index_sha256": {
+                  p: hashlib.sha256(before_raw[p]).hexdigest() for p in index_paths
+              },
+              "runner_export_index_sha256": {
+                  p: hashlib.sha256(after_raw[p]).hexdigest() for p in index_paths
+              },
+              "candidate_only": ugin,
+              "decks": {},
+          }
+          for name in ("Eldrazi Incursion", "Eldrazi Unbound"):
+              deck = next(d for d in manifest["decks"] if d["name"] == name)
+              cards = [c["name"] for c in deck["cards"] for _ in range(c["quantity"])]
+              assert len(cards) == 100, (name, len(cards))
+              assert cards.count(ugin) == 1, (name, "Ugin identity/quantity changed")
+              missing_before = [n for n in cards if n not in set(before)]
+              missing_after = [n for n in cards if n not in set(after)]
+              assert missing_before.count(ugin) == 1, (name, "Ugin not missing from baseline")
+              assert missing_after == [n for n in missing_before if n != ugin], (
+                  name, "Unexpected original-card coverage change", missing_before, missing_after
+              )
+              report["decks"][name] = {
+                  "original_slots": 100,
+                  "baseline_indexed": 100 - len(missing_before),
+                  "runner_only_indexed": 100 - len(missing_after),
+                  "remaining_missing_original_names": missing_after,
+              }
+          Path("ugin-original-deck-coverage.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(report["decks"], indent=2))
+          print("PASS: exactly one original Ugin slot added to EACH deck; no substitutions")
+          PY
       - name: Preserve CI proof, not distributable assets
         if: always()
         uses: actions/upload-artifact@v4
@@ -132,3 +211,4 @@ jobs:
           path: |
             android/custom-cards/build/test-results/test/TEST-*UginTheIneffable*.xml
             android/app/build/test-results/testDebugUnitTest/TEST-*.xml
+            ugin-original-deck-coverage.json
