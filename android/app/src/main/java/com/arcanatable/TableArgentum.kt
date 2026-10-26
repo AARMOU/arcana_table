@@ -164,7 +164,7 @@ internal fun TableController.argentumName(id: String): String =
 internal fun TableController.openArgentumCombat(): Boolean {
     val actions = argentumSnapshot?.legalActions.orEmpty()
     actions.firstNotNullOfOrNull { ArgentumAttackPlan.from(it) }?.let { argentumAttackPlan = it; recordDiagnostic("Opened attack declaration (${it.options.size} possible attackers)", DiagnosticCategory.ACTION); return true }
-    actions.firstNotNullOfOrNull { ArgentumBlockPlan.from(it, argentumLastStateJson) }?.let { argentumBlockPlan = it; recordDiagnostic("Opened block declaration (${it.blockers.size} possible blockers)", DiagnosticCategory.ACTION); return true }
+    actions.firstNotNullOfOrNull { ArgentumBlockPlan.from(it, argentumLastStateJson) }?.let { argentumBlockPlan = it; argentumLastError = null; recordDiagnostic("Opened block declaration (${it.blockers.size} possible blockers)", DiagnosticCategory.ACTION); return true }
     return false
 }
 
@@ -396,6 +396,11 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 argentumLastCompletedEngineMs = incoming.optLong("engineMs", -1).takeIf { it >= 0 }
                 if (argentumLocalPlayersBackup == null) argentumLocalPlayersBackup = loadSavedPlayers(context) ?: players.toList()
                 val snapshot = ArgentumTableSnapshot.parse(state, incoming.optJSONArray("legalActions") ?: JSONArray(), incoming.optString("interactionEpoch").takeUnless { it.isBlank() || it == "null" })
+                // Close the retained block board only when combat has truly moved on.
+                // A rejected INVALID_ACTION during DECLARE_BLOCKERS must not wipe selections.
+                if (argentumBlockPlan != null && !snapshot.stepKey.equals("DECLARE_BLOCKERS", ignoreCase = true)) {
+                    argentumBlockPlan = null
+                }
                 val nextDecision = incoming.optJSONObject("pendingDecision")
                 argentumLastStateJson = state
                 if (nextDecision?.optString("id") != argentumPendingDecision?.optString("id")) {
