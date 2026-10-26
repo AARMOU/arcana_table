@@ -383,6 +383,162 @@ internal class TableController(
     var homeOpen by run { mutableStateOf(true) }
     var quickUiTipsOpen by mutableStateOf(!optionPrefs.getBoolean("tutorial_offer_seen", false))
     var tutorialHubOpen by mutableStateOf(false)
+    var tutorialChapterId by mutableStateOf<String?>(null)
+    var tutorialStepIndex by mutableStateOf(0)
+    var tutorialPracticeActive by mutableStateOf(false)
+    var tutorialLoading by mutableStateOf(false)
+    var tutorialStartTurn by mutableStateOf(0)
+    var tutorialPassPending by mutableStateOf(false)
+    var tutorialMulliganPending by mutableStateOf(false)
+    var tutorialKeepPending by mutableStateOf(false)
+    val tutorialChapters: List<ArcanaLesson> by lazy { loadTutorialLessons(context) }
+    val tutorialLesson: ArcanaLesson? get() = tutorialChapters.firstOrNull { it.id == tutorialChapterId }
+    val tutorialStep: ArcanaLessonStep? get() = tutorialLesson?.steps?.getOrNull(tutorialStepIndex)
+
+    fun tutorialAdvance() {
+        val lesson = tutorialLesson ?: return
+        if (tutorialStepIndex < lesson.steps.lastIndex) {
+            tutorialStepIndex++
+            val next = tutorialStep
+            val mine = argentumSnapshot?.players?.getOrNull(localSeat)
+            // A quick state burst can resolve the creature before the player reads the
+            // stack explanation. Catch up to already-confirmed results, never fake an event.
+            if (tutorialPracticeActive && next?.event == "SpellResolved" &&
+                mine?.battlefield?.any { it.name == "Elvish Mystic" } == true) tutorialStepIndex++
+        } else {
+            val preferences = context.getSharedPreferences("arcana_tutorials", Context.MODE_PRIVATE)
+            val completed = preferences.getStringSet("practiced_chapters", emptySet()).orEmpty().toMutableSet()
+            if (tutorialPracticeActive) completed.add(lesson.id)
+            preferences.edit().putStringSet("practiced_chapters", completed).apply()
+            stopTutorial()
+        }
+    }
+
+    fun tutorialSignal(kind: String, key: String) {
+        val step = tutorialStep ?: return
+        if (step.actionKind != kind) return
+        if (kind == "event") {
+            if (step.event == key) tutorialAdvance()
+        } else if (step.target == key || step.target == "hand-card:any" && key.startsWith("hand-card:") ||
+            step.target == "battlefield-card:any" && key.startsWith("battlefield-card:")) tutorialAdvance()
+    }
+
+    fun tutorialSnapshot(previous: ArgentumTableSnapshot?, current: ArgentumTableSnapshot) {
+        if (!tutorialPracticeActive) return
+        if (tutorialStartTurn == 0) tutorialStartTurn = current.turnNumber
+        val old = previous?.players?.getOrNull(previous.viewingPlayer)
+        val now = current.players.getOrNull(current.viewingPlayer) ?: return
+        if (old != null) {
+            fun wasInHand(name: String) = old.hand.any { it.name == name }
+            fun isInHand(name: String) = now.hand.any { it.name == name }
+            fun nowInPlay(name: String) = now.battlefield.any { it.name == name }
+            if (wasInHand("Forest") && !isInHand("Forest") && nowInPlay("Forest")) tutorialSignal("event", "LandPlayed")
+            if (now.manaPool.values.sum() > old.manaPool.values.sum()) tutorialSignal("event", "ManaAdded")
+            if (wasInHand("Elvish Mystic") && !isInHand("Elvish Mystic") &&
+                (current.stack.any { it.name == "Elvish Mystic" } || nowInPlay("Elvish Mystic"))) tutorialSignal("event", "SpellCast")
+            if (old.battlefield.none { it.name == "Elvish Mystic" } && nowInPlay("Elvish Mystic")) tutorialSignal("event", "SpellResolved")
+            if (previous.stepKey == "DECLARE_ATTACKERS" && current.stepKey != previous.stepKey) tutorialSignal("event", "AttackersDeclared")
+            val oldOpp = previous.players.getOrNull(1 - previous.viewingPlayer)
+            val newOpp = current.players.getOrNull(1 - current.viewingPlayer)
+            if (oldOpp != null && newOpp != null && newOpp.life < oldOpp.life) tutorialSignal("event", "CombatDamageDealt")
+        }
+        if (tutorialPassPending && previous != null && current.interactionEpoch != previous.interactionEpoch) {
+            tutorialPassPending = false
+            tutorialSignal("event", "PriorityPassed")
+        }
+        if (current.turnNumber > tutorialStartTurn || current.activePlayer != current.viewingPlayer && previous?.activePlayer == previous?.viewingPlayer) {
+            tutorialSignal("event", "TurnAdvanced")
+        }
+        if (tutorialKeepPending) {
+            tutorialKeepPending = false
+            tutorialSignal("event", "HandKept")
+        }
+    }
+
+    fun stopTutorial() {
+        val wasPractice = tutorialPracticeActive
+        tutorialPracticeActive = false
+        tutorialChapterId = null
+        tutorialStepIndex = 0
+        tutorialLoading = false
+        tutorialPassPending = false
+        tutorialMulliganPending = false
+        tutorialKeepPending = false
+        if (wasPractice && argentumEnabled) closeArgentumSession(false)
+        tutorialHubOpen = true
+    }
+
+    fun startTutorialCoach(id: String) {
+        if (tutorialChapters.none { it.id == id }) return
+        tutorialHubOpen = false
+        tutorialChapterId = id
+        tutorialStepIndex = 0
+        tutorialPracticeActive = false
+    }
+
+    fun startTutorialPractice(id: String) {
+        if (argentumEnabled || offlineStarting) {
+            message = "Finish your current game before opening a practice match. Your save will be preserved."
+            return
+        }
+        if (id !in TutorialPracticeScenarios.supported) {
+            message = "This activity is not yet available as a practice game."
+            return
+        }
+        tutorialHubOpen = false
+        tutorialChapterId = id
+        tutorialStepIndex = 0
+        tutorialStartTurn = 0
+        tutorialPracticeActive = true
+        tutorialLoading = true
+        offlineStarting = true
+        argentumLastError = null
+        scope.launch {
+            try {
+                if (id == TutorialPracticeScenarios.MULLIGAN) {
+                    val (seats, registry) = withContext(Dispatchers.IO) { TutorialPracticeScenarios.openingHand(offlineLibrary()) }
+                    argentumSocket.localHostFactory = { emit ->
+                        com.arcanatable.engine.LocalArgentumHost(
+                            registry, seats[0], seats[1], gameSeed = 12025L,
+                            tutorialPassiveOpponent = true, emit = emit
+                        )
+                    }
+                    offlineRestoreRequested = true
+                    argentumOffline = true
+                    argentumLobbySubmitted = true
+                    argentumLocalPlayersBackup = players.toList()
+                    argentumEnabled = true
+                    homeOpen = false
+                    lobbyOpen = false
+                    argentumSocket.connect(seats[0].name)
+                    var tries = 0
+                    while (argentumStatus != ArgentumConnectionStatus.CONNECTED && tries++ < 30) delay(100)
+                    check(argentumStatus == ArgentumConnectionStatus.CONNECTED &&
+                        argentumSocket.createCommanderPracticeLobby(vsAi = true)) { "Tutorial engine connection failed." }
+                } else {
+                    val scenario = withContext(Dispatchers.IO) { TutorialPracticeScenarios.build(id, offlineLibrary()) }
+                    launchOfflineCheckpoint(scenario.seats, scenario.registry, scenario.checkpoint.toString())
+                }
+                recordDiagnostic("Tutorial practice started: $id", DiagnosticCategory.ENGINE)
+            } catch (failed: Throwable) {
+                argentumSocket.close()
+                argentumSocket.localHostFactory = null
+                argentumEnabled = false
+                argentumOffline = false
+                offlineRestoreRequested = false
+                homeOpen = true
+                tutorialChapterId = null
+                tutorialPracticeActive = false
+                tutorialHubOpen = true
+                message = "Tutorial could not start: ${failed.message ?: failed.javaClass.simpleName}"
+                recordDiagnostic("Tutorial preparation failed: ${failed.message}", DiagnosticCategory.ERROR)
+            } finally {
+                offlineStarting = false
+                tutorialLoading = false
+            }
+        }
+    }
+
     var lobbyCreated by run { mutableStateOf(false) }
     var lobbyJoinMode by run { mutableStateOf(false) }
     var lobbyReadyPlayers by run { mutableStateOf(emptySet<Int>()) }
