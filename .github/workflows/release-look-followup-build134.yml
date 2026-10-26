@@ -1,4 +1,4 @@
-name: Build 134 full-feature release-look no-goose APKs
+name: Build 134 tutorial-fixed release-look APKs (prepared; not run)
 # Owner-authorized follow-up after successful integrated Build 134 run 40353390125.
 # Build both full-feature, mascot-free debug and release-layout test-signed APKs.
 # No production signing, branch promotion, Cloudflare deploy, or Play publication.
@@ -375,6 +375,23 @@ jobs:
           PYNOHONK
           git diff --check -- android/app
           grep -F 'assertDoesNotExist()' android/app/src/test/java/com/arcanatable/ui/HomeScreenSizesTest.kt
+      - name: Validate PR 282 tutorial HAND port contract (source-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/tests -p 'test_next_apk_tutorial_hand_fix.py' -v
+      - name: Apply and verify exact PR 282 tutorial step-two fix AFTER integrated UI merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Keep Claude's multiplayer lobby/source entirely untouched.
+          # The actual shipped Android source is assembled on this runner,
+          # so patch AFTER table + AI + multiplayer are all reconciled.
+          python3 tools/next_apk_tutorial_hand_fix.py
+          python3 tools/next_apk_tutorial_hand_fix.py --verify-only
+          git diff --check -- android/app/src/main/java/com/arcanatable/TableMainLayout.kt
+          printf '%s\n' 'PR282 8e4702065dff96ba7ce0a64cd5d420fb54def43d' >> combined-evidence/next-apk-source-pins.txt
+          printf '%s\n' 'first-turn HAND step2 next-build isolated port: source verification PASSED' > combined-evidence/tutorial-hand-step2-acceptance.txt
       - uses: actions/setup-node@v4
         if: ${{ github.event_name == 'push' || inputs.include_online_multiplayer }}
         with:
