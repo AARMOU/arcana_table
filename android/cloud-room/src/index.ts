@@ -13,7 +13,8 @@ interface RoomRecord {
   code: string;
   passwordHash: string;
   state: RoomState;
-  seats: Array<{ name: string; token: string; online: boolean; isComputer?: boolean }>;
+  seats: Array<{ name: string; token: string; online: boolean; isComputer?: boolean; claimed?: boolean }>;
+  relayMode?: boolean;
 }
 
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), {
@@ -29,7 +30,7 @@ function roomCode(raw: string): string | null {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname === "/health") return json({ ok: true, service: "arcana-table-rooms", protocol: 1 });
+    if (url.pathname === "/health") return json({ ok: true, service: "arcana-table-rooms", protocol: 1, relay: 1 });
     const match = url.pathname.match(/^\/room\/([A-Za-z0-9]{6,8})$/);
     if (!match) return json({ error: "Use /health or /room/{roomCode}." }, 404);
     const code = roomCode(match[1]);
@@ -114,7 +115,13 @@ export class GameRoom extends DurableObject<Env> {
     const seat = attachment.seat;
     switch (packet.type) {
       case "ping": this.send(socket, { type: "pong" }); break;
-      case "state": await this.acceptSnapshot(seat, String(packet.payload ?? "")); break;
+      case "state":
+        if (this.room.relayMode) this.send(socket, { type: "rejected", reason: "Snapshots are forbidden in directed Argentum rooms." });
+        else await this.acceptSnapshot(seat, String(packet.payload ?? ""));
+        break;
+      case "relay": this.directRelay(socket, seat, packet); break;
+      case "relayKick": this.kickRelayGuest(socket, seat, packet); break;
+      case "relaySeats": await this.configureRelaySeats(socket, seat, packet); break;
       case "ready": this.setReady(socket, seat, packet); break;
       case "deck-status": this.setDeck(socket, seat, packet); break;
       case "leave": this.leave(socket, seat); break;
@@ -162,15 +169,36 @@ export class GameRoom extends DurableObject<Env> {
       this.send(socket, { type: "rejected", reason: "Room code or password is incorrect." }); return;
     }
     const preferred = Number(packet.preferredSeat ?? -1);
-    let seat = Number.isInteger(preferred) && preferred >= 0 && preferred < MAX_PLAYERS && this.room.seats[preferred]?.online === false && this.room.seats[preferred]?.isComputer !== true
-      ? preferred
-      : this.room.seats.findIndex((candidate, index) => index > 0 && !candidate.online && !candidate.isComputer);
-    if (seat < 0) seat = Math.max(1, this.room.seats.length);
-    if (seat >= MAX_PLAYERS) { this.send(socket, { type: "rejected", reason: "This room already has four players." }); return; }
+    let seat: number;
+    if (this.room.relayMode) {
+      // Once occupied, a private-hand seat can only be reclaimed using its
+      // server-generated per-seat credential. A room code is NOT seat auth.
+      if (packet.preferredSeat !== undefined) {
+        const previous = this.room.seats[preferred];
+        if (!Number.isInteger(preferred) || preferred < 0 || preferred >= MAX_PLAYERS ||
+            !previous || previous.online || previous.isComputer ||
+            !previous.claimed || packet.seatToken !== previous.token) {
+          this.send(socket, { type: "rejected", reason: "Your saved player seat could not be verified." });
+          return;
+        }
+        seat = preferred;
+      } else {
+        seat = this.room.seats.findIndex((candidate, index) =>
+          index > 0 && !candidate.online && !candidate.isComputer && !candidate.claimed);
+      }
+    } else {
+      seat = Number.isInteger(preferred) && preferred >= 0 && preferred < MAX_PLAYERS &&
+          this.room.seats[preferred]?.online === false && this.room.seats[preferred]?.isComputer !== true
+        ? preferred
+        : this.room.seats.findIndex((candidate, index) => index > 0 && !candidate.online && !candidate.isComputer);
+      if (seat < 0) seat = Math.max(1, this.room.seats.length);
+    }
+    if (seat < 0 || seat >= MAX_PLAYERS) { this.send(socket, { type: "rejected", reason: "This room already has four players." }); return; }
     while (this.room.seats.length <= seat) this.room.seats.push({ name: `PLAYER ${this.room.seats.length + 1}`, token: crypto.randomUUID(), online: false });
     const existing = this.room.seats[seat];
     existing.name = name;
     existing.online = true;
+    if (this.room.relayMode) existing.claimed = true;
     const players = this.room.state.players;
     while (players.length <= seat) players.push({ name: `PLAYER ${players.length + 1}`, isOnline: false, deckLoaded: false });
     players[seat] = { ...players[seat], name, isOnline: true };
@@ -183,8 +211,96 @@ export class GameRoom extends DurableObject<Env> {
   private async attach(socket: WebSocket, seat: number): Promise<void> {
     if (!this.room) return;
     socket.serializeAttachment({ seat, authenticated: true });
-    this.send(socket, { type: "welcome", seat });
+    this.send(socket, { type: "welcome", seat, relay: 1, seatToken: this.room.seats[seat]?.token });
     this.send(socket, { type: "state", payload: this.privateState(this.room.state, seat) });
+  }
+
+  /**
+   * The Argentum host is the sole rules authority. Guests can send only to the
+   * host, and only the host can send a hidden, masked engine view to a guest.
+   * This packet is never written to Durable Object storage or room snapshots.
+   */
+  private directRelay(socket: WebSocket, from: number, packet: Record<string, unknown>): void {
+    if (!this.room) return;
+    const to = packet.to;
+    const seq = packet.seq;
+    const data = packet.data;
+    if (!Number.isSafeInteger(to) || !Number.isSafeInteger(seq) ||
+        Number(seq) <= 0 || typeof data !== "string" || data.length > 400_000 ||
+        (from === 0 ? Number(to) < 1 || Number(to) >= MAX_PLAYERS : to !== 0) ||
+        !this.room.seats[Number(to)]?.online || this.room.seats[Number(to)]?.isComputer === true) {
+      this.send(socket, { type: "rejected", reason: "Invalid relay destination or data." });
+      return;
+    }
+    this.sendToSeat(Number(to), { type: "relay", from, seq, data });
+  }
+
+  /** Kick an invalid/unvalidated guest without disturbing other players. */
+  private kickRelayGuest(socket: WebSocket, from: number, packet: Record<string, unknown>): void {
+    const seat = packet.to;
+    if (!this.room || from !== 0 || !Number.isInteger(seat) ||
+        Number(seat) < 1 || Number(seat) >= MAX_PLAYERS) {
+      this.send(socket, { type: "rejected", reason: "Only the host may reject a guest." });
+      return;
+    }
+    for (const peer of this.ctx.getWebSockets()) {
+      const attachment = peer.deserializeAttachment() as { seat?: number; authenticated?: boolean } | null;
+      if (attachment?.authenticated && attachment.seat === seat) {
+        this.send(peer, { type: "relay-kicked", reason: "Your deck was rejected by the host." });
+        try { peer.close(4000, "deck rejected"); } catch { /* disconnect handler cleans up */ }
+      }
+    }
+    // Rotate the secret before admitting another player to this seat.
+    // An invalid guest must never be able to reclaim it via preferredSeat.
+    const victim = this.room.seats[Number(seat)];
+    if (victim) {
+      victim.online = false;
+      victim.claimed = false;
+      victim.token = crypto.randomUUID();
+      if (this.room.state.players[Number(seat)]) this.room.state.players[Number(seat)].isOnline = false;
+      void this.save().then(() => this.broadcastState());
+    }
+  }
+
+  /**
+   * The host declares AI-only slots before inviting guests. This prevents a
+   * joining phone from occupying an AI seat and later seeing the wrong view.
+   * Once any guest has joined, seat assignments cannot be changed.
+   */
+  private async configureRelaySeats(socket: WebSocket, from: number, packet: Record<string, unknown>): Promise<void> {
+    if (!this.room || from !== 0 || !Array.isArray(packet.kinds) ||
+        packet.kinds.length < 1 || packet.kinds.length > MAX_PLAYERS - 1 ||
+        packet.kinds.some((kind) => kind !== "ai" && kind !== "friend") ||
+        this.room.seats.some((seat, index) => index > 0 && seat.online)) {
+      this.send(socket, { type: "rejected", reason: "Seat configuration cannot be changed." });
+      return;
+    }
+    const kinds = packet.kinds as string[];
+    for (let index = 1; index <= kinds.length; index++) {
+      const isComputer = kinds[index - 1] === "ai";
+      const previous = this.room.seats[index];
+      this.room.seats[index] = {
+        name: isComputer ? `AI ${index + 1}` : `PLAYER ${index + 1}`,
+        token: isComputer ? "" : (previous?.token || crypto.randomUUID()),
+        online: false,
+        isComputer,
+        claimed: false,
+      };
+      while (this.room.state.players.length <= index) this.room.state.players.push({ name: `PLAYER ${index + 1}`, isOnline: false, deckLoaded: false });
+      this.room.state.players[index] = {
+        name: this.room.seats[index].name, isOnline: false, isComputer, deckLoaded: isComputer,
+      };
+    }
+    this.room.relayMode = true;
+    // No legacy outbox may survive mode negotiation or enter a broadcast.
+    for (const player of this.room.state.players) delete player.arcanaRelay;
+    // Host seat must also be claimed so its private token authorizes reconnect.
+    this.room.seats[0].claimed = true;
+    this.room.seats.length = kinds.length + 1;
+    this.room.state.players.length = kinds.length + 1;
+    await this.save();
+    this.send(socket, { type: "relay-seats-ack", kinds });
+    this.broadcastState();
   }
 
   private async setReady(socket: WebSocket, seat: number, packet: Record<string, unknown>): Promise<void> {
@@ -318,6 +434,7 @@ export class GameRoom extends DurableObject<Env> {
     const state = structuredClone(source);
     state.players = state.players.map((player, index) => {
       const copy = { ...player };
+      if (this.room?.relayMode) delete copy.arcanaRelay;
       if (index !== viewer) {
         copy.library = [];
         if (copy.handRevealedToAll !== true) copy.hand = [];

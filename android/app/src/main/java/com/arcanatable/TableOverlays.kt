@@ -249,11 +249,25 @@ internal fun TableController.TableOverlays() {
                 onDismiss = { playSheetOpen = false },
                 onWifiHost = { playSheetOpen = false; run { startWifiHost() } },
                 onWifiMultiHost = { playSheetOpen = false; run {
-                    if (BuildConfig.DEBUG) wifiMultiConfigOpen = true
+                    wifiMultiOnline = false
+                    wifiMultiConfigOpen = true
                 } },
                 onWifiJoin = { playSheetOpen = false; run { wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() } },
                 onOnlineHost = { playSheetOpen = false; run { startWifiHost(online = true) } },
-                onOnlineJoin = { playSheetOpen = false; run { onlineCodeInput = ""; onlineJoinOpen = true } },
+                onOnlineMultiHost = { playSheetOpen = false; run {
+                    wifiMultiOnline = true
+                    wifiMultiConfigOpen = true
+                } },
+                onOnlineMultiJoin = { playSheetOpen = false; run {
+                    wifiMultiOnlineJoin = true
+                    onlineCodeInput = ""
+                    onlineJoinOpen = true
+                } },
+                onOnlineJoin = { playSheetOpen = false; run {
+                    wifiMultiOnlineJoin = false
+                    onlineCodeInput = ""
+                    onlineJoinOpen = true
+                } },
             )
             val pickDeck: (DeckChoice) -> Unit = { choice ->
                     deckPickerOpen = false
