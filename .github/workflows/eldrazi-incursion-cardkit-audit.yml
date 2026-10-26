@@ -16,17 +16,50 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout exact audit code (isolated GPT lane)
+        uses: actions/checkout@v4
+        with:
+          path: audit
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Checkout latest integrated cards and Cardkit (not stale PR base)
+        uses: actions/checkout@v4
+        with:
+          path: source
+          ref: gpt/arcana-integration-next
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Classify all missing original cards using current integrated Cardkit
-        run: python3 investigation/argentum-six-precons/eldrazi-incursion-cardkit-triage.py
-      - name: Verify read-only audit and report presence
+      - name: Run exact-original audit on current integration checkout
+        shell: bash
         run: |
-          git diff --exit-code
-          test -s investigation/argentum-six-precons/eldrazi-cardkit-report.json
-          test -s investigation/argentum-six-precons/eldrazi-cardkit-report.md
+          set -euo pipefail
+          echo "Audit code: $(git -C audit rev-parse HEAD)"
+          echo "Integration source: $(git -C source rev-parse HEAD)"
+          cp audit/investigation/argentum-six-precons/eldrazi-incursion-cardkit-triage.py source/investigation/argentum-six-precons/eldrazi-incursion-cardkit-triage.py
+          python3 source/investigation/argentum-six-precons/eldrazi-incursion-cardkit-triage.py
+      - name: Verify read-only source and report presence
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C source diff --exit-code
+          test -s source/investigation/argentum-six-precons/eldrazi-cardkit-report.json
+          test -s source/investigation/argentum-six-precons/eldrazi-cardkit-report.md
+          python3 - <<'PY'
+          import json
+          import subprocess
+          from pathlib import Path
+          p = Path("source/investigation/argentum-six-precons/eldrazi-cardkit-report.json")
+          report = json.loads(p.read_text())
+          head = subprocess.check_output(["git", "-C", "source", "rev-parse", "HEAD"], text=True).strip()
+          assert report["integrationCommit"] == head, (report["integrationCommit"], head)
+          assert report["incursionIndexedSlots"] + report["incursionMissingSlots"] == 100
+          assert report["unboundIndexedSlots"] + report["unboundMissingSlots"] == 100
+          assert len(report["rows"]) == report["incursionMissingSlots"]
+          assert report["noPaidWorkerAuthorization"] is True
+          print(f"Verified exact integration {head}: Incursion {report['incursionIndexedSlots']}/100, Unbound {report['unboundIndexedSlots']}/100")
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -34,5 +67,5 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
           path: |
-            investigation/argentum-six-precons/eldrazi-cardkit-report.json
-            investigation/argentum-six-precons/eldrazi-cardkit-report.md
+            source/investigation/argentum-six-precons/eldrazi-cardkit-report.json
+            source/investigation/argentum-six-precons/eldrazi-cardkit-report.md
