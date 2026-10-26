@@ -1,0 +1,47 @@
+name: Verify cumulative Build 121+ in-app changelog on next APK source (no build)
+on:
+  push:
+    branches: [gpt/changelog-since-build121-20261026]
+    paths:
+      - '.github/workflows/changelog-build121-source-validation.yml'
+      - '.github/workflows/release-look-followup-build134.yml'
+      - 'tools/next_apk_changelog_since_b121.py'
+      - 'tools/tests/test_next_apk_changelog_since_b121.py'
+      - 'tools/lobby_tutorial_join_smoke.py'
+      - 'docs/release/CHANGELOG-SINCE-BUILD121.md'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  changelog-source-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Validate all changelog entries and preserved historical text
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/tests -p 'test_next_apk_changelog_since_b121.py' -v
+      - name: Rehearse exact source merge (lobby, tutorial and cumulative changelog)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/lobby_tutorial_join_smoke.py
+      - name: Retain fail-closed source evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: build121-changelog-source-evidence
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            combined-evidence/next-apk-source-pins.txt
+            combined-evidence/next-apk-*merge.log
+            combined-evidence/next-apk-lobby-conflicts.txt
+            combined-evidence/tutorial-hand-step2-acceptance.txt
+            combined-evidence/lobby-worker-deployment-gate.txt
+            combined-evidence/build121-changelog-acceptance.txt
