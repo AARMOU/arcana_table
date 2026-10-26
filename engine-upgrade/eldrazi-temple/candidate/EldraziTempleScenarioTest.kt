@@ -167,4 +167,144 @@ class EldraziTempleScenarioTest {
         d.giveMana(p, Color.GREEN)
         assertNotNull("Restricted {C} must not launder generic payment for colored spells", d.castSpell(p, bear).error)
     }
+
+    @Test fun restrictedManaPaysRealColorlessEldraziActivatedAbility() {
+        val probe = com.wingedsheep.sdk.dsl.card("Temple Colorless Eldrazi Ability Probe") {
+            manaCost = "{3}"
+            colorIdentity = ""
+            typeLine = "Creature — Eldrazi"
+            power = 1
+            toughness = 1
+            activatedAbility {
+                cost = com.wingedsheep.sdk.dsl.Costs.Mana("{C}{C}")
+                effect = com.wingedsheep.sdk.dsl.Effects.LoseLife(
+                    1, com.wingedsheep.sdk.scripting.targets.EffectTarget.Controller
+                )
+            }
+        }
+        val d = customScenario(EldraziTemple)
+        val p = d.player1
+        d.registerCard(probe)
+        val eldrazi = d.putPermanentOnBattlefield(p, probe.name)
+        val temple = d.putPermanentOnBattlefield(p, "Eldrazi Temple")
+        val lifeBefore = d.getLifeTotal(p)
+
+        assertNull(d.activate(p, temple, index = 1).error)
+        d.resolveAll()
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+        assertNull("A colorless Eldrazi activated ability may spend both restricted {C}",
+            d.activate(p, eldrazi).error)
+        d.resolveAll()
+        assertEquals("Ability must resolve, not merely appear legal", lifeBefore - 1, d.getLifeTotal(p))
+        assertTrue("Both restricted units must be consumed by the real ability",
+            d.manaPool(p).restrictedMana.isEmpty())
+    }
+
+    @Test fun restrictedManaRejectsColoredEldraziActivatedAbilityWithoutLaundering() {
+        val probe = com.wingedsheep.sdk.dsl.card("Temple Colored Eldrazi Ability Probe") {
+            manaCost = "{G}"
+            colorIdentity = "G"
+            typeLine = "Creature — Eldrazi"
+            power = 1
+            toughness = 1
+            activatedAbility {
+                cost = com.wingedsheep.sdk.dsl.Costs.Mana("{C}{C}")
+                effect = com.wingedsheep.sdk.dsl.Effects.LoseLife(
+                    1, com.wingedsheep.sdk.scripting.targets.EffectTarget.Controller
+                )
+            }
+        }
+        val d = customScenario(EldraziTemple)
+        val p = d.player1
+        d.registerCard(probe)
+        val eldrazi = d.putPermanentOnBattlefield(p, probe.name)
+        val temple = d.putPermanentOnBattlefield(p, "Eldrazi Temple")
+        val lifeBefore = d.getLifeTotal(p)
+
+        assertNull(d.activate(p, temple, index = 1).error)
+        d.resolveAll()
+        assertNotNull("Eldrazi subtype alone cannot make a colored source eligible",
+            d.activate(p, eldrazi).error)
+        assertEquals("Rejected activation cannot spend restricted mana", 2,
+            d.manaPool(p).restrictedMana.size)
+        assertEquals(lifeBefore, d.getLifeTotal(p))
+
+        d.giveColorlessMana(p, 2)
+        assertNull("Unrestricted {C}{C} can activate the same colored Eldrazi",
+            d.activate(p, eldrazi).error)
+        d.resolveAll()
+        assertEquals(lifeBefore - 1, d.getLifeTotal(p))
+        assertEquals("Unrelated restricted mana must remain untouched", 2,
+            d.manaPool(p).restrictedMana.size)
+        assertEquals(0, d.manaPool(p).colorless)
+    }
+
+    @Test fun restrictedManaRejectsNonEldraziColorlessActivatedAbility() {
+        val probe = com.wingedsheep.sdk.dsl.card("Temple Colorless Golem Ability Probe") {
+            manaCost = "{2}"
+            colorIdentity = ""
+            typeLine = "Artifact Creature — Golem"
+            power = 1
+            toughness = 1
+            activatedAbility {
+                cost = com.wingedsheep.sdk.dsl.Costs.Mana("{C}{C}")
+                effect = com.wingedsheep.sdk.dsl.Effects.LoseLife(
+                    1, com.wingedsheep.sdk.scripting.targets.EffectTarget.Controller
+                )
+            }
+        }
+        val d = customScenario(EldraziTemple)
+        val p = d.player1
+        d.registerCard(probe)
+        val golem = d.putPermanentOnBattlefield(p, probe.name)
+        val temple = d.putPermanentOnBattlefield(p, "Eldrazi Temple")
+        val lifeBefore = d.getLifeTotal(p)
+
+        assertNull(d.activate(p, temple, index = 1).error)
+        d.resolveAll()
+        assertNotNull("Colorless alone cannot satisfy Eldrazi-only ability spending",
+            d.activate(p, golem).error)
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+        assertEquals(lifeBefore, d.getLifeTotal(p))
+        d.giveColorlessMana(p, 2)
+        assertNull(d.activate(p, golem).error)
+        d.resolveAll()
+        assertEquals(lifeBefore - 1, d.getLifeTotal(p))
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+        assertEquals(0, d.manaPool(p).colorless)
+    }
+
+    @Test fun restrictedManaPaysDevoidEldraziActivatedAbilityWithPrintedBlueCost() {
+        val probe = com.wingedsheep.sdk.dsl.card("Temple Devoid Eldrazi Ability Probe") {
+            manaCost = "{U}"
+            colorIdentity = "U"
+            typeLine = "Creature — Eldrazi"
+            power = 1
+            toughness = 1
+            keywords(com.wingedsheep.sdk.core.Keyword.DEVOID)
+            activatedAbility {
+                cost = com.wingedsheep.sdk.dsl.Costs.Mana("{C}{C}")
+                effect = com.wingedsheep.sdk.dsl.Effects.LoseLife(
+                    1, com.wingedsheep.sdk.scripting.targets.EffectTarget.Controller
+                )
+            }
+        }
+        val d = customScenario(EldraziTemple)
+        val p = d.player1
+        d.registerCard(probe)
+        assertTrue("Devoid changes spell color, not commander color identity",
+            d.cardRegistry.requireCard(probe.name).colors.isEmpty())
+        val eldrazi = d.putPermanentOnBattlefield(p, probe.name)
+        val temple = d.putPermanentOnBattlefield(p, "Eldrazi Temple")
+        val lifeBefore = d.getLifeTotal(p)
+
+        assertNull(d.activate(p, temple, index = 1).error)
+        d.resolveAll()
+        assertNull("A Devoid Eldrazi's activated ability has a colorless source",
+            d.activate(p, eldrazi).error)
+        d.resolveAll()
+        assertEquals(lifeBefore - 1, d.getLifeTotal(p))
+        assertTrue(d.manaPool(p).restrictedMana.isEmpty())
+    }
+
 }
