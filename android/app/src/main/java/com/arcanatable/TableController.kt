@@ -493,6 +493,15 @@ internal class TableController(
     var quietOpponentTurns by run { mutableStateOf(optionPrefs.getBoolean("quiet_opponent_turns", false)) }
     /** Offline games: how many AI opponents (1 = a duel, 3 = a four-player game). */
     var offlineAiCount by run { mutableStateOf(optionPrefs.getInt("offline_ai_count", 1).coerceIn(1, 3)) }
+    /** Difficulty of each offline AI seat (seat 2, 3, 4), remembered between games. */
+    var offlineAiDifficulties by run {
+        mutableStateOf(List(3) { i -> com.arcanatable.engine.ai.AiDifficulty.fromName(optionPrefs.getString("offline_ai_difficulty_$i", null)) })
+    }
+    fun setOfflineAiDifficulty(seat: Int, level: com.arcanatable.engine.ai.AiDifficulty) {
+        if (seat !in 0..2) return
+        offlineAiDifficulties = offlineAiDifficulties.toMutableList().also { it[seat] = level }
+        optionPrefs.edit().putString("offline_ai_difficulty_$seat", level.name).apply()
+    }
     var argentumPingResult by run { mutableStateOf<String?>(null) }
     var engineTrialResult by run { mutableStateOf<String?>(null) }
     var lastOpponentViewed by run { mutableIntStateOf(-1) }
@@ -1807,8 +1816,14 @@ internal class TableController(
                 val (names, commander) = activeDeckCards()
                 val started = System.currentTimeMillis()
                 val prepared = prepareOfflineSetup(names, commander, offlineAiDeckId, offlineAiCount)
-                val (setup, registry) = prepared
-                recordDiagnostic("Offline game prepared in ${System.currentTimeMillis() - started} ms: ${setup.you.commander ?: "Portal"} vs ${setup.aiDeckName} (${setup.extraAis.size + 2} players)", DiagnosticCategory.ENGINE)
+                val (preparedSetup, registry) = prepared
+                // Each AI seat plays at the difficulty picked for it on the Play screen.
+                val levels = offlineAiDifficulties
+                val setup = preparedSetup.copy(
+                    ai = preparedSetup.ai.copy(difficulty = levels[0]),
+                    extraAis = preparedSetup.extraAis.mapIndexed { i, seat -> seat.copy(difficulty = levels.getOrElse(i + 1) { levels[0] }) },
+                )
+                recordDiagnostic("Offline game prepared in ${System.currentTimeMillis() - started} ms: ${setup.you.commander ?: "Portal"} vs ${setup.aiDeckName} (${setup.extraAis.size + 2} players; AI ${(listOf(setup.ai) + setup.extraAis).joinToString { it.difficulty.label }})", DiagnosticCategory.ENGINE)
                 setup.notes.forEach { recordDiagnostic("Offline: $it", DiagnosticCategory.ENGINE) }
                 argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, setup.you, setup.ai, emit = emit, extraOpponents = setup.extraAis).also { it.quietOpponentTurns = quietOpponentTurns } }
                 argentumOffline = true
