@@ -166,6 +166,64 @@ class UginTheIneffableScenarioTest {
     }
 
 
+
+    @Test fun uginDiscountNeverAppliesToOpponentsColorlessSpells() {
+        val probe = com.wingedsheep.sdk.dsl.card("Opponent Three Generic Cost Probe") {
+            manaCost = "{3}"
+            typeLine = "Artifact"
+        }
+        val d = customScenario(UginTheIneffable)
+        d.registerCard(probe)
+        d.putPermanentOnBattlefield(d.player1, "Ugin, the Ineffable")
+        // An opponent receives priority during their own main phase. Ugin's
+        // static reduction is controller-specific even for colorless spells.
+        d.passPriorityUntil(com.wingedsheep.sdk.core.Step.PRECOMBAT_MAIN, activePlayer = d.player2)
+        val opponentArtifact = d.putCardInHand(d.player2, probe.name)
+        d.giveColorlessMana(d.player2, 1)
+        assertNotNull("Opposing {3} artifact cannot use our Ugin's {2} discount",
+            d.castSpell(d.player2, opponentArtifact).error)
+        assertTrue(opponentArtifact in d.getHand(d.player2))
+        assertNull(d.findPermanent(d.player2, probe.name))
+        d.giveColorlessMana(d.player2, 2)
+        assertNull("Opposing artifact still casts for its full {3}",
+            d.castSpell(d.player2, opponentArtifact).error)
+        d.resolveAll()
+        assertNotNull(d.findPermanent(d.player2, probe.name))
+    }
+
+    @Test fun spiritWithNoExiledCardLeavesWithoutCreatingOrReturningOne() {
+        val d = customScenario(UginTheIneffable)
+        val p = d.player1
+        d.state.getLibrary(p).toList().forEach(d::moveToGraveyard)
+        val ugin = d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        assertNull(d.activate(p, ugin, index = 0).error)
+        d.resolveAll()
+        val spirit = d.permanentsNamed(p, "Spirit").single()
+        val handBefore = d.getHand(p).toList()
+        val graveyardBefore = d.getGraveyardCardNames(p).toList()
+
+        val removal = com.wingedsheep.sdk.dsl.card("Empty Link Spirit Removal Probe") {
+            manaCost = "{0}"
+            typeLine = "Instant"
+            spell {
+                effect = com.wingedsheep.sdk.dsl.Effects.Destroy(
+                    target(com.wingedsheep.sdk.scripting.filters.unified.TargetFilter(
+                        com.wingedsheep.sdk.scripting.GameObjectFilter.Creature
+                    ))
+                )
+            }
+        }
+        d.registerCard(removal)
+        val spell = d.putCardInHand(p, removal.name)
+        assertNull(d.castSpell(p, spell, listOf(spirit)).error)
+        d.resolveAll()
+        assertTrue(d.permanentsNamed(p, "Spirit").isEmpty())
+        assertTrue("No linked exile must remain empty", d.getExile(p).isEmpty())
+        assertEquals("Empty link must not invent a card in hand", handBefore, d.getHand(p))
+        assertTrue("Original library cards must stay in graveyard",
+            d.getGraveyardCardNames(p).containsAll(graveyardBefore))
+    }
+
     private fun GameTestDriver.loyalty(id: com.wingedsheep.sdk.model.EntityId) =
         state.getEntity(id)!!.get<com.wingedsheep.engine.state.components.battlefield.CountersComponent>()
             ?.getCount(com.wingedsheep.sdk.core.CounterType.LOYALTY) ?: 0
