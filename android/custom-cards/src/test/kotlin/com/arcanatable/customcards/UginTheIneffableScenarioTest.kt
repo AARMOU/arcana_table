@@ -248,4 +248,61 @@ class UginTheIneffableScenarioTest {
         assertEquals(1, d.permanentsNamed(d.player2, "Grizzly Bears").size)
     }
 
+    @Test fun colorlessThreeGenericSpellCostsExactlyOneWithUgin() {
+        val probe = com.wingedsheep.sdk.dsl.card("Ugin Three Generic Cost Probe") {
+            manaCost = "{3}"
+            typeLine = "Artifact"
+        }
+        val d = customScenario(UginTheIneffable)
+        val p = d.player1
+        d.registerCard(probe)
+        d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        val artifact = d.putCardInHand(p, probe.name)
+        d.giveColorlessMana(p, 1)
+        assertNull("Ugin must reduce {3} by exactly {2} to {1}",
+            d.castSpell(p, artifact).error)
+        d.resolveAll()
+        assertNotNull("The discounted artifact must resolve", d.findPermanent(p, probe.name))
+    }
+
+    @Test fun uginDoesNotReduceFourGenericSpellToOne() {
+        val probe = com.wingedsheep.sdk.dsl.card("Ugin Four Generic Cost Probe") {
+            manaCost = "{4}"
+            typeLine = "Artifact"
+        }
+        val d = customScenario(UginTheIneffable)
+        val p = d.player1
+        d.registerCard(probe)
+        d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        val artifact = d.putCardInHand(p, probe.name)
+        d.giveColorlessMana(p, 1)
+        assertNotNull("Ugin reduces {4} to {2}, not {1}",
+            d.castSpell(p, artifact).error)
+        assertTrue("Rejected spell must remain in hand", artifact in d.getHand(p))
+        assertNull(d.findPermanent(p, probe.name))
+    }
+
+    @Test fun uginDoesNotDiscountColoredSpellsGenericComponent() {
+        val probe = com.wingedsheep.sdk.dsl.card("Ugin Colored Cost Probe") {
+            manaCost = "{2}{G}"
+            colorIdentity = "G"
+            typeLine = "Creature — Bear"
+            power = 2
+            toughness = 2
+        }
+        val d = customScenario(UginTheIneffable)
+        val p = d.player1
+        d.registerCard(probe)
+        d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        val bear = d.putCardInHand(p, probe.name)
+        d.giveMana(p, com.wingedsheep.sdk.core.Color.GREEN, 1)
+        assertNotNull("Colored {2}{G} still needs two generic mana",
+            d.castSpell(p, bear).error)
+        assertTrue(bear in d.getHand(p))
+        d.giveColorlessMana(p, 2)
+        assertNull("Full {2}{G} payment must cast normally", d.castSpell(p, bear).error)
+        d.resolveAll()
+        assertNotNull(d.findPermanent(p, probe.name))
+    }
+
 }
