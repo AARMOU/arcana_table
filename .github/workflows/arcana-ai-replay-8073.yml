@@ -1,0 +1,64 @@
+name: AI Seed 8073 Replay Consistency
+
+# Isolated CI probe; never updates runtime JARs or release code.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/arcana-ai-replay-8073.yml'
+      - 'android/app/src/test/java/com/arcanatable/AiStrengthBenchmarkTest.kt'
+
+permissions:
+  contents: read
+
+jobs:
+  replay-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      ARCANA_AI_BENCHMARK: '1'
+      ARCANA_AI_REPEAT_REPLAY: '1'
+      ARCANA_AI_GAMES_PER_MODE: '2'
+      ARCANA_AI_GAME_MODE: '2'
+      ARCANA_AI_PAIR_START: '80'
+      ARCANA_AI_MAX_ACTIONS: '6000'
+      ARCANA_AI_MAX_GAME_MS: '45000'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Play the exact 8073 pair twice for each seat arrangement
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.AiStrengthBenchmarkTest'
+      - name: Verify report is from seed 8073 and includes public action hashes
+        if: success()
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          report=Path("android/app/build/reports/ai-strength/comparison.json")
+          assert report.is_file(), "Missing comparison output"
+          games=json.loads(report.read_text())["games"]
+          assert len(games)==2, len(games)
+          assert all(g["pair"]==80 and g["seed"]==8073 and g["mode"]==2 for g in games)
+          assert {tuple(g["candidateSeatsZeroBased"]) for g in games} == {(0,), (1,)}
+          for game in games:
+              h=game["actionSequenceSha256"]
+              assert len(h)==64 and all(c in "0123456789abcdef" for c in h), h
+              print("pair",game["pair"],"seed",game["seed"],"seats",game["candidateSeatsZeroBased"],
+                    "status",game["status"],"actions",game["actions"],"action_hash",h)
+          print("Within-run replay is checked by Kotlin assertions; report contains only hashes, not hidden action identities.")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: arcana-ai-replay-8073-evidence
+          retention-days: 14
+          path: |
+            android/app/build/reports/ai-strength/
+            android/app/build/test-results/testDebugUnitTest/
