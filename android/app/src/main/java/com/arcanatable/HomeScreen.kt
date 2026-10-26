@@ -227,16 +227,13 @@ fun PlaySheet(
     onCreateRoom: () -> Unit,
     onJoinRoom: () -> Unit,
     onDismiss: () -> Unit,
-    onWifiHost: () -> Unit = {},
     onWifiMultiHost: () -> Unit = {},
     onOnlineMultiHost: () -> Unit = {},
     onOnlineMultiJoin: () -> Unit = {},
     onWifiJoin: () -> Unit = {},
-    onOnlineHost: () -> Unit = {},
-    onOnlineJoin: () -> Unit = {},
 ) {
     var online by remember { mutableStateOf(false) }
-    // Play with a friend: 1 Wi-Fi host, 2 Wi-Fi join, 3 online host, 4 online join, 5 debug multi-host.
+    // All visible multiplayer choices route to the full 2–4 seat lobby.
     var friendMode by remember { mutableStateOf<Int?>(null) }
     var showAllDecks by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
@@ -258,27 +255,22 @@ fun PlaySheet(
                     if (!showAllDecks && shown.size < aiDecks.size) DeckChip("${aiDecks.size - shown.size} more decks ▾", false) { showAllDecks = true }
                 }
             }
-            PlayOption("Play with a friend", "Two to four players. The host runs the Commander rules engine; friends join over Wi-Fi or the internet.", selected = friendMode != null, onClick = { online = false; if (friendMode == null) friendMode = 1 }, tag = "play-wifi-option") {
+            PlayOption("Multiplayer", "Host or join 2–4 player Commander over the internet or Wi-Fi.", selected = friendMode != null, onClick = { online = false; if (friendMode == null) friendMode = 6 }, tag = "play-wifi-option") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DeckChip("Host on Wi-Fi", friendMode == 1) { online = false; friendMode = 1 }
-                    DeckChip("Host 2–4 players on Wi-Fi", friendMode == 5) {
-                        online = false; friendMode = 5
-                    }
-                    DeckChip("Host 2–4 players online", friendMode == 6) { online = false; friendMode = 6 }
-                    DeckChip("Join 2–4 players online", friendMode == 7) { online = false; friendMode = 7 }
+                    DeckChip("Host online", friendMode == 6) { online = false; friendMode = 6 }
+                    DeckChip("Join online", friendMode == 7) { online = false; friendMode = 7 }
+                    DeckChip("Host on Wi-Fi", friendMode == 5) { online = false; friendMode = 5 }
                     DeckChip("Join on Wi-Fi", friendMode == 2) { online = false; friendMode = 2 }
-                    DeckChip("Host online", friendMode == 3) { online = false; friendMode = 3 }
-                    DeckChip("Join online", friendMode == 4) { online = false; friendMode = 4 }
                 }
             }
             // Argentum server play parked for now (Build 113); plumbing kept.
             val context = LocalContext.current
             PlayOption("Online with Argentum", "Not yet available", selected = false, onClick = { Toast.makeText(context, "Not yet available", Toast.LENGTH_SHORT).show() }, tag = "play-online-option", disabled = true) {}
             Button(
-                onClick = { when { online -> onOnline(); friendMode == 1 -> onWifiHost(); friendMode == 2 -> onWifiJoin(); friendMode == 3 -> onOnlineHost(); friendMode == 4 -> onOnlineJoin(); friendMode == 5 -> onWifiMultiHost(); friendMode == 6 -> onOnlineMultiHost(); friendMode == 7 -> onOnlineMultiJoin(); else -> onOffline() } },
+                onClick = { when { online -> onOnline(); friendMode == 2 -> onWifiJoin(); friendMode == 5 -> onWifiMultiHost(); friendMode == 6 -> onOnlineMultiHost(); friendMode == 7 -> onOnlineMultiJoin(); else -> onOffline() } },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp).testTag("play-start"),
                 colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
-            ) { Text(when { online -> "PLAY WITH ARGENTUM"; friendMode == 1 -> "HOST A WI-FI GAME"; friendMode == 2 -> "JOIN A WI-FI GAME"; friendMode == 3 -> "HOST AN ONLINE GAME"; friendMode == 4 -> "JOIN AN ONLINE GAME"; friendMode == 5 -> "HOST 2–4 PLAYER WI-FI"; friendMode == 6 -> "HOST 2–4 PLAYER ONLINE"; friendMode == 7 -> "JOIN 2–4 PLAYER ONLINE"; aiCount > 1 -> "PLAY OFFLINE · ${aiCount + 1} PLAYERS"; else -> "PLAY OFFLINE VS AI" }, fontSize = 17.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
+            ) { Text(when { online -> "PLAY WITH ARGENTUM"; friendMode == 2 -> "JOIN WI-FI LOBBY"; friendMode == 5 -> "HOST WI-FI LOBBY"; friendMode == 6 -> "HOST ONLINE LOBBY"; friendMode == 7 -> "JOIN ONLINE LOBBY"; aiCount > 1 -> "PLAY OFFLINE · ${aiCount + 1} PLAYERS"; else -> "PLAY OFFLINE VS AI" }, fontSize = 17.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
         }
     }
 }
