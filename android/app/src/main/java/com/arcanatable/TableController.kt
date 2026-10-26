@@ -437,6 +437,9 @@ internal class TableController(
     var wifiMultiSeatCount by run { mutableStateOf(4) }
     var wifiMultiFriendSlots by run { mutableStateOf(setOf(1, 2, 3)) }
     var wifiMultiLobby: ArgentumWaitingLobby? = null
+    // Non-null while START is binding seats to the engine: friends who drop in that window
+    // are collected here and handed to the AI once the engine knows them.
+    var wifiMultiStartDepartures: MutableSet<com.wingedsheep.sdk.model.EntityId>? = null
     var wifiMultiSetup: com.arcanatable.engine.OfflineSetup? = null
     var wifiMultiRegistry: com.wingedsheep.engine.registry.CardRegistry? = null
     var wifiMultiLobbyState by run { mutableStateOf<JSONObject?>(null) }

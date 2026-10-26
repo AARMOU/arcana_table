@@ -167,7 +167,9 @@ internal fun TableController.startMultiWifiHost() {
                 },
                 onGuestLeft = { id -> scope.launch {
                     if (wifiServer === server) {
-                        if (argentumSocket.runningLocalHost == null) {
+                        val starting = wifiMultiStartDepartures
+                        if (starting != null) starting += id
+                        else if (argentumSocket.runningLocalHost == null) {
                             room.guestLeft(id)
                             wifiMultiLobbyState = room.lobbyMessage()
                             server.broadcastLobby(wifiMultiLobbyState!!)
@@ -249,6 +251,7 @@ internal fun TableController.startMultiWifiGame() {
     val server = wifiServer as? ArgentumLanMultiServer ?: return
     val registry = wifiMultiRegistry ?: return
     val roster = room.start() ?: return
+    wifiMultiStartDepartures = mutableSetOf()
     scope.launch {
         try {
             wifiRole = "host"
@@ -276,17 +279,33 @@ internal fun TableController.startMultiWifiGame() {
             for ((id, seat) in roster.humanGuests) {
                 host.setGuest(id, seat) { packet -> server.sendTo(id, packet) }
             }
+            releaseMultiStartDepartures(host)
             argentumSocket.createCommanderPracticeLobby(vsAi = false)
             wifiMultiLobbyState = null
             recordDiagnostic("Wi-Fi Commander started with ${roster.players.size} seats and ${roster.humanGuests.size + 1} humans",
                 DiagnosticCategory.ENGINE)
         } catch (error: Throwable) {
+            wifiMultiStartDepartures = null
             message = "Could not start the multiplayer engine: ${error.message ?: error.javaClass.simpleName}"
             argentumSocket.close()
             stopWifi()
             argentumEnabled = false
             homeOpen = true
         }
+    }
+}
+
+/**
+ * Friends who dropped while START was binding seats: the engine registered them as people, so
+ * tell it they left (it hands each seat to the AI) instead of leaving seats nobody will play.
+ * Runs on the main thread after every setGuest call is queued, so the engine sees them in order.
+ */
+internal fun TableController.releaseMultiStartDepartures(host: com.arcanatable.engine.LocalArgentumHost) {
+    val departed = wifiMultiStartDepartures.orEmpty().toList()
+    wifiMultiStartDepartures = null
+    for (id in departed) {
+        host.receive(JSONObject().put("type", "guestLeft").put("seatId", id.value),
+            com.arcanatable.engine.LocalArgentumHost.HUMAN_ID)
     }
 }
 
@@ -408,6 +427,7 @@ internal fun TableController.stopWifi() {
     wifiMultiLobbyState = null
     wifiGuestLobbyState = null
     wifiGuestWaiting = false
+    wifiMultiStartDepartures = null
 }
 
 /** Host's "waiting for your friend" card and the guest's "find a host" dialog. */
