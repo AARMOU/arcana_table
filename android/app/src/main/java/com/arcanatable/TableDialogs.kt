@@ -719,10 +719,33 @@ internal fun OptionsPage(
 ) {
     @Composable
     fun Section(title: String, top: androidx.compose.ui.unit.Dp = 14.dp) =
-        Text(title, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = top, bottom = 2.dp))
+        Text(title, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp,
+            modifier = Modifier.tutorialTarget(when (title) {
+                "GAMEPLAY" -> "setting-gameplay"
+                "NOTIFICATIONS" -> "setting-notifications"
+                "HELP & DIAGNOSTICS" -> "setting-help-diagnostics"
+                else -> "settings-section-${title.lowercase()}"
+            }).padding(top = top, bottom = 2.dp))
     @Composable
     fun LinkRow(label: String, detail: String? = null, modifier: Modifier = Modifier, onClick: () -> Unit) =
-        TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).then(modifier)) {
+        TextButton(onClick = {
+            TutorialActions.tap(when (label) {
+                "Learn & tutorials" -> "tutorial-entry"
+                "Diagnostic log" -> "diagnostic-log"
+                "Export diagnostic log" -> "diagnostic-export"
+                "Run engine self-test" -> "engine-self-test"
+                else -> "settings-${label.lowercase()}"
+            })
+            onClick()
+        }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).then(modifier).tutorialTarget(
+            when (label) {
+                "Learn & tutorials" -> "tutorial-entry"
+                "Diagnostic log" -> "diagnostic-log"
+                "Export diagnostic log" -> "diagnostic-export"
+                "Run engine self-test" -> "engine-self-test"
+                else -> "settings-${label.lowercase()}"
+            }
+        )) {
             Column(Modifier.fillMaxWidth()) {
                 Text(label, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 if (detail != null) Text(detail, color = Muted, fontSize = 10.sp)
@@ -748,13 +771,13 @@ internal fun OptionsPage(
                 Section("APPEARANCE", top = 8.dp)
                 TextButton(onClick = onToggleTheme, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Theme  ·  ${if (darkMode) "Dark" else "Light"}", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
                 SettingsToggle("Reduce swipe animation", "Skip the animated jump when switching player tabs.", reducedSwipeMotion, onReducedMotion, Modifier)
-                Text("CARD SIZE", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
+                Text("CARD SIZE", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.tutorialTarget("setting-card-size").padding(top = 6.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(0.82f to "SMALL", 1f to "STANDARD", 1.18f to "LARGE").forEach { (scale, label) ->
                         TextButton(onClick = { onCardSizeScale(scale) }, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) { Text(if (kotlin.math.abs(cardSizeScale - scale) < 0.03f) "✓ $label" else label, color = if (kotlin.math.abs(cardSizeScale - scale) < 0.03f) Mint else SoftWhite, fontSize = 9.sp) }
                     }
                 }
-                TextButton(onClick = onOpenLayoutLab, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
+                TextButton(onClick = onOpenLayoutLab, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).tutorialTarget("setting-adjust-ui").clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
                     Text("ADJUST UI LAYOUT  ›", color = Mint, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
                 }
                 Section("GAMEPLAY")
