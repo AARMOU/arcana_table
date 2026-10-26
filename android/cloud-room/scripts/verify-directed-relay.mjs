@@ -55,7 +55,9 @@ const msg = (type) => (packet) => packet.type === type;
 try {
   const host = await open("host");
   host.send({ type: "create", code, password, name: "Host" });
-  assert.equal((await host.wait(msg("welcome"))).seat, 0);
+  const hostHello = await host.wait(msg("welcome"));
+  assert.equal(hostHello.seat, 0);
+  assert.match(hostHello.seatToken, /^[a-f0-9-]{30,}$/);
   host.send({ type: "relaySeats", kinds: ["friend", "ai", "friend"] });
   await host.wait(msg("relay-seats-ack"));
 
@@ -135,6 +137,16 @@ try {
   assert.equal((await restored.wait(msg("welcome"))).seat, 3);
   host.send({ type: "relay", to: 3, seq: 3, data: "CHARLIE_ONLY_AFTER_RECONNECT" });
   assert.equal((await restored.wait(msg("relay"))).data, "CHARLIE_ONLY_AFTER_RECONNECT");
+
+  // Host, too, must reclaim its seat with the original token after a drop.
+  host.socket.close();
+  await restored.wait((p) => p.type === "state" && p.payload?.players?.[0]?.isOnline === false);
+  const hostBack = await open("host-back");
+  hostBack.send({ type: "join", code, password, name: "Host",
+    preferredSeat: 0, seatToken: hostHello.seatToken });
+  assert.equal((await hostBack.wait(msg("welcome"))).seat, 0);
+  hostBack.send({ type: "relay", to: 3, seq: 4, data: "HOST_RECONNECTED" });
+  assert.equal((await restored.wait(msg("relay"))).data, "HOST_RECONNECTED");
 
   console.log("PASS: relay privacy, AI slot reservation, seat token authentication, reconnect, no shared snapshots.");
 } finally {
