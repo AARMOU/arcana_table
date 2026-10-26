@@ -620,6 +620,48 @@ jobs:
                   android/app/src/main/java/com/arcanatable/TableOverlays.kt \
                   android/app/src/test/java/com/arcanatable/ui/HomeScreenSizesTest.kt
                 test -z "$(git diff --name-only --diff-filter=U)"
+              elif [ "$label" = combat-outcome-and-commander-tracker ] && \
+                 [ "$(git diff --name-only --diff-filter=U | sort)" = "$(printf '%s\n' \
+                    android/app/src/main/java/com/arcanatable/TableArgentum.kt \
+                    android/app/src/main/java/com/arcanatable/TableDialogs.kt)" ]; then
+                python3 - <<'PYCOMBAT'
+          from pathlib import Path
+          import re
+          root=Path('android/app/src/main/java/com/arcanatable')
+          for name in ('TableArgentum.kt','TableDialogs.kt'):
+              p=root/name
+              s=p.read_text()
+              matches=list(re.finditer(r'^<<<<<<< ours\n(.*?)^=======\n(.*?)^>>>>>>> theirs\n',s,re.MULTILINE|re.DOTALL))
+              assert len(matches)==1,('unreviewed combat conflict count',name,len(matches))
+              c=matches[0]; ours,theirs=c.group(1),c.group(2)
+              if name=='TableArgentum.kt':
+                  assert 'gameEndedOnline = snapshot.gameOver' in ours
+                  assert '!tutorialPracticeActive' in ours
+                  assert 'argentumMatchUnfinished' in theirs
+                  # Both are required: keep the tutorial's own test-game scope, while
+                  # preventing another nonterminal snapshot from erasing a human loss.
+                  combined=theirs.replace(
+                      'if (snapshot.gameOver && argentumOffline && wifiRole == null)',
+                      'if (snapshot.gameOver && argentumOffline && !tutorialPracticeActive && wifiRole == null)')
+              else:
+                  assert 'source.id to amount + 1' in ours
+                  assert 'if (!engineAuthoritative)' in theirs
+                  assert 'record.key to amount + 1' in theirs
+                  # Keep Claude's consistent 48dp touch targets while switching to
+                  # authoritative per-commander keys, not per-player keys.
+                  combined=theirs.replace('Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)',
+                                           'Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)')
+                  combined=combined.replace('color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold)',
+                                            'color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp))')
+              assert combined!=ours and combined.strip()
+              s=s[:c.start()]+combined+s[c.end():]
+              assert not re.search(r'^(?:<<<<<<< |=======|>>>>>>> )',s,re.MULTILINE)
+              p.write_text(s)
+              print('PASS: retained reviewed '+name+' combat and B135 UI semantics')
+          PYCOMBAT
+                git add android/app/src/main/java/com/arcanatable/TableArgentum.kt \
+                  android/app/src/main/java/com/arcanatable/TableDialogs.kt
+                test -z "$(git diff --name-only --diff-filter=U)"
               else
                 echo "::error title=Build 136 integration conflict::${label}: no unreviewed hunk dropped"
                 git status --short
