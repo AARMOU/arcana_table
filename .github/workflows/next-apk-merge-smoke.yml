@@ -41,7 +41,7 @@ jobs:
             git fetch --no-tags origin "$sha"
             test "$(git rev-parse FETCH_HEAD)" = "$sha"
             if ! git merge --no-ff --no-edit -m "Temporary source smoke: $name" "$sha" >/tmp/next-apk-merge.log 2>&1; then
-              if [ "$name" = "table" ] || [ "$name" = "ai" ]; then
+              if [ "$name" = "table" ] || [ "$name" = "ai" ] || [ "$name" = "online" ]; then
                 # Source is an exact reviewed branch blob, NOT arbitrary incoming PR code.
                 git fetch --no-tags origin "$GITHUB_SHA"
                 test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
