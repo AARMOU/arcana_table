@@ -307,4 +307,77 @@ class EldraziTempleScenarioTest {
         assertTrue(d.manaPool(p).restrictedMana.isEmpty())
     }
 
+    @Test fun restrictedManaPaysGenericCostOfColorlessEldraziAbility() {
+        // Oracle allows Temple mana to pay any portion of an eligible ability,
+        // including generic {2}; it is not restricted to explicit {C} symbols.
+        val probe = com.wingedsheep.sdk.dsl.card("Temple Generic Colorless Eldrazi Probe") {
+            manaCost = "{3}"
+            colorIdentity = ""
+            typeLine = "Creature — Eldrazi"
+            power = 1
+            toughness = 1
+            activatedAbility {
+                cost = com.wingedsheep.sdk.dsl.Costs.Mana("{2}")
+                effect = com.wingedsheep.sdk.dsl.Effects.LoseLife(
+                    1, com.wingedsheep.sdk.scripting.targets.EffectTarget.Controller
+                )
+            }
+        }
+        val d = customScenario(EldraziTemple)
+        val p = d.player1
+        d.registerCard(probe)
+        val eldrazi = d.putPermanentOnBattlefield(p, probe.name)
+        val temple = d.putPermanentOnBattlefield(p, "Eldrazi Temple")
+        val lifeBefore = d.getLifeTotal(p)
+
+        assertNull(d.activate(p, temple, index = 1).error)
+        d.resolveAll()
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+        assertNull("Temple's restricted mana may pay generic costs of colorless Eldrazi abilities",
+            d.activate(p, eldrazi).error)
+        d.resolveAll()
+        assertEquals(lifeBefore - 1, d.getLifeTotal(p))
+        assertEquals(0, d.manaPool(p).colorless)
+        assertTrue(d.manaPool(p).restrictedMana.isEmpty())
+    }
+
+    @Test fun restrictedManaRejectsGenericCostOfColoredEldraziAbility() {
+        // A colored Eldrazi is still ineligible even when the ability's
+        // payment is generic {2}, rather than an explicit {C}{C} requirement.
+        val probe = com.wingedsheep.sdk.dsl.card("Temple Generic Colored Eldrazi Probe") {
+            manaCost = "{G}"
+            colorIdentity = "G"
+            typeLine = "Creature — Eldrazi"
+            power = 1
+            toughness = 1
+            activatedAbility {
+                cost = com.wingedsheep.sdk.dsl.Costs.Mana("{2}")
+                effect = com.wingedsheep.sdk.dsl.Effects.LoseLife(
+                    1, com.wingedsheep.sdk.scripting.targets.EffectTarget.Controller
+                )
+            }
+        }
+        val d = customScenario(EldraziTemple)
+        val p = d.player1
+        d.registerCard(probe)
+        val eldrazi = d.putPermanentOnBattlefield(p, probe.name)
+        val temple = d.putPermanentOnBattlefield(p, "Eldrazi Temple")
+        val lifeBefore = d.getLifeTotal(p)
+
+        assertNull(d.activate(p, temple, index = 1).error)
+        d.resolveAll()
+        assertNotNull("Generic cost cannot launder restricted mana into a colored Eldrazi ability",
+            d.activate(p, eldrazi).error)
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+        assertEquals(lifeBefore, d.getLifeTotal(p))
+
+        d.giveColorlessMana(p, 2)
+        assertNull("Unrestricted mana must still activate the colored Eldrazi ability",
+            d.activate(p, eldrazi).error)
+        d.resolveAll()
+        assertEquals(lifeBefore - 1, d.getLifeTotal(p))
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+        assertEquals(0, d.manaPool(p).colorless)
+    }
+
 }
