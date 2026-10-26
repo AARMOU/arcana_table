@@ -13,7 +13,7 @@ interface RoomRecord {
   code: string;
   passwordHash: string;
   state: RoomState;
-  seats: Array<{ name: string; token: string; online: boolean; isComputer?: boolean }>;
+  seats: Array<{ name: string; token: string; online: boolean; isComputer?: boolean; claimed?: boolean }>;
   relayMode?: boolean;
 }
 
@@ -169,15 +169,36 @@ export class GameRoom extends DurableObject<Env> {
       this.send(socket, { type: "rejected", reason: "Room code or password is incorrect." }); return;
     }
     const preferred = Number(packet.preferredSeat ?? -1);
-    let seat = Number.isInteger(preferred) && preferred >= 0 && preferred < MAX_PLAYERS && this.room.seats[preferred]?.online === false && this.room.seats[preferred]?.isComputer !== true
-      ? preferred
-      : this.room.seats.findIndex((candidate, index) => index > 0 && !candidate.online && !candidate.isComputer);
-    if (seat < 0) seat = Math.max(1, this.room.seats.length);
-    if (seat >= MAX_PLAYERS) { this.send(socket, { type: "rejected", reason: "This room already has four players." }); return; }
+    let seat: number;
+    if (this.room.relayMode) {
+      // Once occupied, a private-hand seat can only be reclaimed using its
+      // server-generated per-seat credential. A room code is NOT seat auth.
+      if (packet.preferredSeat !== undefined) {
+        const previous = this.room.seats[preferred];
+        if (!Number.isInteger(preferred) || preferred < 0 || preferred >= MAX_PLAYERS ||
+            !previous || previous.online || previous.isComputer ||
+            !previous.claimed || packet.seatToken !== previous.token) {
+          this.send(socket, { type: "rejected", reason: "Your saved player seat could not be verified." });
+          return;
+        }
+        seat = preferred;
+      } else {
+        seat = this.room.seats.findIndex((candidate, index) =>
+          index > 0 && !candidate.online && !candidate.isComputer && !candidate.claimed);
+      }
+    } else {
+      seat = Number.isInteger(preferred) && preferred >= 0 && preferred < MAX_PLAYERS &&
+          this.room.seats[preferred]?.online === false && this.room.seats[preferred]?.isComputer !== true
+        ? preferred
+        : this.room.seats.findIndex((candidate, index) => index > 0 && !candidate.online && !candidate.isComputer);
+      if (seat < 0) seat = Math.max(1, this.room.seats.length);
+    }
+    if (seat < 0 || seat >= MAX_PLAYERS) { this.send(socket, { type: "rejected", reason: "This room already has four players." }); return; }
     while (this.room.seats.length <= seat) this.room.seats.push({ name: `PLAYER ${this.room.seats.length + 1}`, token: crypto.randomUUID(), online: false });
     const existing = this.room.seats[seat];
     existing.name = name;
     existing.online = true;
+    if (this.room.relayMode) existing.claimed = true;
     const players = this.room.state.players;
     while (players.length <= seat) players.push({ name: `PLAYER ${players.length + 1}`, isOnline: false, deckLoaded: false });
     players[seat] = { ...players[seat], name, isOnline: true };
@@ -190,7 +211,7 @@ export class GameRoom extends DurableObject<Env> {
   private async attach(socket: WebSocket, seat: number): Promise<void> {
     if (!this.room) return;
     socket.serializeAttachment({ seat, authenticated: true });
-    this.send(socket, { type: "welcome", seat, relay: 1 });
+    this.send(socket, { type: "welcome", seat, relay: 1, seatToken: this.room.seats[seat]?.token });
     this.send(socket, { type: "state", payload: this.privateState(this.room.state, seat) });
   }
 
@@ -229,6 +250,16 @@ export class GameRoom extends DurableObject<Env> {
         try { peer.close(4000, "deck rejected"); } catch { /* disconnect handler cleans up */ }
       }
     }
+    // Rotate the secret before admitting another player to this seat.
+    // An invalid guest must never be able to reclaim it via preferredSeat.
+    const victim = this.room.seats[Number(seat)];
+    if (victim) {
+      victim.online = false;
+      victim.claimed = false;
+      victim.token = crypto.randomUUID();
+      if (this.room.state.players[Number(seat)]) this.room.state.players[Number(seat)].isOnline = false;
+      void this.save().then(() => this.broadcastState());
+    }
   }
 
   /**
@@ -253,6 +284,7 @@ export class GameRoom extends DurableObject<Env> {
         token: isComputer ? "" : (previous?.token || crypto.randomUUID()),
         online: false,
         isComputer,
+        claimed: false,
       };
       while (this.room.state.players.length <= index) this.room.state.players.push({ name: `PLAYER ${index + 1}`, isOnline: false, deckLoaded: false });
       this.room.state.players[index] = {
