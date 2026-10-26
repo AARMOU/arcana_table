@@ -165,10 +165,21 @@ jobs:
           assert block.count(icon) == 1 and 'test-scenarios-entry' in block
           assert dev.count('.tutorialTarget("home-settings")') == 1
           block = block.replace(icon, 'Modifier.size(48.dp).tutorialTarget("home-settings").clip(CircleShape)', 1)
-          merged = dev[:a] + block + dev[b:]
+          # Keep Git's successfully merged state and picker sheet, not just
+          # development's older whole file. Replace only the reviewed header conflict.
+          import os
+          path = Path('android/app/src/main/java/com/arcanatable/HomeScreen.kt')
+          value = path.read_text()
+          conflict = ('<<<<<<< HEAD\n' + ours[c:d].rstrip('\n') + '\n=======\n'
+                      + dev[a:b].rstrip('\n') + '\n>>>>>>> ' + os.environ['DEV_SHA'])
+          assert value.count('<<<<<<< HEAD') == value.count(conflict) == 1, 'Unknown home conflict'
+          merged = value.replace(conflict, block.rstrip('\n'), 1)
           assert merged.count('test-scenarios-entry') == 1
           assert merged.count('.tutorialTarget("home-settings")') == 1
-          Path('android/app/src/main/java/com/arcanatable/HomeScreen.kt').write_text(merged)
+          assert merged.count('var scenarioPickerOpen by remember') == 1, 'QA picker state lost'
+          assert merged.count('if (scenarioPickerOpen && testScenarios.isNotEmpty())') == 1, 'QA picker sheet lost'
+          assert not any(marker in merged for marker in ('<<<<<<<', '=======', '>>>>>>>'))
+          path.write_text(merged)
           print('PASS: debug QA entry and tutorial settings target both retained')
           PYHOME
             python3 - <<'PYCONTROLLER'
