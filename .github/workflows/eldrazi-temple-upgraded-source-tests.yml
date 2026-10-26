@@ -38,7 +38,7 @@ jobs:
           cp engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt \
             argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
           git -C argentum-engine diff --check
-          test -z "$(git status --porcelain)"
+          git diff --quiet && git diff --cached --quiet  # upstream checkout is intentionally untracked in parent
           echo "Verified upgraded source SHA and isolated source-only modifications"
       - name: Java 21
         uses: actions/setup-java@v4
