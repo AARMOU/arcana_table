@@ -131,7 +131,6 @@ private suspend fun TableController.acceptWifiGuest(
 
 /** Debug-only four-player host path; regular two-player hosting above remains untouched. */
 internal fun TableController.startMultiWifiHost() {
-    if (!BuildConfig.DEBUG) { message = "Four-player Wi-Fi is not enabled in this release."; return }
     if (offlineStarting || argentumEnabled || wifiServer != null) return
     val count = wifiMultiSeatCount.coerceIn(2, 4)
     val friends = (1 until count).filter(wifiMultiFriendSlots::contains)
@@ -288,6 +287,205 @@ internal fun TableController.startMultiWifiGame() {
             homeOpen = true
         }
     }
+}
+
+
+/** Production-capable internet multiplayer with private, directed Worker relay. */
+internal fun TableController.startMultiOnlineHost() {
+    if (offlineStarting || argentumEnabled || wifiServer != null) return
+    val count = wifiMultiSeatCount.coerceIn(2, 4)
+    val friends = (1 until count).filter(wifiMultiFriendSlots::contains)
+    if (friends.isEmpty()) { message = "Choose at least one friend seat."; return }
+    wifiMultiConfigOpen = false
+    offlineStarting = true
+    scope.launch {
+        try {
+            val (names, commander) = activeDeckCards()
+            val (setup, registry) = prepareOfflineSetup(names, commander, null, aiCount = count - 1)
+            if (setup.you.commander == null) {
+                message = "Choose a Commander deck before hosting."
+                return@launch
+            }
+            val you = setup.you.copy(name = friendlyName(setup.you.commander))
+            val room = ArgentumWaitingLobby(you, listOf(setup.ai) + setup.extraAis, count)
+            for (index in 1 until count) room.setKind(index,
+                if (index in friends) ArgentumWaitingLobby.Kind.FRIEND else ArgentumWaitingLobby.Kind.AI)
+            val kinds = (1 until count).map {
+                if (it in friends) "friend" else "ai"
+            }
+            lateinit var host: ArgentumCloudMultiHost
+            host = ArgentumCloudMultiHost(lobbyCloudEndpoint, friendlyName(commander), kinds,
+                onGuest = { id, hello -> scope.launch {
+                    acceptMultiOnlineGuest(host, room, id, hello, registry)
+                } },
+                onGuestMessage = { id, packet ->
+                    argentumSocket.runningLocalHost?.receive(packet, id)
+                },
+                onGuestLeft = { id -> scope.launch {
+                    if (wifiServer === host) {
+                        if (argentumSocket.runningLocalHost == null) {
+                            room.guestLeft(id)
+                            wifiMultiLobbyState = room.lobbyMessage()
+                            host.broadcastLobby(wifiMultiLobbyState!!)
+                        } else argentumSocket.runningLocalHost?.receive(
+                            JSONObject().put("type", "guestLeft").put("seatId", id.value),
+                            com.arcanatable.engine.LocalArgentumHost.HUMAN_ID)
+                    }
+                } },
+                onFailed = { reason -> scope.launch {
+                    if (wifiServer === host) {
+                        stopWifi()
+                        message = "Internet multiplayer room failed: $reason"
+                        recordDiagnostic("Online multiplayer failed: $reason", DiagnosticCategory.ERROR)
+                    }
+                } },
+                onNotice = { note -> scope.launch {
+                    if (wifiServer === host) message = note
+                } },
+            )
+            host.onRoomReady = {
+                scope.launch {
+                    if (wifiServer === host) {
+                        onlineRoomCode = host.code
+                        wifiMultiLobbyState = room.lobbyMessage()
+                        recordDiagnostic("Internet Commander lobby ready", DiagnosticCategory.CONNECTION)
+                    }
+                }
+            }
+            wifiServer = host
+            wifiMultiLobby = room
+            wifiMultiSetup = setup
+            wifiMultiRegistry = registry
+            wifiMultiLobbyState = room.lobbyMessage()
+            host.start()
+        } catch (error: Throwable) {
+            stopWifi()
+            message = "Online Commander failed: ${error.javaClass.simpleName}: ${error.message?.take(200)}"
+        } finally {
+            offlineStarting = false
+        }
+    }
+}
+
+private suspend fun TableController.acceptMultiOnlineGuest(
+    host: ArgentumCloudMultiHost,
+    room: ArgentumWaitingLobby,
+    id: com.wingedsheep.sdk.model.EntityId,
+    hello: JSONObject,
+    registry: com.wingedsheep.engine.registry.CardRegistry,
+) {
+    if (wifiServer !== host || wifiMultiLobby !== room) return
+    val guestName = hello.optString("name").ifBlank { "Friend" }.take(32)
+    val deck = hello.optJSONArray("deck") ?: JSONArray()
+    val cards = (0 until deck.length()).map(deck::optString)
+    val commander = hello.optString("commander").takeUnless { it.isBlank() || it == "null" }
+    val (seat, notes) = withContext(Dispatchers.IO) {
+        com.arcanatable.engine.OfflineGameSetup.lanSeat(
+            offlineLibrary(), registry, guestName, cards, commander)
+    }
+    if (wifiServer !== host || wifiMultiLobby !== room) return
+    if (seat == null || !room.seatGuestAt(id, seat)) {
+        host.sendTo(id, JSONObject().put("type", "error").put("code", "WIFI")
+            .put("message", notes.firstOrNull() ?: "That seat or deck is not available."))
+        host.rejectGuest(id)
+        return
+    }
+    host.sendTo(id, JSONObject().put("type", "lanSeat")
+        .put("seat", id.value).put("name", seat.name))
+    notes.forEach { host.sendTo(id, JSONObject().put("type", "error")
+        .put("code", "WIFI_NOTE").put("message", it)) }
+    wifiMultiLobbyState = room.lobbyMessage()
+    host.broadcastLobby(wifiMultiLobbyState!!)
+    recordDiagnostic("Remote human admitted to ${id.value}", DiagnosticCategory.CONNECTION)
+}
+
+internal fun TableController.startMultiOnlineGame() {
+    val room = wifiMultiLobby ?: return
+    val server = wifiServer as? ArgentumCloudMultiHost ?: return
+    val registry = wifiMultiRegistry ?: return
+    val roster = room.start() ?: return
+    scope.launch {
+        try {
+            wifiRole = "online-host"
+            onlineRoomCode = null
+            argentumSocket.localHostFactory = { emit ->
+                com.arcanatable.engine.LocalArgentumHost(
+                    registry, roster.players[0], roster.opponent, emit = emit,
+                    extraOpponents = roster.extraOpponents,
+                ).also { it.quietOpponentTurns = quietOpponentTurns }
+            }
+            argentumOffline = true
+            argentumDeckForLobby = null
+            argentumCommanderForLobby = null
+            argentumVsAiLobby = false
+            argentumLobbySubmitted = true
+            argentumLocalPlayersBackup = players.toList()
+            argentumEnabled = true
+            homeOpen = false
+            lobbyOpen = false
+            argentumSocket.connect(lobbyPlayerName)
+            var tries = 0
+            while (argentumSocket.runningLocalHost == null && tries++ < 20) delay(100)
+            val engine = argentumSocket.runningLocalHost
+                ?: error("Authoritative Argentum engine could not start.")
+            for ((id, seat) in roster.humanGuests) {
+                engine.setGuest(id, seat) { packet -> server.sendTo(id, packet) }
+            }
+            argentumSocket.createCommanderPracticeLobby(vsAi = false)
+            wifiMultiLobbyState = null
+            recordDiagnostic("Internet Commander started with ${roster.players.size} seats",
+                DiagnosticCategory.ENGINE)
+        } catch (e: Throwable) {
+            argentumSocket.close()
+            stopWifi()
+            argentumEnabled = false
+            homeOpen = true
+            message = "Could not start online Commander: ${e.message ?: e.javaClass.simpleName}"
+        }
+    }
+}
+
+/** Guests on any network join by code; the relay assigns and protects their seat. */
+internal fun TableController.joinMultiOnlineGame(code: String) {
+    val clean = ArgentumCloudLink.cleanCode(code)
+    if (wifiConnecting || argentumEnabled || clean.length !in 6..8) return
+    wifiConnecting = true
+    val (names, commander) = activeDeckCards()
+    if (commander == null) {
+        wifiConnecting = false
+        message = "Pick a Commander deck before joining online multiplayer."
+        return
+    }
+    val hello = JSONObject().put("type", "lanHello")
+        .put("name", friendlyName(commander)).put("deck", JSONArray(names))
+        .put("commander", commander)
+    val guest = ArgentumCloudMultiGuest(lobbyCloudEndpoint, clean, friendlyName(commander))
+    argentumSocket.attachLanGuest(guest)
+    guest.connect(hello) { failure -> scope.launch {
+        wifiConnecting = false
+        if (failure != null) {
+            guest.close()
+            argentumSocket.close()
+            message = "Couldn't join the multiplayer room: $failure"
+            return@launch
+        }
+        onlineJoinOpen = false
+        wifiRole = "online-guest"
+        wifiGuestWaiting = true
+        wifiGuestLobbyState = null
+        argentumOffline = true
+        argentumDeckForLobby = null
+        argentumCommanderForLobby = null
+        argentumVsAiLobby = false
+        argentumLobbySubmitted = true
+        argentumLocalPlayersBackup = players.toList()
+        argentumEnabled = true
+        homeOpen = false
+        lobbyOpen = false
+        argentumSocket.connect(lobbyPlayerName)
+        message = "Joined online Commander; waiting for host and other players."
+        recordDiagnostic("Joined directed-relay multiplayer room", DiagnosticCategory.CONNECTION)
+    } }
 }
 
 /** Guest: look for a host on this network. */
