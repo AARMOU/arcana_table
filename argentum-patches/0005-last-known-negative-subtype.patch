@@ -9,7 +9,7 @@ Subject: [PATCH] arcana: 0005-last-known-negative-subtype
  1 file changed, 9 insertions(+)
 
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
-index 233b481fa7..765300651d 100644
+index 823d936d56..5a0cb32c61 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
 @@ -1513,6 +1513,15 @@ class TriggerMatcher(

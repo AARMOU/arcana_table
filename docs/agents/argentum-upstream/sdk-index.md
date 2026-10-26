@@ -1474,6 +1474,7 @@ Families:
 - `Player.Each` — All players
 - `Player.EachDefendingPlayer` — All defending players in the current combat, in APNAP order, including those with no attackers assigned and before attackers are declared.
 - `Player.EachOpponent` — All opponents
+- `Player.EachOtherPlayer` — Every player other than you, in turn order — "each other player" (Grave Pact).
 - `Player.EachStartingWithYou` — All players in turn order **starting with you** (the ability's controller), then each other player in turn order from the one after you — "Starting with you, each player …" (Eureka).
 - `Player.EachTargetedPlayer` — **Every** player among the spell or ability's chosen targets — "those players" after "choose any number of target players" (Officious Interrogation).
 - `Player.EnchantedPlayer` — The player enchanted by the source Aura — read from the source's com.wingedsheep.engine.state.components.battlefield.AttachedToComponent target id when it is a player.
@@ -1540,7 +1541,7 @@ Families:
 - `CreateAdditionalToken(additionalTokenType: String, additionalTokenCount: Int, inheritTapped: Boolean, appliesTo: EventPattern, restrictions: List<Condition>, scale: AdditionalTokenScale)` — When a player would create one or more tokens matching appliesTo, also create additionalTokenCount predefined token(s) of a *different* type (additionalTokenType).
 - `DamageCantBePrevented(appliesTo: EventPattern)` — Damage can't be prevented.
 - `DoubleDamage(restrictions: List<Condition>, appliesTo: EventPattern, multiplier: Int)` — Double damage dealt.
-- `EntersAsCopy(optional: Boolean, copyFilter: GameObjectFilter, copyFromZone: Zone, filterByTotalManaSpent: Boolean, additionalSubtypes: List<String>, additionalColors: Set<Color>, additionalKeywords: List<Keyword>, nameOverride: String?, powerOverride: Int?, toughnessOverride: Int?, exileCopiedCard: Boolean, tappedIfCopied: Boolean, entersWithCounters: CopyEntryCounters?, exceptions: CopyExceptions, duration: Duration, appliesTo: EventPattern)` — Enter the battlefield as a copy of a card or permanent.
+- `EntersAsCopy(optional: Boolean, copyFilter: GameObjectFilter, copyFromZone: Zone, filterByTotalManaSpent: Boolean, additionalSubtypes: List<String>, additionalColors: Set<Color>, additionalKeywords: List<Keyword>, nameOverride: String?, powerOverride: Int?, toughnessOverride: Int?, exileCopiedCard: Boolean, tappedIfCopied: Boolean, entersWithCounters: CopyEntryCounters?, exceptions: CopyExceptions, duration: Duration, copyOf: EffectTarget?, appliesTo: EventPattern)` — Enter the battlefield as a copy of a card or permanent.
 - `EntersTapped(unlessCondition: Condition?, payLifeCost: Int?, appliesTo: EventPattern)`
 - `EntersUntapped(appliesTo: EventPattern)` — "Permanents matching appliesTo enter the battlefield untapped" — the inverse of EntersTapped.
 - `EntersWithChoice(choiceType: ChoiceType, chooser: Player, allowedCreatureTypes: List<String>?, modeOptions: List<ModeOption>, minValue: Int, maxValue: Int, cardNamePool: CardNamePool, lookAtOpponentHand: Boolean, excludedColors: Set<Color>, permanentFilter: GameObjectFilter?, mayChooseNothing: Boolean, appliesTo: EventPattern)` — As this permanent enters, make a choice.
