@@ -408,6 +408,20 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                         DiagnosticCategory.ENGINE,
                     )
                 }
+                // Combat-stage evidence is critical for distinguishing ordinary damage from
+                // first-strike or commander-damage elimination while life remains above zero.
+                // Emit only when this viewer's authoritative values change, not for each snapshot.
+                if (currentYou != null && previousYou != null &&
+                    snapshot.stepKey in setOf("FIRST_STRIKE_COMBAT_DAMAGE", "COMBAT_DAMAGE") &&
+                    (currentYou.life != previousYou.life ||
+                        currentYou.commanderDamageReceived != previousYou.commanderDamageReceived)) {
+                    recordDiagnostic(
+                        "Argentum combat ${snapshot.stepKey}: life ${previousYou.life} → ${currentYou.life}; " +
+                            "commanderDamage ${previousYou.commanderDamageReceived} → ${currentYou.commanderDamageReceived}; " +
+                            "eliminated=${currentYou.isEliminated}",
+                        DiagnosticCategory.ENGINE,
+                    )
+                }
                 // Close the retained block board only when combat has truly moved on.
                 // A rejected INVALID_ACTION during DECLARE_BLOCKERS must not wipe selections.
                 if (argentumBlockPlan != null && !snapshot.stepKey.equals("DECLARE_BLOCKERS", ignoreCase = true)) {
