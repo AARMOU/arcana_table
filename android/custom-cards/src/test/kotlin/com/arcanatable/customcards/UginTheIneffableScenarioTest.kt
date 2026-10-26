@@ -306,6 +306,49 @@ class UginTheIneffableScenarioTest {
             opponentHandBefore, d.getHand(opponent).size)
     }
 
+    @Test fun spiritBouncedByRealSpellReturnsLinkedCardToHand() {
+        val d = customScenario(UginTheIneffable, "Sol Ring")
+        val owner = d.player1
+        val ugin = d.putPermanentOnBattlefield(owner, "Ugin, the Ineffable")
+        assertNull(d.activate(owner, ugin, index = 0).error)
+        d.resolveAll()
+        val spirit = d.permanentsNamed(owner, "Spirit").single()
+        val linkedCard = d.getExile(owner).single()
+        val handBefore = d.getHand(owner).size
+
+        // Returning a token to hand is a leave-the-battlefield event, even
+        // though the token itself must cease to exist outside the battlefield.
+        // Its own exiled card must return once, independent of Ugin's presence.
+        d.moveToGraveyard(ugin)
+        val bounce = com.wingedsheep.sdk.dsl.card("Ugin Spirit Bounce Probe") {
+            manaCost = "{0}"
+            typeLine = "Instant"
+            spell {
+                effect = com.wingedsheep.sdk.dsl.Effects.Move(
+                    target(com.wingedsheep.sdk.scripting.filters.unified.TargetFilter(
+                        com.wingedsheep.sdk.scripting.GameObjectFilter.Creature
+                    )),
+                    Zone.HAND
+                )
+            }
+        }
+        d.registerCard(bounce)
+        val spell = d.putCardInHand(owner, bounce.name)
+        assertNull("A real bounce spell must resolve on the Spirit",
+            d.castSpell(owner, spell, listOf(spirit)).error)
+        d.resolveAll()
+
+        assertTrue("Bounced Spirit token must leave the battlefield",
+            d.permanentsNamed(owner, "Spirit").isEmpty())
+        assertFalse("Linked card must leave face-down exile", linkedCard in d.getExile(owner))
+        assertEquals("Linked card must return exactly once", 1,
+            d.getHand(owner).count { it == linkedCard })
+        assertEquals("Token must not become an extra card in hand",
+            handBefore + 1, d.getHand(owner).size)
+        assertFalse("A bounced token must not exist as a hand card",
+            spirit in d.getHand(owner))
+    }
+
     private fun GameTestDriver.loyalty(id: com.wingedsheep.sdk.model.EntityId) =
         state.getEntity(id)!!.get<com.wingedsheep.engine.state.components.battlefield.CountersComponent>()
             ?.getCount(com.wingedsheep.sdk.core.CounterType.LOYALTY) ?: 0
