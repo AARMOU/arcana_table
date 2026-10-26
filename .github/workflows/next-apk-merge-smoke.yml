@@ -43,6 +43,19 @@ jobs:
               echo "::error title=Source join blocked at $name::Conflicting files require reviewed reconciliation; the workflow did not compile an APK or change a remote branch."
               cat /tmp/next-apk-merge.log
               git diff --name-only --diff-filter=U
+              python3 - <<'PYCONFLICT'
+              from pathlib import Path
+              import subprocess
+              paths = subprocess.check_output(['git','diff','--name-only','--diff-filter=U'], text=True).splitlines()
+              for name in paths:
+                  content = Path(name).read_text()
+                  print('=== CONFLICT HUNKS:', name, '===')
+                  lines = content.splitlines()
+                  for idx, line in enumerate(lines):
+                      if line.startswith('<<<<<<<'):
+                          tail = next((j for j in range(idx+1, len(lines)) if lines[j].startswith('>>>>>>>')), min(idx+40, len(lines)-1))
+                          print('\\n'.join(f'{j+1}: {lines[j]}' for j in range(max(0,idx-8),min(len(lines),tail+9)))[:18000])
+              PYCONFLICT
               while IFS= read -r p; do
                 [ -z "$p" ] && continue
                 echo "::warning file=$p,title=Merge conflict::Review $name source integration"
