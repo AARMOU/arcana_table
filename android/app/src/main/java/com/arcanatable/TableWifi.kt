@@ -480,8 +480,8 @@ internal fun TableController.WifiDialogs() {
                 onDismissRequest = {},
                 title = { Text("Waiting for your friend") },
                 text = {
-                    Text("Keep this screen open. On the other phone: PLAY → Wi-Fi with a friend → Join a game.\\n\\n" +
-                        "If it doesn't find you, type this address there:\\n$address")
+                    Text("Keep this screen open. On the other phone: PLAY → Wi-Fi with a friend → Join a game.\n\n" +
+                        "If it doesn't find you, type this address there:\n$address")
                 },
                 confirmButton = {},
                 dismissButton = { TextButton(onClick = { stopWifi() }) { Text("CANCEL") } },
