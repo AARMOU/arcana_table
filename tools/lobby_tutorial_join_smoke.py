@@ -21,6 +21,8 @@ NAMES = [
     "Enforce owner-requested mascot-free home on integrated source",
     "Validate PR 282 tutorial HAND port contract (source-only)",
     "Apply and verify exact PR 282 tutorial step-two fix AFTER integrated UI merge",
+    "Validate post-121 changelog content, source preservation and next-build disclaimers",
+    "Populate What's new with verified changes since Build 121 (after source merges)",
 ]
 PINS = {
     "UPGRADE": "e66eca84125c3180c676702a72ae6cd080f85797",
@@ -96,6 +98,11 @@ def main() -> None:
     pins = Path("combined-evidence/next-apk-source-pins.txt").read_text()
     assert f'claude-fullscreen-ready-lobby {PINS["LOBBY_SHA"]}' in pins
     assert "PR282 8e4702065dff96ba7ce0a64cd5d420fb54def43d" in pins
+    dialog = Path("android/app/src/main/java/com/arcanatable/TableDialogs.kt").read_text()
+    assert "CURRENT NO-GOOSE TEST PREVIEW" in dialog
+    assert "NEXT APK · PREPARED BUT NOT YET BUILT" in dialog
+    assert "BUILD 123 · LARGE END-STEP AI FIX" in dialog and "BUILD 122 · FIXES AND QUICK UI TIPS" in dialog
+    assert Path("combined-evidence/build121-changelog-acceptance.txt").is_file()
     print("PASS: source-only next-build join includes Claude lobby + HAND tutorial + no-goose, exact pins", flush=True)
     print("HOLD: no Android executable or live Cloudflare Worker upgrade was made", flush=True)
 
