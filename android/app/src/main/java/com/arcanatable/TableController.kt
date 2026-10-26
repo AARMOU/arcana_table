@@ -432,6 +432,17 @@ internal class TableController(
     var wifiAddressInput by run { mutableStateOf("") }
     var wifiConnecting by run { mutableStateOf(false) }
     var wifiRole by run { mutableStateOf<String?>(null) }
+    // Isolated four-person Wi-Fi preview. Production's existing two-player path is unchanged.
+    var wifiMultiConfigOpen by run { mutableStateOf(false) }
+    var wifiMultiSeatCount by run { mutableStateOf(4) }
+    var wifiMultiFriendSlots by run { mutableStateOf(setOf(1, 2, 3)) }
+    var wifiMultiLobby: ArgentumWaitingLobby? = null
+    var wifiMultiSetup: com.arcanatable.engine.OfflineSetup? = null
+    var wifiMultiRegistry: com.wingedsheep.engine.registry.CardRegistry? = null
+    var wifiMultiLobbyState by run { mutableStateOf<JSONObject?>(null) }
+    var wifiGuestLobbyState by run { mutableStateOf<JSONObject?>(null) }
+    var wifiGuestWaiting by run { mutableStateOf(false) }
+
     /** A big message that flashes over the table and fades ("Your go", "Your move"). */
     var flashMessage by run { mutableStateOf<FlashText?>(null) }
     /** Offline: the engine has been working on your last action for over 10 seconds. */
