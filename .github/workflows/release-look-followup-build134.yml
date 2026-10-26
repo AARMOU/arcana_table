@@ -489,7 +489,7 @@ jobs:
           python3 tools/next_apk_changelog_since_b121.py --verify-only
           git diff --check -- android/app/src/main/java/com/arcanatable/TableDialogs.kt
           grep -F 'CURRENT NO-GOOSE TEST PREVIEW' android/app/src/main/java/com/arcanatable/TableDialogs.kt
-          grep -F 'NEXT APK · PREPARED BUT NOT YET BUILT' android/app/src/main/java/com/arcanatable/TableDialogs.kt
+          grep -F 'NEXT TEST APK · LOBBY, TUTORIAL AND DECK TOOLS' android/app/src/main/java/com/arcanatable/TableDialogs.kt
           printf '%s\n' 'Build 122–134 cumulative in-app changelog plus staged-next-build warnings: PASS' > combined-evidence/build121-changelog-acceptance.txt
       - name: Verify owner-requested Import new and Deck Editor enablement contract
         shell: bash
