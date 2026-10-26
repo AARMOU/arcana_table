@@ -45,8 +45,8 @@
             "event": "LandPlayed"
           },
           "title": "Play a land",
-          "body": "Tap Forest in your hand and choose Play Land. Lands enter the battlefield without being cast as spells.",
-          "hint": "Choose Play Land"
+          "body": "Tap Forest in your hand and choose to play it. Playing a land isn't casting a spell, and you can play one land each turn.",
+          "hint": "Play Forest"
         },
         {
           "id": "board-land",
@@ -68,8 +68,8 @@
             "event": "ManaAdded"
           },
           "title": "Make green mana",
-          "body": "Select Forest's mana ability. Its green mana can help you cast your next spell.",
-          "hint": "Use Forest's mana ability"
+          "body": "Tap your Forest and choose its mana ability to add green mana. You can also skip this: casting a spell pays from your untapped lands automatically.",
+          "hint": "Tap Forest for mana"
         },
         {
           "id": "pool",
@@ -114,8 +114,8 @@
             "event": "SpellResolved"
           },
           "title": "Let it resolve",
-          "body": "Pass priority when you're ready. Once both players pass in succession, the top spell resolves.",
-          "hint": "Tap Pass as needed"
+          "body": "Tap Pass. Your opponent gets a chance to respond; when you've both passed, the top spell resolves and Elvish Mystic enters the battlefield.",
+          "hint": "Tap Pass"
         },
         {
           "id": "inspect",
@@ -148,7 +148,7 @@
             "event": "PriorityPassed"
           },
           "title": "Keep the turn moving",
-          "body": "Pass gives the other player a chance to act. When everyone passes on an empty stack, the game moves to the next step.",
+          "body": "Tap Pass again. When every player passes with nothing on the stack, the game moves on to the next step.",
           "hint": "Tap Pass"
         },
         {
@@ -160,8 +160,8 @@
             "event": "AttackersDeclared"
           },
           "title": "No attack this time",
-          "body": "Elvish Mystic cannot attack yet. When combat asks you to choose attackers, confirm the legal no-attackers choice.",
-          "hint": "Declare no attackers"
+          "body": "Elvish Mystic arrived this turn, so it can't attack yet. If Arcana asks you to declare attackers, choose none; otherwise the game moves straight past combat.",
+          "hint": "Keep passing"
         },
         {
           "id": "finish-turn",
@@ -172,8 +172,8 @@
             "event": "TurnAdvanced"
           },
           "title": "Finish your turn",
-          "body": "Continue taking the legal Pass or no-action choices until the opponent's turn begins.",
-          "hint": "Continue to opponent's turn"
+          "body": "Keep tapping Pass until your opponent's turn begins.",
+          "hint": "Pass to the opponent's turn"
         },
         {
           "id": "opponent",
@@ -183,7 +183,7 @@
             "kind": "next"
           },
           "title": "Watch the opponent",
-          "body": "Use the opponent tab to inspect their battlefield. Your hand remains private.",
+          "body": "Tap the opponent's tab to see their battlefield. Their hand stays hidden, just like yours is hidden from them.",
           "hint": "Next"
         },
         {
@@ -194,8 +194,8 @@
             "kind": "next"
           },
           "title": "First turn complete",
-          "body": "You've played a land, made mana, cast a creature, and passed priority. Continue with the Field Guide whenever you're ready.",
-          "hint": "Open Field Guide"
+          "body": "You played a land, made mana, cast a creature and passed priority. More lessons are in Settings › Learn & tutorials whenever you want them.",
+          "hint": "Done"
         }
       ]
     },
@@ -231,7 +231,7 @@
             "kind": "tap"
           },
           "title": "Choose a deck",
-          "body": "Open Change deck to choose one of the decks included in this release.",
+          "body": "Change deck lets you pick any of your decks: the included ones and any you've imported.",
           "hint": "Tap Change deck"
         },
         {
@@ -253,7 +253,7 @@
             "kind": "next"
           },
           "title": "Resume safely",
-          "body": "If a saved offline game is available, Resume returns to that game instead of starting over.",
+          "body": "When you have a saved offline game, RESUME takes you back to it instead of starting over.",
           "hint": "Next"
         },
         {
@@ -275,7 +275,7 @@
             "kind": "next"
           },
           "title": "Tutorials are always here",
-          "body": "You can replay any lesson from Help and Tutorials without changing your game.",
+          "body": "You can replay any lesson from Settings › Learn & tutorials. Lessons never change your game.",
           "hint": "Done"
         }
       ]
@@ -310,8 +310,8 @@
           "advance": {
             "kind": "next"
           },
-          "title": "Two players for launch",
-          "body": "This release is focused on one human against one AI. Multiplayer options should stay out of the tutorial until supported.",
+          "title": "How many players",
+          "body": "Offline, choose 2, 3 or 4 players. Each extra player is an AI opponent with its own deck. To play with friends, choose Play with a friend.",
           "hint": "Next"
         },
         {
@@ -333,7 +333,7 @@
             "kind": "tap"
           },
           "title": "Pick the AI's deck",
-          "body": "Choose an included opponent deck. Different commanders create different challenges.",
+          "body": "Choose a deck for the AI, or leave it on Random. With more than one AI, the others get random decks.",
           "hint": "Choose an AI deck"
         },
         {
@@ -344,7 +344,7 @@
             "kind": "tap"
           },
           "title": "Ready to play",
-          "body": "Start creates a new game. The tutorial itself always uses a disposable practice game instead.",
+          "body": "PLAY OFFLINE VS AI starts a new game. Practice lessons always use a separate game instead.",
           "hint": "Tap Start in demo"
         },
         {
@@ -355,7 +355,7 @@
             "kind": "next"
           },
           "title": "Practice is separate",
-          "body": "Tutorial scenarios never overwrite your normal offline checkpoint or deck selection.",
+          "body": "Practice lessons never replace your saved offline game or change your deck choice.",
           "hint": "Done"
         }
       ]
@@ -414,7 +414,7 @@
             "event": "HandMulliganed"
           },
           "title": "Try one mulligan",
-          "body": "This practice hand has poor mana. Tap Mulligan to draw a new hand and follow the game's instructions.",
+          "body": "This practice hand is almost all lands, so it has nothing to cast. Tap Mulligan to shuffle it away and draw a new seven.",
           "hint": "Tap Mulligan"
         },
         {
@@ -425,7 +425,7 @@
             "kind": "next"
           },
           "title": "Follow the game's mulligan prompts",
-          "body": "You may need to put cards on the bottom of your library after deciding to keep, depending on the mulligan procedure. Arcana walks you through it.",
+          "body": "After a mulligan you still draw seven, then put one card on the bottom of your library for each mulligan you took. Arcana asks which cards once you keep.",
           "hint": "Next"
         },
         {
@@ -437,7 +437,7 @@
             "event": "HandKept"
           },
           "title": "Keep this hand",
-          "body": "Keep Hand accepts your opening cards once you've completed any required choices.",
+          "body": "Tap Keep Hand. If Arcana asks, choose the card to put on the bottom of your library.",
           "hint": "Tap Keep Hand"
         },
         {
@@ -448,7 +448,7 @@
             "kind": "next"
           },
           "title": "You can inspect without choosing",
-          "body": "Card previews should never count as a keep or mulligan. Close previews before making your choice.",
+          "body": "Pressing and holding a card to read it never counts as keeping or taking a mulligan, so look as much as you like before you decide.",
           "hint": "Done"
         }
       ]
@@ -641,7 +641,7 @@
             "kind": "next"
           },
           "title": "Why isn't Cast shown?",
-          "body": "You might lack mana, be outside a legal timing window, or need priority. Arcana should explain when an action is unavailable.",
+          "body": "A card can't be cast without enough mana, at the wrong time (most spells need your main phase), or while another player has priority. Wait for your chance, or check the stack.",
           "hint": "Next"
         },
         {
@@ -746,7 +746,7 @@
             "event": "SpellCast"
           },
           "title": "Pay to cast a spell",
-          "body": "Choose a legal Cast action. Arcana should display the cost and let Argentum validate payment.",
+          "body": "Tap Elvish Mystic and choose to cast it. Argentum checks the cost and timing, and Arcana pays from your mana.",
           "hint": "Choose Cast"
         },
         {
@@ -757,7 +757,7 @@
             "kind": "next"
           },
           "title": "Auto-payment and choices",
-          "body": "Arcana may offer mana payment help. You stay in control of choices, and Argentum decides whether a payment is legal.",
+          "body": "Arcana can pay costs from your untapped lands for you. When a choice matters, like which color to make, it asks you.",
           "hint": "Next"
         },
         {
@@ -860,7 +860,7 @@
             "kind": "hold"
           },
           "title": "Pass until your next turn",
-          "body": "Press and hold Pass to use Arcana's auto-pass convenience. It is distinct from one ordinary pass.",
+          "body": "Press and hold Pass to keep passing until your next turn. One tap is a single pass; holding is a shortcut.",
           "hint": "Press and hold Pass"
         },
         {
@@ -871,7 +871,7 @@
             "kind": "next"
           },
           "title": "Stop auto-passing",
-          "body": "You should be able to cancel auto-pass at any time. The tutorial should never enable it without your action.",
+          "body": "Auto-pass stops by itself when something needs your attention, and you can turn it off at any time.",
           "hint": "Next"
         },
         {
@@ -882,7 +882,7 @@
             "kind": "next"
           },
           "title": "Ask why the game is waiting",
-          "body": "When a decision or response is pending, Arcana should indicate who must act and what is waiting.",
+          "body": "When the game is waiting, the bottom bar tells you whether it's waiting on you, and what for.",
           "hint": "Done"
         }
       ]
@@ -907,7 +907,7 @@
             "kind": "tap"
           },
           "title": "Open the stack",
-          "body": "Open the stack panel. Your opponent is passive in this exercise; you'll put a real spell on the stack next.",
+          "body": "Tap STACK to open the stack panel. It's empty now; you'll put a real spell on it in a moment. Your opponent won't respond in this practice.",
           "hint": "Tap STACK"
         },
         {
@@ -918,7 +918,7 @@
             "kind": "next"
           },
           "title": "Last in, first out",
-          "body": "The newest spell or ability normally resolves first after everyone passes.",
+          "body": "Spells and abilities wait here until they resolve. The newest one resolves first, after every player passes.",
           "hint": "Next"
         },
         {
@@ -929,7 +929,7 @@
             "kind": "next"
           },
           "title": "Who can respond?",
-          "body": "Argentum tracks whose opportunity it is. Only legal actions for that game state should be offered.",
+          "body": "Whoever has priority may act. Arcana only offers actions Argentum says are legal right now.",
           "hint": "Next"
         },
         {
@@ -939,8 +939,8 @@
           "advance": {
             "kind": "next"
           },
-          "title": "Prepare your instant",
-          "body": "You control Grizzly Bears and two untapped Forests. Close the stack panel, then open your hand to cast an instant.",
+          "title": "Get your instant ready",
+          "body": "You control Grizzly Bears and two untapped Forests. Tap NEXT and your hand opens so you can cast an instant.",
           "hint": "Next"
         },
         {
@@ -952,7 +952,7 @@
             "event": "SpellCast"
           },
           "title": "Cast Giant Growth",
-          "body": "Choose Giant Growth in your hand, then target your Grizzly Bears. Argentum validates the target and adds the spell to the stack.",
+          "body": "Tap Giant Growth, choose to cast it, then pick your Grizzly Bears as the target.",
           "hint": "Choose Cast and target your Bears"
         },
         {
@@ -975,8 +975,8 @@
             "event": "PriorityPassed"
           },
           "title": "Pass to resolve",
-          "body": "Pass priority so the training opponent can pass too. Argentum then resolves Giant Growth and your Bears get +3/+3 until end of turn.",
-          "hint": "Use PASS PRIORITY"
+          "body": "Tap PASS PRIORITY. Your opponent passes too, Giant Growth resolves, and your Bears get +3/+3 until end of turn.",
+          "hint": "Tap PASS PRIORITY"
         },
         {
           "id": "close",
@@ -986,8 +986,8 @@
             "kind": "tap"
           },
           "title": "Return to your battlefield",
-          "body": "Close the stack panel and return to the battlefield. You used real Argentum rules and priorities.",
-          "hint": "Done"
+          "body": "Giant Growth resolved and the stack is empty. Tap CLOSE to go back to the battlefield.",
+          "hint": "Tap CLOSE"
         }
       ]
     },
@@ -997,7 +997,7 @@
       "section": "Learn Magic",
       "minutes": 5,
       "startScreen": "board",
-      "description": "Practice attackers, blockers, damage and summoning sickness.",
+      "description": "Attack with a creature, see how combat damage works, and learn what changes when creatures block.",
       "scenario": "fixed-combat",
       "availability": [
         "release:offline-two-player"
@@ -1011,8 +1011,8 @@
             "kind": "next"
           },
           "title": "Enter combat",
-          "body": "Combat has steps for attackers, blockers and damage. Argentum handles the exact timing.",
-          "hint": "Next"
+          "body": "Your Grizzly Bears have been with you since your last turn, so they can attack. Tap Pass to leave your main phase and go to combat.",
+          "hint": "Tap Pass"
         },
         {
           "id": "ready",
@@ -1022,7 +1022,7 @@
             "kind": "next"
           },
           "title": "Choose an eligible attacker",
-          "body": "A creature usually needs to have been under your control since the start of your turn to attack, unless it has haste.",
+          "body": "A creature can attack if you've controlled it since the start of your turn, unless it has haste. Your Bears qualify.",
           "hint": "Next"
         },
         {
@@ -1034,8 +1034,8 @@
             "event": "AttackersDeclared"
           },
           "title": "Declare attackers",
-          "body": "Choose your eligible creature and confirm the attack. It usually becomes tapped.",
-          "hint": "Declare an attacker"
+          "body": "Choose Grizzly Bears as an attacker and confirm. Attacking taps the creature.",
+          "hint": "Declare Grizzly Bears"
         },
         {
           "id": "block",
@@ -1044,8 +1044,8 @@
           "advance": {
             "kind": "next"
           },
-          "title": "The defender can block",
-          "body": "Your opponent may assign an untapped, eligible creature to block. Not every creature can block every attacker.",
+          "title": "Blocking",
+          "body": "Your opponent has no creatures, so nothing can block this time. In other games, the defending player may block with untapped creatures.",
           "hint": "Next"
         },
         {
@@ -1056,7 +1056,7 @@
             "kind": "next"
           },
           "title": "Combat pairs creatures",
-          "body": "Blocked attackers normally deal combat damage to blockers instead of the defending player, unless an ability changes that.",
+          "body": "A blocked attacker deals its damage to the blocker instead of the player, unless an ability like trample says otherwise.",
           "hint": "Next"
         },
         {
@@ -1068,8 +1068,8 @@
             "event": "CombatDamageDealt"
           },
           "title": "Damage happens",
-          "body": "Power determines damage dealt. Damage on a creature stays marked until cleanup unless an effect removes it.",
-          "hint": "Resolve combat"
+          "body": "Keep passing. Your unblocked Bears deal 2 damage, equal to their power, to your opponent.",
+          "hint": "Tap Pass"
         },
         {
           "id": "life",
@@ -1079,7 +1079,7 @@
             "kind": "next"
           },
           "title": "Life totals update",
-          "body": "An unblocked attacker normally deals combat damage to the defending player.",
+          "body": "Your opponent's life went down by 2. Damage to creatures is removed at the end of the turn; life lost stays lost.",
           "hint": "Next"
         },
         {
@@ -1170,7 +1170,7 @@
             "kind": "next"
           },
           "title": "Where does the commander go?",
-          "body": "When your commander changes zones, the game's applicable commander replacement or state-based choice may let you move it back to the command zone.",
+          "body": "If your commander would go to your graveyard or exile, you may move it back to the command zone instead. Cast it again later, paying commander tax.",
           "hint": "Next"
         },
         {
@@ -1203,7 +1203,7 @@
             "kind": "next"
           },
           "title": "Let Argentum adjudicate",
-          "body": "The tutorial teaches the concept; Argentum remains the authority for timing, targets, costs and card effects.",
+          "body": "Lessons explain the rules; Argentum applies them. If an action isn't offered, the game doesn't allow it right now.",
           "hint": "Done"
         }
       ]
@@ -1316,7 +1316,7 @@
             "kind": "next"
           },
           "title": "Some effects grant special permission",
-          "body": "Playing from graveyard, exile or the library requires an effect that allows it. Arcana should show legal actions when permitted.",
+          "body": "You can only play cards from your graveyard, exile or library when an effect allows it. When one does, the card's legal actions include it.",
           "hint": "Done"
         }
       ]
@@ -1418,7 +1418,7 @@
             "kind": "next"
           },
           "title": "Keep your place",
-          "body": "Closing a panel should return you to the view and zoom you were using.",
+          "body": "Closing a panel takes you back to the view you were using.",
           "hint": "Done"
         }
       ]
@@ -1476,7 +1476,7 @@
             "kind": "next"
           },
           "title": "When something targets you",
-          "body": "A targeting alert should stay visible while the corresponding stack item requires attention.",
+          "body": "When an opponent's spell or ability targets you or your permanents, an alert stays up until it resolves.",
           "hint": "Next"
         },
         {
@@ -1498,7 +1498,7 @@
             "kind": "next"
           },
           "title": "The AI is thinking",
-          "body": "On large board states, Argentum may be processing many actions. Status feedback is not an invitation to tap repeatedly.",
+          "body": "On big boards the AI can take a moment to think. The status shows it's working; there's no need to tap again.",
           "hint": "Next"
         },
         {
@@ -1545,7 +1545,7 @@
             "kind": "next"
           },
           "title": "Deck groups",
-          "body": "Included Wizards of the Coast precons and Argentum premades should be clearly grouped without duplicates.",
+          "body": "Decks are grouped: WOTC PRECONS, ARCANA, ARGENTUM PREMADE DECKS, and YOUR OTHER DECKS for decks you've imported.",
           "hint": "Next"
         },
         {
@@ -1577,8 +1577,8 @@
           "advance": {
             "kind": "next"
           },
-          "title": "Search a large collection",
-          "body": "If searching is available, find included decks by deck or commander name.",
+          "title": "Your imported decks",
+          "body": "Decks you add with Import new are listed under YOUR OTHER DECKS, ready to choose like any other.",
           "hint": "Next"
         },
         {
@@ -1588,8 +1588,8 @@
           "advance": {
             "kind": "next"
           },
-          "title": "Importing comes later",
-          "body": "User deck import and full deck editing are not part of the first public release tutorial. Unlock this chapter when the product ships the feature.",
+          "title": "Bring your own deck",
+          "body": "Import new on the Home screen adds a deck from a pasted list. Imported decks appear in Change deck alongside the included ones.",
           "hint": "Next"
         },
         {
@@ -1658,7 +1658,7 @@
             "kind": "next"
           },
           "title": "Move controls thoughtfully",
-          "body": "Put frequent actions within reach, but keep important game state visible.",
+          "body": "Move and resize controls so the ones you use most are within reach, while keeping the game state visible.",
           "hint": "Next"
         },
         {
@@ -1669,7 +1669,7 @@
             "kind": "next"
           },
           "title": "Undo and restore",
-          "body": "Provide an obvious way back to the default layout. A tutorial must never overwrite your personalized layout.",
+          "body": "Reset puts the layout back to Arcana's default whenever you want.",
           "hint": "Next"
         },
         {
@@ -1691,7 +1691,7 @@
             "kind": "next"
           },
           "title": "Notifications",
-          "body": "Choose how the game lets you know it needs your attention.",
+          "body": "Choose how Arcana gets your attention when it's your turn or the game needs you.",
           "hint": "Next"
         },
         {
@@ -1702,7 +1702,7 @@
             "kind": "next"
           },
           "title": "Help and diagnostics",
-          "body": "This section includes support tools and the planned engine-running notification switch.",
+          "body": "Support tools live here: the engine running notice, connection checks and the diagnostic log.",
           "hint": "Next"
         },
         {
@@ -1793,7 +1793,7 @@
             "kind": "next"
           },
           "title": "Resetting is destructive",
-          "body": "Never confirm Reset game or Clear all data while practicing. The tutorial must not open destructive actions.",
+          "body": "Reset game and Reset and clear all data end your match or erase your data. Lessons never use them; only choose them when you mean it.",
           "hint": "Next"
         },
         {
@@ -1862,7 +1862,7 @@
             "kind": "next"
           },
           "title": "Zoom the full table",
-          "body": "Pinch to zoom the table overview. Your zoom preference should not be reset by a tutorial.",
+          "body": "Pinch the table overview to zoom in on a busy board.",
           "hint": "Next"
         },
         {
@@ -1884,7 +1884,7 @@
             "kind": "next"
           },
           "title": "Customize per posture",
-          "body": "Personalize controls for compact and expanded layouts, without letting a tutorial overwrite either configuration.",
+          "body": "Adjust UI lets you rearrange the game controls. Arcana fits the layout to the folded or unfolded screen.",
           "hint": "Done"
         }
       ]
@@ -1910,7 +1910,7 @@
             "kind": "tap"
           },
           "title": "Replay any lesson",
-          "body": "Open Tutorials from Help and choose a chapter. You can skip or restart freely.",
+          "body": "Open Learn & tutorials here to replay any lesson. You can exit or restart a lesson at any time.",
           "hint": "Tap Tutorials"
         },
         {
@@ -1949,12 +1949,12 @@
         {
           "id": "status",
           "screen": "diagnostics",
-          "target": "engine-running-toggle",
+          "target": "engine-processing-toggle",
           "advance": {
             "kind": "next"
           },
-          "title": "Engine-running notification",
-          "body": "The persistent engine-running notification is intended to be optional from this menu once the release-polish toggle is integrated.",
+          "title": "Engine running notice",
+          "body": "Turn this on to show a banner with the elapsed time while Argentum works out a big turn.",
           "hint": "Next"
         },
         {
@@ -1965,7 +1965,7 @@
             "kind": "next"
           },
           "title": "Engine self-test",
-          "body": "When supported, a self-test can help separate rules-engine problems from UI problems.",
+          "body": "The engine self-test checks the rules engine on its own, which helps tell an engine problem from a display problem.",
           "hint": "Next"
         },
         {
@@ -1976,7 +1976,7 @@
             "kind": "next"
           },
           "title": "Back to playing",
-          "body": "Help never changes a match unless you explicitly start a separate test or choose a destructive action.",
+          "body": "Help tools never change your match.",
           "hint": "Done"
         }
       ]
@@ -2056,7 +2056,7 @@
             "kind": "next"
           },
           "title": "What if the action looks wrong?",
-          "body": "Check the game log and export diagnostics. A genuine rules bug shouldn't be hidden by manually inventing an action.",
+          "body": "If an action looks wrong, check the game log, then export diagnostics from Settings so the problem can be fixed.",
           "hint": "Done"
         }
       ]

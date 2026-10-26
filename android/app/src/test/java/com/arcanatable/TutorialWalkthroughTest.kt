@@ -99,7 +99,7 @@ class TutorialWalkthroughTest {
 
         fun declareAttackers(all: Boolean) {
             val info = legal().firstOrNull { it.getJSONObject("action").optString("type") == "DeclareAttackers" }
-                ?: fail("No PassPriority or DeclareAttackers to continue during ${run.step?.id}\n${trace.joinToString("\n")}")
+                ?: throw AssertionError("No PassPriority or DeclareAttackers to continue during ${run.step?.id}\n${trace.joinToString("\n")}")
             val plan = ArgentumAttackPlan.from(info)!!
             submit(plan.buildAction(if (all) plan.options.associate { it.attackerId to it.targets.first() } else emptyMap()))
         }
