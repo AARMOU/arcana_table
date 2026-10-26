@@ -309,7 +309,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
     if (!argentumEnabled && incoming.optString("type") !in setOf("connected", "reconnected", "error", "sessionReplaced")) return
     when (incoming.optString("type")) {
         "offlineCheckpoint" -> {
-            if (argentumOffline && wifiRole == null) {
+            if (argentumOffline && !tutorialPracticeActive && wifiRole == null) {
                 val data = incoming.optJSONObject("checkpoint")
                 if (data != null) scope.launch {
                     val outcome = withContext(Dispatchers.IO) {
