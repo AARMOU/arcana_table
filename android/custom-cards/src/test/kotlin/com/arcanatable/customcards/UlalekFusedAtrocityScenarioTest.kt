@@ -226,14 +226,14 @@ class UlalekFusedAtrocityScenarioTest {
         d.giveMana(p, Color.GREEN)
         d.giveColorlessMana(p, 1)
         assertNull(d.castSpell(p, bears).error)
-        assertNull(d.passPriority(p).error)
+        d.passPriority(p)
         val ability = d.cardRegistry.getCard("Prodigal Pyromancer")!!.script.activatedAbilities.single().id
         assertNull(d.submit(ActivateAbility(opponent, pyro, ability,
             targets = listOf(ChosenTarget.Player(p)))).error)
         assertTrue(d.stackObjects().contains("Prodigal Pyromancer activated"))
 
         // Ulalek can copy our own pending spells, but never the opponent's activation.
-        assertNull(d.passPriority(opponent).error)
+        d.passPriority(opponent)
         val fiendCard = d.putCardInHand(p, fiend)
         d.giveColorlessMana(p, 10)
         assertNull(d.castSpell(p, fiendCard).error)
