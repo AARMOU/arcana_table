@@ -417,11 +417,7 @@ internal class TableController(
 
     fun tutorialSignal(kind: String, key: String) {
         val step = tutorialStep ?: return
-        if (step.actionKind != kind) return
-        if (kind == "event") {
-            if (step.event == key) tutorialAdvance()
-        } else if (step.target == key || step.target == "hand-card:any" && key.startsWith("hand-card:") ||
-            step.target == "battlefield-card:any" && key.startsWith("battlefield-card:")) tutorialAdvance()
+        if (TutorialStepGate.accepts(step, kind, key)) tutorialAdvance()
     }
 
     fun tutorialSnapshot(previous: ArgentumTableSnapshot?, current: ArgentumTableSnapshot) {
