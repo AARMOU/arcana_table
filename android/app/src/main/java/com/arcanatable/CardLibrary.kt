@@ -67,6 +67,28 @@ class CardLibrary(val catalog: SupportedCardCatalog) {
         return Result(fuzzy.take(limit).map { it.card }, fuzzy.size, fuzzy.isNotEmpty(), parsed.errors)
     }
 
+    /**
+     * [search] plus the FILTERS panel. Name relevance wins while sorting by name with words typed;
+     * any other sort uses [CardFilters.comparator]. Typos still fall back to close names.
+     */
+    fun search(query: String, filters: CardFilters, limit: Int = 300): Result {
+        val parsed = CardQuery.parse(query)
+        val matches = cards.filter { parsed.matches(it) && filters.matches(it) }
+        fun order(list: List<Indexed>) =
+            if (filters.sort == CardSort.NAME && !filters.descending && parsed.nameWords.isNotEmpty()) rank(list, parsed)
+            else list.sortedWith(filters.comparator())
+        if (matches.isNotEmpty() || parsed.nameWords.isEmpty()) {
+            return Result(order(matches).take(limit).map { it.card }, matches.size, false, parsed.errors)
+        }
+        val fuzzy = cards.asSequence().filter { parsed.matchesIgnoringName(it) && filters.matches(it) }
+            .mapNotNull { c -> fuzzyNameScore(parsed.nameWords, c)?.let { c to it } }
+            .sortedWith(compareBy({ it.second }, { it.first.name })).map { it.first }.toList()
+        return Result(fuzzy.take(limit).map { it.card }, fuzzy.size, fuzzy.isNotEmpty(), parsed.errors)
+    }
+
+    /** Set codes present in this library, for the Set picker. */
+    val setCodes: List<String> by lazy { cards.mapNotNull { it.card.setCode?.uppercase(Locale.ROOT) }.distinct().sorted() }
+
     /** Type-ahead name suggestions: prefix matches first, then word starts. */
     fun suggestNames(prefix: String, limit: Int = 8): List<String> {
         val q = prefix.trim().lowercase(Locale.ROOT)
