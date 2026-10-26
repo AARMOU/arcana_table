@@ -806,9 +806,8 @@ internal fun TableController.TableOverlaysB() {
 
     if (tutorialHubOpen) TutorialHubDialog(
         onDismiss = { tutorialHubOpen = false },
-        onPractice = { startTutorialPractice(it) },
-        onCoach = { id, index -> startTutorialCoach(id, index) },
-        practiceEnabled = !argentumEnabled && !offlineStarting
+        onStart = { id, index -> startTutorial(id, index) },
+        gameRunning = argentumEnabled
     )
     if (optionsOpen) OptionsPage(
         darkMode = darkMode, timerVisible = turnTimerVisible,
@@ -837,10 +836,12 @@ internal fun TableController.TableOverlaysB() {
         onReconnect = if (argentumEnabled && argentumStatus != ArgentumConnectionStatus.CONNECTED && argentumStatus != ArgentumConnectionStatus.REPLACED) ({
             recordDiagnostic("Player chose Reconnect (Options)", DiagnosticCategory.CONNECTION); argentumSocket.retryNow()
         }) else null,
-        onViewDiagnostics = { optionsOpen = false; diagnosticViewerOpen = true },
-        onExportDiagnostics = { exportDiagnosticLog() },
+        // While a lesson is pointing at these links, tapping one moves the lesson on instead of
+        // leaving Settings, so the lesson stays on screen.
+        onViewDiagnostics = { if (tutorialChapterId == null) { optionsOpen = false; diagnosticViewerOpen = true } },
+        onExportDiagnostics = { if (tutorialChapterId == null) exportDiagnosticLog() },
         onWhatsNew = { optionsOpen = false; changelogOpen = true },
-        onTutorials = { optionsOpen = false; tutorialHubOpen = true },
+        onTutorials = { if (tutorialChapterId == null) { optionsOpen = false; tutorialHubOpen = true } },
         engineTrialResult = engineTrialResult,
         onEngineSelfTest = {
             engineTrialResult = "Running an AI-vs-AI game on this phone…"
@@ -1028,39 +1029,41 @@ internal fun TableController.TableOverlaysB() {
         )
     }
 
-    if (stackOpen && argentumEnabled) AlertDialog(
-        onDismissRequest = { stackOpen = false },
-        title = { Text("Argentum stack and priority") },
-        text = {
-            Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                val stackItems = argentumSnapshot?.stack.orEmpty()
-                Text(if (stackItems.isEmpty()) "The Argentum stack is empty." else "ON THE STACK · ${stackItems.size}", color = Mint, fontWeight = FontWeight.Bold)
-                tutorialStep?.takeIf { tutorialPracticeActive || tutorialChapterId != null }?.let { step ->
-                    TutorialInlineCue(step.title, step.body + "  " + step.hint)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = { stopTutorial(); stackOpen = false }) { Text("EXIT LESSON") }
-                        if (step.actionKind == "next") TextButton(onClick = { tutorialAdvance() }) { Text("NEXT") }
+    if (stackOpen && argentumEnabled) Dialog(onDismissRequest = { stackOpen = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxWidth(0.94f).heightIn(max = 620.dp), shape = RoundedCornerShape(18.dp), color = Panel) {
+            Box {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Argentum stack and priority", color = SoftWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val snap = argentumSnapshot
+                    val stackItems = snap?.stack.orEmpty()
+                    Text(if (stackItems.isEmpty()) "The Argentum stack is empty." else "ON THE STACK · ${stackItems.size}  ·  top resolves first", color = Mint, fontWeight = FontWeight.Bold)
+                    val priorityName = snap?.let { s -> s.players.getOrNull(s.priorityPlayer)?.let { if (s.priorityPlayer == s.viewingPlayer) "You" else it.name } }
+                    Text("PRIORITY · ${priorityName ?: "—"}", color = CounterGold, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.tutorialTarget("priority-indicator"))
+                    Box(Modifier.fillMaxWidth().tutorialTarget("stack-items")) { StackCardList(stackItems) }
+                    Text("Argentum controls priority and resolves the stack. Arcana displays the server state and offers only server-provided actions.", color = Muted, fontSize = 12.sp)
+                    TextButton(onClick = { stackOpen = false; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } }, enabled = argentumSnapshot?.legalActions?.isNotEmpty() == true) {
+                        Text("VIEW LEGAL ACTIONS", color = Mint)
                     }
                 }
-                StackCardList(stackItems)
-                Text("Argentum controls priority and resolves the stack. Arcana displays the server state and offers only server-provided actions.", color = Muted, fontSize = 12.sp)
-                TextButton(onClick = { stackOpen = false; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } }, enabled = argentumSnapshot?.legalActions?.isNotEmpty() == true) {
-                    Text("VIEW LEGAL ACTIONS", color = Mint)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { stackOpen = false; TutorialActions.tap("stack-close") }, modifier = Modifier.heightIn(min = 48.dp).tutorialTarget("stack-close")) { Text("CLOSE", color = SoftWhite) }
+                    TextButton(onClick = {
+                        // The stack drill's next gesture is CLOSE. Keep the real sheet open
+                        // through the confirmed pass so that control remains available.
+                        if (!tutorialGated) stackOpen = false
+                        sendArgentumPriority()
+                    }, enabled = !argentumAwaitingUpdate && argentumSnapshot?.legalActions?.any { it.optJSONObject("action")?.optString("type") == "PassPriority" } == true,
+                        modifier = Modifier.heightIn(min = 48.dp).tutorialTarget("stack-pass")) {
+                        Text("PASS PRIORITY", color = Mint, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                // The stack drill's next gesture is CLOSE. Keep the real sheet open
-                // through the confirmed pass so that control remains available.
-                if (!tutorialPracticeActive) stackOpen = false
-                sendArgentumPriority()
-            }, enabled = !argentumAwaitingUpdate && argentumSnapshot?.legalActions?.any { it.optJSONObject("action")?.optString("type") == "PassPriority" } == true) {
-                Text("PASS PRIORITY", color = Mint)
+            TutorialLayer(Modifier.matchParentSize())
             }
-        },
-        dismissButton = { TextButton(onClick = { stackOpen = false; TutorialActions.tap("stack-close") }) { Text("CLOSE") } }
-    ) else if (stackOpen) StackPriorityDialog(
+        }
+    } else if (stackOpen) StackPriorityDialog(
         players = players, stack = stackActions, priorityPlayer = priorityPlayer, passedCount = priorityPassed.size,
         eligibleCount = players.count { !it.isEliminated }, canResolve = stackActions.isNotEmpty() && stackActions.none { !it.targetsConfirmed } && players.filterNot { it.isEliminated }.all { it.id in priorityPassed },
         canAct = !gameEndedOnline && stackActions.none { !it.targetsConfirmed } && players.getOrNull(priorityPlayer)?.isEliminated == false && (if (onlineMode) priorityPlayer == localSeat else priorityPlayer == selectedPlayer),

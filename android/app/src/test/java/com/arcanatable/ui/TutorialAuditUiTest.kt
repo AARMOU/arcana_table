@@ -11,6 +11,9 @@ import androidx.test.core.app.ActivityScenario
 import androidx.test.core.app.ApplicationProvider
 import com.arcanatable.MainActivity
 import com.arcanatable.TableController
+import com.arcanatable.TutorialCoachState
+import com.arcanatable.chooseArgentumLegalAction
+import com.arcanatable.sendArgentumPriority
 import com.arcanatable.TutorialPracticeScenarios
 import com.arcanatable.TutorialTargets
 import org.junit.Assert.assertTrue
@@ -49,6 +52,8 @@ class TutorialAuditUiTest {
 
     private fun screenOf(t: TableController): String = when {
         t.tutorialHubOpen -> "hub"
+        t.argentumMulliganPrompt || t.argentumBottomCardIds != null -> "mulligan"
+        t.layoutLabOpen -> "layout"
         t.diagnosticViewerOpen -> "diagnostics"
         t.optionsOpen -> "settings"
         t.playSheetOpen -> "setup"
@@ -68,25 +73,31 @@ class TutorialAuditUiTest {
             UiTestSupport.settle(rule)
             lateinit var t: TableController
             scenario.onActivity { t = checkNotNull(it.tableController) }
-            val practice = chapter in TutorialPracticeScenarios.supported
-            if (practice) {
-                t.startTutorialPractice(chapter)
-                UiTestSupport.awaitReal(rule, 90_000, "practice game for $chapter") { !t.tutorialLoading && t.argentumSnapshot != null }
-            } else t.startTutorialCoach(chapter)
-            UiTestSupport.settle(rule, 800)
+            // The same entry point as START LESSON in Learn.
+            t.startTutorial(chapter)
+            if (t.tutorialPracticeActive) UiTestSupport.awaitReal(rule, 120_000, "practice game for $chapter") {
+                !t.tutorialLoading && (t.argentumSnapshot != null || t.argentumMulliganPrompt)
+            }
+            val practice = t.tutorialPracticeActive
+            UiTestSupport.settle(rule, 1_000)
             val lesson = checkNotNull(t.tutorialLesson) { "lesson $chapter did not start" }
             var guard = 0
             while (t.tutorialLesson != null && guard++ < lesson.steps.size + 3) {
                 val index = t.tutorialStepIndex
                 val step = lesson.steps[index]
                 UiTestSupport.settle(rule, 600)
-                val bounds = step.target?.let { TutorialTargets.bounds[it] }
+                val top = topWindow()
+                val resolved = step.target?.let { TutorialTargets.resolve(it, top) }
+                val bounds = resolved?.let { TutorialTargets.bounds[it] }
+                // The control must be on the window the player is looking at, not hidden behind it.
                 val targetOk = step.target == null || (bounds != null && bounds.width > 1f && bounds.height > 1f)
+                val coachCount = rule.onAllNodes(hasTestTag("tutorial-coach-tip")).fetchSemanticsNodes().size
                 val screen = screenOf(t)
                 val wantScreen = step.screen.ifBlank { "board" }
-                val screenOk = screen == wantScreen || (wantScreen == "layout" && screen == "settings") || (wantScreen == "menu" && screen == "board")
+                val screenOk = screen == wantScreen
                 val coach = coachShown()
                 val hasNext = rule.onAllNodes(nextButton()).fetchSemanticsNodes().isNotEmpty()
+                val coachOnTop = TutorialCoachState.layers.isNotEmpty() && coachInTopWindow(top)
                 val name = "tutorial-$chapter-${"%02d".format(index + 1)}-${step.id}"
                 scenario.onActivity { UiTestSupport.screenshot(it, name) }
                 // Advance the way a player would: NEXT if offered, otherwise the step's own control.
@@ -97,15 +108,19 @@ class TutorialAuditUiTest {
                 } else {
                     how = "gated-${step.actionKind}"
                     when (step.actionKind) {
-                        "tap", "hold" -> t.tutorialSignal(step.actionKind, step.target.orEmpty().replace(":any", ":Forest"))
-                        else -> t.tutorialAdvance()
+                        "tap", "hold" -> t.tutorialSignal(step.actionKind, resolved ?: step.target.orEmpty())
+                        // Play the drill for real: land, mana, cast, pass. Anything else is forced.
+                        "event" -> if (!playFor(t, step.event.orEmpty())) { how += "-forced"; t.tutorialAdvance() }
                     }
+                    UiTestSupport.awaitReal(rule, 20_000, "engine after ${step.id}") { !t.argentumAwaitingUpdate }
                 }
                 UiTestSupport.settle(rule, 400)
                 val moved = t.tutorialLesson == null || t.tutorialStepIndex != index
                 if (!moved) { how += "-STUCK"; t.tutorialAdvance(); UiTestSupport.settle(rule, 300) }
                 val flags = buildList {
                     if (!coach) add("NO-COACH")
+                    if (coachCount > 1) add("DUPLICATE-COACH($coachCount)")
+                    if (coach && !coachOnTop) add("COACH-BEHIND-WINDOW")
                     if (!screenOk) add("SCREEN(want=$wantScreen got=$screen)")
                     if (!targetOk) add("NO-TARGET(${step.target})")
                     if (!moved) add("STUCK")
@@ -115,7 +130,37 @@ class TutorialAuditUiTest {
                 if (flags.isNotEmpty()) problems += line
             }
             if (t.tutorialLesson != null) { problems += "$chapter: never finished"; report.appendLine("$chapter: NEVER FINISHED") }
-            if (practice) t.stopTutorial()
+            if (t.tutorialLesson != null || practice) t.stopTutorial()
+        }
+    }
+
+    /** The topmost app window (the activity, or the dialog/sheet/popup on top of it). */
+    private fun topWindow(): android.view.View {
+        val global = Class.forName("android.view.WindowManagerGlobal")
+        val instance = global.getMethod("getInstance").invoke(null)
+        @Suppress("UNCHECKED_CAST")
+        val views = (global.getDeclaredField("mViews").apply { isAccessible = true }.get(instance) as List<android.view.View>)
+        return views.last { it.isAttachedToWindow && it.width > 0 }.rootView
+    }
+
+    /** True when the coach card is drawn in [top], the window the player is looking at. */
+    private fun coachInTopWindow(top: android.view.View): Boolean = TutorialCoachState.drawnIn === top
+
+    /** Does the real move a drill step waits for, through the same calls the table's buttons make. */
+    private fun playFor(t: TableController, event: String): Boolean {
+        val actions = t.argentumSnapshot?.legalActions.orEmpty()
+        fun pick(match: (org.json.JSONObject) -> Boolean): Boolean {
+            val info = actions.firstOrNull(match) ?: return false
+            t.chooseArgentumLegalAction(info); return true
+        }
+        fun type(i: org.json.JSONObject) = i.optJSONObject("action")?.optString("type").orEmpty()
+        fun desc(i: org.json.JSONObject) = i.optString("description")
+        return when (event) {
+            "LandPlayed" -> pick { type(it) != "PassPriority" && "Forest" in desc(it) && "Add" !in desc(it) }
+            "ManaAdded" -> pick { "Add {G}" in desc(it) || type(it).contains("Mana") }
+            "SpellCast" -> pick { type(it) == "CastSpell" && ("Elvish Mystic" in desc(it) || "Giant Growth" in desc(it)) }
+            "SpellResolved", "PriorityPassed", "TurnAdvanced" -> { t.sendArgentumPriority(); true }
+            else -> false
         }
     }
 

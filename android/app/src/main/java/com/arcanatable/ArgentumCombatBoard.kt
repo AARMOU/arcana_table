@@ -180,10 +180,9 @@ private fun CombatBoardFrame(
                 Column(Modifier.fillMaxSize().padding(12.dp)) {
                     Text(title, color = SoftWhite, fontSize = 15.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
                     Text(hint, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
-                    tutorialCue?.let { (cueTitle, cueText) -> Box(Modifier.padding(bottom = 8.dp)) { TutorialInlineCue(cueTitle, cueText) } }
                     val topSection: @Composable () -> Unit = {
                         Text(topLabel, color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(Modifier.fillMaxWidth().tutorialTarget("combat-top").horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             top.forEach { piece ->
                                 CombatTile(piece, tileWidth, selected = false, linked = piece.id in linkedIds, enabled = topEnabled(piece.id),
                                     onClick = { onTop(piece.id) }, onBounds = { bounds["t:${piece.id}"] = it }, badge = topBadge(piece.id))
@@ -194,7 +193,7 @@ private fun CombatBoardFrame(
                     }
                     val bottomSection: @Composable () -> Unit = {
                         Text(bottomLabel, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(Modifier.fillMaxWidth().tutorialTarget("combat-bottom").horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             bottom.forEach { piece ->
                                 CombatTile(piece, tileWidth, selected = piece.id == selectedId, linked = piece.id in linkedIds, enabled = bottomEnabled(piece.id),
                                     onClick = { onBottom(piece.id) }, onBounds = { bounds["b:${piece.id}"] = it }, badge = bottomBadge(piece.id))
@@ -210,7 +209,7 @@ private fun CombatBoardFrame(
                         Spacer(Modifier.heightIn(min = 46.dp))
                         bottomSection()
                     }
-                    Column(Modifier.fillMaxWidth().heightIn(max = 120.dp).verticalScroll(rememberScrollState()).padding(top = 6.dp).testTag("combat-summary")) {
+                    Column(Modifier.fillMaxWidth().heightIn(max = 120.dp).verticalScroll(rememberScrollState()).padding(top = 6.dp).testTag("combat-summary").tutorialTarget("combat-summary")) {
                         summary.forEach { Text(it, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                         if (summary.isEmpty()) Text("Nothing assigned yet.", color = Muted, fontSize = 11.sp)
                         warning?.let { Text(it, color = CounterGold, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp)) }
@@ -220,11 +219,12 @@ private fun CombatBoardFrame(
                         extraButton?.invoke()
                         Spacer(Modifier.weight(1f))
                         TextButton(enabled = confirmEnabled, onClick = onConfirm,
-                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (confirmEnabled) Mint else PanelLight)) {
+                            modifier = Modifier.tutorialTarget("combat-confirm").clip(RoundedCornerShape(8.dp)).background(if (confirmEnabled) Mint else PanelLight)) {
                             Text(confirmLabel, color = if (confirmEnabled) Ink else Muted, fontWeight = FontWeight.Black)
                         }
                     }
                 }
+                TutorialLayer(Modifier.matchParentSize())
             }
         }
     }

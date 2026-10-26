@@ -217,20 +217,15 @@ internal fun TableController.TableMainLayout() {
             Box(Modifier) {
                 IconButton(onClick = { run { topMenuSection = null; topMenuExpanded = true; TutorialActions.tap("game-menu") } }, modifier = Modifier.size(46.dp).tutorialTarget("game-menu")) { Icon(Icons.Filled.MoreVert, "App menu", tint = SoftWhite) }
                 DropdownMenu(expanded = topMenuExpanded, onDismissRequest = { topMenuExpanded = false; topMenuSection = null }) {
-                    tutorialStep?.takeIf { it.screen == "menu" }?.let { step ->
-                        DropdownMenuItem(
-                            text = { Column { Text("TUTORIAL · " + step.title, color = Mint, fontWeight = FontWeight.Bold); Text(step.body, fontSize = 11.sp) } },
-                            onClick = { if (step.actionKind == "next") tutorialAdvance() },
-                            enabled = step.actionKind == "next"
-                        )
-                    }
+                    // A running lesson's coach, with its buttons, inside the menu where the player is looking.
+                    TutorialLayer(Modifier.widthIn(max = 320.dp), compact = true)
                     if (topMenuSection == null) {
-                        DropdownMenuItem(text = { Text("Learn & tutorials") }, onClick = { topMenuExpanded = false; topMenuSection = null; tutorialHubOpen = true })
-                        DropdownMenuItem(text = { Text("Game tools") }, modifier = Modifier, onClick = { run { topMenuSection = "tools"; TutorialActions.tap("menu-game-tools") } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
-                        DropdownMenuItem(text = { Text("Room & game") }, modifier = Modifier, onClick = { run { topMenuSection = "game" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                        DropdownMenuItem(text = { Text("Learn & tutorials") }, modifier = Modifier.tutorialTarget("menu-tutorials"), onClick = { topMenuExpanded = false; topMenuSection = null; tutorialHubOpen = true })
+                        DropdownMenuItem(text = { Text("Game tools") }, modifier = Modifier.tutorialTarget("menu-game-tools"), onClick = { run { topMenuSection = "tools"; TutorialActions.tap("menu-game-tools") } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                        DropdownMenuItem(text = { Text("Room & game") }, modifier = Modifier.tutorialTarget("menu-room-game"), onClick = { run { topMenuSection = "game" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("What's new") }, onClick = { topMenuExpanded = false; changelogOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("Adjust UI") }, onClick = { topMenuExpanded = false; topMenuSection = null; layoutLabOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
-                        DropdownMenuItem(text = { Text("Options") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; optionsOpen = true } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                        DropdownMenuItem(text = { Text("Options") }, modifier = Modifier.tutorialTarget("menu-options"), onClick = { run { topMenuExpanded = false; topMenuSection = null; optionsOpen = true } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                     } else {
                         DropdownMenuItem(text = { Text("‹  MAIN MENU") }, modifier = Modifier, onClick = { run { topMenuSection = null } })
                         when (topMenuSection) {
@@ -244,10 +239,10 @@ internal fun TableController.TableMainLayout() {
                                 if (!argentumEnabled && gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Add token") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; tokenTarget = selectedPlayer; tokenPickerOpen = true } })
                                 if (!argentumEnabled && gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Mana pool · ${trackedMana(selectedPlayer)}") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; manaTarget = selectedPlayer; manaPoolOpen = true } })
                                 if (!argentumEnabled && !gameEndedOnline && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Search / browse library") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; librarySearchPlayer = selectedPlayer } })
-                                if (argentumEnabled && gameInProgress) DropdownMenuItem(text = { Text("Argentum legal actions · ${ArgentumActions.visibleChoices(argentumSnapshot?.legalActions.orEmpty()).size}") }, onClick = { topMenuExpanded = false; topMenuSection = null; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } })
+                                if (argentumEnabled && gameInProgress) DropdownMenuItem(text = { Text("Argentum legal actions · ${ArgentumActions.visibleChoices(argentumSnapshot?.legalActions.orEmpty()).size}") }, modifier = Modifier.tutorialTarget("menu-legal-actions"), onClick = { topMenuExpanded = false; topMenuSection = null; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } })
                                 if (gameInProgress) DropdownMenuItem(text = { Text("Stack and priority · $visibleStackCount") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; stackOpen = true } })
-                                DropdownMenuItem(text = { Text("Game log") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; logOpen = true } })
-                                DropdownMenuItem(text = { Text("MTG rules") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; rulesOpen = true } })
+                                DropdownMenuItem(text = { Text("Game log") }, modifier = Modifier.tutorialTarget("menu-game-log"), onClick = { run { topMenuExpanded = false; topMenuSection = null; logOpen = true } })
+                                DropdownMenuItem(text = { Text("MTG rules") }, modifier = Modifier.tutorialTarget("menu-mtg-rules"), onClick = { run { topMenuExpanded = false; topMenuSection = null; rulesOpen = true } })
                             }
                             "game" -> {
                                 if (argentumOffline && !tutorialPracticeActive && wifiRole == null && argentumSnapshot != null && !gameEndedOnline)
@@ -266,7 +261,7 @@ internal fun TableController.TableMainLayout() {
                                     if (endProposalBy < 0) { endProposalBy = localSeat; endVotes = mapOf(localSeat to true); logAction(localSeat, "proposed ending the game") }
                                 } })
                                 if (onlineMode) DropdownMenuItem(text = { Text("Leave game…") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; if (argentumEnabled) argentumLeaveConfirm = true else lobbyOpen = true } })
-                                if (!onlineMode || localSeat == 0 && gameEndedOnline) DropdownMenuItem(text = { Text("Reset game", color = Color(0xFFE9978B)) }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; resetConfirmOpen = true } })
+                                if (!onlineMode || localSeat == 0 && gameEndedOnline) DropdownMenuItem(text = { Text("Reset game", color = Color(0xFFE9978B)) }, modifier = Modifier.tutorialTarget("menu-reset"), onClick = { run { topMenuExpanded = false; topMenuSection = null; resetConfirmOpen = true } })
                                 if (!onlineMode) DropdownMenuItem(text = { Text("Reset and clear all data", color = Color(0xFFE9978B)) }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; clearAllConfirmOpen = true } })
                             }
                         }

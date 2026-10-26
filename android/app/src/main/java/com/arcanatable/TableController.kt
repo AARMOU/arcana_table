@@ -385,7 +385,10 @@ internal class TableController(
     var tutorialHubOpen by mutableStateOf(false)
     var tutorialChapterId by mutableStateOf<String?>(null)
     var tutorialStepIndex by mutableStateOf(0)
+    /** A temporary practice game is running for the lesson (never saved over the player's game). */
     var tutorialPracticeActive by mutableStateOf(false)
+    /** The lesson is a drill: its action steps wait for the real move instead of offering NEXT. */
+    var tutorialGated by mutableStateOf(false)
     var tutorialLoading by mutableStateOf(false)
     /** Snapshot-to-event detection for practice lessons (TutorialProgress.kt, shared with tests). */
     internal val tutorialEvents = TutorialEventDetector()
@@ -418,7 +421,9 @@ internal class TableController(
             val preferences = context.getSharedPreferences("arcana_tutorials", Context.MODE_PRIVATE)
             val completed = preferences.getStringSet("practiced_chapters", emptySet()).orEmpty().toMutableSet()
             if (run.practice) completed.add(run.lesson.id)
-            preferences.edit().putStringSet("practiced_chapters", completed).apply()
+            // Finishing a lesson on screen counts as done in the Learn list too.
+            val read = preferences.getStringSet("read_chapters", emptySet()).orEmpty() + run.lesson.id
+            preferences.edit().putStringSet("practiced_chapters", completed).putStringSet("read_chapters", read).apply()
             stopTutorial()
             return
         }
@@ -431,9 +436,10 @@ internal class TableController(
         tutorialEvents.detect(previous, current, { tutorialStep }) { tutorialSignal("event", it) }
     }
 
-    fun stopTutorial() {
+    fun stopTutorial(reopenHub: Boolean = true) {
         val wasPractice = tutorialPracticeActive
         tutorialPracticeActive = false
+        tutorialGated = false
         tutorialRun = null
         tutorialEvents.reset()
         stackOpen = false
@@ -442,29 +448,66 @@ internal class TableController(
         tutorialLoading = false
         tutorialMulliganPending = false
         if (wasPractice && argentumEnabled) closeArgentumSession(false)
-        tutorialHubOpen = true
+        topMenuExpanded = false
+        if (reopenHub) tutorialHubOpen = true
     }
 
-    fun tutorialRouteScreen() {
-        if (tutorialPracticeActive) {
-            val step = tutorialStep
-            if (step?.screen == "stack" && argentumSnapshot?.stack?.isNotEmpty() == true) {
-                showHand = false
-                stackOpen = true
-            } else if (step?.screen == "board") {
-                stackOpen = false
-                showHand = step.target?.startsWith("hand-card:") == true
-            }
-            return
+    /** Lessons whose steps happen on the game table need a game running. */
+    internal fun tutorialNeedsBoard(lesson: ArcanaLesson): Boolean =
+        lesson.steps.any { it.screen in setOf("board", "stack", "menu", "mulligan") }
+
+    /**
+     * Start a lesson the way the player expects: drills get their own practice game; lessons
+     * about the table use the game in progress, or a ready practice board when there is none;
+     * lessons about Home, Settings and the deck picker run where they are.
+     */
+    fun startTutorial(id: String, startingIndex: Int = 0) {
+        val lesson = tutorialChapters.firstOrNull { it.id == id } ?: return
+        when {
+            id in TutorialPracticeScenarios.supported && !argentumEnabled && !offlineStarting -> startTutorialPractice(id)
+            tutorialNeedsBoard(lesson) && !argentumEnabled -> startTutorialPractice(id, scenario = TutorialPracticeScenarios.TOUR, startingIndex = startingIndex)
+            else -> startTutorialCoach(id, startingIndex)
         }
-        when (tutorialStep?.screen) {
-            "home" -> { homeOpen = true; optionsOpen = false; playSheetOpen = false; deckPickerOpen = false }
-            "setup" -> { homeOpen = true; optionsOpen = false; playSheetOpen = true }
-            "settings", "diagnostics", "layout" -> { homeOpen = true; playSheetOpen = false; optionsOpen = true }
-            "decks" -> { homeOpen = true; optionsOpen = false; deckPickerOpen = true }
-            "board" -> if (argentumEnabled) { homeOpen = false; optionsOpen = false }
-            "stack" -> if (argentumEnabled) stackOpen = true
-            "menu" -> { if (argentumEnabled) homeOpen = false; topMenuSection = null; topMenuExpanded = tutorialStep?.target != "game-menu" }
+    }
+
+    /** Opens the screen each step is about and closes whatever would cover it. */
+    fun tutorialRouteScreen() {
+        val step = tutorialStep ?: return
+        val target = step.target.orEmpty()
+        val game = argentumEnabled
+        fun closeGameOverlays() { stackOpen = false; topMenuExpanded = false; topMenuSection = null; argentumActionChoices = emptyList() }
+        fun closeHomeSheets() { playSheetOpen = false; deckPickerOpen = false }
+        when (step.screen) {
+            "home" -> { closeGameOverlays(); showHand = false; optionsOpen = false; layoutLabOpen = false; closeHomeSheets(); homeOpen = true }
+            "setup" -> { optionsOpen = false; deckPickerOpen = false; homeOpen = true; playSheetOpen = true }
+            "decks" -> { optionsOpen = false; playSheetOpen = false; homeOpen = true; deckPickerOpen = true }
+            "settings", "diagnostics" -> { closeGameOverlays(); showHand = false; closeHomeSheets(); layoutLabOpen = false; if (!game) homeOpen = true; optionsOpen = true }
+            "layout" -> { closeGameOverlays(); showHand = false; optionsOpen = false; layoutLabOpen = true }
+            "board" -> if (game) {
+                homeOpen = false; optionsOpen = false; layoutLabOpen = false; closeHomeSheets()
+                stackOpen = false; topMenuExpanded = false; topMenuSection = null
+                // A step about the legal-actions sheet keeps the sheet (and hand) the player just opened.
+                if (target != "legal-action-sheet") {
+                    argentumActionChoices = emptyList()
+                    // The hand drawer opens for steps about cards in hand, and stays shut otherwise.
+                    showHand = target.startsWith("hand-card:") || target == "hand-grid" || target == "hand-drawer-grip"
+                }
+                if (target == "your-tab" || target.startsWith("battlefield-") || target == "argentum-mana-summary" || target == "commander-chip" ||
+                    target.startsWith("quick-") || target == "stack-button") { showOverview = false; selectedPlayer = localSeat }
+            }
+            // A drill only shows the stack when something is on it; a tour shows it whenever asked.
+            "stack" -> if (game && (!tutorialGated || argentumSnapshot?.stack?.isNotEmpty() == true)) {
+                homeOpen = false; showHand = false; optionsOpen = false; stackOpen = true
+            }
+            "menu" -> if (game) {
+                homeOpen = false; showHand = false; optionsOpen = false; stackOpen = false
+                topMenuSection = when (target) {
+                    "menu-legal-actions", "menu-mtg-rules", "menu-game-log" -> "tools"
+                    "menu-reset" -> "game"
+                    else -> null
+                }
+                topMenuExpanded = true
+            }
         }
     }
 
@@ -473,32 +516,34 @@ internal class TableController(
         tutorialHubOpen = false
         tutorialChapterId = id
         tutorialStepIndex = startingIndex.coerceIn(0, lesson.steps.lastIndex)
-        tutorialPracticeActive = false
+        tutorialGated = false
         tutorialRun = TutorialRun(lesson, practice = false, startIndex = tutorialStepIndex)
         tutorialRouteScreen()
     }
 
-    fun startTutorialPractice(id: String) {
+    fun startTutorialPractice(id: String, scenario: String = id, startingIndex: Int = 0) {
         if (argentumEnabled || offlineStarting) {
             message = "Finish your current game before opening a practice match. Your save will be preserved."
             return
         }
-        if (id !in TutorialPracticeScenarios.supported) {
+        if (scenario !in TutorialPracticeScenarios.supported && scenario != TutorialPracticeScenarios.TOUR) {
             message = "This activity is not yet available as a practice game."
             return
         }
+        val drill = scenario in TutorialPracticeScenarios.supported
         tutorialHubOpen = false
         tutorialChapterId = id
-        tutorialStepIndex = 0
+        tutorialStepIndex = if (drill) 0 else startingIndex
         tutorialEvents.reset()
-        tutorialRun = tutorialChapters.firstOrNull { it.id == id }?.let { TutorialRun(it, practice = true) }
+        tutorialRun = tutorialChapters.firstOrNull { it.id == id }?.let { TutorialRun(it, practice = drill, startIndex = tutorialStepIndex) }
+        tutorialGated = drill
         tutorialPracticeActive = true
         tutorialLoading = true
         offlineStarting = true
         argentumLastError = null
         scope.launch {
             try {
-                if (id == TutorialPracticeScenarios.MULLIGAN) {
+                if (scenario == TutorialPracticeScenarios.MULLIGAN) {
                     val (seats, registry) = withContext(Dispatchers.IO) { TutorialPracticeScenarios.openingHand(offlineLibrary()) }
                     argentumSocket.localHostFactory = { emit ->
                         com.arcanatable.engine.LocalArgentumHost(
@@ -519,10 +564,10 @@ internal class TableController(
                     check(argentumStatus == ArgentumConnectionStatus.CONNECTED &&
                         argentumSocket.createCommanderPracticeLobby(vsAi = true)) { "Tutorial engine connection failed." }
                 } else {
-                    val scenario = withContext(Dispatchers.IO) { TutorialPracticeScenarios.build(id, offlineLibrary()) }
-                    launchOfflineCheckpoint(scenario.seats, scenario.registry, scenario.checkpoint.toString())
+                    val built = withContext(Dispatchers.IO) { TutorialPracticeScenarios.build(scenario, offlineLibrary()) }
+                    launchOfflineCheckpoint(built.seats, built.registry, built.checkpoint.toString())
                 }
-                recordDiagnostic("Tutorial practice started: $id", DiagnosticCategory.ENGINE)
+                recordDiagnostic("Tutorial practice started: $id ($scenario)", DiagnosticCategory.ENGINE)
             } catch (failed: Throwable) {
                 argentumSocket.close()
                 argentumSocket.localHostFactory = null
@@ -532,6 +577,8 @@ internal class TableController(
                 homeOpen = true
                 tutorialChapterId = null
                 tutorialPracticeActive = false
+                tutorialGated = false
+                tutorialRun = null
                 tutorialHubOpen = true
                 message = "Tutorial could not start: ${failed.message ?: failed.javaClass.simpleName}"
                 recordDiagnostic("Tutorial preparation failed: ${failed.message}", DiagnosticCategory.ERROR)

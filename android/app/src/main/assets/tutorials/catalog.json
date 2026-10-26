@@ -97,12 +97,12 @@
         {
           "id": "spell-stack",
           "screen": "stack",
-          "target": "argentum-stack",
+          "target": "stack-items",
           "advance": {
             "kind": "next"
           },
           "title": "Spells use the stack",
-          "body": "Casting a creature puts the spell on the stack. It enters the battlefield after it resolves.",
+          "body": "Casting a creature puts the spell on the stack. Here it is, waiting to resolve. It enters the battlefield when it resolves.",
           "hint": "Next"
         },
         {
@@ -131,7 +131,7 @@
         {
           "id": "sickness",
           "screen": "board",
-          "target": "card-zoom",
+          "target": "battlefield-card:Elvish Mystic",
           "advance": {
             "kind": "next"
           },
@@ -154,13 +154,13 @@
         {
           "id": "combat-skip",
           "screen": "board",
-          "target": "legal-action-sheet",
+          "target": "bottom-bar-pass-button",
           "advance": {
             "kind": "event",
             "event": "AttackersDeclared"
           },
           "title": "No attack this time",
-          "body": "Elvish Mystic arrived this turn, so it can't attack yet. If you see DECLARE ATTACKERS, confirm with no attackers; otherwise the game moves straight past combat.",
+          "body": "Elvish Mystic arrived this turn, so it can't attack yet. Keep tapping Pass; if the game asks for attackers, confirm with none.",
           "hint": "Keep passing"
         },
         {
@@ -248,12 +248,12 @@
         {
           "id": "resume",
           "screen": "home",
-          "target": "home-resume",
+          "target": null,
           "advance": {
             "kind": "next"
           },
           "title": "Resume safely",
-          "body": "When you have a saved offline game, RESUME takes you back to it instead of starting over.",
+          "body": "When you have a saved offline game, a RESUME button appears here on Home and takes you back to it instead of starting over.",
           "hint": "Next"
         },
         {
@@ -337,17 +337,6 @@
           "hint": "Choose an AI deck"
         },
         {
-          "id": "start",
-          "screen": "setup",
-          "target": "setup-start",
-          "advance": {
-            "kind": "tap"
-          },
-          "title": "Ready to play",
-          "body": "PLAY OFFLINE VS AI starts a new game. Practice lessons always use a separate game instead.",
-          "hint": "Tap Start in demo"
-        },
-        {
           "id": "save-note",
           "screen": "setup",
           "target": null,
@@ -355,8 +344,19 @@
             "kind": "next"
           },
           "title": "Practice is separate",
-          "body": "Practice lessons never replace your saved offline game or change your deck choice.",
+          "body": "Practice lessons never replace your saved offline game. Choosing a deck or AI deck here is a real choice, and stays for your next game.",
           "hint": "Done"
+        },
+        {
+          "id": "start",
+          "screen": "setup",
+          "target": "setup-start",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Ready to play",
+          "body": "PLAY starts a real game against the AI with these choices. Tap it when you're ready; that ends this lesson. Practice lessons always use a separate game.",
+          "hint": "Tap PLAY, or Next to finish"
         }
       ]
     },
@@ -630,7 +630,7 @@
             "kind": "next"
           },
           "title": "Choose an action",
-          "body": "Casting, playing a land and activating abilities are different actions. Read the offered choice before confirming.",
+          "body": "This sheet lists only what Argentum allows with that card right now: play, cast, or an ability. Choose one, or close the sheet.",
           "hint": "Next"
         },
         {
@@ -658,13 +658,13 @@
         {
           "id": "close",
           "screen": "board",
-          "target": "hand-handle",
+          "target": null,
           "advance": {
-            "kind": "tap"
+            "kind": "next"
           },
           "title": "Back to the table",
-          "body": "Collapse the drawer any time to see more of the battlefield.",
-          "hint": "Done"
+          "body": "Tap outside the drawer, or its ✕, to close your hand and return to the table.",
+          "hint": "Next"
         }
       ]
     },
@@ -694,12 +694,12 @@
         {
           "id": "symbols",
           "screen": "board",
-          "target": "mana-pips",
+          "target": "hand-card:Elvish Mystic",
           "advance": {
             "kind": "next"
           },
           "title": "Read the mana symbols",
-          "body": "Colored symbols require that color of mana. A number in a gray circle is generic mana, payable with any mana type.",
+          "body": "A card's cost is in its top-right corner. Colored symbols need that color of mana; a number is generic mana, payable with any type. Elvish Mystic costs one green.",
           "hint": "Next"
         },
         {
@@ -752,12 +752,12 @@
         {
           "id": "autopay",
           "screen": "board",
-          "target": "payment-prompt",
+          "target": "argentum-mana-summary",
           "advance": {
             "kind": "next"
           },
           "title": "Auto-payment and choices",
-          "body": "Arcana can pay costs from your untapped lands for you. When a choice matters, like which color to make, it asks you.",
+          "body": "Arcana pays costs from your untapped lands for you. When a choice matters, like which color to make, it asks you.",
           "hint": "Next"
         },
         {
@@ -877,12 +877,12 @@
         {
           "id": "help",
           "screen": "board",
-          "target": "help-priority",
+          "target": "bottom-bar-pass-button",
           "advance": {
             "kind": "next"
           },
           "title": "Ask why the game is waiting",
-          "body": "When the game is waiting, the bottom bar tells you whether it's waiting on you, and what for.",
+          "body": "The Pass button's label tells you what passing will do next, like going to combat or ending your turn. If it glows, the game is waiting for your response.",
           "hint": "Done"
         }
       ]
@@ -1028,19 +1028,19 @@
         {
           "id": "attack",
           "screen": "board",
-          "target": "combat-attackers",
+          "target": "combat-bottom",
           "advance": {
             "kind": "event",
             "event": "AttackersDeclared"
           },
           "title": "Declare attackers",
-          "body": "Tap DECLARE ATTACKERS, choose Grizzly Bears, then confirm. Attacking taps the creature.",
-          "hint": "Declare Grizzly Bears"
+          "body": "When you pass into combat, the attack board opens. Tap Grizzly Bears to attack with it, then confirm. Attacking taps the creature.",
+          "hint": "Choose Grizzly Bears, then confirm"
         },
         {
           "id": "block",
           "screen": "board",
-          "target": "opponent-blocker",
+          "target": null,
           "advance": {
             "kind": "next"
           },
@@ -1051,7 +1051,7 @@
         {
           "id": "blocked",
           "screen": "board",
-          "target": "combat-blocks",
+          "target": null,
           "advance": {
             "kind": "next"
           },
@@ -1062,7 +1062,7 @@
         {
           "id": "damage",
           "screen": "board",
-          "target": "combat-damage",
+          "target": null,
           "advance": {
             "kind": "next"
           },
@@ -1073,23 +1073,23 @@
         {
           "id": "life",
           "screen": "board",
-          "target": "opponent-life",
+          "target": "opponent-tab",
           "advance": {
             "kind": "next"
           },
           "title": "Life totals update",
-          "body": "Your opponent's life went down by 2. Damage to creatures is removed at the end of the turn; life lost stays lost.",
+          "body": "Your opponent's life went down by 2: you can see it on their tab. Damage to creatures wears off at the end of the turn; life lost stays lost.",
           "hint": "Next"
         },
         {
           "id": "keywords",
           "screen": "board",
-          "target": "card-zoom",
+          "target": "battlefield-card:Grizzly Bears",
           "advance": {
             "kind": "next"
           },
           "title": "Keywords matter",
-          "body": "Flying, reach, first strike, trample and deathtouch can change combat. Read the individual card when uncertain.",
+          "body": "Flying, reach, first strike, trample and deathtouch can change combat. Press and hold any creature to read its abilities.",
           "hint": "Next"
         },
         {
@@ -1125,7 +1125,7 @@
             "kind": "next"
           },
           "title": "What is Commander?",
-          "body": "Commander decks normally contain exactly 100 cards including the commander. Your commander leads your deck.",
+          "body": "Commander decks normally have exactly 100 cards including the commander. On this practice board your commander is Ayula, Queen Among Bears.",
           "hint": "Next"
         },
         {
@@ -1133,27 +1133,27 @@
           "screen": "board",
           "target": "commander-chip",
           "advance": {
-            "kind": "tap"
+            "kind": "next"
           },
           "title": "The command zone",
-          "body": "Your commander begins in the command zone. Tap it to see legal actions, including casting when permitted.",
-          "hint": "Tap commander"
+          "body": "Your commander starts in the command zone, shown by this chip. Tapping it opens Argentum's actions for it, including Cast when you can afford it.",
+          "hint": "Next"
         },
         {
           "id": "cast",
           "screen": "board",
-          "target": "commander-action",
+          "target": "commander-chip",
           "advance": {
             "kind": "next"
           },
           "title": "Cast your commander",
-          "body": "The commander is cast as a spell and follows normal timing restrictions unless an ability changes them.",
+          "body": "A commander is cast as a spell, with normal timing: Ayula is a creature, so your main phase with an empty stack.",
           "hint": "Next"
         },
         {
           "id": "tax",
           "screen": "board",
-          "target": "commander-tax",
+          "target": "commander-chip",
           "advance": {
             "kind": "next"
           },
@@ -1164,7 +1164,7 @@
         {
           "id": "returns",
           "screen": "board",
-          "target": "commander-zone-choice",
+          "target": null,
           "advance": {
             "kind": "next"
           },
@@ -1175,29 +1175,29 @@
         {
           "id": "damage",
           "screen": "board",
-          "target": "commander-damage",
+          "target": "opponent-tab",
           "advance": {
             "kind": "next"
           },
           "title": "Track commander combat damage",
-          "body": "Taking 21 combat damage from the same commander over the game causes a loss, even if your life is still above zero.",
+          "body": "Taking 21 combat damage from the same commander over the game makes a player lose, even with life left. Starting life in Commander is 40.",
           "hint": "Next"
         },
         {
           "id": "color",
           "screen": "board",
-          "target": "deck-colors",
+          "target": "commander-chip",
           "advance": {
             "kind": "next"
           },
           "title": "Color identity matters",
-          "body": "The cards in your Commander deck must fit within your commander's color identity.",
+          "body": "Every card in a Commander deck must fit your commander's color identity. Ayula is green, so this deck is green.",
           "hint": "Next"
         },
         {
           "id": "legal",
           "screen": "board",
-          "target": "legal-action-sheet",
+          "target": null,
           "advance": {
             "kind": "next"
           },
@@ -1249,7 +1249,7 @@
             "kind": "tap"
           },
           "title": "Graveyard",
-          "body": "Many cards go here after dying, resolving or being discarded. Tap Graveyard to inspect them.",
+          "body": "Cards go here after dying, resolving or being discarded. There's a Llanowar Elves in yours. Tap Graveyard to look.",
           "hint": "Tap Graveyard"
         },
         {
@@ -1260,7 +1260,7 @@
             "kind": "tap"
           },
           "title": "Exile",
-          "body": "Exile is a separate zone. Exiled cards aren't automatically playable unless an effect allows it.",
+          "body": "Exile is a separate zone. Exiled cards aren't playable unless an effect says so. There's a Forest in yours. Tap Exile to look.",
           "hint": "Tap Exile"
         },
         {
@@ -1288,29 +1288,29 @@
         {
           "id": "tokens",
           "screen": "board",
-          "target": "battlefield-token",
+          "target": null,
           "advance": {
             "kind": "next"
           },
           "title": "Tokens represent permanents",
-          "body": "Tokens can be creatures or other permanents. They aren't physical cards in the library or graveyard.",
+          "body": "Tokens are permanents created by effects. They work like cards on the battlefield but aren't real cards: they vanish if they leave it.",
           "hint": "Next"
         },
         {
           "id": "counters",
           "screen": "board",
-          "target": "battlefield-counters",
+          "target": "battlefield-card:Grizzly Bears",
           "advance": {
             "kind": "next"
           },
           "title": "Counters change objects",
-          "body": "A +1/+1 counter changes a creature's stats. Other counter types can affect other parts of the game.",
+          "body": "Counters change objects. These Grizzly Bears have a +1/+1 counter, so they're 3/3. Hold the card to see it.",
           "hint": "Next"
         },
         {
           "id": "play-from-zone",
           "screen": "board",
-          "target": "legal-action-sheet",
+          "target": null,
           "advance": {
             "kind": "next"
           },
@@ -1400,13 +1400,13 @@
         },
         {
           "id": "configure",
-          "screen": "settings",
-          "target": "quick-actions-config",
+          "screen": "layout",
+          "target": "layout-quick-actions",
           "advance": {
             "kind": "next"
           },
           "title": "Customize the strip",
-          "body": "Adjust UI can change which quick tools appear and where they sit.",
+          "body": "Adjust UI lets you choose which quick actions appear and in what order.",
           "hint": "Next"
         },
         {
@@ -1417,7 +1417,7 @@
             "kind": "next"
           },
           "title": "Keep your place",
-          "body": "Closing a panel takes you back to the view you were using.",
+          "body": "Closing a panel takes you back to the view you were using. TABLE shows everyone at once.",
           "hint": "Done"
         }
       ]
@@ -1448,29 +1448,29 @@
         {
           "id": "action-feed",
           "screen": "board",
-          "target": "argentum-feed",
+          "target": null,
           "advance": {
             "kind": "next"
           },
           "title": "Recent plays",
-          "body": "Card and ability notifications show the important actions happening around the table.",
+          "body": "During a game, the strip under the table shows recent plays: what was cast or activated, and by whom.",
           "hint": "Next"
         },
         {
           "id": "inspect",
           "screen": "board",
-          "target": "played-card-popup",
+          "target": null,
           "advance": {
-            "kind": "tap"
+            "kind": "next"
           },
           "title": "Inspect a recent card",
-          "body": "Tap a recent-play notification to inspect the relevant card when a preview is available.",
-          "hint": "Tap the card notice"
+          "body": "Tap a recent-play notice to see the card large. When the AI plays a card, a pop-up shows it too (you can turn that off in Adjust UI).",
+          "hint": "Next"
         },
         {
           "id": "target",
           "screen": "board",
-          "target": "targeting-alert",
+          "target": null,
           "advance": {
             "kind": "next"
           },
@@ -1492,7 +1492,7 @@
         {
           "id": "ai",
           "screen": "board",
-          "target": "engine-status",
+          "target": null,
           "advance": {
             "kind": "next"
           },
@@ -1550,13 +1550,13 @@
         {
           "id": "preview",
           "screen": "decks",
-          "target": "deck-preview",
+          "target": "deck-select",
           "advance": {
-            "kind": "tap"
+            "kind": "next"
           },
           "title": "Inspect before choosing",
-          "body": "Review the commander's name, deck colors and any available deck summary.",
-          "hint": "Tap a deck"
+          "body": "Each deck shows its name and commander. The one you're playing is outlined and marked PLAYING.",
+          "hint": "Next"
         },
         {
           "id": "select",
@@ -1572,7 +1572,7 @@
         {
           "id": "search",
           "screen": "decks",
-          "target": "deck-search",
+          "target": null,
           "advance": {
             "kind": "next"
           },
@@ -1652,13 +1652,24 @@
         {
           "id": "reorder",
           "screen": "layout",
-          "target": "layout-move",
+          "target": "layout-sizes",
           "advance": {
             "kind": "next"
           },
-          "title": "Move controls thoughtfully",
-          "body": "Move and resize controls so the ones you use most are within reach, while keeping the game state visible.",
+          "title": "Resize the table",
+          "body": "Change card size, board spacing, hand tray height and button sizes. Changes save as you make them, separately for portrait and landscape.",
           "hint": "Next"
+        },
+        {
+          "id": "bottom",
+          "screen": "layout",
+          "target": "layout-sizes",
+          "title": "Your bottom controls",
+          "body": "Pass, Hand and Table are the controls you use most in a game. Bottom button size here makes them bigger or smaller to suit your thumbs.",
+          "hint": "Next",
+          "advance": {
+            "kind": "next"
+          }
         },
         {
           "id": "restore",
@@ -1703,17 +1714,6 @@
           "title": "Help and diagnostics",
           "body": "Support tools live here: the engine running notice, connection checks and the diagnostic log.",
           "hint": "Next"
-        },
-        {
-          "id": "bottom",
-          "screen": "board",
-          "target": "bottom-bar",
-          "advance": {
-            "kind": "next"
-          },
-          "title": "Your bottom controls",
-          "body": "The Pass, Hand and Table controls are the primary navigation and action area.",
-          "hint": "Done"
         }
       ]
     },
@@ -1917,15 +1917,15 @@
           "screen": "settings",
           "target": "setting-help-diagnostics",
           "advance": {
-            "kind": "tap"
+            "kind": "next"
           },
           "title": "Help and diagnostics",
-          "body": "Open the support tools when Arcana behaves unexpectedly.",
-          "hint": "Tap Help and diagnostics"
+          "body": "The Help & diagnostics section has the tools to use when Arcana behaves unexpectedly.",
+          "hint": "Next"
         },
         {
           "id": "log",
-          "screen": "diagnostics",
+          "screen": "settings",
           "target": "diagnostic-log",
           "advance": {
             "kind": "next"
@@ -1936,7 +1936,7 @@
         },
         {
           "id": "export",
-          "screen": "diagnostics",
+          "screen": "settings",
           "target": "diagnostic-export",
           "advance": {
             "kind": "next"
@@ -1947,7 +1947,7 @@
         },
         {
           "id": "status",
-          "screen": "diagnostics",
+          "screen": "settings",
           "target": "engine-processing-toggle",
           "advance": {
             "kind": "next"
@@ -1958,7 +1958,7 @@
         },
         {
           "id": "self-test",
-          "screen": "diagnostics",
+          "screen": "settings",
           "target": "engine-self-test",
           "advance": {
             "kind": "next"

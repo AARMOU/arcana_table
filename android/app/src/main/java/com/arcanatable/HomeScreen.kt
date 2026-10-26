@@ -238,18 +238,12 @@ internal fun PlaySheet(
     var friendMode by remember { mutableStateOf<Int?>(null) }
     var showAllDecks by remember { mutableStateOf(false) }
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
+        Box {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("How do you want to play?", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
-            tutorialStep?.let { step ->
-                TutorialInlineCue(step.title, step.body + "  " + step.hint)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
-                    if (step.actionKind == "next") TextButton(onClick = onTutorialNext) { Text("NEXT", color = Mint) }
-                }
-            }
-            Text(deckName?.let { "Your deck: $it" } ?: "No deck yet: offline uses a quick Portal duel.", color = Muted, fontSize = 14.sp)
+            Text(deckName?.let { "Your deck: $it" } ?: "No deck yet: offline uses a quick Portal duel.", color = Muted, fontSize = 14.sp, modifier = Modifier.tutorialTarget("setup-human-deck"))
             PlayOption("Offline vs AI", "Runs on your phone. No internet needed.", selected = !online && friendMode == null, onClick = { online = false; friendMode = null }, tag = "play-offline-option") {
-                Text("PLAYERS", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
+                Text("PLAYERS", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.tutorialTarget("setup-players"))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     DeckChip("2 · you vs AI", aiCount == 1) { onAiCount(1) }
                     if (ReleaseFeatures.multiplayerPreviewEnabled) {
@@ -258,7 +252,7 @@ internal fun PlaySheet(
                     }
                 }
                 if (!ReleaseFeatures.multiplayerPreviewEnabled) Text("Four-player support coming soon.", color = Muted, fontSize = 12.sp)
-                Text(if (aiCount > 1) "FIRST AI'S DECK (the others are random)" else "AI'S DECK", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
+                Text(if (aiCount > 1) "FIRST AI'S DECK (the others are random)" else "AI'S DECK", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.tutorialTarget("setup-ai-deck"))
                 val shown = if (showAllDecks) aiDecks else aiDecks.filter { !it.builtIn || it.id in setOf("tokens_win", "artificer_v4", "ayula_bears", "sliver_overlord", "hazel_squirrels", "mabel_heir", "velociraptor_beefcake") || it.id == aiDeckId }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     DeckChip("Random", aiDeckId == null) { onAiDeck(null) }
@@ -279,9 +273,11 @@ internal fun PlaySheet(
             PlayOption("Online with Argentum", "Not yet available", selected = false, onClick = { Toast.makeText(context, "Not yet available", Toast.LENGTH_SHORT).show() }, tag = "play-online-option", disabled = true) {}
             Button(
                 onClick = { when { online -> onOnline(); friendMode == 1 -> onWifiHost(); friendMode == 2 -> onWifiJoin(); friendMode == 3 -> onOnlineHost(); friendMode == 4 -> onOnlineJoin(); else -> onOffline() } },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp).testTag("play-start"),
+                modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp).testTag("play-start").tutorialTarget("setup-start"),
                 colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
             ) { Text(when { online -> "PLAY WITH ARGENTUM"; friendMode == 1 -> "HOST A WI-FI GAME"; friendMode == 2 -> "JOIN A WI-FI GAME"; friendMode == 3 -> "HOST AN ONLINE GAME"; friendMode == 4 -> "JOIN AN ONLINE GAME"; aiCount > 1 -> "PLAY OFFLINE · ${aiCount + 1} PLAYERS"; else -> "PLAY OFFLINE VS AI" }, fontSize = 17.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
+        }
+        TutorialLayer(Modifier.matchParentSize())
         }
     }
 }
@@ -290,7 +286,8 @@ internal fun PlaySheet(
 private fun PlayOption(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit, tag: String, disabled: Boolean = false, extra: @Composable () -> Unit) {
     Column(
         Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).border(if (selected) 2.dp else 1.dp, if (selected) Mint else PanelLight, RoundedCornerShape(18.dp))
-            .background(if (selected) PanelLight else Panel).clickable(onClick = onClick).padding(14.dp).testTag(tag),
+            .background(if (selected) PanelLight else Panel).clickable(onClick = onClick).padding(14.dp).testTag(tag)
+            .then(if (tag == "play-offline-option") Modifier.tutorialTarget("setup-offline") else Modifier),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -316,15 +313,9 @@ private fun DeckChip(label: String, selected: Boolean, onClick: () -> Unit) {
 @Composable
 internal fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit, onDeckBuilder: (() -> Unit)? = null, tutorialStep: ArcanaLessonStep? = null, onTutorialNext: () -> Unit = {}, onTutorialExit: () -> Unit = {}) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
+        Box {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text("Choose your deck", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
-            tutorialStep?.let { step ->
-                TutorialInlineCue(step.title, step.body + "  " + step.hint)
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
-                    if (step.actionKind == "next") TextButton(onClick = onTutorialNext) { Text("NEXT", color = Mint) }
-                }
-            }
             listOf(
                 DeckChoiceCategory.PRECON to "WOTC PRECONS",
                 DeckChoiceCategory.ARCANA to "ARCANA",
@@ -332,12 +323,14 @@ internal fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick:
                 DeckChoiceCategory.OTHER to "YOUR OTHER DECKS"
             ).filter { ReleaseFeatures.deckImportEnabled || it.first != DeckChoiceCategory.OTHER }.forEach { (category, heading) ->
                 val list = decks.filter { it.category == category }
-                Text(heading, color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
+                Text(heading, color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp)
+                    .then(if (category == DeckChoiceCategory.PRECON) Modifier.tutorialTarget("deck-categories") else Modifier))
                 if (list.isEmpty()) Text(if (ReleaseFeatures.deckImportEnabled) "None yet. Import a deck and it lands here." else "No decks in this group.", color = Muted, fontSize = 13.sp)
                 list.forEach { d ->
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(if (d.id == activeId) PanelLight else Panel)
-                            .border(1.dp, if (d.id == activeId) Mint else PanelLight, RoundedCornerShape(12.dp)).clickable { onPick(d) }.heightIn(min = 52.dp).padding(horizontal = 14.dp, vertical = 10.dp),
+                            .border(1.dp, if (d.id == activeId) Mint else PanelLight, RoundedCornerShape(12.dp)).clickable { onPick(d) }.heightIn(min = 52.dp).padding(horizontal = 14.dp, vertical = 10.dp)
+                            .then(if (d.id == (decks.firstOrNull { it.id == activeId } ?: decks.firstOrNull())?.id) Modifier.tutorialTarget("deck-select") else Modifier),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
@@ -357,6 +350,8 @@ internal fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick:
                     Text("Deck builder · developer preview", color = Mint, fontWeight = FontWeight.Bold)
                 }
             }
+        }
+        TutorialLayer(Modifier.matchParentSize())
         }
     }
 }

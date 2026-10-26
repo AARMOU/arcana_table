@@ -759,15 +759,6 @@ internal fun OptionsPage(
                     Text("OPTIONS", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 16.sp, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close options", tint = Muted) }
                 }
-                tutorialStep?.let { step ->
-                    TutorialInlineCue(step.title, step.body + "  " + step.hint)
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                        TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
-                        if (step.actionKind == "next") TextButton(onClick = onTutorialNext) {
-                            Text("NEXT", color = Mint)
-                        }
-                    }
-                }
                 Section("APPEARANCE", top = 8.dp)
                 TextButton(onClick = onToggleTheme, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Theme  ·  ${if (darkMode) "Dark" else "Light"}", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
                 SettingsToggle("Reduce swipe animation", "Skip the animated jump when switching player tabs.", reducedSwipeMotion, onReducedMotion, Modifier)
@@ -793,7 +784,7 @@ internal fun OptionsPage(
                     Switch(checked = backgroundAlertsEnabled, onCheckedChange = onToggleBackgroundAlerts)
                 }
                 Section("HELP & DIAGNOSTICS")
-                Row(Modifier.fillMaxWidth().heightIn(min = 60.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).tutorialTarget("engine-processing-toggle"), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f).padding(end = 8.dp)) {
                         Text("Engine running notice", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         Text("Show the in-game processing banner and elapsed time while Argentum works.", color = Muted, fontSize = 10.sp)
@@ -831,6 +822,7 @@ internal fun OptionsPage(
                 }
                 Text("Saved decks are kept when game data is cleared.", color = Muted, fontSize = 10.sp)
             }
+            TutorialLayer()
             }
         }
     }

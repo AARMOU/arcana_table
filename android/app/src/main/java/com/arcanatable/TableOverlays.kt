@@ -252,8 +252,9 @@ internal fun TableController.TableOverlays() {
                 onAiCount = { offlineAiCount = ReleaseFeatures.aiCount(it); optionPrefs.edit().putInt("offline_ai_count", offlineAiCount).apply() },
                 onOffline = {
                     playSheetOpen = false
-                    if (tutorialChapterId != null && !tutorialPracticeActive) TutorialActions.tap("setup-start")
-                    else run { startOfflineGame() }
+                    // PLAY always starts the game; a Choose-a-game lesson ends here, its job done.
+                    if (tutorialChapterId != null && !tutorialPracticeActive) { TutorialActions.tap("setup-start"); stopTutorial(reopenHub = false) }
+                    run { startOfflineGame() }
                 },
                 onOnline = { playSheetOpen = false; run { startArgentumPractice(vsAi = true) } },
                 onCreateRoom = { playSheetOpen = false; run { startArgentumPractice(vsAi = false) } },
@@ -268,9 +269,9 @@ internal fun TableController.TableOverlays() {
             )
             val pickDeck: (DeckChoice) -> Unit = { choice ->
                     deckPickerOpen = false
-                    if (tutorialChapterId != null && !tutorialPracticeActive) {
-                        TutorialActions.tap("deck-select")
-                    } else {
+                    // Choosing a deck during the deck lesson really chooses it, then the lesson moves on.
+                    if (tutorialChapterId != null && !tutorialPracticeActive) TutorialActions.tap("deck-select")
+                    run {
                     activeDeckId = choice.id; saveActiveDeck(context, choice.id)
                     recordDiagnostic("Deck chosen: ${choice.name}", DiagnosticCategory.ACTION)
                     // Also put it on your table (card art, online play). Offline games read the choice directly.
@@ -517,7 +518,6 @@ internal fun TableController.TableOverlays() {
             argentumActionChoices = emptyList(); argentumActionCard = null; chooseArgentumLegalAction(info)
         },
         onChoose = { info -> argentumActionChoices = emptyList(); argentumActionCard = null; argentumStackUse = null; chooseArgentumLegalAction(info) },
-        tutorialCue = tutorialStep?.takeIf { tutorialChapterId != null }?.let { it.title to it.hint },
         onSecretNudge = { if (wifiRole != null) argentumSocket.send("arcanaNudge") },
             onDismiss = { argentumActionChoices = emptyList(); argentumActionCard = null }
     )
@@ -824,7 +824,7 @@ internal fun TableController.TableOverlays() {
                 } else message = "Could not send the attack declaration. Refresh and try again."
             },
             onDismiss = { argentumAttackPlan = null },
-            tutorialCue = tutorialStep?.takeIf { tutorialChapterId != null }?.let { it.title to it.body },)
+            )
     }
     argentumBlockPlan?.let { plan ->
         ArgentumBlockBoard(plan, ::argentumPiece, busy = argentumAwaitingUpdate,
@@ -911,7 +911,7 @@ internal fun TableController.TableOverlays() {
                         .clickable { }
                 ) {
                     Box(
-                        Modifier.fillMaxWidth().height(36.dp)
+                        Modifier.fillMaxWidth().height(36.dp).tutorialTarget("hand-drawer-grip")
                             .pointerInput(configuration.screenHeightDp) {
                                 var dragDistance = 0f
                                 val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }.coerceAtLeast(1f)
@@ -936,9 +936,6 @@ internal fun TableController.TableOverlays() {
                     Text("DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
                     HandSheet(
                         cards = players.getOrNull(handSeat.coerceIn(players.indices))?.hand.orEmpty(), isLandscape = isLandscape,
-                        tutorialCue = tutorialStep?.takeIf { tutorialChapterId != null }?.let { it.title to it.hint },
-                        tutorialStep = if (tutorialChapterId != null) tutorialStep else null,
-                        onTutorialNext = { tutorialAdvance() }, onTutorialExit = { stopTutorial() },
                         availableHeight = LocalConfiguration.current.screenHeightDp.dp * effectiveHandFraction,
                         stackCount = visibleStackCount,
                         highlightedCardId = highlightedHandCardId,

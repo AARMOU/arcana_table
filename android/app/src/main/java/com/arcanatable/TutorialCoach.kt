@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+
 package com.arcanatable
 
 import androidx.compose.foundation.background
@@ -30,7 +32,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import kotlinx.coroutines.delay
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
@@ -40,16 +56,108 @@ import androidx.compose.ui.unit.sp
 
 /**
  * Bounds of opt-in Compose tutorial targets. These are only layout coordinates, never card data.
- * A missing/hidden target is shown as a non-blocking instructional panel, not a fake hotspot.
+ * Each is kept with the window it was laid out in: Settings, the Play sheet, the deck picker and
+ * other dialogs are separate windows, and a coach can only highlight controls in its own window.
  */
 internal object TutorialTargets {
+    /** Bounds in the target's own window. */
     val bounds = mutableStateMapOf<String, Rect>()
+    /** The root view of the window each target is in. */
+    val windows = mutableStateMapOf<String, android.view.View>()
+    /** The id actually on screen in [root]: "hand-card:any" means whichever card in hand is showing. */
+    fun resolve(target: String, root: android.view.View): String? {
+        if (!target.endsWith(":any")) return target.takeIf { windows[it] === root }
+        val prefix = target.removeSuffix("any")
+        return bounds.entries.filter { (id, r) -> id.startsWith(prefix) && windows[id] === root && r.width > 1f && r.height > 1f }
+            .minByOrNull { (_, r) -> r.left + r.top * 10f }?.key
+    }
+    /** Which on-screen control last reported each id (two copies of a card share one id). */
+    internal val owners = HashMap<String, Any>()
 }
 internal fun Modifier.tutorialTarget(id: String): Modifier = composed {
-    // A control that leaves the screen must not leave its highlight behind on an empty spot.
-    DisposableEffect(id) { onDispose { TutorialTargets.bounds.remove(id) } }
-    onGloballyPositioned { TutorialTargets.bounds[id] = it.boundsInRoot() }
+    val root = LocalView.current.rootView
+    // When this control's step comes up, scroll any list it sits in so it is on screen.
+    val requester = remember { BringIntoViewRequester() }
+    val wanted = TutorialCoachState.model?.let { m -> m.lesson.steps.getOrNull(m.index)?.target } == id
+    LaunchedEffect(wanted) { if (wanted) { delay(150); runCatching { requester.bringIntoView() } } }
+    val owner = remember { Any() }
+    // A control that leaves the screen must not leave its highlight behind on an empty spot,
+    // but another copy still showing (a second Forest, the other hand button) keeps it.
+    DisposableEffect(id, root) {
+        onDispose {
+            if (TutorialTargets.owners[id] === owner) {
+                TutorialTargets.owners.remove(id); TutorialTargets.bounds.remove(id); TutorialTargets.windows.remove(id)
+            }
+        }
+    }
+    bringIntoViewRequester(requester).onGloballyPositioned {
+        if (it.isAttached) {
+            val rect = it.boundsInWindow()
+            // An offscreen or collapsed copy never replaces a visible one.
+            if (rect.width > 1f && rect.height > 1f || TutorialTargets.owners[id] == null || TutorialTargets.owners[id] === owner) {
+                TutorialTargets.bounds[id] = rect; TutorialTargets.windows[id] = root; TutorialTargets.owners[id] = owner
+            }
+        }
+    }
 }
+
+/** What the coach shows right now; set by the activity, drawn by the topmost [TutorialLayer]. */
+internal class TutorialCoachModel(
+    val lesson: ArcanaLesson,
+    val index: Int,
+    val practice: Boolean,
+    val onNext: () -> Unit,
+    val onSkip: () -> Unit,
+)
+
+internal object TutorialCoachState {
+    var model by mutableStateOf<TutorialCoachModel?>(null)
+    /** Layers in the order their windows opened; the last one is on top and draws the coach. */
+    internal val layers = mutableStateListOf<Any>()
+    /** The window the coach was last drawn in (checked by the tutorial audit test). */
+    internal var drawnIn: android.view.View? = null
+}
+
+/**
+ * Where the coach is drawn. The activity has one, and every dialog or sheet a lesson visits ends
+ * its content with one. Only the most recently opened layer draws, so the coach card and its
+ * buttons are always on the window the player is looking at, never hidden behind it.
+ */
+@Composable
+internal fun TutorialLayer(modifier: Modifier = Modifier.fillMaxSize(), base: Boolean = false, compact: Boolean = false) {
+    val key = remember { Any() }
+    DisposableEffect(key) {
+        // The activity's own layer is always underneath every dialog, whatever composed first.
+        if (base) TutorialCoachState.layers.add(0, key) else TutorialCoachState.layers.add(key)
+        onDispose { TutorialCoachState.layers.remove(key) }
+    }
+    if (TutorialCoachState.layers.lastOrNull() !== key) return
+    val model = TutorialCoachState.model ?: return
+    val window = LocalView.current.rootView
+    SideEffect { TutorialCoachState.drawnIn = window }
+    if (compact) TutorialCompactCard(model, modifier)
+    else TutorialCoachOverlay(model.lesson, model.index, model.practice, model.onNext, model.onSkip, modifier = modifier)
+}
+
+/** The coach inside a small popup (the game menu): same words and buttons, no screen shade. */
+@Composable
+private fun TutorialCompactCard(model: TutorialCoachModel, modifier: Modifier) {
+    val step = model.lesson.steps.getOrNull(model.index) ?: return
+    Column(modifier.padding(horizontal = 10.dp, vertical = 6.dp).background(Color(0xFF12241F), RoundedCornerShape(10.dp))
+        .border(1.dp, Color(0xFFE6B65C), RoundedCornerShape(10.dp)).padding(10.dp).testTag("tutorial-coach-tip"),
+        verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("${model.index + 1} / ${model.lesson.steps.size} · " + step.title, color = Color(0xFFE6B65C), fontWeight = FontWeight.Black, fontSize = 13.sp)
+        Text(step.body, color = Color.White, fontSize = 12.sp, lineHeight = 16.sp)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            OutlinedButton(onClick = model.onSkip, modifier = Modifier.height(40.dp)) { Text("EXIT") }
+            if (stepHasNext(step, model.practice)) Button(onClick = model.onNext, modifier = Modifier.height(40.dp)) { Text("NEXT") }
+            else Text(step.hint.ifBlank { "Use the highlighted control" }, color = Color(0xFFE6B65C), fontSize = 11.sp, modifier = Modifier.weight(1f))
+        }
+    }
+}
+
+/** Gated drill steps wait for the real control; everything else can always move on with NEXT. */
+internal fun stepHasNext(step: ArcanaLessonStep, practice: Boolean): Boolean = step.actionKind == "next" || !practice
 
 /** Activity-local actions emitted by real control handlers, not by touching the coach overlay. */
 /** Pure gate: only a corresponding engine event or gesture may complete an actionable step. */
@@ -107,15 +215,20 @@ internal fun TutorialCoachOverlay(
     onNext: () -> Unit,
     onSkip: () -> Unit,
     avoidTableOverlay: Boolean = false,
+    modifier: Modifier = Modifier.fillMaxSize(),
 ) {
     val step = lesson.steps.getOrNull(index) ?: return
     val gold = Color(0xFFE6B65C)
     val muted = Color(0xFFBAC6BE)
     val density = LocalDensity.current
-    BoxWithConstraints(Modifier.fillMaxSize().testTag("tutorial-coach")) {
+    val root = LocalView.current.rootView
+    var origin by remember { mutableStateOf(Offset.Zero) }
+    BoxWithConstraints(modifier.testTag("tutorial-coach").onGloballyPositioned { origin = it.positionInWindow() }) {
         val maxW = maxWidth
         val maxH = maxHeight
-        val rect = if (avoidTableOverlay) null else step.target?.let(TutorialTargets.bounds::get)
+        // Only a control in this same window can be highlighted here.
+        val rect = if (avoidTableOverlay) null else step.target?.let { TutorialTargets.resolve(it, root) }
+            ?.let(TutorialTargets.bounds::get)?.translate(-origin)
         val valid = rect != null && rect.width > 1f && rect.height > 1f
         val target = if (valid) rect else null
         val left = if (target == null) 0.dp else with(density) { target.left.toDp() }.coerceIn(0.dp, maxW)
@@ -158,7 +271,7 @@ internal fun TutorialCoachOverlay(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(onClick = onSkip, modifier = Modifier.height(45.dp)) { Text("EXIT") }
-                    if (step.actionKind == "next" || !practice) {
+                    if (stepHasNext(step, practice)) {
                         Button(onClick = onNext, modifier = Modifier.height(45.dp)) { Text("NEXT") }
                     } else {
                         Text(step.hint.ifBlank { "Use the highlighted control" },
