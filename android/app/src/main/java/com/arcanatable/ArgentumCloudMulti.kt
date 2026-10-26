@@ -281,11 +281,12 @@ internal class ArgentumCloudMultiHost(
     private val onNotice: (String) -> Unit = {},
 ) : ArgentumHostLink {
     val code = ArgentumCloudLink.newCode()
+    private val friendKinds = kinds.toList()
     private val link = ArgentumDirectedLink(endpoint, code, true, hostName, kinds)
     var onRoomReady: () -> Unit = {}
 
     init {
-        link.onReady = onRoomReady
+        link.onReady = { onRoomReady() }
         link.onRelay = { from, message ->
             val id = seatId(from)
             if (message.optString("type") == "lanHello") onGuest(id, message)
@@ -301,13 +302,13 @@ internal class ArgentumCloudMultiHost(
     }
 
     fun start() = link.connect()
-    fun sendTo(id: EntityId, message: JSONObject): Boolean = seatNumber(id)?.let { link.sendTo(it, message) } == true
+    fun sendTo(id: EntityId, message: JSONObject): Boolean = seatNumber(id)?.let {
+        if (friendKinds.getOrNull(it - 1) == "friend") link.sendTo(it, message) else false
+    } == true
     fun broadcastLobby(message: JSONObject): Boolean {
         if (message.optString("type") != "lanLobby") return false
-        return (1..3).all { index ->
-            val id = seatId(index)
-            if (seatNumber(id) == null) true else sendTo(id, message)
-        }
+        return friendKinds.indices.filter { friendKinds[it] == "friend" }
+            .all { index -> sendTo(seatId(index + 1), message) }
     }
     override fun send(message: JSONObject): Boolean = false // never broadcast masked state
     override fun close() = link.close()
