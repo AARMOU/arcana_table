@@ -804,7 +804,12 @@ internal fun TableController.TableOverlaysB() {
         }
     }
 
-    if (tutorialHubOpen) TutorialHubDialog(onDismiss = { tutorialHubOpen = false })
+    if (tutorialHubOpen) TutorialHubDialog(
+        onDismiss = { tutorialHubOpen = false },
+        onPractice = { startTutorialPractice(it) },
+        onCoach = { startTutorialCoach(it) },
+        practiceEnabled = !argentumEnabled && !offlineStarting
+    )
     if (optionsOpen) OptionsPage(
         darkMode = darkMode, timerVisible = turnTimerVisible,
         backgroundAlertsEnabled = backgroundAlertsEnabled,
