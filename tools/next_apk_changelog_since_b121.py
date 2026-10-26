@@ -3,7 +3,7 @@
 
 This is a deterministic runner-only source port, invoked AFTER integrating the
 latest game/menu changes. Leaves Claude's lobby and the working release branch
-untouched. Separate NEXT-BUILD features are plainly marked not in Build 134.
+untouched. Next test build features are separated from the earlier verified Build 134 preview.
 """
 from __future__ import annotations
 
@@ -26,14 +26,14 @@ ENTRIES: list[tuple[str, list[str]]] = [
         "A coherent source-built Argentum engine, Ulalek/stack-copying/restricted-mana tests and 94 indexed original Eldrazi Incursion slots are included. Indexed cards are not all independently gameplay-certified.",
         "Offline AI has Easy, Normal, Hard and Brutal options with bounded searches, persistence and recovery from rejected actions. Harder levels still need device and broad win-rate testing.",
         "The 2–4-player online/Wi-Fi candidate uses an authoritative host, per-seat private game state, human/AI seat selection and reconnect handling. Cross-network gameplay on real phones still needs acceptance testing.",
-        "The interactive tutorial has 20 chapters, 160 steps, a 31-term glossary and four offline engine-backed lessons. Its Table-view HAND step-two fix is NOT in the existing Build 134 APK.",
+        "The interactive tutorial has 20 chapters, 160 steps, a 31-term glossary and four offline engine-backed lessons. The Table-view HAND step-two fix is prepared for the next test candidate, NOT in the previous no-goose Build 134 APK.",
         "Help & Diagnostics has the Engine running notice toggle, an original-logo check and cleaner menu controls. Card/priority/deck and multiplayer fixes were regression-tested in CI.",
         "Build 134 here means the validated TEST preview, not a Play Store release; import and deck-edit features are not enabled in the production-style variant."
     ]),
-    ("NEXT APK · PREPARED BUT NOT YET BUILT", [
+    ("NEXT TEST APK · LOBBY, TUTORIAL AND DECK TOOLS", [
         "Full-screen multiplayer lobby: commander portraits, room-code copy/share, READY UP, 2–4 seats, host AI/friend switching, player removal and Start only when guests are ready. Cloudflare Worker is updated; on-phone lobby testing is still pending.",
         "Your First Turn tutorial: the Table-view HAND button advances step two to Play a land, matching Player view. Full Fold and real-engine lesson acceptance remain pending.",
-        "Re-enable Import new and the updated Deck Editor for normal users: REQUESTED, NOT IMPLEMENTED OR VERIFIED IN THE NEXT APK YET. Existing developer-only editor/importer must be connected and tested first."
+        "Import new now opens the existing unified deck importer; the Deck Editor is enabled on the next test candidate using the same saved-deck library, with search, editing and replacement explanations. Both require Android device validation before release."
     ]),
     ("BUILD 133 · ELDRAZI AND ENGINE CANDIDATE", [
         "Combined newer Argentum source and Eldrazi Incursion's 94th original indexed slot (Azlask) with real-card scenarios and strict terminal AI/deck testing.",
@@ -63,7 +63,7 @@ def compose_entries() -> str:
     lines = [
         BEGIN,
         '                Text("UPGRADES SINCE BUILD 121 · VERIFIED VS. PREPARED", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)',
-        '                Text("Builds 122–134 below include tested previews and development milestones. The NEXT APK section is planned integration, not shipped. A test-build pass is not on-device or Play Store acceptance.", color = SoftWhite, fontSize = 12.sp)',
+        '                Text("Builds 122–134 include historical previews and development milestones. The next test APK entries are candidate features, not a Play Store release. Passing compilation is not real-device acceptance.", color = SoftWhite, fontSize = 12.sp)',
     ]
     for title, bullets in ENTRIES:
         lines.append('                Text(' + json.dumps(title, ensure_ascii=False) + ', color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)')
