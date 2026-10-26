@@ -29,7 +29,7 @@ function roomCode(raw: string): string | null {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
-    if (url.pathname === "/health") return json({ ok: true, service: "arcana-table-rooms", protocol: 1 });
+    if (url.pathname === "/health") return json({ ok: true, service: "arcana-table-rooms", protocol: 1, relay: 1 });
     const match = url.pathname.match(/^\/room\/([A-Za-z0-9]{6,8})$/);
     if (!match) return json({ error: "Use /health or /room/{roomCode}." }, 404);
     const code = roomCode(match[1]);
@@ -115,6 +115,8 @@ export class GameRoom extends DurableObject<Env> {
     switch (packet.type) {
       case "ping": this.send(socket, { type: "pong" }); break;
       case "state": await this.acceptSnapshot(seat, String(packet.payload ?? "")); break;
+      case "relay": this.directRelay(socket, seat, packet); break;
+      case "relaySeats": await this.configureRelaySeats(socket, seat, packet); break;
       case "ready": this.setReady(socket, seat, packet); break;
       case "deck-status": this.setDeck(socket, seat, packet); break;
       case "leave": this.leave(socket, seat); break;
@@ -183,8 +185,63 @@ export class GameRoom extends DurableObject<Env> {
   private async attach(socket: WebSocket, seat: number): Promise<void> {
     if (!this.room) return;
     socket.serializeAttachment({ seat, authenticated: true });
-    this.send(socket, { type: "welcome", seat });
+    this.send(socket, { type: "welcome", seat, relay: 1 });
     this.send(socket, { type: "state", payload: this.privateState(this.room.state, seat) });
+  }
+
+  /**
+   * The Argentum host is the sole rules authority. Guests can send only to the
+   * host, and only the host can send a hidden, masked engine view to a guest.
+   * This packet is never written to Durable Object storage or room snapshots.
+   */
+  private directRelay(socket: WebSocket, from: number, packet: Record<string, unknown>): void {
+    if (!this.room) return;
+    const to = packet.to;
+    const seq = packet.seq;
+    const data = packet.data;
+    if (!Number.isSafeInteger(to) || !Number.isSafeInteger(seq) ||
+        Number(seq) <= 0 || typeof data !== "string" || data.length > 400_000 ||
+        (from === 0 ? Number(to) < 1 || Number(to) >= MAX_PLAYERS : to !== 0) ||
+        !this.room.seats[Number(to)]?.online || this.room.seats[Number(to)]?.isComputer === true) {
+      this.send(socket, { type: "rejected", reason: "Invalid relay destination or data." });
+      return;
+    }
+    this.sendToSeat(Number(to), { type: "relay", from, seq, data });
+  }
+
+  /**
+   * The host declares AI-only slots before inviting guests. This prevents a
+   * joining phone from occupying an AI seat and later seeing the wrong view.
+   * Once any guest has joined, seat assignments cannot be changed.
+   */
+  private async configureRelaySeats(socket: WebSocket, from: number, packet: Record<string, unknown>): Promise<void> {
+    if (!this.room || from !== 0 || !Array.isArray(packet.kinds) ||
+        packet.kinds.length < 1 || packet.kinds.length > MAX_PLAYERS - 1 ||
+        packet.kinds.some((kind) => kind !== "ai" && kind !== "friend") ||
+        this.room.seats.some((seat, index) => index > 0 && seat.online)) {
+      this.send(socket, { type: "rejected", reason: "Seat configuration cannot be changed." });
+      return;
+    }
+    const kinds = packet.kinds as string[];
+    for (let index = 1; index <= kinds.length; index++) {
+      const isComputer = kinds[index - 1] === "ai";
+      const previous = this.room.seats[index];
+      this.room.seats[index] = {
+        name: isComputer ? `AI ${index + 1}` : `PLAYER ${index + 1}`,
+        token: isComputer ? "" : (previous?.token || crypto.randomUUID()),
+        online: false,
+        isComputer,
+      };
+      while (this.room.state.players.length <= index) this.room.state.players.push({ name: `PLAYER ${index + 1}`, isOnline: false, deckLoaded: false });
+      this.room.state.players[index] = {
+        name: this.room.seats[index].name, isOnline: false, isComputer, deckLoaded: isComputer,
+      };
+    }
+    this.room.seats.length = kinds.length + 1;
+    this.room.state.players.length = kinds.length + 1;
+    await this.save();
+    this.send(socket, { type: "relay-seats-ack", kinds });
+    this.broadcastState();
   }
 
   private async setReady(socket: WebSocket, seat: number, packet: Record<string, unknown>): Promise<void> {
