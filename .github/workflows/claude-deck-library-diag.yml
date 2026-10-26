@@ -1,0 +1,36 @@
+name: Claude deck-library diagnostics (temporary)
+# Temporary: runs the same Android checks as Arcana Development CI on this branch only and pushes
+# the console output to claude/deck-library-search-ci-log, because the session can't read Actions logs.
+on:
+  push:
+    branches: [claude/deck-library-search-diag]
+permissions:
+  contents: write
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: android-actions/setup-android@v3
+        with: { packages: platform-tools }
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Build and test, capturing output
+        working-directory: android
+        run: |
+          set +e
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards > ../ci.log 2>&1
+          ./gradlew --no-daemon --max-workers=2 --continue :app:testDebugUnitTest --tests 'com.arcanatable.CardFiltersTest' --tests 'com.arcanatable.DeckLibraryTest' --tests 'com.arcanatable.LibrarySearchFiltersTest' --tests 'com.arcanatable.DeckBuilderTest' --tests 'com.arcanatable.ui.DeckBuilderUiTest' >> ../ci.log 2>&1
+          echo "EXIT $?" >> ../ci.log
+          mkdir -p ../out && cp ../ci.log ../out/
+          find app/build/test-results -name '*.xml' -exec cp {} ../out/ \; 2>/dev/null
+          find app/build -path '*screenshots*' -name '*.png' -exec cp {} ../out/ \; 2>/dev/null
+          true
+      - name: Publish output to a log branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout --orphan log && git rm -rqf . && cp out/* . && git add -A . && git commit -qm "CI log for ${GITHUB_SHA}"
+          git push -f origin log:claude/deck-library-search-ci-log
