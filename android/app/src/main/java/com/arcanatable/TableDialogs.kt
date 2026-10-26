@@ -1505,12 +1505,55 @@ internal fun DeckEditorDialog(
     renameCard?.let { card -> AlertDialog(onDismissRequest = { renameCard = null }, title = { Text("Rename card") }, text = { OutlinedTextField(renameValue, { renameValue = it }, singleLine = true, label = { Text("Card name") }) }, confirmButton = { TextButton(onClick = { if (renameValue.isNotBlank()) onRename(card, renameValue.trim()); renameCard = null }) { Text("SAVE") } }, dismissButton = { TextButton(onClick = { renameCard = null }) { Text("CANCEL") } }) }
 }
 
+/**
+ * Argentum's per-defender commanderDamage is keyed by commanderName, whereas manually tracked
+ * tables historically use the opposing seat ID. Do not treat a missing seat-ID lookup as zero.
+ * Extra source keys (partners, a missing commander portrait, or imported legacy data) must remain
+ * visible as separate commanders, never be summed toward the 21-damage threshold.
+ */
+internal data class CommanderDamageTrackerSource(val playerId: String, val playerName: String, val commanderName: String?)
+internal data class CommanderDamageTrackerRow(val label: String, val key: String, val amount: Int)
+
+internal fun commanderDamageTrackerRows(
+    received: Map<String, Int>,
+    opponents: List<CommanderDamageTrackerSource>,
+): List<CommanderDamageTrackerRow> {
+    val represented = mutableSetOf<String>()
+    val rows = opponents.map { source ->
+        val commanderName = source.commanderName?.takeIf(String::isNotBlank)
+        val key = when {
+            commanderName != null && commanderName in received -> commanderName
+            source.playerId in received -> source.playerId
+            else -> source.playerId  // Preserve manual-table storage for an unset count.
+        }
+        represented += key
+        CommanderDamageTrackerRow(
+            label = source.playerName + (commanderName?.let { " · $it" } ?: ""),
+            key = key,
+            amount = received[key] ?: 0,
+        )
+    }.toMutableList()
+    // A second partner commander / hidden commander with recorded damage must not disappear.
+    for ((key, amount) in received) {
+        if (key.isNotBlank() && key !in represented && amount > 0) {
+            rows += CommanderDamageTrackerRow("Commander · $key", key, amount)
+        }
+    }
+    return rows
+}
+
 @Composable
-internal fun PlayerTrackerDialog(player: TablePlayer, players: List<TablePlayer>, playerIndex: Int, onUpdate: (TablePlayer) -> Unit, onDismiss: () -> Unit) {
+internal fun PlayerTrackerDialog(player: TablePlayer, players: List<TablePlayer>, playerIndex: Int, onUpdate: (TablePlayer) -> Unit, onDismiss: () -> Unit, engineAuthoritative: Boolean = false) {
     var search by remember { mutableStateOf("") }
     var custom by remember { mutableStateOf("") }
     val common = listOf("Poison", "Energy", "Experience", "Rad", "Lore", "Ticket", "Shield", "Stun", "Finality", "The Ring tempts you", "Monarch", "Initiative", "City's Blessing", "Day/Night")
     val matches = common.filter { it.contains(search, true) }
+    val damageRows = commanderDamageTrackerRows(
+        player.commanderDamageReceived,
+        players.indices.filter { it != playerIndex }.map { index ->
+            players[index].let { CommanderDamageTrackerSource(it.id, it.name, it.commanderName) }
+        },
+    )
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.88f), shape = RoundedCornerShape(14.dp), color = Panel) {
             Column(Modifier.padding(14.dp)) {
@@ -1527,15 +1570,24 @@ internal fun PlayerTrackerDialog(player: TablePlayer, players: List<TablePlayer>
                             ActionPill("+ CAST") { onUpdate(player.copy(commanderCastCount = player.commanderCastCount + 1)) }
                         }
                     }
-                    item { Text("COMMANDER DAMAGE RECEIVED", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
-                    items(players.indices.filter { it != playerIndex }.size) { row ->
-                        val source = players[players.indices.filter { it != playerIndex }[row]]
-                        val amount = player.commanderDamageReceived[source.id] ?: 0
+                    item {
+                        Text("COMMANDER DAMAGE RECEIVED", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                        if (engineAuthoritative) Text("Tracked by Argentum · read only", color = Muted, fontSize = 9.sp)
+                    }
+                    items(damageRows.size) { row ->
+                        val record = damageRows[row]
+                        val amount = record.amount
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("${source.name}${source.commanderName?.let { " · $it" }.orEmpty()}", color = SoftWhite, fontSize = 9.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            TextButton(onClick = { onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived.toMutableMap().apply { if (amount <= 1) remove(source.id) else put(source.id, amount - 1) })) }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text("−", color = SoftWhite) }
+                            Text(record.label, color = SoftWhite, fontSize = 9.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (!engineAuthoritative) TextButton(onClick = {
+                                onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived.toMutableMap().apply {
+                                    if (amount <= 1) remove(record.key) else put(record.key, amount - 1)
+                                }))
+                            }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text("−", color = SoftWhite) }
                             Text("$amount", color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold)
-                            TextButton(onClick = { onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived + (source.id to amount + 1))) }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text("+", color = Mint) }
+                            if (!engineAuthoritative) TextButton(onClick = {
+                                onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived + (record.key to amount + 1)))
+                            }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text("+", color = Mint) }
                         }
                     }
                     item { Text("COUNTERS AND STATUS", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }

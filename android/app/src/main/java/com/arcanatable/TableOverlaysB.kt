@@ -1083,6 +1083,7 @@ internal fun TableController.TableOverlaysB() {
 
     if (trackerPlayer in players.indices) PlayerTrackerDialog(
         player = players[trackerPlayer], players = players, playerIndex = trackerPlayer,
+        engineAuthoritative = argentumEnabled,
         onUpdate = { updated ->
             val target = trackerPlayer
             updatePlayer(target) { updated }
