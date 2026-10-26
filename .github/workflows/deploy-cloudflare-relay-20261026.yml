@@ -24,6 +24,7 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
+          fetch-depth: 0
           persist-credentials: false
       - name: Verify exact approved relay source
         shell: bash
@@ -80,12 +81,12 @@ jobs:
           import os, re
           from pathlib import Path
           data = Path(os.environ['RUNNER_TEMP'], 'arcana-cloudflare-deploy.log').read_text(errors='replace')
-          urls = re.findall(r'https://[a-zA-Z0-9.-]+\\.workers\\.dev', data)
+          urls = re.findall(r'https://[a-zA-Z0-9.-]+\.workers\.dev', data)
           if not urls:
               raise SystemExit('Cloudflare may have deployed, but Wrangler did not report a workers.dev URL. Check deploy output and account settings.')
           origin = urls[-1].rstrip('/')
           out = Path(os.environ['GITHUB_ENV'])
-          with out.open('a') as f: f.write('ARCANA_LIVE_RELAY_URL=' + origin + '\\n')
+          with out.open('a') as f: f.write('ARCANA_LIVE_RELAY_URL=' + origin + '\n')
           print('Reported public Worker: ' + origin)
           PY
       - name: Verify live /health and private directed relay over public internet
