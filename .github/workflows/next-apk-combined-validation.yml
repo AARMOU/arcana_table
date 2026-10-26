@@ -315,10 +315,14 @@ jobs:
             git fetch --no-tags origin "$ONLINE_SHA"
             test "$(git rev-parse FETCH_HEAD)" = "$ONLINE_SHA"
             if ! git merge --no-ff --no-edit -m "Runner-only next APK: cross-network Commander" "$ONLINE_SHA" > combined-evidence/next-apk-online-merge.log 2>&1; then
-              echo "::error title=Multiplayer source conflict::Review exact overlaps with release seat restrictions and AI seat settings; do not auto-resolve."
-              git diff --name-only --diff-filter=U | tee combined-evidence/next-apk-online-conflicts.txt
-              cat combined-evidence/next-apk-online-merge.log
-              exit 1
+              if python3 tools/next_apk_resolve_conflicts.py online "$ONLINE_SHA"; then
+                git commit --no-gpg-sign -m "Runner-only: reconcile directed online and tutorial callback overlap"
+              else
+                echo "::error title=Multiplayer source conflict::Unknown overlap with release/tutor/AI source; stop."
+                git diff --name-only --diff-filter=U | tee combined-evidence/next-apk-online-conflicts.txt
+                cat combined-evidence/next-apk-online-merge.log
+                exit 1
+              fi
             fi
             git merge-base --is-ancestor "$ONLINE_SHA" HEAD
             printf 'cross-network-multiplayer %s\n' "$ONLINE_SHA" >> combined-evidence/next-apk-source-pins.txt
