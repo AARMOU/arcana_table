@@ -260,6 +260,49 @@ class UginTheIneffableScenarioTest {
         assertEquals(handBefore + 1, d.getHand(owner).size)
     }
 
+    @Test fun opponentRemovalReturnsLinkedCardToOriginalOwner() {
+        val d = customScenario(UginTheIneffable, "Sol Ring")
+        val owner = d.player1
+        val opponent = d.player2
+        val ugin = d.putPermanentOnBattlefield(owner, "Ugin, the Ineffable")
+        assertNull(d.activate(owner, ugin, index = 0).error)
+        d.resolveAll()
+        val spirit = d.permanentsNamed(owner, "Spirit").single()
+        val linkedCard = d.getExile(owner).single()
+        val ownerHandBefore = d.getHand(owner).size
+        val opponentHandBefore = d.getHand(opponent).size
+
+        // The token's controller and the player removing it are different.
+        // Ugin's "your hand" means the exiled card's owner, never the remover.
+        val removal = com.wingedsheep.sdk.dsl.card("Opposing Ugin Spirit Removal Probe") {
+            manaCost = "{0}"
+            typeLine = "Instant"
+            spell {
+                effect = com.wingedsheep.sdk.dsl.Effects.Destroy(
+                    target(com.wingedsheep.sdk.scripting.filters.unified.TargetFilter(
+                        com.wingedsheep.sdk.scripting.GameObjectFilter.Creature
+                    ))
+                )
+            }
+        }
+        d.registerCard(removal)
+        d.passPriorityUntil(com.wingedsheep.sdk.core.Step.PRECOMBAT_MAIN, activePlayer = opponent)
+        val spell = d.putCardInHand(opponent, removal.name)
+        assertNull("Opponent must be able to destroy the Spirit",
+            d.castSpell(opponent, spell, listOf(spirit)).error)
+        d.resolveAll()
+
+        assertTrue(d.permanentsNamed(owner, "Spirit").isEmpty())
+        assertFalse(linkedCard in d.getExile(owner))
+        assertEquals("The original owner receives exactly one linked card",
+            1, d.getHand(owner).count { it == linkedCard })
+        assertEquals(ownerHandBefore + 1, d.getHand(owner).size)
+        assertFalse("The remover must never receive the private exiled card",
+            linkedCard in d.getHand(opponent))
+        assertEquals("Opposing removal consumes its own spell, not the linked card",
+            opponentHandBefore, d.getHand(opponent).size)
+    }
+
     private fun GameTestDriver.loyalty(id: com.wingedsheep.sdk.model.EntityId) =
         state.getEntity(id)!!.get<com.wingedsheep.engine.state.components.battlefield.CountersComponent>()
             ?.getCount(com.wingedsheep.sdk.core.CounterType.LOYALTY) ?: 0
