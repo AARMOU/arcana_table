@@ -436,6 +436,21 @@ jobs:
           git diff --check -- android/app/src/main/java/com/arcanatable/TableMainLayout.kt
           printf '%s\n' 'PR282 8e4702065dff96ba7ce0a64cd5d420fb54def43d' >> combined-evidence/next-apk-source-pins.txt
           printf '%s\n' 'first-turn HAND step2 next-build isolated port: source verification PASSED' > combined-evidence/tutorial-hand-step2-acceptance.txt
+      - name: Validate post-121 changelog content, source preservation and next-build disclaimers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tools/tests -p 'test_next_apk_changelog_since_b121.py' -v
+      - name: Populate What's new with verified changes since Build 121 (after source merges)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/next_apk_changelog_since_b121.py
+          python3 tools/next_apk_changelog_since_b121.py --verify-only
+          git diff --check -- android/app/src/main/java/com/arcanatable/TableDialogs.kt
+          grep -F 'CURRENT NO-GOOSE TEST PREVIEW' android/app/src/main/java/com/arcanatable/TableDialogs.kt
+          grep -F 'NEXT APK · PREPARED BUT NOT YET BUILT' android/app/src/main/java/com/arcanatable/TableDialogs.kt
+          printf '%s\n' 'Build 122–134 cumulative in-app changelog plus staged-next-build warnings: PASS' > combined-evidence/build121-changelog-acceptance.txt
       - uses: actions/setup-node@v4
         if: ${{ github.event_name == 'push' || inputs.include_online_multiplayer }}
         with:
