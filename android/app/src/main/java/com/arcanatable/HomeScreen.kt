@@ -229,6 +229,8 @@ fun PlaySheet(
     onDismiss: () -> Unit,
     onWifiHost: () -> Unit = {},
     onWifiMultiHost: () -> Unit = {},
+    onOnlineMultiHost: () -> Unit = {},
+    onOnlineMultiJoin: () -> Unit = {},
     onWifiJoin: () -> Unit = {},
     onOnlineHost: () -> Unit = {},
     onOnlineJoin: () -> Unit = {},
@@ -256,12 +258,14 @@ fun PlaySheet(
                     if (!showAllDecks && shown.size < aiDecks.size) DeckChip("${aiDecks.size - shown.size} more decks ▾", false) { showAllDecks = true }
                 }
             }
-            PlayOption("Play with a friend", "Two phones. One hosts (runs the game), the other joins. Same Wi-Fi, or online with a room code. Commander decks.", selected = friendMode != null, onClick = { online = false; if (friendMode == null) friendMode = 1 }, tag = "play-wifi-option") {
+            PlayOption("Play with a friend", "Two to four players. The host runs the Commander rules engine; friends join over Wi-Fi or the internet.", selected = friendMode != null, onClick = { online = false; if (friendMode == null) friendMode = 1 }, tag = "play-wifi-option") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     DeckChip("Host on Wi-Fi", friendMode == 1) { online = false; friendMode = 1 }
-                    if (BuildConfig.DEBUG) DeckChip("Host 2–4 players · preview", friendMode == 5) {
+                    DeckChip("Host 2–4 players on Wi-Fi", friendMode == 5) {
                         online = false; friendMode = 5
                     }
+                    DeckChip("Host 2–4 players online", friendMode == 6) { online = false; friendMode = 6 }
+                    DeckChip("Join 2–4 players online", friendMode == 7) { online = false; friendMode = 7 }
                     DeckChip("Join on Wi-Fi", friendMode == 2) { online = false; friendMode = 2 }
                     DeckChip("Host online", friendMode == 3) { online = false; friendMode = 3 }
                     DeckChip("Join online", friendMode == 4) { online = false; friendMode = 4 }
@@ -271,10 +275,10 @@ fun PlaySheet(
             val context = LocalContext.current
             PlayOption("Online with Argentum", "Not yet available", selected = false, onClick = { Toast.makeText(context, "Not yet available", Toast.LENGTH_SHORT).show() }, tag = "play-online-option", disabled = true) {}
             Button(
-                onClick = { when { online -> onOnline(); friendMode == 1 -> onWifiHost(); friendMode == 2 -> onWifiJoin(); friendMode == 3 -> onOnlineHost(); friendMode == 4 -> onOnlineJoin(); friendMode == 5 && BuildConfig.DEBUG -> onWifiMultiHost(); else -> onOffline() } },
+                onClick = { when { online -> onOnline(); friendMode == 1 -> onWifiHost(); friendMode == 2 -> onWifiJoin(); friendMode == 3 -> onOnlineHost(); friendMode == 4 -> onOnlineJoin(); friendMode == 5 -> onWifiMultiHost(); friendMode == 6 -> onOnlineMultiHost(); friendMode == 7 -> onOnlineMultiJoin(); else -> onOffline() } },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp).testTag("play-start"),
                 colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
-            ) { Text(when { online -> "PLAY WITH ARGENTUM"; friendMode == 1 -> "HOST A WI-FI GAME"; friendMode == 2 -> "JOIN A WI-FI GAME"; friendMode == 3 -> "HOST AN ONLINE GAME"; friendMode == 4 -> "JOIN AN ONLINE GAME"; friendMode == 5 -> "HOST 2–4 PLAYER WI-FI"; aiCount > 1 -> "PLAY OFFLINE · ${aiCount + 1} PLAYERS"; else -> "PLAY OFFLINE VS AI" }, fontSize = 17.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
+            ) { Text(when { online -> "PLAY WITH ARGENTUM"; friendMode == 1 -> "HOST A WI-FI GAME"; friendMode == 2 -> "JOIN A WI-FI GAME"; friendMode == 3 -> "HOST AN ONLINE GAME"; friendMode == 4 -> "JOIN AN ONLINE GAME"; friendMode == 5 -> "HOST 2–4 PLAYER WI-FI"; friendMode == 6 -> "HOST 2–4 PLAYER ONLINE"; friendMode == 7 -> "JOIN 2–4 PLAYER ONLINE"; aiCount > 1 -> "PLAY OFFLINE · ${aiCount + 1} PLAYERS"; else -> "PLAY OFFLINE VS AI" }, fontSize = 17.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
         }
     }
 }
