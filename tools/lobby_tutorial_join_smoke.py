@@ -18,7 +18,7 @@ NAMES = [
     "Align merged QA home fixture with the current welcome invitation",
     "Integrate exact latest AI, table UI and optional cross-network multiplayer heads",
     "Integrate Claude's exact lobby revision after four-player transport (runner-only)",
-    "Integrate Claude's already-green quiet import-notices PR287 (runner-only)",
+    "Port ONLY Claude's six reviewed quiet-import files (no dev/JAR merge)",
     "Enforce owner-requested mascot-free home on integrated source",
     "Validate PR 282 tutorial HAND port contract (source-only)",
     "Apply and verify exact PR 282 tutorial step-two fix AFTER integrated UI merge",
