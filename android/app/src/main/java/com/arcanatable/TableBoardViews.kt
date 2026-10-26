@@ -631,7 +631,7 @@ internal fun BattlefieldCard(card: GameCard, tileWidth: androidx.compose.ui.unit
     val activatedAbilities = remember(card.id, card.oracleText) { cardActivatedAbilityLines(card) }
     val cardHeight = tileWidth / 0.72f
     Box(Modifier.width(if (card.tapped) cardHeight else tileWidth).height(cardHeight), contentAlignment = Alignment.Center) {
-        CardFace(card, Modifier.width(tileWidth), onClick = onTap, onLongClick = onPreview, animateTapped = true, glow = glow)
+        CardFace(card, Modifier.width(tileWidth).tutorialTarget("battlefield-card:${card.name}"), onClick = onTap, onLongClick = onPreview, animateTapped = true, glow = glow)
         card.chosenCreatureType?.takeIf { it.isNotBlank() }?.let { chosenType ->
             Text(
                 "TYPE · $chosenType",
@@ -689,11 +689,19 @@ internal fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: ()
     val rotation by animateFloatAsState(targetValue = if (animateTapped && card.tapped) 90f else 0f, animationSpec = tween(260), label = "card-tap")
     // Argentum games: holding any card shows it large (CardZoom.kt) instead of the older long-press actions.
     val zoom = LocalCardZoom.current
-    val holdAction: () -> Unit = if (zoom.enabled) ({ zoom.hold(card) }) else onLongClick
+    val holdAction: () -> Unit = {
+        if (zoom.enabled) zoom.hold(card) else onLongClick()
+        TutorialActions.hold("battlefield-card:${card.name}")
+        TutorialActions.hold("hand-card:${card.name}")
+    }
     Box(
         modifier.aspectRatio(0.72f).graphicsLayer(rotationZ = rotation).clip(RoundedCornerShape(8.dp)).background(card.color)
             .border(if (glow) 2.5.dp else if (card.tapped) 2.dp else 1.dp, if (glow) Mint else if (card.tapped) Mint else Color.White.copy(alpha = 0.28f), RoundedCornerShape(8.dp))
-            .combinedClickable(onClick = onClick, onLongClick = holdAction)
+            .combinedClickable(onClick = {
+                TutorialActions.tap("hand-card:${card.name}")
+                TutorialActions.tap("battlefield-card:${card.name}")
+                onClick()
+            }, onLongClick = holdAction)
             .then(if (zoom.enabled) Modifier.cardZoomRelease(zoom) else Modifier)
     ) {
         if (card.isFaceDown) {
@@ -758,11 +766,13 @@ internal fun cardArtDescription(label: String?, fallbackName: String?): String =
 internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHeight: androidx.compose.ui.unit.Dp, highlightedCardId: Int?, handRevealed: Boolean, canAdvance: Boolean, canControl: Boolean, commanderCanCast: Boolean, actionOrder: List<String>, stackCount: Int, onToggleReveal: (Boolean) -> Unit, onClose: () -> Unit, onDraw: () -> Unit, onCombat: () -> Unit, onNextStep: () -> Unit, onPassTurn: () -> Unit, onStack: () -> Unit, onCastCommander: () -> Unit, onMoreAction: (String) -> Unit, onSelect: (GameCard) -> Unit, onDragDrop: (GameCard, Offset) -> Unit,
     argentumMode: Boolean = false, argentumPrimaryLabel: String? = null, legalActionCount: Int = 0, onUndo: (() -> Unit)? = null,
     arrangement: HandArrangement = HandArrangement.AUTO_FIT, cardScale: Float = 1f, playableIds: Set<Int> = emptySet(),
-    canRespond: Boolean = false, commanderAffordable: Boolean = false) {
+    canRespond: Boolean = false, commanderAffordable: Boolean = false,
+    tutorialCue: Pair<String, String>? = null) {
     val handScrollState = rememberScrollState()
     var moreOpen by remember { mutableStateOf(false) }
     val density = LocalDensity.current
     Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 8.dp)) {
+        tutorialCue?.let { TutorialInlineCue(it.first, it.second) }
         Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
             Text("YOUR HAND  ·  ${cards.size} CARDS", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.weight(1f))
             IconButton(onClick = onClose, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close hand", tint = SoftWhite) }
@@ -832,6 +842,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
                 CardFace(
                     card,
                     Modifier.width(cardWidth).height(cardHeight)
+                        .tutorialTarget("hand-card:${card.name}")
                         .onGloballyPositioned { coordinates = it }
                         // Argentum games: holding a hand card previews it (no drag-to-play there).
                         .then(if (argentumMode) Modifier else Modifier.pointerInput(card.id) {
