@@ -505,7 +505,13 @@ internal class TableController(
             url = ArgentumEndpoints.socketUrl(argentumOrigin),
             onStatus = { status -> argentumStatus = status; if (status != ArgentumConnectionStatus.CONNECTED) argentumAwaitingUpdate = false },
             onMessage = { argentumQueue.trySend(it) },
-            onError = { argentumLastError = it; message = it; argentumAwaitingUpdate = false },
+            // Pop-up only; the pre-game waiting screen also keeps it inline (never the home screen, which would repeat it).
+            onError = {
+                // Stored errors are logged by the argentumLastError effect; log the rest here.
+                if (argentumSnapshot == null && !homeOpen) argentumLastError = it
+                else recordDiagnostic("Argentum problem: $it", DiagnosticCategory.ERROR)
+                message = it; argentumAwaitingUpdate = false
+            },
             // Reconnect on its own only while the player is looking at the app.
             canAutoReconnect = { appInForeground }
         )
@@ -1541,16 +1547,14 @@ internal class TableController(
                         append("Imported ${deck.size} cards. Your opening hand is ready.")
                     }
                 }
+                // No pop-up: picking or importing a deck must not interrupt play. The import dialog
+                // and the deck editor already show which cards Argentum lacks, with suggested swaps.
                 if (supportReport != null && supportReport.unsupportedCopies > 0) {
                     val names = supportReport.unsupportedNames
-                    message = buildString {
-                        append("${names.size} card ${if (names.size == 1) "name isn't" else "names aren't"} in Argentum's card library: ")
-                        append(names.take(6).joinToString())
-                        if (names.size > 6) append(", and ${names.size - 6} more")
-                        append(". ")
-                        if (supportReport.commanderUnsupported) append("That includes your commander. ")
-                        append("Argentum games leave them out. The deck editor (Edit imported deck, or Edit deck in the Argentum deck review) shows suggested Argentum swaps. Your deck was imported as written.")
-                    }
+                    recordDiagnostic("Deck has ${names.size} card name(s) outside Argentum's library" +
+                        (if (supportReport.commanderUnsupported) ", including the commander" else "") +
+                        ": ${names.take(12).joinToString()}${if (names.size > 12) ", +${names.size - 12} more" else ""}",
+                        DiagnosticCategory.UNSUPPORTED)
                 }
                 if (onlineMode && !gameStartedOnline) { showOverview = true; showHand = false; lobbyOpen = true }
             } catch (e: Exception) {
@@ -1828,8 +1832,7 @@ internal class TableController(
             } catch (error: Throwable) {
                 argentumSocket.localHostFactory = null
                 argentumOffline = false
-                argentumLastError = "Couldn't start the offline game: ${error.javaClass.simpleName}: ${error.message?.take(200)}"
-                message = argentumLastError
+                message = "Couldn't start the offline game: ${error.javaClass.simpleName}: ${error.message?.take(200)}"
                 recordDiagnostic("Offline game failed to start: ${error.javaClass.simpleName}: ${error.message}", DiagnosticCategory.ERROR)
             } finally {
                 offlineStarting = false
