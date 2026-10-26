@@ -3,6 +3,9 @@ package com.arcanatable.ui
 import androidx.activity.ComponentActivity
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.performClick
 import com.arcanatable.ArcanaLesson
 import com.arcanatable.ArcanaLessonStep
 import com.arcanatable.TutorialCoachOverlay
@@ -25,8 +28,12 @@ class TutorialScreensTest {
         rule.setContent { TutorialHubDialog(onDismiss = {}) }
         UiTestSupport.settle(rule, 300)
         rule.onNodeWithText("Learn to play").assertExists()
-        rule.onNodeWithText("Your first turn").assertExists()
+        // Both the featured activity and the curriculum row have this title.
+        rule.onAllNodesWithText("Your first turn").assertCountEquals(2)
         rule.onNodeWithText("READ FIRST TURN").assertExists()
+        rule.onNodeWithText("READ FIRST TURN").performClick()
+        UiTestSupport.settle(rule, 300)
+        rule.onNodeWithText("STEP 1 OF 16").assertExists()
     }
 
     @Test @Config(sdk = [34], qualifiers = "w344dp-h882dp-port-xxhdpi")
@@ -53,7 +60,6 @@ class TutorialScreensTest {
         rule.setContent { TutorialHubDialog(onDismiss = {}) }
         UiTestSupport.settle(rule, 300)
         rule.onNodeWithText("Learn to play").assertExists()
-        rule.onNodeWithText("20 short chapters", substring = true).assertDoesNotExist()
-        rule.onNodeWithText("20 short chapters, real-control walkthroughs", substring = true).assertExists()
+        rule.onNodeWithText("20 short chapters, real-control walkthroughs, and engine-backed practice games. Your saved game is never overwritten.").assertExists()
     }
 }

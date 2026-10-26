@@ -97,6 +97,11 @@ internal object TutorialPracticeScenarios {
         val zones = ZoneTransitionService(prepared.registry, prepared.services.predicateEvaluator)
         var state = zones.moveToZone(prepared.state,
             yourCard(prepared.state, "Grizzly Bears", Zone.LIBRARY, Zone.HAND), Zone.BATTLEFIELD).state
+        // The passive opponent will draw an eighth card before cleanup. Give it a land
+        // from its opening hand, as in the existing held-Vehicle scenarios, so setup
+        // can advance through a real turn without stopping at a discard decision.
+        val opponentIsland = state.getZone(LocalArgentumHost.AI_ID, Zone.HAND).first()
+        state = zones.moveToZone(state, opponentIsland, Zone.BATTLEFIELD).state
         // Advance a full turn cycle through the real engine so summoning sickness is removed.
         state = passToMain(state, prepared.services, afterTurn = state.turnNumber)
         return TestScenarioGame(listOf(prepared.you, prepared.ai), prepared.registry,
