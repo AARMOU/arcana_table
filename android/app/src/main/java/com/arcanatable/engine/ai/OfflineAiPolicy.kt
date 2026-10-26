@@ -115,8 +115,9 @@ object OfflineAiPolicy : BudgetPolicy {
         legal: () -> List<LegalAction>,
     ): GameAction {
         if (difficulty.overlookChance <= 0.0 || random.nextDouble() >= difficulty.overlookChance) return bot.chooseAction(state)
-        val options = legal().filterNot { it.isManaAbility }
-        val kept = options.filter { it.actionType == "PassPriority" || random.nextBoolean() }
+        // Only options the AI could actually take now: affordable, and not bare mana abilities.
+        val options = legal().filter { it.affordable && !it.isManaAbility }
+        val kept = options.filter { it.actionType == "PassPriority" || random.nextDouble() < difficulty.considerShare }
         if (kept.isEmpty() || kept.size == options.size) return bot.chooseAction(state)
         return bot.chooseFrom(state, kept).action
     }

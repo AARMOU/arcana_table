@@ -27,13 +27,15 @@ enum class AiDifficulty(
     /** This seat's share of the thinking time for one host burst (until a person must act). */
     val burstMillis: Long,
     /**
-     * Chance that, for one priority choice, the AI only considers a random half of its options
+     * Chance that, for one priority choice, the AI only considers a random part of its options
      * (it still picks the best of those). Search depth alone barely changes the plain AI, so this
      * is what makes Easy beatable while every play stays legal.
      */
     val overlookChance: Double = 0.0,
+    /** When overlooking, the share of options it still considers (passing is always one). */
+    val considerShare: Double = 1.0,
 ) {
-    EASY("Easy", "Misses plays now and then. Good for learning.", 120, 200, 100, 400, overlookChance = 0.45),
+    EASY("Easy", "Misses plays often. Good for learning.", 120, 200, 100, 400, overlookChance = 0.65, considerShare = 0.35),
     NORMAL("Normal", "The standard AI.", 250, 600, 150, 600),
     HARD("Hard", "Argentum's full strategy. Plays tight.", 800, 1_600, 300, 3_000),
     BRUTAL("Brutal", "Hard, with deep search. Slow and punishing.", 1_800, 4_000, 600, 8_000);

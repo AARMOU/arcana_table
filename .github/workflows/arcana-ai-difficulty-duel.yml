@@ -19,6 +19,32 @@ concurrency:
   group: arcana-ai-difficulty-duel-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: true
 jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: AI difficulty unit tests
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.AiDifficultyTest' --tests 'com.arcanatable.customcards.AiRetargetingSearchTest'
+      - name: Report failures as annotations
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          for f in glob.glob('android/custom-cards/build/test-results/test/*.xml'):
+              for case in ET.parse(f).getroot().iter('testcase'):
+                  for bad in list(case.findall('failure')) + list(case.findall('error')):
+                      text = (bad.get('message') or '') + ' | ' + ' | '.join((bad.text or '').strip().splitlines()[:8])
+                      print(f"::error title={case.get('name')}::" + text[:1500].replace('%', '%25').replace('\n', '%0A'))
+          PY
   duel:
     runs-on: ubuntu-latest
     timeout-minutes: 150
