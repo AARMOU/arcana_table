@@ -564,6 +564,64 @@ class UginTheIneffableScenarioTest {
             linkedCard in d.getHand(thief))
     }
 
+
+    @Test fun simultaneousBoardWipeReturnsEachSpiritLinkedCardExactlyOnce() {
+        val d = customScenario(UginTheIneffable, "Sol Ring")
+        val owner = d.player1
+        val ugin = d.putPermanentOnBattlefield(owner, "Ugin, the Ineffable")
+
+        assertNull(d.activate(owner, ugin, index = 0).error)
+        d.resolveAll()
+        val firstSpirit = d.permanentsNamed(owner, "Spirit").single()
+        val firstCard = d.getExile(owner).single()
+
+        // Each loyalty activation must independently link the exiled card
+        // to its own token, including when both tokens leave simultaneously.
+        d.passPriorityUntil(com.wingedsheep.sdk.core.Step.END, activePlayer = owner)
+        d.passPriorityUntil(com.wingedsheep.sdk.core.Step.PRECOMBAT_MAIN, activePlayer = owner)
+        assertNull(d.activate(owner, ugin, index = 0).error)
+        d.resolveAll()
+        val spirits = d.permanentsNamed(owner, "Spirit")
+        assertEquals(2, spirits.size)
+        val secondSpirit = spirits.single { it != firstSpirit }
+        val secondCard = d.getExile(owner).single { it != firstCard }
+        assertNotEquals("Each Spirit must link a different physical card", firstCard, secondCard)
+        assertEquals(listOf(firstCard), d.state.getEntity(firstSpirit)!!
+            .get<LinkedExileComponent>()?.exiledIds)
+        assertEquals(listOf(secondCard), d.state.getEntity(secondSpirit)!!
+            .get<LinkedExileComponent>()?.exiledIds)
+        val handBefore = d.getHand(owner).size
+
+        // A real single board wipe destroys both Spirits in one event.
+        // This must not lose one leave trigger or return either link twice.
+        val wipe = com.wingedsheep.sdk.dsl.card("Ugin Simultaneous Spirit Wipe Probe") {
+            manaCost = "{0}"
+            typeLine = "Sorcery"
+            spell {
+                effect = com.wingedsheep.sdk.dsl.Effects.DestroyAll(
+                    com.wingedsheep.sdk.scripting.GameObjectFilter.Creature
+                )
+            }
+        }
+        d.registerCard(wipe)
+        val spell = d.putCardInHand(owner, wipe.name)
+        assertNull("Board wipe must be cast through the real engine", d.castSpell(owner, spell).error)
+        d.resolveAll()
+
+        assertTrue("Both Spirit tokens must leave the battlefield",
+            d.permanentsNamed(owner, "Spirit").isEmpty())
+        assertTrue("A creature wipe must not destroy Ugin",
+            d.findPermanent(owner, "Ugin, the Ineffable") != null)
+        assertFalse(firstCard in d.getExile(owner))
+        assertFalse(secondCard in d.getExile(owner))
+        assertEquals("First linked card returns exactly once", 1,
+            d.getHand(owner).count { it == firstCard })
+        assertEquals("Second linked card returns exactly once", 1,
+            d.getHand(owner).count { it == secondCard })
+        assertEquals("One spell spent and two linked cards returned",
+            handBefore + 2, d.getHand(owner).size)
+    }
+
     @Test fun uginDiscountCannotPayRequiredColorlessSymbol() {
         val probe = com.wingedsheep.sdk.dsl.card("Ugin Explicit Colorless Cost Probe") {
             manaCost = "{2}{C}"
