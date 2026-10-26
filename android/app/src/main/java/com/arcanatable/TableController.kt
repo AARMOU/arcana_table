@@ -1870,6 +1870,10 @@ internal class TableController(
 
     /** Request a full, unmasked engine checkpoint at the next action boundary. */
     fun saveOfflineGame() {
+        if (tutorialPracticeActive) {
+            message = "Tutorial games are temporary and cannot overwrite your saved match."
+            return
+        }
         if (!argentumOffline || wifiRole != null || argentumSocket.runningLocalHost == null ||
             argentumSnapshot?.gameOver != false) {
             message = "Only active offline vs AI games can be saved."
