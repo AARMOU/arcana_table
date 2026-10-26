@@ -259,6 +259,8 @@ internal fun TableController.TableOverlays() {
                 onWifiJoin = { playSheetOpen = false; run { wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() } },
                 onOnlineHost = { playSheetOpen = false; run { startWifiHost(online = true) } },
                 onOnlineJoin = { playSheetOpen = false; run { onlineCodeInput = ""; onlineJoinOpen = true } },
+                tutorialStep = if (tutorialChapterId != null) tutorialStep else null,
+                onTutorialNext = { tutorialAdvance() }, onTutorialExit = { stopTutorial() },
             )
             val pickDeck: (DeckChoice) -> Unit = { choice ->
                     deckPickerOpen = false
@@ -274,7 +276,9 @@ internal fun TableController.TableOverlays() {
                 onPick = pickDeck,
                 onImport = { deckPickerOpen = false; selectedPlayer = localSeat; importError = null; importOpen = true },
                 onDismiss = { deckPickerOpen = false },
-                onDeckBuilder = if (DeckBuilderFlag.enabled) { { deckPickerOpen = false; deckBuilderOpen = true } } else null)
+                onDeckBuilder = if (DeckBuilderFlag.enabled) { { deckPickerOpen = false; deckBuilderOpen = true } } else null,
+                tutorialStep = if (tutorialChapterId != null) tutorialStep else null,
+                onTutorialNext = { tutorialAdvance() }, onTutorialExit = { stopTutorial() })
             if (deckBuilderOpen && DeckBuilderFlag.enabled) DeckManagerDialog(
                 decks = savedDecks,
                 loadCatalog = { loadSupportCatalog() },
