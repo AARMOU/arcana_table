@@ -46,6 +46,17 @@ internal fun Modifier.tutorialTarget(id: String): Modifier =
     this.onGloballyPositioned { TutorialTargets.bounds[id] = it.boundsInRoot() }
 
 /** Activity-local actions emitted by real control handlers, not by touching the coach overlay. */
+/** Pure gate: only a corresponding engine event or gesture may complete an actionable step. */
+internal object TutorialStepGate {
+    fun accepts(step: ArcanaLessonStep, kind: String, target: String): Boolean {
+        if (step.actionKind != kind) return false
+        if (kind == "event") return step.event == target
+        if (step.target == target) return true
+        return (step.target == "hand-card:any" && target.startsWith("hand-card:")) ||
+            (step.target == "battlefield-card:any" && target.startsWith("battlefield-card:"))
+    }
+}
+
 internal object TutorialActions {
     var onGesture: ((String, String) -> Unit)? = null
     fun tap(target: String) { onGesture?.invoke(target, "tap") }
@@ -127,7 +138,7 @@ internal fun TutorialCoachOverlay(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(onClick = onSkip, modifier = Modifier.height(45.dp)) { Text("EXIT") }
-                    if (step.actionKind == "next" || (!practice && step.actionKind == "event")) {
+                    if (step.actionKind == "next" || !practice) {
                         Button(onClick = onNext, modifier = Modifier.height(45.dp)) { Text("NEXT") }
                     } else {
                         Text(step.hint.ifBlank { "Use the highlighted control" },
