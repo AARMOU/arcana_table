@@ -631,7 +631,7 @@ internal fun BattlefieldCard(card: GameCard, tileWidth: androidx.compose.ui.unit
     val activatedAbilities = remember(card.id, card.oracleText) { cardActivatedAbilityLines(card) }
     val cardHeight = tileWidth / 0.72f
     Box(Modifier.width(if (card.tapped) cardHeight else tileWidth).height(cardHeight), contentAlignment = Alignment.Center) {
-        CardFace(card, Modifier.width(tileWidth).tutorialTarget("battlefield-card:${card.name}"), onClick = onTap, onLongClick = onPreview, animateTapped = true, glow = glow)
+        CardFace(card, Modifier.width(tileWidth).tutorialTarget("battlefield-card:${card.name}"), onClick = onTap, onLongClick = onPreview, animateTapped = true, glow = glow, tutorialZone = "battlefield")
         card.chosenCreatureType?.takeIf { it.isNotBlank() }?.let { chosenType ->
             Text(
                 "TYPE · $chosenType",
@@ -685,21 +685,19 @@ internal fun OverviewCard(card: GameCard, width: androidx.compose.ui.unit.Dp, on
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: () -> Unit, onLongClick: () -> Unit, showCounters: Boolean = true, animateTapped: Boolean = false, glow: Boolean = false) {
+internal fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: () -> Unit, onLongClick: () -> Unit, showCounters: Boolean = true, animateTapped: Boolean = false, glow: Boolean = false, tutorialZone: String? = null) {
     val rotation by animateFloatAsState(targetValue = if (animateTapped && card.tapped) 90f else 0f, animationSpec = tween(260), label = "card-tap")
     // Argentum games: holding any card shows it large (CardZoom.kt) instead of the older long-press actions.
     val zoom = LocalCardZoom.current
     val holdAction: () -> Unit = {
         if (zoom.enabled) zoom.hold(card) else onLongClick()
-        TutorialActions.hold("battlefield-card:${card.name}")
-        TutorialActions.hold("hand-card:${card.name}")
+        if (tutorialZone != null) TutorialActions.hold("$tutorialZone-card:${card.name}")
     }
     Box(
         modifier.aspectRatio(0.72f).graphicsLayer(rotationZ = rotation).clip(RoundedCornerShape(8.dp)).background(card.color)
             .border(if (glow) 2.5.dp else if (card.tapped) 2.dp else 1.dp, if (glow) Mint else if (card.tapped) Mint else Color.White.copy(alpha = 0.28f), RoundedCornerShape(8.dp))
             .combinedClickable(onClick = {
-                TutorialActions.tap("hand-card:${card.name}")
-                TutorialActions.tap("battlefield-card:${card.name}")
+                if (tutorialZone != null) TutorialActions.tap("$tutorialZone-card:${card.name}")
                 onClick()
             }, onLongClick = holdAction)
             .then(if (zoom.enabled) Modifier.cardZoomRelease(zoom) else Modifier)
@@ -867,7 +865,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
                         })
                         .then(if (cards.firstOrNull()?.id == card.id) Modifier else Modifier)
                         .then(if (card.id == highlightedCardId) Modifier.border(3.dp, Mint, RoundedCornerShape(8.dp)) else Modifier),
-                    onClick = { onSelect(card) }, onLongClick = { onSelect(card) }, showCounters = false, glow = card.id in playableIds
+                    onClick = { onSelect(card) }, onLongClick = { onSelect(card) }, showCounters = false, glow = card.id in playableIds, tutorialZone = "hand"
                 )
             }
             } }
