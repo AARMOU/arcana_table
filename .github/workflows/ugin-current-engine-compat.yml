@@ -1,0 +1,223 @@
+name: Ugin current-engine integration preflight (runner-only)
+# GPT #153 / #150: prove Ugin's exact existing candidate against the newest
+# integrated Argentum runtime, without committing registry, assets or JARs.
+on:
+  push:
+    branches: [gpt/ugin-current-engine-compat-20261026]
+    paths:
+      - '.github/workflows/ugin-current-engine-compat.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ugin-current-engine-compat
+  cancel-in-progress: true
+
+jobs:
+  ugin-upgraded-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - name: Checkout isolated exact integration base
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 10  # retain the pinned integration ancestor for provenance
+          persist-credentials: false
+      - name: Checkout existing GPT-owned Ugin candidate at frozen tested SHA
+        uses: actions/checkout@v4
+        with:
+          repository: AARMOU/arcana_table
+          ref: 78f43099a880c8f68b426cb9b9957e7dd599d452
+          path: ugin-source
+          persist-credentials: false
+      - name: Fail closed on unexpected source ancestry or card drift
+        shell: bash
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f" HEAD
+          test "$(git -C ugin-source rev-parse HEAD)" = "78f43099a880c8f68b426cb9b9957e7dd599d452"
+          test ! -e android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt
+          test ! -e android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt
+          test -f android/app/libs/argentum-mtg-sdk.jar
+          test -f android/app/libs/argentum-rules-engine.jar
+          sha256sum android/app/libs/argentum-*.jar > /tmp/ugin-runtime-before.sha
+          echo "Integration base: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f"
+          echo "Ugin tested source: $(git -C ugin-source rev-parse HEAD)"
+      - name: Inject Ugin source and 22 scenarios into throwaway runner only
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp ugin-source/android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/
+          cp ugin-source/android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt android/custom-cards/src/test/kotlin/com/arcanatable/customcards/
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt")
+          s = p.read_text()
+          needle = "val entries: List<Entry> = listOf(\n"
+          assert s.count(needle) == 1, "Unexpected registry layout; manual integration review required"
+          assert "Entry(UginTheIneffable," not in s, "Ugin already registered; stop rather than duplicate"
+          p.write_text(s.replace(needle, needle + '        Entry(UginTheIneffable, "CMM", "Six WotC precons"),\n', 1))
+          PY
+      - name: Install Java 17 and Android 36 SDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install pinned Android SDK using hosted tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          sdk_root="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          sdkmanager_path="$(find "$sdk_root/cmdline-tools" -maxdepth 3 -type f -name sdkmanager | sort -V | tail -1)"
+          test -n "$sdkmanager_path" && test -x "$sdkmanager_path"
+          "$sdkmanager_path" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export Ugin and execute real-engine plus Android regression suites
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test :app:testDebugUnitTest
+      - name: Verify actual 22 Ugin cases and Android test evidence
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          path = Path("android/custom-cards/build/test-results/test/TEST-com.arcanatable.customcards.UginTheIneffableScenarioTest.xml")
+          assert path.is_file(), "Ugin JUnit XML missing"
+          root = ET.parse(path).getroot()
+          cases = [x for x in root.iter("testcase")]
+          names = [x.get("name") for x in cases]
+          assert len(cases) >= 22 and len(names) == len(set(names)), ("Ugin case count/uniqueness", names)
+          required = {
+              "plusOneCannotBeActivatedTwiceInOneTurn",
+              "minusThreeCannotFollowPlusOneInSameTurn",
+              "spiritWithNoExiledCardLeavesWithoutCreatingOrReturningOne",
+              "stolenSpiritKeepsPrivateLinkAndReturnsCardToOriginalOwner",
+              "simultaneousBoardWipeReturnsEachSpiritLinkedCardExactlyOnce",
+              "devoidSpellGetsUginDiscountWithoutWaivingPrintedBlue",
+              "uginDiscountCannotPayRequiredColorlessSymbol",
+          }
+          assert required <= set(names), ("Missing mandatory Ugin cases", sorted(required - set(names)))
+          for case in cases:
+              assert all(case.find(k) is None for k in ("failure", "error", "skipped")), case.get("name")
+          app_xml = list(Path("android/app/build/test-results/testDebugUnitTest").glob("TEST-*.xml"))
+          assert app_xml, "Android debug test XML missing"
+          app_count = 0
+          for f in app_xml:
+              suite = ET.parse(f).getroot()
+              assert int(suite.get("failures", 0)) == 0 and int(suite.get("errors", 0)) == 0, f
+              app_count += int(suite.get("tests", 0))
+          assert app_count > 0, "No Android debug tests executed"
+          print(f"Ugin exact-current-runtime: {len(cases)} Ugin tests, {app_count} Android debug tests, no failures")
+          PY
+      - name: Require deterministic runner-only export and unchanged runtime binaries
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'Ugin, the Ineffable' android/app/src/main/assets/argentum/custom-cards.index.tsv
+          sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/ugin-export-before.sha
+          (cd android && ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards)
+          sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/ugin-export-after.sha
+          diff -u /tmp/ugin-export-before.sha /tmp/ugin-export-after.sha
+          sha256sum android/app/libs/argentum-*.jar > /tmp/ugin-runtime-after.sha
+          diff -u /tmp/ugin-runtime-before.sha /tmp/ugin-runtime-after.sha
+          git diff --exit-code -- android/app/libs
+          echo "Ugin registry/export was modified ONLY in the throwaway runner."
+      - name: Prove exact original Eldrazi deck coverage delta without substitutions
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --exit-code -- investigation/argentum-six-precons/deck-manifest.json android/app/src/main/assets/argentum/all-cards.index.tsv
+          python3 - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          from subprocess import check_output
+
+          manifest_path = "investigation/argentum-six-precons/deck-manifest.json"
+          index_paths = (
+              "android/app/src/main/assets/argentum/all-cards.index.tsv",
+              "android/app/src/main/assets/argentum/custom-cards.index.tsv",
+          )
+          ugin = "Ugin, the Ineffable"
+
+          def committed(path):
+              return check_output(["git", "show", f"HEAD:{path}"])
+
+          def card_names(contents):
+              result = []
+              for line in contents.decode("utf-8").splitlines():
+                  if not line.strip():
+                      continue
+                  fields = line.split("\t")
+                  assert len(fields) == 2, ("Invalid index record", line)
+                  assert fields[1] in ("card", "basic", "token"), ("Unknown index kind", line)
+                  if fields[1] in ("card", "basic"):
+                      result.append(fields[0])
+              return result
+
+          manifest_bytes = committed(manifest_path)
+          manifest = json.loads(manifest_bytes)
+          before_raw = {p: committed(p) for p in index_paths}
+          after_raw = {p: Path(p).read_bytes() for p in index_paths}
+          before = [n for p in index_paths for n in card_names(before_raw[p])]
+          after = [n for p in index_paths for n in card_names(after_raw[p])]
+          assert ugin not in before, "Ugin already integrated in baseline; do not double-count"
+          assert after.count(ugin) == 1, "Ugin must be exported exactly once"
+          assert set(after) - set(before) == {ugin}, "Unexpected added or substituted index cards"
+          assert set(before) <= set(after), "Export dropped an existing indexed card"
+          assert before_raw[index_paths[0]] == after_raw[index_paths[0]], "Upstream card index drift"
+          assert Path(manifest_path).read_bytes() == manifest_bytes, "Original deck manifest drift"
+
+          report = {
+              "baseline_manifest_sha256": hashlib.sha256(manifest_bytes).hexdigest(),
+              "baseline_index_sha256": {
+                  p: hashlib.sha256(before_raw[p]).hexdigest() for p in index_paths
+              },
+              "runner_export_index_sha256": {
+                  p: hashlib.sha256(after_raw[p]).hexdigest() for p in index_paths
+              },
+              "candidate_only": ugin,
+              "decks": {},
+          }
+          # Basic lands (including Wastes) are indexed as "basic", not "card".
+          # Tokens must not count toward original 100-card deck coverage.
+          expected_baseline = {"Eldrazi Incursion": 76, "Eldrazi Unbound": 75}
+          assert "Wastes" in before and "Wastes" in after, "Basic-land index entries missing"
+          for name in ("Eldrazi Incursion", "Eldrazi Unbound"):
+              deck = next(d for d in manifest["decks"] if d["name"] == name)
+              cards = [c["name"] for c in deck["cards"] for _ in range(c["quantity"])]
+              assert len(cards) == 100, (name, len(cards))
+              assert cards.count(ugin) == 1, (name, "Ugin identity/quantity changed")
+              missing_before = [n for n in cards if n not in set(before)]
+              missing_after = [n for n in cards if n not in set(after)]
+              assert 100 - len(missing_before) == expected_baseline[name], (
+                  name, "Pinned original-deck baseline drift (check basic lands)",
+                  100 - len(missing_before), expected_baseline[name]
+              )
+              assert missing_before.count(ugin) == 1, (name, "Ugin not missing from baseline")
+              assert missing_after == [n for n in missing_before if n != ugin], (
+                  name, "Unexpected original-card coverage change", missing_before, missing_after
+              )
+              report["decks"][name] = {
+                  "original_slots": 100,
+                  "baseline_indexed": 100 - len(missing_before),
+                  "runner_only_indexed": 100 - len(missing_after),
+                  "remaining_missing_original_names": missing_after,
+              }
+          Path("ugin-original-deck-coverage.json").write_text(
+              json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          print(json.dumps(report["decks"], indent=2))
+          print("PASS: exactly one original Ugin slot added to EACH deck; no substitutions")
+          PY
+      - name: Preserve CI proof, not distributable assets
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ugin-upgraded-runtime-test-xml
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            android/custom-cards/build/test-results/test/TEST-*UginTheIneffable*.xml
+            android/app/build/test-results/testDebugUnitTest/TEST-*.xml
+            ugin-original-deck-coverage.json
