@@ -700,4 +700,37 @@ class UginTheIneffableScenarioTest {
         d.resolveAll()
         assertNotNull(d.findPermanent(p, probe.name))
     }
+    @Test fun devoidSpellGetsUginDiscountWithoutWaivingPrintedBlue() {
+        // Devoid changes spell COLOR, not its printed mana symbols or color identity.
+        // Ugin reduces only the generic {2} of this genuinely colorless {2}{U}
+        // Eldrazi spell; the player must still supply blue for the printed {U}.
+        val probe = com.wingedsheep.sdk.dsl.card("Ugin Devoid Discount Probe") {
+            manaCost = "{2}{U}"
+            colorIdentity = "U"
+            typeLine = "Creature — Eldrazi"
+            power = 2
+            toughness = 2
+            keywords(com.wingedsheep.sdk.core.Keyword.DEVOID)
+        }
+        val d = customScenario(UginTheIneffable)
+        val p = d.player1
+        d.registerCard(probe)
+        assertTrue("Devoid must make the spell colorless despite blue identity",
+            d.cardRegistry.requireCard(probe.name).colors.isEmpty())
+        d.putPermanentOnBattlefield(p, "Ugin, the Ineffable")
+        val spell = d.putCardInHand(p, probe.name)
+
+        assertNotNull("Ugin's discount must not pay the printed {U} symbol",
+            d.castSpell(p, spell).error)
+        assertTrue("Failed payment must keep the spell in hand", spell in d.getHand(p))
+        assertNull(d.findPermanent(p, probe.name))
+
+        d.giveMana(p, com.wingedsheep.sdk.core.Color.BLUE, 1)
+        assertNull("Devoid colorless spell must cost only {U} after Ugin's {2} reduction",
+            d.castSpell(p, spell).error)
+        d.resolveAll()
+        assertNotNull("The discounted Devoid Eldrazi must actually resolve",
+            d.findPermanent(p, probe.name))
+    }
+
 }
