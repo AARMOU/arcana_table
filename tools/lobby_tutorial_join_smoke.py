@@ -105,7 +105,7 @@ def main() -> None:
     assert "PR282 8e4702065dff96ba7ce0a64cd5d420fb54def43d" in pins
     dialog = Path("android/app/src/main/java/com/arcanatable/TableDialogs.kt").read_text()
     assert "CURRENT NO-GOOSE TEST PREVIEW" in dialog
-    assert "NEXT APK · PREPARED BUT NOT YET BUILT" in dialog
+    assert "NEXT TEST APK · LOBBY, TUTORIAL AND DECK TOOLS" in dialog
     assert "BUILD 123 · LARGE END-STEP AI FIX" in dialog and "BUILD 122 · FIXES AND QUICK UI TIPS" in dialog
     assert Path("combined-evidence/build121-changelog-acceptance.txt").is_file()
     assert Path("combined-evidence/import-editor-candidate.txt").is_file()
