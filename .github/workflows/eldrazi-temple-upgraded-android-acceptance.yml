@@ -55,7 +55,7 @@ jobs:
           test "$(git -C argentum-engine rev-parse HEAD)" = 7fb073337e4389cfabe2ebf4c6416633a7fc63d2
           test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt)" = 0e024338ec2d66c185ddec4aa1d61435845acf97
           test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt)" = 11c075d7480a9fb59911c6115ea2513d2e28ddf4
-          test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py)" = 39b91c7c30b30aed3d3e97c80768ba1e1f119a60
+          test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py)" = 166ddb7826760f373cd07d579e7b60e2d1231a5b
           test "$(git -C temple-port hash-object engine-upgrade/eldrazi-temple/port_to_upgraded.py)" = 9078e8e3c5e245593d4ab6155fdde70965ac088a
           test "$(git -C temple-gameplay hash-object engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt)" = f2b88843a34bf39dd5c54370f21c6bc85bb02426
           sha256sum android/app/libs/argentum-*.jar > /tmp/temple-committed-jars.sha
