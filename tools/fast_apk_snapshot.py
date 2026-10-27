@@ -77,6 +77,23 @@ SEED_CARDS = [
 B136_SOURCE_STEP = "Integrate every owner-requested B136 feature from exact PR heads"
 B136_SOURCE_KEYS = {"DECK_BASE", "DECK_SHA", "LOBBY_BASE", "LOBBY_FIX_SHA",
                     "OUTCOME_SHA", "UGIN_BASE", "UGIN_SHA", "TEMPLE_SHA"}
+# These three pins alone can alter compiled Argentum/custom-card output.
+# Lobby, blockers, deck UI and tutorial source NEVER bypass the source-only
+# combination or their real Android tests; they simply do not force a JAR rebuild.
+ENGINE_SOURCE_KEYS = ("UGIN_BASE", "UGIN_SHA", "TEMPLE_SHA")
+# Old successfully sealed seed run 40417570112 used v1's over-broad fingerprint.
+# Only this ONE audited historical pinset may be translated after verifying
+# exact current engine pins and every engine/card input byte and sealed artifact.
+LEGACY_B136_SOURCE_PINS = {
+    "DECK_BASE": "9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f",
+    "DECK_SHA": "5a64b631b9d7185c7fb4102a58afa9aa237746c0",
+    "LOBBY_BASE": "79dcd0c58837305fcd1f8790fbf052af214d204b",
+    "LOBBY_FIX_SHA": "b162ea69060a50030c55d32f176464cedeeaa57d",
+    "OUTCOME_SHA": "abaf13ad913025762db889bde1bf92907cd5a133",
+    "UGIN_BASE": "9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f",
+    "UGIN_SHA": "49f7f7389b940accf2e2321130407e579cb2ee4c",
+    "TEMPLE_SHA": "e57c462d17075ad3d1f2eee249d75edb04b2572a",
+}
 
 def b136_source_pins() -> dict[str, str]:
     workflow = WORKFLOW.read_text()
@@ -123,25 +140,37 @@ def files_for_fingerprint() -> list[Path]:
     return sorted(result)
 
 
-def fingerprint() -> str:
-    # Delimit content, path and size. Avoid mutable branch/head IDs: UI-only
-    # changes must not invalidate pinned engine/card outputs.
+def fingerprint(legacy: bool = False) -> str:
+    # v2 binds only source-built engine/custom-card pins and the exact *bytes*
+    # that can change the engine/card output. This keeps reviewed Compose/UI
+    # fixes from invalidating a verified 9-file engine cache.
+    source_pins = b136_source_pins()
+    if legacy:
+        # Strict one-way compatibility with the exact B136 v1 seed format.
+        # A changed engine pin always fails before any files are restored.
+        if any(source_pins[k] != LEGACY_B136_SOURCE_PINS[k]
+               for k in ENGINE_SOURCE_KEYS):
+            raise ValueError("Legacy seed engine/card pins changed; rebuild seed")
+        pins = LEGACY_B136_SOURCE_PINS
+    else:
+        pins = {k: source_pins[k] for k in ENGINE_SOURCE_KEYS}
     h = hashlib.sha256()
-    for v in ("arcana-fast-snapshot-v1", UPSTREAM, PATCH_ARTIFACT_SHA256,
-              PATCH_SHA256, *[f"{k}={v}" for k,v in sorted(PINS.items()) if k != "INCLUDE_ONLINE"],
-              *[f"B136:{k}={v}" for k,v in sorted(b136_source_pins().items())]):
-        h.update(v.encode() + b"\0")
+    for v in ("arcana-fast-snapshot-v1" if legacy else "arcana-fast-snapshot-v2",
+              UPSTREAM, PATCH_ARTIFACT_SHA256,
+              PATCH_SHA256,
+              *[f"{k}={v}" for k,v in sorted(PINS.items()) if k != "INCLUDE_ONLINE"],
+              *[f"B136:{k}={v}" for k,v in sorted(pins.items())]):
+        h.update(v.encode() + b"\\0")
     body = WORKFLOW.read_text()
     for expected in (UPSTREAM, PATCH_ARTIFACT_SHA256, PATCH_SHA256):
         if expected not in body:
             raise ValueError(f"Full validated release workflow pin drift: {expected}")
     for path in files_for_fingerprint():
         data = path.read_bytes()
-        h.update(str(path).encode() + b"\0")
-        h.update(str(len(data)).encode() + b"\0")
+        h.update(str(path).encode() + b"\\0")
+        h.update(str(len(data)).encode() + b"\\0")
         h.update(bytes.fromhex(sha(data)))
     return h.hexdigest()
-
 
 def named_scripts(names: list[str]) -> dict[str,str]:
     # Extract *exact* step scripts from the same full Build135 workflow, do not
@@ -204,7 +233,7 @@ def seed_manifest(directory: Path) -> None:
         p.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(name, p)
     manifest = {
-        "schema": 1, "input_fingerprint": expected,
+        "schema": 2, "input_fingerprint": expected,
         "seed_commit": os.environ.get("GITHUB_SHA", "local"),
         "seed_run_id": os.environ.get("GITHUB_RUN_ID", "local"),
         "upstream": UPSTREAM, "engine_patch_sha256": PATCH_SHA256,
@@ -215,10 +244,12 @@ def seed_manifest(directory: Path) -> None:
 
 
 def restore(directory: Path) -> None:
-    expected = fingerprint()  # MUST be before touching repo JARs and card assets
+    # MUST be checked before copying any cached JAR or generated card data.
     manifest = json.loads((directory/"manifest.json").read_text())
-    if manifest.get("schema") != 1 or manifest.get("upstream") != UPSTREAM:
+    schema = manifest.get("schema")
+    if schema not in (1, 2) or manifest.get("upstream") != UPSTREAM:
         raise ValueError("Incompatible or unknown seed format/upstream")
+    expected = fingerprint(legacy=(schema == 1))
     if manifest.get("input_fingerprint") != expected:
         raise ValueError("REJECT stale/mismatched engine cache: source/patches/custom cards changed. Refresh seed; no fallback to unverified binary.")
     if manifest.get("engine_patch_sha256") != PATCH_SHA256:
@@ -270,7 +301,24 @@ def main() -> None:
         subprocess.run(["bash","-euo","pipefail","-c",script], check=True, env=env)
         if not Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt").is_file():
             raise ValueError("Build 136 Ugin integration is missing")
-        print("PASS: exact Build 136 source integrated; no APK compiled")
+        # Mandatory B137 source gate: no stale B136-only APK even when old
+        # source-assembly scripts themselves completed successfully.
+        required = (
+            ("android/app/src/main/java/com/arcanatable/TableMultiLobby.kt",
+             "val hostLobbyState = wifiMultiLobbyState"),
+            ("android/app/src/main/java/com/arcanatable/TableArgentum.kt",
+             "argentumBlockGuard.onStep(snapshot.stepKey)"),
+            ("android/app/src/main/java/com/arcanatable/ArgentumBlockSubmissionGuard.kt",
+             "class ArgentumBlockSubmissionGuard"),
+            ("android/app/src/test/java/com/arcanatable/MultiplayerLobbyVisibilityTest.kt",
+             "class MultiplayerLobbyVisibilityTest"),
+            ("android/app/src/test/java/com/arcanatable/ArgentumBlockSubmissionGuardTest.kt",
+             "class ArgentumBlockSubmissionGuardTest"),
+        )
+        for file, marker in required:
+            if not Path(file).is_file() or marker not in Path(file).read_text():
+                raise ValueError(f"Next-APK source missing mandatory lobby/combat regression: {file}")
+        print("PASS: exact Build 136 plus lobby and blocker fixes; no APK compiled")
     elif args.phase=="fingerprint":
         FINGERPRINT.write_text(fingerprint()+"\n")
         print("SOURCE INPUT FINGERPRINT: "+FINGERPRINT.read_text().strip())
