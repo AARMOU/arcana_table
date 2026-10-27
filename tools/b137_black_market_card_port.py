@@ -15,8 +15,6 @@ REVIEWED_SHA = "5a64b631b9d7185c7fb4102a58afa9aa237746c0"
 FILES = {
     "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BlackMarketConnections.kt":
         "cf8d08d8308349ee075c33adbce024dd02020427",
-    "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BlackMarketConnectionsScenarioTest.kt":
-        "edec2520f845cee929bf0be79d6f090fb9f35ff3",
 }
 REGISTRY = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt")
 ANCHOR = '        Entry(SpringleafParade, "ECC", HAZEL),'
@@ -37,6 +35,13 @@ def main() -> None:
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(data)
         print("RESTORED exact reviewed card/scenario", path, blob_sha)
+    # B137 already has a regression exercising the authoritative upstream
+    # Argentum card. Do NOT replace that test with the older custom scenario.
+    existing_scenario = Path("android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BlackMarketConnectionsScenarioTest.kt")
+    assert existing_scenario.is_file(), "Upstream engine scenario missing"
+    assert run("git", "hash-object", str(existing_scenario)) == "d3889e0c8e30b5d24922f67c211e819939d61343", "Upstream engine scenario changed; review required"
+    assert 'CardPool.driver("Black Market Connections")' in existing_scenario.read_text()
+    print("PASS: retained existing upstream Argentum rules scenario without modification")
     raw = REGISTRY.read_text()
     assert raw.count(ANCHOR) == 1, "registry insertion anchor has changed"
     assert ADD not in raw, "duplicate Black Market Connections registration"
