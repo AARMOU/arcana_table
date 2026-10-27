@@ -14,6 +14,8 @@ internal fun TableController.resetRoomChat() {
     observedChatCount = 0
     roomChatNextId = 0L
     roomChatSeen.clear()
+    roomChatDisplayRevision = 0
+    observedRoomChatRevision = 0
 }
 
 internal fun TableController.receiveRoomChat(packet: JSONObject) {
@@ -25,6 +27,7 @@ internal fun TableController.receiveRoomChat(packet: JSONObject) {
         roomChatSeen.remove(roomChatSeen.first())
     }
     chatMessages = (chatMessages + ChatMessage(received.author, received.text, received.timestamp)).takeLast(200)
+    roomChatDisplayRevision++
 }
 
 private fun TableController.broadcastRoomChat(packet: JSONObject) {
