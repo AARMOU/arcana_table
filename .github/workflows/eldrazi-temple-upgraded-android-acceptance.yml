@@ -333,8 +333,9 @@ jobs:
           set -euo pipefail
           python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --self-test
           python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --apply android/app/src/main/assets/argentum/all-cards.jsonl
-          # No checked-in assets, runtime JARs, or original deck manifests may change.
-          git diff --exit-code -- android/app/src/main/assets/argentum/all-cards.jsonl
+          # This runner-only JSONL rewrite must be real; never commit it to source.
+          test -n "$(git diff -- android/app/src/main/assets/argentum/all-cards.jsonl)"
+          git diff --check -- android/app/src/main/assets/argentum/all-cards.jsonl
       - name: Run real custom-card and Android unit tests against matching SDK and library
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
