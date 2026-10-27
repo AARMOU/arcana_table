@@ -336,7 +336,7 @@ jobs:
           compat=engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py
           assets=android/app/src/main/assets/argentum
           # Original all-cards JSONL contains three chosen-type mana effects and
-          # six counter doublers: 4 bare sealed-class strings + 5 tagged objects
+          # six counter doublers: 5 bare sealed-class strings + 4 tagged objects
           # across the two ABI families.  Require all nine, not just object tags.
           python3 "$compat" --apply "$assets/all-cards.jsonl" --expected-mana 3 --minimum-counters 6
           # Exported custom-cards.jsonl is also consumed by OfflineCardLibrary.
