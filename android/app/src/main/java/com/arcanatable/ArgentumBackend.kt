@@ -199,7 +199,9 @@ data class ArgentumTableSnapshot(
                     // Keep Argentum's zone spelling ("Graveyard"): ChosenTarget.Card deserializes Zone by its serial name.
                     put(id, ArgentumTargetRef(
                         id, card.optString("name", "Card"), targetType,
-                        zoneId.optString("ownerId"), zoneId.optString("zoneType"),
+                        card.optString("ownerId").takeIf { it.isNotBlank() && it != "null" }
+                            ?: zoneId.optString("ownerId"),
+                        zoneId.optString("zoneType"),
                         card.optString("controllerId").takeIf { it.isNotBlank() && it != "null" },
                     ))
                 }
