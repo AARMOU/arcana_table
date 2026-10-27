@@ -133,7 +133,8 @@ internal fun AdjustUiPage(
                     }
                     AdjustSection("GAME DISPLAY")
                     AdjustToggle("Show played card pop-up", "Show a card when the AI plays it.", popup, onPopup)
-                    AdjustSlider("Notice time", popupSeconds, 1f..8f, { "${"%.1f".format(it)} sec" }, onPopupSeconds)
+                    AdjustSlider("Played-card popup time", popupSeconds, 1f..8f, { "${"%.1f".format(it)} sec" }, onPopupSeconds)
+                    Text("This time is exact for played cards; longer ability notices and recaps may stay up for readability.", color = Muted, fontSize = 10.sp)
                     AdjustToggle("Recent-plays strip", "Show or hide the strip of recent cards.", feed, onFeed)
                     AdjustToggle("Ability and trigger banners", "Show short notices when abilities happen.", banners, onBanners)
                     AdjustToggle("Stack on the table", "Show what's on the stack as cards at the edge of the table.", stackPile, onStackPile)
