@@ -66,6 +66,9 @@ jobs:
           assert len(report["rows"]) == report["incursionMissingSlots"]
           assert report["noPaidWorkerAuthorization"] is True
           assert report["originalDeckIdentityVerified"] is True
+          assert report["customExportIndexParityVerified"] is True, "Ghost index entries could inflate coverage"
+          assert report["customExportCount"] > 0, "Missing custom card definitions"
+          assert "android/app/src/main/assets/argentum/custom-cards.jsonl" in report["inputSha256"]
           assert report["originalDeckSha256"] == {
               "Eldrazi Incursion": "43d3cf6a753c82d38992d35d3dbe9b09d3caaec4f8e0369065aaca4a5559849f",
               "Eldrazi Unbound": "f4f98c4f0e2c22f89f8fa8bf92e65847cb94cb8739ad867bc061759bf70ccdcf",
@@ -73,6 +76,9 @@ jobs:
           displacer = next((r for r in report["rows"] if r["name"] == "Eldrazi Displacer"), None)
           if displacer:
               assert displacer["engineeringLane"].startswith("GPT #154 / existing draft #163"), "Duplicate Displacer worker risk"
+          spawnbed = next((r for r in report["rows"] if r["name"] == "Spawnbed Protector"), None)
+          if spawnbed:
+              assert spawnbed["engineeringLane"].startswith("GPT #170 / test-only draft #175"), "Duplicate Spawnbed worker risk"
           print(f"Verified exact integration {head}: Incursion {report['incursionIndexedSlots']}/100, Unbound {report['unboundIndexedSlots']}/100")
           PY
       - uses: actions/upload-artifact@v4
