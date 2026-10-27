@@ -61,6 +61,7 @@ class HomeScreenSizesTest {
         rule.onNodeWithTag("home-play").performClick()
         UiTestSupport.settle(rule)
         // Offline deck choices fill the first viewport on narrow portrait phones.
+        rule.onNodeWithTag("play-online-option").assertDoesNotExist()
         rule.onNodeWithTag("play-wifi-option").performScrollTo().performClick()
         UiTestSupport.settle(rule)
         rule.onNodeWithText("Host online").assertExists()
