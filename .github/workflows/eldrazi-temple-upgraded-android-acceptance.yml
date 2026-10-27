@@ -149,6 +149,33 @@ jobs:
           packages: platform-tools
       - name: Install Android SDK 36
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Port Primal Wellspring mana-spend copy rider to upgraded SDK (runner only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The pinned upgraded SDK removed CopySpellWhenSpent and models the same
+          # delayed trigger via TriggersWhenSpent + CopyTargetSpell. Preserve the
+          # actual spell-copy behavior; do not remove Primal Amulet from registry.
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          src = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt")
+          before = "ManaSpellRider.CopySpellWhenSpent(GameObjectFilter.InstantOrSorcery)"
+          after = ("ManaSpellRider.TriggersWhenSpent(\n"
+                   "                GameObjectFilter.InstantOrSorcery,\n"
+                   "                Effects.CopyTargetSpell(EffectTarget.TriggeringEntity),\n"
+                   "            )")
+          content = src.read_text()
+          assert content.count(before) == 1, "Primal Wellspring API shape changed; manual review required"
+          assert "import com.wingedsheep.sdk.dsl.*" in content
+          assert "import com.wingedsheep.sdk.scripting.targets.EffectTarget" in content
+          upstream = Path("argentum-engine/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaSpellRider.kt").read_text()
+          assert "data class TriggersWhenSpent(" in upstream and "CopySpellWhenSpent" not in upstream
+          src.write_text(content.replace(before, after, 1))
+          assert src.read_text().count("Effects.CopyTargetSpell(EffectTarget.TriggeringEntity)") == 1
+          print("Primal Wellspring's instant/sorcery mana-copy trigger preserved using upgraded SDK API")
+          PY
+          git diff --check
       - name: Export Temple, run real custom-card and Android unit tests
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test :app:testDebugUnitTest
