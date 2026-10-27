@@ -74,7 +74,7 @@ class WorkflowAuditTest(unittest.TestCase):
         a, b = fixture()
         widened = b.replace('  workflow_dispatch:\n',
                             '  schedule:\n    - cron: "0 * * * *"\n  workflow_dispatch:\n')
-        self.assertTrue(any('preview: workflow triggers changed' in x
+        self.assertTrue(any('manual-only' in x
                             for x in audit(a, widened)))
 
     def test_preview_permission_escalation_rejected(self):
