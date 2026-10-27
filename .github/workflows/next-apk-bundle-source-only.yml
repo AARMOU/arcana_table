@@ -36,7 +36,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 tools/fast_apk_snapshot.py source
+          if ! python3 tools/fast_apk_snapshot.py source; then
+            echo 'Source assembly halted; report exact conflict markers (never auto-publish)'
+            git diff --name-only --diff-filter=U || true
+            for file in android/app/src/main/java/com/arcanatable/TableArgentum.kt android/app/src/main/java/com/arcanatable/TableDialogs.kt; do
+              if test -f "$file"; then
+                echo "::group::Unresolved hunks in $file"
+                awk '/^<<<<<<< / {inside=1; count=0} inside && count++<160 {print} /^>>>>>>> / {inside=0}' "$file" | head -350
+                echo '::endgroup::'
+              fi
+            done
+            exit 1
+          fi
           test -s combined-evidence/b136-integration-summary.txt
           test -s combined-evidence/next-apk-source-pins.txt
           grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
