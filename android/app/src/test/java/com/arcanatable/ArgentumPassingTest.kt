@@ -52,6 +52,69 @@ class ArgentumPassingTest {
         assertEquals(ArgentumPassing.Step.INTERRUPTED, tick(over = true))
     }
 
+    private fun stackItem(
+        targetIds: List<String> = emptyList(),
+        targetNames: List<String> = emptyList(),
+    ) = ArgentumStackItem(
+        id = "spell-1", name = "Test spell", controllerName = "Opponent",
+        isYours = false, imageUrl = null, targetNames = targetNames, targetIds = targetIds,
+    )
+
+    @Test
+    fun autoPassIgnoresUntargetedAndOpponentOnlyStackItems() {
+        val refs = mapOf(
+            "opponent" to ArgentumTargetRef("opponent", "Opponent", "Player"),
+            "their-card" to ArgentumTargetRef("their-card", "Their creature", "Permanent", ownerId = "opponent", controllerId = "opponent"),
+        )
+        assertEquals(null, ArgentumPassing.interruptingStackItem(listOf(stackItem()), refs, "me"))
+        assertEquals(null, ArgentumPassing.interruptingStackItem(listOf(stackItem(listOf("opponent"))), refs, "me"))
+        assertEquals(null, ArgentumPassing.interruptingStackItem(listOf(stackItem(listOf("their-card"))), refs, "me"))
+        assertEquals(ArgentumPassing.Step.PASS, tick(opponentStack = null))
+    }
+
+    @Test
+    fun autoPassStopsForYouAndAnythingYouOwnOrControl() {
+        val refs = mapOf(
+            "me" to ArgentumTargetRef("me", "You", "Player"),
+            "mine" to ArgentumTargetRef("mine", "My creature", "Permanent", ownerId = "me", controllerId = "me"),
+            "stolen" to ArgentumTargetRef("stolen", "Stolen from me", "Permanent", ownerId = "me", controllerId = "opponent"),
+            "borrowed" to ArgentumTargetRef("borrowed", "Borrowed by me", "Permanent", ownerId = "opponent", controllerId = "me"),
+            "opponent" to ArgentumTargetRef("opponent", "Opponent", "Player"),
+        )
+        for (id in listOf("me", "mine", "stolen", "borrowed")) {
+            assertEquals("Test spell", ArgentumPassing.interruptingStackItem(listOf(stackItem(listOf(id))), refs, "me"))
+        }
+        assertEquals("Test spell", ArgentumPassing.interruptingStackItem(listOf(stackItem(listOf("opponent", "mine"))), refs, "me"))
+        assertEquals(ArgentumPassing.Step.INTERRUPTED, tick(opponentStack = "Test spell"))
+    }
+
+    @Test
+    fun autoPassStopsConservativelyForUnknownTargets() {
+        assertEquals("Test spell", ArgentumPassing.interruptingStackItem(listOf(stackItem(listOf("unknown"))), emptyMap(), "me"))
+        assertEquals("Test spell", ArgentumPassing.interruptingStackItem(listOf(stackItem(targetNames = listOf("Hidden target"))), emptyMap(), "me"))
+        assertEquals("Test spell", ArgentumPassing.interruptingStackItem(listOf(stackItem()), emptyMap(), null))
+        assertEquals(null, ArgentumPassing.interruptingStackItem(emptyList(), emptyMap(), null))
+        assertEquals(ArgentumPassing.Step.INTERRUPTED, tick(types = setOf("DeclareBlockers")))
+        assertEquals(ArgentumPassing.Step.INTERRUPTED, tick(decision = true))
+    }
+
+    @Test
+    fun projectedCardsRetainControllerForAutoPassProtection() {
+        val card = JSONObject().put("name", "Borrowed creature").put("controllerId", "me")
+            .put("zone", JSONObject().put("zoneType", "Battlefield").put("ownerId", "opponent"))
+        val state = JSONObject()
+            .put("viewingPlayerId", "me")
+            .put("players", JSONArray().put(JSONObject().put("playerId", "me").put("name", "Me")))
+            .put("cards", JSONObject().put("borrowed", card))
+        val snapshot = ArgentumTableSnapshot.parse(state)
+        assertEquals("me", snapshot.targets["borrowed"]?.controllerId)
+        assertEquals("opponent", snapshot.targets["borrowed"]?.ownerId)
+        assertEquals(
+            "Test spell",
+            ArgentumPassing.interruptingStackItem(listOf(stackItem(listOf("borrowed"))), snapshot.targets, "me"),
+        )
+    }
+
     @Test
     fun gameLogParsesWholeGameWithOwnershipAndTurnMarkers() {
         val log = JSONArray()
