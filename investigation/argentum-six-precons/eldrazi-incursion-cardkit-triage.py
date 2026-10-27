@@ -69,6 +69,32 @@ def verify_original_decks(decks: dict, expected: dict | None = None) -> dict:
     return observed
 
 
+
+def unique_manifest_decks(manifest: dict) -> dict[str, dict]:
+    """Reject duplicate deck names instead of silently overwriting an original.
+
+    A dictionary comprehension would accept a second Eldrazi Incursion entry
+    and hide the first. An exact 100-card precon audit must reject that input
+    even when the last duplicate happens to match the pinned digest.
+    """
+    rows = manifest.get("decks") if isinstance(manifest, dict) else None
+    if not isinstance(rows, list):
+        raise ValueError("Invalid deck manifest: expected decks list")
+    decks: dict[str, dict] = {}
+    for number, deck in enumerate(rows, 1):
+        if not isinstance(deck, dict):
+            raise ValueError(f"Invalid deck entry at row {number}")
+        name = deck.get("name")
+        if not isinstance(name, str) or not name or name != name.strip():
+            raise ValueError(f"Invalid deck name at row {number}: {name!r}")
+        if name in decks:
+            raise ValueError(f"Duplicate deck name in manifest: {name!r}")
+        if not isinstance(deck.get("cards"), list):
+            raise ValueError(f"Invalid cards list for deck {name!r}")
+        decks[name] = deck
+    return decks
+
+
 def read_index_entries(path: Path) -> dict[str, str]:
     """Parse a shipped index without silently accepting duplicate or token-only rows."""
     entries: dict[str, str] = {}
@@ -162,7 +188,7 @@ def main() -> None:
         for name, kind in source.items()
         if kind in {"card", "basic"}
     }
-    decks = {deck["name"]: deck for deck in manifest["decks"]}
+    decks = unique_manifest_decks(manifest)
     original_identity = verify_original_decks(decks)
     incursion = decks["Eldrazi Incursion"]
     unbound = decks["Eldrazi Unbound"]
