@@ -22,7 +22,7 @@ def migrate(value, counts, path=()):
     # strings, not {"type": ...}.  The first migration handled only objects,
     # leaving Branching Evolution / The Earth Crystal / Corpsejack Menace and
     # two chosen-type mana lands undecodable by the upgraded SDK.
-    if isinstance(value, str) and value in (OLD_MANA, OLD_COUNTERS):
+    if isinstance(value, str) and value in (OLD_MANA, OLD_COUNTERS) and (not path or path[-1] != "type"):
         if value == OLD_COUNTERS:
             if len(path) < 2 or path[-2] != "replacementEffects" or not isinstance(path[-1], int):
                 raise ValueError(f"Unreviewed bare {OLD_COUNTERS} location: {path}")
@@ -186,6 +186,20 @@ class MigrationTests(unittest.TestCase):
                        "restriction": {"type": "OfChosenType", "creatureOnly": False}},
             "cost": "CostTap"})
         self.assertEqual(counts[OLD_MANA], 1)
+
+    def test_object_type_discriminators_are_not_bare_subclasses(self):
+        # A tagged object's "type" value is metadata, not a bare sealed-class
+        # value. Its parent dictionary must validate and migrate it exactly once.
+        for legacy, fields, expected in (
+            (OLD_COUNTERS, {"placedByYou": True}, "ScaleCounterPlacement"),
+            (OLD_MANA, {"creatureOnly": True}, "AddManaOfChoice"),
+        ):
+            with self.subTest(legacy=legacy):
+                counts = {OLD_MANA: 0, OLD_COUNTERS: 0}
+                updated = migrate({"type": legacy, **fields}, counts)
+                self.assertEqual(updated["type"], expected)
+                self.assertEqual(counts[legacy], 1)
+                self.assertEqual(sum(counts.values()), 1)
 
     def test_bare_legacy_tag_outside_reviewed_location_fails_closed(self):
         for tag in (OLD_MANA, OLD_COUNTERS):
