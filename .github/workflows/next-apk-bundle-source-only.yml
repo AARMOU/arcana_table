@@ -58,3 +58,41 @@ jobs:
           test -s android/app/src/test/java/com/arcanatable/MultiplayerLobbyVisibilityTest.kt
           git diff --check -- android/app android/custom-cards
           echo 'PASS: reviewed source joins without app builds, APKs, signing or Worker deployment'
+
+      - name: Probe Claude PR300 pinned tutorial integration (runner only; NO APK)
+        shell: bash
+        env:
+          TUTORIAL_BASE_SHA: 8e4702065dff96ba7ce0a64cd5d420fb54def43d
+          TUTORIAL_HEAD_SHA: dfccf7ff456e953f099930c426b8dee5554314ba
+        run: |
+          set -euo pipefail
+          # The source assembler above incorporates B136, pinned lobby #296 and blocker #299.
+          # Snapshot that result as a LOCAL commit to make the Git index/worktree
+          # identical for a three-way patch. Nothing is pushed or released.
+          git add -A
+          git -c user.name='Arcana source-only verifier' -c user.email='verifier@users.noreply.github.com' commit --allow-empty -m 'Temporary local B136+fixes source snapshot for tutorial port'
+          git fetch --no-tags origin "$TUTORIAL_BASE_SHA" "$TUTORIAL_HEAD_SHA"
+          git cat-file -e "$TUTORIAL_BASE_SHA^{commit}"
+          git cat-file -e "$TUTORIAL_HEAD_SHA^{commit}"
+          test "$(git diff --name-only "$TUTORIAL_BASE_SHA" "$TUTORIAL_HEAD_SHA" -- android/app/src | wc -l)" -eq 23
+          git diff --binary "$TUTORIAL_BASE_SHA" "$TUTORIAL_HEAD_SHA" -- android/app/src > /tmp/claude-tutorial-300.patch
+          test -s /tmp/claude-tutorial-300.patch
+          if ! git apply --3way --index /tmp/claude-tutorial-300.patch; then
+            echo '::error title=Claude tutorial port needs reconciliation::No source file was silently replaced. Review exact conflicts.'
+            git diff --name-only --diff-filter=U | tee combined-evidence/tutorial-pr300-unresolved.txt || true
+            git ls-files -u | cut -f2 | sort -u || true
+            for file in $(git diff --name-only --diff-filter=U); do
+              echo "::group::PR300 tutorial conflict in $file"
+              awk '/^<<<<<<< / {inside=1; n=0} inside && n++ < 120 {print} /^>>>>>>> / {inside=0}' "$file" | head -320 || true
+              echo '::endgroup::'
+            done
+            exit 1
+          fi
+          # A successful dry source join is NOT an Android CI or Fold-device pass.
+          grep -F 'TutorialLayer(base = true)' android/app/src/main/java/com/arcanatable/MainActivity.kt
+          test -s android/app/src/test/java/com/arcanatable/ui/TutorialAuditUiTest.kt
+          grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' android/app/src/main/java/com/arcanatable/TableArgentum.kt
+          grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+          python3 -m json.tool android/app/src/main/assets/tutorials/catalog.json > /dev/null
+          git diff --check -- android/app
+          echo 'PASS: pinned Claude tutorial PR300 joined with B136, lobby and blocker sources; NO APK'
