@@ -61,10 +61,18 @@ def audit(release: str, preview: str) -> list[str]:
     positions = [i for i, (name, _) in enumerate(preview_steps) if name in PREVIEW_ONLY]
     if len(positions) == 3 and positions != list(range(positions[0], positions[0] + 3)):
         problems.append('preview-only packaging steps are no longer contiguous')
-    # Contiguity alone is insufficient: moving all three steps ahead of a
-    # required shared gate would allow the preview artifact to upload early.
-    if len(positions) == 3 and positions != list(range(len(release_steps), len(release_steps) + 3)):
-        problems.append('preview-only packaging must follow all shared release gates')
+    # The final two shared steps collect diagnostics after a failure; they
+    # intentionally follow the debug build, identity check and upload. The
+    # preview artifact must follow every *required* release validation gate.
+    diagnostic_tail = (
+        'Capture unresolved three-way source conflicts for manual port',
+        'Upload conflict and patch reports even on failure',
+    )
+    if tuple(name for name, _ in release_steps[-2:]) != diagnostic_tail:
+        problems.append('release diagnostic tail changed; review packaging boundary')
+    required_gate_count = len(release_steps) - len(diagnostic_tail)
+    if len(positions) == 3 and positions != list(range(required_gate_count, required_gate_count + 3)):
+        problems.append('preview-only packaging must follow all required release gates and precede diagnostic tail')
     common = [(name, body) for name, body in preview_steps if name not in PREVIEW_ONLY]
     if len(common) != len(release_steps):
         problems.append('common step count changed')
