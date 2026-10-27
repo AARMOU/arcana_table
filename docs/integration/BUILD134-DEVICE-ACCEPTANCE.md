@@ -169,3 +169,18 @@ Unsigned release-source packaging is **not** an installable Play release. The ow
 | Preview-only APK upload | #254 alone adds `Upload APK only when every integrated source, card, AI, and app gate passed` with `if: success()`, `if-no-files-found: error`, 14-day retention, and `actions/upload-artifact@v4` (mutable major-version tag). | **Pre-activation review item:** verify/pin the resolved upload-action commit SHA before any owner-approved preview activation, or explicitly document why the tag is accepted. This is a reproducibility/supply-chain hardening item, **not** evidence of a malicious action or permission escalation. |
 
 **Remaining comparison limit:** The audit is a textual comparison of two frozen workflow files, not an attestation of transitive action dependencies or external runner images. Any workflow/source/pin change invalidates these parity observations until the changed exact heads are re-reviewed. Do not activate #254, sign, upload production artifacts, or expand first-release scope on the strength of this document.
+
+## Executable frozen workflow-parity guard (2026-10-27)
+
+The read-only standard-library checker `tools/build134_workflow_audit.py` turns the reviewed #260/#254 textual comparison above into a **fail-closed, reproducible check**. Its two inputs must be the exact workflow files from the pinned commits, not whatever happens to be on a local branch. From a checkout with those commit objects available:
+
+```bash
+git show b32e499a65f0a4a9b70367a67ea00f91eef8dbaa:.github/workflows/release-upgraded-source-validation.yml > /tmp/b134-release.yml
+git show 57ed89604c9a520387550a1df417a487186aa564:.github/workflows/argentum-eldrazi-azlask94-build134.yml > /tmp/b134-preview.yml
+python3 -m unittest discover -s tools -p 'test_build134_workflow_audit.py' -v
+python3 tools/build134_workflow_audit.py /tmp/b134-release.yml /tmp/b134-preview.yml
+```
+
+The checker verifies **Git blob SHA identities**, all 33 common steps (28 named and 5 unnamed), exactly three preview-only steps, the *exact* permitted descriptive message difference, read-only workflow permissions, preview manual-only triggering, and fail-closed APK upload conditions. It rejects changed source blobs even when their steps still look equivalent, forcing a deliberate re-audit. Its eight offline regression tests cover normal parity, changed assertions, unreviewed message drift, accidental automatic preview triggering, weakened upload handling, removed steps, Git blob hashing and parser safety. **Local synthetic-fixture tests: 8/8 passed; no new GitHub Actions CI, APK, signing or device test was initiated.** The mutable preview `actions/upload-artifact@v4` tag remains a documented pre-activation review item, not a claim of pinning or certification.
+
+This guard is a source-audit aid, **not** a production build or release authorization. It does not validate semantic gameplay, physical devices, transitive action dependencies or production signing.
