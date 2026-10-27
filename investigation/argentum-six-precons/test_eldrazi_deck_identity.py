@@ -131,6 +131,14 @@ class ShippedCustomExportIntegrityTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "invalid JSON"):
             audit.verify_custom_export(audit.read_index_entries(self.index), self.jsonl)
 
+    def test_basic_lands_count_as_cards_but_tokens_do_not(self):
+        self.write('Wastes\tbasic\nEldrazi Spawn\ttoken\n',
+                   '{"name":"Wastes"}\n{"name":"Eldrazi Spawn"}\n')
+        entries = audit.read_index_entries(self.index)
+        self.assertEqual(audit.verify_custom_export(entries, self.jsonl), 2)
+        self.assertEqual({name for name, kind in entries.items()
+                          if kind in {"card", "basic"}}, {"Wastes"})
+
     def test_token_kind_is_not_a_card(self):
         self.write('Eldrazi Spawn\ttoken\nEldrazi Temple\tcard\n',
                    '{"name":"Eldrazi Spawn"}\n{"name":"Eldrazi Temple"}\n')
