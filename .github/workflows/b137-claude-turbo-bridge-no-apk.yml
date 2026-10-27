@@ -1,0 +1,43 @@
+name: B137 Claude-source Turbo bridge — no-APK verification
+# Explicitly NOT a packaging or engine compile workflow.
+on:
+  push:
+    branches:
+      - gpt/b137-claude-turbo-bridge-20261026
+    paths:
+      - .github/workflows/b137-claude-turbo-bridge-no-apk.yml
+      - .github/workflows/fast-test-apk-manual.yml
+      - tools/b137_preassembled_turbo.py
+      - tools/tests/test_b137_preassembled_turbo.py
+      - tools/fast_apk_snapshot.py
+      - tools/tests/test_fast_apk_snapshot.py
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: arcana-b137-claude-turbo-preflight-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify:
+    name: Check exact successful B137 source and Turbo cache safety — NO APK
+    if: github.repository == 'AARMOU/arcana_table'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Read exact working branch source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Confirm no differences from Claude's tested B137 gameplay/engine/card inputs
+        run: |
+          set -euo pipefail
+          python3 tools/b137_preassembled_turbo.py verify
+      - name: Verify manual dispatch only, SHA-256 cache contracts and no B136 replay
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/b137_preassembled_turbo.py tools/fast_apk_snapshot.py
+          python3 -m unittest discover -s tools/tests -p 'test_b137_preassembled_turbo.py' -v
+          python3 -m unittest discover -s tools/tests -p 'test_fast_apk_snapshot.py' -v
+          git diff --check
+          echo 'B137 source bridge validated. NO engine rebuild, APK/AAB, signing or deployment.'
