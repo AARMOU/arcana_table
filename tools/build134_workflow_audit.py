@@ -102,13 +102,13 @@ def audit(release: str, preview: str) -> list[str]:
         # GitHub YAML accepts job-level permissions that override the read-only
         # workflow defaults. Identical escalation in both jobs would otherwise
         # pass the cross-workflow job-configuration parity comparison.
-        if re.search(r'(?m)^    permissions\\s*:', job_config(source) or ''):
+        if re.search(r'(?m)^    permissions\s*:', job_config(source) or ''):
             problems.append(f'{name}: job-level permissions override is not reviewed')
         # Reject duplicate root declarations: the first match can look safe
         # while GitHub/YAML interprets a later declaration differently.
-        if len(re.findall(r'(?m)^permissions\\s*:', header)) != 1:
+        if len(re.findall(r'(?m)^permissions\s*:', header)) != 1:
             problems.append(f'{name}: duplicate or missing root permissions declaration')
-        if len(re.findall(r'(?m)^on\\s*:', header)) != 1:
+        if len(re.findall(r'(?m)^on\s*:', header)) != 1:
             problems.append(f'{name}: duplicate or missing root workflow triggers')
         # Trigger allowlist is asymmetric by design: release may push only
         # changes to its own workflow on its frozen validation branch;
