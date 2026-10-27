@@ -15,7 +15,13 @@ def fixture():
     extras = ['      - name: Build installable combined test APK\n        run: echo build\n',
               '      - name: Verify installable APK and record provenance\n        run: echo verify\n',
               '      - name: Upload APK only when every integrated source, card, AI, and app gate passed\n        if: success()\n        uses: actions/upload-artifact@v4\n        with:\n          if-no-files-found: error\n']
-    return prefix + ''.join(common), prefix + ''.join(preview_common[:-2] + extras + preview_common[-2:])
+    release_prefix = prefix.replace(
+        'on:\n  workflow_dispatch:\n',
+        "on:\n  push:\n    branches: [gpt/release-upgraded-validation-20261025]\n"
+        "    paths: ['.github/workflows/release-upgraded-source-validation.yml']\n"
+        "  workflow_dispatch:\n",
+    )
+    return release_prefix + ''.join(common), prefix + ''.join(preview_common[:-2] + extras + preview_common[-2:])
 
 
 class WorkflowAuditTest(unittest.TestCase):
@@ -42,6 +48,34 @@ class WorkflowAuditTest(unittest.TestCase):
         a, b = fixture()
         self.assertTrue(any('manual-only' in x for x in audit(
             a, b.replace('  workflow_dispatch:\n', '  workflow_dispatch:\n  workflow_call:\n'))))
+
+    def test_release_push_cannot_expand_to_main(self):
+        a, b = fixture()
+        widened = a.replace('branches: [gpt/release-upgraded-validation-20261025]',
+                            'branches: [main]')
+        self.assertTrue(any('release: workflow triggers changed' in x
+                            for x in audit(widened, b)))
+
+    def test_release_push_cannot_expand_to_all_paths(self):
+        a, b = fixture()
+        widened = a.replace("paths: ['.github/workflows/release-upgraded-source-validation.yml']",
+                            "paths: ['**']")
+        self.assertTrue(any('release: workflow triggers changed' in x
+                            for x in audit(widened, b)))
+
+    def test_release_unreviewed_pull_request_trigger_rejected(self):
+        a, b = fixture()
+        widened = a.replace('  workflow_dispatch:\n',
+                            '  pull_request:\n  workflow_dispatch:\n')
+        self.assertTrue(any('release: workflow triggers changed' in x
+                            for x in audit(widened, b)))
+
+    def test_preview_schedule_trigger_rejected(self):
+        a, b = fixture()
+        widened = b.replace('  workflow_dispatch:\n',
+                            '  schedule:\n    - cron: "0 * * * *"\n  workflow_dispatch:\n')
+        self.assertTrue(any('preview: workflow triggers changed' in x
+                            for x in audit(a, widened)))
 
     def test_preview_permission_escalation_rejected(self):
         a, b = fixture()
