@@ -318,10 +318,12 @@ def main() -> None:
         for file, marker in required:
             if not Path(file).is_file() or marker not in Path(file).read_text():
                 raise ValueError(f"Next-APK source missing mandatory lobby/combat regression: {file}")
+        print("TURBO CACHE DIAGNOSTIC pre-tutorial v1=" + fingerprint(legacy=True))
         # Claude PR #300 has passed Android CI. Port its exact 23 reviewed
         # files after the lobby/blocker patch; fail rather than discarding
         # overlapping UI or tutorial behavior.
         subprocess.run([sys.executable, "tools/turbo_tutorial_port.py"], check=True)
+        print("TURBO CACHE DIAGNOSTIC post-tutorial v1=" + fingerprint(legacy=True))
         print("PASS: exact B136 plus lobby, blocker and reviewed tutorial; no APK compiled")
     elif args.phase=="fingerprint":
         FINGERPRINT.write_text(fingerprint()+"\n")
