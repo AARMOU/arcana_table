@@ -632,32 +632,59 @@ jobs:
               p=root/name
               s=p.read_text()
               matches=list(re.finditer(r'^<<<<<<< ours\n(.*?)^=======\n(.*?)^>>>>>>> theirs\n',s,re.MULTILINE|re.DOTALL))
-              assert len(matches)==1,('unreviewed combat conflict count',name,len(matches))
-              c=matches[0]; ours,theirs=c.group(1),c.group(2)
-              if name=='TableArgentum.kt':
-                  assert 'gameEndedOnline = snapshot.gameOver' in ours
-                  assert '!tutorialPracticeActive' in ours
-                  assert 'argentumMatchUnfinished' in theirs
-                  # Both are required: keep the tutorial's own test-game scope, while
-                  # preventing another nonterminal snapshot from erasing a human loss.
-                  combined=theirs.replace(
-                      'if (snapshot.gameOver && argentumOffline && wifiRole == null)',
-                      'if (snapshot.gameOver && argentumOffline && !tutorialPracticeActive && wifiRole == null)')
-              else:
-                  assert 'source.id to amount + 1' in ours
-                  assert 'if (!engineAuthoritative)' in theirs
-                  assert 'record.key to amount + 1' in theirs
-                  # Keep Claude's consistent 48dp touch targets while switching to
-                  # authoritative per-commander keys, not per-player keys.
-                  combined=theirs.replace('Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)',
-                                           'Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)')
-                  combined=combined.replace('color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold)',
-                                            'color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp))')
-              assert combined!=ours and combined.strip()
-              s=s[:c.start()]+combined+s[c.end():]
+              expected=2 if name=='TableArgentum.kt' else 1
+              assert len(matches)==expected,('unreviewed combat conflict count',name,len(matches),expected)
+              handled=set()
+              for c in reversed(matches):
+                  ours,theirs=c.group(1),c.group(2)
+                  if name=='TableArgentum.kt' and 'gameEndedOnline = snapshot.gameOver' in ours:
+                      assert '!tutorialPracticeActive' in ours
+                      assert 'argentumMatchUnfinished' in theirs
+                      combined=theirs.replace(
+                          'if (snapshot.gameOver && argentumOffline && wifiRole == null)',
+                          'if (snapshot.gameOver && argentumOffline && !tutorialPracticeActive && wifiRole == null)')
+                      assert combined!=theirs, 'Tutorial checkpoint scope was not restored'
+                      handled.add('outcome')
+                  elif name=='TableArgentum.kt' and 'val text = incoming.optString("message"' in ours:
+                      # Quiet-notice PR287 prevents stale in-game error banners. New
+                      # blocker guard needs the error only for a rejected block plan.
+                      assert 'if (argentumSnapshot == null && !homeOpen) argentumLastError = text' in ours
+                      assert 'argentumBlockGuard.onError' in theirs
+                      assert 'Blockers have already been declared' in theirs
+                      insert='''            val blockSubmissionWasPending = argentumBlockGuard.submitted
+                      argentumBlockGuard.onError(incoming.optString("code"), text)
+                      if (blockSubmissionWasPending && !argentumBlockGuard.submitted) {
+                          // Keep PR293's inline rejection message until corrected.
+                          argentumLastError = text
+                      }
+                      if (argentumBlockGuard.submitted &&
+                          text.contains("Blockers have already been declared", ignoreCase = true)) {
+                          argentumBlockPlan = null
+                          message = "Blockers already declared. Pass priority to continue combat."
+                      }
+          '''
+                      anchor='            recordDiagnostic("Argentum error ${incoming.optString("code")}: $text", DiagnosticCategory.ERROR)\n'
+                      assert ours.count(anchor)==1, ('unknown quiet-error anchor',name)
+                      combined=ours.replace(anchor,insert+anchor,1)
+                      handled.add('block-error')
+                  else:
+                      assert name=='TableDialogs.kt', ('unhandled combat overlap',name,ours[:180])
+                      assert 'source.id to amount + 1' in ours
+                      assert 'if (!engineAuthoritative)' in theirs
+                      assert 'record.key to amount + 1' in theirs
+                      # Preserve tested 48dp touch targets/padding alongside
+                      # the authoritative commander-name tracker.
+                      combined=theirs.replace('Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)',
+                                             'Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)')
+                      combined=combined.replace('color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold)',
+                                                'color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp))')
+                      assert combined!=theirs
+                      handled.add('tracker')
+                  s=s[:c.start()]+combined+s[c.end():]
+              assert handled==({'outcome','block-error'} if name=='TableArgentum.kt' else {'tracker'}),handled
               assert not re.search(r'^(?:<<<<<<< |=======|>>>>>>> )',s,re.MULTILINE)
               p.write_text(s)
-              print('PASS: retained reviewed '+name+' combat and B135 UI semantics')
+              print('PASS: reconciled '+name+' while retaining quiet notices, blocker retry, commander damage and tutorial scope')
           PYCOMBAT
                 git add android/app/src/main/java/com/arcanatable/TableArgentum.kt \
                   android/app/src/main/java/com/arcanatable/TableDialogs.kt
