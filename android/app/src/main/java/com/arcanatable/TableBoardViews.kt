@@ -779,9 +779,13 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             if (argentumMode) {
                 // Argentum owns draws, reveals, steps and combat; show only actions it can take.
-                if (argentumPrimaryLabel != null || autoPassing) PassButton(
-                    if (autoPassing) "AUTO-PASSING · STOP" else argentumPrimaryLabel!!,
-                    onClick = if (autoPassing) onAutoPass else onPassTurn,
+                if (argentumPrimaryLabel != null || autoPassing || autoPassAvailable) PassButton(
+                    if (autoPassing) "AUTO-PASSING · STOP" else argentumPrimaryLabel ?: "WAITING · HOLD AUTO-PASS",
+                    onClick = when {
+                        autoPassing -> onAutoPass
+                        argentumPrimaryLabel != null -> onPassTurn
+                        else -> ({}) // No legal action to tap yet; a hold can arm auto-pass.
+                    },
                     enabled = true, canRespond = canRespond && !autoPassing,
                     modifier = Modifier.heightIn(min = 50.dp),
                     onLongClick = onAutoPass,
