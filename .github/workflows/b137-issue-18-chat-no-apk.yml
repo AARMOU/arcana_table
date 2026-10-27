@@ -48,7 +48,7 @@ jobs:
           root = ET.parse(results[0]).getroot()
           got = {k: int(root.attrib.get(k, '0')) for k in ('tests', 'failures', 'errors', 'skipped')}
           print('B137 issue #18 room chat:', got)
-          assert got == {'tests': 6, 'failures': 0, 'errors': 0, 'skipped': 0}, got
+          assert got == {'tests': 7, 'failures': 0, 'errors': 0, 'skipped': 0}, got
           PY
       - uses: actions/upload-artifact@v4
         if: always()
