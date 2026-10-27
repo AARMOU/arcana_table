@@ -95,84 +95,9 @@ def audit(release: str, preview: str) -> list[str]:
                 problems.append('preview is no longer manual-only')
     if len(extras) == 3:
         upload = extras[2][1]
-        if (re.findall(r'^        if: [^\n]+    return problems
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('release', type=Path)
-    parser.add_argument('preview', type=Path)
-    args = parser.parse_args()
-    raw_release, raw_preview = args.release.read_bytes(), args.preview.read_bytes()
-    problems = audit(raw_release.decode('utf-8'), raw_preview.decode('utf-8'))
-    for label, actual, expected in [('release', git_blob_sha(raw_release), RELEASE_BLOB),
-                                    ('preview', git_blob_sha(raw_preview), PREVIEW_BLOB)]:
-        if actual != expected:
-            problems.append(f'{label} blob changed: {actual} != reviewed {expected}; re-audit before accepting')
-    if problems:
-        for problem in problems:
-            print('FAIL:', problem)
-        return 1
-    print('PASS: frozen 33 shared steps (28 named, 5 unnamed); 3 preview-only steps; read-only permissions; manual preview')
-    print('NOTICE: preview upload-artifact@v4 remains tag-referenced; pin/review before authorized activation')
-    return 0
-
-
-if __name__ == '__main__':
-    raise SystemExit(main())
-, upload, re.M) != ['        if: success()']
-                or not re.search(r'^          if-no-files-found: error    return problems
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('release', type=Path)
-    parser.add_argument('preview', type=Path)
-    args = parser.parse_args()
-    raw_release, raw_preview = args.release.read_bytes(), args.preview.read_bytes()
-    problems = audit(raw_release.decode('utf-8'), raw_preview.decode('utf-8'))
-    for label, actual, expected in [('release', git_blob_sha(raw_release), RELEASE_BLOB),
-                                    ('preview', git_blob_sha(raw_preview), PREVIEW_BLOB)]:
-        if actual != expected:
-            problems.append(f'{label} blob changed: {actual} != reviewed {expected}; re-audit before accepting')
-    if problems:
-        for problem in problems:
-            print('FAIL:', problem)
-        return 1
-    print('PASS: frozen 33 shared steps (28 named, 5 unnamed); 3 preview-only steps; read-only permissions; manual preview')
-    print('NOTICE: preview upload-artifact@v4 remains tag-referenced; pin/review before authorized activation')
-    return 0
-
-
-if __name__ == '__main__':
-    raise SystemExit(main())
-, upload, re.M)
-                or not re.search(r'^        uses: actions/upload-artifact@v4    return problems
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('release', type=Path)
-    parser.add_argument('preview', type=Path)
-    args = parser.parse_args()
-    raw_release, raw_preview = args.release.read_bytes(), args.preview.read_bytes()
-    problems = audit(raw_release.decode('utf-8'), raw_preview.decode('utf-8'))
-    for label, actual, expected in [('release', git_blob_sha(raw_release), RELEASE_BLOB),
-                                    ('preview', git_blob_sha(raw_preview), PREVIEW_BLOB)]:
-        if actual != expected:
-            problems.append(f'{label} blob changed: {actual} != reviewed {expected}; re-audit before accepting')
-    if problems:
-        for problem in problems:
-            print('FAIL:', problem)
-        return 1
-    print('PASS: frozen 33 shared steps (28 named, 5 unnamed); 3 preview-only steps; read-only permissions; manual preview')
-    print('NOTICE: preview upload-artifact@v4 remains tag-referenced; pin/review before authorized activation')
-    return 0
-
-
-if __name__ == '__main__':
-    raise SystemExit(main())
-, upload, re.M)):
+        if (re.findall(r'^        if: [^\n]+$', upload, re.M) != ['        if: success()']
+                or not re.search(r'^          if-no-files-found: error$', upload, re.M)
+                or not re.search(r'^        uses: actions/upload-artifact@v4$', upload, re.M)):
             problems.append('preview upload success/fail-closed conditions changed')
     return problems
 
