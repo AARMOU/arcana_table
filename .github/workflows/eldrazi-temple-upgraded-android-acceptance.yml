@@ -176,6 +176,56 @@ jobs:
           print("Primal Wellspring's instant/sorcery mana-copy trigger preserved using upgraded SDK API")
           PY
           git diff --check
+      - name: Restore exact mobile retargeting AI regression behavior (runner only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The pinned upstream AI does not include Arcana's existing
+          # RetargetingCandidateFilter, which is imported by the unchanged
+          # AiRetargetingSearchTest. Port the original tested source and
+          # search-pruning hook, not a test stub or an excluded test.
+          test "$(git hash-object argentum-patches/0007-ai-bounded-stack-search.patch)" = 7c8cc175a9c33e76e4a881a498fbcd4d090511b8
+          filter=ai/src/main/kotlin/com/wingedsheep/ai/engine/RetargetingCandidateFilter.kt
+          test ! -e "argentum-engine/$filter"
+          git -C argentum-engine apply --check --include="$filter" ../argentum-patches/0007-ai-bounded-stack-search.patch
+          git -C argentum-engine apply --include="$filter" ../argentum-patches/0007-ai-bounded-stack-search.patch
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("argentum-engine/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt")
+          src = p.read_text()
+          old = "        } else candidatesFrom(legalActions)\n"
+          new = ("        } else candidatesFrom(legalActions).filter {\n"
+                 "            !useMeaningfulFilter || RetargetingCandidateFilter.hasPotentialEffect(state, it, simulator.cardRegistry)\n"
+                 "        }\n")
+          assert src.count(old) == 1, "Upgraded Strategist candidate selection changed: review required"
+          assert src.count("RetargetingCandidateFilter.hasPotentialEffect") == 0
+          assert "useMeaningfulFilter" in src and "simulator.cardRegistry" in src
+          p.write_text(src.replace(old, new, 1))
+          filter_source = Path("argentum-engine/ai/src/main/kotlin/com/wingedsheep/ai/engine/RetargetingCandidateFilter.kt").read_text()
+          assert "object RetargetingCandidateFilter" in filter_source
+          assert "effect !is ChangeTargetEffect" in filter_source
+          assert "return candidates.any" in filter_source
+          print("Restored real retargeting AI optimization; existing positive/negative JUnit tests remain mandatory")
+          PY
+          git -C argentum-engine diff --check
+          # Rebuild only the temporary matching AI JAR, now containing the
+          # real filter. Never change committed Android/runtime binaries.
+          (cd argentum-engine && ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :ai:jar)
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil, struct, zipfile
+          jars = [p for p in Path("argentum-engine/ai/build/libs").glob("*.jar")
+                  if "sources" not in p.name and "javadoc" not in p.name
+                  and "com/wingedsheep/ai/engine/RetargetingCandidateFilter.class" in zipfile.ZipFile(p).namelist()]
+          assert len(jars) == 1, jars
+          dest = Path("android/app/libs/argentum-ai.jar")
+          shutil.copyfile(jars[0], dest)
+          with zipfile.ZipFile(dest) as z:
+              classes = [struct.unpack(">H", z.read(n)[6:8])[0]
+                         for n in z.namelist() if n.endswith(".class")]
+              assert classes and max(classes) <= 61, max(classes)
+          print("Runner-only Java 17 AI JAR now contains original filter implementation")
+          PY
       - name: Export Temple, run real custom-card and Android unit tests
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test :app:testDebugUnitTest
