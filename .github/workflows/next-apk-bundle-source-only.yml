@@ -6,6 +6,7 @@ on:
       - gpt/b136-host-lobby-fix-integration-20261026
     paths:
       - .github/workflows/next-apk-bundle-source-only.yml
+      - .github/workflows/release-look-followup-build134.yml
 permissions:
   contents: read
 concurrency:
