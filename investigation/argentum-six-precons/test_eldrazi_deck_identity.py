@@ -140,20 +140,20 @@ class ShippedCustomExportIntegrityTest(unittest.TestCase):
                           if kind in {"card", "basic"}}, {"Wastes"})
 
     def test_all_cards_index_accepts_matching_card_basic_and_token_exports(self):
-        self.write('Eldrazi Temple\\tcard\\nWastes\\tbasic\\nEldrazi Spawn\\ttoken\\n',
-                   '{"name":"Eldrazi Temple"}\\n{"name":"Wastes"}\\n{"name":"Eldrazi Spawn"}\\n')
+        self.write('Eldrazi Temple\tcard\nWastes\tbasic\nEldrazi Spawn\ttoken\n',
+                   '{"name":"Eldrazi Temple"}\n{"name":"Wastes"}\n{"name":"Eldrazi Spawn"}\n')
         entries = audit.read_index_entries(self.index)
         self.assertEqual(audit.verify_custom_export(entries, self.jsonl), 3)
         self.assertEqual({n for n, kind in entries.items() if kind != "token"},
                          {"Eldrazi Temple", "Wastes"})
 
     def test_all_cards_index_rejects_phantom_coverage_and_unindexed_exports(self):
-        self.write('Eldrazi Temple\\tcard\\nUgin, the Ineffable\\tcard\\n',
-                   '{"name":"Eldrazi Temple"}\\n')
+        self.write('Eldrazi Temple\tcard\nUgin, the Ineffable\tcard\n',
+                   '{"name":"Eldrazi Temple"}\n')
         with self.assertRaisesRegex(ValueError, "index-only"):
             audit.verify_custom_export(audit.read_index_entries(self.index), self.jsonl)
-        self.write('Eldrazi Temple\\tcard\\n',
-                   '{"name":"Eldrazi Temple"}\\n{"name":"Ugin, the Ineffable"}\\n')
+        self.write('Eldrazi Temple\tcard\n',
+                   '{"name":"Eldrazi Temple"}\n{"name":"Ugin, the Ineffable"}\n')
         with self.assertRaisesRegex(ValueError, "export-only"):
             audit.verify_custom_export(audit.read_index_entries(self.index), self.jsonl)
 
