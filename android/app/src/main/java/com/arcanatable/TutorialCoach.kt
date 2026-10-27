@@ -211,8 +211,8 @@ internal data class TutorialCoachRegion(
 internal fun tutorialCoachRegion(maxW: Dp, maxH: Dp, target: TutorialCoachTarget?): TutorialCoachRegion {
     val margin = 12.dp
     val gap = 10.dp
-    val cardWidth = (maxW - 2 * margin).coerceAtLeast(1.dp).coerceAtMost(360.dp)
-    val fullHeight = (maxH - 2 * margin).coerceAtLeast(1.dp)
+    val cardWidth = (maxW - margin * 2).coerceAtLeast(1.dp).coerceAtMost(360.dp)
+    val fullHeight = (maxH - margin * 2).coerceAtLeast(1.dp)
     if (target == null) return TutorialCoachRegion(margin, margin, cardWidth, fullHeight)
     val above = (target.top - gap - margin).coerceAtLeast(0.dp)
     val below = (maxH - target.bottom - gap - margin).coerceAtLeast(0.dp)
