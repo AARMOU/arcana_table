@@ -82,73 +82,73 @@ jobs:
             # lobby/combat/library actions and Claude's tutorial surfaces.
             # Any extra path, hunk or unexpected source content fails closed.
             if ! python3 - <<'PYTUTOR'
-import re
-import subprocess
-from pathlib import Path
-
-expected = {
-    "android/app/src/main/java/com/arcanatable/ArgentumCombatBoard.kt",
-    "android/app/src/main/java/com/arcanatable/HomeScreen.kt",
-    "android/app/src/main/java/com/arcanatable/TableMainLayout.kt",
-}
-unmerged = set(subprocess.check_output(
-    ["git", "diff", "--name-only", "--diff-filter=U"], text=True
-).splitlines())
-assert unmerged == expected, ("unexpected conflict paths", sorted(unmerged))
-hunk = re.compile(r"^<<<<<<< ours\n(.*?)^=======\n(.*?)^>>>>>>> theirs\n",
-                  re.MULTILINE | re.DOTALL)
-for name in sorted(expected):
-    path = Path(name)
-    value = path.read_text()
-    hits = list(hunk.finditer(value))
-    assert len(hits) == 1, (name, "unexpected hunk count", len(hits))
-    ours, theirs = hits[0].group(1), hits[0].group(2)
-    if name.endswith("ArgentumCombatBoard.kt"):
-        original = ("fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, "
-                    "busy: Boolean, warning: String? = null, onConfirm: (JSONObject) -> Unit, "
-                    "onDismiss: () -> Unit)")
-        claude = ("fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, "
-                  "busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, "
-                  "tutorialCue: Pair<String, String>? = null)")
-        assert ours.strip() == original, ("changed blocker warning signature", ours)
-        assert theirs.strip() == claude, ("changed tutorial signature", theirs)
-        merged = original[:-1] + ", tutorialCue: Pair<String, String>? = null)\n"
-    elif name.endswith("HomeScreen.kt"):
-        o = ours.splitlines()
-        t = theirs.splitlines()
-        assert len(o) == len(t) == 2
-        assert "friendMode == 5 -> onWifiMultiHost()" in o[0]
-        assert "friendMode == 6 -> onOnlineMultiHost()" in o[0]
-        assert "friendMode == 7 -> onOnlineMultiJoin()" in o[0]
-        assert "friendMode == 1 -> onWifiHost()" in t[0]
-        assert 'testTag("play-start")' in o[1]
-        assert t[1] == o[1].replace(
-            'testTag("play-start")',
-            'testTag("play-start").tutorialTarget("setup-start")')
-        merged = o[0] + "\n" + t[1] + "\n"
-    else:
-        assert "Look at top of library · private" in ours
-        assert "argentumTopLibraryOpen = true" in ours
-        assert 'tutorialTarget("menu-legal-actions")' not in ours
-        assert 'tutorialTarget("menu-legal-actions")' in theirs
-        assert "Look at top of library · private" not in theirs
-        lines = ours.splitlines(keepends=True)
-        positions = [k for k, line in enumerate(lines)
-                     if 'DropdownMenuItem(text = { Text("Argentum legal actions' in line]
-        assert len(positions) == 1, ("unexpected legal menu lines", len(positions))
-        k = positions[0]
-        anchor = ' }, onClick = { topMenuExpanded'
-        assert lines[k].count(anchor) == 1
-        lines[k] = lines[k].replace(
-            anchor,
-            ' }, modifier = Modifier.tutorialTarget("menu-legal-actions"), onClick = { topMenuExpanded', 1)
-        assert lines[k].strip() == theirs.strip(), "tutorial legal-action menu diverged"
-        merged = "".join(lines)
-    result = value[:hits[0].start()] + merged + value[hits[0].end():]
-    assert not re.search(r"^(<<<<<<<|=======|>>>>>>>)", result, re.MULTILINE)
-    path.write_text(result)
-    print("PASS: reviewed PR300 tutorial conflict", name)
-PYTUTOR
+          import re
+          import subprocess
+          from pathlib import Path
+          
+          expected = {
+              "android/app/src/main/java/com/arcanatable/ArgentumCombatBoard.kt",
+              "android/app/src/main/java/com/arcanatable/HomeScreen.kt",
+              "android/app/src/main/java/com/arcanatable/TableMainLayout.kt",
+          }
+          unmerged = set(subprocess.check_output(
+              ["git", "diff", "--name-only", "--diff-filter=U"], text=True
+          ).splitlines())
+          assert unmerged == expected, ("unexpected conflict paths", sorted(unmerged))
+          hunk = re.compile(r"^<<<<<<< ours\n(.*?)^=======\n(.*?)^>>>>>>> theirs\n",
+                            re.MULTILINE | re.DOTALL)
+          for name in sorted(expected):
+              path = Path(name)
+              value = path.read_text()
+              hits = list(hunk.finditer(value))
+              assert len(hits) == 1, (name, "unexpected hunk count", len(hits))
+              ours, theirs = hits[0].group(1), hits[0].group(2)
+              if name.endswith("ArgentumCombatBoard.kt"):
+                  original = ("fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, "
+                              "busy: Boolean, warning: String? = null, onConfirm: (JSONObject) -> Unit, "
+                              "onDismiss: () -> Unit)")
+                  claude = ("fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, "
+                            "busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, "
+                            "tutorialCue: Pair<String, String>? = null)")
+                  assert ours.strip() == original, ("changed blocker warning signature", ours)
+                  assert theirs.strip() == claude, ("changed tutorial signature", theirs)
+                  merged = original[:-1] + ", tutorialCue: Pair<String, String>? = null)\n"
+              elif name.endswith("HomeScreen.kt"):
+                  o = ours.splitlines()
+                  t = theirs.splitlines()
+                  assert len(o) == len(t) == 2
+                  assert "friendMode == 5 -> onWifiMultiHost()" in o[0]
+                  assert "friendMode == 6 -> onOnlineMultiHost()" in o[0]
+                  assert "friendMode == 7 -> onOnlineMultiJoin()" in o[0]
+                  assert "friendMode == 1 -> onWifiHost()" in t[0]
+                  assert 'testTag("play-start")' in o[1]
+                  assert t[1] == o[1].replace(
+                      'testTag("play-start")',
+                      'testTag("play-start").tutorialTarget("setup-start")')
+                  merged = o[0] + "\n" + t[1] + "\n"
+              else:
+                  assert "Look at top of library · private" in ours
+                  assert "argentumTopLibraryOpen = true" in ours
+                  assert 'tutorialTarget("menu-legal-actions")' not in ours
+                  assert 'tutorialTarget("menu-legal-actions")' in theirs
+                  assert "Look at top of library · private" not in theirs
+                  lines = ours.splitlines(keepends=True)
+                  positions = [k for k, line in enumerate(lines)
+                               if 'DropdownMenuItem(text = { Text("Argentum legal actions' in line]
+                  assert len(positions) == 1, ("unexpected legal menu lines", len(positions))
+                  k = positions[0]
+                  anchor = ' }, onClick = { topMenuExpanded'
+                  assert lines[k].count(anchor) == 1
+                  lines[k] = lines[k].replace(
+                      anchor,
+                      ' }, modifier = Modifier.tutorialTarget("menu-legal-actions"), onClick = { topMenuExpanded', 1)
+                  assert lines[k].strip() == theirs.strip(), "tutorial legal-action menu diverged"
+                  merged = "".join(lines)
+              result = value[:hits[0].start()] + merged + value[hits[0].end():]
+              assert not re.search(r"^(<<<<<<<|=======|>>>>>>>)", result, re.MULTILINE)
+              path.write_text(result)
+              print("PASS: reviewed PR300 tutorial conflict", name)
+          PYTUTOR
             then
               echo '::error title=Claude tutorial port needs manual review::Unexpected tutorial conflict; none accepted.'
               git diff --name-only --diff-filter=U || true
