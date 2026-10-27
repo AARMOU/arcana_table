@@ -264,6 +264,32 @@ class UlalekFusedAtrocityScenarioTest {
     }
 
     @Test
+    fun opponentsEldraziCastDoesNotTriggerMyUlalek() {
+        val d = withUlalekOnBattlefield("Grizzly Bears")
+        val p = d.player1
+        val opponent = d.player2
+
+        // A normal creature spell gives the opponent a genuine response window.
+        val bears = d.putCardInHand(p, "Grizzly Bears")
+        d.giveMana(p, Color.GREEN)
+        d.giveColorlessMana(p, 1)
+        assertNull(d.castSpell(p, bears).error)
+        d.passPriority(p)
+
+        // Elder Deep-Fiend has flash and is Eldrazi, but it was cast by the opponent.
+        val enemyFiend = d.putCardInHand(opponent, fiend)
+        d.giveColorlessMana(opponent, 8)
+        assertNull(d.castSpell(opponent, enemyFiend).error)
+        assertFalse("An opponent casting Eldrazi must not trigger my Ulalek",
+            d.stackObjects().contains("$ulalek ability"))
+
+        assertEquals("No Ulalek payment prompt for an opponent's Eldrazi", 0,
+            d.resolveUlalek(pay = true))
+        assertEquals("Opponent's spell resolves once", 1, d.permanentsNamed(opponent, fiend).size)
+        assertEquals("My earlier creature spell resolves once", 1, d.permanentsNamed(p, "Grizzly Bears").size)
+    }
+
+    @Test
     fun opponentsSpellsAreNotCopied() {
         val d = withUlalekOnBattlefield("Shock", "Grizzly Bears")
         val p = d.player1
