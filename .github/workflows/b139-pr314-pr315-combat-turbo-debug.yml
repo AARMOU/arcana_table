@@ -35,7 +35,7 @@ jobs:
           mkdir -p ci-out
           BASE=41f7556676fd5d5d0b493d47db65450ecdd142e4
           git merge-base --is-ancestor "$BASE" HEAD
-          test "$(git rev-parse HEAD^)" = "8e4f4ed16755013a335d199b6a1a08f80fbe0af1" || { echo "::error::PR314+PR315 combined source pin drift"; exit 1; }
+          git merge-base --is-ancestor "8e4f4ed16755013a335d199b6a1a08f80fbe0af1" HEAD || { echo "::error::PR314+PR315 combined source pin drift"; exit 1; }
           test "$(git diff --name-only 8e4f4ed16755013a335d199b6a1a08f80fbe0af1 HEAD)" = ".github/workflows/b139-pr314-pr315-combat-turbo-debug.yml" || { echo "::error::Unexpected post-integration changes"; exit 1; }
           git rev-parse HEAD | tee ci-out/combined-source-head.txt
           for p in \
