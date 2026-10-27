@@ -8,6 +8,7 @@ on:
       - '.github/workflows/eldrazi-temple-upgraded-android-acceptance.yml'
       - 'engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt'
       - 'engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt'
+      - 'engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py'
   workflow_dispatch:
 permissions:
   contents: read
@@ -334,7 +335,7 @@ jobs:
           python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --self-test
           python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --apply android/app/src/main/assets/argentum/all-cards.jsonl
           # This runner-only JSONL rewrite must be real; never commit it to source.
-          test -n "$(git diff -- android/app/src/main/assets/argentum/all-cards.jsonl)"
+          if git diff --quiet -- android/app/src/main/assets/argentum/all-cards.jsonl; then echo "Legacy ABI port made no change" >&2; exit 1; fi
           git diff --check -- android/app/src/main/assets/argentum/all-cards.jsonl
       - name: Run real custom-card and Android unit tests against matching SDK and library
         working-directory: android
