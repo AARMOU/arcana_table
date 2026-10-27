@@ -354,6 +354,38 @@ jobs:
               exit 1
             fi
           done
+      - name: Attribute any remaining legacy decoder failure to its exact card (runner only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path("android/app/src/main/java/com/arcanatable/engine/OfflineGame.kt")
+          text = source.read_text()
+          old_base = 'if (kind != "card" || name in wanted) out += CardLoader.fromJsonPreservingIds(line)'
+          new_base = """if (kind != "card" || name in wanted) {
+                      try {
+                          out += CardLoader.fromJsonPreservingIds(line)
+                      } catch (error: Exception) {
+                          System.err.println("[temple-abi-diagnostic] library=$base row=$i card=$name legacyCounter=${line.contains("DoubleCounterPlacement")} legacyMana=${line.contains("AddAnyColorManaSpendOnChosenType")}")
+                          throw error
+                      }
+                  }"""
+          old_custom = 'if (name in customWanted) out += CardLoader.fromJsonPreservingIds(line)'
+          new_custom = """if (name in customWanted) {
+                      try {
+                          out += CardLoader.fromJsonPreservingIds(line)
+                      } catch (error: Exception) {
+                          System.err.println("[temple-abi-diagnostic] library=custom-cards row=$i card=$name legacyCounter=${line.contains("DoubleCounterPlacement")} legacyMana=${line.contains("AddAnyColorManaSpendOnChosenType")}")
+                          throw error
+                      }
+                  }"""
+          assert text.count(old_base) == text.count(old_custom) == 1, "OfflineCardLibrary source drift; do not patch blindly"
+          source.write_text(text.replace(old_base, new_base).replace(old_custom, new_custom))
+          assert source.read_text().count("[temple-abi-diagnostic]") == 2
+          PY
+          # Verify the *actual* files the app tests will open immediately before Gradle starts.
+          sha256sum android/app/src/main/assets/argentum/{all-cards,custom-cards}.jsonl
       - name: Run real custom-card and Android unit tests against matching SDK and library
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
