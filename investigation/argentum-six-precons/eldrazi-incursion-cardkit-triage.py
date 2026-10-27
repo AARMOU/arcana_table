@@ -20,6 +20,52 @@ INDEXES = [
 ]
 OUTPUT = ROOT / "investigation/argentum-six-precons/eldrazi-cardkit-report"
 
+# SHA-256 of sorted "original card name\\tquantity\\n" records from the
+# immutable original Wizards deck manifests. Only names and counts are pinned:
+# metadata/order changes do not masquerade as substitutions. These digests
+# were independently calculated from manifest blob dcc6ce418422d221a87df04e233d4f1df7c9cc05.
+ORIGINAL_DECK_DIGESTS = {
+    "Eldrazi Incursion": "43d3cf6a753c82d38992d35d3dbe9b09d3caaec4f8e0369065aaca4a5559849f",
+    "Eldrazi Unbound": "cf5184b6408153ff504dcb6ed135b8ffe2bf6bb14ce107862a1da1d461ae3112",
+}
+
+
+def original_deck_digest(cards: list[dict]) -> str:
+    """Canonical original-deck identity; reject malformed or duplicate rows."""
+    rows = []
+    seen = set()
+    for card in cards:
+        name, quantity = card["name"], card["quantity"]
+        if not isinstance(name, str) or not name or name != name.strip():
+            raise ValueError(f"Invalid original card name: {name!r}")
+        if type(quantity) is not int or quantity <= 0:
+            raise ValueError(f"Invalid original card quantity: {name!r}: {quantity!r}")
+        if name in seen:
+            raise ValueError(f"Duplicate original card name: {name}")
+        seen.add(name)
+        rows.append(f"{name}\\t{quantity}")
+    if not rows:
+        raise ValueError("Empty original deck")
+    canonical = "\\n".join(sorted(rows)) + "\\n"
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def verify_original_decks(decks: dict, expected: dict | None = None) -> dict:
+    """Refuse to count any modified or substituted original precon as coverage."""
+    expected = ORIGINAL_DECK_DIGESTS if expected is None else expected
+    observed = {}
+    for name, pinned_digest in expected.items():
+        if name not in decks:
+            raise ValueError(f"Missing original deck: {name}")
+        actual = original_deck_digest(decks[name]["cards"])
+        if actual != pinned_digest:
+            raise ValueError(
+                f"Original {name} identity mismatch: expected {pinned_digest}, got {actual}. "
+                "Do not substitute cards or alter original quantities."
+            )
+        observed[name] = actual
+    return observed
+
 # Independent ownership/capability guardrails override a heuristic SUPPORTED.
 # "source-review" is not an implementation claim; every candidate still needs
 # exact Oracle, a real engine scenario, registry/export and CI.
@@ -28,7 +74,7 @@ TRIAGE = {
     "Forsaken Monument": ("Copilot CANDIDATE #151", "cross-deck; NO authorization; test mana tap replacement and anthem"),
     "Eldrazi Temple": ("GPT #152 / draft #158", "colorless-Eldrazi ability-source restriction needs source-built engine primitive"),
     "Ugin, the Ineffable": ("GPT #153", "unique token-to-face-down-exile link survives Ugin departure"),
-    "Eldrazi Displacer": ("Copilot CANDIDATE #154", "blink ownership/tapped/token disappearance must be proved"),
+    "Eldrazi Displacer": ("GPT #154 / existing draft #163", "13 real-engine scenarios green on isolated head; DO NOT dispatch a duplicate Copilot worker; upgraded integration pending"),
     "Chittering Dispatcher": ("ENGINE BLOCKED #34/#36", "Myriad defender/planeswalker choice not approximable"),
     "Corrupted Crossroads": ("GPT RESTRICTED MANA", "Devoid-only spend predicate; ColorlessSpellsOnly is too broad"),
     "Azlask, the Swelling Scourge": ("GPT COMPLEX", "experience counters, variable anthem and granted annihilator"),
@@ -61,6 +107,7 @@ def main() -> None:
         if line.strip()
     }
     decks = {deck["name"]: deck for deck in manifest["decks"]}
+    original_identity = verify_original_decks(decks)
     incursion = decks["Eldrazi Incursion"]
     unbound = decks["Eldrazi Unbound"]
     assert sum(x["quantity"] for x in incursion["cards"]) == 100
@@ -98,6 +145,8 @@ def main() -> None:
     }
     result = {
         "integrationCommit": integration_commit,
+        "originalDeckSha256": original_identity,
+        "originalDeckIdentityVerified": True,
         "inputSha256": input_hashes,
         "basis": "current checkout; two shipped indexes + exact official manifest + offline Cardkit Oracle",
         "incursionIndexedSlots": indexed,
@@ -115,6 +164,8 @@ def main() -> None:
         "",
         f"Integration commit `{integration_commit}`: **{indexed}/100 indexed**, {100-indexed} missing; "
         f"Eldrazi Unbound **{indexed_unbound}/100 indexed**.",
+        "",
+        "Original deck identities SHA-256 pinned and verified; no card substitutions or quantity drift.",
         "",
         "Cardkit SUPPORTED is only a similarity heuristic. None of these missing cards "
         "is complete until rules tests, deterministic export, integration and device QA.",
