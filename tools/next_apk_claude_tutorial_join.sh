@@ -1,0 +1,114 @@
+#!/usr/bin/env bash
+# Runner-only, exact-SHA port from Claude tutorial PR #300 onto the reviewed
+# Build 136 + lobby + blocker source. No APK, signing, merge or deployment.
+# Used by the source-only CI and staged future APK source recipe.
+set -euo pipefail
+TUTORIAL_BASE_SHA=8e4702065dff96ba7ce0a64cd5d420fb54def43d
+TUTORIAL_HEAD_SHA=dfccf7ff456e953f099930c426b8dee5554314ba
+set -euo pipefail
+# The source assembler above incorporates B136, pinned lobby #296 and blocker #299.
+# Snapshot that result as a LOCAL commit to make the Git index/worktree
+# identical for a three-way patch. Nothing is pushed or released.
+git add -A
+git -c user.name='Arcana source-only verifier' -c user.email='verifier@users.noreply.github.com' commit --allow-empty -m 'Temporary local B136+fixes source snapshot for tutorial port'
+git fetch --no-tags origin "$TUTORIAL_BASE_SHA" "$TUTORIAL_HEAD_SHA"
+git cat-file -e "$TUTORIAL_BASE_SHA^{commit}"
+git cat-file -e "$TUTORIAL_HEAD_SHA^{commit}"
+test "$(git diff --name-only "$TUTORIAL_BASE_SHA" "$TUTORIAL_HEAD_SHA" -- android/app/src | wc -l)" -eq 23
+git diff --binary "$TUTORIAL_BASE_SHA" "$TUTORIAL_HEAD_SHA" -- android/app/src > /tmp/claude-tutorial-300.patch
+test -s /tmp/claude-tutorial-300.patch
+if ! git apply --3way --index /tmp/claude-tutorial-300.patch; then
+  # Exactly three overlapping UI lines are known. Keep BOTH existing
+  # lobby/combat/library actions and Claude's tutorial surfaces.
+  # Any extra path, hunk or unexpected source content fails closed.
+  if ! python3 - <<'PYTUTOR'
+import re
+import subprocess
+from pathlib import Path
+
+expected = {
+    "android/app/src/main/java/com/arcanatable/ArgentumCombatBoard.kt",
+    "android/app/src/main/java/com/arcanatable/HomeScreen.kt",
+    "android/app/src/main/java/com/arcanatable/TableMainLayout.kt",
+}
+unmerged = set(subprocess.check_output(
+    ["git", "diff", "--name-only", "--diff-filter=U"], text=True
+).splitlines())
+assert unmerged == expected, ("unexpected conflict paths", sorted(unmerged))
+hunk = re.compile(r"^<<<<<<< ours\n(.*?)^=======\n(.*?)^>>>>>>> theirs\n",
+                  re.MULTILINE | re.DOTALL)
+for name in sorted(expected):
+    path = Path(name)
+    value = path.read_text()
+    hits = list(hunk.finditer(value))
+    assert len(hits) == 1, (name, "unexpected hunk count", len(hits))
+    ours, theirs = hits[0].group(1), hits[0].group(2)
+    if name.endswith("ArgentumCombatBoard.kt"):
+        original = ("fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, "
+                    "busy: Boolean, warning: String? = null, onConfirm: (JSONObject) -> Unit, "
+                    "onDismiss: () -> Unit) {")
+        claude = ("fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, "
+                  "busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, "
+                  "tutorialCue: Pair<String, String>? = null) {")
+        assert ours.strip() == original, ("changed blocker warning signature", ours)
+        assert theirs.strip() == claude, ("changed tutorial signature", theirs)
+        merged = original.replace("onDismiss: () -> Unit) {", "onDismiss: () -> Unit, tutorialCue: Pair<String, String>? = null) {") + "\n"
+    elif name.endswith("HomeScreen.kt"):
+        o = ours.splitlines()
+        t = theirs.splitlines()
+        assert len(o) == len(t) == 2
+        assert "friendMode == 5 -> onWifiMultiHost()" in o[0]
+        assert "friendMode == 6 -> onOnlineMultiHost()" in o[0]
+        assert "friendMode == 7 -> onOnlineMultiJoin()" in o[0]
+        assert "friendMode == 1 -> onWifiHost()" in t[0]
+        assert 'testTag("play-start")' in o[1]
+        assert t[1] == o[1].replace(
+            'testTag("play-start")',
+            'testTag("play-start").tutorialTarget("setup-start")')
+        merged = o[0] + "\n" + t[1] + "\n"
+    else:
+        assert "Look at top of library · private" in ours
+        assert "argentumTopLibraryOpen = true" in ours
+        assert 'tutorialTarget("menu-legal-actions")' not in ours
+        assert 'tutorialTarget("menu-legal-actions")' in theirs
+        assert "Look at top of library · private" not in theirs
+        lines = ours.splitlines(keepends=True)
+        positions = [k for k, line in enumerate(lines)
+                     if 'DropdownMenuItem(text = { Text("Argentum legal actions' in line]
+        assert len(positions) == 1, ("unexpected legal menu lines", len(positions))
+        k = positions[0]
+        anchor = ' }, onClick = { topMenuExpanded'
+        assert lines[k].count(anchor) == 1
+        lines[k] = lines[k].replace(
+            anchor,
+            ' }, modifier = Modifier.tutorialTarget("menu-legal-actions"), onClick = { topMenuExpanded', 1)
+        assert lines[k].strip() == theirs.strip(), "tutorial legal-action menu diverged"
+        merged = "".join(lines)
+    result = value[:hits[0].start()] + merged + value[hits[0].end():]
+    assert not re.search(r"^(<<<<<<<|=======|>>>>>>>)", result, re.MULTILINE)
+    path.write_text(result)
+    print("PASS: reviewed PR300 tutorial conflict", name)
+PYTUTOR
+  then
+    echo '::error title=Claude tutorial port needs manual review::Unexpected tutorial conflict; none accepted.'
+    git diff --name-only --diff-filter=U || true
+    for file in $(git diff --name-only --diff-filter=U); do
+      echo "::group::PR300 conflict $file"
+      awk '/^<<<<<<< / {inside=1; n=0} inside && n++ < 120 {print} /^>>>>>>> / {inside=0}' "$file" | head -320 || true
+      echo '::endgroup::'
+    done
+    exit 1
+  fi
+  git add -- android/app/src/main/java/com/arcanatable/ArgentumCombatBoard.kt android/app/src/main/java/com/arcanatable/HomeScreen.kt android/app/src/main/java/com/arcanatable/TableMainLayout.kt
+  test -z "$(git ls-files -u)"
+  echo 'PASS: exactly three reviewed tutorial conflicts reconciled; no APK'
+fi
+# A successful dry source join is NOT an Android CI or Fold-device pass.
+grep -F 'TutorialLayer(base = true)' android/app/src/main/java/com/arcanatable/MainActivity.kt
+test -s android/app/src/test/java/com/arcanatable/ui/TutorialAuditUiTest.kt
+grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' android/app/src/main/java/com/arcanatable/TableArgentum.kt
+grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+python3 -m json.tool android/app/src/main/assets/tutorials/catalog.json > /dev/null
+git diff --cached --check -- android/app
+git diff --check -- android/app
+echo 'PASS: pinned Claude tutorial PR300 joined with B136, lobby and blocker sources; NO APK'
