@@ -106,13 +106,13 @@ jobs:
               if name.endswith("ArgentumCombatBoard.kt"):
                   original = ("fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, "
                               "busy: Boolean, warning: String? = null, onConfirm: (JSONObject) -> Unit, "
-                              "onDismiss: () -> Unit)")
+                              "onDismiss: () -> Unit) {")
                   claude = ("fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, "
                             "busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, "
-                            "tutorialCue: Pair<String, String>? = null)")
+                            "tutorialCue: Pair<String, String>? = null) {")
                   assert ours.strip() == original, ("changed blocker warning signature", ours)
                   assert theirs.strip() == claude, ("changed tutorial signature", theirs)
-                  merged = original[:-1] + ", tutorialCue: Pair<String, String>? = null)\n"
+                  merged = original.replace("onDismiss: () -> Unit) {", "onDismiss: () -> Unit, tutorialCue: Pair<String, String>? = null) {") + "\n"
               elif name.endswith("HomeScreen.kt"):
                   o = ours.splitlines()
                   t = theirs.splitlines()
@@ -169,5 +169,6 @@ jobs:
           grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' android/app/src/main/java/com/arcanatable/TableArgentum.kt
           grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
           python3 -m json.tool android/app/src/main/assets/tutorials/catalog.json > /dev/null
+          git diff --cached --check -- android/app
           git diff --check -- android/app
           echo 'PASS: pinned Claude tutorial PR300 joined with B136, lobby and blocker sources; NO APK'
