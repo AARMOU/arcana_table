@@ -6,6 +6,8 @@ on:
     branches: [gpt/eldrazi-temple-card-candidate-20261024]
     paths:
       - '.github/workflows/eldrazi-temple-upgraded-android-acceptance.yml'
+      - 'engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt'
+      - 'engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt'
   workflow_dispatch:
 permissions:
   contents: read
@@ -71,6 +73,96 @@ jobs:
           mkdir -p "$(dirname "$temple_test_source")"
           cp engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt "$temple_test_source"
           cmp -s engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt "$temple_test_source"
+          git -C argentum-engine diff --check
+      - name: Port missing copyable token triggers and departure LKI (runner only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Restore semantics of the existing Arcana 0004/0005 patches against
+          # exact upgraded source. Old patch hunks cannot be applied blindly:
+          # upstream now has separate donatedTriggeredAbilities on basic tokens.
+          test "$(git hash-object argentum-patches/0004-token-copy-triggered-abilities.patch)" = 365a0a2db208f1dfe34ec033978b16a56ce59bf8
+          test "$(git hash-object argentum-patches/0005-last-known-negative-subtype.patch)" = 759c27c1d7e9f25c0c9e685831f369b78344c179
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          root = Path("argentum-engine/rules-engine/src/main/kotlin/com/wingedsheep/engine")
+          sources = {
+              "handlers/effects/token/CreateTokenExecutor.kt": "8ea11fb1ca6e1b0f843c649751f0c56d39fe704c",
+              "handlers/effects/token/CreateTokenCopyOfTargetExecutor.kt": "38feb6809d72bd7249d5ead435d2dbb6e1d9ff22",
+              "event/TriggerMatcher.kt": "823d936d560abe0c0dbff5331713261073126c89",
+          }
+          def replace_once(text, old, new):
+              assert text.count(old) == 1, f"Upstream source anchor drift: {old[:100]!r}"
+              return text.replace(old, new, 1)
+
+          def remove_between_once(text, start, end):
+              assert text.count(start) == text.count(end) == 1, (start, end)
+              a, b = text.index(start), text.index(end)
+              assert a < b and b-a < 1600, "Unexpected trigger-grant block"
+              return text[:a] + text[b:]
+
+          for relative, expected_sha in sources.items():
+              path = root / relative
+              actual = subprocess.check_output(
+                  ["git", "-C", "argentum-engine", "hash-object",
+                   str(path.relative_to("argentum-engine"))], text=True
+              ).strip()
+              assert actual == expected_sha, (relative, actual, expected_sha)
+              text = path.read_text()
+              if relative.endswith("/CreateTokenExecutor.kt"):
+                  # Upstream's donated triggers are independent copiable text.
+                  # The explicitly created token triggers must also be copiable.
+                  text = replace_once(
+                      text, "copyTriggeredAbilities = donatedTriggers,",
+                      "copyTriggeredAbilities = donatedTriggers + effect.triggeredAbilities,"
+                  )
+                  text = remove_between_once(
+                      text,
+                      "        // If triggered abilities are specified, grant them permanently to each created token\n",
+                      "        // If activated abilities are specified, grant them permanently"
+                  )
+                  assert "copyTriggeredAbilities = donatedTriggers + effect.triggeredAbilities" in text
+              elif relative.endswith("/CreateTokenCopyOfTargetExecutor.kt"):
+                  text = replace_once(
+                      text,
+                      "        val tokenCard = withAddedStatics(CopyExceptionApplier.apply(targetCard, exceptions, context.resolvingTriggeredAbility))\n"
+                      "            .copy(ownerId = controllerId, isDoubleFaced = false)",
+                      "        val tokenCard = withAddedStatics(CopyExceptionApplier.apply(targetCard, exceptions, context.resolvingTriggeredAbility))\n"
+                      "            .let { copied -> copied.copy(\n"
+                      "                ownerId = controllerId,\n"
+                      "                isDoubleFaced = false,\n"
+                      "                copyTriggeredAbilities = copied.copyTriggeredAbilities + effect.triggeredAbilities,\n"
+                      "            ) }"
+                  )
+                  text = remove_between_once(
+                      text,
+                      "            for (ability in effect.triggeredAbilities) {\n",
+                      "            // Activated abilities granted to the copy"
+                  )
+                  assert "copyTriggeredAbilities = copied.copyTriggeredAbilities + effect.triggeredAbilities" in text
+              else:
+                  # Leaving/dying predicates must consult the departed permanent's
+                  # last-known types, rather than its post-move graveyard types.
+                  subtype_branch = (
+                      "                    is com.wingedsheep.sdk.scripting.predicates.CardPredicate.NotSubtype -> {\n"
+                      "                        if (event.toZone == Zone.BATTLEFIELD) {\n"
+                      "                            !projected.hasSubtype(event.entityId, predicate.subtype.value)\n"
+                      "                        } else {\n"
+                      "                            isFaceDown || typeLine?.hasSubtype(predicate.subtype) == false\n"
+                      "                        }\n"
+                      "                    }\n"
+                  )
+                  text = replace_once(
+                      text,
+                      "                    is com.wingedsheep.sdk.scripting.predicates.CardPredicate.HasAnyOfSubtypes -> {",
+                      subtype_branch + "                    is com.wingedsheep.sdk.scripting.predicates.CardPredicate.HasAnyOfSubtypes -> {"
+                  )
+                  assert text.count(subtype_branch) == 1
+              path.write_text(text)
+              print(f"Ported existing Arcana trigger/LKI semantics: {relative}")
+          PY
           git -C argentum-engine diff --check
       - name: Compile disposable Argentum libraries for Android Java 17
         shell: bash
