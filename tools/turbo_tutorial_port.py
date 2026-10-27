@@ -61,10 +61,64 @@ def main() -> None:
     patch_path.write_text(patch)
     applied = run("git", "apply", "--3way", "--index", str(patch_path), check=False)
     if applied.returncode:
-        print("Tutorial source join conflicts; NO app or APK build allowed.")
-        print(applied.stderr[:16000])
-        print(run("git", "diff", "--name-only", "--diff-filter=U").stdout)
-        raise SystemExit(1)
+        # Three exact reviewed overlapping hunks. Keep each independent fix:
+        # PR293 retained invalid blocker selections AND Claude's cue;
+        # PR292 unified 2–4 player hosting AND Claude's lesson start target;
+        # current private library peek AND Claude's legal-actions target.
+        import re
+        conflicts = set(run("git", "diff", "--name-only", "--diff-filter=U").stdout.splitlines())
+        expected = {
+            "android/app/src/main/java/com/arcanatable/ArgentumCombatBoard.kt",
+            "android/app/src/main/java/com/arcanatable/HomeScreen.kt",
+            "android/app/src/main/java/com/arcanatable/TableMainLayout.kt",
+        }
+        if conflicts != expected:
+            raise ValueError(f"Unreviewed tutorial conflicts: {conflicts ^ expected}")
+        for file in sorted(expected):
+            p = Path(file)
+            source = p.read_text()
+            matches = list(re.finditer(r'^<<<<<<< ours\\n(.*?)^=======\\n(.*?)^>>>>>>> theirs\\n',
+                                       source, re.MULTILINE | re.DOTALL))
+            if len(matches) != 1:
+                raise ValueError(f"Unreviewed tutorial overlap count: {file} {len(matches)}")
+            c = matches[0]
+            ours, theirs = c.group(1), c.group(2)
+            if file.endswith("ArgentumCombatBoard.kt"):
+                assert "warning: String? = null" in ours
+                assert "tutorialCue: Pair<String, String>? = null" in theirs
+                assert ours.count("fun ArgentumBlockBoard(") == 1
+                fixed = ours.replace("onDismiss: () -> Unit)",
+                    "onDismiss: () -> Unit, tutorialCue: Pair<String, String>? = null)")
+                assert fixed != ours
+            elif file.endswith("HomeScreen.kt"):
+                assert "friendMode == 5 -> onWifiMultiHost()" in ours
+                assert "friendMode == 6 -> onOnlineMultiHost()" in ours
+                assert "friendMode == 7 -> onOnlineMultiJoin()" in ours
+                assert '.tutorialTarget("setup-start")' in theirs
+                assert '.testTag("play-start"),' in ours
+                fixed = ours.replace('.testTag("play-start"),',
+                                     '.testTag("play-start").tutorialTarget("setup-start"),')
+                assert fixed != ours
+            else:
+                assert file.endswith("TableMainLayout.kt")
+                assert "Look at top of library · private" in ours
+                assert "argentumTopLibraryOpen = true" in ours
+                assert '.tutorialTarget("menu-legal-actions")' in theirs
+                assert ours.count('if (argentumEnabled && gameInProgress) DropdownMenuItem') == 1
+                fixed = ours.replace(
+                    ' }, onClick = { topMenuExpanded = false; topMenuSection = null; run { argentumActionCard',
+                    ' }, modifier = Modifier.tutorialTarget("menu-legal-actions"), onClick = { topMenuExpanded = false; topMenuSection = null; run { argentumActionCard'
+                )
+                assert fixed != ours
+            output = source[:c.start()] + fixed + source[c.end():]
+            if re.search(r'^(<<<<<<< |=======|>>>>>>> )',output,re.MULTILINE):
+                raise ValueError(f"Conflict marker remains: {file}")
+            p.write_text(output)
+            run("git", "add", file)
+            print(f"PASS: exact reviewed tutorial + existing app fix: {file}")
+        remaining = run("git", "diff", "--name-only", "--diff-filter=U").stdout
+        if remaining.strip():
+            raise ValueError(f"Unresolved tutorial overlaps: {remaining}")
     run("git", "diff", "--cached", "--check")
     for file in (
         "android/app/src/test/java/com/arcanatable/ui/TutorialAuditUiTest.kt",
