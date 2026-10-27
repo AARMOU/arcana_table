@@ -447,4 +447,81 @@ class EldraziTempleScenarioTest {
         assertEquals(0, d.manaPool(p).colorless)
     }
 
+
+    @Test fun restrictedManaRejectsDevoidNonEldraziSpellEvenThoughColorless() {
+        // Devoid is not sufficient for Temple: the spell must ALSO have the
+        // Eldrazi subtype. This deliberately distinguishes Temple from the
+        // separate Devoid-only Corrupted Crossroads mana restriction.
+        val probe = com.wingedsheep.sdk.dsl.card("Temple Devoid Non-Eldrazi Spell Probe") {
+            manaCost = "{2}{U}"
+            colorIdentity = "U"
+            typeLine = "Creature — Human"
+            power = 2
+            toughness = 2
+            keywords(com.wingedsheep.sdk.core.Keyword.DEVOID)
+        }
+        val d = customScenario(EldraziTemple)
+        val p = d.player1
+        d.registerCard(probe)
+        assertTrue(d.cardRegistry.requireCard(probe.name).colors.isEmpty())
+        val spell = d.putCardInHand(p, probe.name)
+        val temple = d.putPermanentOnBattlefield(p, "Eldrazi Temple")
+
+        assertNull(d.activate(p, temple, index = 1).error)
+        d.resolveAll()
+        d.giveMana(p, Color.BLUE)
+        assertNotNull("Devoid alone cannot spend Eldrazi-only restricted mana",
+            d.castSpell(p, spell).error)
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+        assertTrue(d.permanentsNamed(p, probe.name).isEmpty())
+
+        d.giveColorlessMana(p, 2)
+        assertNull("Unrestricted generic mana plus blue must still cast the Devoid Human",
+            d.castSpell(p, spell).error)
+        d.resolveAll()
+        assertEquals(1, d.permanentsNamed(p, probe.name).size)
+        assertEquals("Failed cast must not launder Temple mana", 2,
+            d.manaPool(p).restrictedMana.size)
+        assertEquals(0, d.manaPool(p).colorless)
+    }
+
+    @Test fun restrictedManaRejectsDevoidNonEldraziActivatedAbility() {
+        // A colorless Devoid source with the wrong creature subtype cannot
+        // spend Temple mana on an activated ability, even for generic {2}.
+        val probe = com.wingedsheep.sdk.dsl.card("Temple Devoid Non-Eldrazi Ability Probe") {
+            manaCost = "{U}"
+            colorIdentity = "U"
+            typeLine = "Creature — Human"
+            power = 1
+            toughness = 1
+            keywords(com.wingedsheep.sdk.core.Keyword.DEVOID)
+            activatedAbility {
+                cost = com.wingedsheep.sdk.dsl.Costs.Mana("{2}")
+                effect = com.wingedsheep.sdk.dsl.Effects.LoseLife(
+                    1, com.wingedsheep.sdk.scripting.targets.EffectTarget.Controller
+                )
+            }
+        }
+        val d = customScenario(EldraziTemple)
+        val p = d.player1
+        d.registerCard(probe)
+        assertTrue(d.cardRegistry.requireCard(probe.name).colors.isEmpty())
+        val source = d.putPermanentOnBattlefield(p, probe.name)
+        val temple = d.putPermanentOnBattlefield(p, "Eldrazi Temple")
+        val lifeBefore = d.getLifeTotal(p)
+
+        assertNull(d.activate(p, temple, index = 1).error)
+        d.resolveAll()
+        assertNotNull("Devoid colorlessness without Eldrazi subtype is ineligible",
+            d.activate(p, source).error)
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+        assertEquals(lifeBefore, d.getLifeTotal(p))
+
+        d.giveColorlessMana(p, 2)
+        assertNull(d.activate(p, source).error)
+        d.resolveAll()
+        assertEquals(lifeBefore - 1, d.getLifeTotal(p))
+        assertEquals(2, d.manaPool(p).restrictedMana.size)
+        assertEquals(0, d.manaPool(p).colorless)
+    }
 }
