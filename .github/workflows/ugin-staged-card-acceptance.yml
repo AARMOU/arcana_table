@@ -64,8 +64,35 @@ jobs:
           test -n "$sdkmanager_path" && test -x "$sdkmanager_path"
           "$sdkmanager_path" 'platforms;android-36' 'build-tools;36.0.0'
       - name: Export registered Ugin and run engine + Android regressions
+        id: full_regressions
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test :app:testDebugUnitTest
+      # Diagnostic only: the complete suite must still pass. Preserve its original XML
+      # before Gradle's focused rerun can replace test-result files. A focused pass
+      # after a full-suite failure points to ordering/shared-state; a focused failure
+      # supplies a reproducible startup trace. Neither outcome overrides CI failure.
+      - name: Preserve failed Android suite and diagnose UI startup in isolation
+        if: ${{ failure() && steps.full_regressions.outcome == 'failure' }}
+        working-directory: android
+        shell: bash
+        run: |
+          set -uo pipefail
+          mkdir -p ../ugin-diagnostics/full-suite-android ../ugin-diagnostics/focused-android
+          if test -d app/build/test-results/testDebugUnitTest; then
+            cp -a app/build/test-results/testDebugUnitTest/. ../ugin-diagnostics/full-suite-android/
+          fi
+          set +e
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
+            --tests 'com.arcanatable.ui.ArgentumResilienceUiTest.composerSendsDividedDamageSpellThenGameOverReturnsHome' \
+            --rerun-tasks --stacktrace > ../ugin-diagnostics/focused-stdout.log 2>&1
+          focused_status=$?
+          set -e
+          printf '%s\\n' "$focused_status" > ../ugin-diagnostics/focused-exit-code.txt
+          if test -d app/build/test-results/testDebugUnitTest; then
+            cp -a app/build/test-results/testDebugUnitTest/. ../ugin-diagnostics/focused-android/
+          fi
+          echo "Focused UI diagnostic exit: $focused_status (original full-suite failure remains fatal)"
+          tail -n 90 ../ugin-diagnostics/focused-stdout.log
       - name: Assert exact original-deck delta and real executable test results
         shell: bash
         run: |
@@ -214,3 +241,7 @@ jobs:
             ugin-pattern-index.patch
             android/custom-cards/build/test-results/test/TEST-*.xml
             android/app/build/test-results/testDebugUnitTest/TEST-*.xml
+            ugin-diagnostics/full-suite-android/TEST-*.xml
+            ugin-diagnostics/focused-android/TEST-*.xml
+            ugin-diagnostics/focused-stdout.log
+            ugin-diagnostics/focused-exit-code.txt
