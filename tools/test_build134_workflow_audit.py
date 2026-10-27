@@ -36,6 +36,32 @@ class WorkflowAuditTest(unittest.TestCase):
         a, b = fixture()
         self.assertTrue(any('upload' in x for x in audit(a, b.replace('if-no-files-found: error', 'if-no-files-found: ignore'))))
 
+    def test_unlisted_workflow_call_trigger_rejected(self):
+        a, b = fixture()
+        self.assertTrue(any('manual-only' in x for x in audit(
+            a, b.replace('  workflow_dispatch:\n', '  workflow_dispatch:\n  workflow_call:\n'))))
+
+    def test_preview_permission_escalation_rejected(self):
+        a, b = fixture()
+        self.assertTrue(any('permissions' in x for x in audit(
+            a, b.replace('  actions: read\n', '  actions: read\n  issues: write\n'))))
+
+    def test_job_runner_drift_rejected(self):
+        a, b = fixture()
+        self.assertTrue(any('job configuration' in x for x in audit(
+            a, b.replace('  compatibility:\n', '  compatibility:\n    runs-on: self-hosted\n'))))
+
+    def test_packaging_steps_cannot_be_interleaved(self):
+        a, b = fixture()
+        step = '      - name: Verify installable APK and record provenance\n        run: echo verify\n'
+        self.assertTrue(any('contiguous' in x for x in audit(
+            a, b.replace(step, '').replace('      - name: gate 4\n', step + '      - name: gate 4\n'))))
+
+    def test_commented_upload_condition_does_not_count(self):
+        a, b = fixture()
+        self.assertTrue(any('upload' in x for x in audit(
+            a, b.replace('        if: success()\n', '        if: always()\n        # if: success()\n'))))
+
     def test_step_removal_rejected(self):
         a, b = fixture()
         self.assertTrue(audit(a, b.replace('      - name: gate 4\n        run: echo 4\n', '')))
