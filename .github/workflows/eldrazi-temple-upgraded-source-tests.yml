@@ -84,7 +84,7 @@ jobs:
               root = ET.parse(p).getroot()
               for key in counts:
                   counts[key] += int(root.get(key, 0))
-              if "EldraziTempleManaRestrictionTest" in p.name:
+              if p.name.startswith("TEST-com.wingedsheep.engine.scenarios.EldraziTemple"):
                   temple.append((p.name, {k:int(root.get(k,0)) for k in counts}))
           print("Upgraded source SDK/engine:", counts, "Temple:", temple)
           if counts["tests"] < 100 or counts["failures"] or counts["errors"]:
@@ -94,7 +94,7 @@ jobs:
               "TEST-com.wingedsheep.engine.scenarios.EldraziTempleGameplayScenarioTest.xml": 7,
           }
           actual = {name: stats for name, stats in temple}
-          if set(actual) != set(expected):
+          if len(temple) != len(expected) or set(actual) != set(expected):
               raise SystemExit(f"FAIL: missing/duplicate Temple suite XML: {sorted(actual)}")
           for name, count in expected.items():
               if actual[name] != dict(tests=count, failures=0, errors=0, skipped=0):
