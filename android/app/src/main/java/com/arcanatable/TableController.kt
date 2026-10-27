@@ -733,6 +733,7 @@ internal class TableController(
     var aiRecaps by run { mutableStateOf(emptyList<TurnRecapEntry>()) }
     var recapText by run { mutableStateOf<String?>(null) }
     var argentumMulliganPrompt by run { mutableStateOf(false) }
+    var argentumOpeningHand by run { mutableStateOf<List<GameCard>>(emptyList()) }
     var argentumBottomCardIds by run { mutableStateOf<List<String>?>(null) }
     var argentumBottomCardCount by run { mutableIntStateOf(0) }
     var argentumBottomSelection by run { mutableStateOf<Set<String>>(emptySet()) }
