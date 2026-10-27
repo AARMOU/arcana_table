@@ -161,6 +161,8 @@ class DesignPreviewTest {
         message.put("legalActions", JSONArray().put(block)).put("nextStopPoint", JSONObject.NULL)
         state.put("activePlayerId", state.getJSONArray("players").getJSONObject(0).getString("playerId")).put("currentStep", "DECLARE_BLOCKERS")
         val scenario = ActivityScenario.launch(MainActivity::class.java)
+        // Close the activity even when a step fails, so its dialogs can't leave a tutorial layer behind for later tests.
+        try {
         UiTestSupport.settle(rule)
         UiTestSupport.playWithArgentum(rule, scenario)
         UiTestSupport.awaitReal(rule, 30_000, "declare blockers offered") { shown("DECLARE BLOCKERS") }
@@ -169,14 +171,16 @@ class DesignPreviewTest {
         UiTestSupport.awaitReal(rule, 5_000, "block board") { shown("YOUR BLOCKERS") }
         UiTestSupport.settle(rule, 600)
         scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-5-block-board-empty") }
-        mine.forEach { blocker ->
-            rule.onNode(hasTestTag("combat-$blocker")).performClick(); UiTestSupport.settle(rule, 300)
-            rule.onNode(hasTestTag("combat-${theirs[0]}")).performClick(); UiTestSupport.settle(rule, 300)
-        }
+        // The three Rabbit tokens are one stack (×3): pick the attacker, then how many Rabbits block it.
+        rule.onNode(hasTestTag("combat-${theirs[0]}")).performClick(); UiTestSupport.settle(rule, 300)
+        rule.onNode(hasTestTag("combat-${mine[0]}")).performClick(); UiTestSupport.settle(rule, 300)
+        UiTestSupport.awaitReal(rule, 5_000, "stack picker") { shown("How many block") }
+        rule.onNodeWithText("All 3").performClick(); UiTestSupport.settle(rule, 300)
+        rule.onNodeWithText("BLOCK WITH 3").performClick(); UiTestSupport.settle(rule, 300)
         UiTestSupport.settle(rule, 600)
         scenario.onActivity { UiTestSupport.screenshot(it, "design-$name-6-block-board") }
         assertTrue(shown("Ramosian Captain 2/2 first strike ← 3 Rabbit Tokens (1/1)"))
-        scenario.close()
+        } finally { scenario.close() }
     }
 
     @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi") fun blockBoardPhone() = blockScenario("phone-portrait")
