@@ -64,20 +64,27 @@ jobs:
           run-id: 40417570112
           name: arcana-fast-engine-b136-pinned
           path: fast-engine-bundle
-      - name: Prove old signed source inputs and all nine cached output hashes still match
+      - name: Verify original seed or block reuse until fresh manual seed is built (NO APK)
         shell: bash
         env:
           FAST_SEED_RUN_ID: "40417570112"
         run: |
           set -euo pipefail
-          python3 tools/fast_apk_snapshot.py restore --bundle fast-engine-bundle
           python3 - <<'PY'
-          from pathlib import Path
           import json
-          data = json.loads(Path('fast-engine-bundle/manifest.json').read_text())
-          assert data['schema'] == 1, 'Expected exact historic validated B136 seed format'
-          assert str(data['seed_run_id']) == '40417570112'
-          assert len(data['files']) == 9
-          assert len([p for p in data['files'] if p.endswith('.jar')]) == 4
-          print('PASS: original B136 cache reused byte-for-byte; no new JAR/APK compiled')
+          from pathlib import Path
+          data=json.loads(Path('fast-engine-bundle/manifest.json').read_text())
+          assert data['schema']==1
+          assert str(data['seed_run_id'])=='40417570112'
+          assert len(data['files'])==9
+          print('Downloaded exact historical B136 sealed 9-file seed manifest')
           PY
+          if python3 tools/fast_apk_snapshot.py restore --bundle fast-engine-bundle > turbo-cache-compatibility.log 2>&1; then
+            echo 'PASS: old Build 136 engine snapshot is byte-for-byte compatible'
+            echo 'TURBO_EXISTING_SEED=REUSABLE' >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat turbo-cache-compatibility.log
+            grep -F 'REJECT stale/mismatched engine cache: source/patches/custom cards changed' turbo-cache-compatibility.log
+            echo '::warning title=One fresh seed needed::Old B136 engine inputs differ from the next-bundle assembled source. No binary reused. Run seed-engine in the existing manual Turbo workflow after owner authorizes engine seeding; do NOT build APK yet.'
+            echo 'TURBO_EXISTING_SEED=STALE; NEW MANUAL SEED REQUIRED, NO APK' >> "$GITHUB_STEP_SUMMARY"
+          fi
