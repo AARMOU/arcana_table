@@ -99,12 +99,20 @@ def audit(release: str, preview: str) -> list[str]:
         permissions = re.search(r'(?m)^permissions:\n((?:  [a-z-]+: [^\n]+\n)+)', header)
         if not permissions or permissions.group(1) != '  contents: read\n  actions: read\n':
             problems.append(f'{name}: expected read-only permissions missing or extra grants present')
-        if '  workflow_dispatch:' not in header:
-            problems.append(f'{name}: manual dispatch declaration missing')
-        if name == 'preview':
-            triggers = re.search(r'(?m)^on:\n((?:  [a-z_]+:[^\n]*\n)+)', header)
-            if not triggers or triggers.group(1) != '  workflow_dispatch:\n':
-                problems.append('preview is no longer manual-only')
+        # Trigger allowlist is asymmetric by design: release may push only
+        # changes to its own workflow on its frozen validation branch;
+        # the debug APK preview must remain manual-only. Hash pins alone
+        # cannot express this security property in synthetic regressions.
+        trigger_block = re.search(r'(?ms)^on:\n(.*?)(?=^[a-z][\\w-]*:|\\Z)', header)
+        expected_triggers = (
+            "  push:\n"
+            "    branches: [gpt/release-upgraded-validation-20261025]\n"
+            "    paths: ['.github/workflows/release-upgraded-source-validation.yml']\n"
+            "  workflow_dispatch:\n"
+            if name == 'release' else "  workflow_dispatch:\n"
+        )
+        if not trigger_block or trigger_block.group(1) != expected_triggers:
+            problems.append(f'{name}: workflow triggers changed; review before activation')
     if len(extras) == 3:
         upload = extras[2][1]
         if (re.findall(r'^        if: [^\n]+$', upload, re.M) != ['        if: success()']
