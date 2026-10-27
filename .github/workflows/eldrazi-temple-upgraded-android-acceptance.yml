@@ -460,14 +460,28 @@ jobs:
           assert current-prior == {"Eldrazi Temple"} and not prior-current
           manifest = json.loads(Path("investigation/argentum-six-precons/deck-manifest.json").read_text())
           all_cards = names((assets/"all-cards.index.tsv").read_text())
+          # This PR is based on the older isolated Temple source, which does
+          # not yet index Morophon. Never borrow counts from the newer shared
+          # integration branch; enforce the actual exact-HEAD baseline.
+          assert "Eldrazi Temple" not in all_cards and "Eldrazi Temple" not in prior
           counts = {}
           for deck in manifest["decks"]:
               if deck["name"] not in ("Eldrazi Incursion","Eldrazi Unbound"):
                   continue
+              temple_slots = sum(c["quantity"] for c in deck["cards"] if c["name"] == "Eldrazi Temple")
+              assert temple_slots == 1, (deck["name"], temple_slots)
               def count(custom):
                   return sum(c["quantity"] for c in deck["cards"] if c["name"] in all_cards or c["name"] in custom)
-              counts[deck["name"]] = [count(prior),count(current)]
-          assert counts == {"Eldrazi Incursion":[76,77],"Eldrazi Unbound":[75,76]}, counts
+              before_count, after_count = count(prior), count(current)
+              # An unrelated indexed card must not masquerade as the Temple
+              # increment: verify exact name, one-copy official manifest slot,
+              # and unchanged inventory of every other original card.
+              newly_indexed = {c["name"] for c in deck["cards"]
+                               if c["name"] in current - prior and c["name"] not in all_cards}
+              assert newly_indexed == {"Eldrazi Temple"}, (deck["name"], newly_indexed)
+              assert after_count - before_count == temple_slots, (deck["name"], before_count, after_count)
+              counts[deck["name"]] = [before_count, after_count]
+          assert counts == {"Eldrazi Incursion":[75,76],"Eldrazi Unbound":[75,76]}, counts
           Path("temple-upgraded-android-proof.json").write_text(json.dumps({
               "head":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),
               "upgradedArgentum":"7fb073337e4389cfabe2ebf4c6416633a7fc63d2",
