@@ -12,6 +12,7 @@ on:
       - tools/tests/test_fast_apk_snapshot.py
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: arcana-turbo-next-bundle-sources-${{ github.ref }}
   cancel-in-progress: true
@@ -55,3 +56,28 @@ jobs:
           test -s android/app/src/test/java/com/arcanatable/ArgentumBlockSubmissionGuardTest.kt
           git diff --check
           echo "PASS: full reviewed source + immutable engine-cache safety; NO APK, Gradle, signing or Worker deploy"
+      - name: Download previously verified Build 136 engine cache — NO APK
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 40417570112
+          name: arcana-fast-engine-b136-pinned
+          path: fast-engine-bundle
+      - name: Prove old signed source inputs and all nine cached output hashes still match
+        shell: bash
+        env:
+          FAST_SEED_RUN_ID: "40417570112"
+        run: |
+          set -euo pipefail
+          python3 tools/fast_apk_snapshot.py restore --bundle fast-engine-bundle
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          data = json.loads(Path('fast-engine-bundle/manifest.json').read_text())
+          assert data['schema'] == 1, 'Expected exact historic validated B136 seed format'
+          assert str(data['seed_run_id']) == '40417570112'
+          assert len(data['files']) == 9
+          assert len([p for p in data['files'] if p.endswith('.jar')]) == 4
+          print('PASS: original B136 cache reused byte-for-byte; no new JAR/APK compiled')
+          PY
