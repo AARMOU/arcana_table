@@ -94,7 +94,14 @@ class TutorialAuditUiTest {
                 val bounds = resolved?.let { TutorialTargets.bounds[it] }
                 // The control must be on the window the player is looking at, not hidden behind it.
                 val targetOk = step.target == null || (bounds != null && bounds.width > 1f && bounds.height > 1f)
-                val coachCount = rule.onAllNodes(hasTestTag("tutorial-coach-tip")).fetchSemanticsNodes().size
+                val tipNodes = rule.onAllNodes(hasTestTag("tutorial-coach-tip")).fetchSemanticsNodes()
+                val coachCount = tipNodes.size
+                // This was not checked by the previous 160-step walkthrough: both controls
+                // and the coach could exist yet the card could cover the required tap target.
+                val tipRect = tipNodes.singleOrNull()?.boundsInWindow
+                val coachCoversTarget = tipRect != null && bounds != null &&
+                    minOf(tipRect.right, bounds.right) > maxOf(tipRect.left, bounds.left) &&
+                    minOf(tipRect.bottom, bounds.bottom) > maxOf(tipRect.top, bounds.top)
                 val screen = screenOf(t)
                 val wantScreen = step.screen.ifBlank { "board" }
                 val screenOk = screen == wantScreen
@@ -132,6 +139,7 @@ class TutorialAuditUiTest {
                     if (coach && !coachOnTop) add("COACH-BEHIND-WINDOW")
                     if (!screenOk) add("SCREEN(want=$wantScreen got=$screen)")
                     if (!targetOk) add("NO-TARGET(${step.target})")
+                    if (coachCoversTarget) add("COACH-COVERS-TARGET(${step.target})")
                     if (!moved && step.actionKind != "event") add("STUCK")
                 }
                 val line = "$chapter #${index + 1} ${step.id} [${step.actionKind}] screen=$screen target=${step.target} -> $how ${if (flags.isEmpty()) "OK" else flags.joinToString(" ")}"
