@@ -39,6 +39,8 @@ class FastWorkflowStructureTests(unittest.TestCase):
     def test_build136_exact_source_pins(self):
         self.assertEqual(set(fast.b136_source_pins()), fast.B136_SOURCE_KEYS)
         self.assertTrue(any("Ugin" in name for name in fast.SEED_CARDS))
+        self.assertEqual(set(fast.ENGINE_SOURCE_KEYS), {"UGIN_BASE", "UGIN_SHA", "TEMPLE_SHA"})
+        self.assertEqual(set(fast.LEGACY_B136_SOURCE_PINS), fast.B136_SOURCE_KEYS)
 
     def test_workflow_cwd_honored(self):
         self.assertEqual(fast.step_working_directory("Build all four upgraded Argentum runtime JARs"), "combined-argentum")
@@ -89,6 +91,43 @@ class FastArtifactChecksTests(unittest.TestCase):
         with patch.dict(os.environ,{"GITHUB_RUN_ID":"123456","GITHUB_SHA":"source-test","FAST_SEED_RUN_ID":"123456"}):
             fast.seed_manifest(Path("bundle"))
 
+    def test_ui_pins_do_not_invalidate_reusable_verified_engine(self):
+        baseline = fast.fingerprint()
+        changed = {k: "0"*40 for k in fast.B136_SOURCE_KEYS}
+        changed["LOBBY_FIX_SHA"] = "f"*40
+        changed["OUTCOME_SHA"] = "e"*40
+        changed["DECK_SHA"] = "d"*40
+        with patch.object(fast, "b136_source_pins", return_value=changed):
+            self.assertEqual(baseline, fast.fingerprint())
+        changed["UGIN_SHA"] = "a"*40
+        with patch.object(fast, "b136_source_pins", return_value=changed):
+            self.assertNotEqual(baseline, fast.fingerprint())
+
+    def test_legacy_b136_seed_accepts_only_exact_unchanged_engine_bytes_and_pins(self):
+        # Run 40417570112 contains schema 1. Reconstruct its original
+        # fingerprint using immutable B136 source pins.
+        pins = dict(fast.LEGACY_B136_SOURCE_PINS)
+        pins["LOBBY_FIX_SHA"] = "f"*40
+        pins["OUTCOME_SHA"] = "e"*40
+        with patch.object(fast, "b136_source_pins", return_value=pins):
+            legacy = fast.fingerprint(legacy=True)
+            self.seed()
+            manifest = Path("bundle/manifest.json")
+            content = json.loads(manifest.read_text())
+            content["schema"] = 1
+            content["input_fingerprint"] = legacy
+            manifest.write_text(json.dumps(content))
+            with patch.dict(os.environ, {"FAST_SEED_RUN_ID": "123456"}):
+                fast.restore(Path("bundle"))
+            (Path("inputs")/"src-2.patch").write_text("UNVERIFIED")
+            with patch.dict(os.environ, {"FAST_SEED_RUN_ID": "123456"}):
+                with self.assertRaisesRegex(ValueError,"source/patches/custom cards changed"):
+                    fast.restore(Path("bundle"))
+        pins["TEMPLE_SHA"] = "f"*40
+        with patch.object(fast, "b136_source_pins", return_value=pins):
+            with self.assertRaisesRegex(ValueError, "Legacy seed engine/card pins changed"):
+                fast.fingerprint(legacy=True)
+
     def test_changed_sources_block_seed_reuse(self):
         self.seed()
         (Path("inputs")/"src-0.patch").write_text("DIFFERENT")
@@ -112,6 +151,7 @@ class FastArtifactChecksTests(unittest.TestCase):
 
     def test_verified_snapshot_restores_exact_hashes(self):
         self.seed()
+        self.assertEqual(2,json.loads(Path("bundle/manifest.json").read_text())["schema"])
         original={n:fast.sha(Path(n).read_bytes()) for n in fast.BUNDLE_FILES}
         for name in fast.BUNDLE_FILES:
             Path(name).write_text("old")
