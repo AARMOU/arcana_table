@@ -32,6 +32,43 @@ jobs:
           grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
           grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' android/app/src/main/java/com/arcanatable/TableArgentum.kt
           git diff --check
+      - name: Fail fast on assembled keyword-probe test/asset skew (no Gradle)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          import re
+          import sys
+          from pathlib import Path
+
+          test = Path("android/app/src/test/java/com/arcanatable/DeckSupportTest.kt")
+          assets = Path("android/app/src/main/assets/argentum/custom-cards.jsonl")
+          source = test.read_text(encoding="utf-8")
+          match = re.search(
+              r"fun cardsDoNotInheritKeywordLabelsFromCreatedTokensOrAnimationEffects\\(\\)"
+              r"[\\s\\S]*?val names = setOf\\(([\\s\\S]*?)\\)", source
+          )
+          if not match or not assets.is_file():
+              sys.exit("FAIL: keyword-probe test or pinned custom-card JSONL missing")
+          expected = set(re.findall(r'"([^"]+)"', match.group(1)))
+          if not expected:
+              sys.exit("FAIL: keyword-probe fixture contains no card names")
+          actual = {
+              json.loads(line)["name"]
+              for line in assets.read_text(encoding="utf-8").splitlines()
+              if line.strip()
+          }
+          missing = sorted(expected - actual)
+          print(f"Keyword probes: {len(expected)} expected; {len(expected)-len(missing)} in pinned asset")
+          if missing:
+              sys.exit(
+                  "FAIL: combined-source test/asset provenance mismatch: "
+                  + ", ".join(missing)
+                  + ". Keep the real test; reconcile its reviewed source with the "
+                    "pinned card export in the existing integration lane before Android CI."
+              )
+          print("PASS: every keyword-probe test card exists in pinned export")
+          PY
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
