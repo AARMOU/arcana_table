@@ -72,10 +72,29 @@ jobs:
           cp engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt "$temple_test_source"
           cmp -s engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt "$temple_test_source"
           git -C argentum-engine diff --check
+      - name: Compile disposable Argentum libraries for Android Java 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The exact upstream source defaults to JVM 21 (class major 65),
+          # while Arcana Android targets Java 17 (class major 61). Never
+          # weaken the JAR bytecode gate: test a runner-only toolchain port.
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("argentum-engine/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts")
+          src = p.read_text()
+          before = "    jvmToolchain(21)"
+          assert src.count(before) == 1, "Unexpected upstream toolchain convention"
+          p.write_text(src.replace(before, "    jvmToolchain(17)", 1))
+          assert p.read_text().count("    jvmToolchain(17)") == 1
+          PY
+          git -C argentum-engine diff --check
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '21'
+          java-version: |
+            17
+            21
       - name: Test upgraded SDK
         working-directory: argentum-engine
         run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:test
