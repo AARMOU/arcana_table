@@ -1,0 +1,42 @@
+first-turn #1 welcome [next] screen=board target=null -> next OK
+first-turn #2 hand-handle [tap] screen=board target=hand-handle -> gated-tap OK
+first-turn #3 forest [event] screen=board target=hand-card:Forest -> gated-event OK
+first-turn #4 board-land [next] screen=board target=battlefield-card:Forest -> next OK
+first-turn #5 make-mana [event] screen=board target=battlefield-card:Forest -> gated-event OK
+first-turn #6 pool [next] screen=board target=argentum-mana-summary -> next OK
+first-turn #7 cast-elf [event] screen=board target=hand-card:Elvish Mystic -> gated-event OK
+first-turn #8 spell-stack [next] screen=stack target=stack-items -> next OK
+first-turn #9 resolve [event] screen=board target=bottom-bar-pass-button -> gated-event OK
+first-turn #10 inspect [hold] screen=board target=battlefield-card:Elvish Mystic -> gated-hold OK
+first-turn #11 sickness [next] screen=board target=battlefield-card:Elvish Mystic -> next OK
+first-turn #12 pass [event] screen=board target=bottom-bar-pass-button -> gated-event OK
+first-turn #13 combat-skip [event] screen=board target=bottom-bar-pass-button -> next OK
+first-turn #14 finish-turn [event] screen=board target=bottom-bar-pass-button -> gated-event OK
+first-turn #15 opponent [next] screen=board target=opponent-tab -> next OK
+first-turn #16 complete [next] screen=board target=null -> next OK
+opening-hand #1 seven [next] screen=mulligan target=opening-hand-card -> next OK
+opening-hand #2 lands [next] screen=mulligan target=opening-hand-card -> next OK
+opening-hand #3 play-draw [next] screen=mulligan target=opening-hand-header -> next OK
+opening-hand #4 mulligan [event] screen=mulligan target=mulligan-button -> gated-event-forced OK
+opening-hand #5 bottom [next] screen=mulligan target=null -> next OK
+opening-hand #6 keep [event] screen=mulligan target=keep-hand -> gated-event-forced OK
+opening-hand #7 zoom-dismiss [next] screen=mulligan target=null -> next OK
+stack #1 open [tap] screen=board target=stack-button -> gated-tap OK
+stack #2 last-first [next] screen=stack target=stack-items -> next OK
+stack #3 priority [next] screen=stack target=priority-indicator -> next OK
+stack #4 opponent-cast [next] screen=board target=hand-handle -> next OK
+stack #5 respond [event] screen=board target=hand-card:Giant Growth -> gated-event OK
+stack #6 inspect-stack [next] screen=stack target=stack-items -> next OK
+stack #7 pass [event] screen=stack target=stack-pass -> gated-event OK
+stack #8 close [tap] screen=stack target=stack-close -> gated-tap OK
+combat #1 combat-step [next] screen=board target=phase-tracker -> next OK
+combat #2 ready [next] screen=board target=battlefield-card:Grizzly Bears -> next OK
+combat #3 attack [event] screen=board target=bottom-bar-pass-button -> gated-event OK
+combat #4 block [next] screen=board target=null -> next OK
+combat #5 blocked [next] screen=board target=null -> next OK
+combat #6 damage [next] screen=board target=null -> next OK
+combat #7 life [next] screen=board target=opponent-tab -> next OK
+combat #8 keywords [next] screen=board target=battlefield-card:Grizzly Bears -> next OK
+combat #9 postcombat [next] screen=board target=phase-tracker -> next OK
+
+PROBLEMS: 0

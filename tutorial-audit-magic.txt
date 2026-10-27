@@ -1,0 +1,50 @@
+cards #1 open-hand [tap] screen=board target=hand-handle -> next OK
+cards #2 browse [next] screen=board target=hand-grid -> next OK
+cards #3 inspect [hold] screen=board target=hand-card:any -> next OK
+cards #4 tap [tap] screen=board target=hand-card:any -> next OK
+cards #5 choose [next] screen=board target=legal-action-sheet -> next OK
+cards #6 not-available [next] screen=board target=legal-action-sheet -> next OK
+cards #7 resize [next] screen=board target=hand-drawer-grip -> next OK
+cards #8 close [next] screen=board target=null -> next OK
+mana #1 land [next] screen=board target=hand-card:Forest -> next OK
+mana #2 symbols [next] screen=board target=hand-card:Elvish Mystic -> next OK
+mana #3 play-land [event] screen=board target=hand-card:Forest -> next OK
+mana #4 tap-land [event] screen=board target=battlefield-card:Forest -> next OK
+mana #5 pool [next] screen=board target=argentum-mana-summary -> next OK
+mana #6 cast [event] screen=board target=hand-card:Elvish Mystic -> next OK
+mana #7 autopay [next] screen=board target=argentum-mana-summary -> next OK
+mana #8 empty [next] screen=board target=argentum-mana-summary -> next OK
+turns #1 phase-bar [next] screen=board target=phase-tracker -> next OK
+turns #2 main [next] screen=board target=phase-tracker -> next OK
+turns #3 instant [next] screen=board target=phase-tracker -> next OK
+turns #4 priority [next] screen=board target=bottom-bar-pass-button -> next OK
+turns #5 pass [event] screen=board target=bottom-bar-pass-button -> next OK
+turns #6 resolved [next] screen=board target=null -> next OK
+turns #7 hold [hold] screen=board target=bottom-bar-pass-button -> next OK
+turns #8 stop [next] screen=board target=bottom-bar-pass-button -> next OK
+turns #9 help [next] screen=board target=bottom-bar-pass-button -> next OK
+commander #1 format [next] screen=board target=commander-chip -> next OK
+commander #2 commandzone [next] screen=board target=commander-chip -> next OK
+commander #3 cast [next] screen=board target=commander-chip -> next OK
+commander #4 tax [next] screen=board target=commander-chip -> next OK
+commander #5 returns [next] screen=board target=null -> next OK
+commander #6 damage [next] screen=board target=opponent-tab -> next OK
+commander #7 color [next] screen=board target=commander-chip -> next OK
+commander #8 legal [next] screen=board target=null -> next OK
+zones #1 battlefield [next] screen=board target=battlefield-row -> next OK
+zones #2 hand [next] screen=board target=hand-handle -> next OK
+zones #3 graveyard [tap] screen=board target=quick-graveyard -> next OK
+zones #4 exile [tap] screen=board target=quick-exile -> next OK
+zones #5 library [next] screen=board target=null -> next OK
+zones #6 command [next] screen=board target=commander-chip -> next OK
+zones #7 tokens [next] screen=board target=null -> next OK
+zones #8 counters [next] screen=board target=battlefield-card:Grizzly Bears -> next OK
+zones #9 play-from-zone [next] screen=board target=null -> next OK
+unavailable-actions #1 no-action [next] screen=board target=hand-card:any -> next OK
+unavailable-actions #2 timing [next] screen=board target=phase-tracker -> next OK
+unavailable-actions #3 cost [next] screen=board target=hand-card:any -> next OK
+unavailable-actions #4 target [next] screen=board target=null -> next OK
+unavailable-actions #5 tap [next] screen=board target=battlefield-card:any -> next OK
+unavailable-actions #6 bug [next] screen=board target=quick-log -> next OK
+
+PROBLEMS: 0
