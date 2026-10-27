@@ -61,6 +61,10 @@ def audit(release: str, preview: str) -> list[str]:
     positions = [i for i, (name, _) in enumerate(preview_steps) if name in PREVIEW_ONLY]
     if len(positions) == 3 and positions != list(range(positions[0], positions[0] + 3)):
         problems.append('preview-only packaging steps are no longer contiguous')
+    # Contiguity alone is insufficient: moving all three steps ahead of a
+    # required shared gate would allow the preview artifact to upload early.
+    if len(positions) == 3 and positions != list(range(len(release_steps), len(release_steps) + 3)):
+        problems.append('preview-only packaging must follow all shared release gates')
     common = [(name, body) for name, body in preview_steps if name not in PREVIEW_ONLY]
     if len(common) != len(release_steps):
         problems.append('common step count changed')
