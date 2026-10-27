@@ -112,6 +112,8 @@ jobs:
           grep -Fq 'fun ArgentumBlockBoard(' "$a/CombatStackBoard.kt"
           grep -Fq 'attackTargets = attackTargetsFrom(state, attackers)' "$a/ArgentumInteraction.kt"
           test -s "$t/CombatStacksTest.kt"
+          test -s "$t/ui/TutorialAuditUiTest.kt"
+          grep -Fq '@Test fun practiceChapters()' "$t/ui/TutorialAuditUiTest.kt"
           test -s "$t/ui/DesignPreviewTest.kt"
           grep -Fq 'aiThrottle.skipSearch(current, priority)' "$a/engine/LocalArgentumHost.kt"
           grep -Fq 'otherFaceScripts(def)' "$a/engine/priority/OfflineHumanAutoPass.kt"
@@ -161,7 +163,6 @@ jobs:
             --tests 'com.arcanatable.TutorialCoachPlacementTest' \
             --tests 'com.arcanatable.CombatStacksTest' \
             --tests 'com.arcanatable.ui.DesignPreviewTest' \
-            --tests 'com.arcanatable.ui.TutorialAuditUiTest' \
             2>&1 | tee ../ci-out/turbo-compile-and-tests.log | tail -180
       - name: Prove PR314 cascade, PR316 life safety and multifaced auto-pass regressions
         working-directory: android
@@ -187,14 +188,14 @@ jobs:
             assert all(int(root.get(k,'0'))==0 for k in ('failures','errors','skipped')), (name,root.attrib)
             print('PASS:', name, root.get('tests'))
           PY
-      - name: Confirm UI/combat/tutorial targeted tests ran with zero failures and skips
+      - name: Confirm B139 UI and combat tests ran with zero failures and skips
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as E
           base=Path('android/app/build/test-results/testDebugUnitTest')
-          names=['ArgentumPassingTest','ReadableNotificationDurationTest','MultiplayerConnectionGuardTest','ArgentumRoomChatTest','MultiplayerLobbyVisibilityTest','TutorialRunTest','TutorialCoachPlacementTest','CombatStacksTest','DesignPreviewTest','TutorialAuditUiTest']
+          names=['ArgentumPassingTest','ReadableNotificationDurationTest','MultiplayerConnectionGuardTest','ArgentumRoomChatTest','MultiplayerLobbyVisibilityTest','TutorialRunTest','TutorialCoachPlacementTest','CombatStacksTest','DesignPreviewTest']
           total=0
           for name in names:
             files=list(base.glob('TEST-*'+name+'.xml'))
@@ -206,6 +207,33 @@ jobs:
               assert int(root.get(key,'0'))==0,(name,key,root.attrib)
             print('PASS',name,count)
           print('PASS: targeted B139 combat Turbo regressions:',total)
+          PY
+      - name: Execute the full tutorial UI audit in an isolated Gradle invocation
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A filtered multi-suite run can silently omit this suite. Require a dedicated
+          # JUnit execution, rather than treating a missing XML file as a green result.
+          ./gradlew --no-daemon --max-workers=2 \
+            -Parcana.debugApplicationIdSuffix=.turbocombat \
+            -Parcana.debugLabel=Arcana-Combat \
+            :app:testDebugUnitTest \
+            --tests 'com.arcanatable.ui.TutorialAuditUiTest' \
+            2>&1 | tee ../ci-out/tutorial-audit.log | tail -180
+      - name: Require all three tutorial audit methods with zero failures or skips
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as E
+          base=Path('android/app/build/test-results/testDebugUnitTest')
+          files=list(base.glob('TEST-*TutorialAuditUiTest.xml'))
+          assert len(files)==1, ('missing/duplicate tutorial audit XML', files, sorted(p.name for p in base.glob('TEST-*.xml')))
+          root=E.parse(files[0]).getroot()
+          assert int(root.get('tests','0'))==3, ('all three tutorial chapters must run', root.attrib)
+          assert all(int(root.get(k,'0'))==0 for k in ('failures','errors','skipped')), root.attrib
+          print('PASS: all three tutorial UI audit methods executed successfully')
           PY
       - name: Verify debug signature, side-by-side package and shipped assets
         shell: bash
