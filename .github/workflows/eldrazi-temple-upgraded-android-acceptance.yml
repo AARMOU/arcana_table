@@ -1,0 +1,217 @@
+name: Eldrazi Temple upgraded-engine Android candidate (no APK)
+# #152/#150: GPT-owned stacked #162. Runner-only source build and Android registry.
+# No production runtime JAR, tracked card export, deck, APK, signing, or merge writes.
+on:
+  push:
+    branches: [gpt/eldrazi-temple-card-candidate-20261024]
+    paths:
+      - '.github/workflows/eldrazi-temple-upgraded-android-acceptance.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: temple-upgraded-android-candidate
+  cancel-in-progress: true
+
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - name: Checkout exact GPT-owned card candidate
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout verified upgraded mana-source port
+        uses: actions/checkout@v4
+        with:
+          repository: AARMOU/arcana_table
+          ref: 8ef19f2e22eb861eb5cccf73fd6c485ce47a364f
+          path: temple-port
+          persist-credentials: false
+      - name: Checkout verified original gameplay scenarios
+        uses: actions/checkout@v4
+        with:
+          repository: AARMOU/arcana_table
+          ref: c2fb681f08c93549ed9a6f0b8a23dafb7ea06de9
+          path: temple-gameplay
+          persist-credentials: false
+      - name: Checkout exact upgraded Argentum
+        uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 7fb073337e4389cfabe2ebf4c6416633a7fc63d2
+          path: argentum-engine
+          persist-credentials: false
+      - name: Fail closed on card, port, and upstream provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C temple-port rev-parse HEAD)" = 8ef19f2e22eb861eb5cccf73fd6c485ce47a364f
+          test "$(git -C temple-gameplay rev-parse HEAD)" = c2fb681f08c93549ed9a6f0b8a23dafb7ea06de9
+          test "$(git -C argentum-engine rev-parse HEAD)" = 7fb073337e4389cfabe2ebf4c6416633a7fc63d2
+          test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt)" = 0e024338ec2d66c185ddec4aa1d61435845acf97
+          test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt)" = 855eec931798da310b41daa6267a1b61c5ea8b14
+          test "$(git -C temple-port hash-object engine-upgrade/eldrazi-temple/port_to_upgraded.py)" = 9078e8e3c5e245593d4ab6155fdde70965ac088a
+          test "$(git -C temple-gameplay hash-object engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt)" = f2b88843a34bf39dd5c54370f21c6bc85bb02426
+          sha256sum android/app/libs/argentum-*.jar > /tmp/temple-committed-jars.sha
+          git diff --check
+      - name: Port exact restriction and both positive/negative engine suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 temple-port/engine-upgrade/eldrazi-temple/port_to_upgraded.py argentum-engine
+          cp temple-port/engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          cp temple-gameplay/engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          git -C argentum-engine diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Test upgraded SDK
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:test
+      - name: Test 14 real upgraded-engine Temple scenarios
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :rules-engine:test --tests 'com.wingedsheep.engine.scenarios.EldraziTemple*'
+      - name: Build temporary matching runtime JARs
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar
+      - name: Inject matching runtime and exact Temple registry in disposable runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil, struct, zipfile
+          modules = {
+              "mtg-sdk": "com/wingedsheep/sdk/model/CardDefinition.class",
+              "mtg-sdk-tooling": "com/wingedsheep/sdk/tooling/CardLoader.class",
+              "rules-engine": "com/wingedsheep/engine/core/GameAction.class",
+              "ai": "com/wingedsheep/ai/engine/AIPlayer.class",
+          }
+          for module, marker in modules.items():
+              sources = [p for p in Path(f"argentum-engine/{module}/build/libs").glob("*.jar")
+                         if "sources" not in p.name and "javadoc" not in p.name
+                         and marker in zipfile.ZipFile(p).namelist()]
+              assert len(sources) == 1, (module, sources)
+              dest = Path("android/app/libs") / f"argentum-{module}.jar"
+              shutil.copyfile(sources[0], dest)  # runner only, never commit/push
+              with zipfile.ZipFile(dest) as jar:
+                  versions = [struct.unpack(">H", jar.read(n)[6:8])[0]
+                              for n in jar.namelist() if n.endswith(".class")]
+              assert versions and max(versions) <= 61, (module, max(versions))
+          dest = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziTemple.kt")
+          assert not dest.exists(), "Temple already registered: refuse duplicate ownership"
+          shutil.copyfile("engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt", dest)
+          test = Path("android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldraziTempleScenarioTest.kt")
+          assert not test.exists(), "Temple scenario already exists: refuse overwrite"
+          shutil.copyfile("engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt", test)
+          registry = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt")
+          content = registry.read_text()
+          anchor = "val entries: List<Entry> = listOf(\n"
+          assert content.count(anchor) == 1 and "Entry(EldraziTemple," not in content
+          registry.write_text(content.replace(anchor, anchor + '        Entry(EldraziTemple, "M3C", "Eldrazi Incursion"),\n', 1))
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android SDK 36
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export Temple, run real custom-card and Android unit tests
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test :app:testDebugUnitTest
+      - name: Assert upgraded engine, Android scenarios, exact deck delta and deterministic export
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, subprocess, xml.etree.ElementTree as ET
+          def suite(path, expected):
+              assert path.is_file(), f"Missing JUnit evidence: {path}"
+              root = ET.parse(path).getroot()
+              cases = list(root.iter("testcase"))
+              assert len(cases) == expected, (path, len(cases), expected)
+              assert not any(c.find(x) is not None for c in cases for x in ("failure","error","skipped")), path
+              return {c.get("name") for c in cases}
+          e = Path("argentum-engine/rules-engine/build/test-results/test")
+          suite(e/"TEST-com.wingedsheep.engine.scenarios.EldraziTempleManaRestrictionTest.xml", 7)
+          suite(e/"TEST-com.wingedsheep.engine.scenarios.EldraziTempleGameplayScenarioTest.xml", 7)
+          a = Path("android/custom-cards/build/test-results/test")
+          cases = suite(a/"TEST-com.arcanatable.customcards.EldraziTempleScenarioTest.xml", 16)
+          required = {
+              "restrictedManaPaysRealColorlessEldraziActivatedAbility",
+              "restrictedManaRejectsColoredEldraziActivatedAbilityWithoutLaundering",
+              "restrictedManaRejectsNonEldraziColorlessActivatedAbility",
+              "restrictedManaPaysDevoidEldraziActivatedAbilityWithPrintedBlueCost",
+              "restrictedManaPaysGenericCostOfColorlessEldraziAbility",
+              "restrictedManaRejectsGenericCostOfColoredEldraziAbility",
+              "restrictedManaPaysGenericCostOfDevoidEldraziSpellWithPrintedBlueCost",
+              "restrictedManaRejectsGenericCostOfColoredEldraziSpell",
+          }
+          assert required <= cases, sorted(required-cases)
+          for root in (a, Path("android/app/build/test-results/testDebugUnitTest"),
+                       Path("argentum-engine/mtg-sdk/build/test-results/test")):
+              files = list(root.glob("TEST-*.xml"))
+              assert files, f"Missing suite XML: {root}"
+              for f in files:
+                  r = ET.parse(f).getroot()
+                  assert int(r.get("failures",0)) == int(r.get("errors",0)) == 0, f
+          assets = Path("android/app/src/main/assets/argentum")
+          index_path = assets/"custom-cards.index.tsv"
+          jsonl_path = assets/"custom-cards.jsonl"
+          rows = index_path.read_text().splitlines()
+          assert rows.count("Eldrazi Temple\tcard") == 1
+          definitions = [json.loads(s) for s in jsonl_path.read_text().splitlines() if s.strip()]
+          temple = [r for r in definitions if r.get("name") == "Eldrazi Temple"]
+          assert len(temple) == 1
+          abilities = temple[0]["script"]["activatedAbilities"]
+          assert len(abilities) == 2, "Both mana abilities must survive Android JSONL serialization"
+          def before(path):
+              return subprocess.check_output(["git","show",f"HEAD:android/app/src/main/assets/argentum/{path}"],text=True)
+          def names(text):
+              return {line.split("\t",1)[0] for line in text.splitlines() if line.strip()}
+          prior = names(before("custom-cards.index.tsv"))
+          current = names(index_path.read_text())
+          assert current-prior == {"Eldrazi Temple"} and not prior-current
+          manifest = json.loads(Path("investigation/argentum-six-precons/deck-manifest.json").read_text())
+          all_cards = names((assets/"all-cards.index.tsv").read_text())
+          counts = {}
+          for deck in manifest["decks"]:
+              if deck["name"] not in ("Eldrazi Incursion","Eldrazi Unbound"):
+                  continue
+              def count(custom):
+                  return sum(c["quantity"] for c in deck["cards"] if c["name"] in all_cards or c["name"] in custom)
+              counts[deck["name"]] = [count(prior),count(current)]
+          assert counts == {"Eldrazi Incursion":[76,77],"Eldrazi Unbound":[75,76]}, counts
+          Path("temple-upgraded-android-proof.json").write_text(json.dumps({
+              "head":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),
+              "upgradedArgentum":"7fb073337e4389cfabe2ebf4c6416633a7fc63d2",
+              "indexedCandidateOnly":counts, "engineScenarios":14,
+              "androidCardScenarios":16,"integrated":False},indent=2)+"\n")
+          print("Temple upgraded-engine source + Android candidate scenarios and exact original-deck delta verified")
+          PY
+          sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/temple-export-1.sha
+          (cd android && ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards)
+          sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/temple-export-2.sha
+          diff -u /tmp/temple-export-1.sha /tmp/temple-export-2.sha
+          git diff --check
+          echo "Only disposable CI runner runtime/assets modified; no APK, merge, or production JAR replacement."
+      - name: Upload review-only test evidence (no binaries or APK)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: temple-upgraded-android-candidate-proof
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            temple-upgraded-android-proof.json
+            argentum-engine/rules-engine/build/test-results/test/TEST-*EldraziTemple*.xml
+            argentum-engine/mtg-sdk/build/test-results/test/TEST-*.xml
+            android/custom-cards/build/test-results/test/TEST-*.xml
+            android/app/build/test-results/testDebugUnitTest/TEST-*.xml
