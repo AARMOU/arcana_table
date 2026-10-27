@@ -192,6 +192,33 @@ class WorkflowAuditTest(unittest.TestCase):
             a, b.replace('        if: success()\n',
                          '        continue-on-error: true\n        if: success()\n'))))
 
+    def test_preview_job_level_permission_escalation_rejected(self):
+        a, b = fixture()
+        widened = b.replace('  compatibility:\n',
+                            '  compatibility:\n    permissions:\n      contents: write\n')
+        self.assertTrue(any('job-level permissions' in x for x in audit(a, widened)))
+
+    def test_identical_job_level_permission_escalation_rejected(self):
+        a, b = fixture()
+        def widen(source):
+            return source.replace('  compatibility:\n',
+                                  '  compatibility:\n    permissions:\n      contents: write\n')
+        self.assertTrue(any('job-level permissions' in x for x in audit(widen(a), widen(b))))
+
+    def test_duplicate_root_permissions_override_rejected(self):
+        a, b = fixture()
+        widened = b.replace('jobs:\n',
+                            'permissions:\n  contents: write\n  actions: write\njobs:\n')
+        self.assertTrue(any('duplicate or missing root permissions' in x
+                            for x in audit(a, widened)))
+
+    def test_duplicate_root_trigger_override_rejected(self):
+        a, b = fixture()
+        widened = b.replace('jobs:\n',
+                            'on:\n  push:\n    branches: [main]\njobs:\n')
+        self.assertTrue(any('duplicate or missing root workflow triggers' in x
+                            for x in audit(a, widened)))
+
     def test_git_blob_hash(self):
         self.assertEqual(git_blob_sha(b'hello\n'), 'ce013625030ba8dba906f756967f9e9ca394464a')
 
