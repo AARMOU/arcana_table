@@ -112,7 +112,8 @@ def audit(release: str, preview: str) -> list[str]:
             if name == 'release' else "  workflow_dispatch:\n"
         )
         if not trigger_block or trigger_block.group(1) != expected_triggers:
-            problems.append(f'{name}: workflow triggers changed; review before activation')
+            problems.append('preview is no longer manual-only' if name == 'preview' else
+                            'release: workflow triggers changed; review before activation')
     if len(extras) == 3:
         upload = extras[2][1]
         if (re.findall(r'^        if: [^\n]+$', upload, re.M) != ['        if: success()']
