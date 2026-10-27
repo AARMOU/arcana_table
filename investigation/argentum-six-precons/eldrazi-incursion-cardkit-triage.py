@@ -78,7 +78,7 @@ def read_index_entries(path: Path) -> dict[str, str]:
         if len(parts) != 2:
             raise ValueError(f"{path}:{line_number}: expected name and card/token kind")
         name, kind = parts
-        if not name or name != name.strip() or kind not in {"card", "token"}:
+        if not name or name != name.strip() or kind not in {"card", "basic", "token"}:
             raise ValueError(f"{path}:{line_number}: invalid card index row {line!r}")
         if name in entries:
             raise ValueError(f"{path}:{line_number}: duplicate index entry {name!r}")
@@ -153,12 +153,12 @@ def main() -> None:
     manifest = json.loads(MANIFEST.read_text())
     index_sources = [read_index_entries(path) for path in INDEXES]
     custom_export_count = verify_custom_export(index_sources[1], CUSTOM_JSONL)
-    # Tokens are never counted as implemented original deck cards.
+    # Basic lands count as real original cards; token definitions never do.
     index = {
         name
         for source in index_sources
         for name, kind in source.items()
-        if kind == "card"
+        if kind in {"card", "basic"}
     }
     decks = {deck["name"]: deck for deck in manifest["decks"]}
     original_identity = verify_original_decks(decks)
