@@ -29,11 +29,10 @@ import org.json.JSONObject
 /** Host a 2–4 seat Wi-Fi lobby. */
 internal fun TableController.startMultiWifiHost() {
     if (offlineStarting || argentumEnabled || wifiServer != null) return
-    val count = wifiMultiSeatCount.coerceIn(2, 4)
-    val friends = (1 until count).filter(wifiMultiFriendSlots::contains)
-    if (friends.isEmpty()) { message = "Choose at least one friend seat."; return }
+    // Every new room opens with the host and three friend seats. Configure AI/size in the lobby.
+    val count = 4
+    val friends = (1 until count).toList()
     recordDiagnostic("Multiplayer lobby host requested: Wi-Fi; seats=$count; friendSeats=${friends.size}", DiagnosticCategory.ACTION)
-    wifiMultiConfigOpen = false
     offlineStarting = true
     scope.launch {
         try {
@@ -196,11 +195,10 @@ internal fun TableController.startMultiWifiGame() {
 /** Production-capable internet multiplayer with private, directed Worker relay. */
 internal fun TableController.startMultiOnlineHost() {
     if (offlineStarting || argentumEnabled || wifiServer != null) return
-    val count = wifiMultiSeatCount.coerceIn(2, 4)
-    val friends = (1 until count).filter(wifiMultiFriendSlots::contains)
-    if (friends.isEmpty()) { message = "Choose at least one friend seat."; return }
+    // Every new room opens with the host and three friend seats. Configure AI/size in the lobby.
+    val count = 4
+    val friends = (1 until count).toList()
     recordDiagnostic("Multiplayer lobby host requested: internet; seats=$count; friendSeats=${friends.size}", DiagnosticCategory.ACTION)
-    wifiMultiConfigOpen = false
     offlineStarting = true
     scope.launch {
         try {
@@ -622,46 +620,8 @@ internal fun TableController.setGuestLobbyReady(ready: Boolean) {
 @Composable
 internal fun TableController.WifiDialogs() {
     // 2–4 player rooms (host and guests) use the full lobby screen; the dialogs below are the
-    // one-guest paths and the host's room setup.
+    // legacy one-guest paths and guest join controls.
     MultiplayerLobbyScreen()
-    if (wifiMultiConfigOpen) {
-        AlertDialog(
-            onDismissRequest = { wifiMultiConfigOpen = false },
-            title = { Text(if (wifiMultiOnline) "Host online Commander" else "Host Wi-Fi Commander") },
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(if (wifiMultiOnline) "Choose 2–4 seats. Friends can join across different networks using the room code." else "Choose 2–4 seats. Friends must use the same Wi-Fi.")
-                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        (2..4).forEach { size ->
-                            TextButton(onClick = {
-                                wifiMultiSeatCount = size
-                                wifiMultiFriendSlots = wifiMultiFriendSlots.filter { it < size }
-                                    .toSet().ifEmpty { setOf(1) }
-                            }) { Text(if (wifiMultiSeatCount == size) "[$size]" else "$size") }
-                        }
-                    }
-                    (1 until wifiMultiSeatCount).forEach { seat ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text("Seat ${seat + 1}")
-                            TextButton(onClick = {
-                                wifiMultiFriendSlots = if (seat in wifiMultiFriendSlots)
-                                    wifiMultiFriendSlots - seat else wifiMultiFriendSlots + seat
-                            }) {
-                                Text(if (seat in wifiMultiFriendSlots) "Friend · change to AI"
-                                    else "AI · change to friend")
-                            }
-                        }
-                    }
-                    Text("You can change seats in the lobby. Start the game once every friend has joined and is ready.")
-                }
-            },
-            confirmButton = { TextButton(
-                enabled = (1 until wifiMultiSeatCount).any(wifiMultiFriendSlots::contains),
-                onClick = { if (wifiMultiOnline) startMultiOnlineHost() else startMultiWifiHost() }
-            ) { Text("HOST LOBBY") } },
-            dismissButton = { TextButton(onClick = { wifiMultiConfigOpen = false }) { Text("CANCEL") } },
-        )
-    }
     wifiWaitingAddress?.let { address ->
         if (wifiMultiLobbyState == null) {
             AlertDialog(
