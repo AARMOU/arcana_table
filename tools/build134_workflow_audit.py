@@ -57,6 +57,10 @@ def audit(release: str, preview: str) -> list[str]:
     extras = [(name, body) for name, body in preview_steps if name in PREVIEW_ONLY]
     if [name for name, _ in extras] != list(PREVIEW_ONLY):
         problems.append('preview-only build/identity/upload step set or order changed')
+    # The debug build, identity check and upload form one uninterrupted gate.
+    positions = [i for i, (name, _) in enumerate(preview_steps) if name in PREVIEW_ONLY]
+    if len(positions) == 3 and positions != list(range(positions[0], positions[0] + 3)):
+        problems.append('preview-only packaging steps are no longer contiguous')
     common = [(name, body) for name, body in preview_steps if name not in PREVIEW_ONLY]
     if len(common) != len(release_steps):
         problems.append('common step count changed')
@@ -70,17 +74,105 @@ def audit(release: str, preview: str) -> list[str]:
             right_body = right_body.replace(PREVIEW_SCOPE, '<reviewed descriptive message>')
         if left_body != right_body:
             problems.append(f'shared step {index} differs: {left_name}')
+    # Both jobs must use the same runner, timeout and job-level configuration.
+    def job_config(source: str) -> str | None:
+        if '\njobs:\n' not in source or '    steps:\n' not in source:
+            return None
+        return source.split('\njobs:\n', 1)[1].split('    steps:\n', 1)[0]
+
+    if job_config(release) is None or job_config(release) != job_config(preview):
+        problems.append('release/preview job configuration differs')
     for name, source in [('release', release), ('preview', preview)]:
-        header = source.split('\njobs:', 1)[0]
-        if 'permissions:\n  contents: read\n  actions: read' not in header:
-            problems.append(f'{name}: expected read-only permissions missing')
+        header = source.split('\njobs:', 1)[0] + '\n'
+        permissions = re.search(r'(?m)^permissions:\n((?:  [a-z-]+: [^\n]+\n)+)', header)
+        if not permissions or permissions.group(1) != '  contents: read\n  actions: read\n':
+            problems.append(f'{name}: expected read-only permissions missing or extra grants present')
         if '  workflow_dispatch:' not in header:
             problems.append(f'{name}: manual dispatch declaration missing')
-        if name == 'preview' and re.search(r'^  (?:push|pull_request|schedule|workflow_run):', header, re.M):
-            problems.append('preview is no longer manual-only')
+        if name == 'preview':
+            triggers = re.search(r'(?m)^on:\n((?:  [a-z_]+:[^\n]*\n)+)', header)
+            if not triggers or triggers.group(1) != '  workflow_dispatch:\n':
+                problems.append('preview is no longer manual-only')
     if len(extras) == 3:
         upload = extras[2][1]
-        if 'if: success()' not in upload or 'if-no-files-found: error' not in upload:
+        if (re.findall(r'^        if: [^\n]+    return problems
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('release', type=Path)
+    parser.add_argument('preview', type=Path)
+    args = parser.parse_args()
+    raw_release, raw_preview = args.release.read_bytes(), args.preview.read_bytes()
+    problems = audit(raw_release.decode('utf-8'), raw_preview.decode('utf-8'))
+    for label, actual, expected in [('release', git_blob_sha(raw_release), RELEASE_BLOB),
+                                    ('preview', git_blob_sha(raw_preview), PREVIEW_BLOB)]:
+        if actual != expected:
+            problems.append(f'{label} blob changed: {actual} != reviewed {expected}; re-audit before accepting')
+    if problems:
+        for problem in problems:
+            print('FAIL:', problem)
+        return 1
+    print('PASS: frozen 33 shared steps (28 named, 5 unnamed); 3 preview-only steps; read-only permissions; manual preview')
+    print('NOTICE: preview upload-artifact@v4 remains tag-referenced; pin/review before authorized activation')
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
+, upload, re.M) != ['        if: success()']
+                or not re.search(r'^          if-no-files-found: error    return problems
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('release', type=Path)
+    parser.add_argument('preview', type=Path)
+    args = parser.parse_args()
+    raw_release, raw_preview = args.release.read_bytes(), args.preview.read_bytes()
+    problems = audit(raw_release.decode('utf-8'), raw_preview.decode('utf-8'))
+    for label, actual, expected in [('release', git_blob_sha(raw_release), RELEASE_BLOB),
+                                    ('preview', git_blob_sha(raw_preview), PREVIEW_BLOB)]:
+        if actual != expected:
+            problems.append(f'{label} blob changed: {actual} != reviewed {expected}; re-audit before accepting')
+    if problems:
+        for problem in problems:
+            print('FAIL:', problem)
+        return 1
+    print('PASS: frozen 33 shared steps (28 named, 5 unnamed); 3 preview-only steps; read-only permissions; manual preview')
+    print('NOTICE: preview upload-artifact@v4 remains tag-referenced; pin/review before authorized activation')
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
+, upload, re.M)
+                or not re.search(r'^        uses: actions/upload-artifact@v4    return problems
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('release', type=Path)
+    parser.add_argument('preview', type=Path)
+    args = parser.parse_args()
+    raw_release, raw_preview = args.release.read_bytes(), args.preview.read_bytes()
+    problems = audit(raw_release.decode('utf-8'), raw_preview.decode('utf-8'))
+    for label, actual, expected in [('release', git_blob_sha(raw_release), RELEASE_BLOB),
+                                    ('preview', git_blob_sha(raw_preview), PREVIEW_BLOB)]:
+        if actual != expected:
+            problems.append(f'{label} blob changed: {actual} != reviewed {expected}; re-audit before accepting')
+    if problems:
+        for problem in problems:
+            print('FAIL:', problem)
+        return 1
+    print('PASS: frozen 33 shared steps (28 named, 5 unnamed); 3 preview-only steps; read-only permissions; manual preview')
+    print('NOTICE: preview upload-artifact@v4 remains tag-referenced; pin/review before authorized activation')
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
+, upload, re.M)):
             problems.append('preview upload success/fail-closed conditions changed')
     return problems
 
