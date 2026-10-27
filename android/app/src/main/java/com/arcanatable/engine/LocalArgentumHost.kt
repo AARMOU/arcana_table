@@ -2,7 +2,9 @@ package com.arcanatable.engine
 
 import com.arcanatable.engine.costs.CounterRemovalCost
 import com.wingedsheep.ai.engine.AIPlayer
+import com.arcanatable.engine.ai.AiCascadeThrottle
 import com.arcanatable.engine.ai.AiDifficulty
+import com.arcanatable.engine.ai.AiPriorityChoice
 import com.arcanatable.engine.ai.OfflineAiPolicy
 import com.arcanatable.OfflineCheckpointStore
 import com.arcanatable.engine.priority.OfflineHumanAutoPass
@@ -133,6 +135,8 @@ class LocalArgentumHost(
     private val allSeats: List<EntityId> get() = listOf(humanId, aiId) + extraSeats.map { it.first }
     // One AI per computer seat (the second seat has none while a Wi-Fi guest sits there).
     private var ais: Map<EntityId, AIPlayer> = emptyMap()
+    // AI seats skip repeat searches over copies of the same trigger (reset every host burst).
+    private val aiThrottle = AiCascadeThrottle()
     // Only the serialized engine worker mutates either map. Each remote seat has its own
     // private outgoing channel, never a shared guest broadcast of masked game state.
     private val guestEmits = mutableMapOf<EntityId, (JSONObject) -> Unit>()
@@ -698,6 +702,7 @@ class LocalArgentumHost(
     }
 
     private fun driveBurst(events: MutableList<GameEvent>) {
+        aiThrottle.reset()
         var steps = 0
         var lastProgressNanos = System.nanoTime()
         var lastShown = state?.let { it.turnNumber to it.step }
@@ -735,13 +740,18 @@ class LocalArgentumHost(
             if (!isPerson(priority)) {
                 val bot = ais[priority] ?: break
                 val startedChoice = System.nanoTime()
-                val chosen = if (tutorialPassiveOpponent) safePass(current, priority)
-                    else (timed("aiChoice") { aiGuarded("aiChoiceErrors") { OfflineAiPolicy.think {
-                    OfflineAiPolicy.chooseAction(bot, seatOf(priority).difficulty, current) {
-                        enumerator.enumerate(current, priority, com.wingedsheep.engine.legalactions.EnumerationMode.FULL)
+                val chosen = when {
+                    tutorialPassiveOpponent -> safePass(current, priority)
+                    // Another copy of the ability this AI just looked at and passed on.
+                    aiThrottle.skipSearch(current, priority) -> {
+                        countDiagnostic("aiCascadeSkips")
+                        safePass(current, priority)
                     }
-                } } }
-                    ?: safePass(current, priority))
+                    else -> (timed("aiChoice") { aiGuarded("aiChoiceErrors") { OfflineAiPolicy.think {
+                        chooseAiAction(bot, current, priority)
+                    } } } ?: safePass(current, priority))
+                        .also { aiThrottle.recordSearch(current, priority, it) }
+                }
                 val choiceType = if (chosen is PassPriority) "aiChoicePass" else "aiChoiceAction"
                 phaseNanos[choiceType] = (phaseNanos[choiceType] ?: 0L) + System.nanoTime() - startedChoice
                 countDiagnostic(if (chosen is PassPriority) "aiPassChoices" else "aiActionChoices")
@@ -775,6 +785,14 @@ class LocalArgentumHost(
             if (!apply(safePass(current, priority), events, priority)) break
         }
     }
+
+    /** One AI priority choice (see [AiPriorityChoice]), with the host's timings and counters. */
+    private fun chooseAiAction(bot: AIPlayer, current: GameState, priority: EntityId): GameAction =
+        AiPriorityChoice.choose(
+            bot, seatOf(priority).difficulty, current, priority,
+            enumerate = { mode -> timed("aiEnumerate") { enumerator.enumerate(current, priority, mode) } },
+            onTrivialPass = { countDiagnostic("aiTrivialPasses") },
+        )
 
     /**
      * Runs one AI call; an exception inside the AI's own search (for example a crash while it

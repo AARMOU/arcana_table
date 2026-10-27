@@ -17,6 +17,8 @@ import com.wingedsheep.engine.state.components.stack.ActivatedAbilityOnStackComp
 import com.wingedsheep.sdk.scripting.GrantActivatedAbility
 import com.wingedsheep.sdk.scripting.GrantStaticAbility
 import com.wingedsheep.sdk.scripting.HasAllActivatedAbilitiesOfCards
+import com.wingedsheep.sdk.model.CardDefinition
+import com.wingedsheep.sdk.model.CardScript
 import com.wingedsheep.sdk.model.EntityId
 import com.wingedsheep.sdk.core.Step
 
@@ -75,22 +77,37 @@ object OfflineHumanAutoPass {
                 // A source with no registered definition contributes no printed abilities.
                 // Its copied and dynamically granted abilities were checked above.
                 val def = registry.getCard(card.cardDefinitionId) ?: return@getOrPut false
-                // Multifaced and flipped cards can expose non-front-face scripts.
-                if (def.cardFaces.isNotEmpty() || def.flipSide != null) return@getOrPut true
-                def.script.effectiveActivatedAbilities(classLevel).any { it.holdPriority } ||
-                    def.script.effectiveStaticAbilities(classLevel).any { static ->
-                        when (static) {
-                            // The grant is harmless unless its embedded ability requires a stop.
-                            is GrantActivatedAbility -> static.ability.holdPriority
-                            // Dynamic donor/grant-of-grant paths require a real enumeration.
-                            is HasAllActivatedAbilitiesOfCards, is GrantStaticAbility -> true
-                            else -> false
-                        }
-                    }
+                // Multifaced, flipped and transforming cards can expose a script other than the
+                // front one, so every face is checked; any face that could offer a stop falls back.
+                // (Failing closed on any multi-face card at all meant one opponent's Ishgard, the
+                // Holy See forced a full board enumeration for each of your own triggers.)
+                scriptMayHoldPriority(def.script, classLevel) ||
+                    otherFaceScripts(def).any { scriptMayHoldPriority(it, null) }
             }
             if (uncertain) return false
         }
         return true
+    }
+
+    /** Whether [script] has, or could grant, an activated ability that holds priority. */
+    private fun scriptMayHoldPriority(script: CardScript, classLevel: Int?): Boolean =
+        script.effectiveActivatedAbilities(classLevel).any { it.holdPriority } ||
+            script.effectiveStaticAbilities(classLevel).any { static ->
+                when (static) {
+                    // The grant is harmless unless its embedded ability requires a stop.
+                    is GrantActivatedAbility -> static.ability.holdPriority
+                    // Dynamic donor/grant-of-grant paths require a real enumeration.
+                    is HasAllActivatedAbilitiesOfCards, is GrantStaticAbility -> true
+                    else -> false
+                }
+            }
+
+    /** Every script a permanent of [def] could show besides its front: faces, flip side, back face. */
+    private fun otherFaceScripts(def: CardDefinition, depth: Int = 0): List<CardScript> {
+        if (depth > 2) return emptyList()
+        val sides = listOfNotNull(def.flipSide, def.backFace)
+        return def.cardFaces.map { it.script } +
+            sides.flatMap { listOf(it.script) + otherFaceScripts(it, depth + 1) }
     }
 
     /**

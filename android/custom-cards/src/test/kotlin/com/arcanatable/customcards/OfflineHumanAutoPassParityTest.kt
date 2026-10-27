@@ -106,6 +106,49 @@ class OfflineHumanAutoPassParityTest {
         }
     }
 
+    /**
+     * Build 138 device report: one opponent's Ishgard, the Holy See (a two-faced card) made every
+     * one of your own triggers enumerate the whole board. Faces are now checked, not refused.
+     */
+    @Test(timeout = 180000)
+    fun opponentMultiFacedPermanentNoLongerForcesOwnStackEnumeration() {
+        val d = scenario("Grizzly Bears", "Ishgard, the Holy See", "Delver of Secrets")
+        repeat(200) { d.putToken(d.player1, "Food") }
+        d.putLandOnBattlefield(d.player2, "Ishgard, the Holy See")
+        d.putCreatureOnBattlefield(d.player2, "Delver of Secrets")
+        val ishgard = d.cardRegistry.getCard("Ishgard, the Holy See")!!
+        assertTrue("fixture needs a multi-faced card", ishgard.cardFaces.isNotEmpty() || ishgard.flipSide != null || ishgard.backFace != null)
+        val creature = d.putCardInHand(d.player1, "Grizzly Bears")
+        d.giveMana(d.player1, Color.GREEN, 2)
+        assertNull(d.castSpell(d.player1, creature).error)
+        assertTrue("an opponent's two-faced land offers no stop over your own spell",
+            OfflineHumanAutoPass.canPassOwnedStackWithoutEnumerating(d.state, d.player1, d.cardRegistry))
+        assertSameVerdict(d, "own-stack-opponent-ishgard")
+    }
+
+    /** A hold-priority ability printed on a non-front face still forces the real enumeration. */
+    @Test(timeout = 60000)
+    fun holdPriorityAbilityOnAnotherFaceStillFallsBack() {
+        val d = scenario("Grizzly Bears", "Ishgard, the Holy See", "Weaver of Harmony")
+        val weaver = d.cardRegistry.getCard("Weaver of Harmony")!!
+        assertTrue(weaver.script.activatedAbilities.any { it.holdPriority })
+        val ishgard = d.cardRegistry.getCard("Ishgard, the Holy See")!!
+        val hidden = ishgard.copy(
+            name = "Synthetic Two-Faced Weaver",
+            cardFaces = ishgard.cardFaces + com.wingedsheep.sdk.model.CardFace(
+                name = "Synthetic Weaver Face", manaCost = weaver.manaCost, typeLine = weaver.typeLine,
+                script = weaver.script,
+            ),
+        )
+        d.registerCard(hidden)
+        d.putLandOnBattlefield(d.player1, "Synthetic Two-Faced Weaver")
+        val creature = d.putCardInHand(d.player1, "Grizzly Bears")
+        d.giveMana(d.player1, Color.GREEN, 2)
+        assertNull(d.castSpell(d.player1, creature).error)
+        assertFalse("a face that can hold priority is never skipped",
+            OfflineHumanAutoPass.canPassOwnedStackWithoutEnumerating(d.state, d.player1, d.cardRegistry))
+    }
+
     @Test(timeout = 180000)
     fun ownStackFastPassSkipsFullTokenEnumerationAndPreservesVerdict() {
         for (amount in listOf(40, 200, 600)) {

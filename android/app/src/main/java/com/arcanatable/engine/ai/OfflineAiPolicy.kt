@@ -121,7 +121,30 @@ object OfflineAiPolicy : BudgetPolicy {
         random: Random = Random.Default,
         legal: () -> List<LegalAction>,
     ): GameAction {
-        val chosen = bot.chooseAction(state)
+        return hesitate(bot.chooseAction(state), difficulty, state, random, legal)
+    }
+
+    /**
+     * Same as [chooseAction], but the AI picks from [actions] the host already enumerated
+     * (ACTIONS_ONLY, exactly what [AIPlayer.chooseAction] enumerates itself), so the board is
+     * not enumerated twice.
+     */
+    fun chooseFrom(
+        bot: AIPlayer,
+        difficulty: AiDifficulty,
+        state: GameState,
+        actions: List<LegalAction>,
+        random: Random = Random.Default,
+        legal: () -> List<LegalAction>,
+    ): GameAction = hesitate(bot.chooseFrom(state, actions).action, difficulty, state, random, legal)
+
+    private fun hesitate(
+        chosen: GameAction,
+        difficulty: AiDifficulty,
+        state: GameState,
+        random: Random,
+        legal: () -> List<LegalAction>,
+    ): GameAction {
         if (difficulty.hesitateChance <= 0.0 || random.nextDouble() >= difficulty.hesitateChance) return chosen
         return when (chosen) {
             is DeclareAttackers -> if (chosen.attackers.isEmpty()) chosen
