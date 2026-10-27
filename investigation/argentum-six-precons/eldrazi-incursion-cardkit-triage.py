@@ -115,6 +115,26 @@ def read_index_entries(path: Path) -> dict[str, str]:
     return entries
 
 
+def verify_shared_index_kinds(sources: list[dict[str, str]]) -> dict[str, str]:
+    """Fail closed when the same shipped name is a token in one library and a card in another.
+
+    The application may load either registered definition depending on source order.
+    Unioning the two indexes without checking kinds could falsely count a token-only
+    definition as a playable original-deck card. Intentional same-kind overrides
+    remain permitted; this does not claim their rules are equivalent.
+    """
+    if len(sources) != 2:
+        raise ValueError("Expected exactly two shipped card indexes")
+    shared = set(sources[0]) & set(sources[1])
+    conflicts = sorted(
+        (name, sources[0][name], sources[1][name])
+        for name in shared if sources[0][name] != sources[1][name]
+    )
+    if conflicts:
+        raise ValueError(f"Conflicting shipped index kinds: {conflicts!r}")
+    return {name: sources[0][name] for name in sorted(shared)}
+
+
 def verify_custom_export(entries: dict[str, str], jsonl_path: Path) -> int:
     """Reject ghost index entries and unindexed exports before counting coverage.
 
@@ -212,6 +232,7 @@ def require_exact_cardkit_classifications(names: list[str], classified: object) 
 def main() -> None:
     manifest = json.loads(MANIFEST.read_text())
     index_sources = [read_index_entries(path) for path in INDEXES]
+    shared_index_entries = verify_shared_index_kinds(index_sources)
     all_export_count = verify_custom_export(index_sources[0], ALL_JSONL)
     custom_export_count = verify_custom_export(index_sources[1], CUSTOM_JSONL)
     # Basic lands count as real original cards; token definitions never do.
@@ -262,6 +283,8 @@ def main() -> None:
         "originalDeckSha256": original_identity,
         "originalDeckIdentityVerified": True,
         "allExportIndexParityVerified": True,
+        "sharedIndexKindsVerified": True,
+        "sharedIndexNameCount": len(shared_index_entries),
         "allExportCount": all_export_count,
         "customExportIndexParityVerified": True,
         "customExportCount": custom_export_count,
