@@ -55,9 +55,11 @@ class ArgentumPassingTest {
     private fun stackItem(
         targetIds: List<String> = emptyList(),
         targetNames: List<String> = emptyList(),
+        targetCount: Int = targetIds.size,
     ) = ArgentumStackItem(
         id = "spell-1", name = "Test spell", controllerName = "Opponent",
-        isYours = false, imageUrl = null, targetNames = targetNames, targetIds = targetIds,
+        isYours = false, imageUrl = null, targetNames = targetNames,
+        targetIds = targetIds, targetCount = targetCount,
     )
 
     @Test
@@ -92,6 +94,8 @@ class ArgentumPassingTest {
     fun autoPassStopsConservativelyForUnknownTargets() {
         assertEquals("Test spell", ArgentumPassing.interruptingStackItem(listOf(stackItem(listOf("unknown"))), emptyMap(), "me"))
         assertEquals("Test spell", ArgentumPassing.interruptingStackItem(listOf(stackItem(targetNames = listOf("Hidden target"))), emptyMap(), "me"))
+        assertEquals("Test spell", ArgentumPassing.interruptingStackItem(listOf(stackItem(targetCount = 1)), emptyMap(), "me"))
+        assertEquals("Test spell", ArgentumPassing.interruptingStackItem(listOf(stackItem(targetIds = listOf("opponent"), targetCount = 2)), mapOf("opponent" to ArgentumTargetRef("opponent", "Opp", "Player")), "me"))
         assertEquals("Test spell", ArgentumPassing.interruptingStackItem(listOf(stackItem()), emptyMap(), null))
         assertEquals(null, ArgentumPassing.interruptingStackItem(emptyList(), emptyMap(), null))
         assertEquals(ArgentumPassing.Step.INTERRUPTED, tick(types = setOf("DeclareBlockers")))
