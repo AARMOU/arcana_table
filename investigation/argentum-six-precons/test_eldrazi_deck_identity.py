@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import importlib.util
 import pathlib
+import tempfile
 import unittest
 
 SCRIPT = pathlib.Path(__file__).with_name("eldrazi-incursion-cardkit-triage.py")
@@ -80,6 +81,63 @@ class OriginalDeckIdentityTest(unittest.TestCase):
         changed = {"Eldrazi Incursion": {"cards": self.cards[:-1]}}
         with self.assertRaisesRegex(ValueError, "identity"):
             audit.verify_original_decks(changed, expected)
+
+
+class ShippedCustomExportIntegrityTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = pathlib.Path(self.tmp.name)
+        self.index = root / "custom-cards.index.tsv"
+        self.jsonl = root / "custom-cards.jsonl"
+
+    def write(self, index: str, jsonl: str):
+        self.index.write_text(index)
+        self.jsonl.write_text(jsonl)
+
+    def test_matching_custom_index_and_jsonl_is_accepted(self):
+        self.write('Eldrazi Temple\\tcard\\nUgin, the Ineffable\\tcard\\n',
+                   '{"name":"Eldrazi Temple"}\\n{"name":"Ugin, the Ineffable"}\\n')
+        entries = audit.read_index_entries(self.index)
+        self.assertEqual(audit.verify_custom_export(entries, self.jsonl), 2)
+
+    def test_ghost_index_entry_is_rejected(self):
+        self.write('Eldrazi Temple\\tcard\\nUgin, the Ineffable\\tcard\\n',
+                   '{"name":"Eldrazi Temple"}\\n')
+        with self.assertRaisesRegex(ValueError, "index-only"):
+            audit.verify_custom_export(audit.read_index_entries(self.index), self.jsonl)
+
+    def test_unindexed_export_is_rejected(self):
+        self.write('Eldrazi Temple\\tcard\\n',
+                   '{"name":"Eldrazi Temple"}\\n{"name":"Ugin, the Ineffable"}\\n')
+        with self.assertRaisesRegex(ValueError, "export-only"):
+            audit.verify_custom_export(audit.read_index_entries(self.index), self.jsonl)
+
+    def test_duplicate_index_and_duplicate_export_are_rejected(self):
+        self.write('Eldrazi Temple\\tcard\\nEldrazi Temple\\tcard\\n',
+                   '{"name":"Eldrazi Temple"}\\n')
+        with self.assertRaisesRegex(ValueError, "duplicate index"):
+            audit.read_index_entries(self.index)
+        self.write('Eldrazi Temple\\tcard\\n',
+                   '{"name":"Eldrazi Temple"}\\n{"name":"Eldrazi Temple"}\\n')
+        with self.assertRaisesRegex(ValueError, "duplicate exported"):
+            audit.verify_custom_export(audit.read_index_entries(self.index), self.jsonl)
+
+    def test_malformed_index_and_jsonl_fail_closed(self):
+        self.write('Eldrazi Temple\\tunknown\\n', '{"name":"Eldrazi Temple"}\\n')
+        with self.assertRaisesRegex(ValueError, "invalid card index"):
+            audit.read_index_entries(self.index)
+        self.write('Eldrazi Temple\\tcard\\n', '{"name":\\n')
+        with self.assertRaisesRegex(ValueError, "invalid JSON"):
+            audit.verify_custom_export(audit.read_index_entries(self.index), self.jsonl)
+
+    def test_token_kind_is_not_a_card(self):
+        self.write('Eldrazi Spawn\\ttoken\\nEldrazi Temple\\tcard\\n',
+                   '{"name":"Eldrazi Spawn"}\\n{"name":"Eldrazi Temple"}\\n')
+        entries = audit.read_index_entries(self.index)
+        self.assertEqual(audit.verify_custom_export(entries, self.jsonl), 2)
+        self.assertEqual({name for name, kind in entries.items() if kind == "card"},
+                         {"Eldrazi Temple"})
 
 
 if __name__ == "__main__":
