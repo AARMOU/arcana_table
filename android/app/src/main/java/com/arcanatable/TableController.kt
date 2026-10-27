@@ -358,6 +358,9 @@ internal class TableController(
     var resetConfirmOpen by run { mutableStateOf(false) }
     var chatDraft by run { mutableStateOf("") }
     var chatMessages by run { mutableStateOf(emptyList<ChatMessage>()) }
+    /** Monotonic per-host chat IDs and replay guard (reset when a new room begins). */
+    var roomChatNextId: Long = 0L
+    val roomChatSeen: MutableSet<Long> = linkedSetOf()
     var unreadChatCount by run { mutableIntStateOf(0) }
     var triggerPrompts by run { mutableStateOf(emptyList<TriggerPrompt>()) }
     var stackActions by run { mutableStateOf(emptyList<StackAction>()) }
