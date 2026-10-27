@@ -1,0 +1,246 @@
+name: Arcana B138 Play-target release bundle candidate (unsigned)
+# Owner-authorized Build 138 Play publication preparation, preserving verified B138 source pins.
+# Isolated runner-only integration; no shared merges or deployment.
+# Produces UNSIGNED production-ID APK/AAB for original upload-key signing; never uploads to Play.
+on:
+  push:
+    branches:
+      - gpt/b138-play-bundle-candidate-20261027
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: arcana-b138-play-bundle-candidate
+  cancel-in-progress: true
+jobs:
+  build:
+    name: Engine + cards + Android validation + unsigned release APK/AAB (138)
+    if: github.repository == 'AARMOU/arcana_table'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare evidence folder
+        run: mkdir -p ci-out combined-evidence && git rev-parse HEAD > ci-out/source-sha.txt
+      - name: Assemble exact owner-requested PR source heads on runner (no remote merge)
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=3f8228e61d1d38d1c82f73244ce30ce303ac2198
+          git merge-base --is-ancestor "$BASE" HEAD
+          git config user.name 'arcana-build-assembly'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          printf 'B138 runner-only source assembly, base %s\n' "$BASE" > combined-evidence/b138-source-heads.txt
+          # Exact approved heads. Reject any broken merge and require all features afterward.
+          for item in \
+            303:4317184c3fb1666a95a5242e20f4fd777eb47e44 \
+            304:e82b57621374c7aca0a5d854f029ddda4176d597 \
+            305:0f08acef5ea02dc0ee9469adabcf7f0871efc77d \
+            306:1fafb3b1adfb52fdabb8a4f9f27283a263b3faf9 \
+            307:d171b27a21aed98dd3074c02f2c4f01e84c96fd7 \
+            308:abcae2a5e3b9bfb8bff80aa393c34112199b1bbd
+          do
+            IFS=: read -r pr sha <<< "$item"
+            git fetch --no-tags origin "$sha"
+            test "$(git rev-parse FETCH_HEAD)" = "$sha"
+            git merge-base --is-ancestor "$BASE" "$sha"
+            git merge --no-ff --no-edit -X ours "$sha" -m "Runner-only B138 source PR #$pr at $sha"
+            printf 'PR #%s %s\n' "$pr" "$sha" >> combined-evidence/b138-source-heads.txt
+          done
+          git diff --check "$BASE" HEAD -- android/app || true
+          git rev-parse HEAD > ci-out/assembled-source-sha.txt
+      - name: Fail closed if any approved change was lost in overlapping merges
+        shell: bash
+        run: |
+          set -euo pipefail
+          a=android/app/src/main/java/com/arcanatable
+          t=android/app/src/test/java/com/arcanatable
+          grep -F 'var wifiServer by run { mutableStateOf<ArgentumHostLink?>(null) }' "$a/TableController.kt"
+          grep -F 'shouldKeepMultiplayerConnectionGuard(' "$a/TableEffects.kt"
+          test -s "$t/MultiplayerConnectionGuardTest.kt"
+          grep -F 'argentumOpeningHand = hand' "$a/TableArgentum.kt"
+          grep -F 'cards = argentumOpeningHand' "$a/TableOverlays.kt"
+          test "$(grep -Fc 'val count = 4' "$a/TableWifi.kt")" -ge 2
+          ! grep -Fq 'wifiMultiConfigOpen' "$a/TableWifi.kt" "$a/TableController.kt" "$a/TableOverlays.kt"
+          grep -F 'tutorialCoachRegion(maxW, maxH, target)' "$a/TutorialCoach.kt"
+          grep -F 'TARGET-COVERS-WHOLE-SHEET' "$t/ui/TutorialAuditUiTest.kt"
+          test -s "$t/TutorialCoachPlacementTest.kt"
+          ! grep -Fq 'play-online-option' "$a/HomeScreen.kt"
+          grep -F 'startMultiOnlineHost()' "$a/TableOverlays.kt"
+          grep -F 'receiveRoomChatFromGuest' "$a/TableWifi.kt"
+          grep -F 'ArgentumRoomChat.DELIVERY' "$a/TableArgentum.kt"
+          grep -F 'sendTableChat(text)' "$a/TableOverlaysB.kt"
+          grep -F 'roomChatDisplayRevision' "$a/TableEffects.kt"
+          test -s "$a/ArgentumRoomChat.kt"
+          test -s "$t/ArgentumRoomChatTest.kt"
+          grep -F 'class TutorialRun' "$a/TutorialProgress.kt"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          assert len(json.loads(Path('android/app/src/main/assets/tutorials/catalog.json').read_text())['chapters']) == 20
+          print('PASS: all six PRs retained, 20-chapter B137 tutorial preserved')
+          PY
+      - name: Verify every requested change is in the assembled tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          a=android/app/src
+          test -s $a/main/java/com/arcanatable/ArgentumBlockSubmissionGuard.kt
+          grep -F 'val hostLobbyState = wifiMultiLobbyState' $a/main/java/com/arcanatable/TableMultiLobby.kt
+          grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' $a/main/java/com/arcanatable/TableArgentum.kt
+          grep -F 'class TutorialRun' $a/main/java/com/arcanatable/TutorialProgress.kt
+          grep -F 'opponentsEldraziCastDoesNotTriggerMyUlalek' android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlalekFusedAtrocityScenarioTest.kt
+          grep -F 'mixed unrestricted and Temple mana cannot launder' engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt
+          test -s android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt
+          python3 -m json.tool $a/main/assets/tutorials/catalog.json > /dev/null
+          git diff --check HEAD~1 -- android || true
+          python3 tools/check_android_regex.py 2>&1 | tee ci-out/android-regex.log
+          echo PASS | tee ci-out/00-source-check.txt
+      - name: Verify approved upstream patch artifact and SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail
+          python3 tools/fast_apk_snapshot.py preflight 2>&1 | tee ci-out/01-preflight.log
+      - name: Checkout exact Argentum upstream
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: c38f145359c342a04f951b7ba48f741bcb1627ac
+          path: combined-argentum
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build engine JARs with Temple, Ulalek and SDK scenarios
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/fast_apk_snapshot.py engine 2>&1 | tee ci-out/02-engine.log
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' > /dev/null
+      - name: Export and test all custom cards (incl. Ulalek, Ugin, Eldrazi)
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/fast_apk_snapshot.py cards 2>&1 | tee ci-out/03-cards.log
+      - name: Stamp Play-target version 138 and production package ID
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/fast_apk_snapshot.py version --version-code 138 | tee ci-out/04-version.log
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("android/app/build.gradle.kts")
+          t = p.read_text()
+          assert 'applicationId = "com.arcanatable"' in t, "Wrong Play package"
+          assert 'versionCode = 138' in t, "Wrong Play version"
+          assert 'applicationIdSuffix = providers.gradleProperty("arcana.debugApplicationIdSuffix")' in t, "Unexpected debug identity guard"
+          assert "signingConfig = signingConfigs.getByName(\"debug\")" not in t, "Release must not use debug signing"
+          print("PASS: production package com.arcanatable, versionCode 138; release signing not substituted")
+          PY
+      - name: Run all Android unit tests for assembled B138 source
+        working-directory: android
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest 2>&1 | tee ../ci-out/05-app-tests.log | tail -150
+      - name: Fail closed on any Android failure and missing essential release suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' | tee ci-out/06-test-summary.txt
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          root = Path("android/app/build/test-results/testDebugUnitTest")
+          required = {"HomeScreenSizesTest", "ReleaseFeaturesTest", "TutorialRunTest",
+                      "TutorialWalkthroughTest", "TutorialAuditUiTest", "TutorialScreensTest",
+                      "TutorialCoachPlacementTest", "MultiplayerConnectionGuardTest",
+                      "ArgentumRoomChatTest", "MultiplayerLobbyVisibilityTest",
+                      "ArgentumBlockSubmissionGuardTest", "GameOutcomeDetailsTest"}
+          total = failing = skipped = 0
+          seen = set()
+          for f in root.glob("TEST-*.xml"):
+              r = ET.parse(f).getroot()
+              n = int(r.get("tests", 0))
+              bad = int(r.get("failures", 0)) + int(r.get("errors", 0))
+              skip = int(r.get("skipped", 0))
+              total += n; failing += bad; skipped += skip
+              name = (r.get("name") or "").rsplit(".", 1)[-1]
+              if n and not bad and not skip: seen.add(name)
+              if bad: print("FAILED", name, bad)
+          print("Android:", total, "tests,", failing, "failures,", skipped, "skipped")
+          assert total >= 427 and failing == 0, "Android test regression"
+          assert not (required - seen), "Required suites missing or failed: " + repr(required - seen)
+          PY
+      - name: Validate Play release variant, then compile unsigned APK and AAB
+        working-directory: android
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 :app:lintRelease :app:assembleRelease :app:bundleRelease 2>&1 | tee ../ci-out/07-release-build.log | tail -170
+      - name: Verify exact Play identity, original logo, tutorial and card assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          aab=android/app/build/outputs/bundle/release/app-release.aab
+          test -s "$aab"
+          unzip -t "$aab" | tee ci-out/aab-archive-check.txt | tail -2
+          shopt -s nullglob
+          apks=(android/app/build/outputs/apk/release/*.apk)
+          test "${#apks[@]}" = 1
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "${apks[0]}" > ci-out/badging-release.txt
+          grep -F "package: name='com.arcanatable' versionCode='138'" ci-out/badging-release.txt
+          python3 tools/verify_launcher_branding.py | tee ci-out/branding.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile
+          p=Path("android/app/build/outputs/bundle/release/app-release.aab")
+          with ZipFile(p) as z:
+              names=set(z.namelist())
+              t="base/assets/tutorials/catalog.json"
+              assert t in names, "Missing tutorial in AAB"
+              assert len(json.loads(z.read(t))["chapters"]) == 20
+              for n in ("all-cards.index.tsv","custom-cards.index.tsv"):
+                  bundled=f"base/assets/argentum/{n}"
+                  assert bundled in names and z.read(bundled) == Path("android/app/src/main/assets/argentum",n).read_bytes(), n
+          print("PASS: Play AAB bundles original assets, tutorial and source-matched card indexes")
+          PY
+          cp "${apks[0]}" ci-out/ArcanaTable-B138-release-UNSIGNED.apk
+          cp "$aab" ci-out/ArcanaTable-B138-release-UNSIGNED.aab
+          sha256sum ci-out/ArcanaTable-B138-release-UNSIGNED.* | tee ci-out/unsigned-release.sha256
+          printf '%s\n' 'NOT PLAY-READY: requires ORIGINAL arcana-upload keystore signing, certificate verification against Play Console, physical device acceptance, and Play Console submission. Never sign with debug or regenerated keys.' > ci-out/RELEASE-GATE.txt
+      - name: Upload isolated unsigned Play release artifacts and evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcana-b138-production-id-unsigned-play-candidate
+          path: ci-out/
+          if-no-files-found: error
+          retention-days: 21
+      - name: Upload build evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcana-b138-play-candidate-diagnostics
+          path: |
+            ci-out/
+            combined-evidence/
+            android/app/build/test-results/testDebugUnitTest/
+            android/custom-cards/build/test-results/test/
+          if-no-files-found: warn
+          retention-days: 14
