@@ -19,6 +19,7 @@ INDEXES = [
     ROOT / "android/app/src/main/assets/argentum/custom-cards.index.tsv",
 ]
 OUTPUT = ROOT / "investigation/argentum-six-precons/eldrazi-cardkit-report"
+CUSTOM_JSONL = ROOT / "android/app/src/main/assets/argentum/custom-cards.jsonl"
 
 # SHA-256 of sorted "original card name\tquantity\n" records from the
 # immutable original Wizards deck manifests. Only names and counts are pinned:
@@ -66,6 +67,56 @@ def verify_original_decks(decks: dict, expected: dict | None = None) -> dict:
         observed[name] = actual
     return observed
 
+
+def read_index_entries(path: Path) -> dict[str, str]:
+    """Parse a shipped index without silently accepting duplicate or token-only rows."""
+    entries: dict[str, str] = {}
+    for line_number, line in enumerate(path.read_text().splitlines(), 1):
+        if not line.strip():
+            continue
+        parts = line.split("\t")
+        if len(parts) != 2:
+            raise ValueError(f"{path}:{line_number}: expected name and card/token kind")
+        name, kind = parts
+        if not name or name != name.strip() or kind not in {"card", "token"}:
+            raise ValueError(f"{path}:{line_number}: invalid card index row {line!r}")
+        if name in entries:
+            raise ValueError(f"{path}:{line_number}: duplicate index entry {name!r}")
+        entries[name] = kind
+    if not entries:
+        raise ValueError(f"Empty card index: {path}")
+    return entries
+
+
+def verify_custom_export(entries: dict[str, str], jsonl_path: Path) -> int:
+    """Reject ghost index entries and unindexed exports before counting coverage.
+
+    The two source indexes may legitimately overlap; within the custom export,
+    however, every indexed name must have exactly one serialized definition.
+    """
+    exported: set[str] = set()
+    for line_number, line in enumerate(jsonl_path.read_text().splitlines(), 1):
+        if not line.strip():
+            continue
+        try:
+            record = json.loads(line)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"{jsonl_path}:{line_number}: invalid JSON") from exc
+        name = record.get("name") if isinstance(record, dict) else None
+        if not isinstance(name, str) or not name or name != name.strip():
+            raise ValueError(f"{jsonl_path}:{line_number}: invalid exported card name")
+        if name in exported:
+            raise ValueError(f"{jsonl_path}:{line_number}: duplicate exported card {name!r}")
+        exported.add(name)
+    indexed = set(entries)
+    if indexed != exported:
+        raise ValueError(
+            f"Custom index/export mismatch: index-only={sorted(indexed - exported)!r}; "
+            f"export-only={sorted(exported - indexed)!r}"
+        )
+    return len(exported)
+
+
 # Independent ownership/capability guardrails override a heuristic SUPPORTED.
 # "source-review" is not an implementation claim; every candidate still needs
 # exact Oracle, a real engine scenario, registry/export and CI.
@@ -87,7 +138,7 @@ TRIAGE = {
     "Twins of Discord": ("GPT COMPLEX", "odd/even choice combat blocking and granted bloodthirst"),
     "Mutated Cultist": ("GPT COMPLEX", "remove counters from player/permanent, delayed next-spell reduction"),
     "Eldrazi Confluence": ("GPT SOURCE REVIEW", "choose three repeatable modes, blink target identity and tapped owner"),
-    "Spawnbed Protector": ("GPT LOW-HANGING REVIEW", "end-step graveyard return and Scion creation; verify up-to-one targeting"),
+    "Spawnbed Protector": ("GPT #170 / test-only draft #175", "existing sole GPT candidate; verify zero-target two Scions and illegal-target fizzle; do not dispatch duplicate"),
     "Inversion Behemoth": ("GPT SOURCE REVIEW", "any-number targets, continuous switch P/T until end of turn"),
     "Morophon, the Boundless": ("GPT COMPLEX", "chosen type, colored-symbol-only cost reduction and changeling"),
     "Kozilek's Return": ("GPT COMPLEX", "cast-from-graveyard optional exile trigger, seven-plus mana-value check"),
@@ -100,11 +151,14 @@ TRIAGE = {
 
 def main() -> None:
     manifest = json.loads(MANIFEST.read_text())
+    index_sources = [read_index_entries(path) for path in INDEXES]
+    custom_export_count = verify_custom_export(index_sources[1], CUSTOM_JSONL)
+    # Tokens are never counted as implemented original deck cards.
     index = {
-        line.split("\t", 1)[0]
-        for path in INDEXES
-        for line in path.read_text().splitlines()
-        if line.strip()
+        name
+        for source in index_sources
+        for name, kind in source.items()
+        if kind == "card"
     }
     decks = {deck["name"]: deck for deck in manifest["decks"]}
     original_identity = verify_original_decks(decks)
@@ -141,12 +195,14 @@ def main() -> None:
     ).strip()
     input_hashes = {
         str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in [MANIFEST, *INDEXES]
+        for path in [MANIFEST, *INDEXES, CUSTOM_JSONL]
     }
     result = {
         "integrationCommit": integration_commit,
         "originalDeckSha256": original_identity,
         "originalDeckIdentityVerified": True,
+        "customExportIndexParityVerified": True,
+        "customExportCount": custom_export_count,
         "inputSha256": input_hashes,
         "basis": "current checkout; two shipped indexes + exact official manifest + offline Cardkit Oracle",
         "incursionIndexedSlots": indexed,
@@ -166,6 +222,7 @@ def main() -> None:
         f"Eldrazi Unbound **{indexed_unbound}/100 indexed**.",
         "",
         "Original deck identities SHA-256 pinned and verified; no card substitutions or quantity drift.",
+        f"Custom card index/JSONL parity verified ({custom_export_count} unique definitions); tokens excluded from card coverage.",
         "",
         "Cardkit SUPPORTED is only a similarity heuristic. None of these missing cards "
         "is complete until rules tests, deterministic export, integration and device QA.",
