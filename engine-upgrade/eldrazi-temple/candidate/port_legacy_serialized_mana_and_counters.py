@@ -17,12 +17,27 @@ OLD_MANA = "AddAnyColorManaSpendOnChosenType"
 OLD_COUNTERS = "DoubleCounterPlacement"
 
 
-def migrate(value, counts):
+def migrate(value, counts, path=()):
+    # Older Argentum encodes some zero-argument sealed subclasses as bare
+    # strings, not {"type": ...}.  The first migration handled only objects,
+    # leaving Branching Evolution / The Earth Crystal / Corpsejack Menace and
+    # two chosen-type mana lands undecodable by the upgraded SDK.
+    if isinstance(value, str) and value in (OLD_MANA, OLD_COUNTERS):
+        if value == OLD_COUNTERS:
+            if len(path) < 2 or path[-2] != "replacementEffects" or not isinstance(path[-1], int):
+                raise ValueError(f"Unreviewed bare {OLD_COUNTERS} location: {path}")
+            counts[OLD_COUNTERS] += 1
+            return {"type": "ScaleCounterPlacement", "scale": "DOUBLE"}
+        if len(path) < 3 or path[-1] != "effect" or "activatedAbilities" not in path:
+            raise ValueError(f"Unreviewed bare {OLD_MANA} location: {path}")
+        counts[OLD_MANA] += 1
+        return {"type": "AddManaOfChoice",
+                "restriction": {"type": "OfChosenType", "creatureOnly": False}}
     if isinstance(value, list):
-        return [migrate(v, counts) for v in value]
+        return [migrate(v, counts, path + (i,)) for i, v in enumerate(value)]
     if not isinstance(value, dict):
         return value
-    converted = {k: migrate(v, counts) for k, v in value.items()}
+    converted = {k: migrate(v, counts, path + (k,)) for k, v in value.items()}
     tag = converted.get("type")
     if tag == OLD_MANA:
         allowed = {"type", "amount", "creatureOnly", "riders"}
@@ -149,6 +164,47 @@ class MigrationTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 migrate_jsonl(path, expected_mana=1, minimum_counters=0)
             self.assertEqual(path.read_text(), original)
+
+    def test_bare_counter_replacement_at_card_and_class_level(self):
+        counts = {OLD_MANA: 0, OLD_COUNTERS: 0}
+        old = {"name": "The Earth Crystal", "script": {
+            "replacementEffects": [OLD_COUNTERS],
+            "classLevels": [{"replacementEffects": [OLD_COUNTERS]}]}}
+        updated = migrate(old, counts)
+        expected = {"type": "ScaleCounterPlacement", "scale": "DOUBLE"}
+        self.assertEqual(updated["script"]["replacementEffects"], [expected])
+        self.assertEqual(updated["script"]["classLevels"][0]["replacementEffects"], [expected])
+        self.assertEqual(counts[OLD_COUNTERS], 2)
+
+    def test_bare_chosen_type_mana_ability_preserves_ability_context(self):
+        counts = {OLD_MANA: 0, OLD_COUNTERS: 0}
+        old = {"name": "Secluded Courtyard", "script": {
+            "activatedAbilities": [{"effect": OLD_MANA, "cost": "CostTap"}]}}
+        updated = migrate(old, counts)
+        self.assertEqual(updated["script"]["activatedAbilities"][0], {
+            "effect": {"type": "AddManaOfChoice",
+                       "restriction": {"type": "OfChosenType", "creatureOnly": False}},
+            "cost": "CostTap"})
+        self.assertEqual(counts[OLD_MANA], 1)
+
+    def test_bare_legacy_tag_outside_reviewed_location_fails_closed(self):
+        for tag in (OLD_MANA, OLD_COUNTERS):
+            with self.subTest(tag=tag), self.assertRaises(ValueError):
+                migrate({"name": "Unsafe", "metadata": {"flavorText": tag}},
+                        {OLD_MANA: 0, OLD_COUNTERS: 0})
+
+    def test_mixed_legacy_object_and_bare_forms_rewrite_all(self):
+        counts = {OLD_MANA: 0, OLD_COUNTERS: 0}
+        card = {"name": "Mixed", "script": {
+            "replacementEffects": [OLD_COUNTERS, {"type": OLD_COUNTERS, "placedByYou": True}],
+            "activatedAbilities": [{"effect": OLD_MANA},
+                                   {"effect": {"type": OLD_MANA, "creatureOnly": True}}]}}
+        updated = migrate(card, counts)
+        self.assertEqual(counts, {OLD_MANA: 2, OLD_COUNTERS: 2})
+        self.assertNotIn(OLD_MANA, json.dumps(updated))
+        self.assertNotIn(OLD_COUNTERS, json.dumps(updated))
+        self.assertEqual(updated["script"]["replacementEffects"][1]["placer"], {"type": "You"})
+        self.assertTrue(updated["script"]["activatedAbilities"][1]["effect"]["restriction"]["creatureOnly"])
 
     def test_unrelated_card_content_unchanged(self):
         counts = {OLD_MANA: 0, OLD_COUNTERS: 0}
