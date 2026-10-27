@@ -4,16 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0d1513">
-<meta name="description" content="Arcana Table brings Magic: The Gathering to Android with AI opponents, real card art, and the Argentum rules engine. Join our closed test.">
+<meta name="description" content="Arcana Table for Android: Argentum-powered Magic with AI opponents, Commander decks, an interactive tutorial, and early Wi-Fi / online multiplayer. Explore the Build 138 closed-test candidate.">
 <meta property="og:title" content="Arcana Table — Magic on your terms">
-<meta property="og:description" content="Two-player Magic battles, AI opponents, and automated rules on Android.">
+<meta property="og:description" content="Build 138: Commander decks, interactive lessons, deck tools, offline AI, and four-seat Wi-Fi / internet multiplayer preview on Android.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://aarmou.github.io/arcana_table/">
 <meta property="og:image" content="https://aarmou.github.io/arcana_table/assets/arcana-social.jpg">
+<meta property="og:site_name" content="Arcana Table">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="https://aarmou.github.io/arcana_table/assets/arcana-social.jpg">
 <link rel="icon" type="image/png" href="./assets/arcana-logo.png">
-<title>Arcana Table — Play Magic your way</title>
+<title>Arcana Table — Android Commander and Multiplayer Preview · Build 138</title>
 <style>
 :root{color-scheme:dark;--bg:#0c1412;--panel:#14221d;--panel2:#192c24;--ink:#edf8f1;--muted:#a2b6ab;--line:#2c4539;--mint:#90ebbe;--gold:#f2cc7d}
 *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(ellipse at 50% -10%,#294c35 0,transparent 38%),var(--bg);color:var(--ink);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
@@ -40,41 +41,74 @@ section{padding:68px 0}.section-title{max-width:710px;margin:0 0 28px}.section-t
 @media(max-width:760px){.wrap{width:calc(100% - 28px)}.nav{align-items:flex-start;flex-wrap:wrap;gap:10px;padding:13px 0}.navlinks{gap:11px}.hero{padding:42px 0 28px}.hero .intro{display:block}.hero h1{font-size:46px}.hero p{font-size:17px;margin-bottom:22px}.hero-visual{border-radius:14px}.hero-visual figcaption{font-size:9px;left:9px;bottom:9px}.feature-row{grid-template-columns:1fr;padding:18px;min-height:0;gap:12px}.feature-copy{padding:10px 5px}.feature-row.alt .screenshot{order:2}.phone{width:min(265px,100%)}.gallery{grid-template-columns:1fr}.gallery article{display:grid;grid-template-columns:130px 1fr;gap:16px;align-items:center;padding:15px}.gallery figure{margin:0;grid-row:span 2}.gallery img{width:130px;height:200px}.gallery h3{margin:0 0 6px}.gallery p{font-size:13px}.cta{display:block;padding:24px}.cta .actions{margin-top:23px}section{padding:47px 0}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.btn{transition:none}}
 </style>
+<style>
+.release-state{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:0 0 20px}.release-pill{display:inline-block;border:1px solid #60896b;background:#15372a;padding:6px 12px;border-radius:99px;color:var(--mint);font-size:12px;letter-spacing:.04em;font-weight:800}.release-state small{color:var(--muted);font-size:13px}.feature-grid,.faq{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:17px}.feature-card{background:linear-gradient(155deg,#1a3026,#101d18);border:1px solid var(--line);border-radius:18px;padding:24px}.feature-card h3{font-size:20px;line-height:1.3;margin:7px 0}.feature-card p{color:var(--muted);font-size:15px;margin:8px 0 0}.feature-card .kicker{font-size:11px;letter-spacing:.16em;font-weight:850;text-transform:uppercase;color:var(--gold)}.notes-list{margin:0;padding:0;list-style:none;display:grid;gap:14px}.notes-list li{border:1px solid var(--line);background:#17251e;border-radius:14px;padding:20px 23px}.notes-list strong{display:block;color:var(--ink);margin-bottom:5px}.notes-list p{margin:0;color:var(--muted)}.source-note{font-size:13px;color:var(--muted);margin-top:22px}.source-note a{color:var(--mint)}.faq article{border-top:1px solid var(--line);padding:17px 0}.faq h3{font-size:17px;margin:0 0 7px}.faq p{color:var(--muted);margin:0}.testing-status{border:1px solid #476d54;background:#192a20;border-radius:15px;padding:18px 23px;margin-top:18px}.testing-status strong{color:var(--mint)}.testing-status p{color:var(--muted);margin:5px 0 0;font-size:14px}@media(max-width:760px){.feature-grid,.faq{grid-template-columns:1fr}.feature-card{padding:19px}.notes-list li{padding:17px}.release-state{align-items:flex-start}}
+</style>
 <style>.beta-signup-panel{min-width:260px;flex:1;padding:20px;border:1px solid #527c5d;border-radius:15px;background:#0a170f70}.beta-signup-panel .actions{margin:0 0 14px}.beta-fine{font-size:13px;color:#b6c6ba;margin:0}@media(max-width:850px){.cta{display:block}.beta-signup-panel{margin-top:20px}}</style></head>
 <body>
 <header class="wrap nav"><a class="brand" href="./"><img src="./assets/arcana-logo.png" alt="Arcana logo"><span>ARCANA TABLE</span></a>
-<nav class="navlinks" aria-label="Main navigation"><a href="#experience">Experience</a><a href="#screenshots">Screenshots</a><a href="#testing">Closed testing</a><a href="./privacy.html">Privacy</a><a href="https://github.com/AARMOU/arcana_table">GitHub ↗</a></nav></header>
+<nav class="navlinks" aria-label="Main navigation"><a href="#experience">App</a><a href="#new-in-138">What’s new</a><a href="#screenshots">Screenshots</a><a href="#testing">Closed testing</a><a href="./privacy.html">Privacy</a><a href="https://github.com/AARMOU/arcana_table">GitHub ↗</a></nav></header>
 <main>
 <div class="wrap hero">
-<div class="eyebrow">Built for Android · Powered by Argentum</div>
+<div class="eyebrow">Android · Commander · Powered by Argentum</div>
+<div class="release-state"><span class="release-pill">Build 138 · Closed-test release candidate</span><small>Signed bundle ready for Google Play submission; rollout is not yet confirmed.</small></div>
 <h1>A whole Magic table.<br><em>Right in your hand.</em></h1>
-<div class="intro"><p>Play against AI opponents, see the real cards on the battlefield, and let the Argentum rules engine handle much of the heavy lifting.</p>
+<div class="intro"><p>Bring your Commander decks to a touch-friendly table: play offline against AI, learn with guided practice, or try a four-seat multiplayer lobby over Wi-Fi or internet. Argentum handles game rules, actions, and turn flow.</p>
 <div class="actions"><a class="btn primary" href="#testing">Join closed testing ↓</a><a class="btn" href="#screenshots">See the app ↓</a></div></div>
-<figure class="hero-visual"><img src="./assets/arcana-hero.webp" width="1500" height="750" fetchpriority="high" alt="Arcana Table promotional artwork showing the Arcana app icon, an Android phone with the deck selection screen, and highlights for AI opponents and automated rules"><figcaption>Actual Build 112 · Android</figcaption></figure>
-<div class="strip"><span>Two-player battles</span><span>Offline AI opponents</span><span>Automated rules</span><span>Real card art</span></div>
+<figure class="hero-visual"><img src="./assets/arcana-hero.webp" width="1500" height="750" fetchpriority="high" alt="Arcana Table promotional artwork showing the Arcana app icon, an Android phone with the deck selection screen, and highlights for AI opponents and automated rules"><figcaption>Earlier-build screenshot · Interface has evolved</figcaption></figure>
+<div class="strip"><span>Commander premades</span><span>Offline AI</span><span>Four-seat lobby preview</span><span>Deck editor &amp; import</span><span>20 tutorial chapters</span></div>
 </div>
 <section class="wrap" id="experience">
 <div class="section-title"><div class="eyebrow">Inside Arcana</div><h2>From choosing your commander to casting your first spell.</h2><p>A closer look at the real app—not another collection of decorative mockups.</p></div>
 <div class="feature-row">
-<div class="feature-copy"><span class="number">01 / THE HOME SCREEN</span><h3>Pick a deck. Start a game.</h3><p>Choose from the included premade Commander decks, change your selection, and get into the action in a couple of taps.</p><p class="upcoming"><strong>Coming soon:</strong> Deck importing and four-player multiplayer.</p><span class="detail">Designed for a phone-sized table</span></div>
+<div class="feature-copy"><span class="number">01 / THE HOME SCREEN</span><h3>Pick a deck. Start a game.</h3><p>Choose from categorized Commander premades, or use the re-enabled deck importer and editor in the Build 138 candidate. Pick a commander and jump into an AI game.</p><p class="upcoming"><strong>In testing:</strong> Online and local multiplayer now use a four-seat lobby; wider device and network acceptance is still underway.</p><span class="detail">Android-first, including Fold layouts</span></div>
 <figure class="screenshot"><img class="phone" src="./assets/arcana-deck.webp" width="800" height="1424" loading="lazy" alt="Arcana Table home screen showing Sliver Overlord selected and the green Play button"></figure>
 </div>
 <div class="feature-row alt">
 <figure class="screenshot"><img class="phone" src="./assets/arcana-ai.webp" width="800" height="1424" loading="lazy" alt="Arcana offline AI game setup, showing player count and opponent deck options"></figure>
-<div class="feature-copy"><span class="number">02 / THE OPPONENTS</span><h3>Ready when you are.</h3><p>Set up an offline game with AI players, select a deck for the first opponent, or leave the selection to chance. No internet connection is needed for offline AI play.</p><span class="detail">Local Argentum game engine</span></div>
+<div class="feature-copy"><span class="number">02 / THE OPPONENTS</span><h3>Ready when you are.</h3><p>Set up an offline game with AI players, select a deck for the first opponent, or leave the selection to chance. No internet connection is needed for offline AI play.</p><span class="detail">Local Argentum rules engine · No network required for offline AI</span></div>
 </div>
 </section>
+<section class="wrap" id="new-in-138">
+<div class="section-title"><div class="eyebrow">Build 138 update</div><h2>A lot has changed since Build 121.</h2><p>A more capable Commander table, with integrated multiplayer, deck tools, a full tutorial, and targeted usability repairs. These features are present in the Build 138 candidate; physical multiplayer acceptance is ongoing.</p></div>
+<div class="feature-grid">
+<article class="feature-card"><div class="kicker">01 · Multiplayer preview</div><h3>Start at the table, not in setup pop-ups.</h3><p>Host directly into a four-seat friends lobby, adjust seats before starting, share an online room code or Wi-Fi address, and have guests ready up. Two-to-four-seat room flows are in active testing.</p></article>
+<article class="feature-card"><div class="kicker">02 · Stay connected</div><h3>Room chat and private hands.</h3><p>In-room chat has returned for Wi-Fi and internet sessions. Opening-hand and mulligan flows use guest-private card data, and a background-host guard helps keep an active room alive. Reconnect and device testing remain important.</p></article>
+<article class="feature-card"><div class="kicker">03 · Your decks</div><h3>Premades, import, edit.</h3><p>Browse categorized decks from Arcana, Wizards precon content, and Argentum selections. The deck import entry and deck editor are enabled in this test candidate. Card legality and individual interactions remain subject to engine support.</p></article>
+<article class="feature-card"><div class="kicker">04 · Learning the table</div><h3>20 chapters of guided play.</h3><p>Follow interactive lessons through the opening hand, battlefield, combat, stack and controls. Lessons include real Argentum-powered practice states, with improved guidance placement for smaller and folding screens.</p></article>
+<article class="feature-card"><div class="kicker">05 · More readable play</div><h3>Refined table and menus.</h3><p>Touch-friendly hand, stack, turn and commander views; adjustable layouts and notifications; cleaner menu flows. The obsolete separate “Online with Argentum” menu entry has been removed, leaving direct Host and Join actions.</p></article>
+<article class="feature-card"><div class="kicker">06 · Release polish</div><h3>Original identity, useful diagnostics.</h3><p>The original Arcana launcher logo is retained. The optional in-game “engine running” indicator lives under Help &amp; Diagnostics; the required Android foreground-service notice is separate. Release assets and branding are checked during CI.</p></article>
+<article class="feature-card"><div class="kicker">07 · Cards and rules</div><h3>Growing Argentum coverage.</h3><p>More custom-card behaviors, Eldrazi work, and engine regressions are covered by automated tests. The original Eldrazi Incursion index reached 94 of 100 card-name slots in the build evidence; indexed does not mean fully gameplay-certified.</p></article>
+<article class="feature-card"><div class="kicker">08 · Build quality</div><h3>Release candidate tested.</h3><p>The Build 138 production-package job completed with 427 Android tests, zero failures and five skips, plus custom-card, engine, release-lint and branding checks. Passing CI does not replace real-device playtesting.</p></article>
+</div>
+<div class="testing-status"><strong>Release status — October 27, 2026</strong><p>The Build 138 Android App Bundle has been compiled and signed for the existing <code>com.arcanatable</code> Play listing. Google Play acceptance or closed-testing rollout has not been confirmed. Tester access remains invitation-based.</p></div>
+</section>
+<section class="wrap" id="changelog">
+<div class="section-title"><div class="eyebrow">Development milestones</div><h2>From Build 121 to Build 138.</h2><p>Major player-facing workstreams, rather than a claim that every individual bug or card has been fully resolved.</p></div>
+<ul class="notes-list">
+<li><strong>Builds 121–131 · Engine and play foundations</strong><p>Argentum integration, additional card scenarios and regression coverage, targeting and combat investigations, improvements to hand/table usability, and expanded Eldrazi testing. Some complex game interactions remain active issues.</p></li>
+<li><strong>Builds 132–136 · Release and multiplayer groundwork</strong><p>Original launcher branding, Help &amp; Diagnostics cleanup, the interactive tutorial, local and internet room infrastructure, multi-seat host and guest flows, and the new full-screen waiting lobby.</p></li>
+<li><strong>Builds 137–138 · Integrated test candidate</strong><p>Four-seat friends lobby without redundant host setup, guest-private opening hands, in-room chat, background-host improvements, Fold tutorial placement, and simplified online menu. Build 138 additionally passed production-ID APK/AAB validation and signing.</p></li>
+</ul>
+<p class="source-note">See <a href="https://github.com/AARMOU/arcana_table/issues/81">development coordination and release evidence</a>, <a href="https://github.com/AARMOU/arcana_table/actions/runs/40512660878">Build 138 CI results</a>, and <a href="https://github.com/AARMOU/arcana_table">source code</a>. Source tests, candidate availability, and live Play Store status are different milestones.</p>
+</section>
 <section class="wrap" id="screenshots">
-<div class="section-title"><div class="eyebrow">Actual in-game screenshots</div><h2>What playing looks like.</h2><p>Cards you recognize, game actions you can follow, and controls made for touch.</p></div>
+<div class="section-title"><div class="eyebrow">Genuine app captures · Earlier build</div><h2>What playing looks like.</h2><p>Real app screenshots from an earlier Android build, not newly captured Build 138 images. Menus and layouts have evolved in the release candidate.</p></div>
 <div class="gallery">
 <article><figure><img src="./assets/arcana-hand.webp" width="800" height="1424" loading="lazy" alt="Seven-card opening hand showing Hedge Maze and Sliver cards in the Argentum game"></figure><div><h3>Real opening hands</h3><p>See your seven cards, inspect their artwork, and make your opening decisions.</p></div></article>
 <article><figure><img src="./assets/arcana-battlefield.webp" width="800" height="1424" loading="lazy" alt="Arcana Table battlefield interface with phase controls, life totals, and a Bello card played by an AI opponent"></figure><div><h3>A live battlefield</h3><p>Track phases, boards, the stack, and AI actions while the game unfolds.</p></div></article>
 <article><figure><img src="./assets/arcana-settings.webp" width="800" height="1424" loading="lazy" alt="Arcana gameplay settings screen with card size, player following, AI action, timer, and background alert controls"></figure><div><h3>Settings that matter</h3><p>Adjust card size, UI layout, turn behavior, and game notifications to suit your play style.</p></div></article>
 </div>
-<div class="notice"><strong>Closed-test limitations:</strong> Build 112 is still under development. Human-vs-human play currently supports two players, only included premade decks are available, and some cards and rules interactions may need manual attention. AI opponent counts and feature availability can differ by game mode.</div>
+<div class="notice"><strong>Closed-test limitations:</strong> Build 138 includes an early two-to-four-seat multiplayer implementation, but Wi-Fi/internet host, guest, chat, reconnect, and private-hand behavior still require device acceptance. Some cards and rules interactions remain under development. The standalone Iron Spider, Lunar Whale, Ulalek, and Eldrazi Displacer debugging presets exist in debug builds only; they are <strong>not included in the Play release</strong>. Guided tutorial practice is included.</div>
 </section>
-<section class="wrap" id="testing"><div class="cta"><div><div class="eyebrow">Testers wanted</div><h2>Help build a better table.</h2><p>Join the Android closed-testing waitlist. Leave your email through our form and we'll contact you about access when an invitation is available.</p></div><div class="beta-signup-panel"><div class="actions"><a class="btn primary" href="https://docs.google.com/forms/d/e/1FAIpQLScdE0eya-TsaCtqfxZQi_QhWWn095wr1r4lRX49i-KEoDTA3A/viewform" target="_blank" rel="noopener noreferrer">Request beta access ↗</a></div><p class="beta-fine">Sign up securely using Google Forms. We’ll use your email for closed-test invitations and essential updates. Signing up does not automatically grant access. <a href="./privacy.html">Privacy policy</a>.</p></div></div>
+<section class="wrap" id="faq"><div class="section-title"><div class="eyebrow">Before you join</div><h2>What to expect in testing.</h2></div><div class="faq">
+<article><h3>Can I play without internet?</h3><p>Yes. Offline games against local AI run on your device.</p></article>
+<article><h3>Does Build 138 support four friends?</h3><p>The four-seat lobby and local/internet room paths are implemented as a testing preview, not a guarantee of finished cross-network reliability. Testers are helping verify real devices and reconnection.</p></article>
+<article><h3>Are deck importing and editing available?</h3><p>Both are enabled in the Build 138 candidate. Premade decks are still a quick way to get started; individual imported cards depend on current Argentum rules support.</p></article>
+<article><h3>Are the development test scenarios included?</h3><p>No. Dedicated debugging boards are excluded from the Play release. Interactive tutorial lessons and their practice exercises are included.</p></article>
+</div></section>
+<section class="wrap" id="testing"><div class="cta"><div><div class="eyebrow">Testers wanted</div><h2>Help build a better table.</h2><p>Join the Android closed-testing waitlist for upcoming Build 138 testing. Leave your email through our form; we will contact you if an invitation is available. Submitting the form does not install the app.</p></div><div class="beta-signup-panel"><div class="actions"><a class="btn primary" href="https://docs.google.com/forms/d/e/1FAIpQLScdE0eya-TsaCtqfxZQi_QhWWn095wr1r4lRX49i-KEoDTA3A/viewform" target="_blank" rel="noopener noreferrer">Request beta access ↗</a></div><p class="beta-fine">Sign up securely using Google Forms. We’ll use your email for closed-test invitations and essential updates. Signing up does not automatically grant access. <a href="./privacy.html">Privacy policy</a>.</p></div></div>
 <p class="bottom-links">Follow development in the <a href="https://github.com/AARMOU/arcana_table">GitHub repository</a>. Closed-test invitations are not automatic.</p></section>
 </main>
-<footer><div class="wrap footrow"><span>Arcana Table · Independent fan-made project.</span><span>Magic: The Gathering is owned by Wizards of the Coast. · <a href="./privacy.html">Privacy Policy</a></span></div></footer>
+<footer><div class="wrap footrow"><span>Arcana Table · Build 138 candidate · Independent fan-made project.</span><span>Magic: The Gathering is owned by Wizards of the Coast. · <a href="./privacy.html">Privacy Policy</a></span></div></footer>
 </body></html>

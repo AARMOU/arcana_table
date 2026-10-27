@@ -1,0 +1,28 @@
+name: Verify Arcana website changes
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "index.html"
+      - "closed-testing.html"
+      - "privacy.html"
+      - "assets/**"
+      - "README.md"
+      - "tools/verify_site.test.cjs"
+      - ".github/workflows/verify-site-pr.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-site:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out site source
+        uses: actions/checkout@v4
+      - name: Check page copy, paths and release limitations
+        run: node --test tools/verify_site.test.cjs
+      - name: Check dashboard regression
+        run: node --test control/dashboard.test.cjs
