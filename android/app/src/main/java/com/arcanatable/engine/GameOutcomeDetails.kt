@@ -21,6 +21,53 @@ import org.json.JSONObject
  * `winCondition` and `losers` describe what actually ended the game.
  */
 internal object GameOutcomeDetails {
+    /**
+     * Local, viewer-relative terminal notice when all human seats have been eliminated but
+     * Argentum has NOT finished the match. This is not a draw and it does not imply an AI won.
+     * Retain the viewer's own authoritative PlayerLostEvent, rather than blaming the last
+     * opponent spell or another seat's earlier elimination.
+     */
+    fun toHumanEliminatedMessage(
+        state: GameState,
+        viewer: EntityId,
+        nameFor: (EntityId) -> String,
+        events: List<GameEvent>,
+        cardExists: (String) -> Boolean = { false },
+    ): JSONObject {
+        val playerLoss = events.filterIsInstance<PlayerLostEvent>().lastOrNull { it.playerId == viewer }
+        val storedReason = state.getEntity(viewer)?.get<PlayerLostComponent>()?.reason?.name
+        val reason = playerLoss?.reason?.name ?: storedReason ?: "UNKNOWN"
+        val detail = playerLoss?.message?.takeIf(String::isNotBlank)
+        val sourceCard = detail?.substringBefore(':')?.takeIf {
+            it != detail && it.isNotBlank() && it.length <= 100 && cardExists(it)
+        }
+        val life = state.getEntity(viewer)?.get<LifeTotalComponent>()?.life
+        val stillPlaying = state.activePlayers.size
+        val description = buildString {
+            append("You were eliminated")
+            if (reason != "UNKNOWN") append(" (").append(reason.replace('_', ' ').lowercase()).append(")")
+            append(".")
+            if (detail != null) append(" ").append(detail)
+            if (stillPlaying > 0) {
+                append(" ").append(stillPlaying).append(" other player(s) were still active.")
+            }
+            append(" The local game stopped because no human-controlled seats remained; no winner was determined.")
+        }
+        return toMessage(state, viewer, nameFor, events, cardExists)
+            .put("reason", "YOU_LOST") // Existing client compatibility; not a completed match.
+            .put("winnerId", JSONObject.NULL)
+            .put("winnerName", JSONObject.NULL)
+            .put("engineReason", reason)
+            .put("winCondition", detail ?: JSONObject.NULL)
+            .put("sourceCard", sourceCard ?: JSONObject.NULL)
+            .put("matchUnfinished", true)
+            .put("eliminatedPlayerId", viewer.value)
+            .put("eliminatedPlayerName", nameFor(viewer))
+            .put("eliminationLife", life ?: JSONObject.NULL)
+            .put("activePlayersRemaining", stillPlaying)
+            .put("message", description)
+    }
+
     fun toMessage(
         state: GameState,
         viewer: EntityId,

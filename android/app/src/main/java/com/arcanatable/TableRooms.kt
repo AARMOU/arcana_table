@@ -273,7 +273,7 @@ internal fun TableController.applyOnlineSnapshot(source: String) {
         val oldTail = oldGameLog.lastOrNull()
         val additions = if (oldTail == null) emptyList() else state.gameLog.dropWhile { it != oldTail }.drop(1)
         additions.takeLast(4).filterNot { it.contains("${players.getOrNull(localSeat)?.name.orEmpty()} ") }.forEach { entry ->
-            postGameAlert(context, "Game play", entry.substringAfter("· ", entry))
+            postGameAlert(context, "Game activity", entry.substringAfter("· ", entry))
         }
     }
     chatMessages = state.chat.map { ChatMessage(it.author, it.text, it.timestamp) }
@@ -295,7 +295,7 @@ internal fun TableController.applyOnlineSnapshot(source: String) {
         pendingStackOpen = true
         if (backgroundAlertsEnabled && !appInForeground) {
             val title = if (priorityArrivedForLocalPlayer) "Your priority" else "Stack update"
-            val detail = if (priorityArrivedForLocalPlayer) "It is your turn to respond on the stack." else "A spell or ability was added to the stack."
+            val detail = if (priorityArrivedForLocalPlayer) "You have priority on the stack. Respond or pass." else "A spell or ability was added to the stack."
             postGameAlert(context, title, detail)
         }
         recordDiagnostic(if (priorityArrivedForLocalPlayer) "Stack priority arrived at local seat ${localSeat + 1}" else "Shared stack update received")

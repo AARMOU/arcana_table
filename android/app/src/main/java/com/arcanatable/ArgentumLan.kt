@@ -116,6 +116,24 @@ private class LanLink(private val socket: Socket, private val onMessage: (JSONOb
         return true
     }
 
+    fun sendAndClose(message: JSONObject) {
+        if (!open.get()) return
+        try {
+            writes.execute {
+                try {
+                    writer.write(message.toString())
+                    writer.write("\n")
+                    writer.flush()
+                } catch (_: Exception) {
+                } finally {
+                    close()
+                }
+            }
+        } catch (_: java.util.concurrent.RejectedExecutionException) {
+            close()
+        }
+    }
+
     fun close() {
         if (!open.getAndSet(false)) return
         runCatching { socket.close() }
@@ -232,4 +250,191 @@ class ArgentumLanGuest : ArgentumGuestLink {
     override fun send(message: JSONObject): Boolean = link?.send(message) == true
 
     override fun close() { link?.close(); link = null }
+}
+
+/**
+ * Four-player LAN transport, kept separate from the established one-guest server.
+ * Every socket is assigned one stable Argentum opponent seat. A socket's first
+ * lanHello must pass host-side deck validation before [admitGuest] permits game traffic.
+ * A private state update MUST use [sendTo], never a broadcast.
+ */
+class ArgentumLanMultiServer(
+    private val hostName: String,
+    guestSeats: List<com.wingedsheep.sdk.model.EntityId>,
+    private val onGuest: (com.wingedsheep.sdk.model.EntityId, JSONObject) -> Unit,
+    private val onGuestMessage: (com.wingedsheep.sdk.model.EntityId, JSONObject) -> Unit,
+    private val onGuestLeft: (com.wingedsheep.sdk.model.EntityId) -> Unit,
+) : ArgentumHostLink {
+    init {
+        val valid = setOf(
+            com.arcanatable.engine.LocalArgentumHost.AI_ID,
+            com.wingedsheep.sdk.model.EntityId("offline-ai-2"),
+            com.wingedsheep.sdk.model.EntityId("offline-ai-3"),
+        )
+        require(guestSeats.isNotEmpty() && guestSeats.size <= 3 &&
+            guestSeats.distinct().size == guestSeats.size && guestSeats.all { it in valid }) {
+            "A LAN host supports one to three distinct remote opponent seats."
+        }
+    }
+
+    private val running = AtomicBoolean(false)
+    private val guard = Any()
+    /** Seats that accept a phone; the host may change unconnected seats before START. */
+    private var guestSeats: List<com.wingedsheep.sdk.model.EntityId> = guestSeats.toList()
+    private val links = linkedMapOf<com.wingedsheep.sdk.model.EntityId, LanLink>()
+    private val greeted = mutableSetOf<com.wingedsheep.sdk.model.EntityId>()
+    private val admitted = mutableSetOf<com.wingedsheep.sdk.model.EntityId>()
+    @Volatile private var server: ServerSocket? = null
+    private val bound = CountDownLatch(1)
+    @Volatile var bindError: Throwable? = null
+        private set
+
+    fun awaitReady(timeoutMs: Long): Boolean =
+        bound.await(timeoutMs, TimeUnit.MILLISECONDS) && bindError == null && server != null
+
+    val openSeats: Int get() = synchronized(guard) { guestSeats.size - links.size }
+
+    fun start() {
+        if (running.getAndSet(true)) return
+        Thread({
+            try {
+                val listener = try {
+                    ServerSocket().apply {
+                        reuseAddress = true
+                        bind(InetSocketAddress(ArgentumLan.GAME_PORT))
+                    }.also { server = it }
+                } catch (error: Exception) {
+                    bindError = error
+                    throw error
+                } finally {
+                    bound.countDown()
+                }
+                while (running.get()) {
+                    val socket = listener.accept()
+                    val seat = synchronized(guard) { guestSeats.firstOrNull { it !in links } }
+                    if (seat == null) {
+                        // Send a visible full-table error, then close only this extra phone.
+                        runCatching {
+                            socket.getOutputStream().bufferedWriter(Charsets.UTF_8).apply {
+                                write(JSONObject().put("type", "error").put("code", "WIFI")
+                                    .put("message", "This table is full.").toString())
+                                newLine()
+                                flush()
+                            }
+                        }
+                        runCatching { socket.close() }
+                        continue
+                    }
+                    socket.keepAlive = true
+                    socket.tcpNoDelay = true
+                    // Dead sockets cannot indefinitely reserve scarce lobby seats.
+                    socket.soTimeout = 15_000
+                    lateinit var link: LanLink
+                    link = LanLink(socket, onMessage = { message ->
+                        val isCurrent = synchronized(guard) { links[seat] === link }
+                        if (isCurrent) {
+                            if (message.optString("type") == "lanHello") {
+                                val fresh = synchronized(guard) { greeted.add(seat) }
+                                if (fresh) {
+                                    socket.soTimeout = 0
+                                    onGuest(seat, message)
+                                }
+                            } else if (synchronized(guard) { seat in admitted }) {
+                                onGuestMessage(seat, message)
+                            }
+                        }
+                    }, onClosed = {
+                        val departed = synchronized(guard) {
+                            if (links[seat] === link) {
+                                links.remove(seat)
+                                greeted.remove(seat)
+                                admitted.remove(seat)
+                            } else false
+                        }
+                        if (departed && running.get()) onGuestLeft(seat)
+                    })
+                    synchronized(guard) { links[seat] = link }
+                    link.start()
+                }
+            } catch (_: Exception) {
+                // awaitReady exposes a bind error. Closing the host exits accept().
+            }
+        }, "argentum-lan-multi-accept").apply { isDaemon = true }.start()
+        Thread({
+            runCatching {
+                DatagramSocket().use { announcements ->
+                    announcements.broadcast = true
+                    while (running.get()) {
+                        val vacant = openSeats
+                        if (vacant > 0) {
+                            // Optional fourth discovery field; legacy clients ignore it.
+                            val bytes = (ArgentumLan.announcement(hostName) + "|$vacant").toByteArray()
+                            runCatching {
+                                announcements.send(DatagramPacket(bytes, bytes.size,
+                                    InetAddress.getByName("255.255.255.255"), ArgentumLan.DISCOVERY_PORT))
+                            }
+                        }
+                        Thread.sleep(1_000)
+                    }
+                }
+            }
+        }, "argentum-lan-multi-announce").apply { isDaemon = true }.start()
+    }
+
+    /**
+     * Host only, before START: replace the seats that accept a phone. Refused (false) if a seat
+     * with a connected or connecting phone would stop accepting one.
+     */
+    fun updateGuestSeats(seats: List<com.wingedsheep.sdk.model.EntityId>): Boolean = synchronized(guard) {
+        val valid = setOf(
+            com.arcanatable.engine.LocalArgentumHost.AI_ID,
+            com.wingedsheep.sdk.model.EntityId("offline-ai-2"),
+            com.wingedsheep.sdk.model.EntityId("offline-ai-3"),
+        )
+        if (seats.size > 3 || seats.distinct().size != seats.size || seats.any { it !in valid } ||
+            links.keys.any { it !in seats }) return@synchronized false
+        guestSeats = seats.toList()
+        true
+    }
+
+    /** Validated hello only. Guest messages sent before this are silently ignored. */
+    fun admitGuest(seat: com.wingedsheep.sdk.model.EntityId): Boolean = synchronized(guard) {
+        if (seat !in greeted || seat !in links) false
+        else { admitted.add(seat); true }
+    }
+
+    fun rejectGuest(seat: com.wingedsheep.sdk.model.EntityId, reason: String) {
+        val target = synchronized(guard) { links[seat] }
+        target?.sendAndClose(JSONObject().put("type", "error").put("code", "WIFI")
+            .put("message", reason.take(200)))
+    }
+
+    fun sendTo(seat: com.wingedsheep.sdk.model.EntityId, message: JSONObject): Boolean {
+        val target = synchronized(guard) { links[seat]?.takeIf { seat in admitted } }
+        return target?.send(message) == true
+    }
+
+    /** Room rosters contain no hands/decklists. Private engine state must use sendTo. */
+    fun broadcastLobby(message: JSONObject): Boolean {
+        if (message.optString("type") != "lanLobby") return false
+        val targets = synchronized(guard) { admitted.mapNotNull(links::get) }
+        return targets.all { it.send(message) }
+    }
+
+    /** Never guess a recipient for a masked engine view. */
+    override fun send(message: JSONObject): Boolean = false
+
+    override fun close() {
+        running.set(false)
+        val closing = synchronized(guard) {
+            links.values.toList().also {
+                links.clear()
+                greeted.clear()
+                admitted.clear()
+            }
+        }
+        closing.forEach(LanLink::close)
+        runCatching { server?.close() }
+        server = null
+    }
 }

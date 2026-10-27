@@ -2,6 +2,7 @@ package com.arcanatable.engine
 
 import com.arcanatable.engine.costs.CounterRemovalCost
 import com.wingedsheep.ai.engine.AIPlayer
+import com.arcanatable.engine.ai.AiDifficulty
 import com.arcanatable.engine.ai.OfflineAiPolicy
 import com.arcanatable.OfflineCheckpointStore
 import com.arcanatable.engine.priority.OfflineHumanAutoPass
@@ -66,7 +67,13 @@ import java.util.concurrent.Executors
 
 
 /** One seat of an offline game: who sits there and what they play. */
-data class LocalSeat(val name: String, val deck: List<String>, val commander: String?)
+/** One seat. [difficulty] only matters when the AI plays the seat. */
+data class LocalSeat(
+    val name: String,
+    val deck: List<String>,
+    val commander: String?,
+    val difficulty: AiDifficulty = AiDifficulty.DEFAULT,
+)
 
 /**
  * Offline Argentum: the real rules engine and AI, run inside Arcana behind the same `/game`
@@ -83,12 +90,12 @@ data class LocalSeat(val name: String, val deck: List<String>, val commander: St
  * every AI action and every step change, [paceMs] apart, so the AI's turn plays out on the table
  * instead of jumping straight to your next decision.
  *
- * Wi-Fi play: after [setGuest], the second seat is a person on another phone instead of the AI.
- * Their messages come in through `receive(message, GUEST_ID)` and their own view goes out through
- * the guest's emit. Everything else works the same for both seats.
+ * Wi-Fi play: [setGuest] turns any existing opponent seat into a remote person; each guest
+ * receives a separately masked Argentum view and sends messages with its stable seat ID.
+ * The historical two-argument overload still registers the second seat for 1v1 callers.
  *
- * Up to four players: [extraOpponents] sit in seats 3 and 4, always played by the AI (Argentum's
- * engine runs Free-for-All). Each AI seat gets its own AIPlayer.
+ * Up to four players: [extraOpponents] predeclare seats 3 and 4. Unclaimed seats use AI;
+ * a lobby can register remote people for these seats before starting the engine.
  */
 class LocalArgentumHost(
     private val registry: CardRegistry,
@@ -99,6 +106,7 @@ class LocalArgentumHost(
     private val resumeCheckpoint: String? = null,
     /** Optional reproducible shuffle for scenario tests; normal games keep the engine's randomness. */
     private val gameSeed: Long? = null,
+    private val tutorialPassiveOpponent: Boolean = false,
     private val emit: (JSONObject) -> Unit,
 ) {
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(null, r, "argentum-local", 256L shl 20) }
@@ -125,8 +133,14 @@ class LocalArgentumHost(
     private val allSeats: List<EntityId> get() = listOf(humanId, aiId) + extraSeats.map { it.first }
     // One AI per computer seat (the second seat has none while a Wi-Fi guest sits there).
     private var ais: Map<EntityId, AIPlayer> = emptyMap()
-    // Wi-Fi: where the guest's messages go. Null = the second seat is the AI.
-    @Volatile private var guestEmit: ((JSONObject) -> Unit)? = null
+    // Only the serialized engine worker mutates either map. Each remote seat has its own
+    // private outgoing channel, never a shared guest broadcast of masked game state.
+    private val guestEmits = mutableMapOf<EntityId, (JSONObject) -> Unit>()
+    private val guestSeatOverrides = mutableMapOf<EntityId, LocalSeat>()
+    private val guestQuietOpponentTurns = mutableMapOf<EntityId, Boolean>()
+    // Sticky for a live network match: disconnecting the last guest must not turn
+    // it into a saveable offline-AI game by accident. Readable outside the worker.
+    @Volatile private var networkSession = false
     private val gameLogs = mutableMapOf<EntityId, MutableList<ClientEvent>>()
     // Final engine result events must survive empty-event resyncs and terminal follow-up messages.
     private var lastGameOutcomeEvents: List<GameEvent> = emptyList()
@@ -180,14 +194,24 @@ class LocalArgentumHost(
      */
     var quietOpponentTurns: Boolean = false
 
-    val isWifi: Boolean get() = guestEmit != null
+    private val ownStackResponders = mutableSetOf<EntityId>()
+    /** Opt-in, per-human-seat priority stops; never applied to the AI. */
+    var respondToOwnStack: Boolean
+        get() = humanId in ownStackResponders
+        set(enabled) { if (enabled) ownStackResponders.add(humanId) else ownStackResponders.remove(humanId) }
 
-    private fun people(): List<EntityId> = if (guestEmit != null) listOf(humanId, aiId) else listOf(humanId)
-    private fun isPerson(id: EntityId?): Boolean = id == humanId || (id == aiId && guestEmit != null)
-    private fun other(id: EntityId): EntityId = if (id == humanId) aiId else humanId
-    private fun seatOf(id: EntityId): LocalSeat = when (id) { humanId -> human; aiId -> opponent; else -> extraSeats.firstOrNull { it.first == id }?.second ?: opponent }
+    val isWifi: Boolean get() = networkSession
+
+    private fun people(): List<EntityId> = listOf(humanId) + allSeats.drop(1).filter(guestEmits::containsKey)
+    private fun isPerson(id: EntityId?): Boolean = id == humanId || (id != null && guestEmits.containsKey(id))
+    private fun seatOf(id: EntityId): LocalSeat = when (id) {
+        humanId -> human
+        aiId -> opponent
+        else -> guestSeatOverrides[id] ?: extraSeats.firstOrNull { it.first == id }?.second
+            ?: error("Unrecognized seat: $id")
+    }
     private fun emitTo(seat: EntityId, message: JSONObject) {
-        if (seat == humanId) emit(message) else guestEmit?.invoke(message)
+        if (seat == humanId) emit(message) else guestEmits[seat]?.invoke(message)
     }
     private fun logFor(seat: EntityId) = gameLogs.getOrPut(seat) { mutableListOf() }
 
@@ -200,11 +224,18 @@ class LocalArgentumHost(
         }
     }
 
-    /** Wi-Fi: the second seat becomes this person, whose messages go out through [guest]. Call before the game starts. */
-    fun setGuest(seat: LocalSeat, guest: (JSONObject) -> Unit) = worker.execute {
-        opponent = seat
-        guestEmit = guest
-        guest(JSONObject().put("type", "connected").put("playerId", AI_ID.value).put("token", "offline"))
+    /** Compatibility entry point: a legacy Wi-Fi guest occupies seat two. */
+    fun setGuest(seat: LocalSeat, guest: (JSONObject) -> Unit) = setGuest(AI_ID, seat, guest)
+
+    /** Bind a person to any predeclared opponent seat before the game begins. */
+    fun setGuest(seatId: EntityId, seat: LocalSeat, guest: (JSONObject) -> Unit) = worker.execute {
+        require(state == null) { "Remote seats must join before the game starts." }
+        require(seatId != humanId && seatId in allSeats) { "Unknown or host-only remote seat: $seatId" }
+        if (seatId == aiId) opponent = seat
+        else guestSeatOverrides[seatId] = seat
+        guestEmits[seatId] = guest
+        networkSession = true
+        guest(JSONObject().put("type", "connected").put("playerId", seatId.value).put("token", "offline"))
     }
 
     fun shutdown() { worker.shutdownNow() }
@@ -227,13 +258,42 @@ class LocalArgentumHost(
                 mulliganAction(BottomCards(from, (0 until ids.length()).map { EntityId(ids.getString(it)) }))
             }
             "concede" -> concede(from)
-            "guestLeft" -> if (isWifi && state?.gameOver == false) {
-                emit(JSONObject().put("type", "error").put("code", "WIFI").put("message", "Your friend left the game."))
-                concede(aiId)
+            "guestLeft" -> if (isWifi && state?.gameOver != true) {
+                // Network transport (host) may name a seat; remote people may only
+                // leave their own seat. Old 1v1 callers omit seatId and mean seat two.
+                val departed = if (from == humanId) {
+                    message.optString("seatId").takeIf(String::isNotBlank)?.let(::EntityId) ?: aiId
+                } else from
+                if (departed in guestEmits) {
+                    // 1v1 keeps its old meaning (your friend left, you win). With three or
+                    // more seats, conceding would end or stall everyone else's game, so the
+                    // AI keeps playing the departed person's seat instead.
+                    if (allSeats.size > 2 && !message.optBoolean("concede")) handOverToAi(departed)
+                    else if (state != null) {
+                        guestEmits.remove(departed)
+                        guestQuietOpponentTurns.remove(departed)
+                        emit(JSONObject().put("type", "error").put("code", "WIFI")
+                            .put("message", "${seatOf(departed).name} left the game."))
+                        concede(departed)
+                    }
+                }
             }
             "requestUndo" -> undo(from)
-            "setQuietOpponentTurns" -> if (from == humanId) quietOpponentTurns = message.optBoolean("enabled")
-            "arcanaNudge" -> if (isWifi) emitTo(other(from), JSONObject().put("type", "arcanaNudge"))
+            "setRespondToOwnStack" -> {
+                if (message.optBoolean("enabled")) ownStackResponders.add(from) else ownStackResponders.remove(from)
+            }
+            "setQuietOpponentTurns" -> {
+                val enabled = message.optBoolean("enabled")
+                if (from == humanId) quietOpponentTurns = enabled
+                else guestQuietOpponentTurns[from] = enabled
+            }
+            "arcanaNudge" -> if (isWifi) {
+                val target = state?.let { current ->
+                    current.pendingDecision?.let { current.actorFor(it.playerId) } ?: current.priorityPlayerId
+                }
+                if (target != null && target != from && isPerson(target))
+                    emitTo(target, JSONObject().put("type", "arcanaNudge"))
+            }
             "ping" -> emitTo(from, JSONObject().put("type", "pong"))
             else -> Unit // lobby, deck and preference messages need no answer offline
         }
@@ -248,6 +308,34 @@ class LocalArgentumHost(
         if (mulliganDone(seat)) return
         val mull = mulliganState(seat)
         if (mull != null && mull.hasKept) sendBottomCards(seat, mull.cardsToBottom) else sendMulliganDecision(seat)
+    }
+
+    /**
+     * A remote person dropped out of a 3–4 seat game. Their seat keeps its deck and becomes an
+     * AI seat, so the remaining players are never left waiting on someone who isn't there.
+     * Before the game starts, removing the guest is enough: startGame gives every non-person
+     * seat its own AI.
+     */
+    private fun handOverToAi(seat: EntityId) {
+        guestEmits.remove(seat)
+        guestQuietOpponentTurns.remove(seat)
+        interactiveEpochs.remove(seat)
+        val notice = "${seatOf(seat).name} left. The AI is playing their seat now."
+        for (person in people()) emitTo(person, JSONObject().put("type", "error").put("code", "WIFI").put("message", notice))
+        val current = state ?: return
+        if (current.gameOver || seat !in current.activePlayers) return
+        ais = ais + (seat to OfflineAiPolicy.create(registry, seat))
+        if (mulliganPhase) {
+            aiMulligans(seat)
+            if (people().all(::mulliganDone)) finishMulligans()
+            return
+        }
+        // A pay-life question the departed person never answered: the land stays tapped.
+        shockOffers.removeAll { it.player == seat }
+        // If the game was waiting on them, the new AI acts now; otherwise this returns at once.
+        val events = mutableListOf<GameEvent>()
+        drive(events)
+        sendState(events)
     }
 
     private fun concede(seat: EntityId) {
@@ -312,6 +400,7 @@ class LocalArgentumHost(
             .put("version", version)
             .put("mulliganPhase", mulliganPhase)
             .put("quietOpponentTurns", quietOpponentTurns)
+            .put("respondToOwnStack", respondToOwnStack)
             .put("peopleOutSent", peopleOutSent)
             .put("gameLogs", JSONObject().also { logs ->
                 gameLogs.forEach { (seat, events) ->
@@ -364,6 +453,7 @@ class LocalArgentumHost(
         version = record.getLong("version")
         mulliganPhase = record.getBoolean("mulliganPhase")
         quietOpponentTurns = record.optBoolean("quietOpponentTurns")
+        respondToOwnStack = record.optBoolean("respondToOwnStack")
         peopleOutSent = record.optBoolean("peopleOutSent")
         undoCheckpoint = decodeUndo("undoCheckpoint")
         preCombatCheckpoint = decodeUndo("preCombatCheckpoint")
@@ -372,7 +462,7 @@ class LocalArgentumHost(
         interactiveEpochs.clear()
         lastGameOutcomeEvents = emptyList()
         observedLossEvents.clear()
-        ais = allSeats.filterNot(::isPerson).associateWith { OfflineAiPolicy.create(registry, it) }
+        ais = allSeats.filterNot(::isPerson).associateWith { OfflineAiPolicy.create(registry, it, seatOf(it).difficulty) }
         for (seat in people()) {
             emitTo(seat, JSONObject().put("type", "quickGameLobbyState").put("lobbyId", "offline")
                 .put("youPlayerId", seat.value).put("vsAi", true)
@@ -395,7 +485,7 @@ class LocalArgentumHost(
             seed = gameSeed,
         )
         val result = initializer.initializeGame(config)
-        ais = allSeats.filterNot(::isPerson).associateWith { OfflineAiPolicy.create(registry, it) }
+        ais = allSeats.filterNot(::isPerson).associateWith { OfflineAiPolicy.create(registry, it, seatOf(it).difficulty) }
         state = result.state
         gameLogs.clear()
         logSnapshots.clear()
@@ -601,7 +691,9 @@ class LocalArgentumHost(
      * AI does something or the game moves to a new step, the table gets that state ([flush]), so
      * the AI's turn and your auto-passed combat steps play out instead of being skipped.
      */
-    private fun drive(events: MutableList<GameEvent>) = OfflineAiPolicy.withThinkingBurst {
+    private fun drive(events: MutableList<GameEvent>) = OfflineAiPolicy.withThinkingBurst(
+        OfflineAiPolicy.burstMillisFor(ais.keys.map { seatOf(it).difficulty })
+    ) {
         driveBurst(events)
     }
 
@@ -621,7 +713,7 @@ class LocalArgentumHost(
             val current = state ?: return
             if (current.gameOver || shockOffers.isNotEmpty()) break
             // Everyone at this phone (and the Wi-Fi guest) is out: stop instead of watching the AIs finish.
-            if (people().none { it in current.activePlayers }) { peopleOut(); break }
+            if (people().none { it in current.activePlayers }) { peopleOut(events.toList()); events.clear(); break }
             if ((current.turnNumber to current.step) != lastShown) flush(paceMs / 3)
             else if (System.nanoTime() - lastProgressNanos >= 1_000_000_000L) flush(0)
             val decision = current.pendingDecision
@@ -629,8 +721,13 @@ class LocalArgentumHost(
                 val actor = current.actorFor(decision.playerId)
                 if (isPerson(actor)) break
                 val bot = ais[actor] ?: break
-                val response = timed("aiDecision") { OfflineAiPolicy.think { bot.respondToDecision(current, decision) } }
-                if (!apply(SubmitDecision(decision.playerId, response), events, actor)) break
+                val response = timed("aiDecision") { aiGuarded("aiDecisionErrors") { OfflineAiPolicy.think { bot.respondToDecision(current, decision) } } }
+                    ?: retryDecisionWithNormal(actor, current, decision)
+                    ?: break
+                if (!apply(SubmitDecision(decision.playerId, response), events, actor)) {
+                    countDiagnostic("aiRejectedDecisions")
+                    break
+                }
                 flush(paceMs)
                 continue
             }
@@ -638,15 +735,27 @@ class LocalArgentumHost(
             if (!isPerson(priority)) {
                 val bot = ais[priority] ?: break
                 val startedChoice = System.nanoTime()
-                val chosen = timed("aiChoice") { OfflineAiPolicy.think { bot.chooseAction(current) } }
+                val chosen = if (tutorialPassiveOpponent) safePass(current, priority)
+                    else (timed("aiChoice") { aiGuarded("aiChoiceErrors") { OfflineAiPolicy.think {
+                    OfflineAiPolicy.chooseAction(bot, seatOf(priority).difficulty, current) {
+                        enumerator.enumerate(current, priority, com.wingedsheep.engine.legalactions.EnumerationMode.FULL)
+                    }
+                } } }
+                    ?: safePass(current, priority))
                 val choiceType = if (chosen is PassPriority) "aiChoicePass" else "aiChoiceAction"
                 phaseNanos[choiceType] = (phaseNanos[choiceType] ?: 0L) + System.nanoTime() - startedChoice
                 countDiagnostic(if (chosen is PassPriority) "aiPassChoices" else "aiActionChoices")
-                val acted = apply(chosen, events, priority) || apply(safePass(current, priority), events, priority)
+                val acted = apply(chosen, events, priority) ||
+                    retryRejectedAiChoice(bot, current, priority, chosen, events) ||
+                    apply(safePass(current, priority), events, priority)
                 if (!acted) break
                 if (chosen !is PassPriority) flush(paceMs)
                 continue
             }
+            // Practice must expose the real priority window after casting. Ordinary own-stack
+            // auto-pass would otherwise resolve the lesson's spell before the learner can
+            // inspect it or explicitly pass. The engine still validates every submitted action.
+            if (tutorialPassiveOpponent && current.stack.isNotEmpty()) break
             // Human auto-pass needs only engine PriorityActions, not the FULL/enriched UI menu.
             // Interactive state updates still build and send the original complete legal-action DTO.
             val shouldPass = OfflineHumanAutoPass.shouldPass(
@@ -658,12 +767,45 @@ class LocalArgentumHost(
                         enumerator.enumerate(current, priority, com.wingedsheep.engine.legalactions.EnumerationMode.ACTIONS_ONLY)
                     }
                 },
-                quietOpponentTurn = priority == humanId && quietOpponentTurns,
+                quietOpponentTurn = if (priority == humanId) quietOpponentTurns else guestQuietOpponentTurns[priority] == true,
                 stackTargetsPlayer = { stackTargetsYou(current, priority) },
+                ownStackStops = if (priority in ownStackResponders) com.wingedsheep.engine.legalactions.OwnStackStop.entries.toSet() else emptySet(),
             )
             if (!shouldPass) break
             if (!apply(safePass(current, priority), events, priority)) break
         }
+    }
+
+    /**
+     * Runs one AI call; an exception inside the AI's own search (for example a crash while it
+     * simulates combat) is counted and returns null, so the game falls back instead of stopping.
+     */
+    private inline fun <T : Any> aiGuarded(counter: String, work: () -> T): T? = try {
+        work()
+    } catch (error: StackOverflowError) {
+        countDiagnostic(counter); null
+    } catch (error: RuntimeException) {
+        countDiagnostic(counter); null
+    }
+
+    /** A pending decision the chosen AI couldn't answer: ask a Normal-level AI for the seat once. */
+    private fun retryDecisionWithNormal(actor: EntityId, state: GameState, decision: PendingDecision) =
+        if (seatOf(actor).difficulty == AiDifficulty.NORMAL) null
+        else aiGuarded("aiDecisionErrors") { OfflineAiPolicy.think { OfflineAiPolicy.create(registry, actor).respondToDecision(state, decision) } }
+
+    /**
+     * The engine turned down the AI's choice. Instead of passing straight away, let the same AI pick
+     * again from the legal actions without the rejected one (once), so it still makes a real play.
+     */
+    private fun retryRejectedAiChoice(bot: AIPlayer, state: GameState, player: EntityId, rejected: GameAction, events: MutableList<GameEvent>): Boolean {
+        if (rejected is PassPriority) return false
+        countDiagnostic("aiRejectedActions")
+        val legal = runCatching { enumerator.enumerate(state, player, com.wingedsheep.engine.legalactions.EnumerationMode.FULL) }.getOrNull() ?: return false
+        val others = legal.filter { it.action != rejected }
+        if (others.isEmpty()) return false
+        val retry = aiGuarded("aiChoiceErrors") { OfflineAiPolicy.think { bot.chooseFrom(state, others) } } ?: return false
+        if (retry.action is PassPriority) return false
+        return apply(retry.action, events, player).also { if (it) countDiagnostic("aiRejectedRecovered") }
     }
 
     private fun safePass(state: GameState, player: EntityId): GameAction = when {
@@ -816,12 +958,22 @@ class LocalArgentumHost(
 
     private var peopleOutSent = false
 
-    /** Every person has lost while AIs play on: the game is over for them. */
-    private fun peopleOut() {
+    /**
+     * Every human-controlled seat has been eliminated. Stop the local engine for these viewers,
+     * but do not fabricate a completed game or discard the authoritative elimination events.
+     */
+    private fun peopleOut(pendingEvents: List<GameEvent> = emptyList()) {
         if (peopleOutSent) return
+        // This captures the final PlayerLostEvent before any state snapshot clears a burst.
+        sendState(pendingEvents, interactive = false)
+        val current = state ?: return
         peopleOutSent = true
-        sendState(emptyList(), interactive = false)
-        people().forEach { emitTo(it, JSONObject().put("type", "gameOver").put("winnerId", JSONObject.NULL).put("reason", "YOU_LOST")) }
+        val evidence = observedLossEvents.toList()
+        people().forEach { seat ->
+            emitTo(seat, GameOutcomeDetails.toHumanEliminatedMessage(
+                current, seat, { seatOf(it).name }, evidence,
+            ) { registry.getCard(it) != null })
+        }
     }
 
     private fun finishIfOver(events: List<GameEvent>) {
@@ -835,6 +987,9 @@ class LocalArgentumHost(
 
     /** Sends every person their own view of the game. */
     private fun sendState(events: List<GameEvent>, interactive: Boolean = true) {
+        // Never overwrite a terminal human-elimination notice with a later non-terminal progress
+        // snapshot from the still-alive AI-only state.
+        if (peopleOutSent) return
         // Retain elimination events across the host's intermediate AI/progress flushes. A
         // PlayerLostEvent and the final GameEndedEvent need not be delivered in one update.
         observedLossEvents += events.filterIsInstance<com.wingedsheep.engine.core.PlayerLostEvent>()

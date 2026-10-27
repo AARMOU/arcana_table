@@ -3,6 +3,7 @@ package com.arcanatable
 import com.arcanatable.engine.OfflineCardLibrary
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
+import org.junit.Assert.assertFalse
 import org.junit.Test
 
 /**
@@ -11,6 +12,15 @@ import org.junit.Test
  * home screen's test-scenario card has nothing to show.
  */
 class ReleaseHasNoTestScenariosTest {
+    @Test fun releaseTestCandidateKeepsApprovedDecksAndMultiplayerEnabled() {
+        org.junit.Assert.assertTrue(ReleaseFeatures.deckImportEnabled)
+        org.junit.Assert.assertTrue(ReleaseFeatures.multiplayerPreviewEnabled)
+        org.junit.Assert.assertTrue(DeckBuilderFlag.enabled)
+        assertEquals(3, ReleaseFeatures.aiCount(3))
+        val saved = DeckChoice("saved", "An imported deck", null, false)
+        assertEquals(listOf(saved), ReleaseFeatures.availableDecks(listOf(saved)))
+    }
+
     @Test fun releaseHasNoScenarios() {
         assertEquals(emptyList<TestScenario>(), TestScenarios.available)
     }

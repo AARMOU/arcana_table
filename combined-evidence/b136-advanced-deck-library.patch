@@ -1,0 +1,2229 @@
+diff --git a/android/app/src/main/java/com/arcanatable/CardFilters.kt b/android/app/src/main/java/com/arcanatable/CardFilters.kt
+new file mode 100644
+index 0000000..afb5e2b
+--- /dev/null
++++ b/android/app/src/main/java/com/arcanatable/CardFilters.kt
+@@ -0,0 +1,298 @@
++package com.arcanatable
++
++import java.util.Locale
++
++/**
++ * Structured card filters for the deck builder's FILTERS panel. They sit on top of the typed
++ * search box ([CardQuery]) and run over the same offline [CardLibrary], so every result is a card
++ * this build of Arcana can play. Pure Kotlin: no Android types, so it is unit-testable.
++ *
++ * Price, artist and finish filters are deliberately absent: the offline library ships one printing
++ * per card and no market data, so those filters could only ever be guesses.
++ */
++enum class ColorMatch(val label: String) {
++    INCLUDING("Including these"),
++    EXACTLY("Exactly these"),
++    AT_MOST("At most these"),
++}
++
++enum class StatField(val label: String) { MANA_VALUE("Mana value"), POWER("Power"), TOUGHNESS("Toughness") }
++
++enum class StatOp(val symbol: String) { EQ("="), LT("<"), LTE("≤"), GT(">"), GTE("≥"), BETWEEN("from") }
++
++/** One stat condition, e.g. mana value ≤ 3, or power from 2 to 4 (inclusive). */
++data class StatRange(val stat: StatField, val op: StatOp, val value: Double, val upTo: Double? = null) {
++    fun test(actual: Double): Boolean = when (op) {
++        StatOp.EQ -> actual == value
++        StatOp.LT -> actual < value
++        StatOp.LTE -> actual <= value
++        StatOp.GT -> actual > value
++        StatOp.GTE -> actual >= value
++        StatOp.BETWEEN -> actual >= value && actual <= (upTo ?: Double.MAX_VALUE)
++    }
++
++    val label: String
++        get() = when (op) {
++            StatOp.BETWEEN -> "${stat.label} ${fmtNumber(value)}–${upTo?.let(::fmtNumber) ?: "∞"}"
++            else -> "${stat.label} ${op.symbol} ${fmtNumber(value)}"
++        }
++}
++
++enum class CardSort(val label: String) {
++    NAME("Name"), MANA_VALUE("Mana value"), COLOR("Color"), TYPE("Type"), RARITY("Rarity"), SET("Set"), POWER("Power"),
++}
++
++data class CardFilters(
++    /** Every term must appear in the rules text. */
++    val oracleTerms: List<String> = emptyList(),
++    /** Every term must appear in the type line ("Legendary", "Creature", "Angel"). */
++    val typeTerms: List<String> = emptyList(),
++    /** Each cost must be contained in the card's mana cost: "2{G}{W}" or "2GW". */
++    val manaCosts: List<String> = emptyList(),
++    val colors: Set<Char> = emptySet(),
++    /** Colorless only; ignores [colors]. */
++    val colorless: Boolean = false,
++    val colorMatch: ColorMatch = ColorMatch.INCLUDING,
++    /** Compare against color identity (Commander) instead of the colors in the mana cost. */
++    val useIdentity: Boolean = false,
++    /** Number of colors, inclusive. 0..5 means any. */
++    val minColors: Int = 0,
++    val maxColors: Int = 5,
++    /** Set codes of the shipped printing. */
++    val sets: List<String> = emptyList(),
++    /** True: exclude [sets] instead of requiring one of them. */
++    val excludeSets: Boolean = false,
++    /** COMMON / UNCOMMON / RARE / MYTHIC; empty means any. */
++    val rarities: Set<String> = emptySet(),
++    val keywords: List<String> = emptyList(),
++    val stats: List<StatRange> = emptyList(),
++    /** Hide cards marked not legal in Commander. Cards with no legality data (custom cards) stay. */
++    val commanderLegalOnly: Boolean = true,
++    val sort: CardSort = CardSort.NAME,
++    val descending: Boolean = false,
++) {
++    /** How many filter groups are on, for the FILTERS badge. Sort and the legality default don't count. */
++    val activeCount: Int get() = listOf(
++        oracleTerms.isNotEmpty(), typeTerms.isNotEmpty(), manaCosts.isNotEmpty(),
++        colorless || colors.isNotEmpty(), minColors > 0 || maxColors < 5, sets.isNotEmpty(),
++        rarities.isNotEmpty(), keywords.isNotEmpty(), stats.isNotEmpty(), !commanderLegalOnly,
++    ).count { it }
++
++    /** Same filters, default sort, legality on: what "Clear all" resets to. */
++    fun cleared(): CardFilters = CardFilters(sort = sort, descending = descending)
++
++    private val manaNeeds: List<ManaCost> by lazy(LazyThreadSafetyMode.NONE) { manaCosts.mapNotNull(ManaCost::parse) }
++    private val lowOracle by lazy(LazyThreadSafetyMode.NONE) { oracleTerms.map { it.lowercase(Locale.ROOT) } }
++    private val lowTypes by lazy(LazyThreadSafetyMode.NONE) { typeTerms.map { it.lowercase(Locale.ROOT) } }
++    private val lowKeywords by lazy(LazyThreadSafetyMode.NONE) { keywords.map { it.lowercase(Locale.ROOT) } }
++    private val upperSets by lazy(LazyThreadSafetyMode.NONE) { sets.map { it.uppercase(Locale.ROOT) }.toSet() }
++
++    fun matches(c: CardLibrary.Indexed): Boolean {
++        if (commanderLegalOnly && c.card.commanderLegal == false) return false
++        if (lowOracle.any { it !in c.oracle }) return false
++        if (lowTypes.any { it !in c.type }) return false
++        if (lowKeywords.any { k -> c.keywords.none { it == k } && c.oracle.lineSequence().none { it.trim().startsWith(k) } }) return false
++        val have = if (useIdentity) c.identity else c.cardColors
++        if (colorless) { if (have.isNotEmpty()) return false }
++        else if (colors.isNotEmpty()) {
++            val ok = when (colorMatch) {
++                ColorMatch.EXACTLY -> have == colors
++                ColorMatch.INCLUDING -> have.containsAll(colors)
++                ColorMatch.AT_MOST -> colors.containsAll(have)
++            }
++            if (!ok) return false
++        }
++        if (have.size < minColors || have.size > maxColors) return false
++        if (upperSets.isNotEmpty()) {
++            val inSets = c.card.setCode?.uppercase(Locale.ROOT) in upperSets
++            if (inSets == excludeSets) return false
++        }
++        if (rarities.isNotEmpty() && (c.card.rarity ?: "COMMON") !in rarities) return false
++        for (s in stats) {
++            val actual = when (s.stat) {
++                StatField.MANA_VALUE -> c.mv
++                StatField.POWER -> c.card.power?.toDoubleOrNull() ?: return false
++                StatField.TOUGHNESS -> c.card.toughness?.toDoubleOrNull() ?: return false
++            }
++            if (!s.test(actual)) return false
++        }
++        if (manaNeeds.isNotEmpty()) {
++            val cost = ManaCost.parse(c.card.manaCost.substringBefore(" // ")) ?: return false
++            if (manaNeeds.any { !cost.contains(it) }) return false
++        }
++        return true
++    }
++
++    fun comparator(): Comparator<CardLibrary.Indexed> {
++        val byName = compareBy<CardLibrary.Indexed> { it.name }
++        val key: Comparator<CardLibrary.Indexed> = when (sort) {
++            CardSort.NAME -> byName
++            CardSort.MANA_VALUE -> compareBy<CardLibrary.Indexed> { it.mv }.then(byName)
++            CardSort.COLOR -> compareBy<CardLibrary.Indexed> { colorRank(it.cardColors) }.then(byName)
++            CardSort.TYPE -> compareBy<CardLibrary.Indexed> { DECK_GROUP_ORDER.indexOf(deckGroupFor(it.card)) }.thenBy { it.mv }.then(byName)
++            CardSort.RARITY -> compareBy<CardLibrary.Indexed> { rarityRank(it.card.rarity) }.then(byName)
++            CardSort.SET -> compareBy<CardLibrary.Indexed> { it.card.setCode.orEmpty() }.then(byName)
++            // Cards with no numeric power sort last whichever way the list runs.
++            CardSort.POWER -> compareBy<CardLibrary.Indexed> { it.card.power?.toDoubleOrNull() == null }
++                .thenBy { it.card.power?.toDoubleOrNull() ?: 0.0 }.then(byName)
++        }
++        return if (descending && sort == CardSort.POWER) compareBy<CardLibrary.Indexed> { it.card.power?.toDoubleOrNull() == null }
++            .thenByDescending { it.card.power?.toDoubleOrNull() ?: 0.0 }.then(byName)
++        else if (descending) key.reversed() else key
++    }
++
++    /** Short removable chips describing what's on, each with the filters minus that part. */
++    fun summaryChips(): List<Pair<String, CardFilters>> = buildList {
++        oracleTerms.forEach { t -> add("Text: $t" to copy(oracleTerms = oracleTerms - t)) }
++        typeTerms.forEach { t -> add("Type: $t" to copy(typeTerms = typeTerms - t)) }
++        manaCosts.forEach { m -> add("Cost: $m" to copy(manaCosts = manaCosts - m)) }
++        if (colorless) add("Colorless${if (useIdentity) " identity" else ""}" to copy(colorless = false))
++        else if (colors.isNotEmpty()) add("${colorMatch.label.substringBefore(" ")} ${"WUBRG".filter { it in colors }}${if (useIdentity) " identity" else ""}" to copy(colors = emptySet()))
++        if (minColors > 0 || maxColors < 5) add("${if (minColors == maxColors) "$minColors" else "$minColors–$maxColors"} colors" to copy(minColors = 0, maxColors = 5))
++        if (sets.isNotEmpty()) add("${if (excludeSets) "Not set" else "Set"} ${sets.joinToString(", ") { it.uppercase(Locale.ROOT) }}" to copy(sets = emptyList(), excludeSets = false))
++        if (rarities.isNotEmpty()) add(RARITY_ORDER.filter { it in rarities }.joinToString(", ") { it.lowercase(Locale.ROOT).replaceFirstChar(Char::uppercaseChar) } to copy(rarities = emptySet()))
++        keywords.forEach { k -> add("Keyword: $k" to copy(keywords = keywords - k)) }
++        stats.forEach { s -> add(s.label to copy(stats = stats - s)) }
++        if (!commanderLegalOnly) add("Including not Commander-legal" to copy(commanderLegalOnly = true))
++    }
++
++    // ---- Saved filter sets --------------------------------------------------------------------
++
++    /** A line-based text form for saving presets; no JSON so it round-trips on the plain JVM too. */
++    fun encode(): String = buildList {
++        fun put(k: String, v: String) = add("$k\t${v.clean()}")
++        fun list(k: String, v: List<String>) { if (v.isNotEmpty()) put(k, v.joinToString(SEP) { it.clean() }) }
++        list("oracle", oracleTerms); list("type", typeTerms); list("mana", manaCosts)
++        if (colors.isNotEmpty()) put("colors", "WUBRG".filter { it in colors })
++        if (colorless) put("colorless", "1")
++        if (colorMatch != ColorMatch.INCLUDING) put("match", colorMatch.name)
++        if (useIdentity) put("identity", "1")
++        if (minColors > 0 || maxColors < 5) put("count", "$minColors-$maxColors")
++        list("sets", sets); if (excludeSets) put("excludeSets", "1")
++        if (rarities.isNotEmpty()) put("rarity", rarities.sorted().joinToString(SEP))
++        list("keywords", keywords)
++        stats.forEach { s -> put("stat", "${s.stat.name}$SEP${s.op.name}$SEP${s.value}$SEP${s.upTo ?: ""}") }
++        if (!commanderLegalOnly) put("legal", "0")
++        if (sort != CardSort.NAME) put("sort", sort.name)
++        if (descending) put("desc", "1")
++    }.joinToString("\n")
++
++    companion object {
++        private const val SEP = "\u001F"
++        private fun String.clean() = replace('\t', ' ').replace('\n', ' ').replace('\r', ' ').trim()
++
++        /** Reads [encode] output. Unknown or broken lines are skipped, never fatal. */
++        fun decode(text: String): CardFilters {
++            var f = CardFilters()
++            text.lineSequence().forEach { line ->
++                val key = line.substringBefore('\t', "")
++                val v = line.substringAfter('\t', "")
++                if (key.isEmpty()) return@forEach
++                val items = v.split(SEP).map { it.trim() }.filter { it.isNotEmpty() }
++                runCatching {
++                    f = when (key) {
++                        "oracle" -> f.copy(oracleTerms = items)
++                        "type" -> f.copy(typeTerms = items)
++                        "mana" -> f.copy(manaCosts = items)
++                        "colors" -> f.copy(colors = v.uppercase(Locale.ROOT).filter { it in "WUBRG" }.toSet())
++                        "colorless" -> f.copy(colorless = v == "1")
++                        "match" -> f.copy(colorMatch = ColorMatch.valueOf(v))
++                        "identity" -> f.copy(useIdentity = v == "1")
++                        "count" -> v.split('-').let { (a, b) -> f.copy(minColors = a.toInt().coerceIn(0, 5), maxColors = b.toInt().coerceIn(0, 5)) }
++                        "sets" -> f.copy(sets = items)
++                        "excludeSets" -> f.copy(excludeSets = v == "1")
++                        "rarity" -> f.copy(rarities = items.filter { it in RARITY_ORDER }.toSet())
++                        "keywords" -> f.copy(keywords = items)
++                        "stat" -> v.split(SEP).let { p ->
++                            f.copy(stats = f.stats + StatRange(StatField.valueOf(p[0]), StatOp.valueOf(p[1]), p[2].toDouble(), p.getOrNull(3)?.toDoubleOrNull()))
++                        }
++                        "legal" -> f.copy(commanderLegalOnly = v != "0")
++                        "sort" -> f.copy(sort = CardSort.valueOf(v))
++                        "desc" -> f.copy(descending = v == "1")
++                        else -> f
++                    }
++                }
++            }
++            return f
++        }
++
++        val RARITY_ORDER = listOf("COMMON", "UNCOMMON", "RARE", "MYTHIC")
++        private fun rarityRank(r: String?) = RARITY_ORDER.indexOf(r ?: "COMMON").let { if (it < 0) 0 else it }
++
++        /** White, blue, black, red, green, then multicolor, then colorless. */
++        internal fun colorRank(colors: Set<Char>): Int = when {
++            colors.isEmpty() -> 7
++            colors.size > 1 -> 6
++            else -> "WUBRG".indexOf(colors.single())
++        }
++    }
++}
++
++/** A named, saved set of filters ("Load" in the FILTERS panel). */
++data class FilterPreset(val name: String, val filters: CardFilters)
++
++object FilterPresets {
++    private const val RS = "\u001E"
++
++    fun encode(presets: List<FilterPreset>): String =
++        presets.joinToString(RS) { p -> "name\t${p.name.replace('\t', ' ').replace('\n', ' ').trim()}\n${p.filters.encode()}" }
++
++    fun decode(text: String): List<FilterPreset> = text.split(RS).mapNotNull { block ->
++        val lines = block.lines()
++        val name = lines.firstOrNull()?.takeIf { it.startsWith("name\t") }?.removePrefix("name\t")?.trim()?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
++        FilterPreset(name, CardFilters.decode(lines.drop(1).joinToString("\n")))
++    }
++
++    /** Replaces a preset with the same name (case-insensitive) or adds it first. */
++    fun upsert(presets: List<FilterPreset>, preset: FilterPreset): List<FilterPreset> =
++        listOf(preset) + presets.filterNot { it.name.equals(preset.name, ignoreCase = true) }
++}
++
++/**
++ * A mana cost as symbol counts: generic amount plus one entry per other symbol ("G", "W", "G/W",
++ * "X", "C"). Accepts Scryfall-style braces "{2}{G}{W}" or shorthand "2GW".
++ */
++data class ManaCost(val generic: Int, val symbols: Map<String, Int>) {
++    /** True when this cost has at least every symbol of [need] (and at least its generic amount). */
++    fun contains(need: ManaCost): Boolean =
++        generic >= need.generic && need.symbols.all { (s, n) -> (symbols[s] ?: 0) >= n }
++
++    companion object {
++        fun parse(raw: String): ManaCost? {
++            val text = raw.trim().uppercase(Locale.ROOT)
++            if (text.isEmpty()) return ManaCost(0, emptyMap())
++            var generic = 0
++            val symbols = linkedMapOf<String, Int>()
++            fun addSymbol(s: String) {
++                val n = s.toIntOrNull()
++                if (n != null) generic += n else symbols[s] = (symbols[s] ?: 0) + 1
++            }
++            var i = 0
++            while (i < text.length) {
++                val ch = text[i]
++                when {
++                    ch == '{' -> {
++                        val end = text.indexOf('}', i)
++                        if (end < 0) return null
++                        val inner = text.substring(i + 1, end).trim()
++                        if (inner.isEmpty()) return null
++                        addSymbol(inner)
++                        i = end + 1
++                    }
++                    ch.isDigit() -> {
++                        var j = i
++                        while (j < text.length && text[j].isDigit()) j++
++                        generic += text.substring(i, j).toInt()
++                        i = j
++                    }
++                    ch in "WUBRGCXSYZ" -> { addSymbol(ch.toString()); i++ }
++                    ch == ' ' || ch == ',' -> i++
++                    else -> return null
++                }
++            }
++            return ManaCost(generic, symbols)
++        }
++    }
++}
++
++internal fun fmtNumber(v: Double): String = if (v % 1.0 == 0.0) v.toInt().toString() else v.toString()
+diff --git a/android/app/src/main/java/com/arcanatable/CardLibrary.kt b/android/app/src/main/java/com/arcanatable/CardLibrary.kt
+index 9199d1a..5118961 100644
+--- a/android/app/src/main/java/com/arcanatable/CardLibrary.kt
++++ b/android/app/src/main/java/com/arcanatable/CardLibrary.kt
+@@ -67,6 +67,28 @@ class CardLibrary(val catalog: SupportedCardCatalog) {
+         return Result(fuzzy.take(limit).map { it.card }, fuzzy.size, fuzzy.isNotEmpty(), parsed.errors)
+     }
+ 
++    /**
++     * [search] plus the FILTERS panel. Name relevance wins while sorting by name with words typed;
++     * any other sort uses [CardFilters.comparator]. Typos still fall back to close names.
++     */
++    fun search(query: String, filters: CardFilters, limit: Int = 300): Result {
++        val parsed = CardQuery.parse(query)
++        val matches = cards.filter { parsed.matches(it) && filters.matches(it) }
++        fun order(list: List<Indexed>) =
++            if (filters.sort == CardSort.NAME && !filters.descending && parsed.nameWords.isNotEmpty()) rank(list, parsed)
++            else list.sortedWith(filters.comparator())
++        if (matches.isNotEmpty() || parsed.nameWords.isEmpty()) {
++            return Result(order(matches).take(limit).map { it.card }, matches.size, false, parsed.errors)
++        }
++        val fuzzy = cards.asSequence().filter { parsed.matchesIgnoringName(it) && filters.matches(it) }
++            .mapNotNull { c -> fuzzyNameScore(parsed.nameWords, c)?.let { c to it } }
++            .sortedWith(compareBy({ it.second }, { it.first.name })).map { it.first }.toList()
++        return Result(fuzzy.take(limit).map { it.card }, fuzzy.size, fuzzy.isNotEmpty(), parsed.errors)
++    }
++
++    /** Set codes present in this library, for the Set picker. */
++    val setCodes: List<String> by lazy { cards.mapNotNull { it.card.setCode?.uppercase(Locale.ROOT) }.distinct().sorted() }
++
+     /** Type-ahead name suggestions: prefix matches first, then word starts. */
+     fun suggestNames(prefix: String, limit: Int = 8): List<String> {
+         val q = prefix.trim().lowercase(Locale.ROOT)
+diff --git a/android/app/src/main/java/com/arcanatable/DeckBuilder.kt b/android/app/src/main/java/com/arcanatable/DeckBuilder.kt
+index 5b36b8d..d6a1f3d 100644
+--- a/android/app/src/main/java/com/arcanatable/DeckBuilder.kt
++++ b/android/app/src/main/java/com/arcanatable/DeckBuilder.kt
+@@ -18,6 +18,8 @@ data class DeckDraft(
+     val main: List<DeckLine> = emptyList(),
+     val sideboard: List<DeckLine> = emptyList(),
+     val companion: String? = null,
++    /** Cards being considered: saved with the deck, never part of the 100 or the game. */
++    val maybeboard: List<DeckLine> = emptyList(),
+     /** Import lines the parser could not read; kept so nothing the player typed is lost. */
+     val unreadLines: List<String> = emptyList(),
+ ) {
+@@ -41,11 +43,13 @@ data class DeckDraft(
+         }
+         appendLine("Deck")
+         main.forEach { appendLine("${it.count} ${it.name}") }
+-        if (sideboard.isNotEmpty() || companion != null || unreadLines.isNotEmpty()) {
++        if (sideboard.isNotEmpty() || companion != null || maybeboard.isNotEmpty() || unreadLines.isNotEmpty()) {
+             appendLine()
+             appendLine("Sideboard")
+             sideboard.forEach { appendLine("${it.count} ${it.name}") }
+             companion?.let { appendLine(); appendLine("Companion"); appendLine("1 $it") }
++            // Both parsers keep Maybeboard out of the game deck (the importer reads it as excluded).
++            if (maybeboard.isNotEmpty()) { appendLine(); appendLine("Maybeboard"); maybeboard.forEach { appendLine("${it.count} ${it.name}") } }
+             if (unreadLines.isNotEmpty()) { appendLine(); unreadLines.forEach { appendLine("// unread: $it") } }
+         }
+     }.trimEnd() + "\n"
+@@ -98,6 +102,28 @@ data class DeckDraft(
+         return copy(sideboard = sideboard - line).add(line.name, line.count)
+     }
+ 
++    /** Moves every main-deck copy of [card] to the maybeboard. */
++    fun moveToMaybeboard(card: String): DeckDraft {
++        val copies = countOf(card).takeIf { it > 0 } ?: return this
++        return copy(main = main.filterNot { it.name.equals(card, true) }, maybeboard = addLine(maybeboard, card, copies))
++    }
++
++    /** Adds a card straight to the maybeboard (from search), one copy. */
++    fun addToMaybeboard(card: String): DeckDraft =
++        if (maybeboard.any { it.name.equals(card, true) }) this else copy(maybeboard = addLine(maybeboard, card, 1))
++
++    fun moveFromMaybeboard(card: String): DeckDraft {
++        val line = maybeboard.firstOrNull { it.name.equals(card, true) } ?: return this
++        return copy(maybeboard = maybeboard - line).add(line.name, line.count)
++    }
++
++    fun removeFromMaybeboard(card: String): DeckDraft = copy(maybeboard = maybeboard.filterNot { it.name.equals(card, true) })
++
++    private fun addLine(lines: List<DeckLine>, card: String, copies: Int): List<DeckLine> {
++        val i = lines.indexOfFirst { it.name.equals(card, true) }
++        return if (i >= 0) lines.toMutableList().also { it[i] = it[i].copy(count = it[i].count + copies) } else lines + DeckLine(card, copies)
++    }
++
+     /** Swaps every main-deck copy of [old] for [new] (or the commander). Only ever called on a player's choice. */
+     fun replace(old: String, new: String): DeckDraft = when {
+         commanders.any { it.equals(old, true) } -> copy(commanders = commanders.map { if (it.equals(old, true)) new else it })
+@@ -120,6 +146,7 @@ data class DeckDraft(
+                 main = lines(parsed.main),
+                 sideboard = lines(parsed.sideboard),
+                 companion = parsed.companion.firstOrNull()?.let { catalog?.find(it.name)?.name ?: it.name },
++                maybeboard = lines(parsed.excluded),
+                 // Lines kept from an earlier save come back as comments; carry them forward so a
+                 // second save can never drop something the player once typed.
+                 unreadLines = (text.lines().map { it.trim() }.filter { it.startsWith("// unread: ") }.map { it.removePrefix("// unread: ") } +
+@@ -233,6 +260,8 @@ data class DeckStats(
+     val identity: Set<Char>,
+     val unsupported: Int,
+     val byType: Map<String, Int>,
++    /** Lands that can make each color (W U B R G), to compare with [pips]. */
++    val landSources: Map<Char, Int> = emptyMap(),
+ )
+ 
+ fun deckStats(deck: DeckDraft, catalog: SupportedCardCatalog): DeckStats {
+@@ -240,6 +269,7 @@ fun deckStats(deck: DeckDraft, catalog: SupportedCardCatalog): DeckStats {
+     val curve = IntArray(8)
+     val pips = linkedMapOf('W' to 0, 'U' to 0, 'B' to 0, 'R' to 0, 'G' to 0)
+     val byType = linkedMapOf<String, Int>()
++    val sources = linkedMapOf('W' to 0, 'U' to 0, 'B' to 0, 'R' to 0, 'G' to 0)
+     var mvSum = 0.0; var nonland = 0
+     val lines = deck.commanders.map { DeckLine(it, 1) } + deck.main
+     for (line in lines) {
+@@ -249,7 +279,11 @@ fun deckStats(deck: DeckDraft, catalog: SupportedCardCatalog): DeckStats {
+         val group = deckGroupFor(card)
+         byType[group] = (byType[group] ?: 0) + line.count
+         if ("creature" in types) creatures += line.count
+-        if ("land" in types) { lands += line.count; continue }
++        if ("land" in types) {
++            lands += line.count
++            landColors(card, identityOf(deck, catalog)).forEach { c -> sources[c] = sources.getValue(c) + line.count }
++            continue
++        }
+         nonland += line.count
+         mvSum += card.manaValue * line.count
+         curve[card.manaValue.toInt().coerceIn(0, 7)] += line.count
+@@ -258,7 +292,32 @@ fun deckStats(deck: DeckDraft, catalog: SupportedCardCatalog): DeckStats {
+         }
+     }
+     val identity = deck.commanders.flatMap { catalog.find(it)?.colors.orEmpty() }.toSet()
+-    return DeckStats(deck.deckSize, creatures, lands, nonland, curve.toList(), pips, if (nonland == 0) 0.0 else mvSum / nonland, identity, unsupported, byType)
++    return DeckStats(deck.deckSize, creatures, lands, nonland, curve.toList(), pips, if (nonland == 0) 0.0 else mvSum / nonland, identity, unsupported, byType, sources)
++}
++
++private fun identityOf(deck: DeckDraft, catalog: SupportedCardCatalog): Set<Char> =
++    deck.commanders.flatMap { catalog.find(it)?.colors.orEmpty() }.toSet()
++
++/**
++ * Colors a land can make, read from its basic land types and "Add {X}" text. "Any color" and
++ * fetch-style lands count for every color the commander allows (all five with no commander).
++ * A guide for the stats panel only; how the land really works is Argentum's job.
++ */
++internal fun landColors(card: SupportedCard, identity: Set<Char>): Set<Char> {
++    val type = card.typeLine.substringBefore(" // ").lowercase(Locale.ROOT)
++    val text = card.oracleText.orEmpty().lowercase(Locale.ROOT)
++    val out = mutableSetOf<Char>()
++    mapOf("plains" to 'W', "island" to 'U', "swamp" to 'B', "mountain" to 'R', "forest" to 'G').forEach { (t, c) -> if (t in type) out += c }
++    Regex("add[^.]*").findAll(text).forEach { m ->
++        Regex("\\{([wubrg])\\}").findAll(m.value).forEach { out += it.groupValues[1].uppercase(Locale.ROOT)[0] }
++    }
++    val wide = identity.ifEmpty { "WUBRG".toSet() }
++    if ("mana of any color" in text || "mana of any one color" in text || "any color" in text && "add" in text) out += wide
++    if ("search your library for a basic land" in text) out += wide
++    // Name the types fetch lands and dual-fetches look for ("Forest or Plains card").
++    if ("search your library for" in text) mapOf("plains" to 'W', "island" to 'U', "swamp" to 'B', "mountain" to 'R', "forest" to 'G')
++        .forEach { (t, c) -> if (Regex("\\b$t\\b").containsMatchIn(text.substringAfter("search your library for"))) out += c }
++    return out
+ }
+ 
+ /** One group per card for type grouping; the order follows how players usually read a list. */
+@@ -351,9 +410,79 @@ internal object SavedDeckOps {
+ 
+     fun delete(decks: List<SavedDeck>, target: SavedDeck): List<SavedDeck> = decks.filterNot { it.name == target.name && it.text == target.text }
+ 
++    /** Puts a deleted deck back where it was (undo). A deck saved with that name since is kept. */
++    fun restore(decks: List<SavedDeck>, deck: SavedDeck, index: Int): List<SavedDeck> {
++        if (decks.any { it.name == deck.name }) return decks
++        return decks.toMutableList().also { it.add(index.coerceIn(0, it.size), deck) }
++    }
++
++    fun setTags(decks: List<SavedDeck>, target: SavedDeck, tags: List<String>): List<SavedDeck> {
++        val clean = tags.map { it.trim() }.filter { it.isNotEmpty() }.distinctBy { it.lowercase(Locale.ROOT) }
++        return decks.map { if (it.name == target.name && it.text == target.text) it.copy(tags = clean) else it }
++    }
++
++    /** Every tag in use, alphabetically, first spelling wins. */
++    fun allTags(decks: List<SavedDeck>): List<String> =
++        decks.flatMap { it.tags }.distinctBy { it.lowercase(Locale.ROOT) }.sortedBy { it.lowercase(Locale.ROOT) }
++
++    /**
++     * The deck library's visible list: [query] matches the deck name, commander or any card in it;
++     * [tag] keeps decks carrying that tag. Decks with no edit time sort after dated ones.
++     */
++    fun visible(decks: List<SavedDeck>, query: String, tag: String?, sort: DeckLibrarySort, summaries: Map<String, DeckSummary>): List<SavedDeck> {
++        val q = query.trim().lowercase(Locale.ROOT)
++        val filtered = decks.filter { d ->
++            (tag == null || d.tags.any { it.equals(tag, ignoreCase = true) }) &&
++                (q.isEmpty() || d.name.lowercase(Locale.ROOT).contains(q) || d.commander.orEmpty().lowercase(Locale.ROOT).contains(q) ||
++                    d.text.lowercase(Locale.ROOT).lineSequence().any { line -> !line.trimStart().startsWith("//") && line.contains(q) })
++        }
++        return when (sort) {
++            DeckLibrarySort.RECENT -> filtered.sortedWith(compareByDescending<SavedDeck> { it.updatedAt }) // stable: keeps saved order on ties
++            DeckLibrarySort.NAME -> filtered.sortedBy { it.name.lowercase(Locale.ROOT) }
++            DeckLibrarySort.COLOR -> filtered.sortedWith(compareBy<SavedDeck>(
++                { summaries[it.name]?.identity?.size ?: 9 },
++                { summaries[it.name]?.identity?.let { c -> "WUBRG".filter { it in c } } ?: "" },
++                { it.name.lowercase(Locale.ROOT) }))
++        }
++    }
++
+     fun rename(decks: List<SavedDeck>, target: SavedDeck, newName: String): List<SavedDeck> {
+         val clean = newName.trim().ifBlank { return decks }
+         val name = if (clean.equals(target.name, true)) clean else uniqueName(clean, decks.filterNot { it.name == target.name })
+         return decks.map { if (it.name == target.name && it.text == target.text) it.copy(name = name) else it }
+     }
+ }
++
++enum class DeckLibrarySort(val label: String) { RECENT("Recently edited"), NAME("Name"), COLOR("Colors") }
++
++/** What a deck library tile shows. [problems] is null when the card library isn't loaded yet. */
++data class DeckSummary(
++    val commanders: List<String>,
++    val cards: Int,
++    val identity: Set<Char>?,
++    val problems: Int?,
++    val commanderImageUrl: String?,
++)
++
++internal fun summarizeDeck(deck: SavedDeck, catalog: SupportedCardCatalog?): DeckSummary {
++    val draft = DeckDraft.fromText(deck.name, deck.text, catalog)
++    if (catalog == null) return DeckSummary(draft.commanders, draft.deckSize, null, null, null)
++    val identity = if (draft.commanders.isEmpty() || draft.commanders.any { catalog.find(it) == null }) null
++        else draft.commanders.flatMap { catalog.find(it)?.colors.orEmpty() }.toSet()
++    val problems = validateCommanderDeck(draft, catalog).count { it.level == IssueLevel.ERROR }
++    return DeckSummary(draft.commanders, draft.deckSize, identity, problems, draft.commanders.firstOrNull()?.let { catalog.find(it)?.imageUrl })
++}
++
++/** "edited 5 min ago" style label for a deck tile; null when the edit time was never recorded. */
++internal fun editedAgo(updatedAt: Long, now: Long): String? {
++    if (updatedAt <= 0L) return null
++    val minutes = ((now - updatedAt).coerceAtLeast(0L)) / 60_000L
++    return when {
++        minutes < 1 -> "edited just now"
++        minutes < 60 -> "edited $minutes min ago"
++        minutes < 24 * 60 -> "edited ${minutes / 60} h ago"
++        minutes < 48 * 60 -> "edited yesterday"
++        minutes < 30L * 24 * 60 -> "edited ${minutes / (24 * 60)} days ago"
++        else -> "edited " + java.text.SimpleDateFormat("MMM d, yyyy", Locale.getDefault()).format(java.util.Date(updatedAt))
++    }
++}
+diff --git a/android/app/src/main/java/com/arcanatable/DeckBuilderFilters.kt b/android/app/src/main/java/com/arcanatable/DeckBuilderFilters.kt
+new file mode 100644
+index 0000000..31f8e95
+--- /dev/null
++++ b/android/app/src/main/java/com/arcanatable/DeckBuilderFilters.kt
+@@ -0,0 +1,423 @@
++@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
++
++package com.arcanatable
++
++import android.content.Context
++import androidx.compose.foundation.background
++import androidx.compose.foundation.border
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.combinedClickable
++import androidx.compose.foundation.layout.*
++import androidx.compose.foundation.lazy.grid.GridCells
++import androidx.compose.foundation.lazy.grid.LazyGridState
++import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
++import androidx.compose.foundation.lazy.grid.items
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.foundation.text.KeyboardActions
++import androidx.compose.foundation.text.KeyboardOptions
++import androidx.compose.foundation.verticalScroll
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.automirrored.filled.ArrowBack
++import androidx.compose.material.icons.filled.Add
++import androidx.compose.material.icons.filled.ArrowDropDown
++import androidx.compose.material.icons.filled.Close
++import androidx.compose.material3.*
++import androidx.compose.runtime.*
++import androidx.compose.runtime.saveable.Saver
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.alpha
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.layout.ContentScale
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.platform.testTag
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.input.ImeAction
++import androidx.compose.ui.text.input.KeyboardType
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.compose.ui.window.Dialog
++import androidx.compose.ui.window.DialogProperties
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.withContext
++import kotlin.math.roundToInt
++
++/** Keeps the deck builder's filters across rotation and folding. */
++internal val CardFiltersSaver = Saver<CardFilters, String>(save = { it.encode() }, restore = { CardFilters.decode(it) })
++
++// ---- Saved filter sets (on this phone only) ---------------------------------------------------
++
++internal object FilterPresetStore {
++    private const val PREFS = "arcana-deck-builder"
++    private const val KEY = "filterPresets"
++
++    fun load(context: Context): List<FilterPreset> = runCatching {
++        FilterPresets.decode(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, "").orEmpty())
++    }.getOrDefault(emptyList())
++
++    fun save(context: Context, presets: List<FilterPreset>) {
++        runCatching { context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, FilterPresets.encode(presets)).apply() }
++    }
++}
++
++// ---- The FILTERS panel ------------------------------------------------------------------------
++
++/**
++ * Full-screen filter panel, laid out like a classic card-search form but in Arcana's table colors.
++ * Changes apply as you make them; the button at the bottom shows how many cards match.
++ */
++@Composable
++internal fun CardFilterSheet(
++    lib: CardLibrary,
++    baseQuery: String,
++    filters: CardFilters,
++    onChange: (CardFilters) -> Unit,
++    onDismiss: () -> Unit,
++) {
++    val context = LocalContext.current
++    var presets by remember { mutableStateOf(FilterPresetStore.load(context)) }
++    var loadMenu by remember { mutableStateOf(false) }
++    var savingPreset by remember { mutableStateOf(false) }
++    var matchCount by remember { mutableStateOf<Int?>(null) }
++    LaunchedEffect(baseQuery, filters) {
++        delay(150)
++        matchCount = withContext(Dispatchers.Default) { lib.search(baseQuery, filters, limit = 1).total }
++    }
++    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
++        Surface(Modifier.fillMaxSize(), color = Ink) {
++            Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
++                Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
++                    IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back to results", tint = SoftWhite) }
++                    Text("FILTERS", color = CounterGold, fontWeight = FontWeight.Black, fontSize = 18.sp, letterSpacing = 1.2.sp, modifier = Modifier.weight(1f))
++                    Box {
++                        TextButton(onClick = { loadMenu = true }, modifier = Modifier.heightIn(min = 48.dp).testTag("filters-load")) {
++                            Text("LOAD", color = Mint, fontWeight = FontWeight.Bold)
++                        }
++                        DropdownMenu(loadMenu, { loadMenu = false }) {
++                            if (presets.isEmpty()) DropdownMenuItem(text = { Text("No saved filters yet. Use SAVE below.", color = Muted) }, onClick = { loadMenu = false })
++                            presets.forEach { p ->
++                                DropdownMenuItem(
++                                    text = { Text(p.name) },
++                                    onClick = { onChange(p.filters); loadMenu = false },
++                                    trailingIcon = {
++                                        IconButton(onClick = { presets = presets - p; FilterPresetStore.save(context, presets) }) { Icon(Icons.Filled.Close, "Delete saved filter ${p.name}", tint = Muted) }
++                                    })
++                            }
++                        }
++                    }
++                    TextButton(onClick = { onChange(filters.cleared()) }, enabled = filters.activeCount > 0, modifier = Modifier.heightIn(min = 48.dp)) {
++                        Text("CLEAR ALL", color = if (filters.activeCount > 0) CounterGold else Muted, fontWeight = FontWeight.Bold)
++                    }
++                }
++                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
++                    TermSection("Oracle text", "Draw a card, Flying", "Every term must be in the rules text. Separate several with commas.",
++                        filters.oracleTerms, { onChange(filters.copy(oracleTerms = it)) }, tag = "filter-oracle")
++                    TermSection("Type line", "Legendary, Creature, Angel", "Every term must be in the type line.",
++                        filters.typeTerms, { onChange(filters.copy(typeTerms = it)) }, tag = "filter-type")
++                    TermSection("Mana cost", "2{G}{W}  or  2GW", "Cards whose cost includes these symbols.",
++                        filters.manaCosts, { onChange(filters.copy(manaCosts = it)) }, tag = "filter-mana",
++                        validate = { if (ManaCost.parse(it) == null) "Use symbols like 2{G}{W}, {X}{R} or 2GW." else null })
++                    ColorSection(filters, onChange)
++                    TermSection("Keyword", "Flying, Trample", "Keyword abilities the card has.",
++                        filters.keywords, { onChange(filters.copy(keywords = it)) }, tag = "filter-keyword")
++                    SetSection(lib, filters, onChange)
++                    RaritySection(filters, onChange)
++                    StatsSection(filters, onChange)
++                    Column {
++                        SectionLabel("Legality")
++                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel).clickable { onChange(filters.copy(commanderLegalOnly = !filters.commanderLegalOnly)) }
++                            .padding(horizontal = 14.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
++                            Column(Modifier.weight(1f)) {
++                                Text("Commander-legal only", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp)
++                                Text("Hides banned cards. Arcana custom cards have no legality data and always show.", color = Muted, fontSize = 11.sp, lineHeight = 15.sp)
++                            }
++                            Switch(filters.commanderLegalOnly, { onChange(filters.copy(commanderLegalOnly = it)) }, modifier = Modifier.testTag("filter-legal"),
++                                colors = SwitchDefaults.colors(checkedThumbColor = Ink, checkedTrackColor = Mint))
++                        }
++                    }
++                    SortSection(filters, onChange)
++                    Text("Price, artist and finish filters aren't here: Arcana's offline library has one printing per card and no price data.",
++                        color = Muted, fontSize = 11.sp, lineHeight = 15.sp)
++                    Spacer(Modifier.height(8.dp))
++                }
++                Row(Modifier.fillMaxWidth().background(Panel).padding(horizontal = 16.dp, vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
++                    OutlinedButton(onClick = { savingPreset = true }, enabled = filters.activeCount > 0 || filters.sort != CardSort.NAME,
++                        modifier = Modifier.heightIn(min = 52.dp)) { Text("SAVE", color = if (filters.activeCount > 0) SoftWhite else Muted, fontWeight = FontWeight.Bold) }
++                    Button(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 52.dp).testTag("filters-show"),
++                        colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) {
++                        Text(when (val n = matchCount) { null -> "SHOW CARDS"; 0 -> "NO MATCHES"; 1 -> "SHOW 1 CARD"; else -> "SHOW $n CARDS" }, fontWeight = FontWeight.Black)
++                    }
++                }
++            }
++        }
++    }
++    if (savingPreset) {
++        var name by remember { mutableStateOf("") }
++        AlertDialog(onDismissRequest = { savingPreset = false }, title = { Text("Save these filters") },
++            text = {
++                Column {
++                    Text(filters.summaryChips().joinToString(" · ") { it.first }.ifBlank { "Sort: ${filters.sort.label}" }, fontSize = 12.sp, color = Muted)
++                    OutlinedTextField(name, { name = it.take(40) }, singleLine = true, label = { Text("Name") }, placeholder = { Text("Cheap ramp") },
++                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
++                    if (presets.any { it.name.equals(name.trim(), true) }) Text("Replaces the saved filter with this name.", color = CounterGold, fontSize = 11.sp)
++                }
++            },
++            confirmButton = { TextButton(enabled = name.isNotBlank(), onClick = {
++                presets = FilterPresets.upsert(presets, FilterPreset(name.trim(), filters)); FilterPresetStore.save(context, presets); savingPreset = false
++            }) { Text("SAVE") } },
++            dismissButton = { TextButton(onClick = { savingPreset = false }) { Text("CANCEL") } })
++    }
++}
++
++@Composable
++private fun SectionLabel(text: String, note: String? = null) {
++    Row(Modifier.padding(bottom = 8.dp), verticalAlignment = Alignment.Bottom) {
++        Text(text, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
++        note?.let { Text("  $it", color = Muted, fontSize = 11.sp) }
++    }
++}
++
++/** A text field whose entries become removable chips. Commas split several entries at once. */
++@Composable
++private fun TermSection(
++    label: String,
++    placeholder: String,
++    help: String,
++    terms: List<String>,
++    onTerms: (List<String>) -> Unit,
++    tag: String,
++    validate: (String) -> String? = { null },
++) {
++    var input by remember { mutableStateOf("") }
++    var error by remember { mutableStateOf<String?>(null) }
++    fun commit() {
++        val parts = input.split(',').map { it.trim() }.filter { it.isNotEmpty() }
++        if (parts.isEmpty()) return
++        val bad = parts.firstNotNullOfOrNull(validate)
++        if (bad != null) { error = bad; return }
++        onTerms((terms + parts).distinctBy { it.lowercase() })
++        input = ""; error = null
++    }
++    Column {
++        SectionLabel(label)
++        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++            OutlinedTextField(input, { input = it; error = null }, Modifier.weight(1f).testTag(tag), singleLine = true,
++                placeholder = { Text(placeholder, color = Muted) }, isError = error != null,
++                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done), keyboardActions = KeyboardActions(onDone = { commit() }))
++            IconButton(onClick = ::commit, enabled = input.isNotBlank(), modifier = Modifier.size(52.dp).testTag("$tag-add")) {
++                Box(Modifier.size(44.dp).clip(CircleShape).background(if (input.isNotBlank()) Mint else PanelLight), contentAlignment = Alignment.Center) {
++                    Icon(Icons.Filled.Add, "Add $label", tint = if (input.isNotBlank()) Ink else Muted)
++                }
++            }
++        }
++        Text(error ?: help, color = if (error != null) CounterGold else Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
++        if (terms.isNotEmpty()) FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
++            terms.forEach { t -> RemovableChip(t) { onTerms(terms - t) } }
++        }
++    }
++}
++
++@Composable
++internal fun RemovableChip(label: String, onRemove: () -> Unit) {
++    Row(Modifier.clip(RoundedCornerShape(16.dp)).background(PanelLight).border(1.dp, Mint.copy(alpha = 0.6f), RoundedCornerShape(16.dp))
++        .clickable(onClick = onRemove).heightIn(min = 36.dp).padding(start = 12.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
++        Text(label, color = SoftWhite, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 240.dp))
++        Icon(Icons.Filled.Close, "Remove $label", tint = Muted, modifier = Modifier.padding(start = 4.dp).size(16.dp))
++    }
++}
++
++/** An outlined button that opens a menu of [options]; the current one shows with a ▾. */
++@Composable
++private fun <T> MenuButton(current: String, options: List<T>, label: (T) -> String, onPick: (T) -> Unit, modifier: Modifier = Modifier, tag: String? = null) {
++    var open by remember { mutableStateOf(false) }
++    Box(modifier) {
++        OutlinedButton(onClick = { open = true }, modifier = Modifier.heightIn(min = 48.dp).then(if (tag != null) Modifier.testTag(tag) else Modifier),
++            contentPadding = PaddingValues(horizontal = 14.dp)) {
++            Text(current, color = SoftWhite, fontWeight = FontWeight.SemiBold, maxLines = 1)
++            Icon(Icons.Filled.ArrowDropDown, null, tint = SoftWhite)
++        }
++        DropdownMenu(open, { open = false }) {
++            options.forEach { o -> DropdownMenuItem(text = { Text(label(o)) }, onClick = { onPick(o); open = false }) }
++        }
++    }
++}
++
++@Composable
++private fun ColorSection(filters: CardFilters, onChange: (CardFilters) -> Unit) {
++    Column {
++        SectionLabel("Colors")
++        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
++            MenuButton(filters.colorMatch.label, ColorMatch.entries, { it.label }, { onChange(filters.copy(colorMatch = it)) }, tag = "filter-color-match")
++            Row(Modifier.clip(RoundedCornerShape(8.dp)).clickable { onChange(filters.copy(useIdentity = !filters.useIdentity)) }.heightIn(min = 48.dp).padding(end = 8.dp),
++                verticalAlignment = Alignment.CenterVertically) {
++                Checkbox(filters.useIdentity, { onChange(filters.copy(useIdentity = it)) }, colors = CheckboxDefaults.colors(checkedColor = Mint, checkmarkColor = Ink))
++                Text("Color identity", color = SoftWhite, fontSize = 13.sp)
++            }
++        }
++        Row(Modifier.fillMaxWidth().padding(top = 10.dp), horizontalArrangement = Arrangement.SpaceBetween) {
++            "WUBRG".forEach { c ->
++                ColorToggle(c.toString(), on = !filters.colorless && c in filters.colors) {
++                    onChange(filters.copy(colorless = false, colors = if (c in filters.colors) filters.colors - c else filters.colors + c))
++                }
++            }
++            ColorToggle("C", on = filters.colorless) { onChange(filters.copy(colorless = !filters.colorless, colors = emptySet())) }
++        }
++        Text("Number of colors", color = SoftWhite, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, modifier = Modifier.padding(top = 14.dp))
++        Row(verticalAlignment = Alignment.CenterVertically) {
++            Text("0", color = Muted, fontSize = 13.sp)
++            RangeSlider(
++                value = filters.minColors.toFloat()..filters.maxColors.toFloat(),
++                onValueChange = { r -> onChange(filters.copy(minColors = r.start.roundToInt(), maxColors = r.endInclusive.roundToInt())) },
++                valueRange = 0f..5f, steps = 4,
++                colors = SliderDefaults.colors(thumbColor = Mint, activeTrackColor = Mint, inactiveTrackColor = PanelLight),
++                modifier = Modifier.weight(1f).padding(horizontal = 10.dp).testTag("filter-color-count"))
++            Text("5", color = Muted, fontSize = 13.sp)
++        }
++        Text(when {
++            filters.minColors == 0 && filters.maxColors == 5 -> "Any number of colors"
++            filters.minColors == filters.maxColors -> "Exactly ${filters.minColors} color${if (filters.minColors == 1) "" else "s"}"
++            else -> "${filters.minColors} to ${filters.maxColors} colors"
++        } + if (filters.useIdentity) " in color identity" else "", color = Muted, fontSize = 12.sp, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
++    }
++}
++
++@Composable
++private fun ColorToggle(symbol: String, on: Boolean, onClick: () -> Unit) {
++    Box(Modifier.size(52.dp).clip(CircleShape).clickable(onClick = onClick).border(if (on) 3.dp else 0.dp, if (on) Mint else Color.Transparent, CircleShape)
++        .alpha(if (on) 1f else 0.4f).testTag("filter-color-$symbol"), contentAlignment = Alignment.Center) {
++        ManaPip(symbol)
++    }
++}
++
++@Composable
++private fun SetSection(lib: CardLibrary, filters: CardFilters, onChange: (CardFilters) -> Unit) {
++    var input by remember { mutableStateOf("") }
++    val suggestions = remember(input) {
++        val q = input.trim().uppercase()
++        if (q.isEmpty()) emptyList() else lib.setCodes.filter { it.startsWith(q) && it !in filters.sets.map(String::uppercase) }.take(8)
++    }
++    fun add(code: String) { onChange(filters.copy(sets = (filters.sets + code.uppercase()).distinct())); input = "" }
++    Column {
++        SectionLabel("Sets", "the printing Arcana ships")
++        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
++            MenuButton(if (filters.excludeSets) "≠" else "=", listOf(false, true), { if (it) "≠  Not in these sets" else "=  In these sets" },
++                { onChange(filters.copy(excludeSets = it)) })
++            OutlinedTextField(input, { input = it.take(6) }, Modifier.weight(1f).testTag("filter-set"), singleLine = true, placeholder = { Text("Set code, e.g. CMM", color = Muted) },
++                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
++                keyboardActions = KeyboardActions(onDone = { suggestions.firstOrNull()?.let(::add) ?: if (input.trim().uppercase() in lib.setCodes) add(input.trim()) else Unit }))
++        }
++        if (suggestions.isNotEmpty()) FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
++            suggestions.forEach { code -> AssistChip(onClick = { add(code) }, label = { Text(code) }, modifier = Modifier.heightIn(min = 40.dp)) }
++        } else if (input.isNotBlank()) Text("No set code starts with “${input.trim().uppercase()}”.", color = CounterGold, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
++        if (filters.sets.isNotEmpty()) FlowRow(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
++            filters.sets.forEach { s -> RemovableChip(s.uppercase()) { onChange(filters.copy(sets = filters.sets - s)) } }
++        }
++    }
++}
++
++@Composable
++private fun RaritySection(filters: CardFilters, onChange: (CardFilters) -> Unit) {
++    Column {
++        SectionLabel("Rarity")
++        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++            CardFilters.RARITY_ORDER.forEach { r ->
++                val on = r in filters.rarities
++                FilterChip(on, { onChange(filters.copy(rarities = if (on) filters.rarities - r else filters.rarities + r)) },
++                    label = { Text(r.lowercase().replaceFirstChar(Char::uppercaseChar)) }, modifier = Modifier.heightIn(min = 44.dp).testTag("filter-rarity-$r"),
++                    leadingIcon = { Box(Modifier.size(10.dp).clip(CircleShape).background(rarityColor(r))) })
++            }
++        }
++    }
++}
++
++private fun rarityColor(r: String) = when (r) {
++    "MYTHIC" -> Color(0xFFE0703A); "RARE" -> Color(0xFFD9B44A); "UNCOMMON" -> Color(0xFFAEB9C2); else -> Color(0xFF6B6F73)
++}
++
++@Composable
++private fun StatsSection(filters: CardFilters, onChange: (CardFilters) -> Unit) {
++    var stat by remember { mutableStateOf(StatField.MANA_VALUE) }
++    var op by remember { mutableStateOf(StatOp.LTE) }
++    var from by remember { mutableStateOf("") }
++    var to by remember { mutableStateOf("") }
++    val a = from.toDoubleOrNull()
++    val b = to.toDoubleOrNull()
++    val ready = a != null && (op != StatOp.BETWEEN || to.isBlank() || (b != null && b >= a))
++    Column {
++        SectionLabel("Stats", "(mana value, power, toughness)")
++        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++            MenuButton(stat.label, StatField.entries, { it.label }, { stat = it }, tag = "filter-stat")
++            MenuButton(op.symbol, StatOp.entries, { if (it == StatOp.BETWEEN) "from … to" else it.symbol }, { op = it }, tag = "filter-stat-op")
++        }
++        Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++            OutlinedTextField(from, { from = it.filter { ch -> ch.isDigit() || ch == '.' }.take(4) }, Modifier.weight(1f).testTag("filter-stat-value"), singleLine = true,
++                placeholder = { Text(if (op == StatOp.BETWEEN) "from" else "value", color = Muted) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
++            if (op == StatOp.BETWEEN) OutlinedTextField(to, { to = it.filter { ch -> ch.isDigit() || ch == '.' }.take(4) }, Modifier.weight(1f), singleLine = true,
++                placeholder = { Text("to (∞)", color = Muted) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
++            Button(onClick = {
++                val range = StatRange(stat, op, a ?: return@Button, if (op == StatOp.BETWEEN) b else null)
++                onChange(filters.copy(stats = filters.stats.filterNot { it == range } + range)); from = ""; to = ""
++            }, enabled = ready, modifier = Modifier.heightIn(min = 52.dp).testTag("filter-stat-add"),
++                colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { Text("ADD", fontWeight = FontWeight.Bold) }
++        }
++        if (filters.stats.isNotEmpty()) FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
++            filters.stats.forEach { s -> RemovableChip(s.label) { onChange(filters.copy(stats = filters.stats - s)) } }
++        }
++    }
++}
++
++@Composable
++private fun SortSection(filters: CardFilters, onChange: (CardFilters) -> Unit) {
++    Column {
++        SectionLabel("Sort results")
++        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
++            MenuButton(filters.sort.label, CardSort.entries, { it.label }, { onChange(filters.copy(sort = it)) }, tag = "filter-sort")
++            MenuButton(if (filters.descending) "↓ Descending" else "↑ Ascending", listOf(false, true), { if (it) "↓ Descending" else "↑ Ascending" },
++                { onChange(filters.copy(descending = it)) })
++        }
++    }
++}
++
++// ---- Results as a card grid -------------------------------------------------------------------
++
++/** Card pictures in a grid: tap to preview, the + adds a copy, ×N shows what's already in the deck. */
++@Composable
++internal fun LibraryGrid(
++    cards: List<SupportedCard>,
++    countInDeck: (SupportedCard) -> Int,
++    state: LazyGridState,
++    onAdd: (SupportedCard) -> Unit,
++    onPreview: (SupportedCard) -> Unit,
++    modifier: Modifier = Modifier,
++) {
++    LazyVerticalGrid(GridCells.Adaptive(104.dp), modifier, state = state, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(10.dp),
++        contentPadding = PaddingValues(top = 4.dp, bottom = 40.dp)) {
++        items(cards, key = { it.name }) { card ->
++            val inDeck = countInDeck(card)
++            Column(Modifier.testTag("grid-${card.name}")) {
++                Box(Modifier.fillMaxWidth().aspectRatio(0.716f).clip(RoundedCornerShape(8.dp)).background(Panel)
++                    .border(if (inDeck > 0) 2.dp else 0.dp, if (inDeck > 0) Mint else Color.Transparent, RoundedCornerShape(8.dp))
++                    .combinedClickable(onClick = { onPreview(card) }, onLongClick = { onPreview(card) })) {
++                    val url = card.imageUrl
++                    if (url != null) CardArt(url, Modifier.fillMaxSize(), ContentScale.Crop, fallbackName = card.name, fallbackType = card.typeLine)
++                    else Text(card.name, color = SoftWhite, fontSize = 11.sp, modifier = Modifier.padding(6.dp))
++                    if (inDeck > 0) Text("×$inDeck", color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Black,
++                        modifier = Modifier.align(Alignment.TopStart).padding(4.dp).clip(RoundedCornerShape(6.dp)).background(Mint).padding(horizontal = 6.dp, vertical = 2.dp))
++                    IconButton(onClick = { onAdd(card) }, modifier = Modifier.align(Alignment.BottomEnd).size(48.dp).testTag("grid-add-${card.name}")) {
++                        Box(Modifier.size(34.dp).clip(CircleShape).background(Mint).border(1.dp, Ink, CircleShape), contentAlignment = Alignment.Center) {
++                            Icon(Icons.Filled.Add, "Add ${card.name}", tint = Ink)
++                        }
++                    }
++                }
++                Text(card.name, color = SoftWhite, fontSize = 11.sp, maxLines = 2, lineHeight = 13.sp, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
++                    modifier = Modifier.fillMaxWidth().padding(top = 3.dp))
++            }
++        }
++    }
++}
+diff --git a/android/app/src/main/java/com/arcanatable/DeckBuilderScreen.kt b/android/app/src/main/java/com/arcanatable/DeckBuilderScreen.kt
+index c18af2a..df922ba 100644
+--- a/android/app/src/main/java/com/arcanatable/DeckBuilderScreen.kt
++++ b/android/app/src/main/java/com/arcanatable/DeckBuilderScreen.kt
+@@ -1,4 +1,4 @@
+-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
++@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+ 
+ package com.arcanatable
+ 
+@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.*
+ import androidx.compose.foundation.lazy.LazyColumn
+ import androidx.compose.foundation.lazy.items
+ import androidx.compose.foundation.lazy.rememberLazyListState
++import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+ import androidx.compose.foundation.rememberScrollState
+ import androidx.compose.foundation.shape.CircleShape
+ import androidx.compose.foundation.shape.RoundedCornerShape
+@@ -28,6 +29,9 @@ import androidx.compose.material.icons.filled.Add
+ import androidx.compose.material.icons.filled.Close
+ import androidx.compose.material.icons.filled.MoreVert
+ import androidx.compose.material.icons.filled.Remove
++import androidx.compose.material.icons.filled.Tune
++import androidx.compose.material.icons.filled.GridView
++import androidx.compose.material.icons.automirrored.filled.ViewList
+ import androidx.compose.material3.*
+ import androidx.compose.runtime.*
+ import androidx.compose.runtime.saveable.rememberSaveable
+@@ -67,8 +71,19 @@ internal fun DeckManagerDialog(
+     var importText by rememberSaveable { mutableStateOf("") }
+     var pendingImport by rememberSaveable { mutableStateOf<String?>(null) }
+     var renaming by remember { mutableStateOf<SavedDeck?>(null) }
+-    var deleting by remember { mutableStateOf<SavedDeck?>(null) }
++    var tagging by remember { mutableStateOf<SavedDeck?>(null) }
+     var menuFor by remember { mutableStateOf<String?>(null) }
++    var libQuery by rememberSaveable { mutableStateOf("") }
++    var libSort by rememberSaveable { mutableStateOf(DeckLibrarySort.RECENT) }
++    var libTag by rememberSaveable { mutableStateOf<String?>(null) }
++    var recentlyDeleted by remember { mutableStateOf<Pair<SavedDeck, Int>?>(null) }
++    // Tiles fill in color, legality and art once the offline card library has loaded.
++    var summaryCatalog by remember { mutableStateOf<SupportedCardCatalog?>(null) }
++    LaunchedEffect(Unit) { summaryCatalog = runCatching { loadCatalog() }.getOrNull() }
++    val summaries by produceState(emptyMap<String, DeckSummary>(), decks, summaryCatalog) {
++        value = withContext(Dispatchers.Default) { decks.associate { it.name to summarizeDeck(it, summaryCatalog) } }
++    }
++    LaunchedEffect(recentlyDeleted) { if (recentlyDeleted != null) { delay(8_000); recentlyDeleted = null } }
+ 
+     val editTarget = editing
+     if (editTarget != null) {
+@@ -80,7 +95,8 @@ internal fun DeckManagerDialog(
+             allDecks = decks,
+             loadCatalog = loadCatalog,
+             onSave = { original, deck ->
+-                onDecksChanged(SavedDeckOps.upsert(decks, original, deck))
++                val previous = decks.firstOrNull { it.name == original }
++                onDecksChanged(SavedDeckOps.upsert(decks, original, deck.copy(tags = previous?.tags.orEmpty(), updatedAt = System.currentTimeMillis())))
+                 editing = deck.name
+                 pendingImport = null
+             },
+@@ -89,6 +105,12 @@ internal fun DeckManagerDialog(
+         return
+     }
+ 
++    val tags = remember(decks) { SavedDeckOps.allTags(decks) }
++    // A tag that no deck carries any more (after untagging or deleting) stops filtering.
++    val activeTag = libTag?.takeIf { t -> tags.any { it.equals(t, true) } }
++    val shown = remember(decks, libQuery, activeTag, libSort, summaries) { SavedDeckOps.visible(decks, libQuery, activeTag, libSort, summaries) }
++    val now = remember(decks) { System.currentTimeMillis() }
++
+     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+         Surface(Modifier.fillMaxSize(), color = Ink) {
+             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(16.dp)) {
+@@ -96,7 +118,7 @@ internal fun DeckManagerDialog(
+                     IconButton(onClick = onDismiss, modifier = Modifier.size(48.dp)) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = SoftWhite) }
+                     Column(Modifier.weight(1f)) {
+                         Text("DECK BUILDER", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 18.sp, letterSpacing = 1.5.sp)
+-                        Text("Developer preview · your saved decks", color = Muted, fontSize = 11.sp)
++                        Text("Developer preview · ${decks.size} saved deck${if (decks.size == 1) "" else "s"}", color = Muted, fontSize = 11.sp)
+                     }
+                 }
+                 Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+@@ -104,35 +126,61 @@ internal fun DeckManagerDialog(
+                         colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { Text("NEW DECK", fontWeight = FontWeight.Bold) }
+                     OutlinedButton(onClick = { importText = ""; importing = true }, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) { Text("PASTE A LIST", color = SoftWhite, fontWeight = FontWeight.Bold) }
+                 }
+-                if (decks.isEmpty()) {
+-                    Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
++                if (decks.isNotEmpty()) {
++                    OutlinedTextField(libQuery, { libQuery = it }, Modifier.fillMaxWidth().testTag("deck-library-search"), singleLine = true,
++                        placeholder = { Text("Search decks, commanders or cards", color = Muted) },
++                        trailingIcon = { if (libQuery.isNotEmpty()) IconButton(onClick = { libQuery = "" }) { Icon(Icons.Filled.Close, "Clear deck search", tint = Muted) } })
++                    Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
++                        var sortMenu by remember { mutableStateOf(false) }
++                        Box {
++                            FilterChip(true, { sortMenu = true }, label = { Text("${libSort.label} ▾") }, modifier = Modifier.testTag("deck-library-sort"))
++                            DropdownMenu(sortMenu, { sortMenu = false }) {
++                                DeckLibrarySort.entries.forEach { s -> DropdownMenuItem(text = { Text(s.label + if (s == libSort) "  ✓" else "") }, onClick = { libSort = s; sortMenu = false }) }
++                            }
++                        }
++                        if (tags.isNotEmpty()) {
++                            FilterChip(activeTag == null, { libTag = null }, label = { Text("All") })
++                            tags.forEach { t -> FilterChip(activeTag.equals(t, true), { libTag = if (activeTag.equals(t, true)) null else t }, label = { Text(t) }) }
++                        }
++                    }
++                }
++                when {
++                    decks.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                         Text("No saved decks yet.\nStart a new deck or paste a list from ManaBox, Moxfield, Archidekt or Arena.", color = Muted, fontSize = 13.sp, lineHeight = 19.sp)
+                     }
+-                } else LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+-                    items(decks, key = { it.name }) { deck ->
+-                        val entries = remember(deck.text) { parseDeckListDetailed(deck.text) }
+-                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel).clickable { editing = deck.name }.padding(start = 14.dp, end = 4.dp, top = 10.dp, bottom = 10.dp),
+-                            verticalAlignment = Alignment.CenterVertically) {
+-                            Column(Modifier.weight(1f)) {
+-                                Text(deck.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+-                                Text(listOfNotNull(
+-                                    entries.commanders.joinToString(" + ") { it.name }.ifBlank { null },
+-                                    "${entries.playableEntries.sumOf { it.count }} cards",
+-                                ).joinToString(" · "), color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+-                            }
+-                            TextButton(onClick = { editing = deck.name }, modifier = Modifier.heightIn(min = 48.dp)) { Text("EDIT", color = Mint, fontWeight = FontWeight.Bold) }
+-                            Box {
+-                                IconButton(onClick = { menuFor = deck.name }, modifier = Modifier.size(48.dp)) { Icon(Icons.Filled.MoreVert, "More for ${deck.name}", tint = Muted) }
+-                                DropdownMenu(expanded = menuFor == deck.name, onDismissRequest = { menuFor = null }) {
+-                                    DropdownMenuItem(text = { Text("Play this deck") }, onClick = { menuFor = null; onPlay(deck) })
+-                                    DropdownMenuItem(text = { Text("Rename") }, onClick = { menuFor = null; renaming = deck })
+-                                    DropdownMenuItem(text = { Text("Duplicate") }, onClick = { menuFor = null; onDecksChanged(SavedDeckOps.duplicate(decks, deck)) })
+-                                    DropdownMenuItem(text = { Text("Copy list") }, onClick = { menuFor = null; copyDeckText(context, deck.name, deck.text) })
+-                                    DropdownMenuItem(text = { Text("Share list") }, onClick = { menuFor = null; shareDeckText(context, deck.name, deck.text) })
+-                                    DropdownMenuItem(text = { Text("Delete…", color = Color(0xFFE9978B)) }, onClick = { menuFor = null; deleting = deck })
++                    shown.isEmpty() -> Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
++                        Text("No decks match.", color = Muted, fontSize = 13.sp)
++                    }
++                    else -> LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
++                        items(shown, key = { it.name }) { deck ->
++                            DeckTile(deck, summaries[deck.name], now, onOpen = { editing = deck.name }) {
++                                Box {
++                                    IconButton(onClick = { menuFor = deck.name }, modifier = Modifier.size(48.dp)) { Icon(Icons.Filled.MoreVert, "More for ${deck.name}", tint = Muted) }
++                                    DropdownMenu(expanded = menuFor == deck.name, onDismissRequest = { menuFor = null }) {
++                                        DropdownMenuItem(text = { Text("Play this deck") }, onClick = { menuFor = null; onPlay(deck) })
++                                        DropdownMenuItem(text = { Text("Rename") }, onClick = { menuFor = null; renaming = deck })
++                                        DropdownMenuItem(text = { Text("Tags…") }, onClick = { menuFor = null; tagging = deck })
++                                        DropdownMenuItem(text = { Text("Duplicate") }, onClick = { menuFor = null; onDecksChanged(SavedDeckOps.duplicate(decks, deck)) })
++                                        DropdownMenuItem(text = { Text("Copy list") }, onClick = { menuFor = null; copyDeckText(context, deck.name, deck.text) })
++                                        DropdownMenuItem(text = { Text("Share list") }, onClick = { menuFor = null; shareDeckText(context, deck.name, deck.text) })
++                                        DropdownMenuItem(text = { Text("Delete", color = Color(0xFFE9978B)) }, onClick = {
++                                            menuFor = null
++                                            recentlyDeleted = deck to decks.indexOf(deck)
++                                            onDecksChanged(SavedDeckOps.delete(decks, deck))
++                                        })
++                                    }
+                                 }
+                             }
+                         }
++                        item { Spacer(Modifier.height(24.dp)) }
++                    }
++                }
++                recentlyDeleted?.let { (deck, index) ->
++                    Row(Modifier.fillMaxWidth().padding(top = 8.dp).clip(RoundedCornerShape(12.dp)).background(PanelLight).padding(start = 14.dp, end = 4.dp),
++                        verticalAlignment = Alignment.CenterVertically) {
++                        Text("Deleted ${deck.name}", color = SoftWhite, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
++                        TextButton(onClick = { onDecksChanged(SavedDeckOps.restore(decks, deck, index)); recentlyDeleted = null },
++                            modifier = Modifier.heightIn(min = 48.dp).testTag("deck-undo-delete")) { Text("UNDO", color = Mint, fontWeight = FontWeight.Black) }
+                     }
+                 }
+             }
+@@ -157,14 +205,71 @@ internal fun DeckManagerDialog(
+             confirmButton = { TextButton(enabled = value.isNotBlank(), onClick = { onDecksChanged(SavedDeckOps.rename(decks, deck, value)); renaming = null }) { Text("SAVE") } },
+             dismissButton = { TextButton(onClick = { renaming = null }) { Text("CANCEL") } })
+     }
+-    deleting?.let { deck ->
+-        AlertDialog(onDismissRequest = { deleting = null }, title = { Text("Delete ${deck.name}?") },
+-            text = { Text("This removes the saved deck from this phone. It can't be undone. Copy the list first if you might want it back.") },
+-            confirmButton = { TextButton(onClick = { onDecksChanged(SavedDeckOps.delete(decks, deck)); deleting = null }) { Text("DELETE", color = Color(0xFFE9978B)) } },
+-            dismissButton = { TextButton(onClick = { deleting = null }) { Text("KEEP") } })
++    tagging?.let { deck ->
++        var chosen by remember(deck) { mutableStateOf(deck.tags) }
++        var newTag by remember(deck) { mutableStateOf("") }
++        val options = (tags + chosen).distinctBy { it.lowercase() }
++        fun addNew() { newTag.trim().takeIf { it.isNotEmpty() }?.let { t -> if (chosen.none { it.equals(t, true) }) chosen = chosen + t }; newTag = "" }
++        AlertDialog(onDismissRequest = { tagging = null }, title = { Text("Tags for ${deck.name}") },
++            text = {
++                Column {
++                    if (options.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
++                        options.forEach { t ->
++                            val on = chosen.any { it.equals(t, true) }
++                            FilterChip(on, { chosen = if (on) chosen.filterNot { it.equals(t, true) } else chosen + t }, label = { Text(t) })
++                        }
++                    }
++                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 8.dp)) {
++                        OutlinedTextField(newTag, { newTag = it.take(24) }, Modifier.weight(1f), singleLine = true, label = { Text("New tag") }, placeholder = { Text("Casual, Testing…") })
++                        TextButton(onClick = ::addNew, enabled = newTag.isNotBlank(), modifier = Modifier.heightIn(min = 48.dp)) { Text("ADD") }
++                    }
++                }
++            },
++            confirmButton = { TextButton(onClick = { addNew(); onDecksChanged(SavedDeckOps.setTags(decks, deck, chosen)); tagging = null }) { Text("SAVE") } },
++            dismissButton = { TextButton(onClick = { tagging = null }) { Text("CANCEL") } })
++    }
++}
++
++/** One saved deck: commander art, colors, size, whether it's ready to play, tags and last edit. */
++@Composable
++private fun DeckTile(deck: SavedDeck, summary: DeckSummary?, now: Long, onOpen: () -> Unit, menu: @Composable () -> Unit) {
++    Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel).clickable(onClick = onOpen).padding(start = 8.dp, end = 4.dp, top = 8.dp, bottom = 8.dp)
++        .testTag("deck-tile-${deck.name}"), verticalAlignment = Alignment.CenterVertically) {
++        Box(Modifier.size(width = 50.dp, height = 70.dp).clip(RoundedCornerShape(6.dp)).background(PanelLight), contentAlignment = Alignment.Center) {
++            val art = summary?.commanderImageUrl
++            if (art != null) CardArt(art, Modifier.fillMaxSize(), ContentScale.Crop, fallbackName = summary?.commanders?.firstOrNull())
++            else Text(deck.name.take(1).uppercase(), color = Muted, fontWeight = FontWeight.Black, fontSize = 20.sp)
++        }
++        Column(Modifier.weight(1f).padding(horizontal = 12.dp)) {
++            Text(deck.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
++            val commanders = summary?.commanders ?: listOfNotNull(deck.commander)
++            Text(commanders.joinToString(" + ").ifBlank { "No commander yet" }, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
++            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
++                summary?.identity?.let { id ->
++                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
++                        if (id.isEmpty()) ColorDot('C') else "WUBRG".filter { it in id }.forEach { ColorDot(it) }
++                    }
++                }
++                Text("${summary?.cards ?: "…"}/100", color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.SemiBold)
++                when (val n = summary?.problems) {
++                    null -> Text("checking…", color = Muted, fontSize = 11.sp)
++                    0 -> Text("Ready", color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Bold)
++                    else -> Text("$n to fix", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
++                }
++            }
++            val meta = listOfNotNull(deck.tags.takeIf { it.isNotEmpty() }?.joinToString(" · ") { "#$it" }, editedAgo(deck.updatedAt, now))
++            if (meta.isNotEmpty()) Text(meta.joinToString("  ·  "), color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
++        }
++        TextButton(onClick = onOpen, modifier = Modifier.heightIn(min = 48.dp)) { Text("EDIT", color = Mint, fontWeight = FontWeight.Bold) }
++        menu()
+     }
+ }
+ 
++@Composable
++private fun ColorDot(c: Char) {
++    Box(Modifier.size(14.dp).clip(CircleShape).background(pipColor(c)).border(1.dp, Color.White.copy(alpha = 0.5f), CircleShape))
++}
++
+ private enum class EditorTab { LIBRARY, DECK, STATS }
+ 
+ @Composable
+@@ -281,6 +386,9 @@ private fun DeckEditorScreen(
+                             onRemoveCommander = { name -> edit { it.removeCommander(name) } },
+                             onSideboard = { name -> edit { it.moveToSideboard(name) } },
+                             onMain = { name -> edit { it.moveToMain(name) } },
++                            onMaybe = { name -> edit { it.moveToMaybeboard(name) } },
++                            onFromMaybe = { name -> edit { it.moveFromMaybeboard(name) } },
++                            onRemoveMaybe = { name -> edit { it.removeFromMaybeboard(name) } },
+                             onReplace = { replacing = it },
+                             onPreview = { previewName = it })
+                     }
+@@ -306,7 +414,8 @@ private fun DeckEditorScreen(
+     }
+ 
+     previewName?.let { name ->
+-        CardPreviewDialog(name, cat, draft, onAdd = { edit { it.add(name) } }, onCommander = { edit { it.setCommander(name) } }, onDismiss = { previewName = null })
++        CardPreviewDialog(name, cat, draft, onAdd = { edit { it.add(name) } }, onCommander = { edit { it.setCommander(name) } },
++            onMaybe = { edit { it.addToMaybeboard(name) } }, onDismiss = { previewName = null })
+     }
+     replacing?.let { name ->
+         ReplacementDialog(name, lib, draft, identity, onChoose = { choice -> edit { it.replace(name, choice) }; replacing = null }, onDismiss = { replacing = null })
+@@ -326,22 +435,24 @@ private fun DeckEditorScreen(
+ 
+ // ---- Library pane ---------------------------------------------------------------------------
+ 
+-private data class QuickFilters(
+-    val type: String? = null,
+-    val colors: Set<Char> = emptySet(),
+-    val colorless: Boolean = false,
+-    val maxMv: Int? = null,
+-    val fitsCommander: Boolean = true,
+-    val commandersOnly: Boolean = false,
+-)
+-
+-private fun QuickFilters.toQuery(identity: Set<Char>, hasCommander: Boolean): String = buildList {
+-    type?.let { add("t:$it") }
+-    if (colorless) add("c:c") else if (colors.isNotEmpty()) add("c:" + "WUBRG".filter { it in colors }.lowercase())
+-    maxMv?.let { add(if (it >= 7) "mv>=7" else "mv<=$it") }
+-    if (commandersOnly) add("is:commander")
+-    else if (fitsCommander && hasCommander) add("id:" + (if (identity.isEmpty()) "c" else "WUBRG".filter { it in identity }.lowercase()))
+-}.joinToString(" ")
++/** Deck-context search terms layered on the FILTERS panel: commanders first, then what fits. */
++private fun contextQuery(commandersOnly: Boolean, fitsCommander: Boolean, identity: Set<Char>, hasCommander: Boolean): String = when {
++    commandersOnly -> "is:commander"
++    fitsCommander && hasCommander -> "id:" + (if (identity.isEmpty()) "c" else "WUBRG".filter { it in identity }.lowercase())
++    else -> ""
++}
++
++private val QUICK_TYPES = listOf("creature", "instant", "sorcery", "artifact", "enchantment", "planeswalker", "land", "legendary")
++
++/** The quick mana-value chip writes one mana value condition; other stat filters are left alone. */
++private fun CardFilters.withQuickMv(max: Int?): CardFilters {
++    val others = stats.filterNot { it.stat == StatField.MANA_VALUE }
++    return copy(stats = others + listOfNotNull(max?.let { if (it >= 7) StatRange(StatField.MANA_VALUE, StatOp.GTE, 7.0) else StatRange(StatField.MANA_VALUE, StatOp.LTE, it.toDouble()) }))
++}
++
++private fun CardFilters.quickMvLabel(): String? = stats.singleOrNull { it.stat == StatField.MANA_VALUE }?.let { s ->
++    when (s.op) { StatOp.LTE -> "MV ≤${fmtNumber(s.value)}"; StatOp.GTE -> "MV ${fmtNumber(s.value)}+"; else -> s.label.replace("Mana value", "MV") }
++}
+ 
+ @Composable
+ private fun LibraryPane(
+@@ -355,79 +466,116 @@ private fun LibraryPane(
+     onCommander: (String) -> Unit,
+     onPreview: (String) -> Unit,
+ ) {
+-    var filters by remember { mutableStateOf(QuickFilters(commandersOnly = draft.commanders.isEmpty())) }
++    var filters by rememberSaveable(stateSaver = CardFiltersSaver) { mutableStateOf(CardFilters()) }
++    var commandersOnly by rememberSaveable { mutableStateOf(draft.commanders.isEmpty()) }
++    var fitsCommander by rememberSaveable { mutableStateOf(true) }
++    var grid by rememberSaveable { mutableStateOf(false) }
++    var sheetOpen by remember { mutableStateOf(false) }
+     var result by remember { mutableStateOf<CardLibrary.Result?>(null) }
+     var showHelp by remember { mutableStateOf(false) }
+     val listState = rememberLazyListState()
++    val gridState = rememberLazyGridState()
+     val hasCommander = draft.commanders.isNotEmpty()
+     // Start a new deck by showing commanders; once one is chosen, show what fits it instead.
+-    LaunchedEffect(hasCommander) { if (hasCommander && filters.commandersOnly) filters = filters.copy(commandersOnly = false, fitsCommander = true) }
+-    val filterQuery = filters.toQuery(identity, hasCommander)
+-    LaunchedEffect(query, filterQuery) {
++    LaunchedEffect(hasCommander) { if (hasCommander && commandersOnly) { commandersOnly = false; fitsCommander = true } }
++    val baseQuery = "$query ${contextQuery(commandersOnly, fitsCommander, identity, hasCommander)}".trim()
++    LaunchedEffect(baseQuery, filters) {
+         delay(if (query.isBlank()) 0 else 220) // debounce typing
+-        result = withContext(Dispatchers.Default) { lib.search("$query $filterQuery".trim(), limit = 400) }
++        result = withContext(Dispatchers.Default) { lib.search(baseQuery, filters, limit = 400) }
+     }
++    // New results start at the top. requestScrollToItem applies on the next layout pass, on the UI
++    // thread; scrolling from the search coroutine could measure off the main thread.
++    LaunchedEffect(result) { listState.requestScrollToItem(0); gridState.requestScrollToItem(0) }
+     Column(modifier) {
+         OutlinedTextField(query, onQuery, Modifier.fillMaxWidth().testTag("library-search"), singleLine = true,
+             label = { Text("Search ${lib.size} playable cards") },
+             placeholder = { Text("name, or t:creature o:draw mv<=3") },
+             trailingIcon = { if (query.isNotEmpty()) IconButton(onClick = { onQuery("") }) { Icon(Icons.Filled.Close, "Clear search", tint = Muted) } })
+         Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+-            FilterChip(filters.commandersOnly, { filters = filters.copy(commandersOnly = !filters.commandersOnly) }, label = { Text("Commanders") })
+-            if (hasCommander) FilterChip(filters.fitsCommander && !filters.commandersOnly, { filters = filters.copy(fitsCommander = !filters.fitsCommander, commandersOnly = false) }, label = { Text("Fits ${identityLabel(identity)}") })
++            val active = filters.activeCount
++            FilterChip(active > 0, { sheetOpen = true }, modifier = Modifier.testTag("open-filters"),
++                leadingIcon = { Icon(Icons.Filled.Tune, null, Modifier.size(18.dp)) },
++                label = { Text(if (active > 0) "FILTERS · $active" else "FILTERS", fontWeight = FontWeight.Bold) })
++            FilterChip(commandersOnly, { commandersOnly = !commandersOnly }, label = { Text("Commanders") })
++            if (hasCommander) FilterChip(fitsCommander && !commandersOnly, { fitsCommander = !fitsCommander; commandersOnly = false }, label = { Text("Fits ${identityLabel(identity)}") })
++            "WUBRG".forEach { c ->
++                FilterChip(!filters.colorless && c in filters.colors, { filters = filters.copy(colorless = false, colors = if (c in filters.colors) filters.colors - c else filters.colors + c) },
++                    label = { Text(c.toString(), fontWeight = FontWeight.Bold) })
++            }
++            FilterChip(filters.colorless, { filters = filters.copy(colorless = !filters.colorless, colors = emptySet()) }, label = { Text("C") })
+             var typeMenu by remember { mutableStateOf(false) }
+             Box {
+-                FilterChip(filters.type != null, { typeMenu = true }, label = { Text(filters.type?.replaceFirstChar(Char::uppercaseChar) ?: "Type ▾") })
++                FilterChip(filters.typeTerms.isNotEmpty(), { typeMenu = true }, label = { Text(filters.typeTerms.singleOrNull()?.replaceFirstChar(Char::uppercaseChar) ?: if (filters.typeTerms.isEmpty()) "Type ▾" else "${filters.typeTerms.size} types") })
+                 DropdownMenu(typeMenu, { typeMenu = false }) {
+-                    DropdownMenuItem(text = { Text("Any type") }, onClick = { filters = filters.copy(type = null); typeMenu = false })
+-                    listOf("creature", "instant", "sorcery", "artifact", "enchantment", "planeswalker", "land", "legendary").forEach { t ->
+-                        DropdownMenuItem(text = { Text(t.replaceFirstChar(Char::uppercaseChar)) }, onClick = { filters = filters.copy(type = t); typeMenu = false })
++                    DropdownMenuItem(text = { Text("Any type") }, onClick = { filters = filters.copy(typeTerms = emptyList()); typeMenu = false })
++                    QUICK_TYPES.forEach { t ->
++                        DropdownMenuItem(text = { Text(t.replaceFirstChar(Char::uppercaseChar)) }, onClick = { filters = filters.copy(typeTerms = listOf(t)); typeMenu = false })
+                     }
+                 }
+             }
+-            "WUBRG".forEach { c ->
+-                FilterChip(c in filters.colors, { filters = filters.copy(colors = if (c in filters.colors) filters.colors - c else filters.colors + c, colorless = false) },
+-                    label = { Text(c.toString(), fontWeight = FontWeight.Bold) })
+-            }
+-            FilterChip(filters.colorless, { filters = filters.copy(colorless = !filters.colorless, colors = emptySet()) }, label = { Text("C") })
+             var mvMenu by remember { mutableStateOf(false) }
+             Box {
+-                FilterChip(filters.maxMv != null, { mvMenu = true }, label = { Text(filters.maxMv?.let { if (it >= 7) "MV 7+" else "MV ≤$it" } ?: "Mana value ▾") })
++                FilterChip(filters.stats.any { it.stat == StatField.MANA_VALUE }, { mvMenu = true }, label = { Text(filters.quickMvLabel() ?: "Mana value ▾") })
+                 DropdownMenu(mvMenu, { mvMenu = false }) {
+-                    DropdownMenuItem(text = { Text("Any") }, onClick = { filters = filters.copy(maxMv = null); mvMenu = false })
+-                    (1..6).forEach { n -> DropdownMenuItem(text = { Text("$n or less") }, onClick = { filters = filters.copy(maxMv = n); mvMenu = false }) }
+-                    DropdownMenuItem(text = { Text("7 or more") }, onClick = { filters = filters.copy(maxMv = 7); mvMenu = false })
++                    DropdownMenuItem(text = { Text("Any") }, onClick = { filters = filters.withQuickMv(null); mvMenu = false })
++                    (1..6).forEach { n -> DropdownMenuItem(text = { Text("$n or less") }, onClick = { filters = filters.withQuickMv(n); mvMenu = false }) }
++                    DropdownMenuItem(text = { Text("7 or more") }, onClick = { filters = filters.withQuickMv(7); mvMenu = false })
+                 }
+             }
+             TextButton(onClick = { showHelp = !showHelp }) { Text(if (showHelp) "HIDE TIPS" else "SEARCH TIPS", color = Mint, fontSize = 11.sp) }
+         }
+         if (showHelp) Text(
+-            "t:creature · o:draw · c:ub (colors) · id:ub (fits commander) · mv<=3 · pow>=4 · k:flying · r:mythic · s:cmm · is:legendary · is:commander · -t:land to exclude. Combine freely.",
++            "t:creature · o:draw · c:ub (colors) · id:ub (fits commander) · mv<=3 · pow>=4 · k:flying · r:mythic · s:cmm · is:legendary · is:commander · -t:land to exclude. Combine freely, or use FILTERS.",
+             color = Muted, fontSize = 11.sp, lineHeight = 15.sp, modifier = Modifier.padding(bottom = 6.dp))
++        val chips = filters.summaryChips()
++        if (chips.isNotEmpty()) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
++            chips.forEach { (label, without) -> RemovableChip(label) { filters = without } }
++            TextButton(onClick = { filters = filters.cleared() }, modifier = Modifier.heightIn(min = 40.dp)) { Text("CLEAR", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
++        }
+         val r = result
+         when {
+             r == null -> Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Mint) }
+             r.cards.isEmpty() -> Column(Modifier.fillMaxWidth().padding(20.dp)) {
+                 Text("No playable cards match.", color = SoftWhite, fontWeight = FontWeight.Bold)
+-                Text(if (filterQuery.isNotBlank()) "Try removing a filter chip. Only cards this build of Arcana can play are listed." else "Only cards this build of Arcana can play are listed.", color = Muted, fontSize = 12.sp)
++                Text(if (filters.activeCount > 0 || commandersOnly || fitsCommander) "Try removing a filter. Only cards this build of Arcana can play are listed." else "Only cards this build of Arcana can play are listed.", color = Muted, fontSize = 12.sp)
+                 r.errors.forEach { Text(it, color = CounterGold, fontSize = 12.sp) }
+             }
+             else -> {
+-                Text(buildString {
+-                    append(if (r.total > r.cards.size) "Showing ${r.cards.size} of ${r.total}" else "${r.total} card${if (r.total == 1) "" else "s"}")
+-                    if (r.fuzzy) append(" · closest names (check spelling)")
+-                }, color = if (r.fuzzy) CounterGold else Muted, fontSize = 11.sp)
++                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
++                    Text(buildString {
++                        append(if (r.total > r.cards.size) "Showing ${r.cards.size} of ${r.total}" else "${r.total} card${if (r.total == 1) "" else "s"}")
++                        if (r.fuzzy) append(" · closest names (check spelling)")
++                    }, color = if (r.fuzzy) CounterGold else Muted, fontSize = 11.sp, modifier = Modifier.weight(1f))
++                    var sortMenu by remember { mutableStateOf(false) }
++                    Box {
++                        TextButton(onClick = { sortMenu = true }, modifier = Modifier.heightIn(min = 44.dp).testTag("results-sort")) {
++                            Text("${filters.sort.label} ${if (filters.descending) "↓" else "↑"}", color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Bold)
++                        }
++                        DropdownMenu(sortMenu, { sortMenu = false }) {
++                            CardSort.entries.forEach { s ->
++                                DropdownMenuItem(text = { Text(s.label + if (s == filters.sort) "  ✓" else "") }, onClick = { filters = filters.copy(sort = s); sortMenu = false })
++                            }
++                            HorizontalDivider()
++                            DropdownMenuItem(text = { Text(if (filters.descending) "↑ Ascending" else "↓ Descending") }, onClick = { filters = filters.copy(descending = !filters.descending); sortMenu = false })
++                        }
++                    }
++                    IconButton(onClick = { grid = !grid }, modifier = Modifier.size(44.dp).testTag("results-view")) {
++                        Icon(if (grid) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView, if (grid) "Show as list" else "Show as card grid", tint = Mint)
++                    }
++                }
+                 r.errors.forEach { Text(it, color = CounterGold, fontSize = 11.sp) }
+-                LazyColumn(Modifier.fillMaxSize().padding(top = 4.dp), state = listState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
++                fun inDeck(card: SupportedCard) = draft.countOf(card.name) + if (draft.commanders.any { it.equals(card.name, true) }) 1 else 0
++                if (grid) LibraryGrid(r.cards, ::inDeck, gridState, onAdd = { onAdd(it.name) }, onPreview = { onPreview(it.name) }, modifier = Modifier.fillMaxSize().padding(top = 4.dp))
++                else LazyColumn(Modifier.fillMaxSize().padding(top = 4.dp), state = listState, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                     items(r.cards, key = { it.name }) { card ->
+-                        val inDeck = draft.countOf(card.name) + if (draft.commanders.any { it.equals(card.name, true) }) 1 else 0
+-                        LibraryRow(card, inDeck, canCommand = CardLibrary.isCommanderEligible(card),
++                        LibraryRow(card, inDeck(card), canCommand = CardLibrary.isCommanderEligible(card),
+                             onAdd = { onAdd(card.name) }, onCommander = { onCommander(card.name) }, onPreview = { onPreview(card.name) })
+                     }
+                 }
+             }
+         }
+     }
++    if (sheetOpen) CardFilterSheet(lib, baseQuery, filters, onChange = { filters = it }, onDismiss = { sheetOpen = false })
+ }
+ 
+ @Composable
+@@ -438,7 +586,12 @@ private fun LibraryRow(card: SupportedCard, inDeck: Int, canCommand: Boolean, on
+         Column(Modifier.weight(1f).padding(horizontal = 10.dp)) {
+             Text(card.name, color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+             Text(listOf(card.manaCost.ifBlank { "—" }, card.typeLine).joinToString("  ·  "), color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+-            if (card.custom) Text("Arcana custom card", color = Muted, fontSize = 10.sp)
++            Text(listOfNotNull(
++                card.power?.let { "$it/${card.toughness}" },
++                card.setCode,
++                card.rarity?.lowercase()?.replaceFirstChar(Char::uppercaseChar) ?: "Common".takeIf { card.setCode != null },
++                "Arcana custom card".takeIf { card.custom },
++            ).joinToString(" · "), color = Muted, fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+         }
+         if (inDeck > 0) Text("×$inDeck", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp, modifier = Modifier.padding(end = 4.dp))
+         if (canCommand) TextButton(onClick = onCommander, modifier = Modifier.heightIn(min = 48.dp)) { Text("CMDR", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Bold) }
+@@ -464,6 +617,9 @@ private fun DeckPane(
+     onRemoveCommander: (String) -> Unit,
+     onSideboard: (String) -> Unit,
+     onMain: (String) -> Unit,
++    onMaybe: (String) -> Unit,
++    onFromMaybe: (String) -> Unit,
++    onRemoveMaybe: (String) -> Unit,
+     onReplace: (String) -> Unit,
+     onPreview: (String) -> Unit,
+ ) {
+@@ -504,7 +660,7 @@ private fun DeckPane(
+                 DeckRow(line, cat.find(line.name), line.name.lowercase() in flagged, canCommand = cat.find(line.name)?.let { CardLibrary.isCommanderEligible(it) } == true,
+                     hasOneCommander = draft.commanders.size == 1,
+                     onCount = { onCount(line.name, it) }, onCommander = { onCommander(line.name) }, onPartner = { onPartner(line.name) },
+-                    onSideboard = { onSideboard(line.name) }, onReplace = { onReplace(line.name) }, onPreview = { onPreview(line.name) })
++                    onSideboard = { onSideboard(line.name) }, onMaybe = { onMaybe(line.name) }, onReplace = { onReplace(line.name) }, onPreview = { onPreview(line.name) })
+             }
+         }
+         if (draft.sideboard.isNotEmpty()) {
+@@ -516,6 +672,20 @@ private fun DeckPane(
+                 }
+             }
+         }
++        if (draft.maybeboard.isNotEmpty()) {
++            item { Text("MAYBEBOARD · ${draft.maybeboard.sumOf { it.count }} (considering; not in the 100)", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.padding(top = 12.dp)) }
++            items(draft.maybeboard, key = { "m-${it.name}" }) { line ->
++                Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Panel).clickable { onPreview(line.name) }.padding(start = 10.dp), verticalAlignment = Alignment.CenterVertically) {
++                    Column(Modifier.weight(1f).padding(vertical = 6.dp)) {
++                        Text("${line.count}× ${line.name}", color = SoftWhite, fontSize = 13.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                        cat.find(line.name)?.let { Text(it.manaCost.ifBlank { it.typeLine.substringBefore(" —") }, color = Muted, fontSize = 10.sp, maxLines = 1) }
++                            ?: Text("Not in this build's library", color = CounterGold, fontSize = 10.sp)
++                    }
++                    TextButton(onClick = { onFromMaybe(line.name) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("TO DECK", color = Mint, fontSize = 11.sp) }
++                    IconButton(onClick = { onRemoveMaybe(line.name) }, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Remove ${line.name} from maybeboard", tint = Muted) }
++                }
++            }
++        }
+         draft.companion?.let { c -> item { Text("COMPANION · $c (saved; not usable in games yet)", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 10.dp)) } }
+         if (draft.unreadLines.isNotEmpty()) item {
+             Column(Modifier.padding(top = 12.dp).fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(Color(0xFF392B21)).padding(10.dp)) {
+@@ -529,7 +699,7 @@ private fun DeckPane(
+ 
+ @Composable
+ private fun DeckRow(line: DeckLine, card: SupportedCard?, flagged: Boolean, canCommand: Boolean, hasOneCommander: Boolean,
+-                    onCount: (Int) -> Unit, onCommander: () -> Unit, onPartner: () -> Unit, onSideboard: () -> Unit, onReplace: () -> Unit, onPreview: () -> Unit) {
++                    onCount: (Int) -> Unit, onCommander: () -> Unit, onPartner: () -> Unit, onSideboard: () -> Unit, onMaybe: () -> Unit, onReplace: () -> Unit, onPreview: () -> Unit) {
+     var menu by remember { mutableStateOf(false) }
+     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
+         .background(if (flagged) Color(0xFF392B21) else Panel)
+@@ -549,6 +719,7 @@ private fun DeckRow(line: DeckLine, card: SupportedCard?, flagged: Boolean, canC
+             DropdownMenu(menu, { menu = false }) {
+                 if (canCommand) DropdownMenuItem(text = { Text("Make commander") }, onClick = { menu = false; onCommander() })
+                 if (canCommand && hasOneCommander) DropdownMenuItem(text = { Text("Add as second commander") }, onClick = { menu = false; onPartner() })
++                DropdownMenuItem(text = { Text("Move to maybeboard") }, onClick = { menu = false; onMaybe() })
+                 DropdownMenuItem(text = { Text("Move to sideboard") }, onClick = { menu = false; onSideboard() })
+                 DropdownMenuItem(text = { Text("Suggest replacements") }, onClick = { menu = false; onReplace() })
+                 DropdownMenuItem(text = { Text("Remove all copies") }, onClick = { menu = false; onCount(0) })
+@@ -607,6 +778,21 @@ private fun StatsPanel(s: DeckStats, issues: List<DeckIssue>) {
+                 Text(" $n", color = Muted, fontSize = 11.sp, modifier = Modifier.width(36.dp))
+             }
+         }
++        val needs = s.pips.filter { it.value > 0 || (s.landSources[it.key] ?: 0) > 0 }.keys
++        if (needs.isNotEmpty()) {
++            Text("MANA SOURCES · lands that make each color", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
++            needs.forEach { c ->
++                val pips = s.pips[c] ?: 0
++                val lands = s.landSources[c] ?: 0
++                val short = pips > 0 && lands == 0
++                Row(verticalAlignment = Alignment.CenterVertically) {
++                    Text(c.toString(), color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.width(18.dp))
++                    Text("$lands land${if (lands == 1) "" else "s"} for $pips symbol${if (pips == 1) "" else "s"}", color = if (short) CounterGold else SoftWhite, fontSize = 12.sp, modifier = Modifier.weight(1f))
++                    if (short) Text("no source", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
++                }
++            }
++            Text("A guide from land types and rules text; mana rocks and dorks aren't counted.", color = Muted, fontSize = 10.sp)
++        }
+         Text("BY TYPE", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+         DECK_GROUP_ORDER.mapNotNull { g -> s.byType[g]?.let { g to it } }.forEach { (g, n) -> Text("$g  $n", color = SoftWhite, fontSize = 12.sp) }
+         if (s.unsupported > 0) Text("${s.unsupported} card${if (s.unsupported == 1) "" else "s"} not in this build's library (not counted above)", color = CounterGold, fontSize = 12.sp)
+@@ -633,12 +819,12 @@ private fun CurveBars(curve: List<Int>, modifier: Modifier, labels: Boolean = fa
+     }
+ }
+ 
+-private fun pipColor(c: Char) = when (c) { 'W' -> Color(0xFFF2E8C9); 'U' -> Color(0xFF6FA8DC); 'B' -> Color(0xFF8E7F99); 'R' -> Color(0xFFE07A5F); 'G' -> Color(0xFF6DBE7B); else -> Color.Gray }
++private fun pipColor(c: Char) = when (c) { 'W' -> Color(0xFFF2E8C9); 'U' -> Color(0xFF6FA8DC); 'B' -> Color(0xFF8E7F99); 'R' -> Color(0xFFE07A5F); 'G' -> Color(0xFF6DBE7B); 'C' -> Color(0xFFB0B4B8); else -> Color.Gray }
+ 
+ // ---- Card preview & replacements ------------------------------------------------------------
+ 
+ @Composable
+-private fun CardPreviewDialog(name: String, cat: SupportedCardCatalog, draft: DeckDraft, onAdd: () -> Unit, onCommander: () -> Unit, onDismiss: () -> Unit) {
++private fun CardPreviewDialog(name: String, cat: SupportedCardCatalog, draft: DeckDraft, onAdd: () -> Unit, onCommander: () -> Unit, onMaybe: () -> Unit, onDismiss: () -> Unit) {
+     val card = cat.find(name)
+     Dialog(onDismissRequest = onDismiss) {
+         Surface(shape = RoundedCornerShape(16.dp), color = Panel) {
+@@ -656,6 +842,8 @@ private fun CardPreviewDialog(name: String, cat: SupportedCardCatalog, draft: De
+                     Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                         if (CardLibrary.isCommanderEligible(card) && draft.commanders.none { it.equals(card.name, true) })
+                             OutlinedButton(onClick = { onCommander(); onDismiss() }, modifier = Modifier.heightIn(min = 48.dp)) { Text("MAKE COMMANDER", color = CounterGold) }
++                        if (draft.maybeboard.none { it.name.equals(card.name, true) } && draft.countOf(card.name) == 0)
++                            OutlinedButton(onClick = { onMaybe(); onDismiss() }, modifier = Modifier.heightIn(min = 48.dp)) { Text("MAYBE", color = SoftWhite) }
+                         Button(onClick = { onAdd() }, modifier = Modifier.heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) {
+                             Text("ADD${draft.countOf(card.name).takeIf { it > 0 }?.let { " (×$it)" }.orEmpty()}")
+                         }
+diff --git a/android/app/src/main/java/com/arcanatable/LibrarySearchFilters.kt b/android/app/src/main/java/com/arcanatable/LibrarySearchFilters.kt
+new file mode 100644
+index 0000000..b06b233
+--- /dev/null
++++ b/android/app/src/main/java/com/arcanatable/LibrarySearchFilters.kt
+@@ -0,0 +1,75 @@
++package com.arcanatable
++
++import java.util.Locale
++
++/**
++ * Quick filters for searching your library in a game: the engine's tutor choices (Argentum's
++ * SearchLibraryDecision) and the manual table's library browser. They only narrow and arrange
++ * what's shown; the engine still decides which cards are legal picks. Pure Kotlin for tests.
++ */
++enum class LibraryChip(val label: String) {
++    BASIC_LAND("Basic land"), LAND("Land"), CREATURE("Creature"), ARTIFACT("Artifact"), ENCHANTMENT("Enchantment"),
++    INSTANT("Instant"), SORCERY("Sorcery"), PLANESWALKER("Planeswalker"), LEGENDARY("Legendary");
++
++    fun matches(typeLine: String): Boolean {
++        val t = typeLine.substringBefore(" // ").lowercase(Locale.ROOT)
++        return when (this) {
++            BASIC_LAND -> "basic" in t && "land" in t
++            LAND -> "land" in t
++            else -> name.lowercase(Locale.ROOT) in t
++        }
++    }
++
++    companion object {
++        /** Chips worth showing for these cards, with how many each matches. A chip matching all of them adds nothing. */
++        fun present(typeLines: List<String>): List<Pair<LibraryChip, Int>> = entries
++            .map { chip -> chip to typeLines.count(chip::matches) }
++            .filter { (_, n) -> n > 0 && n < typeLines.size }
++    }
++}
++
++enum class LibrarySort(val label: String) { TYPE("By type"), NAME("A–Z"), MANA_VALUE("Mana value") }
++
++/** The heading a card sits under when grouped by type, in the order players usually scan. */
++fun libraryGroupOf(typeLine: String): String {
++    val t = typeLine.substringBefore(" // ").lowercase(Locale.ROOT)
++    return when {
++        t.isBlank() -> "Other"
++        "basic" in t && "land" in t -> "Basic lands"
++        "land" in t -> "Lands"
++        "creature" in t -> "Creatures"
++        "planeswalker" in t -> "Planeswalkers"
++        "battle" in t -> "Battles"
++        "instant" in t -> "Instants"
++        "sorcery" in t -> "Sorceries"
++        "artifact" in t -> "Artifacts"
++        "enchantment" in t -> "Enchantments"
++        else -> "Other"
++    }
++}
++
++val LIBRARY_GROUP_ORDER = listOf("Basic lands", "Lands", "Creatures", "Planeswalkers", "Battles", "Instants", "Sorceries", "Artifacts", "Enchantments", "Other")
++
++/**
++ * Applies a chip and sort to [items]. Cards in [keep] (already selected) always stay, so a chip
++ * can never hide a choice you've made. Returns the items with their group heading.
++ */
++fun <T> arrangeLibrary(
++    items: List<T>,
++    chip: LibraryChip?,
++    sort: LibrarySort,
++    keep: (T) -> Boolean,
++    name: (T) -> String,
++    typeLine: (T) -> String,
++    manaValue: (T) -> Double?,
++): List<Pair<String, T>> {
++    val shown = items.filter { chip == null || chip.matches(typeLine(it)) || keep(it) }
++    val byName = compareBy<T> { name(it).lowercase(Locale.ROOT) }
++    return when (sort) {
++        LibrarySort.TYPE -> shown.sortedWith(compareBy<T> { LIBRARY_GROUP_ORDER.indexOf(libraryGroupOf(typeLine(it))) }.thenBy { manaValue(it) ?: 0.0 }.then(byName))
++            .map { libraryGroupOf(typeLine(it)) to it }
++        LibrarySort.NAME -> shown.sortedWith(byName).map { "Library" to it }
++        LibrarySort.MANA_VALUE -> shown.sortedWith(compareBy<T> { manaValue(it) ?: 99.0 }.then(byName))
++            .map { (manaValue(it)?.let { mv -> "Mana value ${fmtNumber(mv)}" } ?: "Other") to it }
++    }
++}
+diff --git a/android/app/src/main/java/com/arcanatable/TableController.kt b/android/app/src/main/java/com/arcanatable/TableController.kt
+index 595bff0..4ccd288 100644
+--- a/android/app/src/main/java/com/arcanatable/TableController.kt
++++ b/android/app/src/main/java/com/arcanatable/TableController.kt
+@@ -1469,7 +1469,7 @@ internal class TableController(
+                 // Your own deck always goes into your deck list and becomes the deck you play.
+                 if (importSaveToLibrary || (saveAsMine && selectedPlayer == localSeat)) {
+                     val savedName = importSaveName.trim().ifBlank { importedCommander?.name ?: importedTarget?.name ?: "Saved deck" }
+-                    val saved = SavedDeck(savedName, text.trim(), importedCommander?.name)
++                    val saved = SavedDeck(savedName, text.trim(), importedCommander?.name, updatedAt = System.currentTimeMillis())
+                     if (selectedPlayer == localSeat) { activeDeckId = savedName; saveActiveDeck(context, savedName) }
+                     savedDecks = listOf(saved) + savedDecks.filterNot { it.name.equals(savedName, ignoreCase = true) }
+                     saveSavedDecks(context, savedDecks)
+diff --git a/android/app/src/main/java/com/arcanatable/TableDialogs.kt b/android/app/src/main/java/com/arcanatable/TableDialogs.kt
+index 13b2161..383d093 100644
+--- a/android/app/src/main/java/com/arcanatable/TableDialogs.kt
++++ b/android/app/src/main/java/com/arcanatable/TableDialogs.kt
+@@ -144,7 +144,13 @@ internal fun LibrarySearchDialog(
+     onDismiss: () -> Unit
+ ) {
+     var query by remember { mutableStateOf("") }
+-    var selectedCardId by remember { mutableIntStateOf(-1) }
++    var selectedIds by remember { mutableStateOf(setOf<Int>()) }
++    var chip by remember { mutableStateOf<LibraryChip?>(null) }
++    var sort by remember { mutableStateOf(LibrarySort.TYPE) }
++    // A card left the library during this search: offer the shuffle a tutor needs on the way out.
++    var movedOut by remember { mutableStateOf(false) }
++    var shuffledSinceMove by remember { mutableStateOf(false) }
++    var askShuffle by remember { mutableStateOf(false) }
+     // The general browse/search control is not permission to inspect the
+     // library's actual stack. Keep a randomized presentation list separate
+     // from player.library so selecting a card never changes draw order.
+@@ -154,14 +160,24 @@ internal fun LibrarySearchDialog(
+             shuffled.drop(1) + shuffled.first()
+         } else shuffled
+     }
+-    val matches = remember(unorderedLibrary, query) {
++    val searched = remember(unorderedLibrary, query) {
+         unorderedLibrary.filter { card ->
+             query.isBlank() || card.name.contains(query.trim(), ignoreCase = true) || card.type.contains(query.trim(), ignoreCase = true) || card.oracleText.orEmpty().contains(query.trim(), ignoreCase = true)
+         }
+     }
+-    val selected = unorderedLibrary.firstOrNull { it.id == selectedCardId }
++    val chips = remember(unorderedLibrary) { LibraryChip.present(unorderedLibrary.map { it.type }) }
++    val matches = remember(searched, chip, sort, selectedIds) {
++        arrangeLibrary(searched, chip, sort, keep = { it.id in selectedIds }, name = { it.name }, typeLine = { it.type }, manaValue = { it.manaValue })
++    }
++    val selected = unorderedLibrary.filter { it.id in selectedIds }
++    fun close() { if (movedOut && !shuffledSinceMove) askShuffle = true else onDismiss() }
++    fun moveSelected(action: (GameCard) -> Unit, leavesLibrary: Boolean) {
++        selected.forEach(action)
++        if (leavesLibrary) { movedOut = true; shuffledSinceMove = false }
++        selectedIds = emptySet()
++    }
+     Dialog(
+-        onDismissRequest = onDismiss,
++        onDismissRequest = ::close,
+         properties = DialogProperties(usePlatformDefaultWidth = false)
+     ) {
+         Surface(
+@@ -175,35 +191,43 @@ internal fun LibrarySearchDialog(
+                         Text("${player.name} · LIBRARY", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
+                         Text("${player.library.size} cards · randomized display · library order hidden", color = Muted, fontSize = 10.sp)
+                     }
+-                    TextButton(onClick = onShuffle, modifier = Modifier.heightIn(min = 44.dp)) { Text("SHUFFLE", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close library", tint = Muted) }
++                    TextButton(onClick = { onShuffle(); shuffledSinceMove = true }, modifier = Modifier.heightIn(min = 44.dp)) { Text("SHUFFLE", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
++                    IconButton(onClick = ::close, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close library", tint = Muted) }
+                 }
+                 OutlinedTextField(
+                     value = query,
+                     onValueChange = { query = it },
+-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 6.dp),
++                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp),
+                     singleLine = true,
+                     label = { Text("Search name, type, or rules text") },
+                     placeholder = { Text("Blank search shows the full library") }
+                 )
+-                if (selected != null) {
+-                    Text("SELECTED · ${selected.name}", color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
++                    LibrarySort.entries.forEach { s -> FilterChip(sort == s, { sort = s }, label = { Text(s.label, fontSize = 11.sp) }) }
++                    chips.forEach { (c, n) -> FilterChip(chip == c, { chip = if (chip == c) null else c }, label = { Text("${c.label} $n", fontSize = 11.sp) }) }
++                }
++                if (selected.isNotEmpty()) {
++                    Row(verticalAlignment = Alignment.CenterVertically) {
++                        Text(if (selected.size == 1) "SELECTED · ${selected.single().name}" else "${selected.size} SELECTED", color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Bold,
++                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
++                        TextButton(onClick = { selectedIds = emptySet() }, modifier = Modifier.heightIn(min = 40.dp)) { Text("CLEAR", color = Muted, fontSize = 9.sp) }
++                    }
+                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                         listOf(
+-                            "TO HAND" to onTakeToHand,
+-                            "TO BATTLEFIELD" to onPutBattlefield,
+-                            "TO GRAVEYARD" to onPutGraveyard,
+-                            "EXILE" to onPutExile,
+-                            "TOP" to onMoveToTop,
+-                            "BOTTOM" to onMoveToBottom
+-                        ).forEach { (label, action) ->
+-                            TextButton(onClick = { action(selected); selectedCardId = -1 }, modifier = Modifier.heightIn(min = 44.dp)) {
++                            Triple("TO HAND", onTakeToHand, true),
++                            Triple("TO BATTLEFIELD", onPutBattlefield, true),
++                            Triple("TO GRAVEYARD", onPutGraveyard, true),
++                            Triple("EXILE", onPutExile, true),
++                            Triple("TOP", onMoveToTop, false),
++                            Triple("BOTTOM", onMoveToBottom, false)
++                        ).forEach { (label, action, leaves) ->
++                            TextButton(onClick = { moveSelected(action, leaves) }, modifier = Modifier.heightIn(min = 44.dp)) {
+                                 Text(label, color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+                             }
+                         }
+                     }
+                 } else {
+-                    Text("Select a card to move it. Long press a card to inspect it.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(vertical = 5.dp))
++                    Text("Tap cards to select one or more, then move them. Long press a card to inspect it.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(vertical = 5.dp))
+                 }
+                 HorizontalDivider(color = PanelLight)
+                 when {
+@@ -214,32 +238,49 @@ internal fun LibrarySearchDialog(
+                         contentPadding = PaddingValues(vertical = 5.dp),
+                         verticalArrangement = Arrangement.spacedBy(3.dp)
+                     ) {
+-                        items(matches.size, key = { matches[it].id }) { index ->
+-                            val card = matches[index]
+-                            val isSelected = card.id == selectedCardId
+-                            Row(
+-                                Modifier.fillMaxWidth()
+-                                    .clip(RoundedCornerShape(9.dp))
+-                                    .background(if (isSelected) PanelLight else Panel)
+-                                    .border(if (isSelected) 1.dp else 0.dp, if (isSelected) Mint else Panel, RoundedCornerShape(9.dp))
+-                                    .combinedClickable(onClick = { selectedCardId = card.id }, onLongClick = { onPreview(card) })
+-                                    .padding(horizontal = 7.dp, vertical = 4.dp),
+-                                verticalAlignment = Alignment.CenterVertically
+-                            ) {
+-                                CardFace(card, Modifier.width(37.dp), onClick = { selectedCardId = card.id }, onLongClick = { onPreview(card) }, showCounters = false)
+-                                Column(Modifier.weight(1f).padding(start = 8.dp)) {
+-                                    Text(card.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+-                                    Text(card.type, color = Muted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                        matches.forEachIndexed { index, (group, card) ->
++                            if (sort != LibrarySort.NAME && (index == 0 || matches[index - 1].first != group)) item(key = "h-$group") {
++                                Text("${group.uppercase()} · ${matches.count { it.first == group }}", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Black,
++                                    modifier = Modifier.padding(top = 6.dp, bottom = 2.dp))
++                            }
++                            item(key = card.id) {
++                                val isSelected = card.id in selectedIds
++                                Row(
++                                    Modifier.fillMaxWidth()
++                                        .clip(RoundedCornerShape(9.dp))
++                                        .background(if (isSelected) PanelLight else Panel)
++                                        .border(if (isSelected) 1.dp else 0.dp, if (isSelected) Mint else Panel, RoundedCornerShape(9.dp))
++                                        .combinedClickable(onClick = { selectedIds = if (isSelected) selectedIds - card.id else selectedIds + card.id }, onLongClick = { onPreview(card) })
++                                        .padding(horizontal = 7.dp, vertical = 4.dp),
++                                    verticalAlignment = Alignment.CenterVertically
++                                ) {
++                                    CardFace(card, Modifier.width(37.dp), onClick = { selectedIds = if (isSelected) selectedIds - card.id else selectedIds + card.id }, onLongClick = { onPreview(card) }, showCounters = false)
++                                    Column(Modifier.weight(1f).padding(start = 8.dp)) {
++                                        Text(card.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                                        Text(listOfNotNull(card.manaCost?.takeIf { it.isNotBlank() }, card.type, card.power?.let { "$it/${card.toughness}" }).joinToString("  ·  "),
++                                            color = Muted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                                    }
++                                    if (isSelected) Text("✓", color = Mint, fontSize = 13.sp, fontWeight = FontWeight.Black)
+                                 }
+-                                if (isSelected) Text("SELECTED", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                             }
+                         }
+                     }
+                 }
+-                Text("Draw and common turn commands are in the hand tray.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(top = 5.dp))
++                Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
++                    Text("Draw and common turn commands are in the hand tray.", color = Muted, fontSize = 9.sp, modifier = Modifier.weight(1f))
++                    TextButton(onClick = { onShuffle(); onDismiss() }, modifier = Modifier.heightIn(min = 44.dp)) { Text("DONE · SHUFFLE", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
++                }
+             }
+         }
+     }
++    if (askShuffle) AlertDialog(
++        onDismissRequest = { askShuffle = false },
++        title = { Text("Shuffle your library?") },
++        text = { Text("You moved cards out of ${player.name}'s library. Searching usually ends with a shuffle.") },
++        confirmButton = { TextButton(onClick = { askShuffle = false; onShuffle(); onDismiss() }) { Text("SHUFFLE") } },
++        dismissButton = { TextButton(onClick = { askShuffle = false; onDismiss() }) { Text("DON'T SHUFFLE") } },
++        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
++    )
+ }
+ 
+ @Composable
+diff --git a/android/app/src/main/java/com/arcanatable/TableModel.kt b/android/app/src/main/java/com/arcanatable/TableModel.kt
+index 553c5c7..d47dc5c 100644
+--- a/android/app/src/main/java/com/arcanatable/TableModel.kt
++++ b/android/app/src/main/java/com/arcanatable/TableModel.kt
+@@ -349,4 +349,12 @@ data class StackAction(
+     val targetsConfirmed: Boolean = targetCount == null
+ )
+ 
+-internal data class SavedDeck(val name: String, val text: String, val commander: String? = null)
++internal data class SavedDeck(
++    val name: String,
++    val text: String,
++    val commander: String? = null,
++    /** Last edit, epoch millis; 0 for decks saved before this was recorded. */
++    val updatedAt: Long = 0L,
++    /** Player-made labels for sorting the deck library ("Casual", "Testing"). */
++    val tags: List<String> = emptyList(),
++)
+diff --git a/android/app/src/main/java/com/arcanatable/TableOverlays.kt b/android/app/src/main/java/com/arcanatable/TableOverlays.kt
+index 7da5b4e..7dd403a 100644
+--- a/android/app/src/main/java/com/arcanatable/TableOverlays.kt
++++ b/android/app/src/main/java/com/arcanatable/TableOverlays.kt
+@@ -640,10 +640,31 @@ internal fun TableController.TableOverlays() {
+                             Text(decision.optString("filterDescription"), color = Muted, fontSize = 11.sp)
+                             if (options.length() == 0) Text("No matching cards. Confirm to finish the search.", color = Muted, fontSize = 12.sp)
+                             else {
+-                                val libraryItems = (0 until options.length()).map { index ->
+-                                    val id = options.optString(index)
+-                                    libraryPick(id, libraryInfo?.optJSONObject(id), ArgentumDecisions.cardName(decision, id) { argentumSnapshot?.targets?.get(it)?.name })
++                                val allLibraryItems = remember(decision) {
++                                    (0 until options.length()).map { index ->
++                                        val id = options.optString(index)
++                                        libraryPick(id, libraryInfo?.optJSONObject(id), ArgentumDecisions.cardName(decision, id) { argentumSnapshot?.targets?.get(it)?.name })
++                                    }
++                                }
++                                // Type chips and sorting only arrange what Argentum offered; picks stay visible.
++                                var libraryChip by remember(decision) { mutableStateOf<LibraryChip?>(null) }
++                                var librarySort by remember(decision) { mutableStateOf(LibrarySort.TYPE) }
++                                val chips = remember(allLibraryItems) { LibraryChip.present(allLibraryItems.map { it.typeLine }) }
++                                if (allLibraryItems.size > 1) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp),
++                                    horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
++                                    listOf(LibrarySort.TYPE, LibrarySort.NAME).forEach { sort ->
++                                        FilterChip(librarySort == sort, { librarySort = sort }, label = { Text(sort.label) }, modifier = Modifier.testTag("library-sort-${sort.name}"))
++                                    }
++                                    chips.forEach { (chip, n) ->
++                                        FilterChip(libraryChip == chip, { libraryChip = if (libraryChip == chip) null else chip }, label = { Text("${chip.label} $n") },
++                                            modifier = Modifier.testTag("library-chip-${chip.name}"))
++                                    }
+                                 }
++                                val libraryItems = arrangeLibrary(allLibraryItems, libraryChip, librarySort, keep = { it.id in argentumDecisionSelection },
++                                    name = { it.name }, typeLine = { it.typeLine }, manaValue = { null })
++                                    .map { (group, item) -> item.copy(group = group, groupOrder = LIBRARY_GROUP_ORDER.indexOf(group).coerceAtLeast(0)) }
++                                if (maxSel > 1) Text("${argentumDecisionSelection.size} of up to $maxSel chosen", color = if (argentumDecisionSelection.isEmpty()) Muted else Mint,
++                                    fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                 CardPickGrid(libraryItems, argentumDecisionSelection.toSet(), isEnabled = { it in argentumDecisionSelection || argentumDecisionSelection.size < maxSel || maxSel == 1 }, onTap = { id ->
+                                     argentumDecisionSelection = when {
+                                         id in argentumDecisionSelection -> argentumDecisionSelection - id
+@@ -740,7 +761,11 @@ internal fun TableController.TableOverlays() {
+                     }) { Text("CONFIRM") }
+                     "SearchLibraryDecision" -> TextButton(enabled = argentumDecisionSelection.size in decision.optInt("minSelections", 0)..decision.optInt("maxSelections", 1), onClick = {
+                         submitArgentumDecision(ArgentumDecisions.cardsSelectedResponse(argentumDecisionSelection))
+-                    }) { Text("CONFIRM") }
++                    }, modifier = Modifier.testTag("library-confirm")) {
++                        // Finding nothing is a legal answer to most tutors; say so instead of a bare CONFIRM.
++                        Text(if (argentumDecisionSelection.isEmpty() && decision.optInt("minSelections", 0) == 0) "FIND NOTHING"
++                            else if (argentumDecisionSelection.size > 1) "CONFIRM ${argentumDecisionSelection.size}" else "CONFIRM")
++                    }
+                     "OrderObjectsDecision", "ReorderLibraryDecision" -> TextButton(enabled = argentumOrderSelection.isNotEmpty(), onClick = {
+                         submitArgentumDecision(ArgentumDecisions.orderedResponse(argentumOrderSelection))
+                     }) { Text("CONFIRM ORDER") }
+diff --git a/android/app/src/main/java/com/arcanatable/TablePersistence.kt b/android/app/src/main/java/com/arcanatable/TablePersistence.kt
+index 7416612..1b6f5b7 100644
+--- a/android/app/src/main/java/com/arcanatable/TablePersistence.kt
++++ b/android/app/src/main/java/com/arcanatable/TablePersistence.kt
+@@ -168,7 +168,8 @@ internal fun loadActiveDeck(context: android.content.Context): String? =
+     runCatching { context.getSharedPreferences("arcana-saved-decks", android.content.Context.MODE_PRIVATE).getString("activeDeck", null) }.getOrNull()
+ 
+ internal fun saveSavedDecks(context: android.content.Context, decks: List<SavedDeck>) {
+-    val data = JSONArray().apply { decks.forEach { put(JSONObject().put("name", it.name).put("text", it.text).put("commander", it.commander ?: JSONObject.NULL)) } }
++    val data = JSONArray().apply { decks.forEach { put(JSONObject().put("name", it.name).put("text", it.text).put("commander", it.commander ?: JSONObject.NULL)
++        .put("updatedAt", it.updatedAt).put("tags", JSONArray(it.tags))) } }
+     runCatching { context.getSharedPreferences("arcana-saved-decks", android.content.Context.MODE_PRIVATE).edit().putString("savedDecks", data.toString()).apply() }
+ }
+ 
+@@ -186,7 +187,9 @@ internal fun loadSavedDecks(context: android.content.Context): List<SavedDeck> =
+         data.optJSONObject(index)?.let { item ->
+             val name = item.optString("name").trim()
+             val text = item.optString("text").trim()
+-            if (name.isBlank() || text.isBlank()) null else SavedDeck(name, text, item.optString("commander").takeIf { it.isNotBlank() && it != "null" })
++            if (name.isBlank() || text.isBlank()) null else SavedDeck(name, text, item.optString("commander").takeIf { it.isNotBlank() && it != "null" },
++                updatedAt = item.optLong("updatedAt", 0L),
++                tags = item.optJSONArray("tags")?.let { t -> (0 until t.length()).mapNotNull { i -> t.optString(i).trim().takeIf { it.isNotEmpty() } } }.orEmpty())
+         }
+     }
+ }.getOrDefault(emptyList())
+diff --git a/android/app/src/test/java/com/arcanatable/CardFiltersTest.kt b/android/app/src/test/java/com/arcanatable/CardFiltersTest.kt
+new file mode 100644
+index 0000000..f53044e
+--- /dev/null
++++ b/android/app/src/test/java/com/arcanatable/CardFiltersTest.kt
+@@ -0,0 +1,111 @@
++package com.arcanatable
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Assume.assumeTrue
++import org.junit.BeforeClass
++import org.junit.Test
++import java.io.File
++
++/** The deck builder's FILTERS panel: every filter on the real offline library, sorting, presets. */
++class CardFiltersTest {
++    companion object {
++        lateinit var lib: CardLibrary
++
++        @BeforeClass @JvmStatic fun load() {
++            val assets = File("src/main/assets")
++            assumeTrue("full Argentum library asset present", File(assets, "argentum/all-cards.jsonl").exists())
++            lib = CardLibrary(SupportedCardCatalog.load { File(assets, it).takeIf(File::exists)?.inputStream() })
++        }
++
++        fun names(f: CardFilters, q: String = "", limit: Int = 5000) = lib.search(q, f, limit).cards
++    }
++
++    @Test fun oracleAndTypeTermsAllMustMatch() {
++        val cards = names(CardFilters(oracleTerms = listOf("flying", "draw a card"), typeTerms = listOf("Creature")))
++        assertTrue(cards.isNotEmpty())
++        cards.forEach {
++            val text = it.oracleText.orEmpty().lowercase()
++            assertTrue(it.name, "flying" in text && "draw a card" in text && "creature" in it.typeLine.lowercase())
++        }
++    }
++
++    @Test fun manaCostContainsSymbols() {
++        val cards = names(CardFilters(manaCosts = listOf("2{G}{W}"), colors = setOf('G', 'W'), colorMatch = ColorMatch.EXACTLY))
++        assertTrue(cards.isNotEmpty())
++        cards.forEach { c ->
++            val cost = ManaCost.parse(c.manaCost.substringBefore(" // "))!!
++            assertTrue(c.name, cost.generic >= 2 && (cost.symbols["G"] ?: 0) >= 1 && (cost.symbols["W"] ?: 0) >= 1)
++        }
++        assertEquals(ManaCost.parse("2GW"), ManaCost.parse("{2}{G}{W}"))
++        assertEquals(mapOf("G/W" to 2), ManaCost.parse("{2}{G/W}{G/W}")!!.symbols)
++        assertNull("a typo is reported, not guessed", ManaCost.parse("2{G"))
++    }
++
++    @Test fun colorModesAndCounts() {
++        val exactly = names(CardFilters(colors = setOf('U', 'B'), colorMatch = ColorMatch.EXACTLY), limit = 400)
++        assertTrue(exactly.isNotEmpty())
++        exactly.forEach { assertEquals(it.name, setOf('U', 'B'), colorsOf(it.manaCost.substringBefore(" // "))) }
++        names(CardFilters(colors = setOf('G'), colorMatch = ColorMatch.AT_MOST, useIdentity = true), limit = 400).forEach {
++            assertTrue(it.name, it.colors.all { c -> c == 'G' })
++        }
++        names(CardFilters(minColors = 3), limit = 400).forEach { assertTrue(it.name, colorsOf(it.manaCost.substringBefore(" // ")).size >= 3) }
++        names(CardFilters(colorless = true), limit = 400).forEach { assertTrue(it.name, colorsOf(it.manaCost.substringBefore(" // ")).isEmpty()) }
++    }
++
++    @Test fun rarityStatsAndSets() {
++        val mythicCheap = names(CardFilters(rarities = setOf("MYTHIC"), stats = listOf(StatRange(StatField.MANA_VALUE, StatOp.LTE, 2.0))))
++        assertTrue(mythicCheap.isNotEmpty())
++        mythicCheap.forEach { assertTrue(it.name, it.rarity == "MYTHIC" && it.manaValue <= 2.0) }
++        names(CardFilters(stats = listOf(StatRange(StatField.POWER, StatOp.BETWEEN, 5.0, 6.0))), limit = 400).forEach {
++            assertTrue(it.name, it.power!!.toDouble() in 5.0..6.0)
++        }
++        val set = lib.setCodes.first()
++        val inSet = names(CardFilters(sets = listOf(set.lowercase())), limit = 400)
++        assertTrue(inSet.isNotEmpty())
++        inSet.forEach { assertTrue(it.setCode.equals(set, true)) }
++        names(CardFilters(sets = listOf(set), excludeSets = true), limit = 400).forEach { assertFalse(it.setCode.equals(set, true)) }
++    }
++
++    @Test fun commanderLegalOnlyKeepsCardsWithoutLegalityData() {
++        val all = lib.search("", CardFilters(commanderLegalOnly = false), Int.MAX_VALUE).total
++        val legal = lib.search("", CardFilters(), Int.MAX_VALUE).cards
++        assertTrue(legal.none { it.commanderLegal == false })
++        assertEquals(all - lib.cards.count { it.card.commanderLegal == false }, legal.size)
++    }
++
++    @Test fun sortsByChosenKey() {
++        val byMv = names(CardFilters(typeTerms = listOf("creature"), sort = CardSort.MANA_VALUE, descending = true), limit = 200)
++        assertEquals(byMv.map { it.manaValue }.sortedDescending(), byMv.map { it.manaValue })
++        val byPower = names(CardFilters(typeTerms = listOf("creature"), sort = CardSort.POWER, descending = true), limit = 50)
++        assertTrue(byPower.first().power!!.toDouble() >= byPower.last().power!!.toDouble())
++        // Name relevance still leads when a name is typed and the sort is by name.
++        assertEquals("Sol Ring", lib.search("sol ring", CardFilters(), 5).cards.first().name)
++    }
++
++    @Test fun typedQueryAndFiltersCombine() {
++        val cards = lib.search("t:creature", CardFilters(colors = setOf('R'), colorMatch = ColorMatch.EXACTLY), 200).cards
++        assertTrue(cards.isNotEmpty())
++        cards.forEach { assertTrue("creature" in it.typeLine.lowercase() && colorsOf(it.manaCost.substringBefore(" // ")) == setOf('R')) }
++    }
++
++    @Test fun presetsRoundTripAndSummaries() {
++        val f = CardFilters(oracleTerms = listOf("draw a card"), typeTerms = listOf("Angel"), manaCosts = listOf("1U"), colors = setOf('U', 'W'),
++            colorMatch = ColorMatch.AT_MOST, useIdentity = true, minColors = 1, maxColors = 2, sets = listOf("CMM"), excludeSets = true,
++            rarities = setOf("RARE", "MYTHIC"), keywords = listOf("flying"), stats = listOf(StatRange(StatField.MANA_VALUE, StatOp.BETWEEN, 1.0, 3.0)),
++            commanderLegalOnly = false, sort = CardSort.RARITY, descending = true)
++        assertEquals(f, CardFilters.decode(f.encode()))
++        assertEquals(CardFilters(), CardFilters.decode(""))
++        val presets = FilterPresets.upsert(listOf(FilterPreset("Blue", f)), FilterPreset("blue", CardFilters(typeTerms = listOf("Land"))))
++        assertEquals(1, presets.size)
++        assertEquals(presets, FilterPresets.decode(FilterPresets.encode(presets)))
++        assertEquals(10, f.activeCount)
++        // Every summary chip removes exactly its own part.
++        f.summaryChips().forEach { (_, without) -> assertEquals(9, without.activeCount) }
++        assertEquals(0, f.cleared().activeCount)
++        assertNotNull(f.summaryChips().firstOrNull { it.first == "Text: draw a card" })
++    }
++}
+diff --git a/android/app/src/test/java/com/arcanatable/DeckLibraryTest.kt b/android/app/src/test/java/com/arcanatable/DeckLibraryTest.kt
+new file mode 100644
+index 0000000..7d90713
+--- /dev/null
++++ b/android/app/src/test/java/com/arcanatable/DeckLibraryTest.kt
+@@ -0,0 +1,81 @@
++package com.arcanatable
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Assume.assumeTrue
++import org.junit.BeforeClass
++import org.junit.Test
++import java.io.File
++
++/** Maybeboard, mana sources, and the saved-deck library (tiles, search, sort, tags, undo). */
++class DeckLibraryTest {
++    companion object {
++        lateinit var catalog: SupportedCardCatalog
++
++        @BeforeClass @JvmStatic fun load() {
++            val assets = File("src/main/assets")
++            assumeTrue("full Argentum library asset present", File(assets, "argentum/all-cards.jsonl").exists())
++            catalog = SupportedCardCatalog.load { File(assets, it).takeIf(File::exists)?.inputStream() }
++        }
++    }
++
++    @Test fun maybeboardRoundTripsAndNeverReachesTheGame() {
++        val d = DeckDraft("t").setCommander("Krenko, Mob Boss").add("Sol Ring").add("Mountain", 3).add("Goblin Guide")
++            .moveToMaybeboard("Goblin Guide").addToMaybeboard("Lightning Bolt").copy(sideboard = listOf(DeckLine("Shock", 1)))
++        assertEquals(5, d.deckSize) // commander + Sol Ring + 3 Mountain
++        val back = DeckDraft.fromText("t", d.toText(), catalog)
++        assertEquals(listOf("Goblin Guide", "Lightning Bolt"), back.maybeboard.map { it.name })
++        assertEquals(listOf("Shock"), back.sideboard.map { it.name })
++        assertEquals(d.main, back.main)
++        val game = parseDeckList(d.toText()).map { it.name }
++        assertTrue("maybeboard stays out of the game deck", "Goblin Guide" !in game && "Lightning Bolt" !in game)
++        assertEquals(1, back.moveFromMaybeboard("Goblin Guide").countOf("Goblin Guide"))
++        assertTrue(back.removeFromMaybeboard("Lightning Bolt").maybeboard.none { it.name == "Lightning Bolt" })
++        // A pasted Moxfield-style maybeboard is kept on save instead of dropped.
++        val pasted = DeckDraft.fromText("p", "Commander\n1 Krenko, Mob Boss\nDeck\n1 Sol Ring\n\nMaybeboard\n1 Goblin Guide\n", catalog)
++        assertEquals(listOf("Goblin Guide"), pasted.maybeboard.map { it.name })
++    }
++
++    @Test fun landSourcesCountLandsByColor() {
++        val g = setOf('G', 'W')
++        assertEquals(setOf('G'), landColors(catalog.find("Forest")!!, g))
++        assertEquals(setOf('G', 'U'), landColors(catalog.find("Breeding Pool")!!, g))
++        assertEquals(g, landColors(catalog.find("Command Tower")!!, g))
++        assertEquals(g, landColors(catalog.find("Evolving Wilds")!!, g))
++        val stats = deckStats(DeckDraft("s").setCommander("Krenko, Mob Boss").add("Mountain", 10).add("Command Tower").add("Goblin Guide"), catalog)
++        assertEquals(11, stats.landSources['R'])
++        assertEquals(0, stats.landSources['G'])
++    }
++
++    @Test fun libraryTilesSearchSortTagsAndUndo() {
++        val decks = listOf(
++            SavedDeck("Goblins", "Commander\n1 Krenko, Mob Boss\nDeck\n1 Sol Ring", "Krenko, Mob Boss", updatedAt = 5, tags = listOf("Casual")),
++            SavedDeck("Lands", "Deck\n1 Forest", updatedAt = 9),
++            SavedDeck("Old", "Deck\n1 Island"),
++        )
++        val summaries = decks.associate { it.name to summarizeDeck(it, catalog) }
++        assertEquals(setOf('R'), summaries.getValue("Goblins").identity)
++        assertEquals(2, summaries.getValue("Goblins").cards)
++        assertTrue(summaries.getValue("Goblins").problems!! > 0) // 2 of 100
++        assertTrue(summaries.getValue("Goblins").commanderImageUrl != null)
++        assertNull(summarizeDeck(decks[0], null).problems)
++
++        assertEquals(listOf("Lands", "Goblins", "Old"), SavedDeckOps.visible(decks, "", null, DeckLibrarySort.RECENT, summaries).map { it.name })
++        assertEquals(listOf("Goblins"), SavedDeckOps.visible(decks, "sol ring", null, DeckLibrarySort.NAME, summaries).map { it.name })
++        assertEquals(listOf("Goblins"), SavedDeckOps.visible(decks, "krenko", null, DeckLibrarySort.NAME, summaries).map { it.name })
++        assertEquals(listOf("Goblins"), SavedDeckOps.visible(decks, "", "casual", DeckLibrarySort.NAME, summaries).map { it.name })
++
++        val tagged = SavedDeckOps.setTags(decks, decks[1], listOf(" Testing ", "testing", "Casual"))
++        assertEquals(listOf("Testing", "Casual"), tagged[1].tags)
++        assertEquals(listOf("Casual", "Testing"), SavedDeckOps.allTags(tagged))
++
++        val deleted = SavedDeckOps.delete(decks, decks[1])
++        assertEquals(decks, SavedDeckOps.restore(deleted, decks[1], 1))
++        assertEquals("restore never duplicates a name", deleted, SavedDeckOps.restore(deleted, decks[0], 0))
++
++        assertNull(editedAgo(0L, 1_000L))
++        assertEquals("edited 5 min ago", editedAgo(1_000L, 1_000L + 5 * 60_000L))
++        assertEquals("edited yesterday", editedAgo(1L, 1L + 30L * 3_600_000L))
++    }
++}
+diff --git a/android/app/src/test/java/com/arcanatable/LibrarySearchFiltersTest.kt b/android/app/src/test/java/com/arcanatable/LibrarySearchFiltersTest.kt
+new file mode 100644
+index 0000000..dc5aecb
+--- /dev/null
++++ b/android/app/src/test/java/com/arcanatable/LibrarySearchFiltersTest.kt
+@@ -0,0 +1,43 @@
++package com.arcanatable
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/** In-game library search: type chips, grouping and sorting never hide a card already chosen. */
++class LibrarySearchFiltersTest {
++    private data class C(val id: Int, val name: String, val type: String, val mv: Double?)
++    private val items = listOf(
++        C(1, "Forest", "Basic Land — Forest", 0.0), C(2, "Breeding Pool", "Land — Forest Island", 0.0),
++        C(3, "Llanowar Elves", "Creature — Elf Druid", 1.0), C(4, "Sol Ring", "Artifact", 1.0),
++        C(5, "Cultivate", "Sorcery", 3.0), C(6, "Krenko, Mob Boss", "Legendary Creature — Goblin Warrior", 4.0), C(7, "Hidden card", "", null),
++    )
++
++    private fun arrange(chip: LibraryChip?, sort: LibrarySort, keep: Set<Int> = emptySet()) =
++        arrangeLibrary(items, chip, sort, { it.id in keep }, { it.name }, { it.type }, { it.mv })
++
++    @Test fun chipsOnlyForTypesPresentAndNotUniversal() {
++        val chips = LibraryChip.present(items.map { it.type }).toMap()
++        assertEquals(1, chips[LibraryChip.BASIC_LAND])
++        assertEquals(2, chips[LibraryChip.LAND])
++        assertEquals(2, chips[LibraryChip.CREATURE])
++        assertTrue(LibraryChip.INSTANT !in chips)
++        assertTrue("a chip matching every card adds nothing", LibraryChip.present(listOf("Basic Land — Forest", "Basic Land — Island")).none { it.first == LibraryChip.BASIC_LAND })
++    }
++
++    @Test fun groupsByTypeInScanOrder() {
++        val groups = arrange(null, LibrarySort.TYPE).map { it.first }.distinct()
++        assertEquals(listOf("Basic lands", "Lands", "Creatures", "Sorceries", "Artifacts", "Other"), groups)
++    }
++
++    @Test fun chipFiltersButKeepsSelection() {
++        val lands = arrange(LibraryChip.LAND, LibrarySort.NAME).map { it.second.name }
++        assertEquals(listOf("Breeding Pool", "Forest"), lands)
++        val creaturesKeepingSolRing = arrange(LibraryChip.CREATURE, LibrarySort.MANA_VALUE, keep = setOf(4)).map { it.second.name }
++        assertEquals(listOf("Llanowar Elves", "Sol Ring", "Krenko, Mob Boss"), creaturesKeepingSolRing)
++    }
++
++    @Test fun manaValueSortPutsUnknownLast() {
++        assertEquals("Hidden card", arrange(null, LibrarySort.MANA_VALUE).last().second.name)
++    }
++}
+diff --git a/android/app/src/test/java/com/arcanatable/ui/DeckBuilderUiTest.kt b/android/app/src/test/java/com/arcanatable/ui/DeckBuilderUiTest.kt
+index aa3a380..b6d1d63 100644
+--- a/android/app/src/test/java/com/arcanatable/ui/DeckBuilderUiTest.kt
++++ b/android/app/src/test/java/com/arcanatable/ui/DeckBuilderUiTest.kt
+@@ -7,6 +7,11 @@ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.test.ExperimentalTestApi
+ import androidx.compose.ui.test.hasTestTag
+ import androidx.compose.ui.test.hasText
++import androidx.compose.ui.test.SemanticsMatcher
++import androidx.compose.ui.semantics.SemanticsProperties
++import androidx.compose.ui.semantics.getOrNull
++import androidx.compose.ui.test.hasContentDescription
++import androidx.compose.ui.test.onNodeWithContentDescription
+ import androidx.compose.ui.test.junit4.createAndroidComposeRule
+ import androidx.compose.ui.test.onAllNodesWithText
+ import androidx.compose.ui.test.onNodeWithTag
+@@ -83,6 +88,54 @@ class DeckBuilderUiTest {
+         UiTestSupport.screenshot(rule.activity, "deck-builder-$name")
+     }
+ 
++    /** Deck library tiles, search, delete with undo; then the FILTERS panel and the card grid. */
++    @Test @Config(sdk = [34], qualifiers = "w344dp-h882dp-port-xxhdpi") fun libraryTilesAndFiltersPanel() {
++        var decks by mutableStateOf(listOf(
++            SavedDeck("Goblins", "Commander\n1 Krenko, Mob Boss\nDeck\n1 Sol Ring\n", "Krenko, Mob Boss", updatedAt = System.currentTimeMillis(), tags = listOf("Casual")),
++            SavedDeck("Lands", "Deck\n1 Forest\n", updatedAt = 1L),
++        ))
++        rule.setContent {
++            DeckManagerDialog(decks = decks, loadCatalog = { catalog }, onDecksChanged = { decks = it }, onPlay = {}, onDismiss = {})
++        }
++        rule.waitUntil(120_000) { rule.onAllNodes(hasText("Ready") or hasText("to fix", substring = true)).fetchSemanticsNodes().size >= 2 }
++        rule.onNodeWithTag("deck-tile-Goblins").assertExists()
++        rule.onNodeWithText("#Casual", substring = true).assertExists()
++
++        rule.onNodeWithTag("deck-library-search").performTextInput("forest")
++        rule.waitForIdle()
++        assertTrue(rule.onAllNodes(hasTestTag("deck-tile-Goblins")).fetchSemanticsNodes().isEmpty())
++        rule.onNodeWithTag("deck-library-search").performTextReplacement("")
++        rule.waitForIdle()
++        UiTestSupport.screenshot(rule.activity, "deck-library-tiles")
++
++        rule.onNodeWithContentDescription("More for Lands").performClick()
++        rule.onNodeWithText("Delete").performClick()
++        rule.waitForIdle()
++        assertEquals(listOf("Goblins"), decks.map { it.name })
++        rule.onNodeWithTag("deck-undo-delete").performClick()
++        rule.waitForIdle()
++        assertEquals(listOf("Goblins", "Lands"), decks.map { it.name })
++
++        rule.onNodeWithTag("deck-new").performClick()
++        rule.waitUntil(120_000) { rule.onAllNodes(hasTestTag("open-filters")).fetchSemanticsNodes().isNotEmpty() }
++        rule.onNodeWithTag("open-filters").performClick()
++        rule.waitUntil(10_000) { rule.onAllNodes(hasTestTag("filter-oracle")).fetchSemanticsNodes().isNotEmpty() }
++        rule.onNodeWithTag("filter-oracle").performTextInput("flying")
++        rule.onNodeWithTag("filter-oracle-add").performClick()
++        rule.mainClock.advanceTimeBy(500)
++        rule.waitUntil(30_000) { rule.onAllNodes(hasText("SHOW", substring = true) and hasText("CARDS", substring = true)).fetchSemanticsNodes().isNotEmpty() }
++        UiTestSupport.screenshot(rule.activity, "deck-builder-filters")
++        rule.onNodeWithTag("filters-show").performClick()
++        rule.waitForIdle()
++        rule.onNodeWithText("Text: flying").assertExists()
++        rule.onNodeWithText("FILTERS · 1").assertExists()
++
++        rule.onNodeWithTag("results-view").performClick()
++        rule.mainClock.advanceTimeBy(500)
++        rule.waitUntil(30_000) { rule.onAllNodes(SemanticsMatcher("grid add button") { it.config.getOrNull(SemanticsProperties.TestTag)?.startsWith("grid-add-") == true }).fetchSemanticsNodes().isNotEmpty() }
++        UiTestSupport.screenshot(rule.activity, "deck-builder-grid")
++    }
++
+     @Test @Config(sdk = [34], qualifiers = "w344dp-h882dp-port-xxhdpi") fun foldCoverBuildsAndAutosaves() = buildDeck("fold-cover", folded = true)
+     @Test @Config(sdk = [34], qualifiers = "w673dp-h841dp-port-xhdpi") fun foldUnfoldedBuildsAndAutosaves() = buildDeck("fold-unfolded", folded = false)
+ }

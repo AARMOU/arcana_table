@@ -164,7 +164,14 @@ internal fun TableController.argentumName(id: String): String =
 internal fun TableController.openArgentumCombat(): Boolean {
     val actions = argentumSnapshot?.legalActions.orEmpty()
     actions.firstNotNullOfOrNull { ArgentumAttackPlan.from(it) }?.let { argentumAttackPlan = it; recordDiagnostic("Opened attack declaration (${it.options.size} possible attackers)", DiagnosticCategory.ACTION); return true }
-    actions.firstNotNullOfOrNull { ArgentumBlockPlan.from(it, argentumLastStateJson) }?.let { argentumBlockPlan = it; recordDiagnostic("Opened block declaration (${it.blockers.size} possible blockers)", DiagnosticCategory.ACTION); return true }
+    if (!argentumBlockGuard.submitted) {
+        actions.firstNotNullOfOrNull { ArgentumBlockPlan.from(it, argentumLastStateJson) }?.let {
+            argentumBlockPlan = it
+            argentumLastError = null
+            recordDiagnostic("Opened block declaration (${it.blockers.size} possible blockers)", DiagnosticCategory.ACTION)
+            return true
+        }
+    }
     return false
 }
 
@@ -181,7 +188,10 @@ internal fun TableController.submitArgentumAction(action: JSONObject, epoch: Str
             .put("response", JSONObject().put("type", "PlayCardResponse").put("decisionId", decision.optString("id")).put("action", JSONObject(action.toString())))
     } else action
     val sent = argentumSocket.submitLegalAction(outbound, epoch)
-    if (sent) argentumAwaitingUpdate = true
+    if (sent) {
+        argentumAwaitingUpdate = true
+        if (tutorialPracticeActive && type == "PassPriority") tutorialPassPending = true
+    }
     argentumStackUse?.let { use -> if (sent && !use.started) argentumStackUse = use.copy(started = true, manaColor = use.manaColor ?: action.optString("manaColorChoice").takeIf { it.isNotBlank() && it != "null" }) }
     return sent
 }
@@ -243,6 +253,10 @@ internal fun TableController.openArgentumActions(card: GameCard) {
 internal fun TableController.chooseArgentumLegalAction(info: JSONObject) {
     val action = info.optJSONObject("action") ?: return
     val type = action.optString("type")
+    if (type == "DeclareBlockers" && argentumBlockGuard.submitted) {
+        message = "Blockers already submitted. Pass priority to continue combat."
+        return
+    }
     if (type == "DeclareAttackers" || type == "DeclareBlockers") { if (!openArgentumCombat()) message = "Argentum's combat declaration is no longer available."; return }
     if (!info.optBoolean("isAffordable", true)) {
         message = "Not enough spendable mana yet. Activate Treasure, Goose/Food, or other conditional mana sources first."
@@ -305,8 +319,17 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
     // Outside an Argentum session, never let pushed game messages take over the table.
     if (!argentumEnabled && incoming.optString("type") !in setOf("connected", "reconnected", "error", "sessionReplaced")) return
     when (incoming.optString("type")) {
+        "lanSeat" -> {
+            // A transport-level seat acknowledgement, not an engine credential.
+            wifiGuestSeatId = incoming.optString("seat").takeUnless { it.isBlank() || it == "null" }
+            recordDiagnostic("Wi-Fi seat accepted by host", DiagnosticCategory.CONNECTION)
+        }
+        "lanLobby" -> {
+            // Wi-Fi and online guests both show the host's roster.
+            if (wifiRole == "guest" || wifiRole == "online-guest") wifiGuestLobbyState = incoming
+        }
         "offlineCheckpoint" -> {
-            if (argentumOffline && wifiRole == null) {
+            if (argentumOffline && !tutorialPracticeActive && wifiRole == null) {
                 val data = incoming.optJSONObject("checkpoint")
                 if (data != null) scope.launch {
                     val outcome = withContext(Dispatchers.IO) {
@@ -360,7 +383,10 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             }
         }
         "gameStarted" -> {
-            if (argentumOffline && !offlineRestoreRequested && wifiRole == null) {
+            wifiGuestWaiting = false
+            wifiGuestLobbyState = null
+            wifiGuestSeatId = null
+            if (argentumOffline && !offlineRestoreRequested && !tutorialPracticeActive && wifiRole == null) {
                 OfflineCheckpointStore.clear(context)
                 offlineResumeAvailable = false
             }
@@ -373,7 +399,8 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             gameTimerRunning = true
             turnTimerRunning = true
             setArgentumGameActive(true)
-            argentumGameOverDismissed = false; argentumGameOverText = null; argentumWon = null
+            argentumGameOverDismissed = false; argentumGameOverText = null; argentumWon = null; argentumMatchUnfinished = false
+            argentumBlockGuard.reset()
             recordDiagnostic("Argentum game started", DiagnosticCategory.ENGINE)
         }
         "stateUpdate" -> {
@@ -384,6 +411,43 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 argentumLastCompletedEngineMs = incoming.optLong("engineMs", -1).takeIf { it >= 0 }
                 if (argentumLocalPlayersBackup == null) argentumLocalPlayersBackup = loadSavedPlayers(context) ?: players.toList()
                 val snapshot = ArgentumTableSnapshot.parse(state, incoming.optJSONArray("legalActions") ?: JSONArray(), incoming.optString("interactionEpoch").takeUnless { it.isBlank() || it == "null" })
+                // One transition-specific diagnostic, not a continuous life-total trace.
+                // These values come from consecutive authoritative masked snapshots.
+                val currentYou = snapshot.players.getOrNull(snapshot.viewingPlayer)
+                val previousYou = currentYou?.let { player ->
+                    argentumSnapshot?.players?.firstOrNull { it.id == player.id }
+                }
+                if (currentYou?.isEliminated == true && previousYou?.isEliminated == false) {
+                    recordDiagnostic(
+                        "Argentum player elimination: life ${previousYou.life} → ${currentYou.life}; commanderDamage=${currentYou.commanderDamageReceived}",
+                        DiagnosticCategory.ENGINE,
+                    )
+                }
+                // Combat-stage evidence is critical for distinguishing ordinary damage from
+                // first-strike or commander-damage elimination while life remains above zero.
+                // Emit only when this viewer's authoritative values change, not for each snapshot.
+                if (currentYou != null && previousYou != null &&
+                    snapshot.stepKey in setOf("FIRST_STRIKE_COMBAT_DAMAGE", "COMBAT_DAMAGE") &&
+                    (currentYou.life != previousYou.life ||
+                        currentYou.commanderDamageReceived != previousYou.commanderDamageReceived)) {
+                    recordDiagnostic(
+                        "Argentum combat ${snapshot.stepKey}: life ${previousYou.life} → ${currentYou.life}; " +
+                            "commanderDamage ${previousYou.commanderDamageReceived} → ${currentYou.commanderDamageReceived}; " +
+                            "eliminated=${currentYou.isEliminated}",
+                        DiagnosticCategory.ENGINE,
+                    )
+                }
+                // Close the retained block board only when combat has truly moved on.
+                // A rejected INVALID_ACTION during DECLARE_BLOCKERS must not wipe selections.
+                argentumBlockGuard.onStep(snapshot.stepKey)
+                if (argentumBlockPlan != null &&
+                    (!snapshot.stepKey.equals("DECLARE_BLOCKERS", ignoreCase = true) ||
+                        argentumBlockGuard.submitted)) {
+                    // The accepted state can remain DECLARE_BLOCKERS while priority passes.
+                    // Never reopen the stale declaration; after INVALID_ACTION, the guard
+                    // releases the latch so the retained assignments can be corrected.
+                    argentumBlockPlan = null
+                }
                 val nextDecision = incoming.optJSONObject("pendingDecision")
                 argentumLastStateJson = state
                 if (nextDecision?.optString("id") != argentumPendingDecision?.optString("id")) {
@@ -413,8 +477,10 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 argentumPendingDecision = nextDecision
                 argentumNextStop = incoming.optString("nextStopPoint").takeUnless { it.isBlank() || it == "null" }
                 argentumUndoAvailable = incoming.optBoolean("undoAvailable", false)
+                val previousTutorialSnapshot = argentumSnapshot
                 val firstSnapshot = argentumSnapshot == null
                 argentumSnapshot = snapshot
+                tutorialSnapshot(previousTutorialSnapshot, snapshot)
                 // Keep an open action sheet in step with the new state so it never offers stale actions.
                 if (argentumActionChoices.isNotEmpty()) {
                     val sheetCard = argentumActionCard?.let { old -> snapshot.players.flatMap { it.hand + it.battlefield + it.graveyard + it.exile + listOfNotNull(it.commanderCard) }.firstOrNull { it.id == old.id } }
@@ -429,8 +495,8 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 turnNumber = snapshot.turnNumber
                 phaseIndex = phaseSteps.indexOfFirst { it.equals(snapshot.stepName, true) }.takeIf { it >= 0 }
                     ?: phaseSteps.indexOfFirst { it.equals(snapshot.phaseName, true) }.takeIf { it >= 0 } ?: 3
-                gameEndedOnline = snapshot.gameOver
-                if (snapshot.gameOver && argentumOffline && wifiRole == null) {
+                if (!argentumMatchUnfinished) gameEndedOnline = snapshot.gameOver
+                if (snapshot.gameOver && argentumOffline && !tutorialPracticeActive && wifiRole == null) {
                     OfflineCheckpointStore.clear(context)
                     offlineResumeAvailable = false
                 }
@@ -467,6 +533,10 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             argentumAwaitingUpdate = false
             argentumMulliganPrompt = true
             argentumMulliganInfo = Triple(incoming.optInt("mulliganCount"), incoming.optBoolean("isOnThePlay"), incoming.optInt("cardsToPutOnBottom"))
+            if (tutorialMulliganPending) {
+                tutorialMulliganPending = false
+                tutorialSignal("event", "HandMulliganed")
+            }
             val handIds = incoming.optJSONArray("hand") ?: JSONArray()
             val cardInfo = incoming.optJSONObject("cards") ?: JSONObject()
             val hand = (0 until handIds.length()).mapNotNull { index ->
@@ -507,6 +577,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
         }
         "mulliganComplete" -> { argentumMulliganPrompt = false; argentumAwaitingUpdate = false }
         "gameOver" -> {
+            argentumMatchUnfinished = incoming.optBoolean("matchUnfinished")
             setArgentumGameActive(false)
             gameEndedOnline = true
             argentumAwaitingUpdate = false
@@ -526,11 +597,27 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             recordDiagnostic("Online: ${incoming.optString("message")}", DiagnosticCategory.CONNECTION)
         } else if (incoming.optString("code") == "WIFI_NOTE") {
             // An information note from the host (e.g. a card left out of a deck), not a problem.
-            message = "Note: " + incoming.optString("message")
+            // Logged only, so joining a game doesn't open a pop-up per card.
             recordDiagnostic("Note from host: ${incoming.optString("message")}", DiagnosticCategory.ENGINE)
         } else {
-            argentumLastError = incoming.optString("message", "Argentum returned an error."); message = argentumLastError; argentumAwaitingUpdate = false; argentumXChecking = null
-            recordDiagnostic("Argentum error ${incoming.optString("code")}: ${argentumLastError}", DiagnosticCategory.ERROR)
+            val text = incoming.optString("message", "Argentum returned an error.")
+            message = text
+            // Before a game the waiting screen also shows it. During a game the pop-up is enough; it
+            // must not linger and reappear later on the home screen.
+            if (argentumSnapshot == null && !homeOpen) argentumLastError = text
+            argentumAwaitingUpdate = false; argentumXChecking = null
+            val blockSubmissionWasPending = argentumBlockGuard.submitted
+            argentumBlockGuard.onError(incoming.optString("code"), text)
+            if (blockSubmissionWasPending && !argentumBlockGuard.submitted) {
+                // Keep PR293's inline rejection message until corrected.
+                argentumLastError = text
+            }
+            if (argentumBlockGuard.submitted &&
+                text.contains("Blockers have already been declared", ignoreCase = true)) {
+                argentumBlockPlan = null
+                message = "Blockers already declared. Pass priority to continue combat."
+            }
+            recordDiagnostic("Argentum error ${incoming.optString("code")}: $text", DiagnosticCategory.ERROR)
         }
     }
 }
@@ -671,7 +758,7 @@ internal fun TableController.startArgentumPractice(vsAi: Boolean = true, joinLob
             }
             if (unsupported.isNotEmpty()) {
                 // Substitutions apply to this Argentum game only; the saved Arcana deck is untouched.
-                message = "For this Argentum game, ${unsupported.size} unsupported card(s) were left out${if (replacementCommander) " and $commanderForGame is commander" else ""}; ${replacementBasics.size} supported basic land(s) fill the gap. Your saved deck is unchanged."
+                // Logged, not shown: the deck editor already lists unsupported cards and swaps.
                 recordDiagnostic("Player chose to play without ${unsupported.size} unsupported card(s); ${replacementBasics.size} basic land(s) added for this game only", DiagnosticCategory.UNSUPPORTED)
             }
             argentumDeckForLobby = submitted
@@ -726,11 +813,13 @@ internal fun TableController.closeArgentumSession(concede: Boolean) {
     argentumLastCompletedEngineMs = null
     argentumEnabled = false
     argentumOffline = false
+    // A finished or abandoned session's last error must not reappear on the home screen.
+    argentumLastError = null
     setArgentumGameActive(false)
     argentumSnapshot = null
     argentumPendingDecision = null
     argentumActionChoices = emptyList(); argentumActionCard = null; argentumComposer = null
-    argentumAttackPlan = null; argentumBlockPlan = null
+    argentumAttackPlan = null; argentumBlockPlan = null; argentumBlockGuard.reset()
     playPopup = null; playFeed = emptyList(); playBanner = null; recapText = null; aiRecaps = emptyList(); argentumStackUse = null; argentumAutoYes = emptyMap()
     argentumLocalPlayersBackup?.let { players = it; argentumLocalPlayersBackup = null }
     argentumDeckForLobby = null
@@ -738,6 +827,7 @@ internal fun TableController.closeArgentumSession(concede: Boolean) {
     argentumLobbySubmitted = false
     gameStartedOnline = false
     gameEndedOnline = false
+    argentumMatchUnfinished = false
     gameTimerRunning = false
     turnTimerRunning = false
     homeOpen = true

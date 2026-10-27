@@ -1,0 +1,183 @@
+name: Claude B137 all-in DEBUG test APK (owner-requested)
+# Owner asked on 2026-10-26 for one debug APK with every pending update:
+# Build 136 + lobby #296 + blocker #299 + tutorial #300 + Ulalek #132 and Temple #152
+# regressions + review clean-ups. The branch already holds the fully assembled source.
+# Debug/test signing only: no release, AAB, Play upload or Worker deploy.
+on:
+  push:
+    branches:
+      - claude/b137-all-in-debug-apk-20261026
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: claude-b137-all-in-debug-apk
+  cancel-in-progress: true
+env:
+  OUT_BRANCH: claude/b137-all-in-debug-apk-output
+jobs:
+  build:
+    name: Engine + cards + Android tests + debug APK (versionCode 137)
+    if: github.repository == 'AARMOU/arcana_table'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare evidence folder
+        run: mkdir -p ci-out combined-evidence && git rev-parse HEAD > ci-out/source-sha.txt
+      - name: Verify every requested change is in the assembled tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          a=android/app/src
+          test -s $a/main/java/com/arcanatable/ArgentumBlockSubmissionGuard.kt
+          grep -F 'val hostLobbyState = wifiMultiLobbyState' $a/main/java/com/arcanatable/TableMultiLobby.kt
+          grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' $a/main/java/com/arcanatable/TableArgentum.kt
+          grep -F 'class TutorialRun' $a/main/java/com/arcanatable/TutorialProgress.kt
+          grep -F 'opponentsEldraziCastDoesNotTriggerMyUlalek' android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlalekFusedAtrocityScenarioTest.kt
+          grep -F 'mixed unrestricted and Temple mana cannot launder' engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt
+          test -s android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt
+          python3 -m json.tool $a/main/assets/tutorials/catalog.json > /dev/null
+          git diff --check HEAD~1 -- android || true
+          python3 tools/check_android_regex.py 2>&1 | tee ci-out/android-regex.log
+          echo PASS | tee ci-out/00-source-check.txt
+      - name: Verify approved upstream patch artifact and SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail
+          python3 tools/fast_apk_snapshot.py preflight 2>&1 | tee ci-out/01-preflight.log
+      - name: Checkout exact Argentum upstream
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: c38f145359c342a04f951b7ba48f741bcb1627ac
+          path: combined-argentum
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build engine JARs with Temple, Ulalek and SDK scenarios
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/fast_apk_snapshot.py engine 2>&1 | tee ci-out/02-engine.log
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' > /dev/null
+      - name: Export and test all custom cards (incl. Ulalek, Ugin, Eldrazi)
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/fast_apk_snapshot.py cards 2>&1 | tee ci-out/03-cards.log
+      - name: Stamp debug test version 137
+        run: python3 tools/fast_apk_snapshot.py version --version-code 137 | tee ci-out/04-version.log
+      - name: All app unit tests (results recorded, required suites checked next)
+        id: apptests
+        continue-on-error: true
+        working-directory: android
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 --continue :app:testDebugUnitTest 2>&1 | tail -400 | tee ../ci-out/05-app-tests.log
+      - name: Summarize app test results; require the 16 bundle suites
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY' | tee ci-out/06-test-summary.txt
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root = Path('android/app/build/test-results/testDebugUnitTest')
+          required = ['HomeScreenSizesTest','DeckBuilderUiTest','DeckSupportTest','ReleaseFeaturesTest',
+              'TutorialPracticeScenariosTest','TutorialPriorityHostTest','ArgentumResilienceUiTest',
+              'GameOutcomeDetailsTest','ArgentumBackendTest','UginExportedRuntimeTest',
+              'MultiplayerLobbyVisibilityTest','ArgentumBlockSubmissionGuardTest',
+              'TutorialRunTest','TutorialWalkthroughTest','TutorialAuditUiTest','TutorialScreensTest']
+          total = fails = 0
+          bad_required = []
+          seen = set()
+          for xml in sorted(root.glob('TEST-*.xml')):
+              r = ET.parse(xml).getroot()
+              name = r.get('name', xml.stem)
+              short = name.rsplit('.', 1)[-1]
+              seen.add(short)
+              n = int(r.get('tests', 0)); f = int(r.get('failures', 0)) + int(r.get('errors', 0)); s = int(r.get('skipped', 0))
+              total += n; fails += f
+              if f:
+                  print(f'FAIL {name}: {f} of {n}')
+                  for case in r.iter('testcase'):
+                      for node in list(case):
+                          if node.tag in ('failure', 'error'):
+                              print('   -', case.get('name'), '::', (node.get('message') or '')[:400].replace('\n', ' '))
+              if short in required and (f or s or n == 0):
+                  bad_required.append(short)
+          missing = [x for x in required if x not in seen]
+          print(f'TOTAL {total} tests, {fails} failing; required missing={missing} required bad={bad_required}')
+          Path('ci-out/required-ok').write_text('yes' if not missing and not bad_required else 'no')
+          PY
+          test "$(cat ci-out/required-ok)" = yes
+      - name: Assemble debug APK
+        working-directory: android
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 :app:assembleDebug 2>&1 | tail -150 | tee ../ci-out/07-assemble.log
+      - name: Verify package, version, signature and bundled assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=android/app/build/outputs/apk/debug/app-debug.apk
+          bt="$ANDROID_HOME/build-tools/36.0.0"
+          "$bt/aapt" dump badging "$apk" > ci-out/badging.txt
+          grep -F "versionCode='137'" ci-out/badging.txt
+          "$bt/apksigner" verify --print-certs "$apk" > ci-out/signature.txt
+          python3 tools/verify_launcher_branding.py | tee ci-out/branding.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import json
+          with ZipFile('android/app/build/outputs/apk/debug/app-debug.apk') as z:
+              assert len(json.loads(z.read('assets/tutorials/catalog.json'))['chapters']) == 20
+              for n in ('all-cards.index.tsv', 'custom-cards.index.tsv'):
+                  assert z.read('assets/argentum/' + n) == Path('android/app/src/main/assets/argentum', n).read_bytes()
+          print('PASS: 20 tutorial chapters and source-matched card indexes in APK')
+          PY
+          cp "$apk" ci-out/ArcanaTable-B137-debug.apk
+          sha256sum ci-out/ArcanaTable-B137-debug.apk | tee ci-out/apk.sha256
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcana-b137-all-in-debug
+          path: ci-out/
+          retention-days: 14
+      - name: Publish evidence (and APK when built) to the output branch
+        if: always()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          echo "${{ job.status }}" > ci-out/job-status.txt
+          cp -r combined-evidence ci-out/combined-evidence 2>/dev/null || true
+          find android -path '*/build/test-results/*' -name 'TEST-*.xml' -size -2M -exec cp --parents {} ci-out/ \; 2>/dev/null || true
+          if [ -f ci-out/ArcanaTable-B137-debug.apk ]; then
+            (cd ci-out && split -b 45m -d ArcanaTable-B137-debug.apk ArcanaTable-B137-debug.apk.part && rm ArcanaTable-B137-debug.apk)
+          fi
+          cd ci-out
+          git init -q -b out
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' add -A
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -qm "B137 all-in debug APK evidence for $GITHUB_SHA (run $GITHUB_RUN_ID)"
+          git push -f "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "out:refs/heads/${OUT_BRANCH}"

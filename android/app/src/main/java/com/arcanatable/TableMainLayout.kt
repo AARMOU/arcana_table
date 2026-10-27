@@ -151,24 +151,24 @@ internal fun TableController.TableMainLayout() {
         val turnAccent = argentumSnapshot?.let { TurnColors.forSeat(it.activePlayer == localSeat) } ?: Mint
         // Player tabs (seat tabs with life in Argentum games). In landscape they share the top strip.
         val seatTabs: @Composable (Modifier) -> Unit = { rowModifier ->
-            Row(rowModifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                Box(Modifier) { ViewChip("TABLE", selected = showOverview, compact = compactArgentumTable, onClick = { run { showOverview = true; showHand = false } }) }
+            Row(rowModifier.tutorialTarget("player-tabs").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                Box(Modifier.tutorialTarget("table-tab")) { ViewChip("TABLE", selected = showOverview, compact = compactArgentumTable, onClick = { run { showOverview = true; showHand = false; TutorialActions.tap("table-tab") } }) }
                 // Your own tab always comes right after TABLE, then everyone else in seat order.
                 val tabOrder = players.indices.sortedBy { if (it == localSeat) -1 else it }
                 tabOrder.forEach { index -> val player = players[index]
-                    Box(Modifier.testTag(if (onlineMode && index == localSeat) "player-tab-you" else "player-tab-$index")) {
+                    Box(Modifier.testTag(if (onlineMode && index == localSeat) "player-tab-you" else "player-tab-$index").tutorialTarget(if (index == localSeat) "your-tab" else "opponent-tab")) {
                         val snap = argentumSnapshot
                         if (compactArgentumTable && snap != null) ArgentumSeatTab(
                             seat = ArgentumSeatChip(player.name, player.life, isYou = index == localSeat, isActive = index == snap.activePlayer, hasPriority = index == snap.priorityPlayer),
                             turnLabel = if (index == snap.activePlayer) TurnColors.label(index == localSeat, player.name, player.isComputer) else null,
                             artUrl = player.commanderCard?.let { it.artCropUrl ?: it.imageUrl }, artLabel = player.commanderCard?.name,
                             selected = !showOverview && selectedPlayer == index,
-                            onClick = { run { selectedPlayer = index; showOverview = false } }
+                            onClick = { run { selectedPlayer = index; showOverview = false; TutorialActions.tap(if (index == localSeat) "your-tab" else "opponent-tab") } }
                         ) else PlayerViewTab(
                             name = if (onlineMode && index == localSeat) "YOU" else player.name,
                             commander = player.commanderCard,
                             selected = !showOverview && selectedPlayer == index,
-                            onClick = { run { selectedPlayer = index; showOverview = false; showHand = false } }
+                            onClick = { run { selectedPlayer = index; showOverview = false; showHand = false; TutorialActions.tap(if (index == localSeat) "your-tab" else "opponent-tab") } }
                         )
                     }
                 }
@@ -182,10 +182,10 @@ internal fun TableController.TableMainLayout() {
                 Box(Modifier.size(9.dp).clip(CircleShape).background(dotColor).semantics { contentDescription = "Argentum ${argentumStatus.name.lowercase()}" })
                 Spacer(Modifier.width(8.dp))
                 if (tabsInTopBar) {
-                    PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.width(320.dp), accent = turnAccent)
+                    PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.width(320.dp).tutorialTarget("phase-tracker"), accent = turnAccent)
                     Spacer(Modifier.width(8.dp))
                     seatTabs(Modifier.weight(1f))
-                } else PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.weight(1f), accent = turnAccent)
+                } else PhaseTracker(argentumSnapshot?.stepKey.orEmpty(), Modifier.weight(1f).tutorialTarget("phase-tracker"), accent = turnAccent)
                 Spacer(Modifier.width(6.dp))
             } else Column {
                 Text("ARCANA TABLE", color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
@@ -198,7 +198,7 @@ internal fun TableController.TableMainLayout() {
             if (!compactArgentumTable) Spacer(Modifier.weight(1f))
             Box(Modifier) {
                 Text(if (compactArgentumTable) "T${turnNumber}${if (turnTimerVisible) " · " + formatClock(elapsedTurnSeconds) else ""}" else "GAME ${formatClock(elapsedGameSeconds)} · TURN ${if (turnTimerVisible) formatClock(elapsedTurnSeconds) else "HIDDEN"}", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.heightIn(min = 44.dp).wrapContentHeight(Alignment.CenterVertically).combinedClickable(enabled = !onlineMode || localSeat == 0, onClick = { run { timerMenuOpen = true } }, onLongClick = { turnTimerVisible = !turnTimerVisible }))
+                    modifier = Modifier.heightIn(min = 44.dp).tutorialTarget("turn-timer").wrapContentHeight(Alignment.CenterVertically).combinedClickable(enabled = !onlineMode || localSeat == 0, onClick = { run { timerMenuOpen = true } }, onLongClick = { turnTimerVisible = !turnTimerVisible }))
                 DropdownMenu(expanded = timerMenuOpen, onDismissRequest = { timerMenuOpen = false }) {
                     DropdownMenuItem(text = { Text(if (gameTimerRunning) "Stop session timer" else "Start session timer") }, onClick = { gameTimerRunning = !gameTimerRunning; timerMenuOpen = false })
                     DropdownMenuItem(text = { Text("Reset session timer") }, onClick = { elapsedGameSeconds = 0; timerMenuOpen = false })
@@ -215,16 +215,19 @@ internal fun TableController.TableMainLayout() {
                 if (unreadChatCount > 0) Box(Modifier.align(Alignment.TopEnd).padding(top = 5.dp, end = 5.dp).size(9.dp).clip(CircleShape).background(Color(0xFFE35656)))
             }
             Box(Modifier) {
-                IconButton(onClick = { run { topMenuSection = null; topMenuExpanded = true } }, modifier = Modifier.size(46.dp)) { Icon(Icons.Filled.MoreVert, "App menu", tint = SoftWhite) }
+                IconButton(onClick = { run { topMenuSection = null; topMenuExpanded = true; TutorialActions.tap("game-menu") } }, modifier = Modifier.size(46.dp).tutorialTarget("game-menu")) { Icon(Icons.Filled.MoreVert, "App menu", tint = SoftWhite) }
                 DropdownMenu(expanded = topMenuExpanded, onDismissRequest = { topMenuExpanded = false; topMenuSection = null }) {
+                    // A running lesson's coach, with its buttons, inside the menu where the player is looking.
+                    TutorialLayer(Modifier.widthIn(max = 320.dp), compact = true)
                     if (topMenuSection == null) {
-                                                DropdownMenuItem(text = { Text("Game tools") }, modifier = Modifier, onClick = { run { topMenuSection = "tools" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
-                        DropdownMenuItem(text = { Text("Room & game") }, modifier = Modifier, onClick = { run { topMenuSection = "game" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                        DropdownMenuItem(text = { Text("Learn & tutorials") }, modifier = Modifier.tutorialTarget("menu-tutorials"), onClick = { topMenuExpanded = false; topMenuSection = null; tutorialHubOpen = true })
+                        DropdownMenuItem(text = { Text("Game tools") }, modifier = Modifier.tutorialTarget("menu-game-tools"), onClick = { run { topMenuSection = "tools"; TutorialActions.tap("menu-game-tools") } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                        DropdownMenuItem(text = { Text("Room & game") }, modifier = Modifier.tutorialTarget("menu-room-game"), onClick = { run { topMenuSection = "game" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("What's new") }, onClick = { topMenuExpanded = false; changelogOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                         DropdownMenuItem(text = { Text("Adjust UI") }, onClick = { topMenuExpanded = false; topMenuSection = null; layoutLabOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
-                        DropdownMenuItem(text = { Text("Options") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; optionsOpen = true } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                        DropdownMenuItem(text = { Text("Options") }, modifier = Modifier.tutorialTarget("menu-options"), onClick = { run { topMenuExpanded = false; topMenuSection = null; optionsOpen = true } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
                     } else {
-                        DropdownMenuItem(text = { Text("‹  MAIN MENU") }, modifier = Modifier, onClick = { run { topMenuSection = null } })
+                        DropdownMenuItem(text = { Text("‹ Main menu") }, modifier = Modifier, onClick = { run { topMenuSection = null } })
                         when (topMenuSection) {
                             "decks" -> {
                                 if (!argentumEnabled) DropdownMenuItem(text = { Text(if (players[if (onlineMode) localSeat else selectedPlayer].deckLoaded) "Replace imported deck" else "Import deck") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; if (onlineMode) selectedPlayer = localSeat; importError = null; importOpen = true } })
@@ -232,23 +235,27 @@ internal fun TableController.TableMainLayout() {
                                 DropdownMenuItem(text = { Text("Saved decks · ${savedDecks.size}") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; savedDecksOpen = true } })
                             }
                             "tools" -> {
-                                if (!onlineMode) DropdownMenuItem(text = { Text("Add AI opponent · ${players.size}/4") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; addAiOpponent() } })
-                                if (!argentumEnabled && gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Add token") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; tokenTarget = selectedPlayer; tokenPickerOpen = true } })
+                                if (!onlineMode && ReleaseFeatures.multiplayerPreviewEnabled) DropdownMenuItem(text = { Text("Add AI opponent · ${players.size}/4") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; addAiOpponent() } })
+                                if (!argentumEnabled && gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Add token…") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; tokenTarget = selectedPlayer; tokenPickerOpen = true } })
                                 if (!argentumEnabled && gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Mana pool · ${trackedMana(selectedPlayer)}") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; manaTarget = selectedPlayer; manaPoolOpen = true } })
                                 if (!argentumEnabled && !gameEndedOnline && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Search / browse library") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; librarySearchPlayer = selectedPlayer } })
-                                if (argentumEnabled && gameInProgress) DropdownMenuItem(text = { Text("Argentum legal actions · ${ArgentumActions.visibleChoices(argentumSnapshot?.legalActions.orEmpty()).size}") }, onClick = { topMenuExpanded = false; topMenuSection = null; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } })
+                                if (argentumEnabled && gameInProgress && argentumSnapshot?.viewingPlayer == localSeat && argentumSnapshot?.topLibraryCard != null)
+                                    DropdownMenuItem(text = { Text("Look at top of library · private") }, onClick = {
+                                        topMenuExpanded = false; topMenuSection = null; argentumTopLibraryOpen = true
+                                    })
+                                if (argentumEnabled && gameInProgress) DropdownMenuItem(text = { Text("Argentum legal actions · ${ArgentumActions.visibleChoices(argentumSnapshot?.legalActions.orEmpty()).size}") }, modifier = Modifier.tutorialTarget("menu-legal-actions"), onClick = { topMenuExpanded = false; topMenuSection = null; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } })
                                 if (gameInProgress) DropdownMenuItem(text = { Text("Stack and priority · $visibleStackCount") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; stackOpen = true } })
-                                DropdownMenuItem(text = { Text("Game log") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; logOpen = true } })
-                                DropdownMenuItem(text = { Text("MTG rules") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; rulesOpen = true } })
+                                DropdownMenuItem(text = { Text("Game log") }, modifier = Modifier.tutorialTarget("menu-game-log"), onClick = { run { topMenuExpanded = false; topMenuSection = null; logOpen = true } })
+                                DropdownMenuItem(text = { Text("MTG rules") }, modifier = Modifier.tutorialTarget("menu-mtg-rules"), onClick = { run { topMenuExpanded = false; topMenuSection = null; rulesOpen = true } })
                             }
                             "game" -> {
-                                if (argentumOffline && wifiRole == null && argentumSnapshot != null && !gameEndedOnline)
+                                if (argentumOffline && !tutorialPracticeActive && wifiRole == null && argentumSnapshot != null && !gameEndedOnline)
                                     DropdownMenuItem(text = { Text("Save full offline game") }, onClick = {
                                         topMenuExpanded = false
                                         topMenuSection = null
                                         saveOfflineGame()
                                     })
-                                DropdownMenuItem(text = { Text("Room home") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; homeOpen = true; showOverview = true; showHand = false } })
+                                DropdownMenuItem(text = { Text("Home screen") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; homeOpen = true; showOverview = true; showHand = false } })
                                 // Argentum server play parked for now (Build 113); plumbing kept.
                                 if (!onlineMode && !localGameStarted) DropdownMenuItem(text = { Text("Start Argentum game", color = Muted.copy(alpha = .6f)) }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; android.widget.Toast.makeText(context, "Not yet available", android.widget.Toast.LENGTH_SHORT).show() } })
                                 // Argentum server play parked for now (Build 113); plumbing kept.
@@ -258,7 +265,7 @@ internal fun TableController.TableMainLayout() {
                                     if (endProposalBy < 0) { endProposalBy = localSeat; endVotes = mapOf(localSeat to true); logAction(localSeat, "proposed ending the game") }
                                 } })
                                 if (onlineMode) DropdownMenuItem(text = { Text("Leave game…") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; if (argentumEnabled) argentumLeaveConfirm = true else lobbyOpen = true } })
-                                if (!onlineMode || localSeat == 0 && gameEndedOnline) DropdownMenuItem(text = { Text("Reset game", color = Color(0xFFE9978B)) }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; resetConfirmOpen = true } })
+                                if (!onlineMode || localSeat == 0 && gameEndedOnline) DropdownMenuItem(text = { Text("Reset game", color = Color(0xFFE9978B)) }, modifier = Modifier.tutorialTarget("menu-reset"), onClick = { run { topMenuExpanded = false; topMenuSection = null; resetConfirmOpen = true } })
                                 if (!onlineMode) DropdownMenuItem(text = { Text("Reset and clear all data", color = Color(0xFFE9978B)) }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; clearAllConfirmOpen = true } })
                             }
                         }
@@ -354,7 +361,7 @@ internal fun TableController.TableMainLayout() {
                         showTurnTimer = turnTimerVisible,
                         onToggleTimer = { if (!onlineMode || localSeat == 0) turnTimerVisible = !turnTimerVisible },
                         onMoveUp = { if (!onlineMode) movePlayerCard(index, -1) }, onMoveDown = { if (!onlineMode) movePlayerCard(index, 1) },
-                        canReorder = !onlineMode,
+                        canReorder = !onlineMode, isLastSeat = index == players.lastIndex,
                          tableZoom = tableZoom,
                          onTableZoomEnd = { saveTableZoom(tableZoomContext, tableZoomConfig.screenWidthDp, tableZoomConfig.screenHeightDp, it) },
                         onOpen = { run { selectedPlayer = index; showOverview = false } },
@@ -440,7 +447,7 @@ internal fun TableController.TableMainLayout() {
                     onCombat = { run { if (argentumEnabled && boardIndex == localSeat) run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } else if (boardCanControl && boardIndex == activePlayer) combatDialogOpen = true } },
                     onTrackers = { if (boardCanControl) trackerPlayer = boardIndex },
                     onSearchLibrary = { run { if (boardCanControl) librarySearchPlayer = boardIndex } },
-                    onStack = { run { stackOpen = true } },
+                    onStack = { run { stackOpen = true; TutorialActions.tap("stack-button") } },
                     onOpenMore = { run {} },
             onCastCommander = { run {
                         if (boardCanControl) {
@@ -478,12 +485,13 @@ internal fun TableController.TableMainLayout() {
             Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 if (argentumEnabled && gameInProgress) HandPeekBar(
                     players.getOrNull(localSeat)?.hand?.size ?: 0,
-                    modifier = Modifier.weight(1f).testTag("hand-peek-table"),
-                    onClick = { run { showHand = true } }
+                    modifier = Modifier.weight(1f).testTag("hand-peek-table").tutorialTarget("hand-handle"),
+                    // The table-view handle must signal the same tutorial tap as the player-view handle.
+                    onClick = { run { showHand = true; TutorialActions.tap("hand-handle") } }
                 ) else Text("Tap a player to inspect their board", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
                 if (argentumEnabled) {
                     if (passToMyTurnFrom != null) HeaderButton("AUTO-PASSING · STOP", onClick = { run { togglePassToMyTurn() } }, modifier = Modifier, onLongClick = { run { togglePassToMyTurn() } })
-                    else if (argentumPrimaryLabel != null) PassButton(argentumPrimaryLabel!!, onClick = { run { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, canRespond = argentumCanRespond && respondGlow, modifier = Modifier, onLongClick = { run { togglePassToMyTurn() } })
+                    else if (argentumPrimaryLabel != null) PassButton(argentumPrimaryLabel!!, onClick = { run { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, canRespond = argentumCanRespond && respondGlow, modifier = Modifier, onLongClick = { run { TutorialActions.hold("bottom-bar-pass-button"); togglePassToMyTurn() } })
                     else Text(when { gameEndedOnline -> "GAME OVER"; argentumSnapshot == null -> "WAITING FOR ARGENTUM"; argentumPendingDecision != null -> "YOUR CHOICE IS NEEDED"; argentumAwaitingUpdate -> if (argentumSlow) "STILL WORKING…" else if (argentumOffline) "ENGINE THINKING…" else "WAITING FOR ARGENTUM"; wifiRole != null -> "WAITING FOR ${(argentumSnapshot?.let { players.getOrNull(it.priorityPlayer)?.name } ?: "YOUR FRIEND").uppercase()}…"; else -> "OPPONENT HAS PRIORITY" }, color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
                 } else {
                 if (gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) HeaderButton("NEXT · ${phaseSteps[phaseIndex]}", onClick = { run { if (argentumEnabled) sendArgentumPriority() else advanceStep() } }, enabled = !argentumAwaitingUpdate, modifier = Modifier)
@@ -505,20 +513,20 @@ internal fun TableController.TableMainLayout() {
             // Pass · Hand · Table share one baseline and height; the hand drawer is the one larger
             // control (a little taller and wider). The pass button works whichever board you're
             // looking at, and lights up when you can respond on someone else's turn.
-            Row(Modifier.fillMaxWidth().padding(top = 5.dp).testTag("bottom-bar"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+            Row(Modifier.fillMaxWidth().padding(top = 5.dp).testTag("bottom-bar").tutorialTarget("bottom-bar"), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
                 PassButton(
                     if (argentumEnabled && passToMyTurnFrom != null) "AUTO-PASSING · STOP" else if (argentumEnabled) argentumPrimaryLabel ?: "WAITING" else "PASS TURN",
                     onClick = { run { if (argentumEnabled && passToMyTurnFrom != null) togglePassToMyTurn() else if (argentumEnabled) argentumPrimary() else passTurn() } },
                     enabled = if (argentumEnabled && passToMyTurnFrom != null) true else if (argentumEnabled) argentumPrimaryLabel != null && !argentumAwaitingUpdate else canPassTurnFromBoard,
                     canRespond = argentumCanRespond && respondGlow,
-                    modifier = Modifier.weight(1f).height(footerControlHeight).testTag("bottom-bar-pass-button"),
+                    modifier = Modifier.weight(1f).height(footerControlHeight).testTag("bottom-bar-pass-button").tutorialTarget("bottom-bar-pass-button"),
                     onLongClick = if (argentumEnabled) ({ run { togglePassToMyTurn() } }) else null
                 )
                 Box(Modifier.weight(1.3f)) {
                     HandPeekBar(
                         players[if (argentumEnabled) localSeat.coerceIn(players.indices) else selectedPlayer.coerceIn(players.indices)].hand.size,
-                        modifier = Modifier.fillMaxWidth().height(handControlHeight).testTag("hand-peek"),
-                        onClick = { run { if (canControlSelectedPlayer || argentumEnabled) showHand = true } }
+                        modifier = Modifier.fillMaxWidth().height(handControlHeight).testTag("hand-peek").tutorialTarget("hand-handle"),
+                        onClick = { run { if (canControlSelectedPlayer || argentumEnabled) { showHand = true; TutorialActions.tap("hand-handle") } } }
                     )
                 }
                 // Same box style as the pass button, so both fill their full height and line up.

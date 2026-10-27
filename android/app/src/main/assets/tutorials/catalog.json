@@ -1,0 +1,2064 @@
+{
+  "formatVersion": 1,
+  "mode": "guided-reading",
+  "chapters": [
+    {
+      "id": "first-turn",
+      "title": "Your first turn",
+      "section": "Quick Start",
+      "minutes": 4,
+      "startScreen": "board",
+      "description": "Play a land, produce mana, cast your first creature, inspect a card, and pass priority.",
+      "scenario": "fixed-two-player-first-turn",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "welcome",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Welcome to Arcana",
+          "body": "You're going to play a turn, not watch a slideshow. Nothing here changes your saved games.",
+          "hint": "Let's play"
+        },
+        {
+          "id": "hand-handle",
+          "screen": "board",
+          "target": "hand-handle",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Open your hand",
+          "body": "Your hand stays in a drawer to leave room for the battlefield. Tap the hand handle to see your cards.",
+          "hint": "Tap HAND"
+        },
+        {
+          "id": "forest",
+          "screen": "board",
+          "target": "hand-card:Forest",
+          "advance": {
+            "kind": "event",
+            "event": "LandPlayed"
+          },
+          "title": "Play a land",
+          "body": "Tap Forest in your hand and choose to play it. Playing a land isn't casting a spell, and you can play one land each turn.",
+          "hint": "Play Forest"
+        },
+        {
+          "id": "board-land",
+          "screen": "board",
+          "target": "battlefield-card:Forest",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Your first permanent",
+          "body": "Your Forest is now on the battlefield. It can produce green mana when tapped.",
+          "hint": "Next"
+        },
+        {
+          "id": "make-mana",
+          "screen": "board",
+          "target": "battlefield-card:Forest",
+          "advance": {
+            "kind": "event",
+            "event": "ManaAdded"
+          },
+          "title": "Make green mana",
+          "body": "Tap your Forest and choose its mana ability to add green mana. You can also skip this: casting a spell pays from your untapped lands automatically.",
+          "hint": "Tap Forest for mana"
+        },
+        {
+          "id": "pool",
+          "screen": "board",
+          "target": "argentum-mana-summary",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Follow your mana",
+          "body": "The mana display shows what's currently in your pool. Unspent mana normally empties at the end of each step or phase.",
+          "hint": "Next"
+        },
+        {
+          "id": "cast-elf",
+          "screen": "board",
+          "target": "hand-card:Elvish Mystic",
+          "advance": {
+            "kind": "event",
+            "event": "SpellCast"
+          },
+          "title": "Cast a creature",
+          "body": "Elvish Mystic costs one green mana. Tap the card and choose its legal Cast action.",
+          "hint": "Choose Cast"
+        },
+        {
+          "id": "spell-stack",
+          "screen": "stack",
+          "target": "stack-items",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Spells use the stack",
+          "body": "Casting a creature puts the spell on the stack. Here it is, waiting to resolve. It enters the battlefield when it resolves.",
+          "hint": "Next"
+        },
+        {
+          "id": "resolve",
+          "screen": "board",
+          "target": "bottom-bar-pass-button",
+          "advance": {
+            "kind": "event",
+            "event": "SpellResolved"
+          },
+          "title": "Let it resolve",
+          "body": "Tap Pass. Your opponent gets a chance to respond; when you've both passed, the top spell resolves and Elvish Mystic enters the battlefield.",
+          "hint": "Tap Pass"
+        },
+        {
+          "id": "inspect",
+          "screen": "board",
+          "target": "battlefield-card:Elvish Mystic",
+          "advance": {
+            "kind": "hold"
+          },
+          "title": "Read a card",
+          "body": "Press and hold the creature to enlarge it and read its abilities.",
+          "hint": "Press and hold"
+        },
+        {
+          "id": "sickness",
+          "screen": "board",
+          "target": "battlefield-card:Elvish Mystic",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Why can't it attack yet?",
+          "body": "Unless it has haste, a new creature usually can't attack or use abilities with the tap symbol until you've controlled it since the start of your turn.",
+          "hint": "Next"
+        },
+        {
+          "id": "pass",
+          "screen": "board",
+          "target": "bottom-bar-pass-button",
+          "advance": {
+            "kind": "event",
+            "event": "PriorityPassed"
+          },
+          "title": "Keep the turn moving",
+          "body": "Tap Pass. When every player passes with nothing on the stack, the game moves on to the next step.",
+          "hint": "Tap Pass"
+        },
+        {
+          "id": "combat-skip",
+          "screen": "board",
+          "target": "bottom-bar-pass-button",
+          "advance": {
+            "kind": "event",
+            "event": "AttackersDeclared"
+          },
+          "title": "No attack this time",
+          "body": "Elvish Mystic arrived this turn, so it can't attack yet. With no creature able to attack, the game moves straight past combat; if it ever asks for attackers, confirm with none.",
+          "hint": "Keep passing"
+        },
+        {
+          "id": "finish-turn",
+          "screen": "board",
+          "target": "bottom-bar-pass-button",
+          "advance": {
+            "kind": "event",
+            "event": "TurnAdvanced"
+          },
+          "title": "Finish your turn",
+          "body": "Keep tapping Pass until your opponent's turn begins.",
+          "hint": "Pass to the opponent's turn"
+        },
+        {
+          "id": "opponent",
+          "screen": "board",
+          "target": "opponent-tab",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Watch the opponent",
+          "body": "Tap the opponent's tab to see their battlefield. Their hand stays hidden, just like yours is hidden from them.",
+          "hint": "Next"
+        },
+        {
+          "id": "complete",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "First turn complete",
+          "body": "You played a land, made mana, cast a creature and passed priority. More lessons are in Settings › Learn & tutorials whenever you want them.",
+          "hint": "Done"
+        }
+      ]
+    },
+    {
+      "id": "home",
+      "title": "Home and navigation",
+      "section": "App Controls",
+      "minutes": 2,
+      "startScreen": "home",
+      "description": "Recognize your deck, start or resume a game, and find settings.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player",
+        "conditional:saved-game"
+      ],
+      "steps": [
+        {
+          "id": "deck-hero",
+          "screen": "home",
+          "target": "home-deck",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Your selected deck",
+          "body": "This is the deck Arcana will use when you begin a new game. The commander identifies it.",
+          "hint": "Next"
+        },
+        {
+          "id": "change-deck",
+          "screen": "home",
+          "target": "home-change-deck",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Choose a deck",
+          "body": "Change deck lets you pick any of your decks: the included ones and any you've imported.",
+          "hint": "Tap Change deck"
+        },
+        {
+          "id": "play",
+          "screen": "home",
+          "target": "home-play",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Start playing",
+          "body": "Play opens the game setup controls, including the offline AI opponent.",
+          "hint": "Tap Play"
+        },
+        {
+          "id": "resume",
+          "screen": "home",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Resume safely",
+          "body": "When you have a saved offline game, a RESUME button appears here on Home and takes you back to it instead of starting over.",
+          "hint": "Next"
+        },
+        {
+          "id": "settings",
+          "screen": "home",
+          "target": "home-settings",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Make Arcana yours",
+          "body": "Settings controls card size, layout, gameplay behavior, notifications and help.",
+          "hint": "Tap Settings"
+        },
+        {
+          "id": "find-guide",
+          "screen": "settings",
+          "target": "tutorial-entry",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Tutorials are always here",
+          "body": "You can replay any lesson from Settings › Learn & tutorials. Lessons never change your game.",
+          "hint": "Done"
+        }
+      ]
+    },
+    {
+      "id": "setup",
+      "title": "Choose a game",
+      "section": "App Controls",
+      "minutes": 2,
+      "startScreen": "setup",
+      "description": "Start a release-supported offline Commander game.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "mode",
+          "screen": "setup",
+          "target": "setup-offline",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Offline vs AI",
+          "body": "Argentum runs locally on your phone. You don't need an internet connection for an offline match.",
+          "hint": "Next"
+        },
+        {
+          "id": "two",
+          "screen": "setup",
+          "target": "setup-players",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "How many players",
+          "body": "Offline, choose 2, 3 or 4 players. Each extra player is an AI opponent with its own deck. To play with friends, choose Play with a friend.",
+          "hint": "Next"
+        },
+        {
+          "id": "your-deck",
+          "screen": "setup",
+          "target": "setup-human-deck",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Your Commander deck",
+          "body": "The deck you selected on Home fills your seat for a new match.",
+          "hint": "Next"
+        },
+        {
+          "id": "ai-deck",
+          "screen": "setup",
+          "target": "setup-ai-deck",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Pick the AI's deck",
+          "body": "Choose a deck for the AI, or leave it on Random. With more than one AI, the others get random decks.",
+          "hint": "Choose an AI deck"
+        },
+        {
+          "id": "save-note",
+          "screen": "setup",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Practice is separate",
+          "body": "Practice lessons never replace your saved offline game. Choosing a deck or AI deck here is a real choice, and stays for your next game.",
+          "hint": "Done"
+        },
+        {
+          "id": "start",
+          "screen": "setup",
+          "target": "setup-start",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Ready to play",
+          "body": "PLAY starts a real game against the AI with these choices. Tap it when you're ready; that ends this lesson. Practice lessons always use a separate game.",
+          "hint": "Tap PLAY, or Next to finish"
+        }
+      ]
+    },
+    {
+      "id": "opening-hand",
+      "title": "Opening hands and mulligans",
+      "section": "Learn Magic",
+      "minutes": 3,
+      "startScreen": "mulligan",
+      "description": "Practice one mulligan, then keep a playable seven-card draw.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "seven",
+          "screen": "mulligan",
+          "target": "opening-hand-card",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Meet your opening seven",
+          "body": "These are the cards you'll begin with. Press and hold a card to read it before deciding.",
+          "hint": "Next"
+        },
+        {
+          "id": "lands",
+          "screen": "mulligan",
+          "target": "opening-hand-card",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Look for playable mana",
+          "body": "A useful hand generally has enough lands and early spells to make progress. What counts as good depends on your deck.",
+          "hint": "Next"
+        },
+        {
+          "id": "play-draw",
+          "screen": "mulligan",
+          "target": "opening-hand-header",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "On the play or draw?",
+          "body": "The header tells you who acts first. Turn order affects when you draw and when you can play a land.",
+          "hint": "Next"
+        },
+        {
+          "id": "mulligan",
+          "screen": "mulligan",
+          "target": "mulligan-button",
+          "advance": {
+            "kind": "event",
+            "event": "HandMulliganed"
+          },
+          "title": "Try one mulligan",
+          "body": "This practice hand is almost all lands, so it has nothing to cast. Tap Mulligan to shuffle it away and draw a new seven.",
+          "hint": "Tap MULLIGAN"
+        },
+        {
+          "id": "bottom",
+          "screen": "mulligan",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Follow the game's mulligan prompts",
+          "body": "After a mulligan you still draw seven, then put one card on the bottom of your library for each mulligan you took. Arcana asks which cards once you keep.",
+          "hint": "Next"
+        },
+        {
+          "id": "keep",
+          "screen": "mulligan",
+          "target": "keep-hand",
+          "advance": {
+            "kind": "event",
+            "event": "HandKept"
+          },
+          "title": "Keep this hand",
+          "body": "Tap KEEP. If Arcana asks, choose the card to put on the bottom of your library.",
+          "hint": "Tap KEEP"
+        },
+        {
+          "id": "zoom-dismiss",
+          "screen": "mulligan",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "You can inspect without choosing",
+          "body": "Pressing and holding a card to read it never counts as keeping or taking a mulligan, so look as much as you like before you decide.",
+          "hint": "Done"
+        }
+      ]
+    },
+    {
+      "id": "table",
+      "title": "Reading the battlefield",
+      "section": "App Controls",
+      "minutes": 3,
+      "startScreen": "board",
+      "description": "Find every major part of the portrait-oriented table.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "phase",
+          "screen": "board",
+          "target": "phase-tracker",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Phase tracker",
+          "body": "The highlighted phase or step shows where the turn is right now.",
+          "hint": "Next"
+        },
+        {
+          "id": "turn-clock",
+          "screen": "board",
+          "target": "turn-timer",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Turn and timer",
+          "body": "This area shows turn information and the optional timer. Time display is not a game rule.",
+          "hint": "Next"
+        },
+        {
+          "id": "seat-tabs",
+          "screen": "board",
+          "target": "player-tabs",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Choose a view",
+          "body": "Switch between TABLE, your player view and the opponent's view. These are different views of the same game.",
+          "hint": "Next"
+        },
+        {
+          "id": "overview",
+          "screen": "board",
+          "target": "table-tab",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "See the whole table",
+          "body": "TABLE shows both sides at once and is ideal for checking the overall board state.",
+          "hint": "Tap TABLE"
+        },
+        {
+          "id": "player",
+          "screen": "board",
+          "target": "your-tab",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Focus on yourself",
+          "body": "Your player view gives your battlefield more room, particularly on narrow phones.",
+          "hint": "Tap YOU"
+        },
+        {
+          "id": "opp",
+          "screen": "board",
+          "target": "opponent-tab",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Inspect the opponent",
+          "body": "The opponent view shows their public battlefield and status, not the contents of their private hand.",
+          "hint": "Tap opponent"
+        },
+        {
+          "id": "commander",
+          "screen": "board",
+          "target": "commander-chip",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Commander area",
+          "body": "Your commander is a separate zone-aware card. Tap it when legal actions are available.",
+          "hint": "Next"
+        },
+        {
+          "id": "quick-actions",
+          "screen": "board",
+          "target": "quick-actions",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Quick Actions",
+          "body": "This compact strip gives you fast access to priority, the stack, zones and the log.",
+          "hint": "Next"
+        },
+        {
+          "id": "hand",
+          "screen": "board",
+          "target": "hand-handle",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Hand drawer",
+          "body": "Your hand stays available at the bottom. You can resize it without abandoning the game.",
+          "hint": "Next"
+        }
+      ]
+    },
+    {
+      "id": "cards",
+      "title": "Reading and playing cards",
+      "section": "Learn Magic",
+      "minutes": 3,
+      "startScreen": "board",
+      "description": "Open your hand, inspect cards and choose Argentum-provided actions.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "open-hand",
+          "screen": "board",
+          "target": "hand-handle",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Open the hand drawer",
+          "body": "Tap the hand control or its handle to expand the cards you're holding.",
+          "hint": "Tap HAND"
+        },
+        {
+          "id": "browse",
+          "screen": "board",
+          "target": "hand-grid",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Browse your cards",
+          "body": "Scroll through the hand. Large cards make text easier to read, but fewer fit at once.",
+          "hint": "Next"
+        },
+        {
+          "id": "inspect",
+          "screen": "board",
+          "target": "hand-card:any",
+          "advance": {
+            "kind": "hold"
+          },
+          "title": "Inspect without playing",
+          "body": "Press and hold a card for its full-size view. This doesn't cast or play it.",
+          "hint": "Press and hold a card"
+        },
+        {
+          "id": "tap",
+          "screen": "board",
+          "target": "hand-card:any",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Ask for legal actions",
+          "body": "Tap a card to see the actions Argentum currently allows.",
+          "hint": "Tap a card"
+        },
+        {
+          "id": "choose",
+          "screen": "board",
+          "target": "legal-action-sheet",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Choose an action",
+          "body": "This sheet lists only what Argentum allows with that card right now: play, cast, or an ability. Choose one, or close the sheet.",
+          "hint": "Next"
+        },
+        {
+          "id": "not-available",
+          "screen": "board",
+          "target": "legal-action-sheet",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Why isn't Cast shown?",
+          "body": "A card can't be cast without enough mana, at the wrong time (most spells need your main phase), or while another player has priority. Wait for your chance, or check the stack.",
+          "hint": "Next"
+        },
+        {
+          "id": "resize",
+          "screen": "board",
+          "target": "hand-drawer-grip",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Resize the drawer",
+          "body": "Drag the hand drawer to trade battlefield space for larger hand cards.",
+          "hint": "Next"
+        },
+        {
+          "id": "close",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Back to the table",
+          "body": "Tap outside the drawer, or its ✕, to close your hand and return to the table.",
+          "hint": "Next"
+        }
+      ]
+    },
+    {
+      "id": "mana",
+      "title": "Lands, mana and casting",
+      "section": "Learn Magic",
+      "minutes": 4,
+      "startScreen": "board",
+      "description": "Understand land drops, colored mana, auto-payment and manual selection.",
+      "scenario": "fixed-first-turn",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "land",
+          "screen": "board",
+          "target": "hand-card:Forest",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Lands aren't spells",
+          "body": "You normally play a land from your hand during your own main phase with an empty stack and one land play available.",
+          "hint": "Next"
+        },
+        {
+          "id": "symbols",
+          "screen": "board",
+          "target": "hand-card:Elvish Mystic",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Read the mana symbols",
+          "body": "A card's cost is in its top-right corner. Colored symbols need that color of mana; a number is generic mana, payable with any type. Elvish Mystic costs one green.",
+          "hint": "Next"
+        },
+        {
+          "id": "play-land",
+          "screen": "board",
+          "target": "hand-card:Forest",
+          "advance": {
+            "kind": "event",
+            "event": "LandPlayed"
+          },
+          "title": "Make a land drop",
+          "body": "Select your land and choose Play Land. A land drop is not a cast spell.",
+          "hint": "Choose Play Land"
+        },
+        {
+          "id": "tap-land",
+          "screen": "board",
+          "target": "battlefield-card:Forest",
+          "advance": {
+            "kind": "event",
+            "event": "ManaAdded"
+          },
+          "title": "Use a mana ability",
+          "body": "A basic Forest can add green mana. Some cards can produce multiple types of mana.",
+          "hint": "Use mana ability"
+        },
+        {
+          "id": "pool",
+          "screen": "board",
+          "target": "argentum-mana-summary",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Mana in the pool",
+          "body": "Mana is a temporary resource; an untapped land is not itself floating mana.",
+          "hint": "Next"
+        },
+        {
+          "id": "cast",
+          "screen": "board",
+          "target": "hand-card:Elvish Mystic",
+          "advance": {
+            "kind": "event",
+            "event": "SpellCast"
+          },
+          "title": "Pay to cast a spell",
+          "body": "Tap Elvish Mystic and choose to cast it. Argentum checks the cost and timing, and Arcana pays from your mana.",
+          "hint": "Choose Cast"
+        },
+        {
+          "id": "autopay",
+          "screen": "board",
+          "target": "argentum-mana-summary",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Auto-payment and choices",
+          "body": "Arcana pays costs from your untapped lands for you. When a choice matters, like which color to make, it asks you.",
+          "hint": "Next"
+        },
+        {
+          "id": "empty",
+          "screen": "board",
+          "target": "argentum-mana-summary",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Mana empties",
+          "body": "Unused mana normally disappears as the game moves between steps and phases. Don't save it for your next turn.",
+          "hint": "Done"
+        }
+      ]
+    },
+    {
+      "id": "turns",
+      "title": "Turn structure and passing",
+      "section": "Learn Magic",
+      "minutes": 4,
+      "startScreen": "board",
+      "description": "Understand phases, legal timing and long-press passing.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "phase-bar",
+          "screen": "board",
+          "target": "phase-tracker",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "A turn has phases",
+          "body": "Beginning, main, combat, second main and ending phases organize what you can do.",
+          "hint": "Next"
+        },
+        {
+          "id": "main",
+          "screen": "board",
+          "target": "phase-tracker",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Main phase actions",
+          "body": "Most creatures, artifacts and sorceries are cast during your main phase when you have priority and the stack is empty.",
+          "hint": "Next"
+        },
+        {
+          "id": "instant",
+          "screen": "board",
+          "target": "phase-tracker",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Instant-speed actions",
+          "body": "Instants and many activated abilities can be used whenever you have priority, subject to their other restrictions.",
+          "hint": "Next"
+        },
+        {
+          "id": "priority",
+          "screen": "board",
+          "target": "bottom-bar-pass-button",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Priority means permission to act",
+          "body": "The game gives players opportunities to act or pass. The current player doesn't necessarily have priority at every moment.",
+          "hint": "Next"
+        },
+        {
+          "id": "pass",
+          "screen": "board",
+          "target": "bottom-bar-pass-button",
+          "advance": {
+            "kind": "event",
+            "event": "PriorityPassed"
+          },
+          "title": "Pass once",
+          "body": "Pass tells Argentum you don't want to act right now. It doesn't always mean your entire turn is over.",
+          "hint": "Tap Pass"
+        },
+        {
+          "id": "resolved",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "What happens next?",
+          "body": "If everyone passes with something on the stack, its top object resolves. With an empty stack, the game advances.",
+          "hint": "Next"
+        },
+        {
+          "id": "hold",
+          "screen": "board",
+          "target": "bottom-bar-pass-button",
+          "advance": {
+            "kind": "hold"
+          },
+          "title": "Pass until your next turn",
+          "body": "Press and hold Pass to keep passing until your next turn. One tap is a single pass; holding is a shortcut.",
+          "hint": "Press and hold Pass"
+        },
+        {
+          "id": "stop",
+          "screen": "board",
+          "target": "bottom-bar-pass-button",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Stop auto-passing",
+          "body": "Auto-pass stops by itself when something needs your attention, and you can turn it off at any time.",
+          "hint": "Next"
+        },
+        {
+          "id": "help",
+          "screen": "board",
+          "target": "bottom-bar-pass-button",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Ask why the game is waiting",
+          "body": "The Pass button's label tells you what passing will do next, like going to combat or ending your turn. If it glows, the game is waiting for your response.",
+          "hint": "Done"
+        }
+      ]
+    },
+    {
+      "id": "stack",
+      "title": "The stack and responses",
+      "section": "Learn Magic",
+      "minutes": 5,
+      "startScreen": "board",
+      "description": "Practice casting a targeted instant, checking the stack, and passing priority.",
+      "scenario": "fixed-stack-instant",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "open",
+          "screen": "board",
+          "target": "stack-button",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Open the stack",
+          "body": "Tap STACK to open the stack panel. It's empty now; you'll put a real spell on it in a moment. Your opponent won't respond in this practice.",
+          "hint": "Tap STACK"
+        },
+        {
+          "id": "last-first",
+          "screen": "stack",
+          "target": "stack-items",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Last in, first out",
+          "body": "Spells and abilities wait here until they resolve. The newest one resolves first, after every player passes.",
+          "hint": "Next"
+        },
+        {
+          "id": "priority",
+          "screen": "stack",
+          "target": "priority-indicator",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Who can respond?",
+          "body": "Whoever has priority may act. Arcana only offers actions Argentum says are legal right now.",
+          "hint": "Next"
+        },
+        {
+          "id": "opponent-cast",
+          "screen": "board",
+          "target": "hand-handle",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Get your instant ready",
+          "body": "You control Grizzly Bears and two untapped Forests. Tap NEXT and your hand opens so you can cast an instant.",
+          "hint": "Next"
+        },
+        {
+          "id": "respond",
+          "screen": "board",
+          "target": "hand-card:Giant Growth",
+          "advance": {
+            "kind": "event",
+            "event": "SpellCast"
+          },
+          "title": "Cast Giant Growth",
+          "body": "Tap Giant Growth, choose to cast it, then pick your Grizzly Bears as the target.",
+          "hint": "Choose Cast and target your Bears"
+        },
+        {
+          "id": "inspect-stack",
+          "screen": "stack",
+          "target": "stack-items",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Check the new order",
+          "body": "Giant Growth is now on the stack. If a player casts another instant, it will normally resolve before Giant Growth.",
+          "hint": "Next"
+        },
+        {
+          "id": "pass",
+          "screen": "stack",
+          "target": "stack-pass",
+          "advance": {
+            "kind": "event",
+            "event": "PriorityPassed"
+          },
+          "title": "Pass to resolve",
+          "body": "Tap PASS PRIORITY. Your opponent passes too, Giant Growth resolves, and your Bears get +3/+3 until end of turn.",
+          "hint": "Tap PASS PRIORITY"
+        },
+        {
+          "id": "close",
+          "screen": "stack",
+          "target": "stack-close",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Return to your battlefield",
+          "body": "Giant Growth resolved and the stack is empty. Tap CLOSE to go back to the battlefield.",
+          "hint": "Tap CLOSE"
+        }
+      ]
+    },
+    {
+      "id": "combat",
+      "title": "Attacking, blocking and damage",
+      "section": "Learn Magic",
+      "minutes": 5,
+      "startScreen": "board",
+      "description": "Attack with a creature, see how combat damage works, and learn what changes when creatures block.",
+      "scenario": "fixed-combat",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "combat-step",
+          "screen": "board",
+          "target": "phase-tracker",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Enter combat",
+          "body": "Your Grizzly Bears have been with you since your last turn, so they can attack. Tap Pass to leave your main phase and go to combat.",
+          "hint": "Tap Pass"
+        },
+        {
+          "id": "ready",
+          "screen": "board",
+          "target": "battlefield-card:Grizzly Bears",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Choose an eligible attacker",
+          "body": "A creature can attack if you've controlled it since the start of your turn, unless it has haste. Your Bears qualify.",
+          "hint": "Next"
+        },
+        {
+          "id": "attack",
+          "screen": "board",
+          "target": "bottom-bar-pass-button",
+          "advance": {
+            "kind": "event",
+            "event": "AttackersDeclared"
+          },
+          "title": "Declare attackers",
+          "body": "Tap Pass to go to attackers. On the attack board, tap Grizzly Bears, then confirm. Attacking taps the creature.",
+          "hint": "Choose Grizzly Bears, then confirm"
+        },
+        {
+          "id": "block",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Blocking",
+          "body": "Your opponent has no creatures, so nothing can block this time. In other games, the defending player may block with untapped creatures.",
+          "hint": "Next"
+        },
+        {
+          "id": "blocked",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Combat pairs creatures",
+          "body": "A blocked attacker deals its damage to the blocker instead of the player, unless an ability like trample says otherwise.",
+          "hint": "Next"
+        },
+        {
+          "id": "damage",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Damage happens",
+          "body": "With no blockers, your Bears dealt combat damage straight to your opponent: 2 damage, equal to their power.",
+          "hint": "Next"
+        },
+        {
+          "id": "life",
+          "screen": "board",
+          "target": "opponent-tab",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Life totals update",
+          "body": "Your opponent's life went down by 2: you can see it on their tab. Damage to creatures wears off at the end of the turn; life lost stays lost.",
+          "hint": "Next"
+        },
+        {
+          "id": "keywords",
+          "screen": "board",
+          "target": "battlefield-card:Grizzly Bears",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Keywords matter",
+          "body": "Flying, reach, first strike, trample and deathtouch can change combat. Press and hold any creature to read its abilities.",
+          "hint": "Next"
+        },
+        {
+          "id": "postcombat",
+          "screen": "board",
+          "target": "phase-tracker",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Second main phase",
+          "body": "After combat, you normally have another main phase to cast sorcery-speed spells and play a land if you haven't used your land play.",
+          "hint": "Done"
+        }
+      ]
+    },
+    {
+      "id": "commander",
+      "title": "Commander rules",
+      "section": "Learn Magic",
+      "minutes": 4,
+      "startScreen": "board",
+      "description": "Command zone, casting tax, commander damage and color identity.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "format",
+          "screen": "board",
+          "target": "commander-chip",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "What is Commander?",
+          "body": "Commander decks normally have exactly 100 cards including the commander. On this practice board your commander is Ayula, Queen Among Bears.",
+          "hint": "Next"
+        },
+        {
+          "id": "commandzone",
+          "screen": "board",
+          "target": "commander-chip",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "The command zone",
+          "body": "Your commander starts in the command zone, shown by this chip. Tapping it opens Argentum's actions for it, including Cast when you can afford it.",
+          "hint": "Next"
+        },
+        {
+          "id": "cast",
+          "screen": "board",
+          "target": "commander-chip",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Cast your commander",
+          "body": "A commander is cast as a spell, with normal timing: Ayula is a creature, so your main phase with an empty stack.",
+          "hint": "Next"
+        },
+        {
+          "id": "tax",
+          "screen": "board",
+          "target": "commander-chip",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Commander tax",
+          "body": "Each prior cast from the command zone adds two generic mana the next time you cast it from there.",
+          "hint": "Next"
+        },
+        {
+          "id": "returns",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Where does the commander go?",
+          "body": "If your commander would go to your graveyard or exile, you may move it back to the command zone instead. Cast it again later, paying commander tax.",
+          "hint": "Next"
+        },
+        {
+          "id": "damage",
+          "screen": "board",
+          "target": "opponent-tab",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Track commander combat damage",
+          "body": "Taking 21 combat damage from the same commander over the game makes a player lose, even with life left. Starting life in Commander is 40.",
+          "hint": "Next"
+        },
+        {
+          "id": "color",
+          "screen": "board",
+          "target": "commander-chip",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Color identity matters",
+          "body": "Every card in a Commander deck must fit your commander's color identity. Ayula is green, so this deck is green.",
+          "hint": "Next"
+        },
+        {
+          "id": "legal",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Let Argentum adjudicate",
+          "body": "Lessons explain the rules; Argentum applies them. If an action isn't offered, the game doesn't allow it right now.",
+          "hint": "Done"
+        }
+      ]
+    },
+    {
+      "id": "zones",
+      "title": "Zones, tokens and counters",
+      "section": "Learn Magic",
+      "minutes": 4,
+      "startScreen": "board",
+      "description": "Recognize battlefield, graveyard, exile, command zone and token/counter states.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "battlefield",
+          "screen": "board",
+          "target": "battlefield-row",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Battlefield",
+          "body": "Creatures, lands and many other permanents live here while in play.",
+          "hint": "Next"
+        },
+        {
+          "id": "hand",
+          "screen": "board",
+          "target": "hand-handle",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Hand",
+          "body": "Cards in your hand are private to you. You normally cast or play them using legal actions.",
+          "hint": "Next"
+        },
+        {
+          "id": "graveyard",
+          "screen": "board",
+          "target": "quick-graveyard",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Graveyard",
+          "body": "Cards go here after dying, resolving or being discarded. There's a Llanowar Elves in yours. Tap Graveyard to look.",
+          "hint": "Tap Graveyard"
+        },
+        {
+          "id": "exile",
+          "screen": "board",
+          "target": "quick-exile",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Exile",
+          "body": "Exile is a separate zone. Exiled cards aren't playable unless an effect says so. There's a Forest in yours. Tap Exile to look.",
+          "hint": "Tap Exile"
+        },
+        {
+          "id": "library",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Library",
+          "body": "Your library is your draw pile: the number on your seat shows how many cards are left. Cards in it stay hidden and in order.",
+          "hint": "Next"
+        },
+        {
+          "id": "command",
+          "screen": "board",
+          "target": "commander-chip",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Command zone",
+          "body": "Your commander is tracked separately, and effects can sometimes interact with this zone.",
+          "hint": "Next"
+        },
+        {
+          "id": "tokens",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Tokens represent permanents",
+          "body": "Tokens are permanents created by effects. They work like cards on the battlefield but aren't real cards: they vanish if they leave it.",
+          "hint": "Next"
+        },
+        {
+          "id": "counters",
+          "screen": "board",
+          "target": "battlefield-card:Grizzly Bears",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Counters change objects",
+          "body": "Counters change objects. These Grizzly Bears have a +1/+1 counter, so they're 3/3. Hold the card to see it.",
+          "hint": "Next"
+        },
+        {
+          "id": "play-from-zone",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Some effects grant special permission",
+          "body": "You can only play cards from your graveyard, exile or library when an effect allows it. When one does, the card's legal actions include it.",
+          "hint": "Done"
+        }
+      ]
+    },
+    {
+      "id": "quick-actions",
+      "title": "Quick Actions and game log",
+      "section": "App Controls",
+      "minutes": 3,
+      "startScreen": "board",
+      "description": "Use the compact controls without losing your place at the table.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "strip",
+          "screen": "board",
+          "target": "quick-actions",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Quick Actions",
+          "body": "This configurable strip puts your most useful game tools within thumb reach.",
+          "hint": "Next"
+        },
+        {
+          "id": "pass",
+          "screen": "board",
+          "target": "bottom-bar-pass-button",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Pass",
+          "body": "Tap for one priority pass; hold for the pass-to-my-turn shortcut if enabled.",
+          "hint": "Next"
+        },
+        {
+          "id": "stack",
+          "screen": "board",
+          "target": "stack-button",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Stack",
+          "body": "Inspect unresolved spells and abilities, then close the panel to return.",
+          "hint": "Tap STACK"
+        },
+        {
+          "id": "grave",
+          "screen": "board",
+          "target": "quick-graveyard",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Graveyard",
+          "body": "Look through the graveyard without leaving the live game.",
+          "hint": "Tap Graveyard"
+        },
+        {
+          "id": "exile",
+          "screen": "board",
+          "target": "quick-exile",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Exile",
+          "body": "Inspect cards currently in exile.",
+          "hint": "Tap Exile"
+        },
+        {
+          "id": "log",
+          "screen": "board",
+          "target": "quick-log",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Game log",
+          "body": "Review the sequence of played cards, choices and game events; newer actions appear first.",
+          "hint": "Tap Log"
+        },
+        {
+          "id": "configure",
+          "screen": "layout",
+          "target": "layout-quick-actions",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Customize the strip",
+          "body": "Adjust UI lets you choose which quick actions appear and in what order.",
+          "hint": "Next"
+        },
+        {
+          "id": "return",
+          "screen": "board",
+          "target": "table-tab",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Keep your place",
+          "body": "Closing a panel takes you back to the view you were using. TABLE shows everyone at once.",
+          "hint": "Done"
+        }
+      ]
+    },
+    {
+      "id": "opponents",
+      "title": "Opponent turns and alerts",
+      "section": "App Controls",
+      "minutes": 3,
+      "startScreen": "board",
+      "description": "Know what the AI did and when Arcana needs your response.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "who",
+          "screen": "board",
+          "target": "player-tabs",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Whose turn is it?",
+          "body": "The turn indicator shows the active player. Priority may belong to someone else.",
+          "hint": "Next"
+        },
+        {
+          "id": "action-feed",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Recent plays",
+          "body": "During a game, the strip under the table shows recent plays: what was cast or activated, and by whom.",
+          "hint": "Next"
+        },
+        {
+          "id": "inspect",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Inspect a recent card",
+          "body": "Tap a recent-play notice to see the card large. When the AI plays a card, a pop-up shows it too (you can turn that off in Adjust UI).",
+          "hint": "Next"
+        },
+        {
+          "id": "target",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "When something targets you",
+          "body": "When an opponent's spell or ability targets you or your permanents, an alert stays up until it resolves.",
+          "hint": "Next"
+        },
+        {
+          "id": "respond",
+          "screen": "board",
+          "target": "bottom-bar-pass-button",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Respond or pass",
+          "body": "If you have priority and legal actions, you can respond. Otherwise pass to continue.",
+          "hint": "Next"
+        },
+        {
+          "id": "ai",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "The AI is thinking",
+          "body": "On big boards the AI can take a moment to think. The status shows it's working; there's no need to tap again.",
+          "hint": "Next"
+        },
+        {
+          "id": "history",
+          "screen": "board",
+          "target": "quick-log",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "See what you missed",
+          "body": "Open the game log for the complete sequence after your opponent's turn.",
+          "hint": "Done"
+        }
+      ]
+    },
+    {
+      "id": "decks",
+      "title": "Choosing decks and library",
+      "section": "App Controls",
+      "minutes": 3,
+      "startScreen": "home",
+      "description": "Use the release deck picker and understand gated future features.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "open",
+          "screen": "home",
+          "target": "home-change-deck",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Open Change deck",
+          "body": "Select from the included Commander decks. Each deck has a commander and color identity.",
+          "hint": "Tap Change deck"
+        },
+        {
+          "id": "categories",
+          "screen": "decks",
+          "target": "deck-categories",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Deck groups",
+          "body": "Decks are grouped: WOTC PRECONS, ARCANA, ARGENTUM PREMADE DECKS, and YOUR OTHER DECKS for decks you've imported.",
+          "hint": "Next"
+        },
+        {
+          "id": "preview",
+          "screen": "decks",
+          "target": "deck-select",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Inspect before choosing",
+          "body": "Each deck shows its name and commander. The one you're playing is outlined and marked PLAYING.",
+          "hint": "Next"
+        },
+        {
+          "id": "select",
+          "screen": "decks",
+          "target": "deck-select",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Make it active",
+          "body": "Choose this deck for your next game. A running match should not be overwritten.",
+          "hint": "Select deck"
+        },
+        {
+          "id": "search",
+          "screen": "decks",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Your imported decks",
+          "body": "Decks you add with Import new are listed under YOUR OTHER DECKS, ready to choose like any other.",
+          "hint": "Next"
+        },
+        {
+          "id": "coming",
+          "screen": "decks",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Bring your own deck",
+          "body": "Import new on the Home screen adds a deck from a pasted list. Imported decks appear in Change deck alongside the included ones.",
+          "hint": "Next"
+        },
+        {
+          "id": "return",
+          "screen": "home",
+          "target": "home-deck",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Ready for a match",
+          "body": "Your selected deck appears back on the home screen.",
+          "hint": "Done"
+        }
+      ]
+    },
+    {
+      "id": "settings",
+      "title": "Settings and interface layout",
+      "section": "App Controls",
+      "minutes": 4,
+      "startScreen": "home",
+      "description": "Make the game readable and comfortable in portrait or on a Fold.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "access",
+          "screen": "home",
+          "target": "home-settings",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Open Settings",
+          "body": "These preferences let the interface fit how you play.",
+          "hint": "Tap Settings"
+        },
+        {
+          "id": "size",
+          "screen": "settings",
+          "target": "setting-card-size",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Card size",
+          "body": "Choose a card size that gives you readable text while keeping enough battlefield visible.",
+          "hint": "Next"
+        },
+        {
+          "id": "layout",
+          "screen": "settings",
+          "target": "setting-adjust-ui",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Adjust UI",
+          "body": "Open the layout editor to move and resize supported game controls.",
+          "hint": "Tap Adjust UI"
+        },
+        {
+          "id": "reorder",
+          "screen": "layout",
+          "target": "layout-sizes",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Resize the table",
+          "body": "Change card size, board spacing, hand tray height and button sizes. Changes save as you make them, separately for portrait and landscape.",
+          "hint": "Next"
+        },
+        {
+          "id": "bottom",
+          "screen": "layout",
+          "target": "layout-sizes",
+          "title": "Your bottom controls",
+          "body": "Pass, Hand and Table are the controls you use most in a game. Bottom button size here makes them bigger or smaller to suit your thumbs.",
+          "hint": "Next",
+          "advance": {
+            "kind": "next"
+          }
+        },
+        {
+          "id": "restore",
+          "screen": "layout",
+          "target": "layout-reset",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Undo and restore",
+          "body": "Reset puts the layout back to Arcana's default whenever you want.",
+          "hint": "Next"
+        },
+        {
+          "id": "gameplay",
+          "screen": "settings",
+          "target": "setting-gameplay",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Gameplay behavior",
+          "body": "Control display choices and how closely Arcana follows the active player.",
+          "hint": "Next"
+        },
+        {
+          "id": "alerts",
+          "screen": "settings",
+          "target": "setting-notifications",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Notifications",
+          "body": "Choose how Arcana gets your attention when it's your turn or the game needs you.",
+          "hint": "Next"
+        },
+        {
+          "id": "engine",
+          "screen": "settings",
+          "target": "setting-help-diagnostics",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Help and diagnostics",
+          "body": "Support tools live here: the engine running notice, connection checks and the diagnostic log.",
+          "hint": "Next"
+        }
+      ]
+    },
+    {
+      "id": "tools",
+      "title": "Menus, tools and safety",
+      "section": "App Controls",
+      "minutes": 3,
+      "startScreen": "board",
+      "description": "Navigate game menus without accidentally resetting your match.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "menu",
+          "screen": "board",
+          "target": "game-menu",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Open the game menu",
+          "body": "The three-dot button contains Game tools, Room & game, What's new, Adjust UI and Options.",
+          "hint": "Tap ⋮"
+        },
+        {
+          "id": "game-tools",
+          "screen": "menu",
+          "target": "menu-game-tools",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Game tools",
+          "body": "Open stack and priority, legal actions, the log, and MTG rules where available.",
+          "hint": "Tap Game tools"
+        },
+        {
+          "id": "legal",
+          "screen": "menu",
+          "target": "menu-legal-actions",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Legal actions",
+          "body": "Argentum supplies the allowed actions for the current state, not the tutorial itself.",
+          "hint": "Next"
+        },
+        {
+          "id": "rules",
+          "screen": "menu",
+          "target": "menu-mtg-rules",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Rules reference",
+          "body": "Open a rules reference when you need the detailed wording of a rule.",
+          "hint": "Next"
+        },
+        {
+          "id": "room",
+          "screen": "menu",
+          "target": "menu-room-game",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Room and game",
+          "body": "Resume, save or return to the home screen as appropriate for the active mode.",
+          "hint": "Next"
+        },
+        {
+          "id": "reset",
+          "screen": "menu",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Resetting is destructive",
+          "body": "Room & game holds Reset game and Reset and clear all data. They end your match or erase your data. Lessons never use them; only choose them when you mean it.",
+          "hint": "Next"
+        },
+        {
+          "id": "options",
+          "screen": "menu",
+          "target": "menu-options",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Options",
+          "body": "Go here for game display, interaction and diagnostics preferences.",
+          "hint": "Done"
+        }
+      ]
+    },
+    {
+      "id": "mobile",
+      "title": "Touch, zoom and Fold layouts",
+      "section": "App Controls",
+      "minutes": 3,
+      "startScreen": "board",
+      "description": "Use Arcana on a narrow phone or an unfolded Fold.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "portrait",
+          "screen": "board",
+          "target": "table-tab",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Made for portrait play",
+          "body": "Arcana keeps key actions near your thumbs and hides the hand when you need board space.",
+          "hint": "Next"
+        },
+        {
+          "id": "hand-resize",
+          "screen": "board",
+          "target": "hand-drawer-grip",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Resize your hand",
+          "body": "Drag the drawer up for card readability or down for a larger battlefield.",
+          "hint": "Next"
+        },
+        {
+          "id": "hold",
+          "screen": "board",
+          "target": "battlefield-card:any",
+          "advance": {
+            "kind": "hold"
+          },
+          "title": "Hold to inspect",
+          "body": "Long-press a card instead of squinting at the small battlefield version.",
+          "hint": "Press and hold"
+        },
+        {
+          "id": "zoom",
+          "screen": "board",
+          "target": "table-zoom",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Zoom the full table",
+          "body": "Pinch the table overview to zoom in on a busy board.",
+          "hint": "Next"
+        },
+        {
+          "id": "fold",
+          "screen": "board",
+          "target": "player-tabs",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Unfold for more space",
+          "body": "On a Fold, Arcana can show more battlefield space and adapt the panel arrangement.",
+          "hint": "Next"
+        },
+        {
+          "id": "layout",
+          "screen": "settings",
+          "target": "setting-adjust-ui",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Customize per posture",
+          "body": "Adjust UI lets you rearrange the game controls. Arcana fits the layout to the folded or unfolded screen.",
+          "hint": "Done"
+        }
+      ]
+    },
+    {
+      "id": "help",
+      "title": "Help, diagnostics and troubleshooting",
+      "section": "App Controls",
+      "minutes": 4,
+      "startScreen": "settings",
+      "description": "Find guidance and export useful evidence when something breaks.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player",
+        "conditional:engine-toggle"
+      ],
+      "steps": [
+        {
+          "id": "tutorials",
+          "screen": "settings",
+          "target": "tutorial-entry",
+          "advance": {
+            "kind": "tap"
+          },
+          "title": "Replay any lesson",
+          "body": "Open Learn & tutorials here to replay any lesson. You can exit or restart a lesson at any time.",
+          "hint": "Tap Tutorials"
+        },
+        {
+          "id": "help",
+          "screen": "settings",
+          "target": "setting-help-diagnostics",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Help and diagnostics",
+          "body": "The Help & diagnostics section has the tools to use when Arcana behaves unexpectedly.",
+          "hint": "Next"
+        },
+        {
+          "id": "log",
+          "screen": "settings",
+          "target": "diagnostic-log",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "The diagnostic log",
+          "body": "The log records useful context for debugging, including important game actions and errors.",
+          "hint": "Next"
+        },
+        {
+          "id": "export",
+          "screen": "settings",
+          "target": "diagnostic-export",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Export a report",
+          "body": "When reporting a reproducible bug, export a diagnostic report and note the card, turn and action.",
+          "hint": "Next"
+        },
+        {
+          "id": "status",
+          "screen": "settings",
+          "target": "engine-processing-toggle",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Engine running notice",
+          "body": "Turn this on to show a banner with the elapsed time while Argentum works out a big turn.",
+          "hint": "Next"
+        },
+        {
+          "id": "self-test",
+          "screen": "settings",
+          "target": "engine-self-test",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Engine self-test",
+          "body": "The engine self-test checks the rules engine on its own, which helps tell an engine problem from a display problem.",
+          "hint": "Next"
+        },
+        {
+          "id": "return",
+          "screen": "settings",
+          "target": "tutorial-entry",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Back to playing",
+          "body": "Help tools never change your match.",
+          "hint": "Done"
+        }
+      ]
+    },
+    {
+      "id": "unavailable-actions",
+      "title": "Why can't I play this?",
+      "section": "Learn Magic",
+      "minutes": 4,
+      "startScreen": "board",
+      "description": "Understand disabled actions without guessing at rules.",
+      "scenario": "guided",
+      "availability": [
+        "release:offline-two-player"
+      ],
+      "steps": [
+        {
+          "id": "no-action",
+          "screen": "board",
+          "target": "hand-card:any",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "No Cast button?",
+          "body": "First check whether you have priority, the right timing and enough mana.",
+          "hint": "Next"
+        },
+        {
+          "id": "timing",
+          "screen": "board",
+          "target": "phase-tracker",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Timing restrictions",
+          "body": "Creatures normally need your main phase and an empty stack. Instants are more flexible.",
+          "hint": "Next"
+        },
+        {
+          "id": "cost",
+          "screen": "board",
+          "target": "hand-card:any",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Costs aren't just mana",
+          "body": "Some actions require tapping, sacrificing, discarding or other costs.",
+          "hint": "Next"
+        },
+        {
+          "id": "target",
+          "screen": "board",
+          "target": null,
+          "advance": {
+            "kind": "next"
+          },
+          "title": "Targets must be legal",
+          "body": "An effect may only target certain players, cards or zones. The game will ask for valid targets.",
+          "hint": "Next"
+        },
+        {
+          "id": "tap",
+          "screen": "board",
+          "target": "battlefield-card:any",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "A tapped source may not work",
+          "body": "Abilities with the tap symbol generally require the permanent to be untapped, and creatures may be affected by summoning sickness.",
+          "hint": "Next"
+        },
+        {
+          "id": "bug",
+          "screen": "board",
+          "target": "quick-log",
+          "advance": {
+            "kind": "next"
+          },
+          "title": "What if the action looks wrong?",
+          "body": "If an action looks wrong, check the game log, then export diagnostics from Settings so the problem can be fixed.",
+          "hint": "Done"
+        }
+      ]
+    }
+  ]
+}

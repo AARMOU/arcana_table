@@ -144,7 +144,13 @@ internal fun LibrarySearchDialog(
     onDismiss: () -> Unit
 ) {
     var query by remember { mutableStateOf("") }
-    var selectedCardId by remember { mutableIntStateOf(-1) }
+    var selectedIds by remember { mutableStateOf(setOf<Int>()) }
+    var chip by remember { mutableStateOf<LibraryChip?>(null) }
+    var sort by remember { mutableStateOf(LibrarySort.TYPE) }
+    // A card left the library during this search: offer the shuffle a tutor needs on the way out.
+    var movedOut by remember { mutableStateOf(false) }
+    var shuffledSinceMove by remember { mutableStateOf(false) }
+    var askShuffle by remember { mutableStateOf(false) }
     // The general browse/search control is not permission to inspect the
     // library's actual stack. Keep a randomized presentation list separate
     // from player.library so selecting a card never changes draw order.
@@ -154,14 +160,24 @@ internal fun LibrarySearchDialog(
             shuffled.drop(1) + shuffled.first()
         } else shuffled
     }
-    val matches = remember(unorderedLibrary, query) {
+    val searched = remember(unorderedLibrary, query) {
         unorderedLibrary.filter { card ->
             query.isBlank() || card.name.contains(query.trim(), ignoreCase = true) || card.type.contains(query.trim(), ignoreCase = true) || card.oracleText.orEmpty().contains(query.trim(), ignoreCase = true)
         }
     }
-    val selected = unorderedLibrary.firstOrNull { it.id == selectedCardId }
+    val chips = remember(unorderedLibrary) { LibraryChip.present(unorderedLibrary.map { it.type }) }
+    val matches = remember(searched, chip, sort, selectedIds) {
+        arrangeLibrary(searched, chip, sort, keep = { it.id in selectedIds }, name = { it.name }, typeLine = { it.type }, manaValue = { it.manaValue })
+    }
+    val selected = unorderedLibrary.filter { it.id in selectedIds }
+    fun close() { if (movedOut && !shuffledSinceMove) askShuffle = true else onDismiss() }
+    fun moveSelected(action: (GameCard) -> Unit, leavesLibrary: Boolean) {
+        selected.forEach(action)
+        if (leavesLibrary) { movedOut = true; shuffledSinceMove = false }
+        selectedIds = emptySet()
+    }
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = ::close,
         properties = DialogProperties(usePlatformDefaultWidth = false)
     ) {
         Surface(
@@ -175,35 +191,43 @@ internal fun LibrarySearchDialog(
                         Text("${player.name} · LIBRARY", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 15.sp)
                         Text("${player.library.size} cards · randomized display · library order hidden", color = Muted, fontSize = 10.sp)
                     }
-                    TextButton(onClick = onShuffle, modifier = Modifier.heightIn(min = 44.dp)) { Text("SHUFFLE", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close library", tint = Muted) }
+                    TextButton(onClick = { onShuffle(); shuffledSinceMove = true }, modifier = Modifier.heightIn(min = 44.dp)) { Text("SHUFFLE", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+                    IconButton(onClick = ::close, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close library", tint = Muted) }
                 }
                 OutlinedTextField(
                     value = query,
                     onValueChange = { query = it },
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 6.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp),
                     singleLine = true,
                     label = { Text("Search name, type, or rules text") },
                     placeholder = { Text("Blank search shows the full library") }
                 )
-                if (selected != null) {
-                    Text("SELECTED · ${selected.name}", color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(bottom = 4.dp), horizontalArrangement = Arrangement.spacedBy(5.dp), verticalAlignment = Alignment.CenterVertically) {
+                    LibrarySort.entries.forEach { s -> FilterChip(sort == s, { sort = s }, label = { Text(s.label, fontSize = 11.sp) }) }
+                    chips.forEach { (c, n) -> FilterChip(chip == c, { chip = if (chip == c) null else c }, label = { Text("${c.label} $n", fontSize = 11.sp) }) }
+                }
+                if (selected.isNotEmpty()) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(if (selected.size == 1) "SELECTED · ${selected.single().name}" else "${selected.size} SELECTED", color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Bold,
+                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { selectedIds = emptySet() }, modifier = Modifier.heightIn(min = 40.dp)) { Text("CLEAR", color = Muted, fontSize = 9.sp) }
+                    }
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
                         listOf(
-                            "TO HAND" to onTakeToHand,
-                            "TO BATTLEFIELD" to onPutBattlefield,
-                            "TO GRAVEYARD" to onPutGraveyard,
-                            "EXILE" to onPutExile,
-                            "TOP" to onMoveToTop,
-                            "BOTTOM" to onMoveToBottom
-                        ).forEach { (label, action) ->
-                            TextButton(onClick = { action(selected); selectedCardId = -1 }, modifier = Modifier.heightIn(min = 44.dp)) {
+                            Triple("TO HAND", onTakeToHand, true),
+                            Triple("TO BATTLEFIELD", onPutBattlefield, true),
+                            Triple("TO GRAVEYARD", onPutGraveyard, true),
+                            Triple("TO EXILE", onPutExile, true),
+                            Triple("TO TOP", onMoveToTop, false),
+                            Triple("TO BOTTOM", onMoveToBottom, false)
+                        ).forEach { (label, action, leaves) ->
+                            TextButton(onClick = { moveSelected(action, leaves) }, modifier = Modifier.heightIn(min = 44.dp)) {
                                 Text(label, color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                             }
                         }
                     }
                 } else {
-                    Text("Select a card to move it. Long press a card to inspect it.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(vertical = 5.dp))
+                    Text("Tap cards to select one or more, then move them. Long press a card to inspect it.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(vertical = 5.dp))
                 }
                 HorizontalDivider(color = PanelLight)
                 when {
@@ -214,32 +238,49 @@ internal fun LibrarySearchDialog(
                         contentPadding = PaddingValues(vertical = 5.dp),
                         verticalArrangement = Arrangement.spacedBy(3.dp)
                     ) {
-                        items(matches.size, key = { matches[it].id }) { index ->
-                            val card = matches[index]
-                            val isSelected = card.id == selectedCardId
-                            Row(
-                                Modifier.fillMaxWidth()
-                                    .clip(RoundedCornerShape(9.dp))
-                                    .background(if (isSelected) PanelLight else Panel)
-                                    .border(if (isSelected) 1.dp else 0.dp, if (isSelected) Mint else Panel, RoundedCornerShape(9.dp))
-                                    .combinedClickable(onClick = { selectedCardId = card.id }, onLongClick = { onPreview(card) })
-                                    .padding(horizontal = 7.dp, vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                CardFace(card, Modifier.width(37.dp), onClick = { selectedCardId = card.id }, onLongClick = { onPreview(card) }, showCounters = false)
-                                Column(Modifier.weight(1f).padding(start = 8.dp)) {
-                                    Text(card.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                    Text(card.type, color = Muted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        matches.forEachIndexed { index, (group, card) ->
+                            if (sort != LibrarySort.NAME && (index == 0 || matches[index - 1].first != group)) item(key = "h-$group") {
+                                Text("${group.uppercase()} · ${matches.count { it.first == group }}", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Black,
+                                    modifier = Modifier.padding(top = 6.dp, bottom = 2.dp))
+                            }
+                            item(key = card.id) {
+                                val isSelected = card.id in selectedIds
+                                Row(
+                                    Modifier.fillMaxWidth()
+                                        .clip(RoundedCornerShape(9.dp))
+                                        .background(if (isSelected) PanelLight else Panel)
+                                        .border(if (isSelected) 1.dp else 0.dp, if (isSelected) Mint else Panel, RoundedCornerShape(9.dp))
+                                        .combinedClickable(onClick = { selectedIds = if (isSelected) selectedIds - card.id else selectedIds + card.id }, onLongClick = { onPreview(card) })
+                                        .padding(horizontal = 7.dp, vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    CardFace(card, Modifier.width(37.dp), onClick = { selectedIds = if (isSelected) selectedIds - card.id else selectedIds + card.id }, onLongClick = { onPreview(card) }, showCounters = false)
+                                    Column(Modifier.weight(1f).padding(start = 8.dp)) {
+                                        Text(card.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Text(listOfNotNull(card.manaCost?.takeIf { it.isNotBlank() }, card.type, card.power?.let { "$it/${card.toughness}" }).joinToString("  ·  "),
+                                            color = Muted, fontSize = 9.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                    }
+                                    if (isSelected) Text("✓", color = Mint, fontSize = 13.sp, fontWeight = FontWeight.Black)
                                 }
-                                if (isSelected) Text("SELECTED", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
                 }
-                Text("Draw and common turn commands are in the hand tray.", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(top = 5.dp))
+                Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Draw and common turn commands are in the hand tray.", color = Muted, fontSize = 9.sp, modifier = Modifier.weight(1f))
+                    TextButton(onClick = { onShuffle(); onDismiss() }, modifier = Modifier.heightIn(min = 44.dp)) { Text("DONE · SHUFFLE", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
+                }
             }
         }
     }
+    if (askShuffle) AlertDialog(
+        onDismissRequest = { askShuffle = false },
+        title = { Text("Shuffle your library?") },
+        text = { Text("You moved cards out of ${player.name}'s library. Searching usually ends with a shuffle.") },
+        confirmButton = { TextButton(onClick = { askShuffle = false; onShuffle(); onDismiss() }) { Text("SHUFFLE") } },
+        dismissButton = { TextButton(onClick = { askShuffle = false; onDismiss() }) { Text("DON'T SHUFFLE") } },
+        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
+    )
 }
 
 @Composable
@@ -623,13 +664,14 @@ internal fun LobbyDialog(
         AlertDialog(
             onDismissRequest = { removeTarget = -1 },
             title = { Text("Remove $targetName?") },
-            text = { Text("This removes the player and their seat from the online room.") },
+            text = { Text("This removes the player and their seat from this room.") },
             confirmButton = {
                 TextButton(onClick = { onRemovePlayer(removeTarget); removeTarget = -1 }) {
                     Text("REMOVE PLAYER", color = Color(0xFFE9978B), fontWeight = FontWeight.Bold)
                 }
             },
-            dismissButton = { TextButton(onClick = { removeTarget = -1 }) { Text("CANCEL") } }
+            dismissButton = { TextButton(onClick = { removeTarget = -1 }) { Text("CANCEL") } },
+            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
     if (openingHandDialogOpen && !gameStarted && localSeat in players.indices && players[localSeat].deckLoaded && !players[localSeat].openingHandKept) {
@@ -672,7 +714,7 @@ internal fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKe
                             if (choosingBottomCards) {
                                 OutlinedButton(
                                     onClick = { selectedCardIds = if (selected) selectedCardIds - card.id else selectedCardIds + card.id },
-                                    modifier = Modifier.fillMaxWidth().padding(top = 3.dp).heightIn(min = 38.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(top = 3.dp).heightIn(min = 44.dp),
                                     contentPadding = PaddingValues(horizontal = 3.dp, vertical = 4.dp),
                                     border = BorderStroke(1.dp, if (selected) Mint else Muted)
                                 ) {
@@ -689,11 +731,12 @@ internal fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKe
                         Button(onClick = { onKeep(selectedCardIds) }, enabled = selectedCardIds.size == bottomCount, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("CONFIRM KEEP") }
                     }
                 } else {
+                    // Two wide buttons per row so longer labels never wrap on a phone.
                     Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
-                        OutlinedButton(onClick = onMulligan, enabled = canMulliganAgain, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("MULLIGAN", color = if (canMulliganAgain) CounterGold else Muted) }
-                        Button(onClick = { if (bottomCount == 0) onKeep(emptyList()) else choosingBottomCards = true }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(if (bottomCount == 0) "KEEP HAND" else "KEEP · BOTTOM $bottomCount") }
+                        OutlinedButton(onClick = onMulligan, enabled = canMulliganAgain, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("MULLIGAN", color = if (canMulliganAgain) CounterGold else Muted, maxLines = 1) }
+                        Button(onClick = { if (bottomCount == 0) onKeep(emptyList()) else choosingBottomCards = true }, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text(if (bottomCount == 0) "KEEP HAND" else "KEEP · BOTTOM $bottomCount", maxLines = 1) }
                     }
+                    TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.End).padding(top = 4.dp).heightIn(min = 48.dp)) { Text("DECIDE LATER", color = Muted) }
                 }
             }
         }
@@ -705,23 +748,47 @@ internal fun OpeningHandDialog(player: TablePlayer, onMulligan: () -> Unit, onKe
 
 @Composable
 internal fun OptionsPage(
-    darkMode: Boolean, timerVisible: Boolean, backgroundAlertsEnabled: Boolean,
+    darkMode: Boolean, timerVisible: Boolean, backgroundAlertsEnabled: Boolean, showEngineStatus: Boolean,
     followActivePlayer: Boolean, connectionLabel: String, pingResult: String?, versionLabel: String, diagnosticCount: Int,
     reducedSwipeMotion: Boolean, cardSizeScale: Float, onOpenLayoutLab: () -> Unit,
     onToggleTheme: () -> Unit, onToggleTimerVisibility: () -> Unit, onToggleBackgroundAlerts: (Boolean) -> Unit,
-    onFollowActivePlayer: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, onCardSizeScale: (Float) -> Unit,
+    onShowEngineStatus: (Boolean) -> Unit, onFollowActivePlayer: (Boolean) -> Unit, onReducedMotion: (Boolean) -> Unit, onCardSizeScale: (Float) -> Unit,
+    respondToOwnStack: Boolean = false, onRespondToOwnStack: (Boolean) -> Unit = {},
     quietOpponentTurns: Boolean = false, onQuietOpponentTurns: (Boolean) -> Unit = {},
     onTestConnection: () -> Unit, onReconnect: (() -> Unit)?, onViewDiagnostics: () -> Unit, onExportDiagnostics: () -> Unit,
-    onWhatsNew: () -> Unit,
+    onWhatsNew: () -> Unit, onTutorials: () -> Unit = {},
     engineTrialResult: String? = null, onEngineSelfTest: (() -> Unit)? = null,
-    onClearAllData: () -> Unit, onDismiss: () -> Unit
+    onClearAllData: () -> Unit, onDismiss: () -> Unit,
 ) {
     @Composable
     fun Section(title: String, top: androidx.compose.ui.unit.Dp = 14.dp) =
-        Text(title, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = top, bottom = 2.dp))
+        Text(title, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp,
+            modifier = Modifier.tutorialTarget(when (title) {
+                "GAMEPLAY" -> "setting-gameplay"
+                "NOTIFICATIONS" -> "setting-notifications"
+                "HELP & DIAGNOSTICS" -> "setting-help-diagnostics"
+                else -> "settings-section-${title.lowercase()}"
+            }).padding(top = top, bottom = 2.dp))
     @Composable
     fun LinkRow(label: String, detail: String? = null, modifier: Modifier = Modifier, onClick: () -> Unit) =
-        TextButton(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).then(modifier)) {
+        TextButton(onClick = {
+            TutorialActions.tap(when (label) {
+                "Learn & tutorials" -> "tutorial-entry"
+                "Diagnostic log" -> "diagnostic-log"
+                "Export diagnostic log" -> "diagnostic-export"
+                "Run engine self-test" -> "engine-self-test"
+                else -> "settings-${label.lowercase()}"
+            })
+            onClick()
+        }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).then(modifier).tutorialTarget(
+            when (label) {
+                "Learn & tutorials" -> "tutorial-entry"
+                "Diagnostic log" -> "diagnostic-log"
+                "Export diagnostic log" -> "diagnostic-export"
+                "Run engine self-test" -> "engine-self-test"
+                else -> "settings-${label.lowercase()}"
+            }
+        )) {
             Column(Modifier.fillMaxWidth()) {
                 Text(label, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                 if (detail != null) Text(detail, color = Muted, fontSize = 10.sp)
@@ -738,17 +805,18 @@ internal fun OptionsPage(
                 Section("APPEARANCE", top = 8.dp)
                 TextButton(onClick = onToggleTheme, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Theme  ·  ${if (darkMode) "Dark" else "Light"}", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
                 SettingsToggle("Reduce swipe animation", "Skip the animated jump when switching player tabs.", reducedSwipeMotion, onReducedMotion, Modifier)
-                Text("CARD SIZE", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 6.dp))
+                Text("CARD SIZE", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.tutorialTarget("setting-card-size").padding(top = 6.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     listOf(0.82f to "SMALL", 1f to "STANDARD", 1.18f to "LARGE").forEach { (scale, label) ->
                         TextButton(onClick = { onCardSizeScale(scale) }, modifier = Modifier.weight(1f).heightIn(min = 44.dp)) { Text(if (kotlin.math.abs(cardSizeScale - scale) < 0.03f) "✓ $label" else label, color = if (kotlin.math.abs(cardSizeScale - scale) < 0.03f) Mint else SoftWhite, fontSize = 9.sp) }
                     }
                 }
-                TextButton(onClick = onOpenLayoutLab, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
+                TextButton(onClick = onOpenLayoutLab, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).tutorialTarget("setting-adjust-ui").clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
                     Text("ADJUST UI LAYOUT  ›", color = Mint, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
                 }
                 Section("GAMEPLAY")
                 SettingsToggle("Follow the active player", "Show the player whose turn it is. Your selected tab stays until the next turn.", followActivePlayer, onFollowActivePlayer, Modifier)
+                SettingsToggle("Respond to my spells and abilities", "Offline games: keep priority over your own stack when you have a legal response. Turn this on before casting to build Ulalek stacks.", respondToOwnStack, onRespondToOwnStack, Modifier)
                 SettingsToggle("Skip AI actions unless needed", "Offline games: pass over AI spells and abilities unless they affect you. Prompts and blocks still stop the game.", quietOpponentTurns, onQuietOpponentTurns, Modifier)
                 SettingsToggle("Show turn timer", "Show the time spent on the current turn.", timerVisible, { onToggleTimerVisibility() }, Modifier)
                 Section("NOTIFICATIONS")
@@ -760,28 +828,45 @@ internal fun OptionsPage(
                     Switch(checked = backgroundAlertsEnabled, onCheckedChange = onToggleBackgroundAlerts)
                 }
                 Section("HELP & DIAGNOSTICS")
+                Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).tutorialTarget("engine-processing-toggle"), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).padding(end = 8.dp)) {
+                        Text("Engine running notice", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Show the in-game processing banner and elapsed time while Argentum works.", color = Muted, fontSize = 10.sp)
+                    }
+                    Switch(checked = showEngineStatus, onCheckedChange = onShowEngineStatus,
+                        modifier = Modifier.testTag("engine-processing-toggle"))
+                }
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(PanelLight).padding(horizontal = 10.dp, vertical = 8.dp)) {
                     Text(connectionLabel, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     if (pingResult != null) Text(pingResult, color = if (pingResult.startsWith("Can't")) Color(0xFFE9978B) else Muted, fontSize = 10.sp)
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(top = 4.dp)) {
-                        HeaderButton("TEST CONNECTION", onTestConnection, enabled = pingResult != "Testing…")
-                        if (onReconnect != null) HeaderButton("RECONNECT", onReconnect)
+                    Column(Modifier.fillMaxWidth().padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        OutlinedButton(onClick = onTestConnection, enabled = pingResult != "Testing…",
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("diagnostics-test-connection")) {
+                            Text("TEST CONNECTION", color = if (pingResult == "Testing…") Muted else Mint)
+                        }
+                        if (onReconnect != null) OutlinedButton(onClick = onReconnect,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("diagnostics-reconnect")) {
+                            Text("RECONNECT", color = Mint)
+                        }
                     }
                 }
                 LinkRow("Diagnostic log", "Search $diagnosticCount recorded events", onClick = onViewDiagnostics)
                 LinkRow("Export diagnostic log", "Save a text file to share when something goes wrong", onClick = onExportDiagnostics)
+                LinkRow("Learn & tutorials", "20 chapters, 160 lessons and a Magic glossary · works offline", onClick = onTutorials)
                 LinkRow("What's new", "Version $versionLabel", onClick = onWhatsNew)
                 if (onEngineSelfTest != null) LinkRow(
                     "Run engine self-test",
-                    engineTrialResult ?: "Plays one AI-vs-AI game with Argentum inside this phone, no server. Takes up to a minute.",
+                    engineTrialResult ?: "Runs a local AI-vs-AI rules check using Argentum. No server needed.",
                     modifier = Modifier.testTag("engine-self-test"),
                     onClick = { if (engineTrialResult?.startsWith("Running") != true) onEngineSelfTest() })
                 HorizontalDivider(color = Muted.copy(alpha = 0.25f), modifier = Modifier.padding(top = 14.dp))
+                Section("RESET", top = 8.dp)
                 TextButton(onClick = onClearAllData, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(top = 6.dp)) {
                     Text("CLEAR ALL DATA", color = Color(0xFFE9978B), fontWeight = FontWeight.Black, modifier = Modifier.fillMaxWidth())
                 }
                 Text("Saved decks are kept when game data is cleared.", color = Muted, fontSize = 10.sp)
             }
+            TutorialLayer()
             }
         }
     }
@@ -1243,7 +1328,7 @@ internal fun RulesLookupDialog(onDismiss: () -> Unit) {
                                 .onFailure { status = "Download failed. Check your connection and try again." }
                             loading = false
                         }
-                    }, enabled = !loading, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (loading) "DOWNLOADING" else if (rulesText.isBlank()) "DOWNLOAD" else "UPDATE", color = Mint, fontSize = 8.sp) }
+                    }, enabled = !loading, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (loading) "DOWNLOADING…" else if (rulesText.isBlank()) "DOWNLOAD" else "UPDATE", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                 }
                 if (status.isNotBlank()) Text(status, color = if (rulesText.isNotBlank()) Mint else CounterGold, fontSize = 9.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 3.dp))
                 if (rulesText.isBlank()) {
@@ -1284,7 +1369,13 @@ internal fun HandCardActionsDialog(card: GameCard, hasCommander: Boolean, isComm
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         pair.forEach { action ->
                             TextButton(onClick = { onAction(action) }, modifier = Modifier.weight(1f).heightIn(min = 46.dp).clip(RoundedCornerShape(8.dp)).background(PanelLight)) {
-                                Text(action, color = if (action == "DISCARD" || action == "EXILE") Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold, fontSize = 9.sp, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                                // Button text says where the card goes; the action key stays the same.
+                                val label = when (action) {
+                                    "REVEAL" -> "REVEAL · TO REVEALED"
+                                    "COMMAND ZONE" -> "TO COMMAND ZONE"
+                                    else -> action
+                                }
+                                Text(label, color = if (action == "DISCARD" || action == "EXILE") Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold, fontSize = 9.sp, maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                             }
                         }
                         if (pair.size == 1) Spacer(Modifier.weight(1f))
@@ -1392,7 +1483,7 @@ internal fun DeckEditorDialog(
                             searching = true
                             scope.launch { results = Scryfall.searchCards(query.trim()); searching = false }
                         }
-                    }) { Text(if (searching) "SEARCHING" else if (searchArgentum) "SEARCH ARGENTUM" else "SEARCH ALL", color = Mint, fontSize = 9.sp) }
+                    }) { Text(if (searching) "SEARCHING…" else if (searchArgentum) "SEARCH ARGENTUM" else "SEARCH ALL", color = Mint, fontSize = 9.sp) }
                 })
                 if (catalog != null) Row(verticalAlignment = Alignment.CenterVertically) {
                     Checkbox(checked = argentumOnly, onCheckedChange = { argentumOnly = it; results = emptyList(); suggestingFor = null })
@@ -1416,7 +1507,7 @@ internal fun DeckEditorDialog(
                                     suggestingFor = null
                                     results = emptyList()
                                     query = ""
-                                }, modifier = Modifier.heightIn(min = 40.dp)) { Text(if (replacementTarget == null) "+ ADD" else "REPLACE", color = Mint, fontWeight = FontWeight.Bold) }
+                                }, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (replacementTarget == null) "+ ADD" else "REPLACE", color = Mint, fontWeight = FontWeight.Bold) }
                             }
                         }
                     }
@@ -1440,7 +1531,7 @@ internal fun DeckEditorDialog(
                                 }
                                 if (card.importIssue != null) {
                                     TextButton(onClick = { autoFix(card, listOf(card)) }, enabled = autoFixingCardId == null) {
-                                        Text(if (autoFixingCardId == card.id) "…" else "AUTO-FIX", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                                        Text(if (autoFixingCardId == card.id) "FIXING…" else "AUTO FIX", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                                     }
                                     TextButton(onClick = { replacementTarget = card; query = card.name; results = emptyList() }) {
                                         Text("FIND", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold)
@@ -1482,12 +1573,12 @@ internal fun DeckEditorDialog(
                                     TextButton(
                                         onClick = { autoFix(sample, copies) },
                                         enabled = autoFixingCardId == null,
-                                        modifier = Modifier.heightIn(min = 36.dp)
-                                    ) { Text(if (autoFixingCardId == sample.id) "TRYING…" else "AUTO-FIX", color = Mint, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+                                        modifier = Modifier.heightIn(min = 48.dp)
+                                    ) { Text(if (autoFixingCardId == sample.id) "FIXING…" else "AUTO FIX", color = Mint, fontSize = 9.sp, fontWeight = FontWeight.Bold) }
                                 }
                             }
                             Box {
-                                TextButton(onClick = { menuCard = sample }, modifier = Modifier.heightIn(min = 40.dp)) { Text("⋮", color = Mint, fontSize = 18.sp) }
+                                IconButton(onClick = { menuCard = sample }, modifier = Modifier.size(48.dp)) { Icon(Icons.Filled.MoreVert, "${sample.name} options", tint = Mint) }
                                 DropdownMenu(expanded = menuCard?.id == sample.id, onDismissRequest = { menuCard = null }) {
                                     if (sample.importIssue != null) DropdownMenuItem(text = { Text("Search for correct card") }, onClick = { replacementTarget = sample; query = sample.name; results = emptyList(); suggestingFor = null; menuCard = null })
                                     if (catalog != null && sample.importIssue == null) DropdownMenuItem(text = { Text("Replace with an Argentum card") }, onClick = { replacementTarget = sample; query = ""; results = emptyList(); suggestingFor = null; argentumOnly = true; menuCard = null })
@@ -1502,15 +1593,58 @@ internal fun DeckEditorDialog(
             }
         }
     }
-    renameCard?.let { card -> AlertDialog(onDismissRequest = { renameCard = null }, title = { Text("Rename card") }, text = { OutlinedTextField(renameValue, { renameValue = it }, singleLine = true, label = { Text("Card name") }) }, confirmButton = { TextButton(onClick = { if (renameValue.isNotBlank()) onRename(card, renameValue.trim()); renameCard = null }) { Text("SAVE") } }, dismissButton = { TextButton(onClick = { renameCard = null }) { Text("CANCEL") } }) }
+    renameCard?.let { card -> AlertDialog(onDismissRequest = { renameCard = null }, title = { Text("Rename card") }, text = { OutlinedTextField(renameValue, { renameValue = it }, singleLine = true, label = { Text("Card name") }) }, confirmButton = { TextButton(onClick = { if (renameValue.isNotBlank()) onRename(card, renameValue.trim()); renameCard = null }) { Text("SAVE") } }, dismissButton = { TextButton(onClick = { renameCard = null }) { Text("CANCEL") } }, containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted) }
+}
+
+/**
+ * Argentum's per-defender commanderDamage is keyed by commanderName, whereas manually tracked
+ * tables historically use the opposing seat ID. Do not treat a missing seat-ID lookup as zero.
+ * Extra source keys (partners, a missing commander portrait, or imported legacy data) must remain
+ * visible as separate commanders, never be summed toward the 21-damage threshold.
+ */
+internal data class CommanderDamageTrackerSource(val playerId: String, val playerName: String, val commanderName: String?)
+internal data class CommanderDamageTrackerRow(val label: String, val key: String, val amount: Int)
+
+internal fun commanderDamageTrackerRows(
+    received: Map<String, Int>,
+    opponents: List<CommanderDamageTrackerSource>,
+): List<CommanderDamageTrackerRow> {
+    val represented = mutableSetOf<String>()
+    val rows = opponents.map { source ->
+        val commanderName = source.commanderName?.takeIf(String::isNotBlank)
+        val key = when {
+            commanderName != null && commanderName in received -> commanderName
+            source.playerId in received -> source.playerId
+            else -> source.playerId  // Preserve manual-table storage for an unset count.
+        }
+        represented += key
+        CommanderDamageTrackerRow(
+            label = source.playerName + (commanderName?.let { " · $it" } ?: ""),
+            key = key,
+            amount = received[key] ?: 0,
+        )
+    }.toMutableList()
+    // A second partner commander / hidden commander with recorded damage must not disappear.
+    for ((key, amount) in received) {
+        if (key.isNotBlank() && key !in represented && amount > 0) {
+            rows += CommanderDamageTrackerRow("Commander · $key", key, amount)
+        }
+    }
+    return rows
 }
 
 @Composable
-internal fun PlayerTrackerDialog(player: TablePlayer, players: List<TablePlayer>, playerIndex: Int, onUpdate: (TablePlayer) -> Unit, onDismiss: () -> Unit) {
+internal fun PlayerTrackerDialog(player: TablePlayer, players: List<TablePlayer>, playerIndex: Int, onUpdate: (TablePlayer) -> Unit, onDismiss: () -> Unit, engineAuthoritative: Boolean = false) {
     var search by remember { mutableStateOf("") }
     var custom by remember { mutableStateOf("") }
     val common = listOf("Poison", "Energy", "Experience", "Rad", "Lore", "Ticket", "Shield", "Stun", "Finality", "The Ring tempts you", "Monarch", "Initiative", "City's Blessing", "Day/Night")
     val matches = common.filter { it.contains(search, true) }
+    val damageRows = commanderDamageTrackerRows(
+        player.commanderDamageReceived,
+        players.indices.filter { it != playerIndex }.map { index ->
+            players[index].let { CommanderDamageTrackerSource(it.id, it.name, it.commanderName) }
+        },
+    )
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.88f), shape = RoundedCornerShape(14.dp), color = Panel) {
             Column(Modifier.padding(14.dp)) {
@@ -1527,15 +1661,24 @@ internal fun PlayerTrackerDialog(player: TablePlayer, players: List<TablePlayer>
                             ActionPill("+ CAST") { onUpdate(player.copy(commanderCastCount = player.commanderCastCount + 1)) }
                         }
                     }
-                    item { Text("COMMANDER DAMAGE RECEIVED", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
-                    items(players.indices.filter { it != playerIndex }.size) { row ->
-                        val source = players[players.indices.filter { it != playerIndex }[row]]
-                        val amount = player.commanderDamageReceived[source.id] ?: 0
+                    item {
+                        Text("COMMANDER DAMAGE RECEIVED", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+                        if (engineAuthoritative) Text("Tracked by Argentum · read only", color = Muted, fontSize = 9.sp)
+                    }
+                    items(damageRows.size) { row ->
+                        val record = damageRows[row]
+                        val amount = record.amount
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text("${source.name}${source.commanderName?.let { " · $it" }.orEmpty()}", color = SoftWhite, fontSize = 9.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            TextButton(onClick = { onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived.toMutableMap().apply { if (amount <= 1) remove(source.id) else put(source.id, amount - 1) })) }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text("−", color = SoftWhite) }
-                            Text("$amount", color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold)
-                            TextButton(onClick = { onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived + (source.id to amount + 1))) }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text("+", color = Mint) }
+                            Text(record.label, color = SoftWhite, fontSize = 9.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (!engineAuthoritative) TextButton(onClick = {
+                                onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived.toMutableMap().apply {
+                                    if (amount <= 1) remove(record.key) else put(record.key, amount - 1)
+                                }))
+                            }, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Text("−", color = SoftWhite) }
+                            Text("$amount", color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp))
+                            if (!engineAuthoritative) TextButton(onClick = {
+                                onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived + (record.key to amount + 1)))
+                            }, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Text("+", color = Mint) }
                         }
                     }
                     item { Text("COUNTERS AND STATUS", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
@@ -1546,9 +1689,9 @@ internal fun PlayerTrackerDialog(player: TablePlayer, players: List<TablePlayer>
                         val toggle = name in listOf("Monarch", "Initiative", "City's Blessing", "Day/Night", "The Ring tempts you")
                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Text(name, color = SoftWhite, fontSize = 10.sp, modifier = Modifier.weight(1f))
-                            TextButton(onClick = { val next = if (toggle) 0 else (old - 1).coerceAtLeast(0); onUpdate(player.copy(playerCounters = player.playerCounters.toMutableMap().apply { if (next == 0) remove(name) else put(name, next) })) }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text(if (toggle) "OFF" else "−", color = Muted) }
-                            Text(if (toggle) if (old > 0) "ON" else "OFF" else "$old", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                            TextButton(onClick = { val next = if (toggle) if (old > 0) 0 else 1 else old + 1; onUpdate(player.copy(playerCounters = player.playerCounters.toMutableMap().apply { if (next == 0) remove(name) else put(name, next) })) }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text(if (toggle) "SET" else "+", color = Mint) }
+                            if (!toggle) TextButton(onClick = { val next = if (toggle) 0 else (old - 1).coerceAtLeast(0); onUpdate(player.copy(playerCounters = player.playerCounters.toMutableMap().apply { if (next == 0) remove(name) else put(name, next) })) }, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Text("−", color = SoftWhite) }
+                            Text(if (toggle) if (old > 0) "ON" else "OFF" else "$old", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp))
+                            TextButton(onClick = { val next = if (toggle) if (old > 0) 0 else 1 else old + 1; onUpdate(player.copy(playerCounters = player.playerCounters.toMutableMap().apply { if (next == 0) remove(name) else put(name, next) })) }, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Text(if (!toggle) "+" else if (old > 0) "TURN OFF" else "TURN ON", color = Mint) }
                         }
                     }
                     item {
@@ -1731,7 +1874,7 @@ internal fun StackPriorityDialog(players: List<TablePlayer>, stack: List<StackAc
                 TextButton(
                     onClick = { manualAbilityOpen = !manualAbilityOpen },
                     enabled = canAct,
-                    modifier = Modifier.align(Alignment.End).heightIn(min = 34.dp)
+                    modifier = Modifier.align(Alignment.End).heightIn(min = 48.dp)
                 ) {
                     Text(if (manualAbilityOpen) "HIDE MANUAL ENTRY" else "ADD MANUAL ABILITY", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 }
@@ -1811,7 +1954,7 @@ internal fun CombatDialog(players: List<TablePlayer>, attackerIndex: Int, onDism
                     Text("COMBAT · ${players.getOrNull(attackerIndex)?.name ?: "PLAYER"}", color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close combat", tint = Muted) }
                 }
-                Text("Select attackers, assign blockers, and enter damage. The app records declarations; resolve combat rules manually.", color = Muted, fontSize = 10.sp)
+                Text("Select attackers, choose who each attacks, assign blockers, and enter damage. Apply Combat logs the attack and deals unblocked damage to the defending player; resolve blocked combat yourself.", color = Muted, fontSize = 10.sp)
                 if (attackers.isEmpty()) Text("No untapped creatures are available to attack.", color = Muted, modifier = Modifier.padding(vertical = 10.dp))
                 LazyColumn(Modifier.weight(1f).fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     items(attackers.size, key = { attackers[it].id }) { index ->
@@ -1837,7 +1980,7 @@ internal fun CombatDialog(players: List<TablePlayer>, attackerIndex: Int, onDism
                                 val defaultDefender = players.indices.firstOrNull { it != attackerIndex && !players[it].isEliminated } ?: attackerIndex
                                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                     Box {
-                                        TextButton(onClick = { blockMenu = true }, modifier = Modifier.heightIn(min = 40.dp)) { Text("TARGET: ${players.getOrNull(defenders[card.id] ?: defaultDefender)?.name ?: "PLAYER"} ▾", color = Mint, fontSize = 9.sp) }
+                                        TextButton(onClick = { blockMenu = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("ATTACKING: ${players.getOrNull(defenders[card.id] ?: defaultDefender)?.name ?: "PLAYER"} ▾", color = Mint, fontSize = 9.sp) }
                                         DropdownMenu(expanded = blockMenu, onDismissRequest = { blockMenu = false }) {
                                             players.forEachIndexed { targetIndex, target ->
                                             if (targetIndex != attackerIndex && !target.isEliminated) DropdownMenuItem(text = { Text(target.name) }, onClick = {
@@ -1853,7 +1996,7 @@ internal fun CombatDialog(players: List<TablePlayer>, attackerIndex: Int, onDism
                                 }
                                 val defenderIndex = defenders[card.id] ?: defaultDefender
                                 if (players.getOrNull(defenderIndex)?.isComputer == true) Text("AI BLOCK PICK · CHANGE ANYTIME", color = Mint, fontSize = 8.sp, modifier = Modifier.padding(start = 8.dp, top = 3.dp))
-                                else Text("Blockers assigned", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(start = 8.dp, top = 3.dp))
+                                else Text("BLOCKERS", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(start = 8.dp, top = 3.dp))
                                 blockers.filter { it.first == (defenders[card.id] ?: defaultDefender) }.forEach { (owner, blocker) ->
                                     val reservedByOther = assignments.any { (attackerId, blockerIds) -> attackerId != card.id && blocker.id in blockerIds }
                                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(start = 7.dp)) {
@@ -1870,8 +2013,9 @@ internal fun CombatDialog(players: List<TablePlayer>, attackerIndex: Int, onDism
                 }
                 Text("Blockers available: ${blockers.size}  ·  tapped creatures excluded", color = Muted, fontSize = 9.sp, modifier = Modifier.padding(vertical = 6.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                    TextButton(onClick = onDismiss) { Text("CANCEL") }
-                    TextButton(onClick = {
+                    TextButton(onClick = onDismiss, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL") }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(modifier = Modifier.heightIn(min = 48.dp), onClick = {
                         if (selected.isNotEmpty()) {
                             val names = attackers.filter { it.id in selected }.joinToString { card ->
                                 val amount = damage[card.id].orEmpty().takeIf { it.isNotBlank() }?.let { " ($it damage)" }.orEmpty()
@@ -1884,7 +2028,7 @@ internal fun CombatDialog(players: List<TablePlayer>, attackerIndex: Int, onDism
                             onLog("declared attackers: $names")
                         }
                         onDismiss()
-                    }) { Text("LOG COMBAT", color = Mint, fontWeight = FontWeight.Bold) }
+                    }) { Text("APPLY COMBAT", color = Mint, fontWeight = FontWeight.Bold) }
                 }
             }
         }
@@ -1898,7 +2042,7 @@ internal fun CardZoneDialog(zone: String, player: String, cards: List<GameCard>,
             Column(Modifier.padding(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text("$player · $zone (${cards.size})", color = SoftWhite, fontWeight = FontWeight.Bold, fontSize = 14.sp, modifier = Modifier.weight(1f))
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close", tint = Muted) }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close $zone", tint = Muted) }
                 }
                 if (cards.isEmpty()) Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Text("No cards here", color = Muted) }
                 else LazyVerticalGrid(columns = GridCells.Adaptive(90.dp), horizontalArrangement = Arrangement.spacedBy(7.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -2007,7 +2151,7 @@ internal fun TokenPickerDialog(onDismiss: () -> Unit, onAdd: (ScryfallCard) -> U
                 error?.let { Text(it, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(6.dp)) }
                 if (query.trim().length >= 2 && results.none { it.name.equals(query.trim(), ignoreCase = true) }) {
                     TextButton(onClick = { onAdd(ScryfallCard(query.trim(), "Custom token", null)) }, modifier = Modifier.fillMaxWidth().heightIn(min = 44.dp)) {
-                        Text("ADD CUSTOM TOKEN: ${query.trim()}", color = Mint, fontWeight = FontWeight.Bold)
+                        Text("ADD CUSTOM “${query.trim()}” TOKEN", color = Mint, fontWeight = FontWeight.Bold)
                     }
                 }
                 LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -2072,7 +2216,7 @@ internal fun GameLogDialog(entries: List<String>, ownership: List<Boolean?>? = n
         Surface(Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.82f), shape = RoundedCornerShape(14.dp), color = Panel) {
             Column(Modifier.padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("ACTIVITY LOG · ${entries.size}", color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text("GAME LOG · ${entries.size}", color = SoftWhite, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close game log", tint = Muted) }
                 }
                 Text(if (ownership != null) "Whole game · newest first · your actions marked YOU" else "Actions · mana payments · triggers · effects",
@@ -2154,10 +2298,27 @@ internal fun ChangelogDialog(onDismiss: () -> Unit) {
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // BEGIN changelog-since-build121 — generated next-APK release notes
+                Text("UPGRADES SINCE BUILD 121 · VERIFIED VS. PREPARED", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("Builds 122–134 include historical previews and development milestones. The next test APK entries are candidate features, not a Play Store release. Passing compilation is not real-device acceptance.", color = SoftWhite, fontSize = 12.sp)
+                Text("BUILD 134 · CURRENT NO-GOOSE TEST PREVIEW", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• The original Arcana launcher icon is restored. The oversized developer goose is removed from the home screen; debug test scenarios remain available in the debug APK.\n• A coherent source-built Argentum engine, Ulalek/stack-copying/restricted-mana tests and 94 indexed original Eldrazi Incursion slots are included. Indexed cards are not all independently gameplay-certified.\n• Offline AI has Easy, Normal, Hard and Brutal options with bounded searches, persistence and recovery from rejected actions. Harder levels still need device and broad win-rate testing.\n• The 2–4-player online/Wi-Fi candidate uses an authoritative host, per-seat private game state, human/AI seat selection and reconnect handling. Cross-network gameplay on real phones still needs acceptance testing.\n• The interactive tutorial has 20 chapters, 160 steps, a 31-term glossary and four offline engine-backed lessons. The Table-view HAND step-two fix is prepared for the next test candidate, NOT in the previous no-goose Build 134 APK.\n• Help & Diagnostics has the Engine running notice toggle, an original-logo check and cleaner menu controls. Card/priority/deck and multiplayer fixes were regression-tested in CI.\n• Build 134 here means the validated TEST preview, not a Play Store release; import and deck-edit features are not enabled in the production-style variant.", color = SoftWhite, fontSize = 12.sp)
+                Text("NEXT TEST APK · LOBBY, TUTORIAL AND DECK TOOLS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Full-screen multiplayer lobby: commander portraits, room-code copy/share, READY UP, 2–4 seats, host AI/friend switching, player removal and Start only when guests are ready. Cloudflare Worker is updated; on-phone lobby testing is still pending.\n• Your First Turn tutorial: the Table-view HAND button advances step two to Play a land, matching Player view. Full Fold and real-engine lesson acceptance remain pending.\n• Import new now opens the existing unified deck importer; the Deck Editor is enabled on the next test candidate using the same saved-deck library, with search, editing and replacement explanations. Both require Android device validation before release.", color = SoftWhite, fontSize = 12.sp)
+                Text("BUILD 133 · ELDRAZI AND ENGINE CANDIDATE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Combined newer Argentum source and Eldrazi Incursion's 94th original indexed slot (Azlask) with real-card scenarios and strict terminal AI/deck testing.\n• Build 133 attempts exposed a shock-fetch/Android unit-test regression; fixes and passing exact-source tests were required before any subsequent preview. A test attempt is not a released upgrade.", color = SoftWhite, fontSize = 12.sp)
+                Text("BUILD 132 · ENGINE, DECK AND ANDROID INTEGRATION", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Prepared 93 original Eldrazi Incursion slots, updated Argentum runtime patches and Ulalek stack-copying, Eldrazi Temple and Corrupted Crossroads scenarios.\n• The existing developer-only deck builder searches the packaged playable card library offline, validates Commander lists, supports undo/redo and suggests replacements without silently changing a deck.\n• Fixed Android-incompatible regular expressions that crashed the deck editor and added automatic regex guards. The original Build 132 combined validation did not establish a releasable APK.", color = SoftWhite, fontSize = 12.sp)
+                Text("BUILD 131 · ARGENTUM AND PRECON INTEGRATION", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Upgraded the on-device Argentum engine, rebuilt coherent runtime JARs and card assets, and established repeatable hash-checked runtime packaging.\n• Expanded official Warhammer and Eldrazi precon work and custom-card testing; not every card has complete rules support.\n• Improved game-result diagnostics and rules-regression coverage. Priority stops, token-heavy performance and more rules cases remained follow-up work.", color = SoftWhite, fontSize = 12.sp)
+                Text("BUILDS 124–130 · GAMEPLAY AND DEBUG EVOLUTION", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                Text("• Iterative fixes and investigations covered Treasure mana, legal cast/payment feedback, complex token/trigger performance, opening-hand overlays, and Lunar Whale, Iron Spider and Myriad rules.\n• Improved source-built engine integration, diagnostics and repeatable card/AI scenario testing. Several items remained open; inclusion here does not claim all bugs are fixed.\n• Further official precon and custom-card implementations were staged across development branches rather than shipped uniformly in every intermediate APK.", color = SoftWhite, fontSize = 12.sp)
+                // END changelog-since-build121
                 Text("BUILD 123 · LARGE END-STEP AI FIX", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• The offline AI skips pointless redirect searches on targetless spells and abilities.\\n• AI simulations share a deadline, including nested choices, and long resolution sequences show progress updates.\\n• Retains the Build 122 fixes and Quick UI Tips, based on Build 120.", color = SoftWhite, fontSize = 13.sp)
                 Text("BUILD 122 · FIXES AND QUICK UI TIPS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• Smaug copies keep their death ability and create 14 Treasures when they die.\n• Valkyrie’s Call returns Cid as an Angel with flying and a +1/+1 counter. A returned Angel’s next death ends the legend-rule sequence.\n• The offline AI spends less time searching on large boards, with bounded thinking budgets and more useful timing diagnostics.\n• New Quick UI Tips popup, grouped by interaction, with Dismiss and Don’t remind me again.\n• Temporarily removed the custom-card/opponent notice after choosing your opening hand.\n• Based on Build 120, preserving the seven WotC precons. Build 122 is now shown consistently in the app and installer.", color = SoftWhite, fontSize = 13.sp)
+                Text("EARLIER HISTORY · BUILDS 105 AND BEFORE", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("BUILDS 105–106 · NEW CARDS AND DECKS", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)
                 Text("• 62 more custom cards (92 in all). New premade decks for you or the AI: Ayula Bears, Sliver Overlord, Hazel Squirrels.\n• Waiting for your friend shows in the bar; a secret nudge; prompts name the card asking; custom cards load their art.", color = SoftWhite, fontSize = 13.sp)
                 Text("BUILD 104 · ONLINE WITH A FRIEND", color = Mint, fontWeight = FontWeight.Bold, fontSize = 12.sp)

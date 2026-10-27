@@ -234,10 +234,20 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
         }
     }
         TableEffects(darkMode)
+        SideEffect { TutorialActions.onGesture = { target, kind -> tutorialSignal(kind, target) } }
+        DisposableEffect(t) {
+            onDispose { TutorialActions.onGesture = null }
+        }
         Box(Modifier.fillMaxSize().background(Ink)) {
             TableMainLayout()
             TableOverlays()
             TableOverlaysB()
+            // The coach draws on whichever window is on top: here, or the dialog/sheet a step opened.
+            val coachModel = tutorialLesson?.takeIf { !tutorialHubOpen && !(tutorialPracticeActive && tutorialLoading) }?.let { lesson ->
+                TutorialCoachModel(lesson, tutorialStepIndex, tutorialGated && !tutorialStepSatisfied, onNext = { tutorialAdvance() }, onSkip = { stopTutorial() })
+            }
+            SideEffect { TutorialCoachState.model = coachModel }
+            TutorialLayer(base = true)
             SnackbarHost(
                 hostState = automaticActionSnackbar,
                 modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 12.dp, vertical = 4.dp),

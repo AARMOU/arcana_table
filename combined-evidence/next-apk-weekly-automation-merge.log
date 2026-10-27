@@ -1,0 +1,18 @@
+Auto-merging engine-upgrade/UPGRADE-TEMPLATE.md
+Merge made by the 'ort' strategy.
+ .github/workflows/argentum-weekly-upgrade.yml      |  51 +++++--
+ .../src/main/assets/argentum/custom-overrides.txt  |   4 +
+ .../java/com/arcanatable/engine/OfflineGame.kt     |  28 +++-
+ .../java/com/arcanatable/CustomOverridesTest.kt    |  47 ++++++
+ android/custom-cards/build.gradle.kts              |   3 +
+ .../arcanatable/customcards/CustomCardDataTest.kt  |  23 ++-
+ .../arcanatable/customcards/support/CardPool.kt    |  33 ++++-
+ .../customcards/support/GameTestDriver.kt          |   9 +-
+ engine-upgrade/HANDOFF.md                          |  23 +--
+ engine-upgrade/UPGRADE-TEMPLATE.md                 |   2 +-
+ engine-upgrade/tests/test_weekly_reconcile.py      |  60 ++++++++
+ engine-upgrade/weekly.py                           | 162 ++++++++++++++++++---
+ 12 files changed, 393 insertions(+), 52 deletions(-)
+ create mode 100644 android/app/src/main/assets/argentum/custom-overrides.txt
+ create mode 100644 android/app/src/test/java/com/arcanatable/CustomOverridesTest.kt
+ create mode 100644 engine-upgrade/tests/test_weekly_reconcile.py

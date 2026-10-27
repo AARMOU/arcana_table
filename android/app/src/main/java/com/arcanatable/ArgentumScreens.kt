@@ -139,7 +139,8 @@ import org.json.JSONObject
 @Composable
 internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidManaAbilities: Boolean, busy: Boolean, manaChoices: List<JSONObject> = emptyList(), stackCount: (JSONObject) -> Int = { 1 }, onChooseMany: (JSONObject, Int) -> Unit = { _, _ -> }, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit, onSecretNudge: () -> Unit = {}) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 24.dp)) {
+      Box {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 24.dp).tutorialTarget("legal-action-sheet")) {
             if (card != null) Row(verticalAlignment = Alignment.Top) {
                 Box(Modifier.width(118.dp).aspectRatio(0.716f).clip(RoundedCornerShape(8.dp)).background(card.color)) {
                     val url = card.imageUrl
@@ -210,6 +211,8 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
                 TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterEnd).heightIn(min = 48.dp)) { Text("CLOSE", color = Muted) }
             }
         }
+        TutorialLayer(Modifier.matchParentSize())
+      }
     }
 }
 
@@ -229,11 +232,12 @@ internal fun ArgentumOpeningHandScreen(
     Dialog(onDismissRequest = {}, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false, dismissOnClickOutside = false)) {
       CompositionLocalProvider(LocalCardZoom provides handZoom) {
         Surface(Modifier.fillMaxSize(), color = Ink) {
+          Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(18.dp)) {
                 Text("ARGENTUM", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
                 Text(title, color = SoftWhite, fontSize = 24.sp, fontWeight = FontWeight.Black)
-                Text(subtitle, color = Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
-                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
+                Text(subtitle, color = Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp).tutorialTarget("opening-hand-header"))
+                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().then(if (selectable) Modifier.tutorialTarget("mulligan-bottom-choice") else Modifier)) {
                     val grid = HandLayout.compute(cards.size, maxWidth.value, maxHeight.value, HandArrangement.AUTO_FIT, 1.25f)
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(HandLayout.GAP.dp)) {
                         cards.chunked(grid.columns.coerceAtLeast(1)).forEach { row ->
@@ -241,7 +245,7 @@ internal fun ArgentumOpeningHandScreen(
                                 row.forEach { card ->
                                     val chosen = card.id in selection
                                     Box(Modifier.width(grid.cardWidth.dp)) {
-                                        CardFace(card, Modifier.width(grid.cardWidth.dp).testTag("opening-hand-card"), onClick = { if (selectable) onToggle(card) },
+                                        CardFace(card, Modifier.width(grid.cardWidth.dp).testTag("opening-hand-card").then(if (card.id == cards.firstOrNull()?.id) Modifier.tutorialTarget("opening-hand-card") else Modifier), onClick = { if (selectable) onToggle(card) },
                                             onLongClick = {}, showCounters = false, glow = chosen) // hold → handZoom
                                         if (chosen) Text("BOTTOM", color = Ink, fontSize = 9.sp, fontWeight = FontWeight.Black,
                                             modifier = Modifier.align(Alignment.TopCenter).padding(4.dp).clip(RoundedCornerShape(5.dp)).background(Mint).padding(horizontal = 6.dp, vertical = 2.dp))
@@ -253,11 +257,13 @@ internal fun ArgentumOpeningHandScreen(
                 }
                 Text("Hold a card to see it large.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(vertical = 8.dp))
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (secondaryLabel != null) OutlinedButton(onClick = onSecondary, enabled = secondaryEnabled, modifier = Modifier.weight(1f).heightIn(min = 54.dp)) { Text(secondaryLabel, fontWeight = FontWeight.Bold) }
-                    Button(onClick = onPrimary, enabled = primaryEnabled, modifier = Modifier.weight(if (secondaryLabel != null) 1.4f else 1f).heightIn(min = 54.dp),
+                    if (secondaryLabel != null) OutlinedButton(onClick = onSecondary, enabled = secondaryEnabled, modifier = Modifier.weight(1f).heightIn(min = 54.dp).tutorialTarget("mulligan-button")) { Text(secondaryLabel, fontWeight = FontWeight.Bold) }
+                    Button(onClick = onPrimary, enabled = primaryEnabled, modifier = Modifier.weight(if (secondaryLabel != null) 1.4f else 1f).heightIn(min = 54.dp).tutorialTarget(if (selectable) "mulligan-bottom-confirm" else "keep-hand"),
                         colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { Text(primaryLabel, fontWeight = FontWeight.Black) }
                 }
             }
+            TutorialLayer(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing))
+          }
         }
         CardZoomOverlay(handZoom)
       }

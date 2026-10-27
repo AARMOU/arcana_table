@@ -420,7 +420,7 @@ internal fun TableController.TableOverlaysB() {
         },
         confirmButton = {
             TextButton(onClick = { reconnectToRoom() }, enabled = !reconnecting) {
-                Text(if (reconnecting) "TRYING…" else "AUTO RECONNECT", color = if (reconnecting) Muted else Mint)
+                Text(if (reconnecting) "TRYING…" else "RECONNECT", color = if (reconnecting) Muted else Mint)
             }
         },
         dismissButton = {
@@ -435,7 +435,7 @@ internal fun TableController.TableOverlaysB() {
                     onlineStatus = "Disconnected"
                 }
                 connectionLostReason = null
-            }) { Text(if (reconnecting) "CANCEL" else "LATER", color = Muted) }
+            }) { Text(if (reconnecting) "CANCEL" else "STAY OFFLINE", color = Muted) }
         },
         containerColor = Panel,
         titleContentColor = SoftWhite,
@@ -528,7 +528,7 @@ internal fun TableController.TableOverlaysB() {
                         Modifier.fillMaxWidth().clickable {
                             importText = deck.asImportText()
                             importError = null
-                            message = "${deck.name} loaded from Argentum. Review the 100-card list, then tap Import."
+                            // The list is now in the import box above; no pop-up needed.
                             argentumDeckPickerOpen = false
                         },
                         shape = RoundedCornerShape(12.dp), color = PanelLight, border = BorderStroke(1.dp, Muted.copy(alpha = 0.35f))
@@ -574,10 +574,12 @@ internal fun TableController.TableOverlaysB() {
             onDismissRequest = { if (!importAutoFixInProgress) importReviewOpen = false },
             title = { Text("Review imported cards") },
             text = { Text(importReviewMessage, color = Muted, fontSize = 12.sp) },
+            // All actions stack in one right-aligned column, so the dismiss button
+            // is not stranded beside a multi-row group.
             confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    Row {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         if (cardsNeedingReview.isNotEmpty()) TextButton(
+                            modifier = Modifier.heightIn(min = 48.dp),
                             enabled = !importAutoFixInProgress,
                             onClick = {
                                 val groupedCards = cardsNeedingReview.groupBy { it.name }
@@ -654,6 +656,7 @@ internal fun TableController.TableOverlaysB() {
                             }
                         ) { Text(if (importAutoFixInProgress) "FIXING…" else "AUTO FIX", color = Mint) }
                         if (importOverflowCardIds.isNotEmpty()) TextButton(
+                            modifier = Modifier.heightIn(min = 48.dp),
                             enabled = !importAutoFixInProgress,
                             onClick = {
                                 val overflow = importOverflowCardIds
@@ -663,13 +666,15 @@ internal fun TableController.TableOverlaysB() {
                                 importReviewMessage = "Removed ${overflow.size} card(s) over the deck limit."
                             }
                         ) { Text("TRIM EXCESS", color = Mint) }
-                    }
-                    if (cardsNeedingReview.isNotEmpty()) TextButton(onClick = { if (!importAutoFixInProgress) { importReviewOpen = false; deckEditorOpen = true } }, enabled = !importAutoFixInProgress) {
+                    if (cardsNeedingReview.isNotEmpty()) TextButton(onClick = { if (!importAutoFixInProgress) { importReviewOpen = false; deckEditorOpen = true } }, enabled = !importAutoFixInProgress, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text("OPEN EDITOR", color = Mint)
+                    }
+                    val reviewFinished = cardsNeedingReview.isEmpty() && importOverflowCardIds.isEmpty()
+                    TextButton(onClick = { if (!importAutoFixInProgress) importReviewOpen = false }, enabled = !importAutoFixInProgress, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text(if (reviewFinished) "CLOSE" else "LATER", color = SoftWhite)
                     }
                 }
             },
-            dismissButton = { TextButton(onClick = { if (!importAutoFixInProgress) importReviewOpen = false }, enabled = !importAutoFixInProgress) { Text("LATER") } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
@@ -692,6 +697,53 @@ internal fun TableController.TableOverlaysB() {
             logAction(playerIndex, "put a $counter counter on ${card.name}")
             counterTarget = null
         })
+    }
+
+    // The Lunar Whale (and other LookAtTopOfLibrary grants) do not use priority.
+    // Read only the viewer's individually authorized top card from the masked engine view;
+    // casting/land play, unlike looking, MUST be offered by Argentum as a legal action.
+    if (argentumTopLibraryOpen) {
+        val snap = argentumSnapshot?.takeIf { it.viewingPlayer == localSeat }
+        val top = snap?.topLibraryCard
+        val playChoices = if (snap != null && top != null)
+            ArgentumActions.forCardServerId(snap.legalActions, snap.serverCardIds[top.id])
+                .filter { it.optJSONObject("action")?.optString("type") in setOf("CastSpell", "PlayLand") }
+        else emptyList()
+        AlertDialog(
+            onDismissRequest = { argentumTopLibraryOpen = false },
+            title = { Text("Top of your library · private") },
+            text = {
+                if (top == null) Text("Argentum is not currently allowing you to look at the top card.", color = Muted)
+                else Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(top.name, color = SoftWhite)
+                    Text(top.type, color = Muted)
+                    if (!top.manaCost.isNullOrBlank()) ManaCostPips(top.manaCost.orEmpty())
+                    Text(top.oracleText.orEmpty(), color = SoftWhite)
+                    Text(
+                        if (playChoices.isEmpty()) "You may look without priority. Playing or casting is not currently legal."
+                        else "Argentum controls timing, available land plays, targets, and mana payment.",
+                        color = Muted
+                    )
+                }
+            },
+            confirmButton = {
+                if (top != null && playChoices.isNotEmpty())
+                    TextButton(onClick = {
+                        argentumTopLibraryOpen = false
+                        openArgentumActions(top)
+                    }) { Text("PLAY / CAST OPTIONS", color = Mint) }
+            },
+            dismissButton = {
+                Row {
+                    if (top != null) TextButton(onClick = {
+                        argentumTopLibraryOpen = false
+                        preview = CardPreview(localSeat, top, fromHand = false, canManipulate = false)
+                    }) { Text("LARGE VIEW", color = Muted) }
+                    TextButton(onClick = { argentumTopLibraryOpen = false }) { Text("CLOSE", color = Muted) }
+                }
+            },
+            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
+        )
     }
 
     preview?.let { item ->
@@ -804,9 +856,14 @@ internal fun TableController.TableOverlaysB() {
         }
     }
 
+    if (tutorialHubOpen) TutorialHubDialog(
+        onDismiss = { tutorialHubOpen = false },
+        onStart = { id, index -> startTutorial(id, index) },
+        gameRunning = argentumEnabled
+    )
     if (optionsOpen) OptionsPage(
         darkMode = darkMode, timerVisible = turnTimerVisible,
-        backgroundAlertsEnabled = backgroundAlertsEnabled,
+        backgroundAlertsEnabled = backgroundAlertsEnabled, showEngineStatus = showEngineStatus,
         followActivePlayer = followActivePlayer,
         connectionLabel = when {
             argentumEnabled && wifiRole == "online-host" -> "Online game with a friend · you are hosting"
@@ -831,9 +888,12 @@ internal fun TableController.TableOverlaysB() {
         onReconnect = if (argentumEnabled && argentumStatus != ArgentumConnectionStatus.CONNECTED && argentumStatus != ArgentumConnectionStatus.REPLACED) ({
             recordDiagnostic("Player chose Reconnect (Options)", DiagnosticCategory.CONNECTION); argentumSocket.retryNow()
         }) else null,
-        onViewDiagnostics = { optionsOpen = false; diagnosticViewerOpen = true },
-        onExportDiagnostics = { exportDiagnosticLog() },
+        // While a lesson is pointing at these links, tapping one moves the lesson on instead of
+        // leaving Settings, so the lesson stays on screen.
+        onViewDiagnostics = { if (tutorialChapterId == null) { optionsOpen = false; diagnosticViewerOpen = true } },
+        onExportDiagnostics = { if (tutorialChapterId == null) exportDiagnosticLog() },
         onWhatsNew = { optionsOpen = false; changelogOpen = true },
+        onTutorials = { if (tutorialChapterId == null) { optionsOpen = false; tutorialHubOpen = true } },
         engineTrialResult = engineTrialResult,
         onEngineSelfTest = {
             engineTrialResult = "Running an AI-vs-AI game on this phone…"
@@ -852,17 +912,20 @@ internal fun TableController.TableOverlaysB() {
             }
         },
         onFollowActivePlayer = { value -> run { followActivePlayer = value; optionPrefs.edit().putBoolean("follow_active_player", value).apply() } },
+        respondToOwnStack = respondToOwnStack,
+        onRespondToOwnStack = { value -> respondToOwnStack = value; optionPrefs.edit().putBoolean("respond_to_own_stack", value).apply(); if (argentumOffline) argentumSocket.send("setRespondToOwnStack", JSONObject().put("enabled", value)) },
         quietOpponentTurns = quietOpponentTurns,
         onQuietOpponentTurns = { value -> quietOpponentTurns = value; optionPrefs.edit().putBoolean("quiet_opponent_turns", value).apply(); if (argentumOffline) argentumSocket.send("setQuietOpponentTurns", JSONObject().put("enabled", value)) },
         reducedSwipeMotion = reducedSwipeMotion, cardSizeScale = cardSizeScale,
-        onOpenLayoutLab = { run { optionsOpen = false; layoutLabOpen = true } },
+        onOpenLayoutLab = { run { optionsOpen = false; layoutLabOpen = true; TutorialActions.tap("setting-adjust-ui") } },
         onToggleTheme = { run { onToggleTheme() } },
         onToggleTimerVisibility = { run { turnTimerVisible = !turnTimerVisible } },
         onToggleBackgroundAlerts = { enabled -> run { setBackgroundAlerts(enabled) } },
+        onShowEngineStatus = { value -> showEngineStatus = value; optionPrefs.edit().putBoolean("show_engine_status", value).apply() },
         onReducedMotion = { value -> run { reducedSwipeMotion = value; optionPrefs.edit().putBoolean("reduced_swipe_motion", value).apply() } },
         onCardSizeScale = { value -> run { cardSizeScale = value; optionPrefs.edit().putFloat("card_size_scale", value).putFloat("layout_card_size_$layoutOrientationSuffix", value).apply() } },
         onClearAllData = { run { optionsOpen = false; clearAllConfirmOpen = true } },
-        onDismiss = { run { optionsOpen = false } }
+        onDismiss = { run { optionsOpen = false } },
     )
     if (layoutLabOpen) AdjustUiPage(
         orientationName = if (isLandscape) "LANDSCAPE" else "PORTRAIT",
@@ -905,7 +968,8 @@ internal fun TableController.TableOverlaysB() {
         title = { Text("Reset this game?") },
         text = { Text("This will shuffle each player's non-token cards into a new library, deal a new opening hand, reset life and timers, and clear the current board and game log. Player names, decks, and commanders will stay.") },
         confirmButton = { TextButton(onClick = { resetGame() }) { Text("RESET GAME", color = Color(0xFFE9978B)) } },
-        dismissButton = { TextButton(onClick = { resetConfirmOpen = false }) { Text("CANCEL") } }
+        dismissButton = { TextButton(onClick = { resetConfirmOpen = false }) { Text("CANCEL") } },
+        containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
     )
 
     if (onlineMode && endProposalBy >= 0 && localSeat !in endVotes && !gameEndedOnline) {
@@ -919,11 +983,14 @@ internal fun TableController.TableOverlaysB() {
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
-    if (onlineMode && gameEndedOnline && !argentumEnabled) AlertDialog(
-        onDismissRequest = {},
+    LaunchedEffect(gameEndedOnline) { if (!gameEndedOnline) gameEndedNoticeDismissed = false }
+    // Its buttons must dismiss it, or it would sit on top of the lobby it opens.
+    if (onlineMode && gameEndedOnline && !argentumEnabled && !gameEndedNoticeDismissed) AlertDialog(
+        onDismissRequest = { gameEndedNoticeDismissed = true },
         title = { Text("Game ended by unanimous vote") },
         text = { Text("Every player agreed to end the game. The table is now read-only.") },
-        confirmButton = { TextButton(onClick = { homeOpen = true; showOverview = true; lobbyOpen = true }) { Text("ROOM LOBBY", color = Mint) } },
+        confirmButton = { TextButton(onClick = { gameEndedNoticeDismissed = true; homeOpen = true; showOverview = true; lobbyOpen = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("OPEN LOBBY", color = Mint) } },
+        dismissButton = { TextButton(onClick = { gameEndedNoticeDismissed = true }, modifier = Modifier.heightIn(min = 48.dp)) { Text("VIEW TABLE", color = SoftWhite) } },
         containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
     )
 
@@ -972,16 +1039,16 @@ internal fun TableController.TableOverlaysB() {
                 }
             },
             confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    if (prompt.isShockLand) TextButton(onClick = { placeLand(enterTapped = false, payTwoLife = true) }, enabled = life >= 2) {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    if (prompt.isShockLand) TextButton(onClick = { placeLand(enterTapped = false, payTwoLife = true) }, enabled = life >= 2, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text("PAY 2 LIFE · ENTER UNTAPPED", color = if (life >= 2) Mint else Muted)
-                    } else TextButton(onClick = { placeLand(enterTapped = false) }) {
+                    } else TextButton(onClick = { placeLand(enterTapped = false) }, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text("ENTER UNTAPPED", color = Mint)
                     }
-                    TextButton(onClick = { placeLand(enterTapped = true) }) { Text("ENTER TAPPED", color = Mint) }
+                    TextButton(onClick = { placeLand(enterTapped = true) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("ENTER TAPPED", color = Mint) }
+                    TextButton(onClick = { landEntryPrompt = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
                 }
             },
-            dismissButton = { TextButton(onClick = { landEntryPrompt = null }) { Text("CANCEL", color = Muted) } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
@@ -1008,37 +1075,51 @@ internal fun TableController.TableOverlaysB() {
                 }
             },
             confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
-                    TextButton(onClick = { castFromPayment(owner, card, commanderCast) }, enabled = payable != null && costKnown) { Text("PAY FROM MANA POOL", color = if (payable != null && costKnown) Mint else Muted) }
-                    TextButton(onClick = { castFromPayment(owner, card, commanderCast, manualPayment = true) }) { Text("I PAID MANUALLY", color = CounterGold) }
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    TextButton(onClick = { castFromPayment(owner, card, commanderCast) }, enabled = payable != null && costKnown, modifier = Modifier.heightIn(min = 48.dp)) { Text("PAY FROM MANA POOL", color = if (payable != null && costKnown) Mint else Muted) }
+                    TextButton(onClick = { castFromPayment(owner, card, commanderCast, manualPayment = true) }, modifier = Modifier.heightIn(min = 48.dp)) { Text("I PAID MANUALLY", color = CounterGold) }
+                    TextButton(onClick = { paymentCard = null; paymentSourceZone = null; handActionCard = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
                 }
             },
-            dismissButton = { TextButton(onClick = { paymentCard = null; paymentSourceZone = null; handActionCard = null }) { Text("CANCEL") } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = SoftWhite
         )
     }
 
-    if (stackOpen && argentumEnabled) AlertDialog(
-        onDismissRequest = { stackOpen = false },
-        title = { Text("Argentum stack and priority") },
-        text = {
-            Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                val stackItems = argentumSnapshot?.stack.orEmpty()
-                Text(if (stackItems.isEmpty()) "The Argentum stack is empty." else "ON THE STACK · ${stackItems.size}", color = Mint, fontWeight = FontWeight.Bold)
-                StackCardList(stackItems)
-                Text("Argentum controls priority and resolves the stack. Arcana displays the server state and offers only server-provided actions.", color = Muted, fontSize = 12.sp)
-                TextButton(onClick = { stackOpen = false; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } }, enabled = argentumSnapshot?.legalActions?.isNotEmpty() == true) {
-                    Text("VIEW LEGAL ACTIONS", color = Mint)
+    if (stackOpen && argentumEnabled) Dialog(onDismissRequest = { stackOpen = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(Modifier.fillMaxWidth(0.94f).heightIn(max = 620.dp), shape = RoundedCornerShape(18.dp), color = Panel) {
+            Box {
+            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Argentum stack and priority", color = SoftWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val snap = argentumSnapshot
+                    val stackItems = snap?.stack.orEmpty()
+                    Text(if (stackItems.isEmpty()) "The Argentum stack is empty." else "ON THE STACK · ${stackItems.size}  ·  top resolves first", color = Mint, fontWeight = FontWeight.Bold)
+                    val priorityName = snap?.let { s -> s.players.getOrNull(s.priorityPlayer)?.let { if (s.priorityPlayer == s.viewingPlayer) "You" else it.name } }
+                    Text("PRIORITY · ${priorityName ?: "—"}", color = CounterGold, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                        modifier = Modifier.tutorialTarget("priority-indicator"))
+                    Box(Modifier.fillMaxWidth().heightIn(min = 48.dp).tutorialTarget("stack-items")) { StackCardList(stackItems) }
+                    Text("Argentum controls priority and resolves the stack. Arcana displays the server state and offers only server-provided actions.", color = Muted, fontSize = 12.sp)
+                    TextButton(onClick = { stackOpen = false; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } }, enabled = argentumSnapshot?.legalActions?.isNotEmpty() == true) {
+                        Text("VIEW LEGAL ACTIONS", color = Mint)
+                    }
+                }
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { stackOpen = false; TutorialActions.tap("stack-close") }, modifier = Modifier.heightIn(min = 48.dp).tutorialTarget("stack-close")) { Text("CLOSE", color = SoftWhite) }
+                    TextButton(onClick = {
+                        // The stack drill's next gesture is CLOSE. Keep the real sheet open
+                        // through the confirmed pass so that control remains available.
+                        if (!tutorialGated) stackOpen = false
+                        sendArgentumPriority()
+                    }, enabled = !argentumAwaitingUpdate && argentumSnapshot?.legalActions?.any { it.optJSONObject("action")?.optString("type") == "PassPriority" } == true,
+                        modifier = Modifier.heightIn(min = 48.dp).tutorialTarget("stack-pass")) {
+                        Text("PASS PRIORITY", color = Mint, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
-        },
-        confirmButton = {
-            TextButton(onClick = { stackOpen = false; sendArgentumPriority() }, enabled = !argentumAwaitingUpdate && argentumSnapshot?.legalActions?.any { it.optJSONObject("action")?.optString("type") == "PassPriority" } == true) {
-                Text("PASS PRIORITY", color = Mint)
+            TutorialLayer(Modifier.matchParentSize())
             }
-        },
-        dismissButton = { TextButton(onClick = { stackOpen = false }) { Text("CLOSE") } }
-    ) else if (stackOpen) StackPriorityDialog(
+        }
+    } else if (stackOpen) StackPriorityDialog(
         players = players, stack = stackActions, priorityPlayer = priorityPlayer, passedCount = priorityPassed.size,
         eligibleCount = players.count { !it.isEliminated }, canResolve = stackActions.isNotEmpty() && stackActions.none { !it.targetsConfirmed } && players.filterNot { it.isEliminated }.all { it.id in priorityPassed },
         canAct = !gameEndedOnline && stackActions.none { !it.targetsConfirmed } && players.getOrNull(priorityPlayer)?.isEliminated == false && (if (onlineMode) priorityPlayer == localSeat else priorityPlayer == selectedPlayer),
@@ -1083,6 +1164,7 @@ internal fun TableController.TableOverlaysB() {
 
     if (trackerPlayer in players.indices) PlayerTrackerDialog(
         player = players[trackerPlayer], players = players, playerIndex = trackerPlayer,
+        engineAuthoritative = argentumEnabled,
         onUpdate = { updated ->
             val target = trackerPlayer
             updatePlayer(target) { updated }
@@ -1093,7 +1175,7 @@ internal fun TableController.TableOverlaysB() {
 
     if (concedePlayer in players.indices) AlertDialog(
         onDismissRequest = { concedePlayer = -1 },
-        title = { Text("Concede and leave the game?") },
+        title = { Text("Concede this game?") },
         text = { Text("${players[concedePlayer].name} will be marked eliminated and cannot take further game actions. This does not close the room for other players.") },
         confirmButton = { TextButton(onClick = { concede(concedePlayer); concedePlayer = -1 }) { Text("CONCEDE", color = Color(0xFFE9978B)) } },
         dismissButton = { TextButton(onClick = { concedePlayer = -1 }) { Text("CANCEL") } },
@@ -1143,7 +1225,7 @@ internal fun TableController.TableOverlaysB() {
             title = { Text("Choose mana · ${prompt.cardName}") },
             text = { Text("Which mana did this permanent produce?") },
             confirmButton = {
-                Column(horizontalAlignment = Alignment.End) {
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     prompt.options.forEach { option ->
                         TextButton(onClick = {
                             updatePlayer(prompt.playerIndex) { player ->
@@ -1153,13 +1235,13 @@ internal fun TableController.TableOverlaysB() {
                             }
                             logAction(prompt.playerIndex, "added ${option.label} mana")
                             manaChoicePrompt = null
-                        }, modifier = Modifier.heightIn(min = 44.dp)) {
+                        }, modifier = Modifier.heightIn(min = 48.dp)) {
                             ManaSymbolText(option.label, color = Mint, fontSize = 14.sp)
                         }
                     }
+                    TextButton(onClick = { manaChoicePrompt = null }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
                 }
             },
-            dismissButton = { TextButton(onClick = { manaChoicePrompt = null }) { Text("CANCEL", color = Muted) } },
             containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
         )
     }
@@ -1197,7 +1279,8 @@ internal fun TableController.TableOverlaysB() {
             else -> "${prompt.cardName} triggered: ${prompt.triggerText}. Choose any modes, targets, and other decisions on the card, resolve it manually, then confirm. Effect: ${prompt.effectText}"
         }
         AlertDialog(
-            onDismissRequest = { if (prompt.kind == "RHYSTIC" || prompt.kind == "TITHE") resolveTrigger(prompt, paid = false) },
+            // A tap outside must not make the pay-or-not decision for anyone.
+            onDismissRequest = {},
             title = { Text(if (prompt.kind == "RHYSTIC" || prompt.kind == "TITHE") "Triggered choice · ${prompt.cardName}" else "Triggered ability · ${prompt.cardName}") },
             text = { Column {
                 Text(promptText, color = SoftWhite)
@@ -1224,8 +1307,8 @@ internal fun TableController.TableOverlaysB() {
                 }
                 TextButton(onClick = { resolveTrigger(prompt, paid = prompt.kind == "RHYSTIC" || prompt.kind == "TITHE", targetIndex = selectedTriggerTarget.takeIf { it >= 0 }) }, enabled = enabled) {
                     Text(when (prompt.kind) {
-                        "RHYSTIC" -> "PAY {1}"
-                        "TITHE" -> "PAY {2}"
+                        "RHYSTIC" -> "${players[prompt.eventPlayerIndex].name} PAYS {1}"
+                        "TITHE" -> "${players[prompt.eventPlayerIndex].name} PAYS {2}"
                         "AUTO_EFFECT" -> "RESOLVE EFFECT"
                         "TARGET_EFFECT" -> "APPLY TO TARGET"
                         else -> "DONE · MANUAL RESOLUTION"
@@ -1234,8 +1317,8 @@ internal fun TableController.TableOverlaysB() {
             },
             dismissButton = {
                 when (prompt.kind) {
-                    "RHYSTIC" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("DRAW CARD") }
-                    "TITHE" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("CREATE TREASURE") }
+                    "RHYSTIC" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("DON'T PAY · ${players[prompt.controllerIndex].name} DRAWS") }
+                    "TITHE" -> TextButton(onClick = { resolveTrigger(prompt, paid = false) }) { Text("DON'T PAY · ${players[prompt.controllerIndex].name} GETS TREASURE") }
                     "AUTO_EFFECT", "TARGET_EFFECT" -> TextButton(onClick = { resolveTrigger(prompt, paid = false, targetIndex = selectedTriggerTarget.takeIf { it >= 0 }, manual = true) }) { Text("RESOLVE MANUALLY", color = Muted) }
                 }
             },

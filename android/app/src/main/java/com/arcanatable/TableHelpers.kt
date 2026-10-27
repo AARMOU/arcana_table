@@ -155,7 +155,7 @@ internal fun HandPeekBar(cardCount: Int, modifier: Modifier = Modifier, onClick:
         modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(10.dp)).background(PanelLight)
             .combinedClickable(onClick = onClick).padding(horizontal = 11.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
     ) {
         Text("HAND  $cardCount", color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Black)
         Spacer(Modifier.width(6.dp))
@@ -301,14 +301,39 @@ internal fun SettingsToggle(title: String, detail: String, checked: Boolean, onC
 
 @Composable
 internal fun ZoneChip(name: String, count: Int, enabled: Boolean = true, onClick: () -> Unit) {
-    Text("$name  $count", color = if (enabled) SoftWhite else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.heightIn(min = 34.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(6.dp)).background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp))
+    val target = when (name.uppercase()) {
+        "GRAVEYARD" -> "quick-graveyard"
+        "EXILE" -> "quick-exile"
+        "LIBRARY" -> "quick-library"
+        else -> "quick-${name.lowercase()}"
+    }
+    Text("$name  $count", color = if (enabled) SoftWhite else Muted, fontSize = 8.sp,
+        fontWeight = FontWeight.Bold, modifier = Modifier.tutorialTarget(target)
+            .heightIn(min = 44.dp).wrapContentHeight(Alignment.CenterVertically)
+            .clip(RoundedCornerShape(6.dp)).background(if (enabled) PanelLight else Panel)
+            .combinedClickable(enabled = enabled, onClick = { TutorialActions.tap(target); onClick() })
+            .padding(horizontal = 8.dp, vertical = 6.dp))
 }
 
 @Composable
 internal fun QuickActionChip(label: String, enabled: Boolean, onClick: () -> Unit) {
+    val target = when {
+        label.startsWith("STACK") -> "stack-button"
+        label.startsWith("GRAVEYARD") -> "quick-graveyard"
+        label.startsWith("EXILE") -> "quick-exile"
+        label.startsWith("LIBRARY") -> "quick-library"
+        label.startsWith("GAME LOG") -> "quick-log"
+        label.startsWith("PASS TO MY TURN") || label.startsWith("STOP AUTO-PASS") -> "quick-pass-to-turn"
+        label.startsWith("HAND") -> "hand-handle"
+        label.startsWith("UNDO") -> "quick-undo"
+        else -> "quick-action-${label.lowercase().replace(' ', '-')}"
+    }
     Text(label, color = if (enabled) SoftWhite else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold,
-        modifier = Modifier.heightIn(min = 34.dp).wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(6.dp))
-            .background(if (enabled) PanelLight else Panel).combinedClickable(enabled = enabled, onClick = onClick).padding(horizontal = 8.dp, vertical = 6.dp))
+        modifier = Modifier.tutorialTarget(target).heightIn(min = 34.dp)
+            .wrapContentHeight(Alignment.CenterVertically).clip(RoundedCornerShape(6.dp))
+            .background(if (enabled) PanelLight else Panel)
+            .combinedClickable(enabled = enabled, onClick = { TutorialActions.tap(target); onClick() })
+            .padding(horizontal = 8.dp, vertical = 6.dp))
 }
 
 internal fun manaLetter(color: String): String = when (color.uppercase()) {

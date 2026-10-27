@@ -1,0 +1,383 @@
+diff --git a/android/app/src/main/java/com/arcanatable/HomeScreen.kt b/android/app/src/main/java/com/arcanatable/HomeScreen.kt
+index 014693cb..b8de64c2 100644
+--- a/android/app/src/main/java/com/arcanatable/HomeScreen.kt
++++ b/android/app/src/main/java/com/arcanatable/HomeScreen.kt
+@@ -227,16 +227,13 @@ fun PlaySheet(
+     onCreateRoom: () -> Unit,
+     onJoinRoom: () -> Unit,
+     onDismiss: () -> Unit,
+-    onWifiHost: () -> Unit = {},
+     onWifiMultiHost: () -> Unit = {},
+     onOnlineMultiHost: () -> Unit = {},
+     onOnlineMultiJoin: () -> Unit = {},
+     onWifiJoin: () -> Unit = {},
+-    onOnlineHost: () -> Unit = {},
+-    onOnlineJoin: () -> Unit = {},
+ ) {
+     var online by remember { mutableStateOf(false) }
+-    // Play with a friend: 1 Wi-Fi host, 2 Wi-Fi join, 3 online host, 4 online join, 5 debug multi-host.
++    // All visible multiplayer choices route to the full 2–4 seat lobby.
+     var friendMode by remember { mutableStateOf<Int?>(null) }
+     var showAllDecks by remember { mutableStateOf(false) }
+     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
+@@ -258,27 +255,22 @@ fun PlaySheet(
+                     if (!showAllDecks && shown.size < aiDecks.size) DeckChip("${aiDecks.size - shown.size} more decks ▾", false) { showAllDecks = true }
+                 }
+             }
+-            PlayOption("Play with a friend", "Two to four players. The host runs the Commander rules engine; friends join over Wi-Fi or the internet.", selected = friendMode != null, onClick = { online = false; if (friendMode == null) friendMode = 1 }, tag = "play-wifi-option") {
++            PlayOption("Multiplayer", "Host or join 2–4 player Commander over the internet or Wi-Fi.", selected = friendMode != null, onClick = { online = false; if (friendMode == null) friendMode = 6 }, tag = "play-wifi-option") {
+                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+-                    DeckChip("Host on Wi-Fi", friendMode == 1) { online = false; friendMode = 1 }
+-                    DeckChip("Host 2–4 players on Wi-Fi", friendMode == 5) {
+-                        online = false; friendMode = 5
+-                    }
+-                    DeckChip("Host 2–4 players online", friendMode == 6) { online = false; friendMode = 6 }
+-                    DeckChip("Join 2–4 players online", friendMode == 7) { online = false; friendMode = 7 }
++                    DeckChip("Host online", friendMode == 6) { online = false; friendMode = 6 }
++                    DeckChip("Join online", friendMode == 7) { online = false; friendMode = 7 }
++                    DeckChip("Host on Wi-Fi", friendMode == 5) { online = false; friendMode = 5 }
+                     DeckChip("Join on Wi-Fi", friendMode == 2) { online = false; friendMode = 2 }
+-                    DeckChip("Host online", friendMode == 3) { online = false; friendMode = 3 }
+-                    DeckChip("Join online", friendMode == 4) { online = false; friendMode = 4 }
+                 }
+             }
+             // Argentum server play parked for now (Build 113); plumbing kept.
+             val context = LocalContext.current
+             PlayOption("Online with Argentum", "Not yet available", selected = false, onClick = { Toast.makeText(context, "Not yet available", Toast.LENGTH_SHORT).show() }, tag = "play-online-option", disabled = true) {}
+             Button(
+-                onClick = { when { online -> onOnline(); friendMode == 1 -> onWifiHost(); friendMode == 2 -> onWifiJoin(); friendMode == 3 -> onOnlineHost(); friendMode == 4 -> onOnlineJoin(); friendMode == 5 -> onWifiMultiHost(); friendMode == 6 -> onOnlineMultiHost(); friendMode == 7 -> onOnlineMultiJoin(); else -> onOffline() } },
++                onClick = { when { online -> onOnline(); friendMode == 2 -> onWifiJoin(); friendMode == 5 -> onWifiMultiHost(); friendMode == 6 -> onOnlineMultiHost(); friendMode == 7 -> onOnlineMultiJoin(); else -> onOffline() } },
+                 modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp).testTag("play-start"),
+                 colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
+-            ) { Text(when { online -> "PLAY WITH ARGENTUM"; friendMode == 1 -> "HOST A WI-FI GAME"; friendMode == 2 -> "JOIN A WI-FI GAME"; friendMode == 3 -> "HOST AN ONLINE GAME"; friendMode == 4 -> "JOIN AN ONLINE GAME"; friendMode == 5 -> "HOST 2–4 PLAYER WI-FI"; friendMode == 6 -> "HOST 2–4 PLAYER ONLINE"; friendMode == 7 -> "JOIN 2–4 PLAYER ONLINE"; aiCount > 1 -> "PLAY OFFLINE · ${aiCount + 1} PLAYERS"; else -> "PLAY OFFLINE VS AI" }, fontSize = 17.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
++            ) { Text(when { online -> "PLAY WITH ARGENTUM"; friendMode == 2 -> "JOIN WI-FI LOBBY"; friendMode == 5 -> "HOST WI-FI LOBBY"; friendMode == 6 -> "HOST ONLINE LOBBY"; friendMode == 7 -> "JOIN ONLINE LOBBY"; aiCount > 1 -> "PLAY OFFLINE · ${aiCount + 1} PLAYERS"; else -> "PLAY OFFLINE VS AI" }, fontSize = 17.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
+         }
+     }
+ }
+diff --git a/android/app/src/main/java/com/arcanatable/TableMultiLobby.kt b/android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+index db968c3b..263131a7 100644
+--- a/android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
++++ b/android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+@@ -25,6 +25,7 @@ import androidx.compose.material3.Surface
+ import androidx.compose.material3.Text
+ import androidx.compose.material3.TextButton
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.mutableStateOf
+ import androidx.compose.runtime.remember
+@@ -94,12 +95,23 @@ internal fun lobbyStatusLine(state: JSONObject?, isHost: Boolean): String {
+ /** Shows the multiplayer lobby when this phone is hosting or waiting in a 2–4 player room. */
+ @Composable
+ internal fun TableController.MultiplayerLobbyScreen() {
+-    val hosting = wifiMultiLobby != null && wifiMultiLobbyState != null &&
++    // Read observable state FIRST. wifiMultiLobby and wifiServer are plain fields;
++    // checking either before this state short-circuits Compose's initial read,
++    // so publishing a ready host room never recomposes the first lobby screen.
++    val hostLobbyState = wifiMultiLobbyState
++    val hosting = hostLobbyState != null && wifiMultiLobby != null &&
+         (wifiServer is ArgentumLanMultiServer || wifiServer is ArgentumCloudMultiHost)
+     val guesting = wifiGuestWaiting && wifiRole in setOf("guest", "online-guest")
+     if (!hosting && !guesting) return
+     val online = if (hosting) wifiServer is ArgentumCloudMultiHost else wifiRole == "online-guest"
+-    val state = if (hosting) wifiMultiLobbyState else wifiGuestLobbyState
++    // A room being ready is not evidence this full-screen lobby reached the device.
++    LaunchedEffect(hosting, online) {
++        recordDiagnostic(
++            "Multiplayer lobby screen displayed: ${if (online) "internet" else "Wi-Fi"}; ${if (hosting) "host" else "guest"}",
++            DiagnosticCategory.CONNECTION,
++        )
++    }
++    val state = if (hosting) hostLobbyState else wifiGuestLobbyState
+     val seats = lobbySeats(state)
+     val context = LocalContext.current
+     var removeTarget by remember { mutableStateOf<LobbySeat?>(null) }
+diff --git a/android/app/src/main/java/com/arcanatable/TableOverlays.kt b/android/app/src/main/java/com/arcanatable/TableOverlays.kt
+index 81c23e76..239d0487 100644
+--- a/android/app/src/main/java/com/arcanatable/TableOverlays.kt
++++ b/android/app/src/main/java/com/arcanatable/TableOverlays.kt
+@@ -247,27 +247,23 @@ internal fun TableController.TableOverlays() {
+                 onCreateRoom = { playSheetOpen = false; run { startArgentumPractice(vsAi = false) } },
+                 onJoinRoom = { playSheetOpen = false; run { argentumLastError = null; argentumJoinCode = ""; argentumJoinDialogOpen = true } },
+                 onDismiss = { playSheetOpen = false },
+-                onWifiHost = { playSheetOpen = false; run { startWifiHost() } },
+                 onWifiMultiHost = { playSheetOpen = false; run {
++                    recordDiagnostic("Multiplayer: Wi-Fi host setup opened", DiagnosticCategory.ACTION)
+                     wifiMultiOnline = false
+                     wifiMultiConfigOpen = true
+                 } },
+-                onWifiJoin = { playSheetOpen = false; run { wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() } },
+-                onOnlineHost = { playSheetOpen = false; run { startWifiHost(online = true) } },
++                onWifiJoin = { playSheetOpen = false; run { recordDiagnostic("Multiplayer: Wi-Fi join opened", DiagnosticCategory.ACTION); wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() } },
+                 onOnlineMultiHost = { playSheetOpen = false; run {
++                    recordDiagnostic("Multiplayer: internet host setup opened", DiagnosticCategory.ACTION)
+                     wifiMultiOnline = true
+                     wifiMultiConfigOpen = true
+                 } },
+                 onOnlineMultiJoin = { playSheetOpen = false; run {
++                    recordDiagnostic("Multiplayer: internet join opened", DiagnosticCategory.ACTION)
+                     wifiMultiOnlineJoin = true
+                     onlineCodeInput = ""
+                     onlineJoinOpen = true
+                 } },
+-                onOnlineJoin = { playSheetOpen = false; run {
+-                    wifiMultiOnlineJoin = false
+-                    onlineCodeInput = ""
+-                    onlineJoinOpen = true
+-                } },
+             )
+             val pickDeck: (DeckChoice) -> Unit = { choice ->
+                     deckPickerOpen = false
+diff --git a/android/app/src/main/java/com/arcanatable/TableWifi.kt b/android/app/src/main/java/com/arcanatable/TableWifi.kt
+index 247c62c5..d5a70432 100644
+--- a/android/app/src/main/java/com/arcanatable/TableWifi.kt
++++ b/android/app/src/main/java/com/arcanatable/TableWifi.kt
+@@ -135,6 +135,7 @@ internal fun TableController.startMultiWifiHost() {
+     val count = wifiMultiSeatCount.coerceIn(2, 4)
+     val friends = (1 until count).filter(wifiMultiFriendSlots::contains)
+     if (friends.isEmpty()) { message = "Choose at least one friend seat."; return }
++    recordDiagnostic("Multiplayer lobby host requested: Wi-Fi; seats=$count; friendSeats=${friends.size}", DiagnosticCategory.ACTION)
+     wifiMultiConfigOpen = false
+     offlineStarting = true
+     scope.launch {
+@@ -195,8 +196,7 @@ internal fun TableController.startMultiWifiHost() {
+             wifiMultiRegistry = registry
+             wifiMultiLobbyState = room.lobbyMessage()
+             wifiWaitingAddress = address
+-            recordDiagnostic("Four-player Wi-Fi lobby open; requested ${room.seatCount} seats at $address",
+-                DiagnosticCategory.CONNECTION)
++            recordDiagnostic("Multiplayer lobby opened: Wi-Fi; seats=${room.seatCount}", DiagnosticCategory.CONNECTION)
+         } catch (error: Throwable) {
+             stopWifi()
+             message = "Multiplayer hosting failed: ${error.javaClass.simpleName}: ${error.message?.take(200)}"
+@@ -242,7 +242,7 @@ private suspend fun TableController.acceptMultiWifiGuest(
+     notes.forEach { note -> server.sendTo(id, JSONObject().put("type", "error")
+         .put("code", "WIFI_NOTE").put("message", note)) }
+     publishMultiLobby()
+-    recordDiagnostic("Multiplayer guest joined seat ${id.value}", DiagnosticCategory.CONNECTION)
++    recordDiagnostic("Multiplayer lobby guest joined: Wi-Fi; seat=${id.value}", DiagnosticCategory.CONNECTION)
+ }
+ 
+ /** Host alone decides when every requested friend has arrived and gameplay can start. */
+@@ -282,7 +282,7 @@ internal fun TableController.startMultiWifiGame() {
+             releaseMultiStartDepartures(host)
+             argentumSocket.createCommanderPracticeLobby(vsAi = false)
+             wifiMultiLobbyState = null
+-            recordDiagnostic("Wi-Fi Commander started with ${roster.players.size} seats and ${roster.humanGuests.size + 1} humans",
++            recordDiagnostic("Multiplayer lobby game started: Wi-Fi; seats=${roster.players.size}; humans=${roster.humanGuests.size + 1}",
+                 DiagnosticCategory.ENGINE)
+         } catch (error: Throwable) {
+             wifiMultiStartDepartures = null
+@@ -302,6 +302,7 @@ internal fun TableController.startMultiOnlineHost() {
+     val count = wifiMultiSeatCount.coerceIn(2, 4)
+     val friends = (1 until count).filter(wifiMultiFriendSlots::contains)
+     if (friends.isEmpty()) { message = "Choose at least one friend seat."; return }
++    recordDiagnostic("Multiplayer lobby host requested: internet; seats=$count; friendSeats=${friends.size}", DiagnosticCategory.ACTION)
+     wifiMultiConfigOpen = false
+     offlineStarting = true
+     scope.launch {
+@@ -368,6 +369,7 @@ internal fun TableController.startMultiOnlineHost() {
+             wifiMultiSetup = setup
+             wifiMultiRegistry = registry
+             wifiMultiLobbyState = room.lobbyMessage()
++            recordDiagnostic("Multiplayer lobby opened: internet; seats=${room.seatCount}", DiagnosticCategory.CONNECTION)
+             host.start()
+         } catch (error: Throwable) {
+             stopWifi()
+@@ -406,7 +408,7 @@ private suspend fun TableController.acceptMultiOnlineGuest(
+     notes.forEach { host.sendTo(id, JSONObject().put("type", "error")
+         .put("code", "WIFI_NOTE").put("message", it)) }
+     publishMultiLobby()
+-    recordDiagnostic("Remote human admitted to ${id.value}", DiagnosticCategory.CONNECTION)
++    recordDiagnostic("Multiplayer lobby guest joined: internet; seat=${id.value}", DiagnosticCategory.CONNECTION)
+ }
+ 
+ internal fun TableController.startMultiOnlineGame() {
+@@ -445,7 +447,7 @@ internal fun TableController.startMultiOnlineGame() {
+             releaseMultiStartDepartures(engine)
+             argentumSocket.createCommanderPracticeLobby(vsAi = false)
+             wifiMultiLobbyState = null
+-            recordDiagnostic("Internet Commander started with ${roster.players.size} seats",
++            recordDiagnostic("Multiplayer lobby game started: internet; seats=${roster.players.size}; humans=${roster.humanGuests.size + 1}",
+                 DiagnosticCategory.ENGINE)
+         } catch (e: Throwable) {
+             wifiMultiStartDepartures = null
+@@ -462,6 +464,7 @@ internal fun TableController.startMultiOnlineGame() {
+ internal fun TableController.joinMultiOnlineGame(code: String) {
+     val clean = ArgentumCloudLink.cleanCode(code)
+     if (wifiConnecting || argentumEnabled || clean.length !in 6..8) return
++    recordDiagnostic("Multiplayer lobby join requested: internet", DiagnosticCategory.ACTION)
+     wifiConnecting = true
+     val (names, commander) = activeDeckCards()
+     if (commander == null) {
+@@ -506,7 +509,7 @@ internal fun TableController.joinMultiOnlineGame(code: String) {
+             return@launch
+         }
+         message = "Joined online Commander; waiting for host and other players."
+-        recordDiagnostic("Joined directed-relay multiplayer room", DiagnosticCategory.CONNECTION)
++        recordDiagnostic("Multiplayer lobby joined: internet; awaiting host roster", DiagnosticCategory.CONNECTION)
+     } }
+ }
+ 
+@@ -668,7 +671,7 @@ private fun TableController.markMultiGuestReady(
+     if (wifiMultiLobby !== room || argentumSocket.runningLocalHost != null) return
+     if (room.setReady(id, ready)) {
+         publishMultiLobby()
+-        recordDiagnostic("Lobby seat ${id.value} ${if (ready) "ready" else "not ready"}", DiagnosticCategory.CONNECTION)
++        recordDiagnostic("Multiplayer lobby guest readiness: seat=${id.value}; ready=$ready", DiagnosticCategory.CONNECTION)
+     }
+ }
+ 
+diff --git a/android/app/src/test/java/com/arcanatable/MultiplayerLobbyVisibilityTest.kt b/android/app/src/test/java/com/arcanatable/MultiplayerLobbyVisibilityTest.kt
+new file mode 100644
+index 00000000..ed93f769
+--- /dev/null
++++ b/android/app/src/test/java/com/arcanatable/MultiplayerLobbyVisibilityTest.kt
+@@ -0,0 +1,109 @@
++package com.arcanatable
++
++import android.content.Context
++import androidx.compose.ui.test.assertIsDisplayed
++import androidx.compose.ui.test.junit4.createComposeRule
++import androidx.compose.ui.test.onNodeWithText
++import androidx.test.core.app.ApplicationProvider
++import com.arcanatable.engine.LocalSeat
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.SupervisorJob
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++
++/**
++ * Build 136 regression: a newly created host reported "lobby opened" but never
++ * logged "lobby screen displayed". Before this fix, the Composable checked a
++ * plain, initially-null wifiMultiLobby before ever reading the observable
++ * wifiMultiLobbyState. No observable state was subscribed to for host creation.
++ *
++ * Runs the ACTUAL full-screen lobby Composable, not merely the Play menu.
++ * Does not start networking, a rules engine, or a Cloudflare connection.
++ */
++@RunWith(RobolectricTestRunner::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++@Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi")
++class MultiplayerLobbyVisibilityTest {
++    @get:Rule val rule = createComposeRule()
++
++    private fun seat(name: String) = LocalSeat(name, List(40) { "Forest" }, null)
++
++    private fun room() = ArgentumWaitingLobby(
++        seat("Host"),
++        listOf(seat("AI 2"), seat("AI 3"), seat("AI 4")),
++        4,
++    ).also {
++        it.setKind(1, ArgentumWaitingLobby.Kind.FRIEND)
++        it.setKind(2, ArgentumWaitingLobby.Kind.FRIEND)
++        it.setKind(3, ArgentumWaitingLobby.Kind.FRIEND)
++    }
++
++    @Test fun wifiHostOpenedAfterInitialCompositionDisplaysAndClosesLobby() {
++        val context = ApplicationProvider.getApplicationContext<Context>()
++        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
++        val controller = TableController(context, scope, CardZoomController())
++        val lobby = room()
++        val server = ArgentumLanMultiServer(
++            "Host", lobby.friendSeatIds(),
++            onGuest = { _, _ -> },
++            onGuestMessage = { _, _ -> },
++            onGuestLeft = { _ -> },
++        )
++        try {
++            rule.setContent { controller.MultiplayerLobbyScreen() }
++            rule.onNodeWithText("WI-FI COMMANDER LOBBY").assertDoesNotExist()
++            // Plain fields arrive before the last published mutableState snapshot,
++            // matching the sequence observed in the user's Build 136 diagnostics.
++            rule.runOnIdle {
++                controller.wifiServer = server
++                controller.wifiMultiLobby = lobby
++                controller.wifiWaitingAddress = "192.0.2.1"
++                controller.wifiMultiLobbyState = lobby.lobbyMessage()
++            }
++            rule.onNodeWithText("WI-FI COMMANDER LOBBY").assertIsDisplayed()
++            rule.onNodeWithText("CLOSE ROOM").assertIsDisplayed()
++            rule.onNodeWithText("START GAME").assertIsDisplayed()
++            rule.runOnIdle { controller.stopWifi() }
++            rule.onNodeWithText("WI-FI COMMANDER LOBBY").assertDoesNotExist()
++        } finally {
++            rule.runOnIdle { controller.stopWifi() }
++            scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
++        }
++    }
++
++    @Test fun onlineHostOpenedAfterInitialCompositionDisplaysLobbyWithoutNetwork() {
++        val context = ApplicationProvider.getApplicationContext<Context>()
++        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
++        val controller = TableController(context, scope, CardZoomController())
++        val lobby = room()
++        val cloud = ArgentumCloudMultiHost(
++            "https://invalid.example", "Host", listOf("friend", "friend", "friend"),
++            onGuest = { _, _ -> },
++            onGuestMessage = { _, _ -> },
++            onGuestLeft = { _ -> },
++            onFailed = { _ -> },
++        )
++        try {
++            rule.setContent { controller.MultiplayerLobbyScreen() }
++            rule.onNodeWithText("ONLINE COMMANDER LOBBY").assertDoesNotExist()
++            rule.runOnIdle {
++                controller.wifiServer = cloud
++                controller.wifiMultiLobby = lobby
++                controller.onlineRoomCode = "ABCDEF"
++                controller.wifiMultiLobbyState = lobby.lobbyMessage()
++            }
++            rule.onNodeWithText("ONLINE COMMANDER LOBBY").assertIsDisplayed()
++            rule.onNodeWithText("CLOSE ROOM").assertIsDisplayed()
++            rule.runOnIdle { controller.stopWifi() }
++            rule.onNodeWithText("ONLINE COMMANDER LOBBY").assertDoesNotExist()
++        } finally {
++            rule.runOnIdle { controller.stopWifi() }
++            scope.coroutineContext[kotlinx.coroutines.Job]?.cancel()
++        }
++    }
++}
+diff --git a/android/app/src/test/java/com/arcanatable/ui/HomeScreenSizesTest.kt b/android/app/src/test/java/com/arcanatable/ui/HomeScreenSizesTest.kt
+index 279f0203..6c1fff13 100644
+--- a/android/app/src/test/java/com/arcanatable/ui/HomeScreenSizesTest.kt
++++ b/android/app/src/test/java/com/arcanatable/ui/HomeScreenSizesTest.kt
+@@ -1,6 +1,8 @@
+ package com.arcanatable.ui
+ 
+ import androidx.compose.ui.test.assertIsDisplayed
++import androidx.compose.ui.test.performClick
++import androidx.compose.ui.test.performScrollTo
+ import androidx.compose.ui.test.junit4.createAndroidComposeRule
+ import androidx.compose.ui.test.onNodeWithText
+ import androidx.compose.ui.test.onNodeWithTag
+@@ -29,4 +31,24 @@ class HomeScreenSizesTest {
+     @Test @Config(sdk = [34], qualifiers = "w891dp-h411dp-land-xxhdpi") fun phoneLandscape() = homeShows("phone-landscape")
+     @Test @Config(sdk = [34], qualifiers = "w344dp-h882dp-port-xxhdpi") fun foldableCoverScreen() = homeShows("foldable-cover")
+     @Test @Config(sdk = [34], qualifiers = "w673dp-h841dp-port-xhdpi") fun foldableUnfolded() = homeShows("foldable-unfolded")
++
++    @Test @Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi")
++    fun multiplayerOnlyShowsUnifiedLobbyRoutes() {
++        UiTestSupport.settle(rule)
++        rule.onNodeWithTag("home-play").performClick()
++        UiTestSupport.settle(rule)
++        // Offline deck choices fill the first viewport on narrow portrait phones.
++        rule.onNodeWithTag("play-wifi-option").performScrollTo().performClick()
++        UiTestSupport.settle(rule)
++        rule.onNodeWithText("Host online").assertExists()
++        rule.onNodeWithText("Join online").assertExists()
++        rule.onNodeWithText("Host on Wi-Fi").assertExists()
++        rule.onNodeWithText("Join on Wi-Fi").assertExists()
++        rule.onNodeWithText("Host 2–4 players online").assertDoesNotExist()
++        rule.onNodeWithText("HOST ONLINE LOBBY").assertExists()
++        rule.onNodeWithText("Join online").performScrollTo().performClick()
++        UiTestSupport.settle(rule)
++        rule.onNodeWithTag("play-start").assertExists()
++        rule.onNodeWithText("JOIN ONLINE LOBBY").assertExists()
++    }
+ }

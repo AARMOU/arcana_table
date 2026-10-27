@@ -31,7 +31,7 @@ object UiTestSupport {
      */
     fun playWithArgentum(rule: ComposeTestRule, scenario: ActivityScenario<MainActivity>) {
         if (rule.onAllNodesWithTag("quick-ui-tips").fetchSemanticsNodes().isNotEmpty()) {
-            rule.onNodeWithText("Dismiss").performClick()
+            rule.onNodeWithText("NOT NOW").performClick()
             settle(rule, 300)
         }
         scenario.onActivity { activity ->

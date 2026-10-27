@@ -1,0 +1,33 @@
+{
+  "base": "14c6c68a8fb526eeb9cdb1b387a734ee7ffe623a",
+  "runner": "Local standalone Gradle JVM harness; repository Kotlin sources, committed runtime jars, JDK 17, Kotlin 2.4.0 and exact custom-cards dependencies; Android app tests are separate CI.",
+  "suites": 269,
+  "totals": {
+    "tests": 586,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "classes": [
+    {
+      "name": "com.arcanatable.customcards.EldraziConfluenceScenarioTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "com.arcanatable.customcards.SelectiveObliterationScenarioTest",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "runtimeSha256": {
+    "argentum-ai.jar": "10321247e9d3b052547123bdab6dab8f720882a2dd8a2782c8a8a74714eb5757",
+    "argentum-mtg-sdk-tooling.jar": "b2849dfc2f95412a415a0cacb786333c3232dd73291670583f6396c81033694d",
+    "argentum-mtg-sdk.jar": "4c77058760b912ca376412151b344529ce67b2d674d1b895f723b7766cc453ac",
+    "argentum-rules-engine.jar": "8c151136af028fa36438dfa931d5fea14286abc9f58876e483c6850acec4f66f"
+  }
+}

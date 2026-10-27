@@ -182,20 +182,28 @@ internal fun TableController.TableOverlays() {
                 }
             )
             if (quickUiTipsOpen) QuickUiTipsDialog(
-                onDismiss = { quickUiTipsOpen = false },
-                onDontRemind = {
-                    optionPrefs.edit().putBoolean("quick_ui_tips_disabled", true).apply()
+                onDismiss = {
+                    optionPrefs.edit().putBoolean("tutorial_offer_seen", true).apply()
                     quickUiTipsOpen = false
+                },
+                onDontRemind = {
+                    optionPrefs.edit().putBoolean("tutorial_offer_seen", true).putBoolean("quick_ui_tips_disabled", true).apply()
+                    quickUiTipsOpen = false
+                },
+                onOpenTutorials = {
+                    optionPrefs.edit().putBoolean("tutorial_offer_seen", true).apply()
+                    quickUiTipsOpen = false
+                    tutorialHubOpen = true
                 },
             )
             val deckChoices = remember(savedDecks, premadeDecks, preconDecks) {
-                preconDecks.map { DeckChoice("precon:${it.id}", it.name, it.commander, builtIn = true, category = DeckChoiceCategory.PRECON) } +
+                ReleaseFeatures.availableDecks(preconDecks.map { DeckChoice("precon:${it.id}", it.name, it.commander, builtIn = true, category = DeckChoiceCategory.PRECON) } +
                     premadeDecks.map { DeckChoice("builtin:${it.id}", it.name, it.commander, builtIn = true, category = argentumDeckCategory(it.id)) } +
-                    savedDecks.map { DeckChoice(it.name, it.name, it.commander ?: parseDeckList(it.text).firstOrNull { e -> e.commander }?.name, builtIn = false, category = DeckChoiceCategory.OTHER) }
+                    savedDecks.map { DeckChoice(it.name, it.name, it.commander ?: parseDeckList(it.text).firstOrNull { e -> e.commander }?.name, builtIn = false, category = DeckChoiceCategory.OTHER) })
             }
             val seat = players.getOrNull(localSeat)
             val activeDeck = deckChoices.firstOrNull { it.id == activeDeckId }
-                ?: seat?.takeIf { it.deckLoaded }?.let { DeckChoice("table", it.commanderName ?: "Your table deck", it.commanderName, builtIn = false) }
+                ?: seat?.takeIf { it.deckLoaded && ReleaseFeatures.deckImportEnabled }?.let { DeckChoice("table", it.commanderName ?: "Your table deck", it.commanderName, builtIn = false) }
             // Commander art: the table card's own picture, else the app's card data (cached on the
             // phone by CardImages), and only then a Scryfall name lookup.
             val commanderName = activeDeck?.commander
@@ -229,32 +237,54 @@ internal fun TableController.TableOverlays() {
                     argentumEndPreviousRequested = true
                     argentumSocket.connect(lobbyPlayerName)
                 },
-                onPlay = { playSheetOpen = true },
-                onChangeDeck = { deckPickerOpen = true },
+                onPlay = { playSheetOpen = true; TutorialActions.tap("home-play") },
+                onChangeDeck = { deckPickerOpen = true; TutorialActions.tap("home-change-deck") },
                 onImport = { selectedPlayer = localSeat; importError = null; importOpen = true },
-                onSettings = { optionsOpen = true },
+                onSettings = { optionsOpen = true; TutorialActions.tap("home-settings") },
                 onReturnToTable = { run { homeOpen = false } },
             )
             if (playSheetOpen) PlaySheet(
                 deckName = activeDeck?.name,
                 aiDecks = premadeDecks.map { DeckChoice(it.id, it.name, it.commander, builtIn = true) },
                 aiDeckId = offlineAiDeckId,
-                onAiDeck = { offlineAiDeckId = it },
+                onAiDeck = { offlineAiDeckId = it; TutorialActions.tap("setup-ai-deck") },
                 aiCount = offlineAiCount,
-                onAiCount = { offlineAiCount = it; optionPrefs.edit().putInt("offline_ai_count", it).apply() },
-                onOffline = { playSheetOpen = false; run { startOfflineGame() } },
+                onAiCount = { offlineAiCount = ReleaseFeatures.aiCount(it); optionPrefs.edit().putInt("offline_ai_count", offlineAiCount).apply() },
+                aiDifficulties = offlineAiDifficulties,
+                onAiDifficulty = { seat, level -> setOfflineAiDifficulty(seat, level) },
+                onOffline = {
+                    playSheetOpen = false
+                    // PLAY always starts the game; a Choose-a-game lesson ends here, its job done.
+                    if (tutorialChapterId != null && !tutorialPracticeActive) { TutorialActions.tap("setup-start"); stopTutorial(reopenHub = false) }
+                    startOfflineGame()
+                },
                 onOnline = { playSheetOpen = false; run { startArgentumPractice(vsAi = true) } },
                 onCreateRoom = { playSheetOpen = false; run { startArgentumPractice(vsAi = false) } },
                 onJoinRoom = { playSheetOpen = false; run { argentumLastError = null; argentumJoinCode = ""; argentumJoinDialogOpen = true } },
                 onDismiss = { playSheetOpen = false },
-                onWifiHost = { playSheetOpen = false; run { startWifiHost() } },
-                onWifiJoin = { playSheetOpen = false; run { wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() } },
-                onOnlineHost = { playSheetOpen = false; run { startWifiHost(online = true) } },
-                onOnlineJoin = { playSheetOpen = false; run { onlineCodeInput = ""; onlineJoinOpen = true } },
+                onWifiMultiHost = { playSheetOpen = false; run {
+                    recordDiagnostic("Multiplayer: Wi-Fi host setup opened", DiagnosticCategory.ACTION)
+                    wifiMultiOnline = false
+                    wifiMultiConfigOpen = true
+                } },
+                onWifiJoin = { playSheetOpen = false; run { recordDiagnostic("Multiplayer: Wi-Fi join opened", DiagnosticCategory.ACTION); wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() } },
+                onOnlineMultiHost = { playSheetOpen = false; run {
+                    recordDiagnostic("Multiplayer: internet host setup opened", DiagnosticCategory.ACTION)
+                    wifiMultiOnline = true
+                    wifiMultiConfigOpen = true
+                } },
+                onOnlineMultiJoin = { playSheetOpen = false; run {
+                    recordDiagnostic("Multiplayer: internet join opened", DiagnosticCategory.ACTION)
+                    onlineCodeInput = ""
+                    onlineJoinOpen = true
+                } },
+                tutorialStep = if (tutorialChapterId != null) tutorialStep else null,
             )
-            if (deckPickerOpen) DeckPickerSheet(deckChoices, activeDeckId,
-                onPick = { choice ->
+            val pickDeck: (DeckChoice) -> Unit = { choice ->
                     deckPickerOpen = false
+                    // Choosing a deck during the deck lesson really chooses it, then the lesson moves on.
+                    if (tutorialChapterId != null && !tutorialPracticeActive) TutorialActions.tap("deck-select")
+                    run {
                     activeDeckId = choice.id; saveActiveDeck(context, choice.id)
                     recordDiagnostic("Deck chosen: ${choice.name}", DiagnosticCategory.ACTION)
                     // Also put it on your table (card art, online play). Offline games read the choice directly.
@@ -262,9 +292,23 @@ internal fun TableController.TableOverlays() {
                         ?: savedDecks.firstOrNull { it.name == choice.id }?.text
                         ?: premadeDecks.firstOrNull { "builtin:${it.id}" == choice.id }?.let { d -> "Commander\n1 ${d.commander}\nDeck\n" + d.cards.filterNot { it == d.commander }.groupingBy { it }.eachCount().entries.joinToString("\n") { (n, c) -> "$c $n" } }
                     if (text != null) { selectedPlayer = localSeat; importDeck(text, saveAsMine = false) }
-                },
+                    }
+            }
+            if (deckPickerOpen) DeckPickerSheet(deckChoices, activeDeckId,
+                onPick = pickDeck,
                 onImport = { deckPickerOpen = false; selectedPlayer = localSeat; importError = null; importOpen = true },
-                onDismiss = { deckPickerOpen = false })
+                onDismiss = { deckPickerOpen = false },
+                onDeckBuilder = if (DeckBuilderFlag.enabled) { { deckPickerOpen = false; deckBuilderOpen = true } } else null,
+                tutorialStep = if (tutorialChapterId != null) tutorialStep else null)
+            if (deckBuilderOpen && DeckBuilderFlag.enabled) DeckManagerDialog(
+                decks = savedDecks,
+                loadCatalog = { loadSupportCatalog() },
+                onDecksChanged = { updated -> savedDecks = updated; saveSavedDecks(context, updated) },
+                onPlay = { deck ->
+                    deckBuilderOpen = false
+                    pickDeck(DeckChoice(deck.name, deck.name, deck.commander, builtIn = false, category = DeckChoiceCategory.OTHER))
+                },
+                onDismiss = { deckBuilderOpen = false })
         }
 
     if (argentumEnabled && argentumSnapshot == null && !homeOpen) {
@@ -344,6 +388,7 @@ internal fun TableController.TableOverlays() {
                         gameEndedOnline = false
                         gameTimerRunning = false
                         turnTimerRunning = false
+                        argentumLastError = null
                         homeOpen = true
                     }, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) { Text("LEAVE") }
                 }
@@ -379,9 +424,11 @@ internal fun TableController.TableOverlays() {
         dismissButton = { TextButton(onClick = { argentumJoinDialogOpen = false }) { Text("CANCEL") } }
     )
 
+    // Start-up problems (deck validation, connecting, resuming). In-game errors never reach here,
+    // and errors already shown as a pop-up are not stored for it.
     if (argentumLastError != null && argentumSnapshot == null && homeOpen) AlertDialog(
         onDismissRequest = { argentumLastError = null },
-        title = { Text("Argentum deck check") },
+        title = { Text("Couldn't start the game") },
         text = { Text(argentumLastError.orEmpty()) },
         confirmButton = { TextButton(onClick = { argentumLastError = null }) { Text("OK") } }
     )
@@ -392,7 +439,7 @@ internal fun TableController.TableOverlays() {
         val won = argentumWon ?: argentumSnapshot?.winnerName?.let { it == players.getOrNull(localSeat)?.name }
         AlertDialog(
             onDismissRequest = { argentumGameOverDismissed = true },
-            title = { Text(when (won) { true -> "Victory"; false -> "Defeat"; null -> "Game over" }, fontWeight = FontWeight.Black, color = when (won) { true -> Mint; false -> Color(0xFFFFB4A8); null -> SoftWhite }) },
+            title = { Text(if (argentumMatchUnfinished) "Eliminated" else when (won) { true -> "Victory"; false -> "Defeat"; null -> "Game over" }, fontWeight = FontWeight.Black, color = if (argentumMatchUnfinished) Color(0xFFFFB4A8) else when (won) { true -> Mint; false -> Color(0xFFFFB4A8); null -> SoftWhite }) },
             text = {
                 Column {
                     Text(argentumGameOverText ?: argentumSnapshot?.winnerName?.let { "$it won." } ?: "The game has ended.", color = SoftWhite)
@@ -405,10 +452,10 @@ internal fun TableController.TableOverlays() {
                 val wifi = wifiRole
                 closeArgentumSession(concede = false)
                 when {
-                    // Wi-Fi: the host waits for the friend again; the guest looks for the host again.
-                    wifi == "host" -> startWifiHost()
+                    // Multiplayer: the host reopens the 2–4 seat lobby setup (keeping the last
+                    // seat choices); a guest looks for or re-enters a room, as from the Play menu.
+                    wifi == "host" || wifi == "online-host" -> { wifiMultiOnline = wifi == "online-host"; wifiMultiConfigOpen = true }
                     wifi == "guest" -> { wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() }
-                    wifi == "online-host" -> startWifiHost(online = true)
                     wifi == "online-guest" -> { onlineCodeInput = ""; onlineJoinOpen = true }
                     wasOffline -> startOfflineGame()
                     else -> startArgentumPractice(vsAi = true)
@@ -442,9 +489,9 @@ internal fun TableController.TableOverlays() {
         } ?: "Argentum dealt your opening seven.",
         selectable = false, selection = emptySet(), onToggle = {},
         primaryLabel = "KEEP ${players.getOrNull(localSeat)?.hand?.size ?: 7}", primaryEnabled = !argentumAwaitingUpdate,
-        onPrimary = { if (argentumSocket.keepHand()) { argentumMulliganPrompt = false; argentumAwaitingUpdate = true; recordDiagnostic("Kept opening hand", DiagnosticCategory.ACTION) } },
+        onPrimary = { if (argentumSocket.keepHand()) { argentumMulliganPrompt = false; argentumAwaitingUpdate = true; tutorialKeepPending = tutorialPracticeActive; recordDiagnostic("Kept opening hand", DiagnosticCategory.ACTION) } },
         secondaryLabel = "MULLIGAN", secondaryEnabled = !argentumAwaitingUpdate,
-        onSecondary = { if (argentumSocket.mulligan()) { argentumAwaitingUpdate = true; recordDiagnostic("Took a mulligan", DiagnosticCategory.ACTION) } },
+        onSecondary = { if (argentumSocket.mulligan()) { argentumAwaitingUpdate = true; tutorialMulliganPending = tutorialPracticeActive; recordDiagnostic("Took a mulligan", DiagnosticCategory.ACTION) } },
     )
 
     argentumBottomCardIds?.let { ids ->
@@ -629,10 +676,31 @@ internal fun TableController.TableOverlays() {
                             Text(decision.optString("filterDescription"), color = Muted, fontSize = 11.sp)
                             if (options.length() == 0) Text("No matching cards. Confirm to finish the search.", color = Muted, fontSize = 12.sp)
                             else {
-                                val libraryItems = (0 until options.length()).map { index ->
-                                    val id = options.optString(index)
-                                    libraryPick(id, libraryInfo?.optJSONObject(id), ArgentumDecisions.cardName(decision, id) { argentumSnapshot?.targets?.get(it)?.name })
+                                val allLibraryItems = remember(decision) {
+                                    (0 until options.length()).map { index ->
+                                        val id = options.optString(index)
+                                        libraryPick(id, libraryInfo?.optJSONObject(id), ArgentumDecisions.cardName(decision, id) { argentumSnapshot?.targets?.get(it)?.name })
+                                    }
                                 }
+                                // Type chips and sorting only arrange what Argentum offered; picks stay visible.
+                                var libraryChip by remember(decision) { mutableStateOf<LibraryChip?>(null) }
+                                var librarySort by remember(decision) { mutableStateOf(LibrarySort.TYPE) }
+                                val chips = remember(allLibraryItems) { LibraryChip.present(allLibraryItems.map { it.typeLine }) }
+                                if (allLibraryItems.size > 1) Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    listOf(LibrarySort.TYPE, LibrarySort.NAME).forEach { sort ->
+                                        FilterChip(librarySort == sort, { librarySort = sort }, label = { Text(sort.label) }, modifier = Modifier.testTag("library-sort-${sort.name}"))
+                                    }
+                                    chips.forEach { (chip, n) ->
+                                        FilterChip(libraryChip == chip, { libraryChip = if (libraryChip == chip) null else chip }, label = { Text("${chip.label} $n") },
+                                            modifier = Modifier.testTag("library-chip-${chip.name}"))
+                                    }
+                                }
+                                val libraryItems = arrangeLibrary(allLibraryItems, libraryChip, librarySort, keep = { it.id in argentumDecisionSelection },
+                                    name = { it.name }, typeLine = { it.typeLine }, manaValue = { null })
+                                    .map { (group, item) -> item.copy(group = group, groupOrder = LIBRARY_GROUP_ORDER.indexOf(group).coerceAtLeast(0)) }
+                                if (maxSel > 1) Text("${argentumDecisionSelection.size} of up to $maxSel chosen", color = if (argentumDecisionSelection.isEmpty()) Muted else Mint,
+                                    fontSize = 11.sp, fontWeight = FontWeight.Bold)
                                 CardPickGrid(libraryItems, argentumDecisionSelection.toSet(), isEnabled = { it in argentumDecisionSelection || argentumDecisionSelection.size < maxSel || maxSel == 1 }, onTap = { id ->
                                     argentumDecisionSelection = when {
                                         id in argentumDecisionSelection -> argentumDecisionSelection - id
@@ -729,7 +797,11 @@ internal fun TableController.TableOverlays() {
                     }) { Text("CONFIRM") }
                     "SearchLibraryDecision" -> TextButton(enabled = argentumDecisionSelection.size in decision.optInt("minSelections", 0)..decision.optInt("maxSelections", 1), onClick = {
                         submitArgentumDecision(ArgentumDecisions.cardsSelectedResponse(argentumDecisionSelection))
-                    }) { Text("CONFIRM") }
+                    }, modifier = Modifier.testTag("library-confirm")) {
+                        // Finding nothing is a legal answer to most tutors; say so instead of a bare CONFIRM.
+                        Text(if (argentumDecisionSelection.isEmpty() && decision.optInt("minSelections", 0) == 0) "FIND NOTHING"
+                            else if (argentumDecisionSelection.size > 1) "CONFIRM ${argentumDecisionSelection.size}" else "CONFIRM")
+                    }
                     "OrderObjectsDecision", "ReorderLibraryDecision" -> TextButton(enabled = argentumOrderSelection.isNotEmpty(), onClick = {
                         submitArgentumDecision(ArgentumDecisions.orderedResponse(argentumOrderSelection))
                     }) { Text("CONFIRM ORDER") }
@@ -787,15 +859,21 @@ internal fun TableController.TableOverlays() {
                     argentumAttackPlan = null
                 } else message = "Could not send the attack declaration. Refresh and try again."
             },
-            onDismiss = { argentumAttackPlan = null })
+            onDismiss = { argentumAttackPlan = null },
+            )
     }
     argentumBlockPlan?.let { plan ->
         ArgentumBlockBoard(plan, ::argentumPiece, busy = argentumAwaitingUpdate,
+            warning = argentumLastError?.takeIf { it.contains("block", ignoreCase = true) },
             onConfirm = { action ->
                 val epoch = ArgentumActions.epochFor(plan.legalAction, argentumSnapshot?.interactionEpoch)
                 if (epoch != null && submitArgentumAction(action, epoch)) {
+                    argentumLastError = null
+                    argentumBlockGuard.markSent()
                     recordDiagnostic("Declared ${action.optJSONObject("blockers")?.length() ?: 0} blocker(s)", DiagnosticCategory.ACTION)
-                    argentumBlockPlan = null
+                    // The next authoritative snapshot either confirms this declaration
+                    // (hide the board and offer priority) or an INVALID_ACTION releases
+                    // the latch and preserves this plan's selections for correction.
                 } else message = "Could not send the block declaration. Refresh and try again."
             },
             onDismiss = { argentumBlockPlan = null })
@@ -874,7 +952,7 @@ internal fun TableController.TableOverlays() {
                         .clickable { }
                 ) {
                     Box(
-                        Modifier.fillMaxWidth().height(36.dp)
+                        Modifier.fillMaxWidth().height(36.dp).tutorialTarget("hand-drawer-grip")
                             .pointerInput(configuration.screenHeightDp) {
                                 var dragDistance = 0f
                                 val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }.coerceAtLeast(1f)

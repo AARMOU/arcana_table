@@ -25,7 +25,7 @@ val DrownerOfHope = card("Drowner of Hope") {
 
     activatedAbility {
         val creature = target(TargetFilter.Creature)
-        cost = Costs.Sacrifice(GameObjectFilter.Creature.withSubtype("Eldrazi").withSubtype("Scion"))
+        cost = Costs.Sacrifice(GameObjectFilter.Permanent.withSubtype("Eldrazi").withSubtype("Scion"))
         effect = Effects.Tap(creature)
     }
 

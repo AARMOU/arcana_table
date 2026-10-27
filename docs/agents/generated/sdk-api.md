@@ -1249,6 +1249,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `ConvertCountersToTokens(CreateTokenEffect, String): Effect`*
 - `CopyCardIntoCollection(EffectTarget, String): Effect`
 - `CopyCollectionIntoCollection(String, String): Effect`
+- `CopyControlledStackObjects(Set<? extends StackObjectKind>, Player): Effect`*
 - `CopyEachSpellCast(Int, GameObjectFilter): Effect`*
 - `CopyEachTargetSpell(List<? extends Keyword>, Boolean): Effect`*
 - `CopyForEachOtherPossibleTarget(GameObjectFilter, EffectTarget, Player): Effect`*

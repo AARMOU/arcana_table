@@ -87,17 +87,20 @@ git push -u origin gpt/argentum-weekly-fix-<date>
 
 `finish` refuses commits that do not belong to a patch: every change must be part of a patch.
 
-## Custom-card collision
+## Custom-card collision (automatic)
 
-Upstream now implements a card Arcana defined itself. `CustomCardDataTest.noCustomCardShadowsAnArgentumCard`
-stays strict and is never exempted. For each card listed:
+Upstream now implements a card Arcana defined itself. This no longer needs a person: every Arcana custom
+card is kept, and `weekly.py reconcile` (the workflow's custom-card step) decides which version is played.
 
-1. Compare upstream's implementation with Arcana's custom one (`android/custom-cards/.../cards/`).
-2. Run the card's positive and negative scenarios against upstream's version.
-3. If upstream is correct: retire the custom card (remove its definition and its `CustomCards.kt` entry,
-   re-export with `./gradlew :custom-cards:exportCards`), keeping a scenario test that now exercises
-   upstream's card. If it is not: report it on #81 and to upstream; the owner decides whether the upgrade
-   waits.
+1. Each collided card first plays Argentum's version: the app prefers the library, and the custom-card
+   scenario tests register exactly what the app plays (`CardPool.inPlay`).
+2. If a card's scenario tests fail against Argentum's version, the card is written to
+   `android/app/src/main/assets/argentum/custom-overrides.txt`, so Arcana's tested version stays in
+   play (app and tests), and the suite re-runs to confirm.
+3. The list starts clean every week, so a card returns to Argentum's version once that version passes.
+
+The PR body's **Custom-card reconciliation** section lists both groups. Do not delete a custom card to
+clear a run; if a test fails for a reason unrelated to a collision, treat it as a failing test (below).
 
 ## Failing test or lost precon slot
 
@@ -108,5 +111,5 @@ the six-precon manifest uses no longer resolves: find out whether upstream renam
 
 - Push to `bot/argentum-weekly`. The robot only replaces that branch when its tip is the robot's own
   commit; anything else stops the next weekly run.
-- Weaken or skip a test, or add a collision exemption.
+- Weaken or skip a test, or hand-edit `custom-overrides.txt` (the reconcile step owns it).
 - Merge, release, sign or publish. Those are the owner's.

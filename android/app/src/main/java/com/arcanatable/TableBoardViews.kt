@@ -208,7 +208,7 @@ internal fun ManaSymbolText(text: String, color: Color, fontSize: androidx.compo
 }
 
 @Composable
-internal fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier = Modifier, compact: Boolean = false, isActivePlayer: Boolean = false, turnNumber: Int, phaseName: String, turnTime: Long?, showTurnTimer: Boolean, onToggleTimer: () -> Unit, onMoveUp: () -> Unit, onMoveDown: () -> Unit, onOpen: () -> Unit, onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit, tableZoom: MutableFloatState, onTableZoomEnd: (Float) -> Unit, canReorder: Boolean = true) {
+internal fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier = Modifier, compact: Boolean = false, isActivePlayer: Boolean = false, turnNumber: Int, phaseName: String, turnTime: Long?, showTurnTimer: Boolean, onToggleTimer: () -> Unit, onMoveUp: () -> Unit, onMoveDown: () -> Unit, onOpen: () -> Unit, onZone: (String) -> Unit, onPreview: (GameCard) -> Unit, onPublicPreview: (GameCard) -> Unit, tableZoom: MutableFloatState, onTableZoomEnd: (Float) -> Unit, canReorder: Boolean = true, isLastSeat: Boolean = false) {
     // A turn change must not expand or collapse a player's overview panel.
     var expanded by rememberSaveable(player.id) { mutableStateOf(false) }
     val paymentCards = player.battlefield.filter { card ->
@@ -341,13 +341,15 @@ internal fun PlayerOverview(player: TablePlayer, index: Int, modifier: Modifier 
                 if (player.revealed.isNotEmpty()) ZoneChip("REVEALED", player.revealed.size) { onZone("Revealed") }
             }
         }
-        Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = if (expanded) "Collapse player details" else "Expand player details",
-            tint = Muted, modifier = Modifier.align(Alignment.CenterHorizontally).size(28.dp).clip(CircleShape).combinedClickable(onClick = { expanded = !expanded }))
+        // 48dp touch target around the 28dp chevron.
+        IconButton(onClick = { expanded = !expanded }, modifier = Modifier.align(Alignment.CenterHorizontally).size(48.dp)) {
+            Icon(if (expanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore, contentDescription = if (expanded) "Collapse player details" else "Expand player details", tint = Muted, modifier = Modifier.size(28.dp))
+        }
         // Seat order only changes on a local table; online games take their order from the room or engine.
         if (expanded && canReorder) {
             Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                TextButton(onClick = onMoveUp, enabled = index > 0, modifier = Modifier.heightIn(min = 48.dp)) { Text("MOVE ↑", color = Mint, fontSize = 9.sp) }
-                TextButton(onClick = onMoveDown, modifier = Modifier.heightIn(min = 48.dp)) { Text("MOVE ↓", color = Mint, fontSize = 9.sp) }
+                TextButton(onClick = onMoveUp, enabled = index > 0, modifier = Modifier.heightIn(min = 48.dp)) { Text("MOVE UP ↑", color = if (index > 0) Mint else Muted, fontSize = 9.sp) }
+                TextButton(onClick = onMoveDown, enabled = !isLastSeat, modifier = Modifier.heightIn(min = 48.dp)) { Text("MOVE DOWN ↓", color = if (!isLastSeat) Mint else Muted, fontSize = 9.sp) }
             }
         }
     }
@@ -438,7 +440,7 @@ internal fun PlayerBoard(
                         val trackerSummary = player.playerCounters.entries.joinToString(" · ") { "${it.key} ${it.value}" }
                         Text("Cast ${player.commanderCastCount} · tax +{${player.commanderCastCount * 2}}${if (trackerSummary.isNotBlank()) " · $trackerSummary" else ""}", color = Muted, fontSize = 7.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
-                    TextButton(onClick = onCastCommander, enabled = (canControl || engineControlled) && !commanderUnavailable && !player.isEliminated, modifier = Modifier.heightIn(min = 32.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) { Text("CAST", color = if (canControl && !commanderUnavailable && !player.isEliminated) Mint else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = onCastCommander, enabled = (canControl || engineControlled) && !commanderUnavailable && !player.isEliminated, modifier = Modifier.heightIn(min = 44.dp), contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)) { Text("CAST", color = if (canControl && !commanderUnavailable && !player.isEliminated) Mint else Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold) }
                 } else Text("PLAYER TRACKERS · ${player.playerCounters.entries.joinToString { "${it.key} ${it.value}" }.ifBlank { "none" }}", color = Muted, fontSize = 9.sp, modifier = Modifier.weight(1f))
                 val incomingDamage = player.commanderDamageReceived.entries.sumOf { it.value }
                 if (incomingDamage > 0) Text("CMD DMG $incomingDamage", color = if (player.commanderDamageReceived.values.any { it >= 21 }) Color(0xFFE9978B) else CounterGold, fontSize = 8.sp, fontWeight = FontWeight.Bold)
@@ -453,7 +455,7 @@ internal fun PlayerBoard(
                 if (engineControlled && !player.isEliminated) Text("ARGENTUM RUNS THE RULES · USE ${if (isActivePlayer) "PASS PRIORITY / ACTIONS" else "ACTIONS WHEN OFFERED"}", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                 else if (player.isComputer || player.isEliminated) Text(if (player.isEliminated) "ELIMINATED · ${player.eliminationReason ?: "OUT"}" else if (player.deckLoaded) "AI TURN IN PROGRESS" else "IMPORT A DECK FOR THE AI", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(10.dp))
                 else {
-                    TextButton(onClick = onNextStep, enabled = isActivePlayer && canControl, modifier = Modifier.heightIn(min = 38.dp)) {
+                    TextButton(onClick = onNextStep, enabled = isActivePlayer && canControl, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text(if (!canControl) "OTHER PLAYER · READ ONLY" else if (isActivePlayer) "NEXT STEP  ›" else "WAITING FOR TURN", color = if (isActivePlayer && canControl) Mint else Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
                     }
                 }
@@ -472,7 +474,7 @@ internal fun PlayerBoard(
                 Row(
                     Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp))
                         .background(PanelLight).padding(horizontal = 10.dp, vertical = 7.dp)
-                        .testTag("argentum-mana-summary"),
+                        .testTag("argentum-mana-summary").tutorialTarget("argentum-mana-summary"),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -490,7 +492,7 @@ internal fun PlayerBoard(
                     }
                 }
             }
-            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().tutorialTarget("quick-actions").horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             // In an Argentum game only controls that work are shown: Argentum owns draws, tokens,
             // mana, steps and shuffles, so those manual shortcuts would be silent no-ops.
             if (engineGame) {
@@ -503,7 +505,7 @@ internal fun PlayerBoard(
                             Modifier.height(40.dp).clip(RoundedCornerShape(9.dp)).background(PanelLight)
                                 .border(if (commander.id in playableIds) 2.dp else 0.dp, if (commander.id in playableIds) Mint else PanelLight, RoundedCornerShape(9.dp))
                                 .combinedClickable(onClick = { if (castable) onCastCommander() else onPublicPreview(commander) }, onLongClick = { onPublicPreview(commander) })
-                                .padding(end = 10.dp).testTag("commander-chip"),
+                                .padding(end = 10.dp).testTag("commander-chip").tutorialTarget("commander-chip"),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             CardFace(commander, Modifier.width(29.dp), onClick = { if (castable) onCastCommander() else onPublicPreview(commander) }, onLongClick = { onPublicPreview(commander) }, showCounters = false)
@@ -580,13 +582,13 @@ internal fun PlayerBoard(
             "BATTLEFIELD" to {
         if (!engineGame) Text("BATTLEFIELD  ·  grouped by type  ·  tap to tap/untap  ·  long-press to inspect", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.3.sp, modifier = Modifier.padding(start = 3.dp))
         if (player.battlefield.isEmpty()) {
-            Box(Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)).background(Panel), contentAlignment = Alignment.Center) {
+            Box(Modifier.fillMaxWidth().weight(1f).tutorialTarget("battlefield-row").clip(RoundedCornerShape(12.dp)).background(Panel), contentAlignment = Alignment.Center) {
                 Text("Your battlefield is empty", color = Muted, fontSize = 12.sp)
             }
         } else {
             LazyColumn(
                 state = battlefieldListState,
-                modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(12.dp)).background(Panel)
+                modifier = Modifier.fillMaxWidth().weight(1f).tutorialTarget("battlefield-row").tutorialTarget("table-zoom").clip(RoundedCornerShape(12.dp)).background(Panel)
                     .pinchToZoom(boardZoom) { saveBoardZoom(zoomContext, zoomConfig.screenWidthDp, zoomConfig.screenHeightDp, it) }
                     .padding(5.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(3.dp)
@@ -631,7 +633,7 @@ internal fun BattlefieldCard(card: GameCard, tileWidth: androidx.compose.ui.unit
     val activatedAbilities = remember(card.id, card.oracleText) { cardActivatedAbilityLines(card) }
     val cardHeight = tileWidth / 0.72f
     Box(Modifier.width(if (card.tapped) cardHeight else tileWidth).height(cardHeight), contentAlignment = Alignment.Center) {
-        CardFace(card, Modifier.width(tileWidth), onClick = onTap, onLongClick = onPreview, animateTapped = true, glow = glow)
+        CardFace(card, Modifier.width(tileWidth).tutorialTarget("battlefield-card:${card.name}"), onClick = onTap, onLongClick = onPreview, animateTapped = true, glow = glow, tutorialZone = "battlefield")
         card.chosenCreatureType?.takeIf { it.isNotBlank() }?.let { chosenType ->
             Text(
                 "TYPE · $chosenType",
@@ -652,8 +654,8 @@ internal fun BattlefieldCard(card: GameCard, tileWidth: androidx.compose.ui.unit
             }
             DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 DropdownMenuItem(text = { Text(if (card.tapped) "Untap" else "Tap") }, onClick = { menuOpen = false; onAction("TAP") })
-                DropdownMenuItem(text = { Text("Add counter") }, onClick = { menuOpen = false; onAction("COUNTER") })
-                DropdownMenuItem(text = { Text("Create token") }, onClick = { menuOpen = false; onAction("TOKEN") })
+                DropdownMenuItem(text = { Text("Add counter…") }, onClick = { menuOpen = false; onAction("COUNTER") })
+                DropdownMenuItem(text = { Text("Add token…") }, onClick = { menuOpen = false; onAction("TOKEN") })
                 DropdownMenuItem(text = { Text("Move to graveyard") }, onClick = { menuOpen = false; onAction("GRAVEYARD") })
                 DropdownMenuItem(text = { Text("Exile") }, onClick = { menuOpen = false; onAction("EXILE") })
                 if (!card.isFaceDown && activatedAbilities.isNotEmpty()) {
@@ -685,15 +687,21 @@ internal fun OverviewCard(card: GameCard, width: androidx.compose.ui.unit.Dp, on
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: () -> Unit, onLongClick: () -> Unit, showCounters: Boolean = true, animateTapped: Boolean = false, glow: Boolean = false) {
+internal fun CardFace(card: GameCard, modifier: Modifier = Modifier, onClick: () -> Unit, onLongClick: () -> Unit, showCounters: Boolean = true, animateTapped: Boolean = false, glow: Boolean = false, tutorialZone: String? = null) {
     val rotation by animateFloatAsState(targetValue = if (animateTapped && card.tapped) 90f else 0f, animationSpec = tween(260), label = "card-tap")
     // Argentum games: holding any card shows it large (CardZoom.kt) instead of the older long-press actions.
     val zoom = LocalCardZoom.current
-    val holdAction: () -> Unit = if (zoom.enabled) ({ zoom.hold(card) }) else onLongClick
+    val holdAction: () -> Unit = {
+        if (zoom.enabled) zoom.hold(card) else onLongClick()
+        if (tutorialZone != null) TutorialActions.hold("$tutorialZone-card:${card.name}")
+    }
     Box(
         modifier.aspectRatio(0.72f).graphicsLayer(rotationZ = rotation).clip(RoundedCornerShape(8.dp)).background(card.color)
             .border(if (glow) 2.5.dp else if (card.tapped) 2.dp else 1.dp, if (glow) Mint else if (card.tapped) Mint else Color.White.copy(alpha = 0.28f), RoundedCornerShape(8.dp))
-            .combinedClickable(onClick = onClick, onLongClick = holdAction)
+            .combinedClickable(onClick = {
+                if (tutorialZone != null) TutorialActions.tap("$tutorialZone-card:${card.name}")
+                onClick()
+            }, onLongClick = holdAction)
             .then(if (zoom.enabled) Modifier.cardZoomRelease(zoom) else Modifier)
     ) {
         if (card.isFaceDown) {
@@ -790,7 +798,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
             if (!argentumMode && !canControl && actionOrder.none { it == "REVEAL" || it == "STACK" || it == "MORE" }) Text("WAITING", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
             DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
                 if (canControl) {
-                    DropdownMenuItem(text = { Text("Add token") }, modifier = Modifier, onClick = { moreOpen = false; onMoreAction("TOKEN") })
+                    DropdownMenuItem(text = { Text("Add token…") }, modifier = Modifier, onClick = { moreOpen = false; onMoreAction("TOKEN") })
                     DropdownMenuItem(text = { Text("Reveal top card") }, onClick = { moreOpen = false; onMoreAction("REVEAL") })
                     DropdownMenuItem(text = { Text("Shuffle library…") }, onClick = { moreOpen = false; onMoreAction("SHUFFLE") })
                     DropdownMenuItem(text = { Text("Player trackers and commander damage") }, onClick = { moreOpen = false; onMoreAction("TRACKERS") })
@@ -825,13 +833,14 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
             val rows = cards.chunked(grid.columns.coerceAtLeast(1))
             val container = if (grid.rows == 1) Modifier.fillMaxWidth().horizontalScroll(handScrollState)
                 else Modifier.fillMaxWidth().heightIn(max = areaHeight).verticalScroll(handScrollState)
-            Column(container.testTag("hand-grid"), verticalArrangement = Arrangement.spacedBy(gap)) {
+            Column(container.testTag("hand-grid").tutorialTarget("hand-grid"), verticalArrangement = Arrangement.spacedBy(gap)) {
             rows.forEach { rowCards -> Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
             rowCards.forEach { card ->
                 var coordinates by remember(card.id) { mutableStateOf<LayoutCoordinates?>(null) }
                 CardFace(
                     card,
                     Modifier.width(cardWidth).height(cardHeight)
+                        .tutorialTarget("hand-card:${card.name}")
                         .onGloballyPositioned { coordinates = it }
                         // Argentum games: holding a hand card previews it (no drag-to-play there).
                         .then(if (argentumMode) Modifier else Modifier.pointerInput(card.id) {
@@ -848,7 +857,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
                         })
                         .then(if (cards.firstOrNull()?.id == card.id) Modifier else Modifier)
                         .then(if (card.id == highlightedCardId) Modifier.border(3.dp, Mint, RoundedCornerShape(8.dp)) else Modifier),
-                    onClick = { onSelect(card) }, onLongClick = { onSelect(card) }, showCounters = false, glow = card.id in playableIds
+                    onClick = { onSelect(card) }, onLongClick = { onSelect(card) }, showCounters = false, glow = card.id in playableIds, tutorialZone = "hand"
                 )
             }
             } }

@@ -1,0 +1,1 @@
+Release-look TEST scope: Import new, saved decks, deck editor, 2–4 seats; debug scenarios strictly omitted
