@@ -361,6 +361,9 @@ internal class TableController(
     /** Monotonic per-host chat IDs and replay guard (reset when a new room begins). */
     var roomChatNextId: Long = 0L
     val roomChatSeen: MutableSet<Long> = linkedSetOf()
+    /** Tracks new messages even after the 200-message rolling history reaches capacity. */
+    var roomChatDisplayRevision by run { mutableIntStateOf(0) }
+    var observedRoomChatRevision: Int = 0
     var unreadChatCount by run { mutableIntStateOf(0) }
     var triggerPrompts by run { mutableStateOf(emptyList<TriggerPrompt>()) }
     var stackActions by run { mutableStateOf(emptyList<StackAction>()) }
