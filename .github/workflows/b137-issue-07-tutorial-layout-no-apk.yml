@@ -1,0 +1,67 @@
+name: B137 issue 07 tutorial coach layout (NO APK)
+# A focused gate independent from unrelated custom-card scenario failures.
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/b137-issue-07-tutorial-layout-no-apk.yml'
+      - 'android/app/src/main/java/com/arcanatable/TutorialCoach.kt'
+      - 'android/app/src/test/java/com/arcanatable/TutorialCoachPlacementTest.kt'
+      - 'android/app/src/test/java/com/arcanatable/ui/TutorialAuditUiTest.kt'
+permissions:
+  contents: read
+concurrency:
+  group: b137-issue07-coach-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  tutorial-layout-no-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export bundled card assets for tutorial tests (no card scenarios)
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+      - name: Run geometry, cover/Fold smoke, and all 160 tutorial steps
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
+            --tests 'com.arcanatable.TutorialCoachPlacementTest' \
+            --tests 'com.arcanatable.ui.TutorialScreensTest' \
+            --tests 'com.arcanatable.ui.TutorialAuditUiTest'
+      - name: Verify exact XML totals; refuse silently skipped tests
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          d = Path('android/app/build/test-results/testDebugUnitTest')
+          wanted = {
+              'com.arcanatable.TutorialCoachPlacementTest': 6,
+              'com.arcanatable.ui.TutorialScreensTest': 3,
+              'com.arcanatable.ui.TutorialAuditUiTest': 3,
+          }
+          for cls, n in wanted.items():
+              files = list(d.rglob('TEST-' + cls + '.xml'))
+              assert len(files) == 1, (cls, files)
+              root = ET.parse(files[0]).getroot()
+              counts = {k:int(root.attrib.get(k,'0')) for k in ('tests','failures','errors','skipped')}
+              print(cls, counts)
+              assert counts == {'tests':n, 'failures':0, 'errors':0, 'skipped':0}, counts
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b137-issue-07-tutorial-junit
+          retention-days: 14
+          path: |
+            android/app/build/test-results/testDebugUnitTest/
+            android/app/build/screenshots/tutorial-audit-*.txt
