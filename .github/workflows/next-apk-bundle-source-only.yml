@@ -1,0 +1,117 @@
+name: Next APK bundle pinned-source integration — NO APK
+# Isolated staging branch only. Never assemble/sign APK/AAB or deploy a Worker.
+on:
+  push:
+    branches:
+      - gpt/b136-host-lobby-fix-integration-20261026
+    paths:
+      - .github/workflows/next-apk-bundle-source-only.yml
+      - .github/workflows/release-look-followup-build134.yml
+      - tools/next_apk_claude_tutorial_join.sh
+permissions:
+  contents: read
+concurrency:
+  group: arcana-next-apk-source-only-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify-combined-source:
+    name: Assemble exact full B136 + lobby + combat pins (no Gradle)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch reviewed exact-source assembler, no remote writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          PIN=8e481cdb77d50c5753933262d9198a79afe56c95
+          test ! -f tools/fast_apk_snapshot.py
+          git fetch --no-tags origin "$PIN"
+          test "$(git rev-parse FETCH_HEAD)" = "$PIN"
+          git show "$PIN:tools/fast_apk_snapshot.py" > tools/fast_apk_snapshot.py
+          grep -F 'def b136_source_pins()' tools/fast_apk_snapshot.py
+          grep -F 'subprocess.run([sys.executable,"tools/lobby_tutorial_join_smoke.py"]' tools/fast_apk_snapshot.py
+      - name: Assemble reviewed source exactly as future APK runner will (NO APK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! python3 tools/fast_apk_snapshot.py source; then
+            echo 'Source assembly halted; report exact conflict markers (never auto-publish)'
+            git diff --name-only --diff-filter=U || true
+            for file in android/app/src/main/java/com/arcanatable/TableArgentum.kt android/app/src/main/java/com/arcanatable/TableDialogs.kt; do
+              if test -f "$file"; then
+                echo "::group::Unresolved hunks in $file"
+                awk '/^<<<<<<< / {inside=1; count=0} inside && count++<160 {print} /^>>>>>>> / {inside=0}' "$file" | head -350
+                echo '::endgroup::'
+              fi
+            done
+            exit 1
+          fi
+          test -s combined-evidence/b136-integration-summary.txt
+          test -s combined-evidence/next-apk-source-pins.txt
+          grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+          grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' android/app/src/main/java/com/arcanatable/TableArgentum.kt
+          test -s android/app/src/main/java/com/arcanatable/ArgentumBlockSubmissionGuard.kt
+          test -s android/app/src/test/java/com/arcanatable/ArgentumBlockSubmissionGuardTest.kt
+          test -s android/app/src/test/java/com/arcanatable/MultiplayerLobbyVisibilityTest.kt
+          git diff --check -- android/app android/custom-cards
+          echo 'PASS: reviewed source joins without app builds, APKs, signing or Worker deployment'
+
+      - name: Probe Claude PR300 pinned tutorial integration (runner only; NO APK)
+        shell: bash
+        run: bash tools/next_apk_claude_tutorial_join.sh
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android compile SDK (no packaging)
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Execute exact combined-source tutorial, lobby and blockers Android regressions (NO APK)
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
+            --tests 'com.arcanatable.ui.TutorialAuditUiTest' \
+            --tests 'com.arcanatable.TutorialRunTest' \
+            --tests 'com.arcanatable.TutorialWalkthroughTest' \
+            --tests 'com.arcanatable.MultiplayerLobbyVisibilityTest' \
+            --tests 'com.arcanatable.ArgentumBlockSubmissionGuardTest'
+      - name: Fail closed unless all five combined suites actually ran
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          root = Path('android/app/build/test-results/testDebugUnitTest')
+          targets = (
+              'com.arcanatable.ui.TutorialAuditUiTest',
+              'com.arcanatable.TutorialRunTest',
+              'com.arcanatable.TutorialWalkthroughTest',
+              'com.arcanatable.MultiplayerLobbyVisibilityTest',
+              'com.arcanatable.ArgentumBlockSubmissionGuardTest',
+          )
+          for name in targets:
+              xml = root / ('TEST-' + name + '.xml')
+              assert xml.is_file(), ('Missing exact regression suite', name)
+              report = ET.parse(xml).getroot()
+              count = int(report.attrib.get('tests', '0'))
+              bad = sum(int(report.attrib.get(k, '0')) for k in ('failures', 'errors', 'skipped'))
+              assert count > 0 and bad == 0, ('Missing/failing/skipped test', name, count, bad)
+              print('PASS:', name, count, 'tests')
+          PY
+      - name: Upload combined-source Android test evidence (no APK)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b136-pr300-tutorial-lobby-blockers-junit
+          retention-days: 14
+          if-no-files-found: ignore
+          path: android/app/build/test-results/testDebugUnitTest/*.xml

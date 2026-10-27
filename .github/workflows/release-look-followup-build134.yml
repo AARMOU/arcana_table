@@ -524,8 +524,8 @@ jobs:
           DECK_BASE: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f
           DECK_SHA: 5a64b631b9d7185c7fb4102a58afa9aa237746c0
           LOBBY_BASE: 79dcd0c58837305fcd1f8790fbf052af214d204b
-          LOBBY_FIX_SHA: b162ea69060a50030c55d32f176464cedeeaa57d
-          OUTCOME_SHA: abaf13ad913025762db889bde1bf92907cd5a133
+          LOBBY_FIX_SHA: cdcfe759501d044c73b35cba4e6838ffa1ef8b82
+          OUTCOME_SHA: c7f95db09560be4249d89b1288f2dccebe14a45e
           UGIN_BASE: 9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f
           UGIN_SHA: 49f7f7389b940accf2e2321130407e579cb2ee4c
           TEMPLE_SHA: e57c462d17075ad3d1f2eee249d75edb04b2572a
@@ -632,32 +632,59 @@ jobs:
               p=root/name
               s=p.read_text()
               matches=list(re.finditer(r'^<<<<<<< ours\n(.*?)^=======\n(.*?)^>>>>>>> theirs\n',s,re.MULTILINE|re.DOTALL))
-              assert len(matches)==1,('unreviewed combat conflict count',name,len(matches))
-              c=matches[0]; ours,theirs=c.group(1),c.group(2)
-              if name=='TableArgentum.kt':
-                  assert 'gameEndedOnline = snapshot.gameOver' in ours
-                  assert '!tutorialPracticeActive' in ours
-                  assert 'argentumMatchUnfinished' in theirs
-                  # Both are required: keep the tutorial's own test-game scope, while
-                  # preventing another nonterminal snapshot from erasing a human loss.
-                  combined=theirs.replace(
-                      'if (snapshot.gameOver && argentumOffline && wifiRole == null)',
-                      'if (snapshot.gameOver && argentumOffline && !tutorialPracticeActive && wifiRole == null)')
-              else:
-                  assert 'source.id to amount + 1' in ours
-                  assert 'if (!engineAuthoritative)' in theirs
-                  assert 'record.key to amount + 1' in theirs
-                  # Keep Claude's consistent 48dp touch targets while switching to
-                  # authoritative per-commander keys, not per-player keys.
-                  combined=theirs.replace('Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)',
-                                           'Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)')
-                  combined=combined.replace('color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold)',
-                                            'color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp))')
-              assert combined!=ours and combined.strip()
-              s=s[:c.start()]+combined+s[c.end():]
+              expected=2 if name=='TableArgentum.kt' else 1
+              assert len(matches)==expected,('unreviewed combat conflict count',name,len(matches),expected)
+              handled=set()
+              for c in reversed(matches):
+                  ours,theirs=c.group(1),c.group(2)
+                  if name=='TableArgentum.kt' and 'gameEndedOnline = snapshot.gameOver' in ours:
+                      assert '!tutorialPracticeActive' in ours
+                      assert 'argentumMatchUnfinished' in theirs
+                      combined=theirs.replace(
+                          'if (snapshot.gameOver && argentumOffline && wifiRole == null)',
+                          'if (snapshot.gameOver && argentumOffline && !tutorialPracticeActive && wifiRole == null)')
+                      assert combined!=theirs, 'Tutorial checkpoint scope was not restored'
+                      handled.add('outcome')
+                  elif name=='TableArgentum.kt' and 'val text = incoming.optString("message"' in ours:
+                      # Quiet-notice PR287 prevents stale in-game error banners. New
+                      # blocker guard needs the error only for a rejected block plan.
+                      assert 'if (argentumSnapshot == null && !homeOpen) argentumLastError = text' in ours
+                      assert 'argentumBlockGuard.onError' in theirs
+                      assert 'Blockers have already been declared' in theirs
+                      insert='''            val blockSubmissionWasPending = argentumBlockGuard.submitted
+                      argentumBlockGuard.onError(incoming.optString("code"), text)
+                      if (blockSubmissionWasPending && !argentumBlockGuard.submitted) {
+                          // Keep PR293's inline rejection message until corrected.
+                          argentumLastError = text
+                      }
+                      if (argentumBlockGuard.submitted &&
+                          text.contains("Blockers have already been declared", ignoreCase = true)) {
+                          argentumBlockPlan = null
+                          message = "Blockers already declared. Pass priority to continue combat."
+                      }
+          '''
+                      anchor='            recordDiagnostic("Argentum error ${incoming.optString("code")}: $text", DiagnosticCategory.ERROR)\n'
+                      assert ours.count(anchor)==1, ('unknown quiet-error anchor',name)
+                      combined=ours.replace(anchor,insert+anchor,1)
+                      handled.add('block-error')
+                  else:
+                      assert name=='TableDialogs.kt', ('unhandled combat overlap',name,ours[:180])
+                      assert 'source.id to amount + 1' in ours
+                      assert 'if (!engineAuthoritative)' in theirs
+                      assert 'record.key to amount + 1' in theirs
+                      # Preserve tested 48dp touch targets/padding alongside
+                      # the authoritative commander-name tracker.
+                      combined=theirs.replace('Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)',
+                                             'Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)')
+                      combined=combined.replace('color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold)',
+                                                'color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 6.dp))')
+                      assert combined!=theirs
+                      handled.add('tracker')
+                  s=s[:c.start()]+combined+s[c.end():]
+              assert handled==({'outcome','block-error'} if name=='TableArgentum.kt' else {'tracker'}),handled
               assert not re.search(r'^(?:<<<<<<< |=======|>>>>>>> )',s,re.MULTILINE)
               p.write_text(s)
-              print('PASS: retained reviewed '+name+' combat and B135 UI semantics')
+              print('PASS: reconciled '+name+' while retaining quiet notices, blocker retry, commander damage and tutorial scope')
           PYCOMBAT
                 git add android/app/src/main/java/com/arcanatable/TableArgentum.kt \
                   android/app/src/main/java/com/arcanatable/TableDialogs.kt
@@ -748,12 +775,32 @@ jobs:
           git add android/app/src/main/java/com/arcanatable/HomeScreen.kt
           git commit --no-gpg-sign -m 'B136: keep large commander artwork in debug and release'
           grep -F 'Multiplayer lobby screen displayed:' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+          # Build 136 regression: the old guard skipped the observable host state,
+          # so the real Wi-Fi/internet room existed but its screen never mounted.
+          grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+          test -s android/app/src/test/java/com/arcanatable/MultiplayerLobbyVisibilityTest.kt
+          test -s android/app/src/main/java/com/arcanatable/ArgentumBlockSubmissionGuard.kt
+          test -s android/app/src/test/java/com/arcanatable/ArgentumBlockSubmissionGuardTest.kt
+          grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' android/app/src/main/java/com/arcanatable/TableArgentum.kt
           grep -F 'commanderDamageTrackerRows(' android/app/src/main/java/com/arcanatable/TableDialogs.kt
           grep -F 'class UginTheIneffableScenarioTest' android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt
           test -f android/app/src/main/java/com/arcanatable/CardFilters.kt
           test -f android/app/src/main/java/com/arcanatable/DeckBuilderFilters.kt
           git diff --check
           echo 'All requested B136 app features source-integrated; run engine/Android gates next' > combined-evidence/b136-integration-summary.txt
+      - name: Include SHA-pinned Claude PR300 tutorial after B136 lobby/blocker assembly
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Stage only. This workflow's push trigger is on the B136 package branch,
+          # NOT on this isolated PR297 staging branch. Do not dispatch APK here.
+          bash tools/next_apk_claude_tutorial_join.sh
+          test -s android/app/src/test/java/com/arcanatable/ui/TutorialAuditUiTest.kt
+          test -s android/app/src/test/java/com/arcanatable/TutorialRunTest.kt
+          test -s android/app/src/test/java/com/arcanatable/MultiplayerLobbyVisibilityTest.kt
+          test -s android/app/src/test/java/com/arcanatable/ArgentumBlockSubmissionGuardTest.kt
+          printf 'claude-tutorial-pr300 %s\n' dfccf7ff456e953f099930c426b8dee5554314ba >> combined-evidence/next-apk-source-pins.txt
+          echo 'PASS: full reviewed PR300 tutorial staged before Android and engine tests (runner only)'
       - uses: actions/setup-node@v4
         if: ${{ github.event_name == 'push' || inputs.include_online_multiplayer }}
         with:
@@ -1186,7 +1233,9 @@ jobs:
             --tests 'com.arcanatable.GameOutcomeDetailsTest' \
             --tests 'com.arcanatable.ui.HomeScreenSizesTest' \
             --tests 'com.arcanatable.ui.DeckBuilderUiTest' \
-            --tests 'com.arcanatable.UginExportedRuntimeTest'
+            --tests 'com.arcanatable.UginExportedRuntimeTest' \
+            --tests 'com.arcanatable.MultiplayerLobbyVisibilityTest' \
+            --tests 'com.arcanatable.ArgentumBlockSubmissionGuardTest'
       - name: Run full Android app unit tests and strict Eldrazi Commander AI tests
         working-directory: android
         shell: bash
