@@ -482,13 +482,13 @@ internal fun TableController.TableOverlays() {
     )
 
     if (argentumMulliganPrompt && argentumSnapshot == null) ArgentumOpeningHandScreen(
-        cards = players.getOrNull(localSeat)?.hand.orEmpty(),
+        cards = argentumOpeningHand,
         title = "Opening hand",
         subtitle = argentumMulliganInfo?.let { (count, onPlay, _) ->
             listOfNotNull(if (onPlay) "You're on the play" else "You're on the draw", if (count > 0) "Mulligan $count · you'll put $count on the bottom after keeping" else null).joinToString(" · ")
         } ?: "Argentum dealt your opening seven.",
         selectable = false, selection = emptySet(), onToggle = {},
-        primaryLabel = "KEEP ${players.getOrNull(localSeat)?.hand?.size ?: 7}", primaryEnabled = !argentumAwaitingUpdate,
+        primaryLabel = "KEEP ${argentumOpeningHand.size}", primaryEnabled = !argentumAwaitingUpdate && argentumOpeningHand.isNotEmpty(),
         onPrimary = { if (argentumSocket.keepHand()) { argentumMulliganPrompt = false; argentumAwaitingUpdate = true; tutorialKeepPending = tutorialPracticeActive; recordDiagnostic("Kept opening hand", DiagnosticCategory.ACTION) } },
         secondaryLabel = "MULLIGAN", secondaryEnabled = !argentumAwaitingUpdate,
         onSecondary = { if (argentumSocket.mulligan()) { argentumAwaitingUpdate = true; tutorialMulliganPending = tutorialPracticeActive; recordDiagnostic("Took a mulligan", DiagnosticCategory.ACTION) } },
@@ -496,7 +496,7 @@ internal fun TableController.TableOverlays() {
 
     argentumBottomCardIds?.let { ids ->
         val idFor = { serverId: String -> (serverId.hashCode() and 0x7fffffff).coerceAtLeast(1) }
-        val hand = players.getOrNull(localSeat)?.hand.orEmpty()
+        val hand = argentumOpeningHand
         ArgentumOpeningHandScreen(
             cards = ids.mapNotNull { id -> hand.firstOrNull { it.id == idFor(id) } },
             title = "Put ${argentumBottomCardCount} on the bottom",
