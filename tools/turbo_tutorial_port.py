@@ -77,7 +77,7 @@ def main() -> None:
         for file in sorted(expected):
             p = Path(file)
             source = p.read_text()
-            matches = list(re.finditer(r'^<<<<<<< ours\\n(.*?)^=======\\n(.*?)^>>>>>>> theirs\\n',
+            matches = list(re.finditer(r'^<<<<<<< ours\n(.*?)^=======\n(.*?)^>>>>>>> theirs\n',
                                        source, re.MULTILINE | re.DOTALL))
             if len(matches) != 1:
                 raise ValueError(f"Unreviewed tutorial overlap count: {file} {len(matches)}")
@@ -130,7 +130,7 @@ def main() -> None:
             raise ValueError(f"Missing tutorial regression source: {file}")
     run("git", "commit", "--no-gpg-sign", "-m", "Runner only: Claude PR300 full 20-chapter tutor and actual UI audit")
     with Path("combined-evidence/next-apk-source-pins.txt").open("a") as f:
-        f.write(f"claude-tutorial-all-20-chapters {SHA}\\n")
+        f.write(f"claude-tutorial-all-20-chapters {SHA}\n")
     print("PASS: full 23-file Claude tutorial source and tests integrated; NO APK built")
 
 if __name__ == "__main__":
