@@ -136,8 +136,9 @@ jobs:
         working-directory: android
         run: |
           set -euo pipefail
+          # --tests applies only to the Test task. Never pass it to bundleRelease.
           ./gradlew --no-daemon --max-workers=2 \
-            :app:testDebugUnitTest :app:lintRelease :app:bundleRelease \
+            :app:testDebugUnitTest \
             --tests 'com.arcanatable.ArgentumPassingTest' \
             --tests 'com.arcanatable.ReadableNotificationDurationTest' \
             --tests 'com.arcanatable.MultiplayerConnectionGuardTest' \
@@ -145,7 +146,9 @@ jobs:
             --tests 'com.arcanatable.MultiplayerLobbyVisibilityTest' \
             --tests 'com.arcanatable.TutorialRunTest' \
             --tests 'com.arcanatable.TutorialCoachPlacementTest' \
-            2>&1 | tee ../ci-out/b139-gradle-test-lint-bundle.log | tail -180
+            2>&1 | tee ../ci-out/b139-android-focused-tests.log | tail -150
+          ./gradlew --no-daemon --max-workers=2 :app:lintRelease :app:bundleRelease \
+            2>&1 | tee ../ci-out/b139-release-lint-bundle.log | tail -150
       - name: Validate complete focused test execution, AAB archive and source parity
         shell: bash
         run: |
