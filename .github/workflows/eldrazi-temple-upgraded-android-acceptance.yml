@@ -335,7 +335,10 @@ jobs:
           python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --self-test
           compat=engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py
           assets=android/app/src/main/assets/argentum
-          python3 "$compat" --apply "$assets/all-cards.jsonl" --expected-mana 1 --minimum-counters 1
+          # Original all-cards JSONL contains three chosen-type mana effects and
+          # six counter doublers: 4 bare sealed-class strings + 5 tagged objects
+          # across the two ABI families.  Require all nine, not just object tags.
+          python3 "$compat" --apply "$assets/all-cards.jsonl" --expected-mana 3 --minimum-counters 6
           # Exported custom-cards.jsonl is also consumed by OfflineCardLibrary.
           # The pinned SDK's AddAnyColorManaSpendOnChosenType DSL factory emits
           # *new* AddManaOfChoice wire format, so its generated legacy-mana count
@@ -349,8 +352,8 @@ jobs:
           fi
           for asset in all-cards.jsonl custom-cards.jsonl; do
             git diff --check -- "$assets/$asset"
-            if grep -Eq '"type"[[:space:]]*:[[:space:]]*"(DoubleCounterPlacement|AddAnyColorManaSpendOnChosenType)"' "$assets/$asset"; then
-              echo "Legacy wire type remains in $asset" >&2
+            if grep -Eq 'DoubleCounterPlacement|AddAnyColorManaSpendOnChosenType' "$assets/$asset"; then
+              echo "Unmigrated legacy wire tag remains in $asset" >&2
               exit 1
             fi
           done
