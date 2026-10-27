@@ -172,6 +172,16 @@ jobs:
           assert len(temple) == 1
           abilities = temple[0]["script"]["activatedAbilities"]
           assert len(abilities) == 2, "Both mana abilities must survive Android JSONL serialization"
+          assert all(a.get("cost") == "CostTap" and a.get("timing") == "ManaAbility"
+                     and a.get("isManaAbility") is True for a in abilities), "Both modes must tap as mana abilities"
+          first, second = (a["effect"] for a in abilities)
+          assert first == {"type":"AddColorlessMana","amount":{"type":"Fixed","amount":1}}, (
+              "First Temple mode must remain unrestricted {C}", first)
+          assert second == {
+              "type":"AddColorlessMana",
+              "amount":{"type":"Fixed","amount":2},
+              "restriction":{"type":"ColorlessSubtypeSpellsOrAbilitiesOnly","subtype":"Eldrazi"},
+          }, ("Second Temple mode lost its exact source/spell restriction", second)
           def before(path):
               return subprocess.check_output(["git","show",f"HEAD:android/app/src/main/assets/argentum/{path}"],text=True)
           def names(text):
