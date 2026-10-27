@@ -1034,7 +1034,7 @@
             "event": "AttackersDeclared"
           },
           "title": "Declare attackers",
-          "body": "Tap Pass to go to attackers. On the attack board, tap Grizzly Bears, then confirm. Attacking taps the creature.",
+          "body": "Tap Pass to go to attackers. Your creatures appear as stacks in the middle of the attack board: tap Grizzly Bears, then confirm. Identical creatures share one stack, and − and + choose how many of them attack. Attacking taps the creature.",
           "hint": "Choose Grizzly Bears, then confirm"
         },
         {
@@ -1045,7 +1045,7 @@
             "kind": "next"
           },
           "title": "Blocking",
-          "body": "Your opponent has no creatures, so nothing can block this time. In other games, the defending player may block with untapped creatures.",
+          "body": "Your opponent has no creatures, so nothing can block this time. In other games, the defending player taps an attacker, then picks how many of their own creatures block it.",
           "hint": "Next"
         },
         {

@@ -255,6 +255,8 @@ data class ArgentumBlockPlan(
     val attackers: List<String>,
     val maxBlocks: Map<String, Int>,
     val mandatory: Map<String, List<String>>,
+    /** Attacker → the player, planeswalker or battle it attacks, when the masked state says. */
+    val attackTargets: Map<String, String> = emptyMap(),
 ) {
     fun buildAction(selection: Map<String, List<String>>): JSONObject {
         val action = JSONObject(legalAction.optJSONObject("action")?.toString() ?: "{}")
@@ -278,6 +280,7 @@ data class ArgentumBlockPlan(
                 attackers = attackers,
                 maxBlocks = info.optJSONObject("blockerMaxBlockCounts").intMap(),
                 mandatory = info.optJSONObject("mandatoryBlockerAssignments").stringListMap(),
+                attackTargets = attackTargetsFrom(state, attackers),
             )
         }
     }
