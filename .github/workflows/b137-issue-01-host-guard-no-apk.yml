@@ -1,0 +1,61 @@
+name: B137 issue 01 host guard - focused Android test (NO APK)
+# Isolated acceptance for #303; full Development CI remains a separate mandatory gate.
+on:
+  push:
+    branches: [gpt/b137-issue-01-background-host]
+    paths:
+      - '.github/workflows/b137-issue-01-host-guard-no-apk.yml'
+      - 'android/app/src/main/java/com/arcanatable/TableController.kt'
+      - 'android/app/src/main/java/com/arcanatable/TableEffects.kt'
+      - 'android/app/src/test/java/com/arcanatable/MultiplayerConnectionGuardTest.kt'
+  pull_request:
+    paths:
+      - '.github/workflows/b137-issue-01-host-guard-no-apk.yml'
+      - 'android/app/src/main/java/com/arcanatable/TableController.kt'
+      - 'android/app/src/main/java/com/arcanatable/TableEffects.kt'
+      - 'android/app/src/test/java/com/arcanatable/MultiplayerConnectionGuardTest.kt'
+permissions:
+  contents: read
+concurrency:
+  group: b137-host-guard-focused-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  host-guard-no-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export custom-card assets (do not run unrelated card scenario tests)
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+      - name: Execute only the five issue-01 foreground-guard tests
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.MultiplayerConnectionGuardTest'
+      - name: Fail closed on missing or incomplete JUnit XML
+        run: |
+          python3 - <<'PY'
+          import pathlib
+          import xml.etree.ElementTree as ET
+          files = list(pathlib.Path('android/app/build/test-results/testDebugUnitTest').rglob('TEST-*MultiplayerConnectionGuardTest.xml'))
+          assert len(files) == 1, f'expected exactly one host guard XML, got {files}'
+          root = ET.parse(files[0]).getroot()
+          counts = {k: int(root.attrib.get(k, '0')) for k in ('tests', 'failures', 'errors', 'skipped')}
+          print('B137 issue #1 host guard:', counts)
+          assert counts == {'tests': 5, 'failures': 0, 'errors': 0, 'skipped': 0}, counts
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b137-issue-01-host-guard-junit
+          retention-days: 14
+          path: android/app/build/test-results/testDebugUnitTest/
