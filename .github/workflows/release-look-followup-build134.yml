@@ -788,6 +788,19 @@ jobs:
           test -f android/app/src/main/java/com/arcanatable/DeckBuilderFilters.kt
           git diff --check
           echo 'All requested B136 app features source-integrated; run engine/Android gates next' > combined-evidence/b136-integration-summary.txt
+      - name: Include SHA-pinned Claude PR300 tutorial after B136 lobby/blocker assembly
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Stage only. This workflow's push trigger is on the B136 package branch,
+          # NOT on this isolated PR297 staging branch. Do not dispatch APK here.
+          bash tools/next_apk_claude_tutorial_join.sh
+          test -s android/app/src/test/java/com/arcanatable/ui/TutorialAuditUiTest.kt
+          test -s android/app/src/test/java/com/arcanatable/TutorialRunTest.kt
+          test -s android/app/src/test/java/com/arcanatable/MultiplayerLobbyVisibilityTest.kt
+          test -s android/app/src/test/java/com/arcanatable/ArgentumBlockSubmissionGuardTest.kt
+          printf 'claude-tutorial-pr300 %s\n' dfccf7ff456e953f099930c426b8dee5554314ba >> combined-evidence/next-apk-source-pins.txt
+          echo 'PASS: full reviewed PR300 tutorial staged before Android and engine tests (runner only)'
       - uses: actions/setup-node@v4
         if: ${{ github.event_name == 'push' || inputs.include_online_multiplayer }}
         with:
