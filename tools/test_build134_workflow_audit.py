@@ -219,6 +219,27 @@ class WorkflowAuditTest(unittest.TestCase):
         self.assertTrue(any('duplicate or missing root workflow triggers' in x
                             for x in audit(a, widened)))
 
+    def test_identical_unreviewed_reusable_job_rejected(self):
+        a, b = fixture()
+        extra = ('  unauthorized:\n'
+                 '    uses: ./.github/workflows/unreviewed.yml\n'
+                 '    permissions: write-all\n')
+        problems = audit(a + extra, b + extra)
+        self.assertTrue(any('unexpected job set' in x for x in problems), problems)
+
+    def test_identical_renamed_compatibility_job_rejected(self):
+        a, b = fixture()
+        a = a.replace('  compatibility:\n', '  other:\n')
+        b = b.replace('  compatibility:\n', '  other:\n')
+        problems = audit(a, b)
+        self.assertTrue(any('unexpected job set' in x for x in problems), problems)
+
+    def test_duplicate_root_jobs_key_rejected(self):
+        a, b = fixture()
+        b += 'jobs:\n  other:\n    uses: ./.github/workflows/unreviewed.yml\n'
+        problems = audit(a, b)
+        self.assertTrue(any('duplicate or missing root jobs' in x for x in problems), problems)
+
     def test_git_blob_hash(self):
         self.assertEqual(git_blob_sha(b'hello\n'), 'ce013625030ba8dba906f756967f9e9ca394464a')
 
