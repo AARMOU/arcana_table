@@ -20,6 +20,7 @@ INDEXES = [
 ]
 OUTPUT = ROOT / "investigation/argentum-six-precons/eldrazi-cardkit-report"
 CUSTOM_JSONL = ROOT / "android/app/src/main/assets/argentum/custom-cards.jsonl"
+ALL_JSONL = ROOT / "android/app/src/main/assets/argentum/all-cards.jsonl"
 
 # SHA-256 of sorted "original card name\tquantity\n" records from the
 # immutable original Wizards deck manifests. Only names and counts are pinned:
@@ -91,8 +92,8 @@ def read_index_entries(path: Path) -> dict[str, str]:
 def verify_custom_export(entries: dict[str, str], jsonl_path: Path) -> int:
     """Reject ghost index entries and unindexed exports before counting coverage.
 
-    The two source indexes may legitimately overlap; within the custom export,
-    however, every indexed name must have exactly one serialized definition.
+    The all-cards and custom indexes may overlap, but within each library every
+    indexed name must have exactly one corresponding serialized definition.
     """
     exported: set[str] = set()
     for line_number, line in enumerate(jsonl_path.read_text().splitlines(), 1):
@@ -152,6 +153,7 @@ TRIAGE = {
 def main() -> None:
     manifest = json.loads(MANIFEST.read_text())
     index_sources = [read_index_entries(path) for path in INDEXES]
+    all_export_count = verify_custom_export(index_sources[0], ALL_JSONL)
     custom_export_count = verify_custom_export(index_sources[1], CUSTOM_JSONL)
     # Basic lands count as real original cards; token definitions never do.
     index = {
@@ -195,12 +197,14 @@ def main() -> None:
     ).strip()
     input_hashes = {
         str(path.relative_to(ROOT)): hashlib.sha256(path.read_bytes()).hexdigest()
-        for path in [MANIFEST, *INDEXES, CUSTOM_JSONL]
+        for path in [MANIFEST, *INDEXES, ALL_JSONL, CUSTOM_JSONL]
     }
     result = {
         "integrationCommit": integration_commit,
         "originalDeckSha256": original_identity,
         "originalDeckIdentityVerified": True,
+        "allExportIndexParityVerified": True,
+        "allExportCount": all_export_count,
         "customExportIndexParityVerified": True,
         "customExportCount": custom_export_count,
         "inputSha256": input_hashes,
@@ -222,7 +226,7 @@ def main() -> None:
         f"Eldrazi Unbound **{indexed_unbound}/100 indexed**.",
         "",
         "Original deck identities SHA-256 pinned and verified; no card substitutions or quantity drift.",
-        f"Custom card index/JSONL parity verified ({custom_export_count} unique definitions); tokens excluded from card coverage.",
+        f"Both shipped index/JSONL pairs verified (all-cards {all_export_count}; custom {custom_export_count} unique definitions); tokens excluded from card coverage.",
         "",
         "Cardkit SUPPORTED is only a similarity heuristic. None of these missing cards "
         "is complete until rules tests, deterministic export, integration and device QA.",
