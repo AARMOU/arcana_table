@@ -1,0 +1,48 @@
+name: Next APK bundle pinned-source integration — NO APK
+# Isolated staging branch only. Never assemble/sign APK/AAB or deploy a Worker.
+on:
+  push:
+    branches:
+      - gpt/b136-host-lobby-fix-integration-20261026
+    paths:
+      - .github/workflows/next-apk-bundle-source-only.yml
+permissions:
+  contents: read
+concurrency:
+  group: arcana-next-apk-source-only-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  verify-combined-source:
+    name: Assemble exact full B136 + lobby + combat pins (no Gradle)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fetch reviewed exact-source assembler, no remote writes
+        shell: bash
+        run: |
+          set -euo pipefail
+          PIN=8e481cdb77d50c5753933262d9198a79afe56c95
+          test ! -f tools/fast_apk_snapshot.py
+          git fetch --no-tags origin "$PIN"
+          test "$(git rev-parse FETCH_HEAD)" = "$PIN"
+          git show "$PIN:tools/fast_apk_snapshot.py" > tools/fast_apk_snapshot.py
+          grep -F 'def b136_source_pins()' tools/fast_apk_snapshot.py
+          grep -F 'subprocess.run([sys.executable,"tools/lobby_tutorial_join_smoke.py"]' tools/fast_apk_snapshot.py
+      - name: Assemble reviewed source exactly as future APK runner will (NO APK)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/fast_apk_snapshot.py source
+          test -s combined-evidence/b136-integration-summary.txt
+          test -s combined-evidence/next-apk-source-pins.txt
+          grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+          grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' android/app/src/main/java/com/arcanatable/TableArgentum.kt
+          test -s android/app/src/main/java/com/arcanatable/ArgentumBlockSubmissionGuard.kt
+          test -s android/app/src/test/java/com/arcanatable/ArgentumBlockSubmissionGuardTest.kt
+          test -s android/app/src/test/java/com/arcanatable/MultiplayerLobbyVisibilityTest.kt
+          git diff --check -- android/app android/custom-cards
+          echo 'PASS: reviewed source joins without app builds, APKs, signing or Worker deployment'
