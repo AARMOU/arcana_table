@@ -440,6 +440,8 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 // Close the retained block board only when combat has truly moved on.
                 // A rejected INVALID_ACTION during DECLARE_BLOCKERS must not wipe selections.
                 argentumBlockGuard.onStep(snapshot.stepKey)
+                // "Same as last turn" only keeps an attack Argentum accepted: your creatures are now attacking.
+                currentYou?.let { you -> if (you.battlefield.any { it.combatRole == "ATTACKING" }) CombatMemory.commit(you.id) }
                 if (argentumBlockPlan != null &&
                     (!snapshot.stepKey.equals("DECLARE_BLOCKERS", ignoreCase = true) ||
                         argentumBlockGuard.submitted)) {

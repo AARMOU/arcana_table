@@ -359,7 +359,7 @@ fun ArgentumAttackBoard(
         tray = {
             val attacking = selection.size
             val power = damage.values.sum()
-            Text(if (attacking == 0) "No attackers yet" else "$attacking attacking · $power damage if unblocked",
+            Text(if (attacking == 0) "No attackers yet" else "$attacking attacking · about $power damage if unblocked",
                 color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold, modifier = Modifier.testTag("combat-summary").tutorialTarget("combat-summary"))
             selection.entries.groupBy { (attacker, target) -> Triple(piece(attacker).name, combatStats(piece(attacker).card), target) }.forEach { (key, list) ->
                 val (name, stats, target) = key
@@ -485,7 +485,7 @@ private fun commanderDamageLines(player: TablePlayer, adding: Map<String, Int>):
         val plus = adding[name] ?: 0
         if (now + plus <= 0) return@mapNotNull null
         val total = now + plus
-        ("CMD ${name.substringBefore(',')} $total/21" + if (plus > 0) " (+$plus)" else "") to (total >= 21)
+        ("CMD ${name.substringBefore(',')} $total/21" + if (plus > 0) " (+$plus est.)" else "") to (total >= 21)
     }
 
 /**
@@ -529,7 +529,7 @@ fun ArgentumBlockBoard(
         tray = {
             val life = defender?.life
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("combat-summary").tutorialTarget("combat-summary")) {
-                Text("You take ", color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text("Estimated: you take ", color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 Text("$damage", color = if (life != null && damage >= life) Danger else CounterGold, fontSize = 16.sp, fontWeight = FontWeight.Black)
                 Text(" damage" + (life?.let { " · ${it - damage} life left" } ?: ""), color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
@@ -574,7 +574,7 @@ fun ArgentumBlockBoard(
                 )
             }
         }
-        SectionLabel("YOUR CREATURES", Mint)
+        SectionLabel("YOUR BLOCKERS", Mint)
         if (blockerStacks.isEmpty()) Text("None of your creatures can block.", color = Muted, fontSize = 12.sp)
         CenteredGrid("combat-bottom") {
             blockerStacks.forEach { stack ->

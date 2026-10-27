@@ -101,13 +101,20 @@ internal fun stepStack(
  */
 internal object CombatMemory {
     private val lastAttack = mutableMapOf<String, Map<String, Map<String, Int>>>()
+    private val sent = mutableMapOf<String, Map<String, Map<String, Int>>>()
 
+    /** Holds an attack just sent; it becomes "last turn" only once [commit] sees it accepted. */
     fun remember(playerId: String, stacks: List<CombatStack>, selection: Map<String, String>, piece: (String) -> CombatPiece) {
-        lastAttack[playerId] = stacks.associate { stackKey(piece(it.rep)) to stackAllocation(selection, it.ids) }
-            .filterValues { it.isNotEmpty() }
+        val attack = stacks.associate { stackKey(piece(it.rep)) to stackAllocation(selection, it.ids) }.filterValues { it.isNotEmpty() }
+        if (attack.isEmpty()) sent.remove(playerId) else sent[playerId] = attack
     }
 
-    fun forget() = lastAttack.clear()
+    /** Argentum accepted the attack (the player's creatures are attacking): keep it for next turn. */
+    fun commit(playerId: String) {
+        sent.remove(playerId)?.let { lastAttack[playerId] = it }
+    }
+
+    fun forget() { lastAttack.clear(); sent.clear() }
 
     /** Last turn's attack applied to these stacks, or null when nothing from it fits. */
     fun replay(

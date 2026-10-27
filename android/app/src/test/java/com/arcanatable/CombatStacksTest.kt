@@ -63,6 +63,8 @@ class CombatStacksTest {
         val plan1 = attackPlan(listOf("g1", "g2", "g3"), listOf("ai"))
         val stacks1 = stacksOf(listOf("g1", "g2", "g3"), first.piece)
         CombatMemory.remember("me", stacks1, mapOf("g1" to "ai", "g2" to "ai"), first.piece)
+        assertNull("an attack Argentum has not accepted is not last turn's", CombatMemory.replay("me", stacks1, emptyMap(), plan1.options.associateBy { it.attackerId }, first.piece))
+        CombatMemory.commit("me")
 
         val next = Board("n1" to card(9, "Goblin Token"), "n2" to card(10, "Goblin Token"), "n3" to card(11, "Goblin Token"), "n4" to card(12, "Goblin Token"))
         val plan2 = attackPlan(listOf("n1", "n2", "n3", "n4"), listOf("ai"))
