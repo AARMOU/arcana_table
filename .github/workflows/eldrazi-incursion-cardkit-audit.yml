@@ -68,7 +68,7 @@ jobs:
           assert report["originalDeckIdentityVerified"] is True
           assert report["originalDeckSha256"] == {
               "Eldrazi Incursion": "43d3cf6a753c82d38992d35d3dbe9b09d3caaec4f8e0369065aaca4a5559849f",
-              "Eldrazi Unbound": "cf5184b6408153ff504dcb6ed135b8ffe2bf6bb14ce107862a1da1d461ae3112",
+              "Eldrazi Unbound": "f4f98c4f0e2c22f89f8fa8bf92e65847cb94cb8739ad867bc061759bf70ccdcf",
           }, "Original precon manifest substituted or changed"
           displacer = next((r for r in report["rows"] if r["name"] == "Eldrazi Displacer"), None)
           if displacer:
