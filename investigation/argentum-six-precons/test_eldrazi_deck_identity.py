@@ -43,9 +43,21 @@ class OriginalDeckIdentityTest(unittest.TestCase):
             audit.original_deck_digest(altered),
         )
 
-    def test_duplicate_name_is_rejected_not_collapsed(self):
-        with self.assertRaisesRegex(ValueError, "Duplicate"):
-            audit.original_deck_digest(self.cards + [dict(self.cards[0])])
+    def test_split_wastes_rows_preserve_exact_card_quantities(self):
+        split = [dict(c) for c in self.cards]
+        split[1]["quantity"] = 8
+        split.append({"name": "Wastes", "quantity": 4})
+        self.assertEqual(
+            audit.original_deck_digest(self.cards),
+            audit.original_deck_digest(split),
+        )
+
+    def test_extra_duplicate_copy_changes_identity(self):
+        with_extra = self.cards + [{"name": "Wastes", "quantity": 1}]
+        self.assertNotEqual(
+            audit.original_deck_digest(self.cards),
+            audit.original_deck_digest(with_extra),
+        )
 
     def test_zero_or_non_integer_quantity_is_rejected(self):
         for bad in (0, -1, 1.0, True):
