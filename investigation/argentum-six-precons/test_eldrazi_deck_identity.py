@@ -83,6 +83,30 @@ class OriginalDeckIdentityTest(unittest.TestCase):
             audit.verify_original_decks(changed, expected)
 
 
+    def test_distinct_original_manifest_decks_are_retained(self):
+        incursion = {"name": "Eldrazi Incursion", "cards": self.cards}
+        unbound = {"name": "Eldrazi Unbound", "cards": [{"name": "Wastes", "quantity": 15}]}
+        decks = audit.unique_manifest_decks({"decks": [incursion, unbound]})
+        self.assertEqual(set(decks), {"Eldrazi Incursion", "Eldrazi Unbound"})
+        self.assertIs(decks["Eldrazi Incursion"], incursion)
+
+    def test_duplicate_original_deck_entry_is_rejected_even_if_last_copy_is_valid(self):
+        original = {"name": "Eldrazi Incursion", "cards": self.cards}
+        replaced = {"name": "Eldrazi Incursion", "cards": self.cards[:-1]}
+        for entries in ([replaced, original], [original, replaced], [original, original]):
+            with self.subTest(entries=entries):
+                with self.assertRaisesRegex(ValueError, "Duplicate deck name"):
+                    audit.unique_manifest_decks({"decks": entries})
+
+    def test_malformed_manifest_deck_entries_are_rejected(self):
+        for manifest in ({}, {"decks": None}, {"decks": [None]},
+                         {"decks": [{"name": "", "cards": []}]},
+                         {"decks": [{"name": "Eldrazi Incursion", "cards": None}]}):
+            with self.subTest(manifest=manifest):
+                with self.assertRaisesRegex(ValueError, "Invalid"):
+                    audit.unique_manifest_decks(manifest)
+
+
 class ShippedCustomExportIntegrityTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
