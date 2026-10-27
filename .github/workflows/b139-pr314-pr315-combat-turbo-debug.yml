@@ -161,7 +161,7 @@ jobs:
             --tests 'com.arcanatable.TutorialCoachPlacementTest' \
             --tests 'com.arcanatable.CombatStacksTest' \
             --tests 'com.arcanatable.ui.DesignPreviewTest' \
-            --tests 'com.arcanatable.TutorialAuditUiTest' \
+            --tests 'com.arcanatable.ui.TutorialAuditUiTest' \
             2>&1 | tee ../ci-out/turbo-compile-and-tests.log | tail -180
       - name: Prove PR314 cascade, PR316 life safety and multifaced auto-pass regressions
         working-directory: android
