@@ -140,6 +140,8 @@ class TutorialAuditUiTest {
                     if (!screenOk) add("SCREEN(want=$wantScreen got=$screen)")
                     if (!targetOk) add("NO-TARGET(${step.target})")
                     if (coachCoversTarget) add("COACH-COVERS-TARGET(${step.target})")
+                    if (step.target == "legal-action-sheet" && bounds != null && bounds.height > top.height * 0.35f)
+                        add("TARGET-COVERS-WHOLE-SHEET")
                     if (!moved && step.actionKind != "event") add("STUCK")
                 }
                 val line = "$chapter #${index + 1} ${step.id} [${step.actionKind}] screen=$screen target=${step.target} -> $how ${if (flags.isEmpty()) "OK" else flags.joinToString(" ")}"
