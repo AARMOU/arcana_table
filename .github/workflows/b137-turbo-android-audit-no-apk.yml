@@ -1,11 +1,12 @@
-name: B137 Turbo complete Android regression audit - NO APK
+name: B137 restored Black Market Connections + 16 Android suites - NO APK
 # Owner-authorized isolated source validation; no APK/signing/Cloudflare/release.
 on:
   push:
     branches:
-      - gpt/b137-turbo-android-validation-20261026
+      - gpt/b137-blackmarket-card-recovery-20261026
     paths:
       - .github/workflows/b137-turbo-android-audit-no-apk.yml
+      - tools/b137_black_market_card_port.py
   workflow_dispatch:
 permissions:
   contents: read
@@ -32,6 +33,14 @@ jobs:
           grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
           grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' android/app/src/main/java/com/arcanatable/TableArgentum.kt
           git diff --check
+      - name: Restore missing Black Market Connections from reviewed card source on runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/b137_black_market_card_port.py
+          git diff --check
+          test -s android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BlackMarketConnections.kt
+          test -s android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BlackMarketConnectionsScenarioTest.kt
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -44,6 +53,22 @@ jobs:
       - name: Export current custom-card indexes, no APK
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+      - name: Run restored card's real rules scenario before full Android matrix (NO APK)
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -F 'Black Market Connections' app/src/main/assets/argentum/custom-cards.index.tsv
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.BlackMarketConnectionsScenarioTest'
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+          path = Path("custom-cards/build/test-results/test/TEST-com.arcanatable.customcards.BlackMarketConnectionsScenarioTest.xml")
+          assert path.is_file(), 'Missing card-scenario XML'
+          tests = ET.parse(path).getroot().attrib
+          assert int(tests.get('tests', 0)) > 0 and all(int(tests.get(k, 0)) == 0 for k in ('failures','errors','skipped')), tests
+          print('PASS: Black Market Connections real-engine scenario',tests)
+          PY
       - name: Fail fast on assembled keyword-probe test/asset skew (after export, before Android tests)
         shell: bash
         run: |
