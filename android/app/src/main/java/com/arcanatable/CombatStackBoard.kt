@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -86,8 +87,11 @@ private fun combatSizing(small: Boolean = false): CombatSizing {
 @Composable
 private fun CombatScreen(
     title: String, subtitle: String, dismissable: Boolean, onDismiss: () -> Unit,
-    tray: @Composable ColumnScope.() -> Unit, content: @Composable ColumnScope.() -> Unit,
+    tray: @Composable ColumnScope.() -> Unit, top: @Composable ColumnScope.() -> Unit, bottom: @Composable ColumnScope.() -> Unit,
 ) {
+    val config = LocalConfiguration.current
+    // Short landscape screens put the two sides next to each other so neither is scrolled away.
+    val sideBySide = config.screenHeightDp < 520 && config.screenWidthDp > config.screenHeightDp
     Dialog(
         onDismissRequest = { if (dismissable) onDismiss() },
         properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = dismissable, dismissOnClickOutside = false),
@@ -99,24 +103,34 @@ private fun CombatScreen(
                         Text(title, color = SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 0.4.sp)
                         Text(subtitle, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp))
                     }
-                    BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                        val viewport = maxHeight
-                        Column(
-                            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = viewport).padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            content = content,
-                        )
-                    }
+                    if (sideBySide) Row(Modifier.weight(1f).fillMaxWidth()) {
+                        CenteredScroll(Modifier.weight(1f), top)
+                        CenteredScroll(Modifier.weight(1f), bottom)
+                    } else CenteredScroll(Modifier.weight(1f).fillMaxWidth()) { top(); bottom() }
                     Column(
-                        Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp).clip(RoundedCornerShape(14.dp))
-                            .background(Panel).border(1.dp, PanelLight, RoundedCornerShape(14.dp)).padding(10.dp),
+                        Modifier.fillMaxWidth().heightIn(max = (config.screenHeightDp * if (sideBySide) 0.34f else 0.4f).dp)
+                            .padding(start = 10.dp, end = 10.dp, bottom = 10.dp).clip(RoundedCornerShape(14.dp))
+                            .background(Panel).border(1.dp, PanelLight, RoundedCornerShape(14.dp)).verticalScroll(rememberScrollState()).padding(10.dp),
                         content = tray,
                     )
                 }
                 TutorialLayer(Modifier.matchParentSize())
             }
         }
+    }
+}
+
+/** A column that centers its content vertically and scrolls when it doesn't fit. */
+@Composable
+private fun CenteredScroll(modifier: Modifier, content: @Composable ColumnScope.() -> Unit) {
+    BoxWithConstraints(modifier.fillMaxHeight()) {
+        val viewport = maxHeight
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = viewport).padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            content = content,
+        )
     }
 }
 
@@ -256,9 +270,10 @@ private fun StackPickerDialog(
             SectionLabel(listOf(piece.name.uppercase(), combatStats(piece.card), "$stackSize READY").filter(String::isNotBlank).joinToString(" · "))
             Text(question, color = SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center)
             // The fan: first [total] cards lift and get a ring.
-            val shown = minOf(stackSize, 10)
+            val shortScreen = LocalConfiguration.current.screenHeightDp < 520
+            val shown = if (shortScreen) 0 else minOf(stackSize, 10)
             val cardW = 58.dp
-            Box(Modifier.width(cardW + (24 * (shown - 1)).dp).height(cardW / 0.72f + 14.dp)) {
+            if (shown > 0) Box(Modifier.width(cardW + (24 * (shown - 1)).dp).height(cardW / 0.72f + 14.dp)) {
                 repeat(shown) { i ->
                     val lifted = i < total
                     Box(Modifier.offset(x = (24 * i).dp, y = if (lifted) 0.dp else 14.dp).width(cardW).alpha(if (lifted) 1f else 0.7f)
@@ -381,7 +396,7 @@ fun ArgentumAttackBoard(
                 }
             }
         },
-    ) {
+        top = {
         // What you can attack: players with life and commander damage, planeswalkers, battles.
         SectionLabel(if (targets.size > 1) "ATTACKING · TAP TO CHOOSE" else "ATTACKING", CounterGold)
         FlowRow(Modifier.fillMaxWidth().tutorialTarget("combat-top"), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -414,6 +429,8 @@ fun ArgentumAttackBoard(
             }
             if (showBlockers) OpponentBlockersStrip(opponentBlockers)
         }
+        },
+    ) {
         SectionLabel("YOUR CREATURES", Mint)
         if (stacks.isEmpty()) Text("No creatures can attack right now.", color = Muted, fontSize = 12.sp)
         CenteredGrid("combat-bottom") {
@@ -552,7 +569,7 @@ fun ArgentumBlockBoard(
                 }
             }
         },
-    ) {
+        top = {
         SectionLabel("ATTACKING · TAP ONE TO BLOCK IT", CounterGold)
         CenteredGrid("combat-top") {
             attackerStacks.forEach { stack ->
@@ -574,6 +591,8 @@ fun ArgentumBlockBoard(
                 )
             }
         }
+        },
+    ) {
         SectionLabel("YOUR BLOCKERS", Mint)
         if (blockerStacks.isEmpty()) Text("None of your creatures can block.", color = Muted, fontSize = 12.sp)
         CenteredGrid("combat-bottom") {
