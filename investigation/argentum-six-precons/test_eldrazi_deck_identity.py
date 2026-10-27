@@ -191,6 +191,32 @@ class ShippedCustomExportIntegrityTest(unittest.TestCase):
 
 
 
+
+class CrossLibraryKindIntegrityTest(unittest.TestCase):
+    def test_matching_shared_card_and_token_kinds_are_accepted(self):
+        upstream = {"Eldrazi Temple": "card", "Wastes": "basic", "Spawn": "token"}
+        custom = {"Eldrazi Temple": "card", "Spawn": "token", "Other": "card"}
+        self.assertEqual(
+            audit.verify_shared_index_kinds([upstream, custom]),
+            {"Eldrazi Temple": "card", "Spawn": "token"},
+        )
+
+    def test_token_card_conflict_fails_in_either_direction(self):
+        for left, right in (("token", "card"), ("card", "token"),
+                            ("basic", "card"), ("card", "basic")):
+            with self.subTest(left=left, right=right):
+                with self.assertRaisesRegex(ValueError, "Conflicting shipped index kinds"):
+                    audit.verify_shared_index_kinds([{"Eldrazi Temple": left},
+                                                     {"Eldrazi Temple": right}])
+
+    def test_missing_or_extra_index_source_fails_closed(self):
+        for sources in ([], [{}], [{}, {}, {}]):
+            with self.subTest(sources=sources):
+                with self.assertRaisesRegex(ValueError, "exactly two"):
+                    audit.verify_shared_index_kinds(sources)
+
+
+
 class CardkitClassificationIntegrityTest(unittest.TestCase):
     def setUp(self):
         self.names = ["Eldrazi Temple", "Ugin, the Ineffable"]
