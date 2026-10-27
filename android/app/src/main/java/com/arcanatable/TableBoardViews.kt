@@ -767,7 +767,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
     argentumMode: Boolean = false, argentumPrimaryLabel: String? = null, legalActionCount: Int = 0, onUndo: (() -> Unit)? = null,
     arrangement: HandArrangement = HandArrangement.AUTO_FIT, cardScale: Float = 1f, playableIds: Set<Int> = emptySet(),
     canRespond: Boolean = false, commanderAffordable: Boolean = false,
-    autoPassing: Boolean = false, onAutoPass: () -> Unit = {}) {
+    autoPassing: Boolean = false, autoPassAvailable: Boolean = false, onAutoPass: () -> Unit = {}) {
     val handScrollState = rememberScrollState()
     var moreOpen by remember { mutableStateOf(false) }
     val density = LocalDensity.current
