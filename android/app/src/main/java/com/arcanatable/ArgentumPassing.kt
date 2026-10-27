@@ -28,9 +28,9 @@ object ArgentumPassing {
         return stack.firstOrNull { item ->
             (item.targetNames.isNotEmpty() && item.targetIds.isEmpty()) ||
                 item.targetIds.any { id ->
-                    id == localPlayerId || targets[id]?.let { target ->
+                    id == localPlayerId || (targets[id]?.let { target ->
                         target.ownerId == localPlayerId || target.controllerId == localPlayerId
-                    } ?: true
+                    } ?: true)
                 }
         }?.name
     }
