@@ -26,26 +26,26 @@ OUTPUT = ROOT / "investigation/argentum-six-precons/eldrazi-cardkit-report"
 # were independently calculated from manifest blob dcc6ce418422d221a87df04e233d4f1df7c9cc05.
 ORIGINAL_DECK_DIGESTS = {
     "Eldrazi Incursion": "43d3cf6a753c82d38992d35d3dbe9b09d3caaec4f8e0369065aaca4a5559849f",
-    "Eldrazi Unbound": "cf5184b6408153ff504dcb6ed135b8ffe2bf6bb14ce107862a1da1d461ae3112",
+    "Eldrazi Unbound": "f4f98c4f0e2c22f89f8fa8bf92e65847cb94cb8739ad867bc061759bf70ccdcf",
 }
 
 
 def original_deck_digest(cards: list[dict]) -> str:
-    """Canonical original-deck identity; reject malformed or duplicate rows."""
-    rows = []
-    seen = set()
+    """Canonical original-deck identity; aggregate legitimate split-printing rows."""
+    # Original Unbound intentionally splits Wastes across two 8+7 rows.
+    # Aggregate duplicate names instead of treating valid print-art splits as
+    # substitutions. Added copies still change the normalized deck digest.
+    counts = {}
     for card in cards:
         name, quantity = card["name"], card["quantity"]
         if not isinstance(name, str) or not name or name != name.strip():
             raise ValueError(f"Invalid original card name: {name!r}")
         if type(quantity) is not int or quantity <= 0:
             raise ValueError(f"Invalid original card quantity: {name!r}: {quantity!r}")
-        if name in seen:
-            raise ValueError(f"Duplicate original card name: {name}")
-        seen.add(name)
-        rows.append(f"{name}\t{quantity}")
-    if not rows:
+        counts[name] = counts.get(name, 0) + quantity
+    if not counts:
         raise ValueError("Empty original deck")
+    rows = [f"{name}\t{quantity}" for name, quantity in counts.items()]
     canonical = "\n".join(sorted(rows)) + "\n"
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
