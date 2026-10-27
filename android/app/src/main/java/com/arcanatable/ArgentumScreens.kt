@@ -140,7 +140,7 @@ import org.json.JSONObject
 internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidManaAbilities: Boolean, busy: Boolean, manaChoices: List<JSONObject> = emptyList(), stackCount: (JSONObject) -> Int = { 1 }, onChooseMany: (JSONObject, Int) -> Unit = { _, _ -> }, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit, onSecretNudge: () -> Unit = {}) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
       Box {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 24.dp).tutorialTarget("legal-action-sheet")) {
+        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 24.dp)) {
             if (card != null) Row(verticalAlignment = Alignment.Top) {
                 Box(Modifier.width(118.dp).aspectRatio(0.716f).clip(RoundedCornerShape(8.dp)).background(card.color)) {
                     val url = card.imageUrl
@@ -156,7 +156,7 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
                 }
             }
             Text(if (card == null) "ACTIONS" else if (choices.isEmpty() && manaChoices.isEmpty()) "NOTHING TO DO WITH THIS CARD RIGHT NOW" else if (choices.isEmpty()) "MANA" else "WHAT YOU CAN DO NOW",
-                color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
+                color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp).tutorialTarget("legal-action-sheet"))
             if (choices.isEmpty() && manaChoices.isEmpty()) Text(if (card == null) "Argentum isn't offering you any actions at the moment." else "Argentum offers no action for this card at this moment (wrong timing, no mana, or not your priority).", color = Muted, fontSize = 12.sp)
             if (hidManaAbilities) Text("Mana is paid automatically: your lands and mana sources are tapped for you when you cast or activate.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp, bottom = 4.dp))
             // Things you can do first; ones you can't afford right now go to the bottom.
