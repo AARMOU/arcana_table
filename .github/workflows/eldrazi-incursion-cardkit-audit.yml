@@ -4,6 +4,7 @@ on:
     branches: [gpt/eldrazi-incursion-cardkit-audit-20261024]
     paths:
       - 'investigation/argentum-six-precons/eldrazi-incursion-cardkit-triage.py'
+      - 'investigation/argentum-six-precons/test_eldrazi_deck_identity.py'
       - '.github/workflows/eldrazi-incursion-cardkit-audit.yml'
   workflow_dispatch:
 permissions:
@@ -31,6 +32,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Prove identity gate catches substitutions, quantity drift and duplicates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile audit/investigation/argentum-six-precons/eldrazi-incursion-cardkit-triage.py
+          python3 -m unittest discover -s audit/investigation/argentum-six-precons -p 'test_eldrazi_deck_identity.py' -v
       - name: Run exact-original audit on current integration checkout
         shell: bash
         run: |
@@ -58,6 +65,14 @@ jobs:
           assert report["unboundIndexedSlots"] + report["unboundMissingSlots"] == 100
           assert len(report["rows"]) == report["incursionMissingSlots"]
           assert report["noPaidWorkerAuthorization"] is True
+          assert report["originalDeckIdentityVerified"] is True
+          assert report["originalDeckSha256"] == {
+              "Eldrazi Incursion": "43d3cf6a753c82d38992d35d3dbe9b09d3caaec4f8e0369065aaca4a5559849f",
+              "Eldrazi Unbound": "cf5184b6408153ff504dcb6ed135b8ffe2bf6bb14ce107862a1da1d461ae3112",
+          }, "Original precon manifest substituted or changed"
+          displacer = next((r for r in report["rows"] if r["name"] == "Eldrazi Displacer"), None)
+          if displacer:
+              assert displacer["engineeringLane"].startswith("GPT #154 / existing draft #163"), "Duplicate Displacer worker risk"
           print(f"Verified exact integration {head}: Incursion {report['incursionIndexedSlots']}/100, Unbound {report['unboundIndexedSlots']}/100")
           PY
       - uses: actions/upload-artifact@v4
