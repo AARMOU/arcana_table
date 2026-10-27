@@ -49,6 +49,11 @@ import org.json.JSONObject
  * Base duration remains user-controlled, but never forces long text offscreen after a second.
  * This affects informational notices only; mandatory decisions use their own persistent panels.
  */
+/** Respect the Adjust UI played-card slider exactly. Reading-time extensions apply only to
+ * banners and recaps; they must not override the user's explicit card-popup timeout. */
+internal fun playedCardPopupDurationMs(requestedSeconds: Float): Long =
+    (requestedSeconds.coerceIn(1f, 8f) * 1000).toLong()
+
 internal fun readableNotificationDurationMs(text: String, requestedSeconds: Float): Long {
     val words = text.trim().split(Regex("\\s+")).count { it.isNotBlank() }
     val estimatedSeconds = maxOf(5f, words / 2.3f, text.length / 18f)
@@ -159,7 +164,8 @@ object PlayFeedParser {
 }
 
 /**
- * The opponent's card, big, for about 1.5 s: tap to dismiss, hold to keep reading it. Below it
+ * The opponent's played card stays visible for the exact duration selected in Adjust UI.
+ * Tap to dismiss, hold to keep reading it. Below it
  * (top-left of the table) the last few cards anyone played, and abilities as a small banner.
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -170,7 +176,7 @@ fun BoxScope.PlayFeedOverlay(popup: PlayedCard?, feed: List<PlayedCard>, banner:
     var holding by remember { mutableStateOf(false) }
     LaunchedEffect(popup?.key, holding, popupDurationSeconds) {
         if (popup != null && !holding) {
-            delay(readableNotificationDurationMs("${popup.name}: ${popup.detail}", popupDurationSeconds))
+            delay(playedCardPopupDurationMs(popupDurationSeconds))
             onDismissPopup()
         }
     }
