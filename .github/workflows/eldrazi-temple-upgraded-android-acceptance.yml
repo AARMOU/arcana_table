@@ -210,7 +210,12 @@ jobs:
           git -C argentum-engine diff --check
           # Rebuild only the temporary matching AI JAR, now containing the
           # real filter. Never change committed Android/runtime binaries.
-          (cd argentum-engine && ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :ai:jar)
+          # Gradle 9 buildSrc itself requires a Java 21 *launcher*, even though
+          # the pinned source convention above targets Java 17 classfiles.
+          # setup-java switched JAVA_HOME to 17 for Android; restore 21 only
+          # for this subprocess, then enforce classfile major <=61 below.
+          test -x "${JAVA_HOME_21_X64:?}/bin/java"
+          (export JAVA_HOME="$JAVA_HOME_21_X64"; export PATH="$JAVA_HOME/bin:$PATH"; cd argentum-engine && ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :ai:jar)
           python3 - <<'PY'
           from pathlib import Path
           import shutil, struct, zipfile
