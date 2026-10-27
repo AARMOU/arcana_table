@@ -1,0 +1,233 @@
+name: Arcana B138 all-current-fixes DEBUG test APK
+# Owner-approved B138 test APK, based on successful Claude Build137 + six isolated PRs.
+# Runner-only merges and debug signing; no branch merges, Play or AAB.
+# Debug/test signing only: no release, AAB, Play upload or Worker deploy.
+on:
+  push:
+    branches:
+      - gpt/b138-all-in-debug-apk-20261026
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: arcana-b138-all-current-fixes-debug
+  cancel-in-progress: true
+jobs:
+  build:
+    name: Engine + cards + Android tests + debug APK (versionCode 138)
+    if: github.repository == 'AARMOU/arcana_table'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prepare evidence folder
+        run: mkdir -p ci-out combined-evidence && git rev-parse HEAD > ci-out/source-sha.txt
+      - name: Assemble exact owner-requested PR source heads on runner (no remote merge)
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE=3f8228e61d1d38d1c82f73244ce30ce303ac2198
+          git merge-base --is-ancestor "$BASE" HEAD
+          git config user.name 'arcana-build-assembly'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          printf 'B138 runner-only source assembly, base %s\n' "$BASE" > combined-evidence/b138-source-heads.txt
+          # Exact approved heads. Reject any broken merge and require all features afterward.
+          for item in \
+            303:4317184c3fb1666a95a5242e20f4fd777eb47e44 \
+            304:e82b57621374c7aca0a5d854f029ddda4176d597 \
+            305:0f08acef5ea02dc0ee9469adabcf7f0871efc77d \
+            306:1fafb3b1adfb52fdabb8a4f9f27283a263b3faf9 \
+            307:d171b27a21aed98dd3074c02f2c4f01e84c96fd7 \
+            308:abcae2a5e3b9bfb8bff80aa393c34112199b1bbd
+          do
+            IFS=: read -r pr sha <<< "$item"
+            git fetch --no-tags origin "$sha"
+            test "$(git rev-parse FETCH_HEAD)" = "$sha"
+            git merge-base --is-ancestor "$BASE" "$sha"
+            git merge --no-ff --no-edit -X ours "$sha" -m "Runner-only B138 source PR #$pr at $sha"
+            printf 'PR #%s %s\n' "$pr" "$sha" >> combined-evidence/b138-source-heads.txt
+          done
+          git diff --check "$BASE" HEAD -- android/app || true
+          git rev-parse HEAD > ci-out/assembled-source-sha.txt
+      - name: Fail closed if any approved change was lost in overlapping merges
+        shell: bash
+        run: |
+          set -euo pipefail
+          a=android/app/src/main/java/com/arcanatable
+          t=android/app/src/test/java/com/arcanatable
+          grep -F 'var wifiServer by run { mutableStateOf<ArgentumHostLink?>(null) }' "$a/TableController.kt"
+          grep -F 'shouldKeepMultiplayerConnectionGuard(' "$a/TableEffects.kt"
+          test -s "$t/MultiplayerConnectionGuardTest.kt"
+          grep -F 'argentumOpeningHand = hand' "$a/TableArgentum.kt"
+          grep -F 'cards = argentumOpeningHand' "$a/TableOverlays.kt"
+          test "$(grep -Fc 'val count = 4' "$a/TableWifi.kt")" -ge 2
+          ! grep -Fq 'wifiMultiConfigOpen' "$a/TableWifi.kt" "$a/TableController.kt" "$a/TableOverlays.kt"
+          grep -F 'tutorialCoachRegion(maxW, maxH, target)' "$a/TutorialCoach.kt"
+          grep -F 'TARGET-COVERS-WHOLE-SHEET' "$t/ui/TutorialAuditUiTest.kt"
+          test -s "$t/TutorialCoachPlacementTest.kt"
+          ! grep -Fq 'play-online-option' "$a/HomeScreen.kt"
+          grep -F 'startMultiOnlineHost()' "$a/TableOverlays.kt"
+          grep -F 'receiveRoomChatFromGuest' "$a/TableWifi.kt"
+          grep -F 'ArgentumRoomChat.DELIVERY' "$a/TableArgentum.kt"
+          grep -F 'sendTableChat(text)' "$a/TableOverlaysB.kt"
+          grep -F 'roomChatDisplayRevision' "$a/TableEffects.kt"
+          test -s "$a/ArgentumRoomChat.kt"
+          test -s "$t/ArgentumRoomChatTest.kt"
+          grep -F 'class TutorialRun' "$a/TutorialProgress.kt"
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          assert len(json.loads(Path('android/app/src/main/assets/tutorials/catalog.json').read_text())['chapters']) == 20
+          print('PASS: all six PRs retained, 20-chapter B137 tutorial preserved')
+          PY
+      - name: Verify every requested change is in the assembled tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          a=android/app/src
+          test -s $a/main/java/com/arcanatable/ArgentumBlockSubmissionGuard.kt
+          grep -F 'val hostLobbyState = wifiMultiLobbyState' $a/main/java/com/arcanatable/TableMultiLobby.kt
+          grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' $a/main/java/com/arcanatable/TableArgentum.kt
+          grep -F 'class TutorialRun' $a/main/java/com/arcanatable/TutorialProgress.kt
+          grep -F 'opponentsEldraziCastDoesNotTriggerMyUlalek' android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlalekFusedAtrocityScenarioTest.kt
+          grep -F 'mixed unrestricted and Temple mana cannot launder' engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt
+          test -s android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt
+          python3 -m json.tool $a/main/assets/tutorials/catalog.json > /dev/null
+          git diff --check HEAD~1 -- android || true
+          python3 tools/check_android_regex.py 2>&1 | tee ci-out/android-regex.log
+          echo PASS | tee ci-out/00-source-check.txt
+      - name: Verify approved upstream patch artifact and SHA
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail
+          python3 tools/fast_apk_snapshot.py preflight 2>&1 | tee ci-out/01-preflight.log
+      - name: Checkout exact Argentum upstream
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: c38f145359c342a04f951b7ba48f741bcb1627ac
+          path: combined-argentum
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Build engine JARs with Temple, Ulalek and SDK scenarios
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/fast_apk_snapshot.py engine 2>&1 | tee ci-out/02-engine.log
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0' > /dev/null
+      - name: Export and test all custom cards (incl. Ulalek, Ugin, Eldrazi)
+        shell: bash
+        run: |
+          set -o pipefail
+          python3 tools/fast_apk_snapshot.py cards 2>&1 | tee ci-out/03-cards.log
+      - name: Stamp debug test version 138
+        run: python3 tools/fast_apk_snapshot.py version --version-code 138 | tee ci-out/04-version.log
+      - name: All app unit tests (results recorded, required suites checked next)
+        id: apptests
+        continue-on-error: true
+        working-directory: android
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 --continue :app:testDebugUnitTest 2>&1 | tail -400 | tee ../ci-out/05-app-tests.log
+      - name: Summarize app test results; require the 16 bundle suites
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY' | tee ci-out/06-test-summary.txt
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root = Path('android/app/build/test-results/testDebugUnitTest')
+          required = ['HomeScreenSizesTest','DeckBuilderUiTest','DeckSupportTest','ReleaseFeaturesTest',
+              'TutorialPracticeScenariosTest','TutorialPriorityHostTest','ArgentumResilienceUiTest',
+              'GameOutcomeDetailsTest','ArgentumBackendTest','UginExportedRuntimeTest',
+              'MultiplayerLobbyVisibilityTest','ArgentumBlockSubmissionGuardTest',
+              'TutorialRunTest','TutorialWalkthroughTest','TutorialAuditUiTest','TutorialScreensTest',
+              'TutorialCoachPlacementTest','MultiplayerConnectionGuardTest','ArgentumRoomChatTest']
+          total = fails = 0
+          bad_required = []
+          seen = set()
+          for xml in sorted(root.glob('TEST-*.xml')):
+              r = ET.parse(xml).getroot()
+              name = r.get('name', xml.stem)
+              short = name.rsplit('.', 1)[-1]
+              seen.add(short)
+              n = int(r.get('tests', 0)); f = int(r.get('failures', 0)) + int(r.get('errors', 0)); s = int(r.get('skipped', 0))
+              total += n; fails += f
+              if f:
+                  print(f'FAIL {name}: {f} of {n}')
+                  for case in r.iter('testcase'):
+                      for node in list(case):
+                          if node.tag in ('failure', 'error'):
+                              print('   -', case.get('name'), '::', (node.get('message') or '')[:400].replace('\n', ' '))
+              if short in required and (f or s or n == 0):
+                  bad_required.append(short)
+          missing = [x for x in required if x not in seen]
+          print(f'TOTAL {total} tests, {fails} failing; required missing={missing} required bad={bad_required}')
+          Path('ci-out/required-ok').write_text('yes' if not missing and not bad_required else 'no')
+          PY
+          test "$(cat ci-out/required-ok)" = yes
+      - name: Assemble debug APK
+        working-directory: android
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --max-workers=2 :app:assembleDebug 2>&1 | tail -150 | tee ../ci-out/07-assemble.log
+      - name: Verify package, version, signature and bundled assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=android/app/build/outputs/apk/debug/app-debug.apk
+          bt="$ANDROID_HOME/build-tools/36.0.0"
+          "$bt/aapt" dump badging "$apk" > ci-out/badging.txt
+          grep -F "versionCode='138'" ci-out/badging.txt
+          "$bt/apksigner" verify --print-certs "$apk" > ci-out/signature.txt
+          python3 tools/verify_launcher_branding.py | tee ci-out/branding.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import json
+          with ZipFile('android/app/build/outputs/apk/debug/app-debug.apk') as z:
+              assert len(json.loads(z.read('assets/tutorials/catalog.json'))['chapters']) == 20
+              for n in ('all-cards.index.tsv', 'custom-cards.index.tsv'):
+                  assert z.read('assets/argentum/' + n) == Path('android/app/src/main/assets/argentum', n).read_bytes()
+          print('PASS: 20 tutorial chapters and source-matched card indexes in APK')
+          PY
+          cp "$apk" ci-out/ArcanaTable-B138-debug.apk
+          sha256sum ci-out/ArcanaTable-B138-debug.apk | tee ci-out/apk.sha256
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcana-b138-all-current-fixes-debug
+          path: ci-out/
+          retention-days: 14
+      - name: Upload validation evidence even when an earlier gate fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcana-b138-build-diagnostics
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            ci-out/
+            combined-evidence/
+            android/app/build/test-results/testDebugUnitTest/
+            android/custom-cards/build/test-results/test/
