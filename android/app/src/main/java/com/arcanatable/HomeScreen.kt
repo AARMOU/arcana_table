@@ -58,8 +58,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import android.widget.Toast
-import androidx.compose.ui.platform.LocalContext
 
 enum class DeckChoiceCategory { PRECON, ARCANA, ARGENTUM, OTHER }
 
@@ -301,9 +299,6 @@ internal fun PlaySheet(
                     DeckChip("Join on Wi-Fi", friendMode == 2) { online = false; friendMode = 2 }
                 }
             }
-            // Argentum server play parked for now (Build 113); plumbing kept.
-            val context = LocalContext.current
-            PlayOption("Online with Argentum", "Not yet available", selected = false, onClick = { Toast.makeText(context, "Not yet available", Toast.LENGTH_SHORT).show() }, tag = "play-online-option", disabled = true) {}
             Button(
                 onClick = { when { online -> onOnline(); friendMode == 2 -> onWifiJoin(); friendMode == 5 -> onWifiMultiHost(); friendMode == 6 -> onOnlineMultiHost(); friendMode == 7 -> onOnlineMultiJoin(); else -> onOffline() } },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp).testTag("play-start").tutorialTarget("setup-start"),
