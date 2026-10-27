@@ -32,7 +32,19 @@ jobs:
           grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
           grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' android/app/src/main/java/com/arcanatable/TableArgentum.kt
           git diff --check
-      - name: Fail fast on assembled keyword-probe test/asset skew (no Gradle)
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install only Android compile SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export current custom-card indexes, no APK
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+      - name: Fail fast on assembled keyword-probe test/asset skew (after export, before Android tests)
         shell: bash
         run: |
           python3 - <<'PY'
@@ -69,18 +81,6 @@ jobs:
               )
           print("PASS: every keyword-probe test card exists in pinned export")
           PY
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
-      - name: Install only Android compile SDK
-        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-      - name: Export current custom-card indexes, no APK
-        working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
       - name: Run exact Turbo Android test matrix (no assembleDebug)
         working-directory: android
         shell: bash
