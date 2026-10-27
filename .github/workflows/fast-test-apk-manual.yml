@@ -1,6 +1,7 @@
 name: Arcana Fast Test APK — manual only (seed or build)
-# Absolutely NO push/pull_request/schedule trigger. A future owner must explicitly
-# dispatch this on an approved branch, then supply a verified seed run to build.
+# B137 bridge on isolated branch: use the SAME already-assembled source as
+# Claude's green 40430360039, NEVER replay old B136 source ports.
+# Absolutely NO push/pull_request/schedule trigger; owner dispatches seed then APK.
 on:
   workflow_dispatch:
     inputs:
@@ -34,7 +35,7 @@ concurrency:
 jobs:
   verify-engine-seed:
     name: Rebuild + prove reusable engine/card snapshot (NO APK)
-    if: github.repository == 'AARMOU/arcana_table' && inputs.mode == 'seed-engine'
+    if: github.repository == 'AARMOU/arcana_table' && inputs.mode == 'seed-engine' && github.ref_name == 'gpt/b137-claude-turbo-bridge-20261026'
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     steps:
@@ -43,9 +44,9 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Reconcile exact B136 lobby, AI, tutorial, deck, combat and Ugin source pins
+      - name: Verify the already-assembled, successful Claude B137 source (NO B136 replay)
         shell: bash
-        run: python3 tools/fast_apk_snapshot.py source
+        run: python3 tools/b137_preassembled_turbo.py verify
       - name: Capture engine/card source fingerprint BEFORE rebuilding generated outputs
         shell: bash
         run: python3 tools/fast_apk_snapshot.py fingerprint
@@ -91,7 +92,7 @@ jobs:
       - name: Publish immutable verified engine snapshot (no APK)
         uses: actions/upload-artifact@v4
         with:
-          name: arcana-fast-engine-b136-pinned
+          name: arcana-fast-engine-b137-claude-pinned
           path: fast-engine-bundle/
           retention-days: 21
           if-no-files-found: error
@@ -109,7 +110,7 @@ jobs:
 
   fast-debug-apk:
     name: Compile/test DEBUG APK from exactly verified engine snapshot
-    if: github.repository == 'AARMOU/arcana_table' && inputs.mode == 'fast-apk'
+    if: github.repository == 'AARMOU/arcana_table' && inputs.mode == 'fast-apk' && github.ref_name == 'gpt/b137-claude-turbo-bridge-20261026'
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -118,9 +119,9 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Reconcile exact B136 app/lobby/tutorial/deck/combat/Ugin without rebuilding engine
+      - name: Verify exact Claude B137 app without reconstructing older B136
         shell: bash
-        run: python3 tools/fast_apk_snapshot.py source
+        run: python3 tools/b137_preassembled_turbo.py verify
       - name: Require successful seed workflow run from THIS repository
         shell: bash
         env:
@@ -145,6 +146,8 @@ jobs:
           assert r.get('event')=='workflow_dispatch', 'Seed was not manual'
           assert r.get('name')=='Arcana Fast Test APK — manual only (seed or build)', 'Wrong producer workflow'
           assert r.get('repository',{}).get('full_name')==os.environ['GITHUB_REPOSITORY'], 'Wrong repository'
+          assert r.get('head_branch') == os.environ['GITHUB_REF_NAME'], 'Seed must come from this same B137 Turbo branch'
+          assert r.get('head_sha'), 'Seed commit missing'
           print('PASS: approved manually dispatched seed ran successfully in this exact repository')
           PY
       - name: Download exact previously validated four-JAR and five-card snapshot
@@ -153,13 +156,23 @@ jobs:
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
           run-id: ${{ inputs.verified_seed_run }}
-          name: arcana-fast-engine-b136-pinned
+          name: arcana-fast-engine-b137-claude-pinned
           path: fast-engine-bundle
       - name: Verify every SHA-256 and current engine/card source input fingerprint
         shell: bash
         env:
           FAST_SEED_RUN_ID: ${{ inputs.verified_seed_run }}
-        run: python3 tools/fast_apk_snapshot.py restore --bundle fast-engine-bundle
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os
+          from pathlib import Path
+          r=json.loads(Path(os.environ['RUNNER_TEMP'],'arcana-fast-seed-run.json').read_text())
+          data=json.loads(Path('fast-engine-bundle/manifest.json').read_text())
+          assert data['seed_commit'] == r['head_sha'], 'Seed artifact not from selected workflow commit'
+          assert str(data['seed_run_id']) == str(r['id']), 'Seed artifact not from selected workflow run'
+          PY
+          python3 tools/fast_apk_snapshot.py restore --bundle fast-engine-bundle
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -264,7 +277,7 @@ jobs:
           print('PASS: original UI logo, tutorial assets and source-matched card indexes')
           PY
           sha256sum "$apk" > fast-debug-apk.sha256
-          echo 'DEBUG TEST APK ONLY: No full regression certification, no release-lint, no AAB, no Play Store upload-key signing.' > fast-scope.txt
+          echo 'DEBUG TEST APK ONLY: B137 Claude-source TURBO preview only; full regression/release-lint still separate; no AAB, production signing or Play upload.' > fast-scope.txt
       - name: Upload the signed fast-debug TEST APK as soon as checks pass
         uses: actions/upload-artifact@v4
         with:
