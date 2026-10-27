@@ -87,7 +87,7 @@ jobs:
             --rerun-tasks --stacktrace > ../ugin-diagnostics/focused-stdout.log 2>&1
           focused_status=$?
           set -e
-          printf '%s\\n' "$focused_status" > ../ugin-diagnostics/focused-exit-code.txt
+          printf '%s\n' "$focused_status" > ../ugin-diagnostics/focused-exit-code.txt
           if test -d app/build/test-results/testDebugUnitTest; then
             cp -a app/build/test-results/testDebugUnitTest/. ../ugin-diagnostics/focused-android/
           fi
