@@ -667,10 +667,6 @@ internal class TableController(
     var wifiConnecting by run { mutableStateOf(false) }
     var wifiRole by run { mutableStateOf<String?>(null) }
     // Isolated four-person Wi-Fi preview. Production's existing two-player path is unchanged.
-    var wifiMultiConfigOpen by run { mutableStateOf(false) }
-    var wifiMultiOnline by run { mutableStateOf(false) }
-    var wifiMultiSeatCount by run { mutableStateOf(4) }
-    var wifiMultiFriendSlots by run { mutableStateOf(setOf(1, 2, 3)) }
     var wifiMultiLobby: ArgentumWaitingLobby? = null
     // Non-null while START is binding seats to the engine: friends who drop in that window
     // are collected here and handed to the AI once the engine knows them.

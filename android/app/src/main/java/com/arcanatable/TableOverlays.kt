@@ -263,15 +263,13 @@ internal fun TableController.TableOverlays() {
                 onJoinRoom = { playSheetOpen = false; run { argentumLastError = null; argentumJoinCode = ""; argentumJoinDialogOpen = true } },
                 onDismiss = { playSheetOpen = false },
                 onWifiMultiHost = { playSheetOpen = false; run {
-                    recordDiagnostic("Multiplayer: Wi-Fi host setup opened", DiagnosticCategory.ACTION)
-                    wifiMultiOnline = false
-                    wifiMultiConfigOpen = true
+                    recordDiagnostic("Multiplayer: Wi-Fi host opened", DiagnosticCategory.ACTION)
+                    startMultiWifiHost()
                 } },
                 onWifiJoin = { playSheetOpen = false; run { recordDiagnostic("Multiplayer: Wi-Fi join opened", DiagnosticCategory.ACTION); wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() } },
                 onOnlineMultiHost = { playSheetOpen = false; run {
-                    recordDiagnostic("Multiplayer: internet host setup opened", DiagnosticCategory.ACTION)
-                    wifiMultiOnline = true
-                    wifiMultiConfigOpen = true
+                    recordDiagnostic("Multiplayer: internet host opened", DiagnosticCategory.ACTION)
+                    startMultiOnlineHost()
                 } },
                 onOnlineMultiJoin = { playSheetOpen = false; run {
                     recordDiagnostic("Multiplayer: internet join opened", DiagnosticCategory.ACTION)
@@ -452,9 +450,10 @@ internal fun TableController.TableOverlays() {
                 val wifi = wifiRole
                 closeArgentumSession(concede = false)
                 when {
-                    // Multiplayer: the host reopens the 2–4 seat lobby setup (keeping the last
-                    // seat choices); a guest looks for or re-enters a room, as from the Play menu.
-                    wifi == "host" || wifi == "online-host" -> { wifiMultiOnline = wifi == "online-host"; wifiMultiConfigOpen = true }
+                    // Multiplayer hosts reopen a four-seat friends lobby directly.
+                    // Guests look for or re-enter a room, as from the Play menu.
+                    wifi == "host" -> startMultiWifiHost()
+                    wifi == "online-host" -> startMultiOnlineHost()
                     wifi == "guest" -> { wifiFound = emptyList(); wifiJoinOpen = true; searchWifiHosts() }
                     wifi == "online-guest" -> { onlineCodeInput = ""; onlineJoinOpen = true }
                     wasOffline -> startOfflineGame()
