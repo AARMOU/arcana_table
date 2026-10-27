@@ -14,6 +14,8 @@ import com.wingedsheep.engine.handlers.effects.ZoneTransitionService
 import com.wingedsheep.engine.registry.CardRegistry
 import com.wingedsheep.engine.state.GameState
 import com.wingedsheep.engine.state.components.identity.CardComponent
+import com.wingedsheep.engine.state.components.battlefield.CountersComponent
+import com.wingedsheep.sdk.core.CounterType
 import com.wingedsheep.sdk.core.Format
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
@@ -33,14 +35,64 @@ internal object TutorialPracticeScenarios {
     const val COMBAT = "combat"
     const val STACK = "stack"
     const val MULLIGAN = "opening-hand"
+    /** A ready Commander board for lessons that explain the table rather than drill one action. */
+    const val TOUR = "tour"
 
+    /** Drills: every step waits for the learner to do it in the real game. */
     val supported = setOf(FIRST_TURN, COMBAT, STACK, MULLIGAN)
 
     fun build(id: String, library: OfflineCardLibrary): TestScenarioGame = when (id) {
         FIRST_TURN -> firstTurn(library)
         COMBAT -> combat(library)
         STACK -> stack(library)
+        TOUR -> tour(library)
         else -> error("Unknown checkpoint tutorial $id")
+    }
+
+    const val YOUR_COMMANDER = "Ayula, Queen Among Bears"
+    const val OPPONENT_COMMANDER = "Tetsuko Umezawa, Fugitive"
+
+    /**
+     * Your third turn of a two-player Commander game, main phase, with something in every zone:
+     * commanders in the command zone, Forests and a Grizzly Bears (with a +1/+1 counter, able to
+     * attack) on the battlefield, Forest / Elvish Mystic / Giant Growth in hand, a card in the
+     * graveyard and one in exile. The opponent passes every turn.
+     */
+    private fun tour(library: OfflineCardLibrary): TestScenarioGame {
+        val you = LocalSeat("You", listOf("Grizzly Bears", "Elvish Mystic", "Giant Growth", "Llanowar Elves") + List(36) { "Forest" }, YOUR_COMMANDER)
+        val ai = LocalSeat("Training Opponent", List(40) { "Island" }, OPPONENT_COMMANDER)
+        val registry = CardRegistry().apply { register(library.load((you.deck + ai.deck + listOf(YOUR_COMMANDER, OPPONENT_COMMANDER)).toSet())) }
+        val services = EngineServices(registry)
+        val config = GameConfig(
+            players = listOf(
+                PlayerConfig(name = you.name, deck = Deck(you.deck), playerId = LocalArgentumHost.HUMAN_ID, startingLife = 40, commanderCardNames = listOf(YOUR_COMMANDER)),
+                PlayerConfig(name = ai.name, deck = Deck(ai.deck), playerId = LocalArgentumHost.AI_ID, startingLife = 40, commanderCardNames = listOf(OPPONENT_COMMANDER)),
+            ),
+            skipMulligans = true,
+            startingPlayerIndex = 0,
+            format = Format.Commander(),
+            seed = 12025L,
+        )
+        var state = GameInitializer(registry, services.printingRegistry).initializeGame(config).state
+        state = passToMain(state, services, afterTurn = 0)
+        val zones = ZoneTransitionService(registry, services.predicateEvaluator)
+        val bears = yourCard(state, "Grizzly Bears", Zone.LIBRARY, Zone.HAND)
+        state = zones.moveToZone(state, bears, Zone.BATTLEFIELD).state
+        repeat(2) { state = zones.moveToZone(state, yourCard(state, "Forest", Zone.HAND, Zone.LIBRARY), Zone.BATTLEFIELD).state }
+        // The passive opponent keeps seven cards through its turn, so setup never stops for a discard.
+        state = zones.moveToZone(state, state.getZone(LocalArgentumHost.AI_ID, Zone.HAND).first(), Zone.BATTLEFIELD).state
+        // A full real turn cycle: the Bears lose summoning sickness and it is your turn again.
+        state = passToMain(state, services, afterTurn = state.turnNumber)
+        for (name in listOf("Forest", "Elvish Mystic", "Giant Growth")) {
+            if (state.getZone(LocalArgentumHost.HUMAN_ID, Zone.HAND).none { state.getEntity(it)?.get<CardComponent>()?.name == name })
+                state = zones.moveToZone(state, yourCard(state, name, Zone.LIBRARY), Zone.HAND).state
+        }
+        state = zones.moveToZone(state, yourCard(state, "Llanowar Elves", Zone.LIBRARY, Zone.HAND), Zone.GRAVEYARD).state
+        state = zones.moveToZone(state, yourCard(state, "Forest", Zone.LIBRARY), Zone.EXILE).state
+        state = state.updateEntity(bears) { c ->
+            c.with((c.get<CountersComponent>() ?: CountersComponent()).withAdded(CounterType.PLUS_ONE_PLUS_ONE, 1))
+        }
+        return TestScenarioGame(listOf(you, ai), registry, checkpoint(state, you, ai))
     }
 
     fun openingHand(library: OfflineCardLibrary): Pair<List<LocalSeat>, CardRegistry> {

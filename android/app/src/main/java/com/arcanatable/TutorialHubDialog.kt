@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import org.json.JSONObject
@@ -66,7 +67,11 @@ internal data class ArcanaLesson(
 )
 
 internal fun loadTutorialLessons(context: Context): List<ArcanaLesson> = runCatching {
-    val json = context.assets.open("tutorials/catalog.json").bufferedReader().use { it.readText() }
+    parseTutorialLessons(context.assets.open("tutorials/catalog.json").bufferedReader().use { it.readText() })
+}.getOrDefault(emptyList())
+
+/** The bundled catalog as lessons; shared with the tests that walk each lesson. */
+internal fun parseTutorialLessons(json: String): List<ArcanaLesson> = run {
     val chapters = JSONObject(json).getJSONArray("chapters")
     (0 until chapters.length()).map { index ->
         val chapter = chapters.getJSONObject(index)
@@ -92,7 +97,7 @@ internal fun loadTutorialLessons(context: Context): List<ArcanaLesson> = runCatc
             }
         )
     }
-}.getOrDefault(emptyList())
+}
 
 private val TutorialFelt = Color(0xFF101B18)
 private val TutorialPanel = Color(0xFF1B2A25)
@@ -103,9 +108,10 @@ private val TutorialGold = Color(0xFFE6B65C)
 @Composable
 internal fun TutorialHubDialog(
     onDismiss: () -> Unit,
-    onPractice: (String) -> Unit = {},
-    onCoach: (String, Int) -> Unit = { _, _ -> },
-    practiceEnabled: Boolean = false
+    /** Run the lesson in the app from this step (a practice board is set up when it needs one). */
+    onStart: (String, Int) -> Unit = { _, _ -> },
+    /** A game is in progress: table lessons use it instead of a practice board. */
+    gameRunning: Boolean = false,
 ) {
     val context = LocalContext.current
     val chapters = remember(context) { loadTutorialLessons(context) }
@@ -117,6 +123,7 @@ internal fun TutorialHubDialog(
     var query by rememberSaveable { mutableStateOf("") }
     var chapterId by rememberSaveable { mutableStateOf<String?>(null) }
     var stepIndex by rememberSaveable { mutableStateOf(0) }
+    var reading by rememberSaveable { mutableStateOf(false) }
     var showGlossary by rememberSaveable { mutableStateOf(false) }
     val current = chapters.firstOrNull { it.id == chapterId }
 
@@ -130,7 +137,8 @@ internal fun TutorialHubDialog(
                     Text("ARCANA  /  LEARN", color = TutorialGold, fontSize = 12.sp, fontWeight = FontWeight.Black,
                         modifier = Modifier.weight(1f))
                     TextButton(onClick = {
-                        if (current != null || showGlossary) { chapterId = null; showGlossary = false }
+                        if (reading) reading = false
+                        else if (current != null || showGlossary) { chapterId = null; showGlossary = false }
                         else onDismiss()
                     }) { Text(if (current != null || showGlossary) "BACK" else "CLOSE", color = TutorialText) }
                 }
@@ -165,12 +173,13 @@ internal fun TutorialHubDialog(
                         ) {
                             Text("START HERE", color = TutorialGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                             Text("Your first turn", color = TutorialText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                            Text("Play a real, isolated Argentum practice turn. You can also read every step without leaving your game.",
+                            Text(if (gameRunning) "A game is in progress, so this follows along on it. Leave the game to play the practice turn instead."
+                                else "Play a real practice turn against a passive opponent. Your saved game is never touched.",
                                 color = TutorialMuted, fontSize = 12.sp)
                             Button(
-                                onClick = { if (practiceEnabled) onPractice(intro.id) else { chapterId = intro.id; stepIndex = 0 } },
-                                modifier = Modifier.heightIn(min = 48.dp)
-                            ) { Text(if (practiceEnabled) "PLAY THE FIRST TURN" else "READ FIRST TURN") }
+                                onClick = { onStart(intro.id, 0) },
+                                modifier = Modifier.heightIn(min = 48.dp).testTag("tutorial-start-first-turn")
+                            ) { Text(if (gameRunning) "FOLLOW ON MY GAME" else "PLAY THE FIRST TURN") }
                         }
                     }
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -206,7 +215,7 @@ internal fun TutorialHubDialog(
                             Row(
                                 modifier = Modifier.fillMaxWidth()
                                     .background(TutorialPanel, RoundedCornerShape(12.dp))
-                                    .clickable { chapterId = lesson.id; stepIndex = 0 }
+                                    .clickable { chapterId = lesson.id; stepIndex = 0; reading = false }
                                     .padding(12.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -221,6 +230,32 @@ internal fun TutorialHubDialog(
                             }
                         }
                     }
+                } else if (!reading) {
+                    // Chapter overview: one clear way in, plus a text-only option.
+                    val drill = current.id in TutorialPracticeScenarios.supported
+                    val table = current.steps.any { it.screen in setOf("board", "stack", "menu", "mulligan") }
+                    Text(current.section.uppercase() + "  /  " + current.minutes + " MIN  /  " + current.steps.size + " STEPS",
+                        color = TutorialGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    Text(current.title, color = TutorialText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                    Text(current.description, color = TutorialText, fontSize = 15.sp, lineHeight = 21.sp)
+                    Text(when {
+                        drill && !gameRunning -> "You'll play it in a practice game. Each step waits for you to do it on the real table. Your saved game is never touched."
+                        table && !gameRunning -> "Opens a practice Commander board so every control is there to see. Your saved game is never touched."
+                        table -> "Runs on your current game. Nothing is played for you."
+                        else -> "Highlights each control on the real screen."
+                    }, color = TutorialMuted, fontSize = 12.sp, lineHeight = 17.sp)
+                    LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        items(current.steps.size) { n ->
+                            Text("${n + 1}.  " + current.steps[n].title, color = TutorialMuted, fontSize = 13.sp,
+                                modifier = Modifier.fillMaxWidth().clickable { stepIndex = n; reading = true }.padding(vertical = 5.dp))
+                        }
+                    }
+                    Button(onClick = { onStart(current.id, 0) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("tutorial-start")) {
+                        Text("START LESSON", fontWeight = FontWeight.Black)
+                    }
+                    OutlinedButton(onClick = { stepIndex = 0; reading = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                        Text("READ IT HERE INSTEAD")
+                    }
                 } else {
                     Text(current.section.uppercase() + "  /  " + current.minutes + " MIN",
                         color = TutorialGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
@@ -228,13 +263,8 @@ internal fun TutorialHubDialog(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("STEP " + (stepIndex + 1).toString() + " OF " + current.steps.size.toString(),
                             color = TutorialMuted, fontSize = 11.sp, modifier = Modifier.weight(1f))
-                        TextButton(onClick = { onCoach(current.id, stepIndex) }) {
+                        TextButton(onClick = { onStart(current.id, if (current.id in TutorialPracticeScenarios.supported) 0 else stepIndex) }) {
                             Text("SHOW ON SCREEN", color = TutorialGold, fontSize = 11.sp)
-                        }
-                        if (practiceEnabled && current.id in TutorialPracticeScenarios.supported) {
-                            TextButton(onClick = { onPractice(current.id) }) {
-                                Text("PRACTICE", color = TutorialGold, fontSize = 11.sp)
-                            }
                         }
                     }
                     val step = current.steps.getOrNull(stepIndex)
@@ -252,7 +282,7 @@ internal fun TutorialHubDialog(
                                 Text("TRY: " + step.hint, color = TutorialGold, fontSize = 12.sp)
                             }
                             if (step.actionKind != "next") {
-                                Text("Use SHOW ON SCREEN to highlight the control in Arcana, or PRACTICE for supported engine-backed drills.",
+                                Text("SHOW ON SCREEN runs this step in the app so you can do it yourself.",
                                     color = TutorialMuted, fontSize = 12.sp)
                             }
                         }
@@ -269,6 +299,7 @@ internal fun TutorialHubDialog(
                                     if (current.id !in readIds) readIds.add(current.id)
                                     prefs.edit().putStringSet("read_chapters", readIds.toSet()).apply()
                                     chapterId = null
+                                    reading = false
                                     stepIndex = 0
                                 }
                             },

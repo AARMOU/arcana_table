@@ -141,6 +141,8 @@ private fun CombatBoardFrame(
     extraButton: (@Composable () -> Unit)? = null,
     onDismiss: () -> Unit,
     topExtra: (@Composable () -> Unit)? = null,
+    /** The running lesson's instruction; the board covers the coach card, so it shows here. */
+    tutorialCue: Pair<String, String>? = null,
 ) {
     val config = LocalConfiguration.current
     val combatScale = LocalContext.current.getSharedPreferences("arcana_options", android.content.Context.MODE_PRIVATE)
@@ -180,7 +182,7 @@ private fun CombatBoardFrame(
                     Text(hint, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
                     val topSection: @Composable () -> Unit = {
                         Text(topLabel, color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(Modifier.fillMaxWidth().tutorialTarget("combat-top").horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             top.forEach { piece ->
                                 CombatTile(piece, tileWidth, selected = false, linked = piece.id in linkedIds, enabled = topEnabled(piece.id),
                                     onClick = { onTop(piece.id) }, onBounds = { bounds["t:${piece.id}"] = it }, badge = topBadge(piece.id))
@@ -191,7 +193,7 @@ private fun CombatBoardFrame(
                     }
                     val bottomSection: @Composable () -> Unit = {
                         Text(bottomLabel, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(Modifier.fillMaxWidth().tutorialTarget("combat-bottom").horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                             bottom.forEach { piece ->
                                 CombatTile(piece, tileWidth, selected = piece.id == selectedId, linked = piece.id in linkedIds, enabled = bottomEnabled(piece.id),
                                     onClick = { onBottom(piece.id) }, onBounds = { bounds["b:${piece.id}"] = it }, badge = bottomBadge(piece.id))
@@ -207,7 +209,7 @@ private fun CombatBoardFrame(
                         Spacer(Modifier.heightIn(min = 46.dp))
                         bottomSection()
                     }
-                    Column(Modifier.fillMaxWidth().heightIn(max = 120.dp).verticalScroll(rememberScrollState()).padding(top = 6.dp).testTag("combat-summary")) {
+                    Column(Modifier.fillMaxWidth().heightIn(max = 120.dp).verticalScroll(rememberScrollState()).padding(top = 6.dp).testTag("combat-summary").tutorialTarget("combat-summary")) {
                         summary.forEach { Text(it, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
                         if (summary.isEmpty()) Text("Nothing assigned yet.", color = Muted, fontSize = 11.sp)
                         warning?.let { Text(it, color = CounterGold, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp)) }
@@ -217,11 +219,12 @@ private fun CombatBoardFrame(
                         extraButton?.invoke()
                         Spacer(Modifier.weight(1f))
                         TextButton(enabled = confirmEnabled, onClick = onConfirm,
-                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (confirmEnabled) Mint else PanelLight)) {
+                            modifier = Modifier.tutorialTarget("combat-confirm").clip(RoundedCornerShape(8.dp)).background(if (confirmEnabled) Mint else PanelLight)) {
                             Text(confirmLabel, color = if (confirmEnabled) Ink else Muted, fontWeight = FontWeight.Black)
                         }
                     }
                 }
+                TutorialLayer(Modifier.matchParentSize())
             }
         }
     }
@@ -233,7 +236,7 @@ private fun CombatBoardFrame(
  * Argentum lists can be used, and Argentum validates the result (flying, menace, ...).
  */
 @Composable
-fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit) {
+fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, tutorialCue: Pair<String, String>? = null) {
     var selection by remember(plan) { mutableStateOf(plan.mandatory.filterKeys { it in plan.blockers }) }
     var pending by remember(plan) { mutableStateOf<String?>(null) }
     val attackers = plan.attackers.map(piece)
@@ -273,6 +276,7 @@ fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, 
         onConfirm = { onConfirm(plan.buildAction(selection)) },
         extraButton = { if (selection.isNotEmpty()) TextButton(onClick = { selection = plan.mandatory.filterKeys { it in plan.blockers }; pending = null }) { Text("CLEAR", color = Muted) } },
         onDismiss = onDismiss,
+        tutorialCue = tutorialCue,
     )
 }
 
@@ -282,7 +286,7 @@ fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, 
  * creature, then the player or planeswalker it attacks.
  */
 @Composable
-fun ArgentumAttackBoard(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, opponentBlockers: List<Pair<String, List<GameCard>>> = emptyList()) {
+fun ArgentumAttackBoard(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, opponentBlockers: List<Pair<String, List<GameCard>>> = emptyList(), tutorialCue: Pair<String, String>? = null) {
     var selection by remember(plan) { mutableStateOf(plan.options.filter { it.mandatory }.associate { it.attackerId to it.targets.first() }) }
     var pending by remember(plan) { mutableStateOf<String?>(null) }
     val targets = plan.options.flatMap { it.targets }.distinct()
@@ -344,6 +348,7 @@ fun ArgentumAttackBoard(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece
         },
         onDismiss = onDismiss,
         topExtra = if (opponentBlockers.isEmpty()) null else ({ OpponentBlockersStrip(opponentBlockers) }),
+        tutorialCue = tutorialCue,
     )
 }
 

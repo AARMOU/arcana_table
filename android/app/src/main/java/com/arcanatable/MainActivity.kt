@@ -242,18 +242,12 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
             TableMainLayout()
             TableOverlays()
             TableOverlaysB()
-            tutorialLesson?.let { lesson ->
-                if (!tutorialHubOpen && !(tutorialPracticeActive && tutorialLoading)) {
-                    TutorialCoachOverlay(
-                        lesson = lesson,
-                        index = tutorialStepIndex,
-                        practice = tutorialPracticeActive,
-                        onNext = { tutorialAdvance() },
-                        onSkip = { stopTutorial() },
-                        avoidTableOverlay = showHand || argentumActionChoices.isNotEmpty() || stackOpen
-                    )
-                }
+            // The coach draws on whichever window is on top: here, or the dialog/sheet a step opened.
+            val coachModel = tutorialLesson?.takeIf { !tutorialHubOpen && !(tutorialPracticeActive && tutorialLoading) }?.let { lesson ->
+                TutorialCoachModel(lesson, tutorialStepIndex, tutorialGated && !tutorialStepSatisfied, onNext = { tutorialAdvance() }, onSkip = { stopTutorial() })
             }
+            SideEffect { TutorialCoachState.model = coachModel }
+            TutorialLayer(base = true)
             SnackbarHost(
                 hostState = automaticActionSnackbar,
                 modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 12.dp, vertical = 4.dp),

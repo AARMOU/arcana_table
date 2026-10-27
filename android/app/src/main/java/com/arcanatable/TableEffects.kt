@@ -277,7 +277,8 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
     }
     LaunchedEffect(argentumTurnKey) {
         val (_, active) = argentumTurnKey ?: return@LaunchedEffect
-        if (active != localSeat || !autoOpenHand || !argentumEnabled) return@LaunchedEffect
+        // A lesson decides when the hand opens; opening it here would cover what the lesson points at.
+        if (active != localSeat || !autoOpenHand || !argentumEnabled || tutorialChapterId != null) return@LaunchedEffect
         delay(350)
         if (argentumPendingDecision == null && argentumAttackPlan == null && argentumBlockPlan == null &&
             argentumActionChoices.isEmpty() && !gameEndedOnline) showHand = true
@@ -369,8 +370,19 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
         observedChatCount = chatMessages.size
         if (chatOpen) unreadChatCount = 0
     }
+    // A lesson step about your own board keeps your player view while that step is showing.
+    LaunchedEffect(showOverview, tutorialHoldsPlayerView, tutorialStepIndex) {
+        if (showOverview && tutorialChapterId != null && tutorialHoldsPlayerView == tutorialStepIndex) {
+            delay(50)
+            if (showOverview && tutorialHoldsPlayerView == tutorialStepIndex) { showOverview = false; selectedPlayer = localSeat }
+        }
+    }
     LaunchedEffect(gameStartedOnline) {
-        if (gameStartedOnline) { homeOpen = false; showOverview = true; showHand = false; lobbyOpen = false }
+        if (gameStartedOnline) {
+            homeOpen = false; showOverview = true; showHand = false; lobbyOpen = false
+            // A lesson that just started its practice game puts back the view its step needs.
+            if (tutorialChapterId != null) tutorialRouteScreen()
+        }
     }
     LaunchedEffect(gameEndedOnline) {
         if (gameEndedOnline) { gameTimerRunning = false; turnTimerRunning = false; showOverview = true; showHand = false }

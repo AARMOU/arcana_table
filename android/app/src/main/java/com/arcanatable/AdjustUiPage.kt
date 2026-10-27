@@ -58,6 +58,7 @@ internal fun AdjustUiPage(
     val label = { id: String -> catalog.firstOrNull { it.id == id }?.label ?: id }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth(.96f).fillMaxHeight(.94f), shape = RoundedCornerShape(18.dp), color = Panel) {
+          Box(Modifier.fillMaxSize()) {
             Column(Modifier.fillMaxSize().padding(14.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
@@ -104,7 +105,7 @@ internal fun AdjustUiPage(
                     }
                 }
                 Column(Modifier.weight(1f).fillMaxWidth().padding(top = 7.dp).verticalScroll(rememberScrollState())) {
-                    AdjustSection("TABLE SIZE")
+                    Box(Modifier.tutorialTarget("layout-sizes")) { AdjustSection("TABLE SIZE") }
                     AdjustSlider("Card size", cardSize, .75f..1.4f, { "${(it * 100).toInt()}%" }, onCardSize)
                     AdjustSlider("Board spacing", spacing, .5f..2f, { "${(it * 100).toInt()}%" }, onSpacing)
                     AdjustSlider("Hand tray height", handHeight, .38f.. .95f, { "${(it * 100).toInt()}%" }, onHandHeight)
@@ -114,7 +115,7 @@ internal fun AdjustUiPage(
                     Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { HandArrangement.entries.forEach { item ->
                         FilterChip(selected = item == arrangement, onClick = { onArrangement(item) }, label = { Text(item.label, fontSize = 9.sp) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Mint, selectedLabelColor = Ink, labelColor = SoftWhite))
                     } }
-                    AdjustSection("QUICK ACTIONS")
+                    Box(Modifier.tutorialTarget("layout-quick-actions")) { AdjustSection("QUICK ACTIONS") }
                     Text("Choose and order the shortcuts shown during an Argentum game.", color = Muted, fontSize = 10.sp)
                     actions.forEachIndexed { index, id ->
                         Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -145,10 +146,12 @@ internal fun AdjustUiPage(
                     AdjustSlider("Combat card size", combatSize, .65f..1.35f, { "${(it * 100).toInt()}%" }, onCombatSize)
                 }
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    TextButton(onClick = onReset, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("RESET TO DEFAULT", color = Color(0xFFE5B2A7), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                    TextButton(onClick = onReset, modifier = Modifier.weight(1f).heightIn(min = 48.dp).tutorialTarget("layout-reset")) { Text("RESET TO DEFAULT", color = Color(0xFFE5B2A7), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
                     Button(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = PanelLight)) { Text("DONE", color = Mint, fontWeight = FontWeight.Black) }
                 }
             }
+            TutorialLayer(Modifier.matchParentSize())
+          }
         }
     }
 }
