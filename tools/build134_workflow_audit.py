@@ -95,101 +95,18 @@ def audit(release: str, preview: str) -> list[str]:
     if job_config(release) is None or job_config(release) != job_config(preview):
         problems.append('release/preview job configuration differs')
     for name, source in [('release', release), ('preview', preview)]:
-        # A second job (including a reusable-workflow job with no steps) can
-        # execute outside the reviewed compatibility job. If inserted into
-        # *both* workflows it would pass job-config and step parity checks.
-        # Keep the reviewed one-job boundary explicit even when both sides
-        # drift identically; blob pins remain an additional independent gate.
-        job_roots = re.findall(r'(?m)^jobs[ \\t]*:', source)
+        # An extra reusable-workflow job with no steps can execute outside
+        # the reviewed compatibility job. Identical additions to both files
+        # would otherwise pass step parity and job-config comparison.
+        job_roots = re.findall(r'(?m)^jobs[ \t]*:', source)
         if len(job_roots) != 1:
             problems.append(f'{name}: duplicate or missing root jobs declaration')
         else:
-            job_body = source.split('\\njobs:', 1)[1]
-            job_names = re.findall(r'(?m)^  ([A-Za-z_][A-Za-z0-9_-]*):[ \\t]*(?:#.*)?        permissions = re.search(r'(?m)^permissions:\n((?:  [a-z-]+: [^\n]+\n)+)', header)
-        if not permissions or permissions.group(1) != '  contents: read\n  actions: read\n':
-            problems.append(f'{name}: expected read-only permissions missing or extra grants present')
-        # GitHub YAML accepts job-level permissions that override the read-only
-        # workflow defaults. Identical escalation in both jobs would otherwise
-        # pass the cross-workflow job-configuration parity comparison.
-        if re.search(r'(?m)^    permissions\s*:', job_config(source) or ''):
-            problems.append(f'{name}: job-level permissions override is not reviewed')
-        # Reject duplicate root declarations: the first match can look safe
-        # while GitHub/YAML interprets a later declaration differently.
-        if len(re.findall(r'(?m)^permissions\s*:', header)) != 1:
-            problems.append(f'{name}: duplicate or missing root permissions declaration')
-        if len(re.findall(r'(?m)^on\s*:', header)) != 1:
-            problems.append(f'{name}: duplicate or missing root workflow triggers')
-        # Trigger allowlist is asymmetric by design: release may push only
-        # changes to its own workflow on its frozen validation branch;
-        # the debug APK preview must remain manual-only. Hash pins alone
-        # cannot express this security property in synthetic regressions.
-        trigger_block = re.search(r'(?ms)^on:\n(.*?)(?=^[a-z][a-z_-]*:|\Z)', header)
-        expected_triggers = (
-            "  push:\n"
-            "    branches: [gpt/release-upgraded-validation-20261025]\n"
-            "    paths: ['.github/workflows/release-upgraded-source-validation.yml']\n"
-            "  workflow_dispatch:\n"
-            if name == 'release' else "  workflow_dispatch:\n"
-        )
-        if not trigger_block or trigger_block.group(1) != expected_triggers:
-            problems.append('preview is no longer manual-only' if name == 'preview' else
-                            'release: workflow triggers changed; review before activation')
-    if len(extras) == 3:
-        build, verify, upload = (body for _, body in extras)
-        # Preview-only steps have no release counterpart. Check their
-        # security-critical behavior as well as the complete file blob pins.
-        if (not re.search(r'(?m)^          \./gradlew [^\n]*:app:assembleDebug\b', build)
-                or re.search(r'(?m)^        (?:if|continue-on-error):', build)):
-            problems.append('preview build must assemble debug APK without skip/continue-on-error')
-        required_verify = (
-            r'^          test -s android/app/build/outputs/apk/debug/app-debug\.apk$',
-            r"^          grep -F \"package: name='com\.arcanatable\.argentum' versionCode='134'",
-            r'^          .*apksigner" verify --print-certs android/app/build/outputs/apk/debug/app-debug\.apk',
-            r'^          sha256sum android/app/build/outputs/apk/debug/app-debug\.apk > combined-evidence/apk\.sha256$',
-        )
-        if (any(not re.search(pattern, verify, re.M) for pattern in required_verify)
-                or re.search(r'(?m)^        (?:if|continue-on-error):', verify)):
-            problems.append('preview identity/signature/hash verification weakened or skippable')
-        if (re.findall(r'(?m)^          path: [^\n]+$', upload) !=
-                ['          path: android/app/build/outputs/apk/debug/app-debug.apk']
-                or re.findall(r'(?m)^          name: [^\n]+$', upload) !=
-                ['          name: arcana-combined-argentum-eldrazi94-build134-logo-polish-debug-apk']
-                or re.search(r'(?m)^        continue-on-error:', upload)):
-            problems.append('preview upload must contain only reviewed debug APK artifact')
-        upload = extras[2][1]
-        if (re.findall(r'^        if: [^\n]+$', upload, re.M) != ['        if: success()']
-                or not re.search(r'^          if-no-files-found: error$', upload, re.M)
-                or not re.search(r'^        uses: actions/upload-artifact@v4$', upload, re.M)):
-            problems.append('preview upload success/fail-closed conditions changed')
-    return problems
-
-
-def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('release', type=Path)
-    parser.add_argument('preview', type=Path)
-    args = parser.parse_args()
-    raw_release, raw_preview = args.release.read_bytes(), args.preview.read_bytes()
-    problems = audit(raw_release.decode('utf-8'), raw_preview.decode('utf-8'))
-    for label, actual, expected in [('release', git_blob_sha(raw_release), RELEASE_BLOB),
-                                    ('preview', git_blob_sha(raw_preview), PREVIEW_BLOB)]:
-        if actual != expected:
-            problems.append(f'{label} blob changed: {actual} != reviewed {expected}; re-audit before accepting')
-    if problems:
-        for problem in problems:
-            print('FAIL:', problem)
-        return 1
-    print('PASS: frozen 33 shared steps (28 named, 5 unnamed); 3 preview-only steps; read-only permissions; manual preview')
-    print('NOTICE: preview upload-artifact@v4 remains tag-referenced; pin/review before authorized activation')
-    return 0
-
-
-if __name__ == '__main__':
-    raise SystemExit(main())
-, job_body)
+            job_body = source.split('\njobs:', 1)[1]
+            job_names = re.findall(r'(?m)^  ([A-Za-z_][A-Za-z0-9_-]*):[ \t]*(?:#.*)?$', job_body)
             if job_names != ['compatibility']:
                 problems.append(f'{name}: unexpected job set {job_names!r}; only compatibility is reviewed')
-        header = source.split('\\njobs:', 1)[0] + '\\n'
+        header = source.split('\njobs:', 1)[0] + '\n'
         permissions = re.search(r'(?m)^permissions:\n((?:  [a-z-]+: [^\n]+\n)+)', header)
         if not permissions or permissions.group(1) != '  contents: read\n  actions: read\n':
             problems.append(f'{name}: expected read-only permissions missing or extra grants present')
