@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.DeckSupportTest" tests="20" skipped="0" failures="1" errors="0" timestamp="2026-10-27T23:21:45.565Z" hostname="runnervmtai0g" time="1.007">
+  <properties/>
+  <testcase name="searchRanksExactThenPrefixThenWordStart" classname="com.arcanatable.DeckSupportTest" time="0.002"/>
+  <testcase name="swapRewritesOnlyTheMatchingLineAndKeepsStructure" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="missingCreatureStatsDoNotInventPowerOrToughness" classname="com.arcanatable.DeckSupportTest" time="0.001"/>
+  <testcase name="reportCountsCopiesAndNeverClaimsVerification" classname="com.arcanatable.DeckSupportTest" time="0.001"/>
+  <testcase name="shippedLibraryMatchesOfflineEngineForEveryCustomCardAndPreconEntry" classname="com.arcanatable.DeckSupportTest" time="0.529"/>
+  <testcase name="parsesManaBoxAndMoxfieldStyleListsWithCommanderAndSideboard" classname="com.arcanatable.DeckSupportTest" time="0.001"/>
+  <testcase name="swapRefusesCsvAndMissingLines" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="cardsDoNotInheritKeywordLabelsFromCreatedTokensOrAnimationEffects" classname="com.arcanatable.DeckSupportTest" time="0.075">
+    <failure message="java.lang.AssertionError: every probed card must remain in the shipped library expected:&lt;[Sai, Master Thopterist, Celestial Colonnade, Springleaf Parade, Black Market Connections, Tyranid Invasion]&gt; but was:&lt;[Sai, Master Thopterist, Celestial Colonnade, Springleaf Parade, Tyranid Invasion]&gt;" type="java.lang.AssertionError">java.lang.AssertionError: every probed card must remain in the shipped library expected:&lt;[Sai, Master Thopterist, Celestial Colonnade, Springleaf Parade, Black Market Connections, Tyranid Invasion]&gt; but was:&lt;[Sai, Master Thopterist, Celestial Colonnade, Springleaf Parade, Tyranid Invasion]&gt;
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.failNotEquals(Assert.java:835)
+	at org.junit.Assert.assertEquals(Assert.java:120)
+	at com.arcanatable.DeckSupportTest.cardsDoNotInheritKeywordLabelsFromCreatedTokensOrAnimationEffects(DeckSupportTest.kt:216)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke0(Native Method)
+	at java.base/jdk.internal.reflect.NativeMethodAccessorImpl.invoke(NativeMethodAccessorImpl.java:77)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)
+	at org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)
+	at org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)
+	at org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)
+	at org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)
+	at org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:63)
+	at org.junit.runners.ParentRunner$4.run(ParentRunner.java:331)
+	at org.junit.runners.ParentRunner$1.schedule(ParentRunner.java:79)
+	at org.junit.runners.ParentRunner.runChildren(ParentRunner.java:329)
+	at org.junit.runners.ParentRunner.access$100(ParentRunner.java:66)
+	at org.junit.runners.ParentRunner$2.evaluate(ParentRunner.java:293)
+	at org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)
+	at org.junit.runners.ParentRunner.run(ParentRunner.java:413)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestClassExecutor.runTestClass(JUnitTestClassExecutor.java:112)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestClassExecutor.execute(JUnitTestClassExecutor.java:58)
+	at org.gradle.api.internal.tasks.testing.junit.JUnitTestClassExecutor.execute(JUnitTestClassExecutor.java:40)
+	at org.gradle.api.internal.tasks.testing.junit.AbstractJUnitTestClassProcessor.processTestClass(AbstractJUnitTestClassProcessor.java:54)
+	at org.gradle.api.internal.tasks.testing.SuiteTestClassProcessor.processTestClass(SuiteTestClassProcessor.java:53)
+	at jdk.internal.reflect.GeneratedMethodAccessor13.invoke(Unknown Source)
+	at java.base/jdk.internal.reflect.DelegatingMethodAccessorImpl.invoke(DelegatingMethodAccessorImpl.java:43)
+	at java.base/java.lang.reflect.Method.invoke(Method.java:569)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:36)
+	at org.gradle.internal.dispatch.ReflectionDispatch.dispatch(ReflectionDispatch.java:24)
+	at org.gradle.internal.dispatch.ContextClassLoaderDispatch.dispatch(ContextClassLoaderDispatch.java:33)
+	at org.gradle.internal.dispatch.ProxyDispatchAdapter$DispatchingInvocationHandler.invoke(ProxyDispatchAdapter.java:92)
+	at jdk.proxy1/jdk.proxy1.$Proxy4.processTestClass(Unknown Source)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker$2.run(TestWorker.java:183)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.executeAndMaintainThreadName(TestWorker.java:132)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:103)
+	at org.gradle.api.internal.tasks.testing.worker.TestWorker.execute(TestWorker.java:63)
+	at org.gradle.process.internal.worker.child.ActionExecutionWorker.execute(ActionExecutionWorker.java:56)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:121)
+	at org.gradle.process.internal.worker.child.SystemApplicationClassLoaderWorker.call(SystemApplicationClassLoaderWorker.java:71)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.run(GradleWorkerMain.java:69)
+	at worker.org.gradle.process.internal.worker.GradleWorkerMain.main(GradleWorkerMain.java:74)
+</failure>
+  </testcase>
+  <testcase name="suggestionsStayInTypeAndCommanderIdentityAndSkipDeckCards" classname="com.arcanatable.DeckSupportTest" time="0.001"/>
+  <testcase name="offlineSearchResultsRetainCreatureStatsOracleTextAndKeywords" classname="com.arcanatable.DeckSupportTest" time="0.001"/>
+  <testcase name="nestedEffectStatisticsAreNotOriginalCardStatistics" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="doubleFacedNamesMatchFrontFaceAndTokensAreNotDeckCards" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="argentumDefinitionWinsOverCustomOfSameName" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="shippedLibrarySuggestionsAreSupportedAndCarryImages" classname="com.arcanatable.DeckSupportTest" time="0.392"/>
+  <testcase name="parsesCsvExportWithZoneColumn" classname="com.arcanatable.DeckSupportTest" time="0.001"/>
+  <testcase name="explicitLibraryColorIdentityOverridesTextHeuristics" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="shippedCustomCardMetadataMatchesActualJsonlDefinitions" classname="com.arcanatable.DeckSupportTest" time="0.001"/>
+  <testcase name="swapSplitsMultipleCopiesAndRewritesCommanderLines" classname="com.arcanatable.DeckSupportTest" time="0.002"/>
+  <testcase name="manaValueAndColorsFromCost" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="decodesLibraryLineFieldsAndEscapes" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
