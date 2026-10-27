@@ -176,6 +176,39 @@ TRIAGE = {
 }
 
 
+
+def require_exact_cardkit_classifications(names: list[str], classified: object) -> dict[str, dict]:
+    """Fail closed if Cardkit omits, duplicates or invents a requested result.
+
+    A dict comprehension silently overwrites duplicate classifications, which
+    could disguise a contradictory capability result before work assignment.
+    This gate is about audit integrity, never proof of executable card rules.
+    """
+    if len(names) != len(set(names)):
+        raise ValueError("Duplicate requested Cardkit card name")
+    if not isinstance(classified, list):
+        raise ValueError("Invalid Cardkit result: expected list")
+    by_name: dict[str, dict] = {}
+    for row_number, item in enumerate(classified, 1):
+        if not isinstance(item, dict):
+            raise ValueError(f"Invalid Cardkit result at row {row_number}")
+        name = item.get("name")
+        readiness = item.get("readiness")
+        if not isinstance(name, str) or not name or name != name.strip():
+            raise ValueError(f"Invalid Cardkit name at row {row_number}: {name!r}")
+        if not isinstance(readiness, str) or not readiness.strip():
+            raise ValueError(f"Invalid Cardkit readiness for {name!r}")
+        if name in by_name:
+            raise ValueError(f"Duplicate Cardkit classification: {name!r}")
+        by_name[name] = item
+    missing = sorted(set(names) - set(by_name))
+    extra = sorted(set(by_name) - set(names))
+    if missing or extra:
+        raise ValueError(f"Cardkit classification mismatch: missing={missing!r}, extra={extra!r}")
+    return by_name
+
+
+
 def main() -> None:
     manifest = json.loads(MANIFEST.read_text())
     index_sources = [read_index_entries(path) for path in INDEXES]
@@ -201,8 +234,7 @@ def main() -> None:
     assert set(names) <= set(TRIAGE), "new missing card requires explicit safety triage"
     cmd = [str(ROOT / "tools/cardkit/cardkit"), "classify", *names, "--json"]
     classified = json.loads(subprocess.check_output(cmd, cwd=ROOT, text=True)) if names else []
-    by_name = {v["name"]: v for v in classified}
-    assert set(by_name) == set(names)
+    by_name = require_exact_cardkit_classifications(names, classified)
     rows = []
     for entry in missing:
         name = entry["name"]
