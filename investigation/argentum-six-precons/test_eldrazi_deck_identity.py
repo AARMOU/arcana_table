@@ -190,5 +190,44 @@ class ShippedCustomExportIntegrityTest(unittest.TestCase):
                          {"Eldrazi Temple"})
 
 
+
+class CardkitClassificationIntegrityTest(unittest.TestCase):
+    def setUp(self):
+        self.names = ["Eldrazi Temple", "Ugin, the Ineffable"]
+        self.rows = [
+            {"name": "Eldrazi Temple", "readiness": "SUPPORTED"},
+            {"name": "Ugin, the Ineffable", "readiness": "NEEDS_ENGINE"},
+        ]
+
+    def test_complete_classification_accepts_any_result_order(self):
+        actual = audit.require_exact_cardkit_classifications(self.names, list(reversed(self.rows)))
+        self.assertEqual(set(actual), set(self.names))
+        self.assertEqual(actual["Eldrazi Temple"]["readiness"], "SUPPORTED")
+
+    def test_duplicate_cardkit_result_rejected_instead_of_last_row_wins(self):
+        duplicate = self.rows + [{"name": "Eldrazi Temple", "readiness": "BLOCKED"}]
+        with self.assertRaisesRegex(ValueError, "Duplicate Cardkit classification"):
+            audit.require_exact_cardkit_classifications(self.names, duplicate)
+
+    def test_missing_or_unrequested_classification_rejected(self):
+        for rows in (self.rows[:1], self.rows + [{"name": "Extra Card", "readiness": "SUPPORTED"}]):
+            with self.subTest(rows=rows):
+                with self.assertRaisesRegex(ValueError, "classification mismatch"):
+                    audit.require_exact_cardkit_classifications(self.names, rows)
+
+    def test_invalid_result_shapes_or_readiness_rejected(self):
+        bad = (None, {}, [None], [{"name": "", "readiness": "SUPPORTED"}],
+               [{"name": "Eldrazi Temple", "readiness": ""}])
+        for rows in bad:
+            with self.subTest(rows=rows):
+                with self.assertRaisesRegex(ValueError, "Invalid Cardkit"):
+                    audit.require_exact_cardkit_classifications(self.names, rows)
+
+    def test_duplicate_requested_name_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Duplicate requested"):
+            audit.require_exact_cardkit_classifications(self.names + self.names[:1], self.rows)
+
+
+
 if __name__ == "__main__":
     unittest.main()
