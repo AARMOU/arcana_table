@@ -113,7 +113,12 @@ data class ArgentumDeckValidation(
 data class ArgentumTargetRef(val id: String, val name: String, val type: String, val ownerId: String? = null, val zone: String? = null, val controllerId: String? = null)
 
 /** A spell or ability on Argentum's stack, top first. */
-data class ArgentumStackItem(val id: String, val name: String, val controllerName: String, val isYours: Boolean, val imageUrl: String?, val targetNames: List<String>, val targetIds: List<String> = emptyList())
+data class ArgentumStackItem(
+    val id: String, val name: String, val controllerName: String, val isYours: Boolean,
+    val imageUrl: String?, val targetNames: List<String>, val targetIds: List<String> = emptyList(),
+    /** Raw target count before parsing IDs; an unresolved target must stop auto-pass. */
+    val targetCount: Int = targetIds.size,
+)
 
 /** One line of Argentum's own game log (ClientEvent.description). */
 data class ArgentumLogLine(val description: String, val type: String, val isYours: Boolean?, val groupingKey: String? = null) {
@@ -338,6 +343,7 @@ data class ArgentumTableSnapshot(
                     id = id, name = card.optString("name", "Spell"), controllerName = nameById[controller] ?: "Player", isYours = controller == viewerId,
                     imageUrl = card.optString("imageUri").takeUnless { it.isBlank() || it == "null" },
                     targetNames = (0 until (chosen?.length() ?: 0)).mapNotNull { chosen!!.optJSONObject(it)?.let(::targetName) },
+                    targetCount = chosen?.length() ?: 0,
                     targetIds = (0 until (chosen?.length() ?: 0)).mapNotNull { pos ->
                         chosen!!.optJSONObject(pos)?.let { t ->
                             listOf("playerId", "entityId", "spellEntityId", "cardId")
