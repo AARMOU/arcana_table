@@ -438,7 +438,8 @@ jobs:
           print("Temple upgraded-engine source + Android candidate scenarios and exact original-deck delta verified")
           PY
           sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/temple-export-1.sha
-          (cd android && ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards)
+          # Force a genuine second export; an UP-TO-DATE task would not test determinism.
+          (cd android && ./gradlew --no-daemon --max-workers=2 --rerun-tasks :custom-cards:exportCards)
           # Reapply the same deterministic, strict runner-only ABI migration:
           # the export task emits legacy custom-card wire shapes before migration.
           python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --apply android/app/src/main/assets/argentum/custom-cards.jsonl --expected-mana 1 --minimum-counters 0
