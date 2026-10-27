@@ -1,0 +1,38 @@
+name: Claude combat-stacks diagnostics (temporary)
+# Temporary: runs the same Android checks as Arcana Development CI on this branch only and pushes
+# the console output to claude/combat-stacks-ci-log, because the session can't read Actions logs.
+on:
+  push:
+    branches: [claude/combat-stacks-diag]
+permissions:
+  contents: write
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: refs/pull/315/merge }
+      - name: Keep this workflow's publish step
+        run: git log --oneline -3
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '17' }
+      - uses: android-actions/setup-android@v3
+        with: { packages: platform-tools }
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Build and test, capturing output
+        working-directory: android
+        run: |
+          set +e
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards > ../ci.log 2>&1
+          ./gradlew --no-daemon --max-workers=2 --continue :custom-cards:test :app:testDebugUnitTest >> ../ci.log 2>&1
+          echo "EXIT $?" >> ../ci.log
+          mkdir -p ../out && cp ../ci.log ../out/
+          grep -l '<failure\|<error' -r app/build/test-results custom-cards/build/test-results 2>/dev/null | xargs -r -I{} cp {} ../out/
+          true
+      - name: Publish output to a log branch
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          mkdir -p /tmp/logrepo && cp out/* /tmp/logrepo/ && cd /tmp/logrepo && git init -q && git add -A . && git commit -qm "CI log for ${GITHUB_SHA}"
+          git push -f https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git HEAD:claude/combat-stacks-ci-log
