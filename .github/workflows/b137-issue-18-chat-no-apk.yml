@@ -1,0 +1,58 @@
+name: B137 issue 18 room chat - focused Android test (NO APK)
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/b137-issue-18-chat-no-apk.yml'
+      - 'android/app/src/main/java/com/arcanatable/ArgentumRoomChat.kt'
+      - 'android/app/src/main/java/com/arcanatable/TableChatTransport.kt'
+      - 'android/app/src/main/java/com/arcanatable/TableController.kt'
+      - 'android/app/src/main/java/com/arcanatable/TableWifi.kt'
+      - 'android/app/src/main/java/com/arcanatable/TableArgentum.kt'
+      - 'android/app/src/main/java/com/arcanatable/TableMainLayout.kt'
+      - 'android/app/src/main/java/com/arcanatable/TableOverlaysB.kt'
+      - 'android/app/src/test/java/com/arcanatable/ArgentumRoomChatTest.kt'
+permissions:
+  contents: read
+concurrency:
+  group: b137-chat-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  room-chat-no-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export unchanged card assets (without unrelated scenario tests)
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+      - name: Run all room chat protocol and routing tests
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.ArgentumRoomChatTest'
+      - name: Validate complete JUnit XML
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          results = list(Path('android/app/build/test-results/testDebugUnitTest').rglob('TEST-*ArgentumRoomChatTest.xml'))
+          assert len(results) == 1, f'expected exactly one chat test class: {results}'
+          root = ET.parse(results[0]).getroot()
+          got = {k: int(root.attrib.get(k, '0')) for k in ('tests', 'failures', 'errors', 'skipped')}
+          print('B137 issue #18 room chat:', got)
+          assert got == {'tests': 6, 'failures': 0, 'errors': 0, 'skipped': 0}, got
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b137-issue-18-chat-junit
+          retention-days: 14
+          path: android/app/build/test-results/testDebugUnitTest/
