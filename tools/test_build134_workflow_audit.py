@@ -4,8 +4,10 @@ from build134_workflow_audit import audit, git_blob_sha, steps, RELEASE_SCOPE, P
 
 
 def fixture():
-    common = [f'      - name: gate {i}\n        run: echo {i}\n' for i in range(28)]
+    common = [f'      - name: gate {i}\n        run: echo {i}\n' for i in range(26)]
     common += [f'      - uses: action{i}@012345\n' for i in range(5)]
+    common += ['      - name: Capture unresolved three-way source conflicts for manual port\n        run: echo capture\n',
+               '      - name: Upload conflict and patch reports even on failure\n        run: echo diagnostics\n']
     common[0] = '      - name: Verify original logo and tutorial assets inside unsigned release package\n' + RELEASE_SCOPE + '\n'
     preview_common = common.copy()
     preview_common[0] = preview_common[0].replace(RELEASE_SCOPE, PREVIEW_SCOPE)
@@ -13,7 +15,7 @@ def fixture():
     extras = ['      - name: Build installable combined test APK\n        run: echo build\n',
               '      - name: Verify installable APK and record provenance\n        run: echo verify\n',
               '      - name: Upload APK only when every integrated source, card, AI, and app gate passed\n        if: success()\n        uses: actions/upload-artifact@v4\n        with:\n          if-no-files-found: error\n']
-    return prefix + ''.join(common), prefix + ''.join(preview_common + extras)
+    return prefix + ''.join(common), prefix + ''.join(preview_common[:-2] + extras + preview_common[-2:])
 
 
 class WorkflowAuditTest(unittest.TestCase):
@@ -57,23 +59,42 @@ class WorkflowAuditTest(unittest.TestCase):
         self.assertTrue(any('contiguous' in x for x in audit(
             a, b.replace(step, '').replace('      - name: gate 4\n', step + '      - name: gate 4\n'))))
 
-    def test_contiguous_packaging_before_final_shared_gate_rejected(self):
+    def test_contiguous_packaging_before_final_required_gate_rejected(self):
         a, b = fixture()
         marker = '      - name: Build installable combined test APK\n'
-        before, packaging = b.split(marker, 1)
-        packaging = marker + packaging
-        moved = before.replace('      - name: gate 27\n', packaging + '      - name: gate 27\n')
+        tail = '      - name: Capture unresolved three-way source conflicts for manual port\n'
+        before, remainder = b.split(marker, 1)
+        packaging, diagnostics = remainder.split(tail, 1)
+        moved = (before + tail + diagnostics).replace(
+            '      - name: gate 25\n', marker + packaging + '      - name: gate 25\n')
         self.assertEqual(len(steps(moved)), 36)
-        self.assertTrue(any('must follow all shared release gates' in x for x in audit(a, moved)))
+        self.assertTrue(any('must follow all required release gates' in x for x in audit(a, moved)))
 
-    def test_contiguous_packaging_before_first_shared_gate_rejected(self):
+    def test_contiguous_packaging_before_first_required_gate_rejected(self):
         a, b = fixture()
         marker = '      - name: Build installable combined test APK\n'
-        before, packaging = b.split(marker, 1)
-        packaging = marker + packaging
-        moved = before.replace('      - name: gate 1\n', packaging + '      - name: gate 1\n')
+        tail = '      - name: Capture unresolved three-way source conflicts for manual port\n'
+        before, remainder = b.split(marker, 1)
+        packaging, diagnostics = remainder.split(tail, 1)
+        moved = (before + tail + diagnostics).replace(
+            '      - name: gate 1\n', marker + packaging + '      - name: gate 1\n')
         self.assertEqual(len(steps(moved)), 36)
-        self.assertTrue(any('must follow all shared release gates' in x for x in audit(a, moved)))
+        self.assertTrue(any('must follow all required release gates' in x for x in audit(a, moved)))
+
+    def test_packaging_after_diagnostic_tail_rejected(self):
+        a, b = fixture()
+        marker = '      - name: Build installable combined test APK\n'
+        tail = '      - name: Capture unresolved three-way source conflicts for manual port\n'
+        before, remainder = b.split(marker, 1)
+        packaging, diagnostics = remainder.split(tail, 1)
+        moved = before + tail + diagnostics + marker + packaging
+        self.assertEqual(len(steps(moved)), 36)
+        self.assertTrue(any('precede diagnostic tail' in x for x in audit(a, moved)))
+
+    def test_diagnostic_tail_identity_drift_rejected(self):
+        a, b = fixture()
+        self.assertTrue(any('diagnostic tail changed' in x for x in audit(
+            a.replace('Capture unresolved three-way source conflicts for manual port', 'Different final gate'), b)))
 
     def test_commented_upload_condition_does_not_count(self):
         a, b = fixture()
