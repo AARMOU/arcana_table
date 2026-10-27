@@ -63,6 +63,14 @@ jobs:
           python3 temple-port/engine-upgrade/eldrazi-temple/port_to_upgraded.py argentum-engine
           cp temple-port/engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
           cp temple-gameplay/engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          # Gameplay tests import the real Temple DSL definition. Compile an isolated
+          # test-source copy in rules-engine (Android custom-cards is not an SDK dependency).
+          # Keep the pinned candidate source identical to the Android runner copy.
+          temple_test_source=argentum-engine/rules-engine/src/test/kotlin/com/arcanatable/customcards/cards/EldraziTemple.kt
+          test ! -e "$temple_test_source"
+          mkdir -p "$(dirname "$temple_test_source")"
+          cp engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt "$temple_test_source"
+          cmp -s engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt "$temple_test_source"
           git -C argentum-engine diff --check
       - uses: actions/setup-java@v4
         with:
