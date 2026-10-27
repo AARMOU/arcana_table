@@ -6,6 +6,7 @@ import com.wingedsheep.engine.legalactions.LegalAction
 import com.wingedsheep.engine.state.GameState
 import com.wingedsheep.engine.state.components.battlefield.TappedComponent
 import com.wingedsheep.engine.state.components.identity.ControllerComponent
+import com.wingedsheep.engine.state.components.identity.LifeTotalComponent
 import com.wingedsheep.engine.state.components.stack.ActivatedAbilityOnStackComponent
 import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.engine.state.components.stack.TargetsComponent
@@ -87,9 +88,13 @@ class AiCascadeThrottle(private val recheckEvery: Int = DEFAULT_RECHECK_EVERY) {
             return null
         }
 
-        /** Changes whenever [player]'s hand or own permanents (or their tapped state) change. */
+        /** Changes when this AI's life, hand or battlefield resources, or active seats change. */
         internal fun resources(state: GameState, player: EntityId): Long {
             var h = 1L
+            // Life payments, damage and elimination can change whether an instant is worth casting
+            // even though the AI still holds exactly the same cards and permanents.
+            h = h * 31 + (state.getEntity(player)?.get<LifeTotalComponent>()?.life ?: Int.MIN_VALUE)
+            h = h * 31 + state.activePlayers.hashCode()
             for (id in state.getHand(player)) h = h * 31 + id.hashCode()
             h = h * 31 + 7
             for (id in state.getBattlefield(player)) {
