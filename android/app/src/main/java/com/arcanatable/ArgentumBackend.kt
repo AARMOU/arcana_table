@@ -110,7 +110,7 @@ data class ArgentumDeckValidation(
     }
 }
 
-data class ArgentumTargetRef(val id: String, val name: String, val type: String, val ownerId: String? = null, val zone: String? = null)
+data class ArgentumTargetRef(val id: String, val name: String, val type: String, val ownerId: String? = null, val zone: String? = null, val controllerId: String? = null)
 
 /** A spell or ability on Argentum's stack, top first. */
 data class ArgentumStackItem(val id: String, val name: String, val controllerName: String, val isYours: Boolean, val imageUrl: String?, val targetNames: List<String>, val targetIds: List<String> = emptyList())
@@ -197,7 +197,11 @@ data class ArgentumTableSnapshot(
                         else -> "Card"
                     }
                     // Keep Argentum's zone spelling ("Graveyard"): ChosenTarget.Card deserializes Zone by its serial name.
-                    put(id, ArgentumTargetRef(id, card.optString("name", "Card"), targetType, zoneId.optString("ownerId"), zoneId.optString("zoneType")))
+                    put(id, ArgentumTargetRef(
+                        id, card.optString("name", "Card"), targetType,
+                        zoneId.optString("ownerId"), zoneId.optString("zoneType"),
+                        card.optString("controllerId").takeIf { it.isNotBlank() && it != "null" },
+                    ))
                 }
             }
             val displayIds = linkedMapOf<String, Int>()
