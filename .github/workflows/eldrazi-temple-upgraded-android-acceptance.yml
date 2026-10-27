@@ -51,7 +51,7 @@ jobs:
           test "$(git -C temple-gameplay rev-parse HEAD)" = c2fb681f08c93549ed9a6f0b8a23dafb7ea06de9
           test "$(git -C argentum-engine rev-parse HEAD)" = 7fb073337e4389cfabe2ebf4c6416633a7fc63d2
           test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt)" = 0e024338ec2d66c185ddec4aa1d61435845acf97
-          test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt)" = 855eec931798da310b41daa6267a1b61c5ea8b14
+          test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt)" = 11c075d7480a9fb59911c6115ea2513d2e28ddf4
           test "$(git -C temple-port hash-object engine-upgrade/eldrazi-temple/port_to_upgraded.py)" = 9078e8e3c5e245593d4ab6155fdde70965ac088a
           test "$(git -C temple-gameplay hash-object engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt)" = f2b88843a34bf39dd5c54370f21c6bc85bb02426
           sha256sum android/app/libs/argentum-*.jar > /tmp/temple-committed-jars.sha
@@ -252,7 +252,7 @@ jobs:
           suite(e/"TEST-com.wingedsheep.engine.scenarios.EldraziTempleManaRestrictionTest.xml", 7)
           suite(e/"TEST-com.wingedsheep.engine.scenarios.EldraziTempleGameplayScenarioTest.xml", 7)
           a = Path("android/custom-cards/build/test-results/test")
-          cases = suite(a/"TEST-com.arcanatable.customcards.EldraziTempleScenarioTest.xml", 16)
+          cases = suite(a/"TEST-com.arcanatable.customcards.EldraziTempleScenarioTest.xml", 18)
           required = {
               "restrictedManaPaysRealColorlessEldraziActivatedAbility",
               "restrictedManaRejectsColoredEldraziActivatedAbilityWithoutLaundering",
@@ -262,6 +262,8 @@ jobs:
               "restrictedManaRejectsGenericCostOfColoredEldraziAbility",
               "restrictedManaPaysGenericCostOfDevoidEldraziSpellWithPrintedBlueCost",
               "restrictedManaRejectsGenericCostOfColoredEldraziSpell",
+              "restrictedManaRejectsDevoidNonEldraziSpellEvenThoughColorless",
+              "restrictedManaRejectsDevoidNonEldraziActivatedAbility",
           }
           assert required <= cases, sorted(required-cases)
           for root in (a, Path("android/app/build/test-results/testDebugUnitTest"),
@@ -312,7 +314,7 @@ jobs:
               "head":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),
               "upgradedArgentum":"7fb073337e4389cfabe2ebf4c6416633a7fc63d2",
               "indexedCandidateOnly":counts, "engineScenarios":14,
-              "androidCardScenarios":16,"integrated":False},indent=2)+"\n")
+              "androidCardScenarios":18,"integrated":False},indent=2)+"\n")
           print("Temple upgraded-engine source + Android candidate scenarios and exact original-deck delta verified")
           PY
           sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/temple-export-1.sha
