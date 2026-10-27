@@ -21,10 +21,12 @@ jobs:
         working-directory: android
         run: |
           set +e
-          ./gradlew --no-daemon --max-workers=2 --continue :app:testDebugUnitTest --tests 'com.arcanatable.Tutorial*' --tests 'com.arcanatable.ui.Tutorial*' > ../ci.log 2>&1
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards > ../ci.log 2>&1
+          ./gradlew --no-daemon --max-workers=2 --continue :custom-cards:test :app:testDebugUnitTest >> ../ci.log 2>&1
+          ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest' >> ../ci.log 2>&1
           echo "EXIT $?" >> ../ci.log
           mkdir -p ../out && cp ../ci.log ../out/
-          find app/build/test-results -name 'TEST-*Tutorial*.xml' -exec cp {} ../out/ \; 2>/dev/null
+          grep -l '<failure\|<error' -r app/build/test-results custom-cards/build/test-results 2>/dev/null | xargs -r -I{} cp {} ../out/
           find app/build -path '*screenshots*' \( -name 'tutorial*.png' -o -name 'tutorial*.txt' \) -exec cp {} ../out/ \; 2>/dev/null
           true
       - name: Publish output to a log branch
