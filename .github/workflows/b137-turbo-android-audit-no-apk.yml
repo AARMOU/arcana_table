@@ -1,0 +1,97 @@
+name: B137 Turbo complete Android regression audit - NO APK
+# Owner-authorized isolated source validation; no APK/signing/Cloudflare/release.
+on:
+  push:
+    branches:
+      - gpt/b137-turbo-android-validation-20261026
+    paths:
+      - .github/workflows/b137-turbo-android-audit-no-apk.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: b137-turbo-no-apk-audit-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  combined-android-no-apk:
+    name: Exact B137 Turbo source, 16 focused Android suites (NO APK)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 85
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Assemble EXACT pinned B137 Turbo source without packaging
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$(git rev-parse HEAD)"
+          python3 tools/fast_apk_snapshot.py source
+          grep -F 'claude-tutorial-all-20-chapters dfccf7ff456e953f099930c426b8dee5554314ba' combined-evidence/next-apk-source-pins.txt
+          grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+          grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' android/app/src/main/java/com/arcanatable/TableArgentum.kt
+          git diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install only Android compile SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export current custom-card indexes, no APK
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+      - name: Run exact Turbo Android test matrix (no assembleDebug)
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
+            --tests 'com.arcanatable.ui.HomeScreenSizesTest' \
+            --tests 'com.arcanatable.ui.DeckBuilderUiTest' \
+            --tests 'com.arcanatable.DeckSupportTest' \
+            --tests 'com.arcanatable.ReleaseFeaturesTest' \
+            --tests 'com.arcanatable.TutorialPracticeScenariosTest' \
+            --tests 'com.arcanatable.TutorialPriorityHostTest' \
+            --tests 'com.arcanatable.ui.ArgentumResilienceUiTest' \
+            --tests 'com.arcanatable.GameOutcomeDetailsTest' \
+            --tests 'com.arcanatable.ArgentumBackendTest' \
+            --tests 'com.arcanatable.UginExportedRuntimeTest' \
+            --tests 'com.arcanatable.MultiplayerLobbyVisibilityTest' \
+            --tests 'com.arcanatable.ArgentumBlockSubmissionGuardTest' \
+            --tests 'com.arcanatable.TutorialRunTest' \
+            --tests 'com.arcanatable.TutorialWalkthroughTest' \
+            --tests 'com.arcanatable.ui.TutorialAuditUiTest' \
+            --tests 'com.arcanatable.ui.TutorialScreensTest'
+      - name: Require all 16 suites actually ran without failures, errors or skips
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root = Path('android/app/build/test-results/testDebugUnitTest')
+          names = ["com.arcanatable.ui.HomeScreenSizesTest","com.arcanatable.ui.DeckBuilderUiTest","com.arcanatable.DeckSupportTest","com.arcanatable.ReleaseFeaturesTest","com.arcanatable.TutorialPracticeScenariosTest","com.arcanatable.TutorialPriorityHostTest","com.arcanatable.ui.ArgentumResilienceUiTest","com.arcanatable.GameOutcomeDetailsTest","com.arcanatable.ArgentumBackendTest","com.arcanatable.UginExportedRuntimeTest","com.arcanatable.MultiplayerLobbyVisibilityTest","com.arcanatable.ArgentumBlockSubmissionGuardTest","com.arcanatable.TutorialRunTest","com.arcanatable.TutorialWalkthroughTest","com.arcanatable.ui.TutorialAuditUiTest","com.arcanatable.ui.TutorialScreensTest"]
+          total=0
+          for name in names:
+              matching = list(root.glob('TEST-' + name + '.xml'))
+              assert len(matching)==1,(name,matching)
+              data=ET.parse(matching[0]).getroot()
+              count=int(data.get('tests','0'))
+              assert count>0,(name,'no tests executed')
+              for k in ('failures','errors','skipped'):
+                  assert int(data.get(k,'0'))==0,(name,k,data.attrib)
+              total+=count
+              print('PASS',name,count,'executed')
+          print('PASS: 16 required exact-head Turbo suites,',total,'tests, zero failures/errors/skips; NO APK')
+          PY
+      - name: Upload Android XML proof, no APK
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: b137-turbo-16-android-test-xml-no-apk
+          retention-days: 14
+          if-no-files-found: ignore
+          path: android/app/build/test-results/testDebugUnitTest/*.xml
