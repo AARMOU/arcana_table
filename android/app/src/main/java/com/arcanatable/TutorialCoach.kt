@@ -253,56 +253,69 @@ internal fun TutorialCoachOverlay(
     BoxWithConstraints(modifier.testTag("tutorial-coach").onGloballyPositioned { origin = it.positionInWindow() }) {
         val maxW = maxWidth
         val maxH = maxHeight
-        // Only a control in this same window can be highlighted here.
+        // A target from a scrolled list can extend outside its window. Clip
+        // to the visible area; only the visible control may receive the tap.
         val rect = if (avoidTableOverlay) null else step.target?.let { TutorialTargets.resolve(it, root) }
             ?.let(TutorialTargets.bounds::get)?.translate(-origin)
-        val valid = rect != null && rect.width > 1f && rect.height > 1f
-        val target = if (valid) rect else null
-        val left = if (target == null) 0.dp else with(density) { target.left.toDp() }.coerceIn(0.dp, maxW)
-        val top = if (target == null) 0.dp else with(density) { target.top.toDp() }.coerceIn(0.dp, maxH)
-        val right = if (target == null) maxW else with(density) { target.right.toDp() }.coerceIn(0.dp, maxW)
-        val bottom = if (target == null) maxH else with(density) { target.bottom.toDp() }.coerceIn(0.dp, maxH)
+        val target = rect?.let {
+            TutorialCoachTarget(
+                with(density) { it.left.toDp() }.coerceIn(0.dp, maxW),
+                with(density) { it.top.toDp() }.coerceIn(0.dp, maxH),
+                with(density) { it.right.toDp() }.coerceIn(0.dp, maxW),
+                with(density) { it.bottom.toDp() }.coerceIn(0.dp, maxH),
+            )
+        }?.takeIf { it.right > it.left && it.bottom > it.top }
         if (target != null) {
             val dark = Color.Black.copy(alpha = 0.58f)
-            @Composable fun Shade(x: androidx.compose.ui.unit.Dp, y: androidx.compose.ui.unit.Dp,
-                                  w: androidx.compose.ui.unit.Dp, h: androidx.compose.ui.unit.Dp) {
+            @Composable fun Shade(x: Dp, y: Dp, w: Dp, h: Dp) {
                 if (w > 0.dp && h > 0.dp) Box(
                     Modifier.offset(x, y).size(w, h).background(dark)
                         .pointerInput(Unit) { detectTapGestures {} }
                 )
             }
-            Shade(0.dp, 0.dp, maxW, top)
-            Shade(0.dp, bottom, maxW, maxH - bottom)
-            Shade(0.dp, top, left, bottom - top)
-            Shade(right, top, maxW - right, bottom - top)
+            Shade(0.dp, 0.dp, maxW, target.top)
+            Shade(0.dp, target.bottom, maxW, maxH - target.bottom)
+            Shade(0.dp, target.top, target.left, target.bottom - target.top)
+            Shade(target.right, target.top, maxW - target.right, target.bottom - target.top)
             // Not clickable: touches in the highlighted hole reach the real control.
-            Box(Modifier.offset(left, top).size(right - left, bottom - top)
+            Box(Modifier.offset(target.left, target.top).size(target.right - target.left, target.bottom - target.top)
                 .border(3.dp, gold, RoundedCornerShape(9.dp)))
         }
-        val cardY = when {
-            target == null -> (maxH * 0.23f).coerceAtLeast(24.dp)
-            top > maxH * 0.43f -> 16.dp
-            else -> (maxH - 216.dp).coerceAtLeast((bottom + 8.dp).coerceAtMost(maxH - 216.dp))
-        }
-        Surface(Modifier.offset(x = 12.dp, y = cardY).widthIn(max = (maxW - 24.dp))
-            .testTag("tutorial-coach-tip"), shape = RoundedCornerShape(14.dp),
-            color = Color(0xFF12241F), shadowElevation = 10.dp) {
-            Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("ARCANA  /  " + lesson.title.uppercase(), color = gold,
-                        fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
-                    Text("${index + 1} / ${lesson.steps.size}", color = muted, fontSize = 11.sp)
-                }
-                Text(step.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text(step.body, color = Color(0xFFF0EEE6), fontSize = 13.sp, lineHeight = 18.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(onClick = onSkip, modifier = Modifier.height(45.dp)) { Text("EXIT") }
-                    if (stepHasNext(step, practice)) {
-                        Button(onClick = onNext, modifier = Modifier.height(45.dp)) { Text("NEXT") }
-                    } else {
-                        Text(step.hint.ifBlank { "Use the highlighted control" },
-                            color = gold, fontSize = 12.sp, modifier = Modifier.weight(1f))
+        // The card's actual height is bounded by free space. Unlike the old
+        // 216dp guess, this also works for long text and smaller folded windows.
+        val region = tutorialCoachRegion(maxW, maxH, target)
+        val scroll = rememberScrollState()
+        LaunchedEffect(lesson, index) { scroll.scrollTo(0) }
+        Box(
+            Modifier.offset(region.x, region.y).size(region.width, region.height),
+            contentAlignment = if (region.bottomAligned) Alignment.BottomStart else Alignment.TopStart,
+        ) {
+            Surface(
+                Modifier.fillMaxWidth().heightIn(max = region.height).testTag("tutorial-coach-tip"),
+                shape = RoundedCornerShape(14.dp),
+                color = Color(0xFF12241F), shadowElevation = 10.dp,
+            ) {
+                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                    Column(Modifier.weight(1f, fill = false).verticalScroll(scroll),
+                        verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("ARCANA  /  " + lesson.title.uppercase(), color = gold,
+                                fontSize = 10.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
+                            Text((index + 1).toString() + " / " + lesson.steps.size, color = muted, fontSize = 11.sp)
+                        }
+                        Text(step.title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                        Text(step.body, color = Color(0xFFF0EEE6), fontSize = 13.sp, lineHeight = 18.sp)
+                    }
+                    // Actions stay accessible while the instruction copy scrolls.
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedButton(onClick = onSkip, modifier = Modifier.height(45.dp)) { Text("EXIT") }
+                        if (stepHasNext(step, practice)) {
+                            Button(onClick = onNext, modifier = Modifier.height(45.dp)) { Text("NEXT") }
+                        } else {
+                            Text(step.hint.ifBlank { "Use the highlighted control" },
+                                color = gold, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        }
                     }
                 }
             }
