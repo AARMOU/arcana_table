@@ -336,15 +336,18 @@ jobs:
           compat=engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py
           assets=android/app/src/main/assets/argentum
           python3 "$compat" --apply "$assets/all-cards.jsonl" --expected-mana 1 --minimum-counters 1
-          # Exported custom-cards.jsonl is also consumed by OfflineCardLibrary,
-          # and may contain legacy wire shapes even when the committed asset did not.
-          # Keep the migration confined to disposable CI assets, never production.
-          python3 "$compat" --apply "$assets/custom-cards.jsonl" --expected-mana 1 --minimum-counters 0
+          # Exported custom-cards.jsonl is also consumed by OfflineCardLibrary.
+          # The pinned SDK's AddAnyColorManaSpendOnChosenType DSL factory emits
+          # *new* AddManaOfChoice wire format, so its generated legacy-mana count
+          # is exactly zero; committed pre-export assets may still be stale.
+          # Accept no old mana wire there, but port any legacy counter shapes.
+          python3 "$compat" --apply "$assets/custom-cards.jsonl" --expected-mana 0 --minimum-counters 0
+          # all-cards must change; custom-cards may already be current SDK ABI.
+          if git diff --quiet -- "$assets/all-cards.jsonl"; then
+            echo "Legacy ABI port made no change to all-cards.jsonl" >&2
+            exit 1
+          fi
           for asset in all-cards.jsonl custom-cards.jsonl; do
-            if git diff --quiet -- "$assets/$asset"; then
-              echo "Legacy ABI port made no change to $asset" >&2
-              exit 1
-            fi
             git diff --check -- "$assets/$asset"
             if grep -Eq '"type"[[:space:]]*:[[:space:]]*"(DoubleCounterPlacement|AddAnyColorManaSpendOnChosenType)"' "$assets/$asset"; then
               echo "Legacy wire type remains in $asset" >&2
@@ -442,7 +445,7 @@ jobs:
           (cd android && ./gradlew --no-daemon --max-workers=2 --rerun-tasks :custom-cards:exportCards)
           # Reapply the same deterministic, strict runner-only ABI migration:
           # the export task emits legacy custom-card wire shapes before migration.
-          python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --apply android/app/src/main/assets/argentum/custom-cards.jsonl --expected-mana 1 --minimum-counters 0
+          python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --apply android/app/src/main/assets/argentum/custom-cards.jsonl --expected-mana 0 --minimum-counters 0
           sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/temple-export-2.sha
           diff -u /tmp/temple-export-1.sha /tmp/temple-export-2.sha
           git diff --check
