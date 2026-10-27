@@ -14,6 +14,7 @@ import com.wingedsheep.engine.state.components.battlefield.EnteredThisTurnCompon
 import com.wingedsheep.engine.state.components.combat.AttackersDeclaredThisCombatComponent
 import com.wingedsheep.engine.state.components.combat.BlockersDeclaredThisCombatComponent
 import com.wingedsheep.engine.state.components.identity.TokenComponent
+import com.wingedsheep.engine.state.components.identity.LifeTotalComponent
 import com.wingedsheep.engine.state.components.player.LifeGainedAmountThisTurnComponent
 import com.wingedsheep.engine.state.components.player.LifeGainedThisTurnComponent
 import com.wingedsheep.engine.state.components.player.PlayerCitysBlessingComponent
@@ -240,5 +241,20 @@ class TokenCascadeEndStepStressTest {
         val before = AiCascadeThrottle.resources(d.state, a1)
         d.putCardInHand(a1, "Path to Exile")
         assertNotEquals(before, AiCascadeThrottle.resources(d.state, a1))
+    }
+
+    /** Life can change in the middle of an end-step cascade without a single card moving. */
+    @Test
+    fun aiLifeChangeInvalidatesCascadeResourceFingerprint() {
+        val f = fixture()
+        val d = f.d
+        val ai = f.players[1]
+        d.replaceState(f.root)
+        val original = d.state.getEntity(ai)!!.get<LifeTotalComponent>()!!.life
+        val before = AiCascadeThrottle.resources(d.state, ai)
+        d.replaceState(d.state.updateEntity(ai) { it.with(LifeTotalComponent(original - 3)) })
+        assertEquals(original - 3, d.state.getEntity(ai)!!.get<LifeTotalComponent>()!!.life)
+        assertNotEquals("life change must invalidate an AI's cached pass", before,
+            AiCascadeThrottle.resources(d.state, ai))
     }
 }
