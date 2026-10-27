@@ -105,9 +105,16 @@ class WorkflowAuditTest(unittest.TestCase):
 
     def test_packaging_steps_cannot_be_interleaved(self):
         a, b = fixture()
-        step = '      - name: Verify installable APK and record provenance\n        run: echo verify\n'
-        self.assertTrue(any('contiguous' in x for x in audit(
-            a, b.replace(step, '').replace('      - name: gate 4\n', step + '      - name: gate 4\n'))))
+        # Move the real multi-line verification step. A stale placeholder
+        # would leave the fixture unchanged and never exercise this guard.
+        verify = '      - name: Verify installable APK and record provenance\n'
+        upload = '      - name: Upload APK only when every integrated source, card, AI, and app gate passed\n'
+        before, remainder = b.split(verify, 1)
+        verify_body, after = remainder.split(upload, 1)
+        moved = (before + upload + after).replace(
+            '      - name: gate 4\n', verify + verify_body + '      - name: gate 4\n')
+        self.assertEqual(len(steps(moved)), 36)
+        self.assertTrue(any('contiguous' in x for x in audit(a, moved)))
 
     def test_contiguous_packaging_before_final_required_gate_rejected(self):
         a, b = fixture()
