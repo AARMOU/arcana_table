@@ -51,6 +51,15 @@ jobs:
       - name: Regenerate custom-card assets
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+      # Owner-requested B138 UI/priority regressions run independently. Do not let
+      # unrelated existing custom-card scenario failures prevent their execution.
+      # The complete custom-card + Android suite below remains mandatory/fatal.
+      - name: Verify B138 auto-pass and played-card popup timing
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
+            --tests 'com.arcanatable.ArgentumPassingTest' \
+            --tests 'com.arcanatable.ReadableNotificationDurationTest'
       - name: Run custom-card scenario tests and Build 131 Android unit tests
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest

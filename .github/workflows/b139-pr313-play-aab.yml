@@ -1,0 +1,208 @@
+name: Arcana B139 PR313 Play AAB (unsigned; private upload-key signing)
+# Owner-authorized AAB packaging of the EXACT WORKING B138 Turbo gameplay/UI source.
+# Uses B138 pinned engine/card JAR+assets; runner-only pin merges; no main PR merges.
+# Never put Play upload keystore, credentials or a signed AAB in this workflow.
+on:
+  push:
+    branches:
+      - gpt/b138-auto-pass-targets-nudge-fix-20261027
+    paths:
+      - .github/workflows/b139-pr313-play-aab.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arcana-b139-pr313-aab
+  cancel-in-progress: false
+
+jobs:
+  aab:
+    name: B138 Turbo source -> B139 production-ID unsigned AAB
+    if: github.repository == 'AARMOU/arcana_table'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - name: Checkout PR313 source without credentials
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Prove exact frozen engine and card data from user-tested B138
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci-out
+          BASE=41f7556676fd5d5d0b493d47db65450ecdd142e4
+          git merge-base --is-ancestor "$BASE" HEAD
+          git rev-parse HEAD > ci-out/source-pr313-sha.txt
+          for p in \
+            android/app/libs/argentum-ai.jar \
+            android/app/libs/argentum-mtg-sdk-tooling.jar \
+            android/app/libs/argentum-mtg-sdk.jar \
+            android/app/libs/argentum-rules-engine.jar \
+            android/app/src/main/assets/argentum/all-cards.index.tsv \
+            android/app/src/main/assets/argentum/all-cards.jsonl \
+            android/app/src/main/assets/argentum/custom-cards.index.tsv \
+            android/app/src/main/assets/argentum/custom-cards.jsonl; do
+              test "$(git rev-parse "HEAD:$p")" = "$(git rev-parse "$BASE:$p")" || { echo "::error::Unreviewed engine/card drift in $p"; exit 1; }
+              printf '%s %s\n' "$(git rev-parse "HEAD:$p")" "$p" >> ci-out/reused-b138-assets.txt
+          done
+          echo 'PASS: exactly the user-tested pinned B138 engine JARs and card sources'
+      - name: Runner-only merge of identical six reviewed B138 multiplayer fixes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name arcana-b139-source-assembler
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          for item in \
+            303:4317184c3fb1666a95a5242e20f4fd777eb47e44 \
+            304:e82b57621374c7aca0a5d854f029ddda4176d597 \
+            305:0f08acef5ea02dc0ee9469adabcf7f0871efc77d \
+            306:1fafb3b1adfb52fdabb8a4f9f27283a263b3faf9 \
+            307:d171b27a21aed98dd3074c02f2c4f01e84c96fd7 \
+            308:abcae2a5e3b9bfb8bff80aa393c34112199b1bbd; do
+              IFS=: read -r pr sha <<< "$item"
+              git fetch --no-tags origin "$sha"
+              test "$(git rev-parse FETCH_HEAD)" = "$sha"
+              git merge --no-ff --no-edit -X ours "$sha" -m "Runner-only B139 source: B138 PR #$pr $sha"
+              printf 'PR #%s %s\n' "$pr" "$sha" >> ci-out/runner-only-pins.txt
+          done
+          git rev-parse HEAD > ci-out/assembled-source-sha.txt
+          git diff --check
+      - name: Assert working Turbo source and PR313 fixes survived integration
+        shell: bash
+        run: |
+          set -euo pipefail
+          a=android/app/src/main/java/com/arcanatable
+          t=android/app/src/test/java/com/arcanatable
+          grep -Fq 'shouldKeepMultiplayerConnectionGuard(' "$a/TableEffects.kt"
+          grep -Fq 'argentumOpeningHand = hand' "$a/TableArgentum.kt"
+          grep -Fq 'val hostLobbyState = wifiMultiLobbyState' "$a/TableMultiLobby.kt"
+          grep -Fq 'tutorialCoachRegion(maxW, maxH, target)' "$a/TutorialCoach.kt"
+          grep -Fq 'receiveRoomChatFromGuest' "$a/TableWifi.kt"
+          grep -Fq 'ArgentumRoomChat.DELIVERY' "$a/TableArgentum.kt"
+          grep -Fq 'class TutorialRun' "$a/TutorialProgress.kt"
+          test -s "$t/MultiplayerConnectionGuardTest.kt"
+          test -s "$t/ArgentumRoomChatTest.kt"
+          grep -Fq 'playedCardPopupDurationMs(popupDurationSeconds)' "$a/PlayFeed.kt"
+          grep -Fq 'Played-card popup time' "$a/AdjustUiPage.kt"
+          grep -Fq 'lastBackgroundYourMoveKey' "$a/TableEffects.kt"
+          grep -Fq 'ArgentumPassing.interruptingStackItem' "$a/TableEffects.kt"
+          grep -Fq 'onAutoPass = { if (argentumEnabled) togglePassToMyTurn() }' "$a/TableOverlays.kt"
+          grep -Fq 'targetCount > item.targetIds.size' "$a/ArgentumPassing.kt"
+          test -s "$t/ArgentumPassingTest.kt"
+          test -s "$t/ReadableNotificationDurationTest.kt"
+          python3 tools/check_android_regex.py
+          python3 tools/verify_launcher_branding.py
+          python3 - <<'PY'
+          from pathlib import Path
+          import json
+          x=json.loads(Path('android/app/src/main/assets/tutorials/catalog.json').read_text())
+          assert len(x['chapters'])==20, 'Missing B138 tutorial chapters'
+          print('PASS: same reviewed multiplayer/PR313 fixes + tutorial as working debug')
+          PY
+      - name: Install Java 17 / cached Gradle
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Configure Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Stamp Play versionCode 139, production application ID, no debug signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/fast_apk_snapshot.py version --version-code 139
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('android/app/build.gradle.kts'); s=p.read_text()
+          before='versionName = "0.33.14-build139-fast-test"'
+          assert s.count(before)==1
+          s=s.replace(before,'versionName = "0.33.15-build139"',1)
+          assert 'applicationId = "com.arcanatable"' in s
+          assert 'versionCode = 139' in s
+          assert 'signingConfig = signingConfigs.getByName("debug")' not in s
+          p.write_text(s)
+          print('PASS: com.arcanatable, versionCode 139, release variant with NO debug signing')
+          PY
+      - name: Run focused Android tests, release lint, produce unsigned production AAB
+        shell: bash
+        working-directory: android
+        run: |
+          set -euo pipefail
+          # --tests applies only to the Test task. Never pass it to bundleRelease.
+          ./gradlew --no-daemon --max-workers=2 \
+            :app:testDebugUnitTest \
+            --tests 'com.arcanatable.ArgentumPassingTest' \
+            --tests 'com.arcanatable.ReadableNotificationDurationTest' \
+            --tests 'com.arcanatable.MultiplayerConnectionGuardTest' \
+            --tests 'com.arcanatable.ArgentumRoomChatTest' \
+            --tests 'com.arcanatable.MultiplayerLobbyVisibilityTest' \
+            --tests 'com.arcanatable.TutorialRunTest' \
+            --tests 'com.arcanatable.TutorialCoachPlacementTest' \
+            2>&1 | tee ../ci-out/b139-android-focused-tests.log | tail -150
+          ./gradlew --no-daemon --max-workers=2 :app:lintRelease :app:bundleRelease \
+            2>&1 | tee ../ci-out/b139-release-lint-bundle.log | tail -150
+      - name: Validate complete focused test execution, AAB archive and source parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          from zipfile import ZipFile
+          import json,hashlib
+          root=Path('android/app/build/test-results/testDebugUnitTest')
+          names=['ArgentumPassingTest','ReadableNotificationDurationTest',
+             'MultiplayerConnectionGuardTest','ArgentumRoomChatTest',
+             'MultiplayerLobbyVisibilityTest','TutorialRunTest','TutorialCoachPlacementTest']
+          count=0
+          for name in names:
+              files=list(root.glob('TEST-*'+name+'.xml'))
+              assert len(files)==1,(name,files)
+              suite=ET.parse(files[0]).getroot()
+              tests=int(suite.get('tests','0'));count+=tests
+              assert tests>0,(name,'no tests')
+              for key in ('failures','errors','skipped'):
+                  assert int(suite.get(key,'0'))==0,(name,key,suite.attrib)
+          p=Path('android/app/build/outputs/bundle/release/app-release.aab')
+          assert p.stat().st_size>10_000_000
+          with ZipFile(p) as z:
+              assert z.testzip() is None
+              names=set(z.namelist())
+              for name in ('all-cards.index.tsv','custom-cards.index.tsv'):
+                  path='base/assets/argentum/'+name
+                  assert z.read(path)==Path('android/app/src/main/assets/argentum',name).read_bytes()
+              assert len(json.loads(z.read('base/assets/tutorials/catalog.json'))['chapters'])==20
+          out=Path('ci-out/ArcanaTable-B139-PR313-UNSIGNED.aab')
+          out.write_bytes(p.read_bytes())
+          Path('ci-out/UNSIGNED-AAB-SHA256.txt').write_text(hashlib.sha256(out.read_bytes()).hexdigest()+'  '+out.name+'\n')
+          Path('ci-out/PRIVATE-SIGNING-REQUIRED.txt').write_text(
+              'BUILD 139 / com.arcanatable. This AAB is intentionally UNSIGNED.\n'
+              'Privately sign with the ORIGINAL verified arcana-upload key; do not upload the key to GitHub.\n'
+              'Device-tested B138 Turbo source, 7 targeted suites and release lint, not a new full card suite.\n')
+          print('PASS:',count,'focused tests, AAB archive + tutorial/card parity, unsigned release artifact')
+          PY
+      - name: Upload UNSIGNED Play-target AAB for private upload-key signing
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArcanaTable-B139-PR313-UNSIGNED-AAB
+          path: ci-out/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Upload logs and tests even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArcanaTable-B139-PR313-build-diagnostics
+          path: |
+            ci-out/
+            android/app/build/test-results/testDebugUnitTest/
+          retention-days: 14
+          if-no-files-found: warn

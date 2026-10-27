@@ -192,7 +192,7 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
         argentumStackUse = use.copy(remaining = use.remaining - 1)
         if (!submitArgentumAction(action, epoch)) argentumStackUse = null
     }
-    // "Pass to my turn": press Argentum's own PassPriority until your next turn or until you're needed.
+    // Hold Pass to auto-pass harmless priority windows until your next turn or an actual threat.
     LaunchedEffect(passToMyTurnFrom, argentumSnapshot, argentumPendingDecision, argentumAwaitingUpdate, argentumStatus) {
         val start = passToMyTurnFrom ?: return@LaunchedEffect
         val snapshot = argentumSnapshot ?: return@LaunchedEffect
@@ -203,7 +203,9 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
             priorityPlayer = snapshot.priorityPlayer,
             legalActionTypes = snapshot.legalActions.mapNotNull { it.optJSONObject("action")?.optString("type") }.toSet(),
             hasPendingDecision = argentumPendingDecision != null,
-            opponentStackItem = snapshot.stack.firstOrNull { !it.isYours }?.name,
+            opponentStackItem = ArgentumPassing.interruptingStackItem(
+                snapshot.stack, snapshot.targets, snapshot.players.getOrNull(localSeat)?.id,
+            ),
             gameOver = gameEndedOnline || snapshot.gameOver, awaitingUpdate = argentumAwaitingUpdate,
         )
         when (outcome.step) {
@@ -251,13 +253,17 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
             }
         }
     }
-    LaunchedEffect(argentumYourMove) {
-        if (!argentumYourMove) return@LaunchedEffect
-        delay(350) // ignore momentary priority during Argentum's own auto-passing
-        // Playing a friend: when they're waiting on you during their turn, make it obvious.
-        if (wifiRole != null && argentumCanRespond && appInForeground) { buzz(250); flashMessage = FlashText("Your move", 0xFF8BE3B4) }
-        if (appInForeground) haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
-        else if (backgroundAlertsEnabled) postGameAlert(context, "Your move", argentumPendingDecision?.optString("prompt")?.takeIf { it.isNotBlank() } ?: "Argentum is waiting for you.")
+    // The hidden two-tap "arcanaNudge" owns the foreground buzz/flash. Ordinary priority
+    // is already indicated by the Pass button; never flash or vibrate for it.
+    // Keep explicitly enabled BACKGROUND alerts, deduplicated per turn/decision.
+    LaunchedEffect(argentumYourMove, argentumTurnKey, argentumPendingDecision?.optString("id"), appInForeground, backgroundAlertsEnabled) {
+        if (!argentumYourMove || appInForeground || !backgroundAlertsEnabled) return@LaunchedEffect
+        delay(350)
+        val key = "${argentumTurnKey?.first}:${argentumPendingDecision?.optString("id").orEmpty()}"
+        if (argentumYourMove && !appInForeground && backgroundAlertsEnabled && lastBackgroundYourMoveKey != key) {
+            lastBackgroundYourMoveKey = key
+            postGameAlert(context, "Your move", argentumPendingDecision?.optString("prompt")?.takeIf { it.isNotBlank() } ?: "Argentum is waiting for you.")
+        }
     }
     LaunchedEffect(argentumTurnKey) {
         val (turn, active) = argentumTurnKey ?: return@LaunchedEffect

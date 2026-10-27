@@ -862,6 +862,8 @@ internal class TableController(
         (argentumPrimaryLabel != null || argentumPendingDecision?.optString("type")?.let { it != "PlayCardDecision" } == true)
     // A banner (and a buzz on yours) when each turn starts.
     var turnBanner by run { mutableStateOf<TurnBannerState?>(null) }
+    /** Prevent repeated background priority notifications within the same turn/choice. */
+    var lastBackgroundYourMoveKey: String? = null
     var observedChatCount by run { mutableIntStateOf(chatMessages.size) }
 
     val activity get() = context as? Activity
