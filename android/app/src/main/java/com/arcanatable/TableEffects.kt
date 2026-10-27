@@ -365,9 +365,13 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
                 (!onlineMode || it.controllerId == players.getOrNull(localSeat)?.id)
         }?.id
     }
-    LaunchedEffect(chatMessages.size, chatOpen) {
-        if (chatMessages.size > observedChatCount && !chatOpen) unreadChatCount += chatMessages.size - observedChatCount
+    LaunchedEffect(chatMessages.size, roomChatDisplayRevision, chatOpen) {
+        // Counting list items alone stops the badge when the rolling history reaches 200.
+        val listDelta = (chatMessages.size - observedChatCount).coerceAtLeast(0)
+        val relayDelta = (roomChatDisplayRevision - observedRoomChatRevision).coerceAtLeast(0)
+        if (!chatOpen) unreadChatCount += maxOf(listDelta, relayDelta)
         observedChatCount = chatMessages.size
+        observedRoomChatRevision = roomChatDisplayRevision
         if (chatOpen) unreadChatCount = 0
     }
     // A lesson step about your own board keeps your player view while that step is showing.
