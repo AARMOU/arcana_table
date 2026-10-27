@@ -1,0 +1,98 @@
+name: Ulalek exact-owner stack and own-priority regressions
+
+# Isolated GPT #132 lane. Runs committed engine scenarios only; no jar build,
+# artifact publication to releases, app assembly, or shared-branch mutation.
+on:
+  push:
+    branches: [gpt/ulalek-polish-20261024]
+    paths:
+      - .github/workflows/ulalek-focused-regressions.yml
+      - android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlalekFusedAtrocityScenarioTest.kt
+      - android/custom-cards/src/test/kotlin/com/arcanatable/customcards/OfflineHumanAutoPassParityTest.kt
+      - android/app/src/main/java/com/arcanatable/engine/priority/OfflineHumanAutoPass.kt
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ulalek-focused-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-engine-and-priority:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Record exact candidate and committed runtime hashes
+        run: |
+          echo "HEAD=$(git rev-parse HEAD)"
+          sha256sum android/app/libs/argentum-*.jar | sort > /tmp/ulalek-runtime-before.sha256
+          cat /tmp/ulalek-runtime-before.sha256
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android compile SDK
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Execute actual Ulalek and offline-priority JUnit scenarios
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:test \
+            --tests 'com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest' \
+            --tests 'com.arcanatable.customcards.OfflineHumanAutoPassParityTest'
+      - name: Require every named scenario to execute and pass
+        run: |
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          from pathlib import Path
+
+          root = Path('android/custom-cards/build/test-results/test')
+          expected = {
+              'com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest': 18,
+              'com.arcanatable.customcards.OfflineHumanAutoPassParityTest': 9,
+          }
+          executed = {key: [] for key in expected}
+          files = list(root.glob('TEST-*.xml'))
+          assert files, 'No JUnit XML: do not treat compilation alone as passing'
+          for path in files:
+              suite = ET.parse(path).getroot()
+              for test in suite.iter('testcase'):
+                  cls = test.get('classname', '')
+                  if cls in executed:
+                      executed[cls].append(test)
+          for cls, count in expected.items():
+              cases = executed[cls]
+              assert len(cases) == count, f'{cls}: executed {len(cases)} of {count}'
+              bad = [t.get('name') for t in cases
+                     if any(t.find(tag) is not None for tag in ('failure', 'error', 'skipped'))]
+              assert not bad, f'{cls}: failed/error/skipped scenarios: {bad}'
+              print(f'{cls}: {len(cases)}/{count} passed')
+          names = {t.get('name') for t in executed[
+              'com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest']}
+          for required in (
+              'opponentsEldraziCastDoesNotTriggerMyUlalek',
+              'opponentsActivatedAbilitiesAreNotCopiedEvenWhenTheyAreOnTheStack',
+              'activatedAbilitiesAreCopiedWithTheirTargets',
+          ):
+              assert required in names, f'Critical regression did not execute: {required}'
+          PY
+      - name: Verify no tracked runtime or source changes
+        if: always()
+        run: |
+          sha256sum android/app/libs/argentum-*.jar | sort > /tmp/ulalek-runtime-after.sha256
+          diff -u /tmp/ulalek-runtime-before.sha256 /tmp/ulalek-runtime-after.sha256
+          git diff --exit-code
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ulalek-focused-junit
+          retention-days: 14
+          if-no-files-found: warn
+          path: android/custom-cards/build/test-results/test/TEST-*.xml
