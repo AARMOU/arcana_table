@@ -1,0 +1,9 @@
+Auto-merging android/app/src/main/java/com/arcanatable/TableBoardViews.kt
+Auto-merging android/app/src/main/java/com/arcanatable/TableController.kt
+Auto-merging android/app/src/main/java/com/arcanatable/TableDialogs.kt
+Auto-merging android/app/src/main/java/com/arcanatable/TableHelpers.kt
+CONFLICT (content): Merge conflict in android/app/src/main/java/com/arcanatable/TableHelpers.kt
+Auto-merging android/app/src/main/java/com/arcanatable/TableMainLayout.kt
+CONFLICT (content): Merge conflict in android/app/src/main/java/com/arcanatable/TableMainLayout.kt
+Auto-merging android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
+Automatic merge failed; fix conflicts and then commit the result.

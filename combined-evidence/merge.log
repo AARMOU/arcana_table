@@ -1,0 +1,13 @@
+Auto-merging android/app/src/main/assets/argentum/custom-cards.index.tsv
+Auto-merging android/app/src/main/assets/argentum/custom-cards.jsonl
+Auto-merging android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt
+Auto-merging docs/agents/generated/pattern-index.json
+CONFLICT (content): Merge conflict in docs/agents/generated/pattern-index.json
+Auto-merging docs/agents/generated/pattern-index.md
+CONFLICT (content): Merge conflict in docs/agents/generated/pattern-index.md
+Auto-merging engine-upgrade/UPGRADE-TEMPLATE.md
+CONFLICT (content): Merge conflict in engine-upgrade/UPGRADE-TEMPLATE.md
+Auto-merging tools/cardkit/data/known-blockers.json
+CONFLICT (content): Merge conflict in tools/cardkit/data/known-blockers.json
+Auto-merging tools/cardkit/tests/test_cardkit.py
+Automatic merge failed; fix conflicts and then commit the result.

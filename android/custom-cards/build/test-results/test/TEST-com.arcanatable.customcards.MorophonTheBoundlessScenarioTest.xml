@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.MorophonTheBoundlessScenarioTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:29.242Z" hostname="runnervmtai0g" time="0.193">
+  <properties/>
+  <testcase name="noReductionForColoredNonTypeSpell" classname="com.arcanatable.customcards.MorophonTheBoundlessScenarioTest" time="0.049"/>
+  <testcase name="genericIsNotReducedAndOtherTypesPayFull" classname="com.arcanatable.customcards.MorophonTheBoundlessScenarioTest" time="0.049"/>
+  <testcase name="otherCreaturesOfTheChosenTypeYouControlGetPlusOne" classname="com.arcanatable.customcards.MorophonTheBoundlessScenarioTest" time="0.046"/>
+  <testcase name="chosenTypeSpellsLoseTheirColoredPipsOnly" classname="com.arcanatable.customcards.MorophonTheBoundlessScenarioTest" time="0.049"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

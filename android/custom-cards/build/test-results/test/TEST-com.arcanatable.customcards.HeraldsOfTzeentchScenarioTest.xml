@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.HeraldsOfTzeentchScenarioTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:24.571Z" hostname="runnervmtai0g" time="0.171">
+  <properties/>
+  <testcase name="cascadeSkipsLandAndCastsLowerManaValueSpellBeforeHeraldEnters" classname="com.arcanatable.customcards.HeraldsOfTzeentchScenarioTest" time="0.058"/>
+  <testcase name="enteringWithoutBeingCastDoesNotCascade" classname="com.arcanatable.customcards.HeraldsOfTzeentchScenarioTest" time="0.053"/>
+  <testcase name="controllerMayDeclineTheCascadeSpell" classname="com.arcanatable.customcards.HeraldsOfTzeentchScenarioTest" time="0.06"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

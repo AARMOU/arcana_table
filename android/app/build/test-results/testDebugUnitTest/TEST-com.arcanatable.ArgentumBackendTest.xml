@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ArgentumBackendTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:16:35.959Z" hostname="runnervmtai0g" time="0.061">
+  <properties/>
+  <testcase name="commanderDamageProjectionAndTrackerUseCommanderNameNotSeatId" classname="com.arcanatable.ArgentumBackendTest" time="0.049"/>
+  <testcase name="validationSeparatesUnknownCardsFromOtherFormatErrors" classname="com.arcanatable.ArgentumBackendTest" time="0.002"/>
+  <testcase name="tableProjectionKeepsServerMaskingAndMapsOtherBoards" classname="com.arcanatable.ArgentumBackendTest" time="0.006"/>
+  <testcase name="commanderDamageTrackerDoesNotHideUnknownEngineSource" classname="com.arcanatable.ArgentumBackendTest" time="0.0"/>
+  <testcase name="commanderRemovalDoesNotDropAnAdditionalCopy" classname="com.arcanatable.ArgentumBackendTest" time="0.002"/>
+  <testcase name="validServerResponseHasNoUnsupportedCards" classname="com.arcanatable.ArgentumBackendTest" time="0.0"/>
+  <testcase name="commanderDamageTrackerPreservesLegacySeatAndSeparatePartnerCommanderCounts" classname="com.arcanatable.ArgentumBackendTest" time="0.0"/>
+  <testcase name="commanderIsRemovedFromLibraryPayloadAndSentSeparately" classname="com.arcanatable.ArgentumBackendTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

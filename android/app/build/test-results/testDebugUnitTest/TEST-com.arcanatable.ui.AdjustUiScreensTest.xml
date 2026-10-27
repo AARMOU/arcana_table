@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ui.AdjustUiScreensTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:47.782Z" hostname="runnervmtai0g" time="1.873">
+  <properties/>
+  <testcase name="foldCoverAdjust" classname="com.arcanatable.ui.AdjustUiScreensTest" time="0.512"/>
+  <testcase name="foldUnfoldedAdjust" classname="com.arcanatable.ui.AdjustUiScreensTest" time="0.228"/>
+  <testcase name="phoneLandscapeAdjust" classname="com.arcanatable.ui.AdjustUiScreensTest" time="0.228"/>
+  <testcase name="landscapeOptions" classname="com.arcanatable.ui.AdjustUiScreensTest" time="0.213"/>
+  <testcase name="phonePortraitAdjust" classname="com.arcanatable.ui.AdjustUiScreensTest" time="0.234"/>
+  <testcase name="foldCoverOptions" classname="com.arcanatable.ui.AdjustUiScreensTest" time="0.276"/>
+  <testcase name="phonePortraitOptions" classname="com.arcanatable.ui.AdjustUiScreensTest" time="0.181"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

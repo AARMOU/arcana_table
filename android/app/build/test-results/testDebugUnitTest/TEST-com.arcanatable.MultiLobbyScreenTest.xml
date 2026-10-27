@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.MultiLobbyScreenTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:33.999Z" hostname="runnervmtai0g" time="0.083">
+  <properties/>
+  <testcase name="emptyOrMalformedRosterIsEmpty" classname="com.arcanatable.MultiLobbyScreenTest" time="0.044"/>
+  <testcase name="rosterSeatsCarryKindCommanderAndReadiness" classname="com.arcanatable.MultiLobbyScreenTest" time="0.019"/>
+  <testcase name="statusLineSaysWhatTheTableIsWaitingFor" classname="com.arcanatable.MultiLobbyScreenTest" time="0.02"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

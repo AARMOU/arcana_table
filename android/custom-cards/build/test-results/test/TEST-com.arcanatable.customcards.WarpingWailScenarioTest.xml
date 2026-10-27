@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.WarpingWailScenarioTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:46.979Z" hostname="runnervmtai0g" time="0.054">
+  <properties/>
+  <testcase name="exileModeAcceptsEitherLowPowerOrLowToughnessButRejectsTwoTwo" classname="com.arcanatable.customcards.WarpingWailScenarioTest" time="0.047"/>
+  <testcase name="thirdModeMakesManaCapableScionWithSacrificeAsCost" classname="com.arcanatable.customcards.WarpingWailScenarioTest" time="0.005"/>
+  <testcase name="counterModeCountersOnlyASorcerySpellOnTheStack" classname="com.arcanatable.customcards.WarpingWailScenarioTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

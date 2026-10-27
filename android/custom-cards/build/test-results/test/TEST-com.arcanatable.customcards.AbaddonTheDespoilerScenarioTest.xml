@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.AbaddonTheDespoilerScenarioTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:13:59.920Z" hostname="runnervmtai0g" time="2.14">
+  <properties/>
+  <testcase name="definition" classname="com.arcanatable.customcards.AbaddonTheDespoilerScenarioTest" time="0.081"/>
+  <testcase name="noLifeLostMeansXIsZeroAndNothingCascades" classname="com.arcanatable.customcards.AbaddonTheDespoilerScenarioTest" time="1.616"/>
+  <testcase name="yourOwnLifeLossDoesNotCount" classname="com.arcanatable.customcards.AbaddonTheDespoilerScenarioTest" time="0.111"/>
+  <testcase name="notDuringYourTurn" classname="com.arcanatable.customcards.AbaddonTheDespoilerScenarioTest" time="0.099"/>
+  <testcase name="opponentsAbaddonDoesNotGrantYouCascade" classname="com.arcanatable.customcards.AbaddonTheDespoilerScenarioTest" time="0.07"/>
+  <testcase name="afterOpponentLosesTwoATwoDropCascades" classname="com.arcanatable.customcards.AbaddonTheDespoilerScenarioTest" time="0.094"/>
+  <testcase name="manaValueAboveXDoesNotCascade" classname="com.arcanatable.customcards.AbaddonTheDespoilerScenarioTest" time="0.067"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.Build112Test" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:16:42.359Z" hostname="runnervmtai0g" time="0.016">
+  <properties/>
+  <testcase name="scryfallPictureLinksResolveThroughTheJsonApi" classname="com.arcanatable.Build112Test" time="0.008"/>
+  <testcase name="premadeDecksSkipTheServerCheck" classname="com.arcanatable.Build112Test" time="0.0"/>
+  <testcase name="libraryPicksUseTheDecisionsCardInfoThenNameArt" classname="com.arcanatable.Build112Test" time="0.003"/>
+  <testcase name="blockersStripListsEachOpponentsUntappedCreatures" classname="com.arcanatable.Build112Test" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

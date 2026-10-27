@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.UginTheIneffableScenarioTest" tests="22" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:44.147Z" hostname="runnervmtai0g" time="0.758">
+  <properties/>
+  <testcase name="uginDiscountCannotPayRequiredColorlessSymbol" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.002"/>
+  <testcase name="multipleSpiritsKeepIndependentFaceDownLinksAcrossTurns" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.115"/>
+  <testcase name="uginDiscountNeverAppliesToOpponentsColorlessSpells" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.006"/>
+  <testcase name="spiritWithNoExiledCardLeavesWithoutCreatingOrReturningOne" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.007"/>
+  <testcase name="colorlessSpellDiscountDoesNotPayColoredMana" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.061"/>
+  <testcase name="plusOneCannotBeActivatedTwiceInOneTurn" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.047"/>
+  <testcase name="colorlessThreeGenericSpellCostsExactlyOneWithUgin" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.004"/>
+  <testcase name="uginDoesNotReduceFourGenericSpellToOne" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.001"/>
+  <testcase name="minusThreeCannotTargetAColorlessPermanent" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.047"/>
+  <testcase name="spiritBouncedByRealSpellReturnsLinkedCardToHand" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.048"/>
+  <testcase name="minusThreeDestroysAColoredPermanent" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.048"/>
+  <testcase name="uginGenericDiscountStopsAtZero" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.005"/>
+  <testcase name="simultaneousBoardWipeReturnsEachSpiritLinkedCardExactlyOnce" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.05"/>
+  <testcase name="opponentRemovalReturnsLinkedCardToOriginalOwner" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.052"/>
+  <testcase name="plusOneWithEmptyLibraryStillCreatesSpiritWithoutFakeLinkedCard" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.004"/>
+  <testcase name="stolenSpiritKeepsPrivateLinkAndReturnsCardToOriginalOwner" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.066"/>
+  <testcase name="devoidSpellGetsUginDiscountWithoutWaivingPrintedBlue" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.004"/>
+  <testcase name="minusThreeCannotFollowPlusOneInSameTurn" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.048"/>
+  <testcase name="plusOneExilesOneFaceDownForControllerOnlyAndCreatesLinkedSpirit" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.046"/>
+  <testcase name="uginDoesNotDiscountColoredSpellsGenericComponent" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.003"/>
+  <testcase name="spiritExiledByRealSpellReturnsItsLinkedCardExactlyOnce" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.045"/>
+  <testcase name="linkedSpiritReturnsItsOwnExiledCardAfterUginLeaves" classname="com.arcanatable.customcards.UginTheIneffableScenarioTest" time="0.048"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

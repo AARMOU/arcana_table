@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.CustomCardDataTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:12.878Z" hostname="runnervmtai0g" time="0.089">
+  <properties/>
+  <testcase name="registeredDecksAreCovered" classname="com.arcanatable.customcards.CustomCardDataTest" time="0.0"/>
+  <testcase name="everyOverrideIsACustomCardThatArgentumAlsoHas" classname="com.arcanatable.customcards.CustomCardDataTest" time="0.005"/>
+  <testcase name="everyCardLoadsBackFromItsDataWithRulesText" classname="com.arcanatable.customcards.CustomCardDataTest" time="0.016"/>
+  <testcase name="shippedDataMatchesTheDefinitions" classname="com.arcanatable.customcards.CustomCardDataTest" time="0.067"/>
+  <testcase name="everyCustomCardIsStillPlayable" classname="com.arcanatable.customcards.CustomCardDataTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

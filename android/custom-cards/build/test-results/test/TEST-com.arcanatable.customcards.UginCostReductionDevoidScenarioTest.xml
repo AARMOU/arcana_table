@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.UginCostReductionDevoidScenarioTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:44.124Z" hostname="runnervmtai0g" time="0.01">
+  <properties/>
+  <testcase name="exactTwoGenericDiscountEndsWhenUginLeaves" classname="com.arcanatable.customcards.UginCostReductionDevoidScenarioTest" time="0.004"/>
+  <testcase name="devoidSpellKeepsWhiteRequirementButGetsTwoGenericDiscount" classname="com.arcanatable.customcards.UginCostReductionDevoidScenarioTest" time="0.002"/>
+  <testcase name="opponentsUginCannotDiscountMySpellOrStackWithMyUgin" classname="com.arcanatable.customcards.UginCostReductionDevoidScenarioTest" time="0.002"/>
+  <testcase name="printedColoredSpellStillRequiresItsTwoGenericMana" classname="com.arcanatable.customcards.UginCostReductionDevoidScenarioTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.ValkyriesCallScenarioTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:46.220Z" hostname="runnervmtai0g" time="0.292">
+  <properties/>
+  <testcase name="keepingReturnedCidAlsoEndsTheLegendRuleSequence" classname="com.arcanatable.customcards.ValkyriesCallScenarioTest" time="0.055"/>
+  <testcase name="returnsCidWithAngelFlyingAndOneCounter" classname="com.arcanatable.customcards.ValkyriesCallScenarioTest" time="0.083"/>
+  <testcase name="returnedAngelStaysDeadWhenDestroyedAgain" classname="com.arcanatable.customcards.ValkyriesCallScenarioTest" time="0.055"/>
+  <testcase name="keepingOriginalCidEndsTheLegendRuleSequence" classname="com.arcanatable.customcards.ValkyriesCallScenarioTest" time="0.051"/>
+  <testcase name="printedAngelAndTokenAreExcluded" classname="com.arcanatable.customcards.ValkyriesCallScenarioTest" time="0.048"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

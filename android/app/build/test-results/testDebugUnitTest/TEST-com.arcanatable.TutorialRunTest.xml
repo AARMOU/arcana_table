@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.TutorialRunTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:42.052Z" hostname="runnervmtai0g" time="0.014">
+  <properties/>
+  <testcase name="castingWithoutTappingForManaFirstDoesNotStrandTheLesson" classname="com.arcanatable.TutorialRunTest" time="0.006"/>
+  <testcase name="aPriorityPassNeverCompletesALaterPassPrompt" classname="com.arcanatable.TutorialRunTest" time="0.001"/>
+  <testcase name="skippedCombatDoesNotStrandTheLesson" classname="com.arcanatable.TutorialRunTest" time="0.001"/>
+  <testcase name="milestonesSeenDuringAnExplanationCompleteTheirStepOnArrival" classname="com.arcanatable.TutorialRunTest" time="0.001"/>
+  <testcase name="guidedReadingOnlyMovesOnTheMatchingGestureOrNext" classname="com.arcanatable.TutorialRunTest" time="0.002"/>
+  <testcase name="finishingTheLastStepEndsTheRun" classname="com.arcanatable.TutorialRunTest" time="0.001"/>
+  <testcase name="explanationsAreNeverSkippedByEarlyMilestones" classname="com.arcanatable.TutorialRunTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

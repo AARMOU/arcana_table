@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.SzarekhTheSilentKingScenarioTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:42.944Z" hostname="runnervmtai0g" time="0.184">
+  <properties/>
+  <testcase name="anUncrewedVehicleIsEligible" classname="com.arcanatable.customcards.SzarekhTheSilentKingScenarioTest" time="0.045"/>
+  <testcase name="attackingMillsThreeAndReturnsOneArtifactCreatureMilledThisWay" classname="com.arcanatable.customcards.SzarekhTheSilentKingScenarioTest" time="0.046"/>
+  <testcase name="returningACardIsOptionalEvenWhenAnArtifactCreatureWasMilled" classname="com.arcanatable.customcards.SzarekhTheSilentKingScenarioTest" time="0.045"/>
+  <testcase name="notAttackingDoesNotMill" classname="com.arcanatable.customcards.SzarekhTheSilentKingScenarioTest" time="0.002"/>
+  <testcase name="ordinaryCreaturesNoncreatureArtifactsAndOlderGraveyardCardsAreIneligible" classname="com.arcanatable.customcards.SzarekhTheSilentKingScenarioTest" time="0.044"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

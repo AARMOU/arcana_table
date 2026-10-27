@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.ZhulodokVoidGorgerScenarioTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:47.241Z" hostname="runnervmtai0g" time="0.372">
+  <properties/>
+  <testcase name="manaValueBelowSevenDoesNotCascade" classname="com.arcanatable.customcards.ZhulodokVoidGorgerScenarioTest" time="0.045"/>
+  <testcase name="noCascadeWithoutZhulodok" classname="com.arcanatable.customcards.ZhulodokVoidGorgerScenarioTest" time="0.046"/>
+  <testcase name="coloredSevenDropDoesNotCascade" classname="com.arcanatable.customcards.ZhulodokVoidGorgerScenarioTest" time="0.046"/>
+  <testcase name="definitionIsAColorlessSixDropWithTwoCascadeGrants" classname="com.arcanatable.customcards.ZhulodokVoidGorgerScenarioTest" time="0.0"/>
+  <testcase name="opponentsSpellsDoNotCascade" classname="com.arcanatable.customcards.ZhulodokVoidGorgerScenarioTest" time="0.045"/>
+  <testcase name="cascadeCastIsOptional" classname="com.arcanatable.customcards.ZhulodokVoidGorgerScenarioTest" time="0.047"/>
+  <testcase name="colorlessSevenPlusFromHandCascadesTwice" classname="com.arcanatable.customcards.ZhulodokVoidGorgerScenarioTest" time="0.049"/>
+  <testcase name="xIsCountedAtCastTime" classname="com.arcanatable.customcards.ZhulodokVoidGorgerScenarioTest" time="0.046"/>
+  <testcase name="xBelowThresholdDoesNotCascade" classname="com.arcanatable.customcards.ZhulodokVoidGorgerScenarioTest" time="0.048"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

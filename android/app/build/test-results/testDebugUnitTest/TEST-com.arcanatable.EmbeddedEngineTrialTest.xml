@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.EmbeddedEngineTrialTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:24.260Z" hostname="runnervmtai0g" time="0.466">
+  <properties/>
+  <testcase name="aiPlaysAWholeGameInProcess" classname="com.arcanatable.EmbeddedEngineTrialTest" time="0.457"/>
+  <testcase name="portalCardDataLoadsIntoArgentum" classname="com.arcanatable.EmbeddedEngineTrialTest" time="0.008"/>
+  <system-out><![CDATA[[engine-trial] Engine trial: 163 cards loaded in 20 ms; AI vs AI (green vs red) finished after 17 turns, 322 actions in 427 ms; winner Green AI; peak heap 477 MB
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

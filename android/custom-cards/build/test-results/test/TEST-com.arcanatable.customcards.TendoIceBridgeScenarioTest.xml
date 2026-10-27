@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.TendoIceBridgeScenarioTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:43.370Z" hostname="runnervmtai0g" time="0.147">
+  <properties/>
+  <testcase name="colorlessModeDoesNotConsumeTheChargeAndPaysForAnArtifact" classname="com.arcanatable.customcards.TendoIceBridgeScenarioTest" time="0.046"/>
+  <testcase name="spentChargeCannotBeUsedAgainAfterUntappingButColorlessModeStillWorks" classname="com.arcanatable.customcards.TendoIceBridgeScenarioTest" time="0.051"/>
+  <testcase name="chargeCounterPaysForOneColoredManaUse" classname="com.arcanatable.customcards.TendoIceBridgeScenarioTest" time="0.003"/>
+  <testcase name="tappingForColoredManaPreventsASecondActivationOfEitherMode" classname="com.arcanatable.customcards.TendoIceBridgeScenarioTest" time="0.046"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

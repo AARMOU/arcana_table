@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ShockFetchTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:40.539Z" hostname="runnervmtai0g" time="0.095">
+  <properties/>
+  <testcase name="fetchedShockLandOffersToPayLife" classname="com.arcanatable.ShockFetchTest" time="0.095"/>
+  <system-out><![CDATA[[shock-fetch] stage=4 life=17 untapped=true guard=21
+[shock-fetch] msg {"type":"connected","playerId":"offline-you","token":"offline"}
+[shock-fetch] msg {"vsAi":true,"players":[{"name":"You","playerId":"offline-you"},{"name":"AI","playerId":"offline-ai"}],"type":"quickGameLobbyState","youPlayerId":"offline-you",
+[shock-fetch] msg {"players":[{"isYou":true,"playerId":"offline-you"},{"isYou":false,"playerId":"offline-ai"}],"type":"gameStarted"}
+[shock-fetch] msg {"cards":{"e20":{"imageUri":"https://cards.scryfall.io/normal/front/a/2/a2773d8f-f906-475d-aaff-b7ca3b01f188.jpg?1783943453","typeLine":"Land \u2014 Mountain Fo
+[shock-fetch] msg {"finalHandSize":7,"type":"mulliganComplete"}
+[shock-fetch] state t=1 step= prio=offline-ai dec=null:null:null acts={} [] stage=0
+[shock-fetch] state t=1 step= prio=offline-ai dec=null:null:null acts={} [] stage=0
+[shock-fetch] state t=1 step= prio=offline-ai dec=null:null:null acts={} [] stage=0
+[shock-fetch] state t=1 step= prio=offline-ai dec=null:null:null acts={} [] stage=0
+[shock-fetch] state t=1 step= prio=offline-ai dec=null:null:null acts={} [] stage=0
+[shock-fetch] state t=1 step= prio=offline-ai dec=null:null:null acts={} [] stage=0
+[shock-fetch] state t=1 step= prio=offline-ai dec=null:null:null acts={} [] stage=0
+[shock-fetch] state t=1 step= prio=offline-ai dec=null:null:null acts={} [] stage=0
+[shock-fetch] state t=2 step= prio=offline-you dec=null:null:null acts={} [] stage=0
+[shock-fetch] state t=2 step= prio=offline-you dec=null:null:null acts={} [] stage=0
+[shock-fetch] state t=2 step= prio=offline-you dec=null:null:null acts={} [] stage=0
+[shock-fetch] state t=2 step= prio=offline-you dec=null:null:null acts={PassPriority=1, PlayLand=8} [Play Stomping Ground, Play Wooded Foothills] stage=0
+[shock-fetch] state t=2 step= prio=offline-you dec=null:null:null acts={PassPriority=1, ActivateAbility=1} [{T}, Pay 1 life, Sacrifice this permanent: Search your libra] stage=1
+[shock-fetch] state t=2 step= prio=offline-ai dec=SelectCardsDecision:r0:offline-you acts={} [] stage=1
+[shock-fetch] state t=2 step= prio=offline-you dec=YesNoDecision:arcana-shock-e8:offline-you acts={} [] stage=2
+[shock-fetch] state t=2 step= prio=offline-you dec=null:null:null acts={PassPriority=1, ActivateAbility=2} [{T}: Add {R}, {T}: Add {G}] stage=3
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

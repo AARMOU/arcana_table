@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.FourPlayerLanTransportTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:27.952Z" hostname="runnervmtai0g" time="0.676">
+  <properties/>
+  <testcase name="hostCanChangeOpenSeatsButNeverDropsAConnectedPhone" classname="com.arcanatable.FourPlayerLanTransportTest" time="0.007"/>
+  <testcase name="threeGuestSocketsHavePrivateSendChannelsAndRejectFifthPhone" classname="com.arcanatable.FourPlayerLanTransportTest" time="0.465"/>
+  <testcase name="invalidGuestIsRejectedWithoutEvictingAnotherGuest" classname="com.arcanatable.FourPlayerLanTransportTest" time="0.204"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

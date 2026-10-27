@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.IronSpiderCounterRemovalTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:32.629Z" hostname="runnervmtai0g" time="0.069">
+  <properties/>
+  <testcase name="differentTypesAcrossPermanentsFailClosed" classname="com.arcanatable.IronSpiderCounterRemovalTest" time="0.001"/>
+  <testcase name="oneAndOneAcrossTwoArtifactsOneOfThemMixed" classname="com.arcanatable.IronSpiderCounterRemovalTest" time="0.0"/>
+  <testcase name="onePlusOneBesideOtherCountersCannotPayTwo" classname="com.arcanatable.IronSpiderCounterRemovalTest" time="0.0"/>
+  <testcase name="twoPlusOneOnAMixedArtifactSendsExactlyTwoPlusOne" classname="com.arcanatable.IronSpiderCounterRemovalTest" time="0.001"/>
+  <testcase name="requirementComesFromTheAbilitysOwnCost" classname="com.arcanatable.IronSpiderCounterRemovalTest" time="0.064"/>
+  <testcase name="withoutATotalNothingChanges" classname="com.arcanatable.IronSpiderCounterRemovalTest" time="0.0"/>
+  <testcase name="splitMustTotalExactlyAndStayWithinEachPermanent" classname="com.arcanatable.IronSpiderCounterRemovalTest" time="0.0"/>
+  <testcase name="planAsksWhichArtifactsGiveUpCountersAndStartsComplete" classname="com.arcanatable.IronSpiderCounterRemovalTest" time="0.0"/>
+  <testcase name="builtActionCarriesTheDistributionTheEngineExpects" classname="com.arcanatable.IronSpiderCounterRemovalTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

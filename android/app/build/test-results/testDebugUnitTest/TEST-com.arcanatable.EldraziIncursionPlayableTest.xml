@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.EldraziIncursionPlayableTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:16:56.891Z" hostname="runnervmtai0g" time="27.368">
+  <properties/>
+  <testcase name="incursionMirrorAiGame" classname="com.arcanatable.EldraziIncursionPlayableTest" time="27.28"/>
+  <testcase name="newlyImplementedCardsLoadIntoTheOfflineGame" classname="com.arcanatable.EldraziIncursionPlayableTest" time="0.083"/>
+  <testcase name="originalSlotIndexInventoryMatchesTheExplicitMissingList" classname="com.arcanatable.EldraziIncursionPlayableTest" time="0.005"/>
+  <system-out><![CDATA[[eldrazi-incursion] seed=1 turn=19 actions=430 over=true winner=e1 ms=24163
+[eldrazi-incursion] seed=2 turn=19 actions=383 over=true winner=e0 ms=1494
+[eldrazi-incursion] seed=3 turn=15 actions=309 over=true winner=e1 ms=1486
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

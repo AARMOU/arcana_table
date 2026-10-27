@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.OfflineHumanAutoPassParityTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:33.918Z" hostname="runnervmtai0g" time="2.105">
+  <properties/>
+  <testcase name="targetlessStackWithSpellskiteStillPassesOnlyWhenOriginalDoes" classname="com.arcanatable.customcards.OfflineHumanAutoPassParityTest" time="0.051"/>
+  <testcase name="harmlessClassLevelDoesNotForceFullBoardEnumeration" classname="com.arcanatable.customcards.OfflineHumanAutoPassParityTest" time="0.052"/>
+  <testcase name="optInKeepsOwnSpellWithAFlashResponseButDefaultStillPasses" classname="com.arcanatable.customcards.OfflineHumanAutoPassParityTest" time="0.052"/>
+  <testcase name="realOcelotEndStepCascadeNeverChangesPassOrStopDecisions" classname="com.arcanatable.customcards.OfflineHumanAutoPassParityTest" time="0.467"/>
+  <testcase name="ownStackFastPassSkipsFullTokenEnumerationAndPreservesVerdict" classname="com.arcanatable.customcards.OfflineHumanAutoPassParityTest" time="0.948"/>
+  <testcase name="targetedStackWithSpellskiteKeepsTheUsefulResponseWindow" classname="com.arcanatable.customcards.OfflineHumanAutoPassParityTest" time="0.055"/>
+  <testcase name="ownStackOptInDoesNotStopForUnaffordableResponsesOrJustMana" classname="com.arcanatable.customcards.OfflineHumanAutoPassParityTest" time="0.048"/>
+  <testcase name="holdPriorityAbilityDisablesOwnedStackShortcut" classname="com.arcanatable.customcards.OfflineHumanAutoPassParityTest" time="0.05"/>
+  <testcase name="tokenHeavyOwnMainAndEmptyStackEndStepKeepTheSameStop" classname="com.arcanatable.customcards.OfflineHumanAutoPassParityTest" time="0.382"/>
+  <system-out><![CDATA[AUTO_PASS_PARITY case=spellskite-targetless-stack stack=1 battlefield=2 original=false candidate=false fullActions=3 candidateEnumerations=1
+AUTO_PASS_PARITY case=owned-stack-safe-class-level3 stack=1 battlefield=1 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-0 stack=0 battlefield=47 original=false candidate=false fullActions=11 candidateEnumerations=1
+AUTO_PASS_PARITY case=ocelot-end-step-window-1 stack=0 battlefield=47 original=true candidate=true fullActions=1 candidateEnumerations=1
+AUTO_PASS_PARITY case=ocelot-end-step-window-2 stack=3 battlefield=47 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-3 stack=3 battlefield=47 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-4 stack=2 battlefield=47 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-5 stack=2 battlefield=47 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-6 stack=17 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-7 stack=17 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-8 stack=16 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-9 stack=16 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-10 stack=15 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-11 stack=15 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-12 stack=14 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-13 stack=14 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-14 stack=13 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-15 stack=13 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-16 stack=12 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-17 stack=12 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-18 stack=11 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-19 stack=11 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-20 stack=10 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-21 stack=10 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-22 stack=9 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-23 stack=9 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-24 stack=8 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-25 stack=8 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-26 stack=7 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-27 stack=7 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-28 stack=6 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-29 stack=6 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-30 stack=5 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-31 stack=5 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-32 stack=4 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-33 stack=4 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-34 stack=3 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-35 stack=3 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-36 stack=2 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-37 stack=2 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-38 stack=1 battlefield=55 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-39 stack=1 battlefield=55 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-40 stack=48 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-41 stack=48 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-42 stack=47 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-43 stack=47 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-44 stack=46 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-45 stack=46 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-46 stack=45 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-47 stack=45 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-48 stack=44 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-49 stack=44 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-50 stack=43 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-51 stack=43 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-52 stack=42 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-53 stack=42 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-54 stack=41 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-55 stack=41 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-56 stack=40 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-57 stack=40 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-58 stack=39 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-59 stack=39 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-60 stack=38 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-61 stack=38 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-62 stack=37 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-63 stack=37 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-64 stack=36 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-65 stack=36 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-66 stack=35 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-67 stack=35 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-68 stack=34 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-69 stack=34 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-70 stack=33 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-71 stack=33 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-72 stack=32 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-73 stack=32 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-74 stack=31 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-75 stack=31 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-76 stack=30 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-77 stack=30 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-78 stack=29 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-79 stack=29 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-80 stack=28 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-81 stack=28 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-82 stack=27 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-83 stack=27 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-84 stack=26 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-85 stack=26 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-86 stack=25 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-87 stack=25 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-88 stack=24 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-89 stack=24 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-90 stack=23 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-91 stack=23 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-92 stack=22 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-93 stack=22 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-94 stack=21 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-95 stack=21 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-96 stack=20 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-97 stack=20 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-98 stack=19 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-99 stack=19 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-100 stack=18 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-101 stack=18 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-102 stack=17 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-103 stack=17 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-104 stack=16 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-105 stack=16 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-106 stack=15 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-107 stack=15 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-108 stack=14 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-109 stack=14 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-110 stack=13 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-111 stack=13 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-112 stack=12 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-113 stack=12 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-114 stack=11 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-115 stack=11 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-116 stack=10 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-117 stack=10 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-118 stack=9 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-119 stack=9 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-120 stack=8 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-121 stack=8 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-122 stack=7 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-123 stack=7 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-124 stack=6 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-125 stack=6 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-126 stack=5 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-127 stack=5 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-128 stack=4 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-129 stack=4 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-130 stack=3 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-131 stack=3 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-132 stack=2 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-133 stack=2 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-134 stack=1 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-135 stack=1 battlefield=79 original=false candidate=false fullActions=2 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-136 stack=0 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=0
+AUTO_PASS_PARITY case=ocelot-end-step-window-137 stack=0 battlefield=79 original=true candidate=true fullActions=1 candidateEnumerations=1
+AUTO_PASS_CASCADE completed=true windows=138 stackedWindows=134 fastStackWindows=67 decisions=0 iterations=139 finalTokens=78
+AUTO_PASS_PARITY case=owned-spell-food-40 stack=1 battlefield=40 original=true candidate=true fullActions=41 candidateEnumerations=0
+AUTO_PASS_PARITY case=owned-spell-food-200 stack=1 battlefield=200 original=true candidate=true fullActions=201 candidateEnumerations=0
+AUTO_PASS_PARITY case=owned-spell-food-600 stack=1 battlefield=600 original=true candidate=true fullActions=601 candidateEnumerations=0
+AUTO_PASS_PARITY case=spellskite-targeted-stack stack=1 battlefield=3 original=false candidate=false fullActions=3 candidateEnumerations=1
+AUTO_PASS_PARITY case=owned-stack-with-kitsa-hold-priority stack=1 battlefield=1 original=true candidate=true fullActions=1 candidateEnumerations=1
+AUTO_PASS_PARITY case=main-Food-40 stack=0 battlefield=40 original=false candidate=false fullActions=48 candidateEnumerations=1
+AUTO_PASS_PARITY case=end-empty-Food-40 stack=0 battlefield=40 original=true candidate=true fullActions=41 candidateEnumerations=0
+AUTO_PASS_PARITY case=main-Food-200 stack=0 battlefield=200 original=false candidate=false fullActions=208 candidateEnumerations=1
+AUTO_PASS_PARITY case=end-empty-Food-200 stack=0 battlefield=200 original=true candidate=true fullActions=201 candidateEnumerations=0
+AUTO_PASS_PARITY case=main-Treasure-200 stack=0 battlefield=200 original=false candidate=false fullActions=208 candidateEnumerations=1
+AUTO_PASS_PARITY case=end-empty-Treasure-200 stack=0 battlefield=200 original=true candidate=true fullActions=201 candidateEnumerations=0
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

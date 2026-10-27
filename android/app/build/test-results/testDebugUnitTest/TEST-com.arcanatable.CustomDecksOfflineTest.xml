@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.CustomDecksOfflineTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:16:44.163Z" hostname="runnervmtai0g" time="11.179">
+  <properties/>
+  <testcase name="artificerUsesCustomCardsAndOnlyLeavesOutRatchet" classname="com.arcanatable.CustomDecksOfflineTest" time="0.714"/>
+  <testcase name="tokensWinUsesCustomCardsAndOnlyLeavesOutGoblinWelder" classname="com.arcanatable.CustomDecksOfflineTest" time="0.159"/>
+  <testcase name="tokensWinVersusArtificerAiGame" classname="com.arcanatable.CustomDecksOfflineTest" time="10.306"/>
+  <system-out><![CDATA[[custom-decks] seed=1 turn=21 actions=498 over=true winner=e1 ms=7403
+[custom-decks] seed=2 turn=22 actions=463 over=true winner=e1 ms=2268
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

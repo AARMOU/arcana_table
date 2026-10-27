@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.SireOfStagnationScenarioTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:39.990Z" hostname="runnervmtai0g" time="0.298">
+  <properties/>
+  <testcase name="enteringOpponentControlledLandsTriggerSeparatelyEvenWhenNotPlayedAndNotOwnedByThatOpponent" classname="com.arcanatable.customcards.SireOfStagnationScenarioTest" time="0.05"/>
+  <testcase name="ownLandAndOpponentNonlandDoNotTrigger" classname="com.arcanatable.customcards.SireOfStagnationScenarioTest" time="0.049"/>
+  <testcase name="opponentLandEntryExilesOnlyAvailableCardsAndAlwaysDrawsTwo" classname="com.arcanatable.customcards.SireOfStagnationScenarioTest" time="0.14"/>
+  <testcase name="sireInGraveyardDoesNotTriggerAndAnEmptyControllerLibraryStillCausesTheDrawLoss" classname="com.arcanatable.customcards.SireOfStagnationScenarioTest" time="0.056"/>
+  <testcase name="devoidIsColorlessButKeepsItsBlueBlackIdentityInEveryZone" classname="com.arcanatable.customcards.SireOfStagnationScenarioTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

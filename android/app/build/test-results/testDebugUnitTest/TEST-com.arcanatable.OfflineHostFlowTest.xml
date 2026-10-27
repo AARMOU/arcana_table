@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.OfflineHostFlowTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:39.963Z" hostname="runnervmtai0g" time="0.192">
+  <properties/>
+  <testcase name="londonMulliganDownToSix" classname="com.arcanatable.OfflineHostFlowTest" time="0.022"/>
+  <testcase name="theAiTurnIsShownStepByStep" classname="com.arcanatable.OfflineHostFlowTest" time="0.133"/>
+  <testcase name="playingALandCanBeUndone" classname="com.arcanatable.OfflineHostFlowTest" time="0.037"/>
+  <system-out><![CDATA[[offline-flow] AI turn updates by turn: {2=9, 4=9, 6=1}
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

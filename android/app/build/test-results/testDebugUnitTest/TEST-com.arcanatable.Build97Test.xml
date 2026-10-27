@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.Build97Test" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:16:42.376Z" hostname="runnervmtai0g" time="0.017">
+  <properties/>
+  <testcase name="identicalAttackersShareOneTile" classname="com.arcanatable.Build97Test" time="0.0"/>
+  <testcase name="roccoAndTailsArePremadesTheAiCanUse" classname="com.arcanatable.Build97Test" time="0.009"/>
+  <testcase name="alwaysYesIsKeyedByCardAndQuestion" classname="com.arcanatable.Build97Test" time="0.003"/>
+  <testcase name="feedKeepsSpellsAndLandsButNotTokens" classname="com.arcanatable.Build97Test" time="0.002"/>
+  <testcase name="bounceCostsAreChosenAndSent" classname="com.arcanatable.Build97Test" time="0.0"/>
+  <testcase name="numbersStayInsideArgentumsLimits" classname="com.arcanatable.Build97Test" time="0.001"/>
+  <testcase name="treasuresShowAsSacrificeForMana" classname="com.arcanatable.Build97Test" time="0.0"/>
+  <testcase name="stackUseRepeatsTheSameAbilityWithTheSameColour" classname="com.arcanatable.Build97Test" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

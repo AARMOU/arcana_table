@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.AiRetargetingSearchTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:08.351Z" hostname="runnervmtai0g" time="0.361">
+  <properties/>
+  <testcase name="usefulSpellskiteRedirectIsRetainedAndSavesTheThreatenedCreature" classname="com.arcanatable.customcards.AiRetargetingSearchTest" time="0.055"/>
+  <testcase name="mobileAiStillChoosesAUsefulRedirectToSaveAMoreValuableCreature" classname="com.arcanatable.customcards.AiRetargetingSearchTest" time="0.06"/>
+  <testcase name="targetlessSpellKeepsItsLegalActivationButDoesNotStartRetargetSearch" classname="com.arcanatable.customcards.AiRetargetingSearchTest" time="0.054"/>
+  <testcase name="burstExpiryIsSharedAndRestoresAfterAnException" classname="com.arcanatable.customcards.AiRetargetingSearchTest" time="0.049"/>
+  <testcase name="animationAndRulesTimeDoNotSpendTheThinkingAllowance" classname="com.arcanatable.customcards.AiRetargetingSearchTest" time="0.143"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

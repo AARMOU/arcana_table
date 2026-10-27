@@ -1,0 +1,1 @@
+android/app/src/main/java/com/arcanatable/TableDialogs.kt: merged Eldrazi priority preference with current Help & Diagnostics

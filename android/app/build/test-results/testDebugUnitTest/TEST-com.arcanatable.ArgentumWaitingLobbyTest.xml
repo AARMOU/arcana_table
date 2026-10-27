@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ArgentumWaitingLobbyTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:16:36.187Z" hostname="runnervmtai0g" time="6.17">
+  <properties/>
+  <testcase name="fourFriendsJoinStableSeatsAndCannotOverfillOrStartEarly" classname="com.arcanatable.ArgentumWaitingLobbyTest" time="5.978"/>
+  <testcase name="onlySeatedGuestsCanMarkReady" classname="com.arcanatable.ArgentumWaitingLobbyTest" time="0.025"/>
+  <testcase name="hostChangesOpenSeatsAndSizeButNeverDropsASeatedGuest" classname="com.arcanatable.ArgentumWaitingLobbyTest" time="0.025"/>
+  <testcase name="removedGuestLosesReadyAndTheSeatReopens" classname="com.arcanatable.ArgentumWaitingLobbyTest" time="0.021"/>
+  <testcase name="invalidOrUnexpectedGuestNeverTakesAnAiSeat" classname="com.arcanatable.ArgentumWaitingLobbyTest" time="0.021"/>
+  <testcase name="broadcastLobbyContainsNoDecksAndDoesNotDiscloseUnjoinedAiDeck" classname="com.arcanatable.ArgentumWaitingLobbyTest" time="0.02"/>
+  <testcase name="disconnectBeforeStartReopensOnlyTheDepartedSeat" classname="com.arcanatable.ArgentumWaitingLobbyTest" time="0.02"/>
+  <testcase name="aiSeatCanRemainBetweenTwoIndependentHumanGuests" classname="com.arcanatable.ArgentumWaitingLobbyTest" time="0.022"/>
+  <testcase name="lobbyMessageCarriesReadinessWithoutDecks" classname="com.arcanatable.ArgentumWaitingLobbyTest" time="0.018"/>
+  <testcase name="startWaitsForEveryGuestToMarkReadyAndReadyCanBeWithdrawn" classname="com.arcanatable.ArgentumWaitingLobbyTest" time="0.02"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

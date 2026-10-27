@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ui.ArgentumResilienceUiTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:50.057Z" hostname="runnervmtai0g" time="14.685">
+  <properties/>
+  <testcase name="unreachableServerShowsRecoveryMessageNotEndlessLoading" classname="com.arcanatable.ui.ArgentumResilienceUiTest" time="0.78"/>
+  <testcase name="unsupportedDecisionMalformedDataBackgroundPauseAndResume" classname="com.arcanatable.ui.ArgentumResilienceUiTest" time="9.324"/>
+  <testcase name="combatDamageBoardReplacesNeedsHandlingAndSubmitsArgentumShape" classname="com.arcanatable.ui.ArgentumResilienceUiTest" time="0.919"/>
+  <testcase name="declareAttackersIsTheOnlyOfferAndArcanaSendsArgentumsShape" classname="com.arcanatable.ui.ArgentumResilienceUiTest" time="0.847"/>
+  <testcase name="manaAbilitiesAreHiddenFromTheActionSheet" classname="com.arcanatable.ui.ArgentumResilienceUiTest" time="1.3"/>
+  <testcase name="composerSendsDividedDamageSpellThenGameOverReturnsHome" classname="com.arcanatable.ui.ArgentumResilienceUiTest" time="1.515"/>
+  <system-out><![CDATA[[diag-tail]
+1	1793063870245	APP	0	Application opened
+2	1793063870443	ERROR	0	Argentum deck validation failed (ConnectException): Failed to connect to /<ip>
+3	1793063870701	ERROR	0	Argentum problem: Couldn't reach the Argentum server. Check your internet connection and try again. Your deck hasn't been changed.
+[diag-tail]
+1	1793063870904	APP	0	Application opened
+2	1793063871221	CONNECTION	0	Argentum session connected
+3	1793063871245	CONNECTION	0	Argentum connection status: connected
+4	1793063871499	ENGINE	0	Argentum Commander practice lobby requested with 100 supported cards
+5	1793063871502	ENGINE	0	Argentum lobby received; compatible deck submitted and marked ready
+6	1793063871756	ENGINE	0	Argentum game started
+7	1793063871764	ENGINE	0	Argentum decision TimeTravelDecision: Choose a moment in time
+8	1793063871765	UNSUPPORTED	0	Needs handling: TimeTravelDecision — Argentum asked for time travel, which Arcana does not have a control for yet.
+9	1793063871768	ENGINE	0	Argentum state v1 applied: 2 players, turn 2 PRECOMBAT MAIN, 0 legal actions
+10	1793063871986	UNSUPPORTED	0	Player requested refresh for unhandled TimeTravelDecision
+11	1793063872000	ENGINE	0	Argentum state v1 applied: 2 players, turn 2 PRECOMBAT MAIN, 0 legal actions
+12	1793063872173	ERROR	0	Argentum problem: Argentum sent a message Arcana could not read.
+13	1793063872467	CONNECTION	0	Argentum connection status: paused
+14	1793063878663	CONNECTION	0	Player chose Resume
+15	1793063878673	CONNECTION	0	Argentum connection status: connecting
+16	1793063878679	CONNECTION	0	Argentum session reconnected to an active game
+17	1793063878682	ENGINE	0	Argentum state v1 applied: 2 players, turn 2 PRECOMBAT MAIN, 0 legal actions
+18	1793063878803	ENGINE	0	Argentum state v1 applied: 2 players, turn 2 PRECOMBAT MAIN, 0 legal actions
+19	1793063878811	CONNECTION	0	Argentum connection status: disconnected
+20	1793063879571	CONNECTION	0	Argentum connection status: connecting
+21	1793063879576	CONNECTION	0	Argentum session reconnected to an active game
+22	1793063879582	ENGINE	0	Argentum state v1 applied: 2 players, turn 2 PRECOMBAT MAIN, 0 legal actions
+23	1793063879584	ENGINE	0	Argentum state v1 applied: 2 players, turn 2 PRECOMBAT MAIN, 0 legal actions
+24	1793063879612	CONNECTION	0	Argentum connection status: connected
+[diag-tail]
+1	1793063880222	APP	0	Application opened
+2	1793063880313	CONNECTION	0	Argentum connection status: disconnected
+3	1793063880316	CONNECTION	0	Argentum session connected
+4	1793063880574	CONNECTION	0	Argentum connection status: connected
+5	1793063880576	ENGINE	0	Argentum Commander practice lobby requested with 100 supported cards
+6	1793063880578	ENGINE	0	Argentum lobby received; compatible deck submitted and marked ready
+7	1793063880832	ENGINE	0	Argentum game started
+8	1793063880835	ENGINE	0	Argentum decision CombatResolutionDecision: Assign Wildsear, Scouring Maw's 6 combat damage
+9	1793063880836	ENGINE	0	Argentum state v1 applied: 2 players, turn 2 PRECOMBAT MAIN, 0 legal actions
+10	1793063881005	ACTION	0	Answered CombatResolutionDecision with CombatResolutionResponse
+[diag-tail]
+1	1793063881132	APP	0	Application opened
+2	1793063881200	CONNECTION	0	Argentum connection status: disconnected
+3	1793063881203	CONNECTION	0	Argentum session connected
+4	1793063881459	CONNECTION	0	Argentum connection status: connected
+5	1793063881461	ENGINE	0	Argentum Commander practice lobby requested with 100 supported cards
+6	1793063881462	ENGINE	0	Argentum lobby received; compatible deck submitted and marked ready
+7	1793063881716	ENGINE	0	Argentum game started
+8	1793063881717	ENGINE	0	Argentum state v1 applied: 2 players, turn 2 PRECOMBAT MAIN, 1 legal actions
+9	1793063881746	ACTION	0	Opened attack declaration (2 possible attackers)
+10	1793063881906	ACTION	0	Declared 1 attacker(s)
+[diag-tail]
+1	1793063881977	APP	0	Application opened
+2	1793063882285	CONNECTION	0	Argentum session connected
+3	1793063882297	CONNECTION	0	Argentum connection status: connected
+4	1793063882550	ENGINE	0	Argentum Commander practice lobby requested with 100 supported cards
+5	1793063882552	ENGINE	0	Argentum lobby received; compatible deck submitted and marked ready
+6	1793063882807	ENGINE	0	Argentum game started
+7	1793063882809	ENGINE	0	Argentum state v1 applied: 2 players, turn 2 PRECOMBAT MAIN, 2 legal actions
+[diag-tail]
+1	1793063883273	APP	0	Application opened
+2	1793063883339	CONNECTION	0	Argentum connection status: disconnected
+3	1793063883341	CONNECTION	0	Argentum session connected
+4	1793063883598	CONNECTION	0	Argentum connection status: connected
+5	1793063883599	ENGINE	0	Argentum Commander practice lobby requested with 100 supported cards
+6	1793063883601	ENGINE	0	Argentum lobby received; compatible deck submitted and marked ready
+7	1793063883854	ENGINE	0	Argentum game started
+8	1793063883855	ENGINE	0	Argentum state v1 applied: 2 players, turn 2 PRECOMBAT MAIN, 1 legal actions
+9	1793063884483	ACTION	0	Sent CastSpell (Cast Arc Lightning) with 2 target(s)
+10	1793063884498	ENGINE	0	Argentum game over: winner=ArcanaProbe; losers=not supplied; result=LIFE_ZERO
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

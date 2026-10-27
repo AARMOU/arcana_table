@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.DeepfathomSkulkerScenarioTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:13.196Z" hostname="runnervmtai0g" time="0.124">
+  <properties/>
+  <testcase name="controllerMayDeclineTheCombatDraw" classname="com.arcanatable.customcards.DeepfathomSkulkerScenarioTest" time="0.005"/>
+  <testcase name="eachCreatureDealingCombatDamageMayDrawOneCard" classname="com.arcanatable.customcards.DeepfathomSkulkerScenarioTest" time="0.056"/>
+  <testcase name="unblockableAbilityRequiresColorlessManaAndMayTargetAnOpponentCreature" classname="com.arcanatable.customcards.DeepfathomSkulkerScenarioTest" time="0.063"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

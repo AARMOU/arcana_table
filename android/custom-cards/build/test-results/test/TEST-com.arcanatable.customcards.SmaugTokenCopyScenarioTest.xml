@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.SmaugTokenCopyScenarioTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:41.091Z" hostname="runnervmtai0g" time="0.357">
+  <properties/>
+  <testcase name="retainedSmaugCopyPaysOutWhenTheBalloonIsSacrificedAtEndStep" classname="com.arcanatable.customcards.SmaugTokenCopyScenarioTest" time="0.071"/>
+  <testcase name="keepingTheCopyPreservesItsDeathTriggerWithoutDoublingEitherPayout" classname="com.arcanatable.customcards.SmaugTokenCopyScenarioTest" time="0.063"/>
+  <testcase name="aCopyOfACopyAlsoRetainsTheDeathTrigger" classname="com.arcanatable.customcards.SmaugTokenCopyScenarioTest" time="0.06"/>
+  <testcase name="copyingAnUnrelatedCreatureDoesNotAddSmaugsDeathTrigger" classname="com.arcanatable.customcards.SmaugTokenCopyScenarioTest" time="0.05"/>
+  <testcase name="originalSmaugCreatesFourteenTreasuresWhenDestroyed" classname="com.arcanatable.customcards.SmaugTokenCopyScenarioTest" time="0.055"/>
+  <testcase name="copiedSmaugCreatesFourteenTreasuresWhenItDiesToLegendRule" classname="com.arcanatable.customcards.SmaugTokenCopyScenarioTest" time="0.058"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

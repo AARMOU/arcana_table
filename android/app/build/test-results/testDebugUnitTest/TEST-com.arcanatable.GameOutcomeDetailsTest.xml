@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.GameOutcomeDetailsTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:32.567Z" hostname="runnervmtai0g" time="0.003">
+  <properties/>
+  <testcase name="legacyOnlinePacketStillProvidesAnEndMessage" classname="com.arcanatable.GameOutcomeDetailsTest" time="0.001"/>
+  <testcase name="unknownEliminationReasonIsMarkedUnknownRatherThanBlamingAnotherPlayer" classname="com.arcanatable.GameOutcomeDetailsTest" time="0.0"/>
+  <testcase name="earlierMultiplayerCardEffectIsNotMisreportedAsTheFinalWin" classname="com.arcanatable.GameOutcomeDetailsTest" time="0.001"/>
+  <testcase name="lastHumanEliminatedFromFourPlayerPodDoesNotDeclareWinnerOrDraw" classname="com.arcanatable.GameOutcomeDetailsTest" time="0.0"/>
+  <testcase name="ordinaryDeathAndUnexplainedCardEffectAreNotMisidentifiedAsAnAlternateWin" classname="com.arcanatable.GameOutcomeDetailsTest" time="0.0"/>
+  <testcase name="nullableViewerNeverClaimsAnUnidentifiedViewerWon" classname="com.arcanatable.GameOutcomeDetailsTest" time="0.0"/>
+  <testcase name="drawnGameHasNoInventedWinner" classname="com.arcanatable.GameOutcomeDetailsTest" time="0.0"/>
+  <testcase name="diagnosticAndBannerPreservePreciseWinEvidence" classname="com.arcanatable.GameOutcomeDetailsTest" time="0.0"/>
+  <testcase name="alternativeWinCarriesAuthoritativeCardAndThresholdNotAnInferredCard" classname="com.arcanatable.GameOutcomeDetailsTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

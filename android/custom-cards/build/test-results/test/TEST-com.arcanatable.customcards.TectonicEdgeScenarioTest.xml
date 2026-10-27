@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.TectonicEdgeScenarioTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:43.278Z" hostname="runnervmtai0g" time="0.091">
+  <properties/>
+  <testcase name="anyNonbasicMayBeTargetedAfterThresholdButBasicLandMayNot" classname="com.arcanatable.customcards.TectonicEdgeScenarioTest" time="0.045"/>
+  <testcase name="opponentNeedsFourLandsIndividuallyBeforeActivationIsLegal" classname="com.arcanatable.customcards.TectonicEdgeScenarioTest" time="0.046"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

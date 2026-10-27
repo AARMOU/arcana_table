@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.PlagueDroneScenarioTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:36.080Z" hostname="runnervmtai0g" time="0.211">
+  <properties/>
+  <testcase name="replacementEndsWhenDroneLeavesBattlefield" classname="com.arcanatable.customcards.PlagueDroneScenarioTest" time="0.076"/>
+  <testcase name="twoDronesReplaceOneLifeGainOnlyOnce" classname="com.arcanatable.customcards.PlagueDroneScenarioTest" time="0.083"/>
+  <testcase name="opposingLifeGainBecomesLossWhileControllersLifeGainIsUnchanged" classname="com.arcanatable.customcards.PlagueDroneScenarioTest" time="0.052"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

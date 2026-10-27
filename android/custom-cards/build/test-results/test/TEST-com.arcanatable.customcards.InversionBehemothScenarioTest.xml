@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.InversionBehemothScenarioTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:25.281Z" hostname="runnervmtai0g" time="0.392">
+  <properties/>
+  <testcase name="switchEndsAtEndOfTurn" classname="com.arcanatable.customcards.InversionBehemothScenarioTest" time="0.055"/>
+  <testcase name="switchesEachChosenCreatureOfAnyController" classname="com.arcanatable.customcards.InversionBehemothScenarioTest" time="0.069"/>
+  <testcase name="zeroTargetsIsLegalAndChangesNothing" classname="com.arcanatable.customcards.InversionBehemothScenarioTest" time="0.066"/>
+  <testcase name="noTriggerOnOpponentsTurn" classname="com.arcanatable.customcards.InversionBehemothScenarioTest" time="0.047"/>
+  <testcase name="moreThanNinetyNineTargetsHaveNoCeiling" classname="com.arcanatable.customcards.InversionBehemothScenarioTest" time="0.154"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

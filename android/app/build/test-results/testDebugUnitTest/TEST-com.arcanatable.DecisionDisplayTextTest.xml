@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.DecisionDisplayTextTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:16:55.354Z" hostname="runnervmtai0g" time="0.0">
+  <properties/>
+  <testcase name="whitespaceAndLiteralNullLabelsUseFallback" classname="com.arcanatable.DecisionDisplayTextTest" time="0.0"/>
+  <testcase name="jsonNullAndMissingLabelsNeverRenderAsNull" classname="com.arcanatable.DecisionDisplayTextTest" time="0.0"/>
+  <testcase name="realCustomLabelsArePreserved" classname="com.arcanatable.DecisionDisplayTextTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

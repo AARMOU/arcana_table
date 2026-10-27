@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.FourPlayerOfflineTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:28.629Z" hostname="runnervmtai0g" time="3.918">
+  <properties/>
+  <testcase name="concedingEndsTheGameForYouWhileAisPlayOn" classname="com.arcanatable.FourPlayerOfflineTest" time="0.127"/>
+  <testcase name="fourPlayerGameRunsThroughArcanasProtocol" classname="com.arcanatable.FourPlayerOfflineTest" time="3.77"/>
+  <testcase name="setupMakesThreeAiSeats" classname="com.arcanatable.FourPlayerOfflineTest" time="0.021"/>
+  <system-out><![CDATA[[4p-offline] lobby=4 turn=46 actives=[0, 1, 2, 3] passes=36 over=true
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

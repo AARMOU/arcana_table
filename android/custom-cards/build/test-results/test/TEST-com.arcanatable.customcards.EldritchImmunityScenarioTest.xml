@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.EldritchImmunityScenarioTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:16.109Z" hostname="runnervmtai0g" time="0.45">
+  <properties/>
+  <testcase name="redDamageIsPreventedButColorlessDamageStillKills" classname="com.arcanatable.customcards.EldritchImmunityScenarioTest" time="0.052"/>
+  <testcase name="overloadStillRequiresOneTrueColorlessMana" classname="com.arcanatable.customcards.EldritchImmunityScenarioTest" time="0.049"/>
+  <testcase name="normalCostRequiresAControlledCreatureTarget" classname="com.arcanatable.customcards.EldritchImmunityScenarioTest" time="0.047"/>
+  <testcase name="overloadCanBeCastWithNoCreaturesAndDoesNotAffectLaterEntrants" classname="com.arcanatable.customcards.EldritchImmunityScenarioTest" time="0.048"/>
+  <testcase name="normalCostCannotBePaidWithColoredMana" classname="com.arcanatable.customcards.EldritchImmunityScenarioTest" time="0.047"/>
+  <testcase name="overloadProtectsAllOurCreaturesIncludingShroudButNotOpponentsOrLands" classname="com.arcanatable.customcards.EldritchImmunityScenarioTest" time="0.048"/>
+  <testcase name="overloadRejectsExplicitTargetsAndRequiresAllFiveMana" classname="com.arcanatable.customcards.EldritchImmunityScenarioTest" time="0.05"/>
+  <testcase name="normalCostProtectsExactlyTheChosenCreatureFromAllFiveColors" classname="com.arcanatable.customcards.EldritchImmunityScenarioTest" time="0.054"/>
+  <testcase name="shroudPreventsTheNormalTargetedCast" classname="com.arcanatable.customcards.EldritchImmunityScenarioTest" time="0.003"/>
+  <testcase name="protectionExpiresAtEndOfTurn" classname="com.arcanatable.customcards.EldritchImmunityScenarioTest" time="0.051"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

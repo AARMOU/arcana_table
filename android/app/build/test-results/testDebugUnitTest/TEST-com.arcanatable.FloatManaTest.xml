@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.FloatManaTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:24.732Z" hostname="runnervmtai0g" time="0.389">
+  <properties/>
+  <testcase name="manaLabelsAreShort" classname="com.arcanatable.FloatManaTest" time="0.004"/>
+  <testcase name="floatManaChoicesKeepOnlyUsableManaAbilities" classname="com.arcanatable.FloatManaTest" time="0.0"/>
+  <testcase name="floatingManaIsSpentBeforeTappingMoreLands" classname="com.arcanatable.FloatManaTest" time="0.385"/>
+  <system-out><![CDATA[[float-mana] stage=3 floated=1 tappedAfterFloat=1 cost=2 tappedAfterCast=2 poolAfterCast=0
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

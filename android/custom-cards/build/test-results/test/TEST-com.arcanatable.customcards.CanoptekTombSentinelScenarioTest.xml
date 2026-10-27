@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.CanoptekTombSentinelScenarioTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:11.451Z" hostname="runnervmtai0g" time="0.112">
+  <properties/>
+  <testcase name="unearthFromGraveyardExilesChosenNonlandThenSentinelAtEndStep" classname="com.arcanatable.customcards.CanoptekTombSentinelScenarioTest" time="0.061"/>
+  <testcase name="castingFromHandDoesNotExileOpponentsNonlandPermanent" classname="com.arcanatable.customcards.CanoptekTombSentinelScenarioTest" time="0.051"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.HomeArtUrlTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:32.618Z" hostname="runnervmtai0g" time="0.005">
+  <properties/>
+  <testcase name="usesBundledArtWhenTableHasNone" classname="com.arcanatable.HomeArtUrlTest" time="0.005"/>
+  <testcase name="forcesApiImageLookupToUseArtCrop" classname="com.arcanatable.HomeArtUrlTest" time="0.0"/>
+  <testcase name="rewritesScryfallCardPictureToArtworkCrop" classname="com.arcanatable.HomeArtUrlTest" time="0.0"/>
+  <testcase name="fallsThroughUnsupportedTableImageToBundledArt" classname="com.arcanatable.HomeArtUrlTest" time="0.0"/>
+  <testcase name="replacesCustomImageWithNameLookup" classname="com.arcanatable.HomeArtUrlTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

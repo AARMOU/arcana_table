@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.TallymanOfNurgleScenarioTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:43.129Z" hostname="runnervmtai0g" time="0.101">
+  <properties/>
+  <testcase name="sevenCreatureDeathsDrawSevenAndLoseSevenLife" classname="com.arcanatable.customcards.TallymanOfNurgleScenarioTest" time="0.052"/>
+  <testcase name="aCreatureDyingBeforeEndStepDrawsOneAndLosesOneLife" classname="com.arcanatable.customcards.TallymanOfNurgleScenarioTest" time="0.046"/>
+  <testcase name="noDeathThisTurnMeansNoChantTrigger" classname="com.arcanatable.customcards.TallymanOfNurgleScenarioTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

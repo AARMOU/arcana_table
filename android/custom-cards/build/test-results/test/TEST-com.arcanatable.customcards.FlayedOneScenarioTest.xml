@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.FlayedOneScenarioTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:19.169Z" hostname="runnervmtai0g" time="0.017">
+  <properties/>
+  <testcase name="castMillsExactlyThreeFromControllersLibrary" classname="com.arcanatable.customcards.FlayedOneScenarioTest" time="0.01"/>
+  <testcase name="combatLifelinkGainsFourLifeForController" classname="com.arcanatable.customcards.FlayedOneScenarioTest" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

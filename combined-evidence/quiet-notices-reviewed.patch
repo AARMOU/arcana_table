@@ -1,0 +1,179 @@
+diff --git a/android/app/src/main/java/com/arcanatable/TableArgentum.kt b/android/app/src/main/java/com/arcanatable/TableArgentum.kt
+index 27bde66..3275fa5 100644
+--- a/android/app/src/main/java/com/arcanatable/TableArgentum.kt
++++ b/android/app/src/main/java/com/arcanatable/TableArgentum.kt
+@@ -526,11 +526,16 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
+             recordDiagnostic("Online: ${incoming.optString("message")}", DiagnosticCategory.CONNECTION)
+         } else if (incoming.optString("code") == "WIFI_NOTE") {
+             // An information note from the host (e.g. a card left out of a deck), not a problem.
+-            message = "Note: " + incoming.optString("message")
++            // Logged only, so joining a game doesn't open a pop-up per card.
+             recordDiagnostic("Note from host: ${incoming.optString("message")}", DiagnosticCategory.ENGINE)
+         } else {
+-            argentumLastError = incoming.optString("message", "Argentum returned an error."); message = argentumLastError; argentumAwaitingUpdate = false; argentumXChecking = null
+-            recordDiagnostic("Argentum error ${incoming.optString("code")}: ${argentumLastError}", DiagnosticCategory.ERROR)
++            val text = incoming.optString("message", "Argentum returned an error.")
++            message = text
++            // Before a game the waiting screen also shows it. During a game the pop-up is enough; it
++            // must not linger and reappear later on the home screen.
++            if (argentumSnapshot == null && !homeOpen) argentumLastError = text
++            argentumAwaitingUpdate = false; argentumXChecking = null
++            recordDiagnostic("Argentum error ${incoming.optString("code")}: $text", DiagnosticCategory.ERROR)
+         }
+     }
+ }
+@@ -671,7 +676,7 @@ internal fun TableController.startArgentumPractice(vsAi: Boolean = true, joinLob
+             }
+             if (unsupported.isNotEmpty()) {
+                 // Substitutions apply to this Argentum game only; the saved Arcana deck is untouched.
+-                message = "For this Argentum game, ${unsupported.size} unsupported card(s) were left out${if (replacementCommander) " and $commanderForGame is commander" else ""}; ${replacementBasics.size} supported basic land(s) fill the gap. Your saved deck is unchanged."
++                // Logged, not shown: the deck editor already lists unsupported cards and swaps.
+                 recordDiagnostic("Player chose to play without ${unsupported.size} unsupported card(s); ${replacementBasics.size} basic land(s) added for this game only", DiagnosticCategory.UNSUPPORTED)
+             }
+             argentumDeckForLobby = submitted
+@@ -726,6 +731,8 @@ internal fun TableController.closeArgentumSession(concede: Boolean) {
+     argentumLastCompletedEngineMs = null
+     argentumEnabled = false
+     argentumOffline = false
++    // A finished or abandoned session's last error must not reappear on the home screen.
++    argentumLastError = null
+     setArgentumGameActive(false)
+     argentumSnapshot = null
+     argentumPendingDecision = null
+diff --git a/android/app/src/main/java/com/arcanatable/TableController.kt b/android/app/src/main/java/com/arcanatable/TableController.kt
+index 595bff0..772f9bb 100644
+--- a/android/app/src/main/java/com/arcanatable/TableController.kt
++++ b/android/app/src/main/java/com/arcanatable/TableController.kt
+@@ -505,7 +505,13 @@ internal class TableController(
+             url = ArgentumEndpoints.socketUrl(argentumOrigin),
+             onStatus = { status -> argentumStatus = status; if (status != ArgentumConnectionStatus.CONNECTED) argentumAwaitingUpdate = false },
+             onMessage = { argentumQueue.trySend(it) },
+-            onError = { argentumLastError = it; message = it; argentumAwaitingUpdate = false },
++            // Pop-up only; the pre-game waiting screen also keeps it inline (never the home screen, which would repeat it).
++            onError = {
++                // Stored errors are logged by the argentumLastError effect; log the rest here.
++                if (argentumSnapshot == null && !homeOpen) argentumLastError = it
++                else recordDiagnostic("Argentum problem: $it", DiagnosticCategory.ERROR)
++                message = it; argentumAwaitingUpdate = false
++            },
+             // Reconnect on its own only while the player is looking at the app.
+             canAutoReconnect = { appInForeground }
+         )
+@@ -1541,16 +1547,14 @@ internal class TableController(
+                         append("Imported ${deck.size} cards. Your opening hand is ready.")
+                     }
+                 }
++                // No pop-up: picking or importing a deck must not interrupt play. The import dialog
++                // and the deck editor already show which cards Argentum lacks, with suggested swaps.
+                 if (supportReport != null && supportReport.unsupportedCopies > 0) {
+                     val names = supportReport.unsupportedNames
+-                    message = buildString {
+-                        append("${names.size} card ${if (names.size == 1) "name isn't" else "names aren't"} in Argentum's card library: ")
+-                        append(names.take(6).joinToString())
+-                        if (names.size > 6) append(", and ${names.size - 6} more")
+-                        append(". ")
+-                        if (supportReport.commanderUnsupported) append("That includes your commander. ")
+-                        append("Argentum games leave them out. The deck editor (Edit imported deck, or Edit deck in the Argentum deck review) shows suggested Argentum swaps. Your deck was imported as written.")
+-                    }
++                    recordDiagnostic("Deck has ${names.size} card name(s) outside Argentum's library" +
++                        (if (supportReport.commanderUnsupported) ", including the commander" else "") +
++                        ": ${names.take(12).joinToString()}${if (names.size > 12) ", +${names.size - 12} more" else ""}",
++                        DiagnosticCategory.UNSUPPORTED)
+                 }
+                 if (onlineMode && !gameStartedOnline) { showOverview = true; showHand = false; lobbyOpen = true }
+             } catch (e: Exception) {
+@@ -1828,8 +1832,7 @@ internal class TableController(
+             } catch (error: Throwable) {
+                 argentumSocket.localHostFactory = null
+                 argentumOffline = false
+-                argentumLastError = "Couldn't start the offline game: ${error.javaClass.simpleName}: ${error.message?.take(200)}"
+-                message = argentumLastError
++                message = "Couldn't start the offline game: ${error.javaClass.simpleName}: ${error.message?.take(200)}"
+                 recordDiagnostic("Offline game failed to start: ${error.javaClass.simpleName}: ${error.message}", DiagnosticCategory.ERROR)
+             } finally {
+                 offlineStarting = false
+diff --git a/android/app/src/main/java/com/arcanatable/TableOverlays.kt b/android/app/src/main/java/com/arcanatable/TableOverlays.kt
+index 7da5b4e..8123649 100644
+--- a/android/app/src/main/java/com/arcanatable/TableOverlays.kt
++++ b/android/app/src/main/java/com/arcanatable/TableOverlays.kt
+@@ -355,6 +355,7 @@ internal fun TableController.TableOverlays() {
+                         gameEndedOnline = false
+                         gameTimerRunning = false
+                         turnTimerRunning = false
++                        argentumLastError = null
+                         homeOpen = true
+                     }, modifier = Modifier.weight(1f).heightIn(min = 52.dp)) { Text("LEAVE") }
+                 }
+@@ -390,9 +391,11 @@ internal fun TableController.TableOverlays() {
+         dismissButton = { TextButton(onClick = { argentumJoinDialogOpen = false }) { Text("CANCEL") } }
+     )
+ 
++    // Start-up problems (deck validation, connecting, resuming). In-game errors never reach here,
++    // and errors already shown as a pop-up are not stored for it.
+     if (argentumLastError != null && argentumSnapshot == null && homeOpen) AlertDialog(
+         onDismissRequest = { argentumLastError = null },
+-        title = { Text("Argentum deck check") },
++        title = { Text("Couldn't start the game") },
+         text = { Text(argentumLastError.orEmpty()) },
+         confirmButton = { TextButton(onClick = { argentumLastError = null }) { Text("OK") } }
+     )
+diff --git a/android/app/src/main/java/com/arcanatable/TableOverlaysB.kt b/android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
+index 2499c58..250f5a5 100644
+--- a/android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
++++ b/android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
+@@ -528,7 +528,7 @@ internal fun TableController.TableOverlaysB() {
+                         Modifier.fillMaxWidth().clickable {
+                             importText = deck.asImportText()
+                             importError = null
+-                            message = "${deck.name} loaded from Argentum. Review the 100-card list, then tap Import."
++                            // The list is now in the import box above; no pop-up needed.
+                             argentumDeckPickerOpen = false
+                         },
+                         shape = RoundedCornerShape(12.dp), color = PanelLight, border = BorderStroke(1.dp, Muted.copy(alpha = 0.35f))
+diff --git a/android/app/src/main/java/com/arcanatable/TableWifi.kt b/android/app/src/main/java/com/arcanatable/TableWifi.kt
+index dac047b..a194dde 100644
+--- a/android/app/src/main/java/com/arcanatable/TableWifi.kt
++++ b/android/app/src/main/java/com/arcanatable/TableWifi.kt
+@@ -71,8 +71,7 @@ internal fun TableController.startWifiHost(online: Boolean = false) {
+             recordDiagnostic("Wi-Fi host waiting at $address", DiagnosticCategory.CONNECTION)
+         } catch (error: Throwable) {
+             stopWifi()
+-            argentumLastError = "Couldn't start hosting: ${error.javaClass.simpleName}: ${error.message?.take(200)}"
+-            message = argentumLastError
++            message = "Couldn't start hosting: ${error.javaClass.simpleName}: ${error.message?.take(200)}"
+             recordDiagnostic("Wi-Fi host failed: ${error.javaClass.simpleName}: ${error.message}", DiagnosticCategory.ERROR)
+         } finally {
+             offlineStarting = false
+@@ -180,8 +179,7 @@ internal fun TableController.joinWifiGame(address: String) {
+         } catch (error: Throwable) {
+             guest.close()
+             argentumSocket.close()
+-            argentumLastError = "Couldn't join $address. Check both phones are on the same Wi-Fi and the other phone is hosting. (${error.javaClass.simpleName})"
+-            message = argentumLastError
++            message = "Couldn't join $address. Check both phones are on the same Wi-Fi and the other phone is hosting. (${error.javaClass.simpleName})"
+             recordDiagnostic("Wi-Fi join failed: ${error.javaClass.simpleName}: ${error.message}", DiagnosticCategory.ERROR)
+         } finally {
+             wifiConnecting = false
+@@ -208,8 +206,7 @@ internal fun TableController.joinOnlineGame(code: String) {
+             if (failure != null) {
+                 guest.close()
+                 argentumSocket.close()
+-                argentumLastError = "Couldn't join room $clean: $failure"
+-                message = argentumLastError
++                message = "Couldn't join room $clean: $failure"
+                 recordDiagnostic("Online join failed: $failure", DiagnosticCategory.ERROR)
+                 return@launch
+             }
+diff --git a/android/app/src/test/java/com/arcanatable/ui/ArgentumResilienceUiTest.kt b/android/app/src/test/java/com/arcanatable/ui/ArgentumResilienceUiTest.kt
+index 56d2d12..716ac12 100644
+--- a/android/app/src/test/java/com/arcanatable/ui/ArgentumResilienceUiTest.kt
++++ b/android/app/src/test/java/com/arcanatable/ui/ArgentumResilienceUiTest.kt
+@@ -94,7 +94,7 @@ class ArgentumResilienceUiTest {
+         val scenario = ActivityScenario.launch(MainActivity::class.java)
+         UiTestSupport.settle(rule)
+         UiTestSupport.playWithArgentum(rule, scenario)
+-        UiTestSupport.awaitReal(rule, 40_000, "deck-check error dialog") { shown("Argentum deck check") }
++        UiTestSupport.awaitReal(rule, 40_000, "start-up error dialog") { shown("Couldn't start the game") }
+         shot(scenario, "01-unreachable")
+         assertFalse("must not be stuck in a loading state", shown("CHECKING DECK WITH ARGENTUM"))
+         rule.onNodeWithText("OK").performClick()

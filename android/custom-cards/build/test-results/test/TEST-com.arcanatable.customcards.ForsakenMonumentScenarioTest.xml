@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.ForsakenMonumentScenarioTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:19.477Z" hostname="runnervmtai0g" time="0.525">
+  <properties/>
+  <testcase name="castingAColorlessSpellGainsTwoLife" classname="com.arcanatable.customcards.ForsakenMonumentScenarioTest" time="0.054"/>
+  <testcase name="coloredSpellsGainNoLife" classname="com.arcanatable.customcards.ForsakenMonumentScenarioTest" time="0.059"/>
+  <testcase name="tappingAColorlessLandAddsAnAdditionalColorless" classname="com.arcanatable.customcards.ForsakenMonumentScenarioTest" time="0.057"/>
+  <testcase name="anthemBuffsOnlyColorlessCreaturesYouControl" classname="com.arcanatable.customcards.ForsakenMonumentScenarioTest" time="0.055"/>
+  <testcase name="nonLandPermanentsTappedForColorlessAlsoCount" classname="com.arcanatable.customcards.ForsakenMonumentScenarioTest" time="0.049"/>
+  <testcase name="monumentItselfIsAColorlessSpellButDoesNotSeeItsOwnCast" classname="com.arcanatable.customcards.ForsakenMonumentScenarioTest" time="0.053"/>
+  <testcase name="withoutMonumentNoExtraMana" classname="com.arcanatable.customcards.ForsakenMonumentScenarioTest" time="0.053"/>
+  <testcase name="coloredManaAndOpponentsTapsGetNoBonus" classname="com.arcanatable.customcards.ForsakenMonumentScenarioTest" time="0.076"/>
+  <testcase name="anthemEndsWhenMonumentLeaves" classname="com.arcanatable.customcards.ForsakenMonumentScenarioTest" time="0.067"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

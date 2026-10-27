@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.CardFiltersTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:16:43.043Z" hostname="runnervmtai0g" time="0.259">
+  <properties/>
+  <testcase name="manaCostContainsSymbols" classname="com.arcanatable.CardFiltersTest" time="0.021"/>
+  <testcase name="typedQueryAndFiltersCombine" classname="com.arcanatable.CardFiltersTest" time="0.015"/>
+  <testcase name="oracleAndTypeTermsAllMustMatch" classname="com.arcanatable.CardFiltersTest" time="0.011"/>
+  <testcase name="commanderLegalOnlyKeepsCardsWithoutLegalityData" classname="com.arcanatable.CardFiltersTest" time="0.031"/>
+  <testcase name="colorModesAndCounts" classname="com.arcanatable.CardFiltersTest" time="0.028"/>
+  <testcase name="sortsByChosenKey" classname="com.arcanatable.CardFiltersTest" time="0.064"/>
+  <testcase name="rarityStatsAndSets" classname="com.arcanatable.CardFiltersTest" time="0.081"/>
+  <testcase name="presetsRoundTripAndSummaries" classname="com.arcanatable.CardFiltersTest" time="0.008"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

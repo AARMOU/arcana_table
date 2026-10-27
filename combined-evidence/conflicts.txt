@@ -1,0 +1,4 @@
+docs/agents/generated/pattern-index.json
+docs/agents/generated/pattern-index.md
+engine-upgrade/UPGRADE-TEMPLATE.md
+tools/cardkit/data/known-blockers.json

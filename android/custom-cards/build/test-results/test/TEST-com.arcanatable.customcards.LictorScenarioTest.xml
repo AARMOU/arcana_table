@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.LictorScenarioTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:27.347Z" hostname="runnervmtai0g" time="0.249">
+  <properties/>
+  <testcase name="opponentEntryOnAnEarlierTurnDoesNotQualify" classname="com.arcanatable.customcards.LictorScenarioTest" time="0.061"/>
+  <testcase name="ownCreatureEnteringDoesNotSatisfyPheromoneTrail" classname="com.arcanatable.customcards.LictorScenarioTest" time="0.073"/>
+  <testcase name="flashingInAfterAnOpponentsCreatureEnteredCreatesTramplingWarrior" classname="com.arcanatable.customcards.LictorScenarioTest" time="0.058"/>
+  <testcase name="creatureThatEnteredAndDiedStillQualifiesInTurnHistory" classname="com.arcanatable.customcards.LictorScenarioTest" time="0.056"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

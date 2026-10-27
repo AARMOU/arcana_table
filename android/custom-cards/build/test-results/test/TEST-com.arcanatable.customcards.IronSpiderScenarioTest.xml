@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.IronSpiderScenarioTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:25.828Z" hostname="runnervmtai0g" time="0.531">
+  <properties/>
+  <testcase name="abilityIsOfferedWithOtherArtifactListedAsCounterSource" classname="com.arcanatable.customcards.IronSpiderScenarioTest" time="0.06"/>
+  <testcase name="activationWithoutAnyDistributionIsWhatTheAppSendsToday" classname="com.arcanatable.customcards.IronSpiderScenarioTest" time="0.052"/>
+  <testcase name="otherCounterTypesDoNotCountTowardTheCost" classname="com.arcanatable.customcards.IronSpiderScenarioTest" time="0.048"/>
+  <testcase name="notAffordableWithFewerThanTwoCounters" classname="com.arcanatable.customcards.IronSpiderScenarioTest" time="0.046"/>
+  <testcase name="requirementIsTwoPlusOneCountersAsTheEngineKeysThem" classname="com.arcanatable.customcards.IronSpiderScenarioTest" time="0.046"/>
+  <testcase name="appHostFillsInTheCountOnTheRealLegalAction" classname="com.arcanatable.customcards.IronSpiderScenarioTest" time="0.057"/>
+  <testcase name="removingBothCountersFromAnotherArtifactDrawsACard" classname="com.arcanatable.customcards.IronSpiderScenarioTest" time="0.053"/>
+  <testcase name="countersCanBeSplitAcrossTwoArtifacts" classname="com.arcanatable.customcards.IronSpiderScenarioTest" time="0.05"/>
+  <testcase name="exactlyTwoPlusOneFromAMixedArtifactLeavesItsOtherCounters" classname="com.arcanatable.customcards.IronSpiderScenarioTest" time="0.067"/>
+  <testcase name="hostListsOnlyPlusOneCountersOnMixedArtifactsAndANoncreatureArtifact" classname="com.arcanatable.customcards.IronSpiderScenarioTest" time="0.051"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

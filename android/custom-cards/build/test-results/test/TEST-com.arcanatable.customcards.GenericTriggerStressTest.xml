@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.GenericTriggerStressTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:20.134Z" hostname="runnervmtai0g" time="3.687">
+  <properties/>
+  <testcase name="oneHugeLifeGainIsNotTwoHundredIndividualTriggers" classname="com.arcanatable.customcards.GenericTriggerStressTest" time="0.02"/>
+  <testcase name="twoHundredSeparateLifeGainsWithoutCreatures" classname="com.arcanatable.customcards.GenericTriggerStressTest" time="0.05"/>
+  <testcase name="oneHugeLifeGainOnLargeFoodBoardStillTriggersOnce" classname="com.arcanatable.customcards.GenericTriggerStressTest" time="0.236"/>
+  <testcase name="repeatedLifeGainWithLargeFoodBoardShowsEnumerationCost" classname="com.arcanatable.customcards.GenericTriggerStressTest" time="1.264"/>
+  <testcase name="twoHundredArtifactEtbsAreRealHaliyaTriggers" classname="com.arcanatable.customcards.GenericTriggerStressTest" time="1.505"/>
+  <testcase name="twoHundredCreatureEtbsAreRealHaliyaTriggers" classname="com.arcanatable.customcards.GenericTriggerStressTest" time="0.612"/>
+  <system-out><![CDATA[GENERIC_STRESS_RESULT case=gain200once windows=4 peakStack=1 decisions=0 fullCalls=4 fastPassSamples=3 fullMs=3 candidateMs=1 resolutionMs=1 life=1200 opponentLife=999 created=0
+GENERIC_STRESS_RESULT case=gain1x200 windows=402 peakStack=200 decisions=0 fullCalls=16 fastPassSamples=15 fullMs=3 candidateMs=0 resolutionMs=38 life=1200 opponentLife=800 created=0
+GENERIC_STRESS_RESULT case=gain200once-foodboard windows=4 peakStack=1 decisions=0 fullCalls=4 fastPassSamples=3 fullMs=210 candidateMs=4 resolutionMs=8 life=1200 opponentLife=999 created=0
+GENERIC_STRESS_RESULT case=gain1x200-foodboard windows=402 peakStack=200 decisions=0 fullCalls=16 fastPassSamples=15 fullMs=877 candidateMs=4 resolutionMs=368 life=1200 opponentLife=800 created=0
+GENERIC_STRESS_RESULT case=food200 windows=402 peakStack=200 decisions=0 fullCalls=16 fastPassSamples=15 fullMs=939 candidateMs=2 resolutionMs=492 life=1200 opponentLife=1000 created=200
+GENERIC_STRESS_RESULT case=creature200 windows=402 peakStack=200 decisions=0 fullCalls=16 fastPassSamples=15 fullMs=134 candidateMs=2 resolutionMs=410 life=1200 opponentLife=1000 created=200
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

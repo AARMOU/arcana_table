@@ -1,0 +1,60 @@
+EXECUTING SOURCE-PINNED FULL-VALIDATION STEP: Inject original Eldrazi Temple, Corrupted Crossroads and Azlask with exact scenarios
+Runner-only AI mirror: <=120 turns, <=8000 actions, gameOver mandatory for all 3 seeds
+EXECUTING SOURCE-PINNED FULL-VALIDATION STEP: Rebuild and test all bundled custom cards against exact upgraded runtime
+Downloading https://services.gradle.org/distributions/gradle-8.13-bin.zip
+.............10%.............20%.............30%.............40%.............50%.............60%.............70%.............80%.............90%.............100%
+
+Welcome to Gradle 8.13!
+
+Here are the highlights of this release:
+ - Daemon JVM auto-provisioning
+ - Enhancements for Scala plugin and JUnit testing
+ - Improvements for build authors and plugin developers
+
+For more details see https://docs.gradle.org/8.13/release-notes.html
+
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.13/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :app
+w: ⚠️ Deprecated Gradle Version
+The used Gradle version (Gradle 8.13) is deprecated and will not be supported in future Kotlin Gradle Plugin releases.
+The minimum supported Gradle version will become Gradle 8.14.4 in Kotlin 2.5.0.
+
+This warning can be suppressed in 'gradle.properties':
+    kotlin.suppressGradlePluginWarnings=DeprecatedGradleVersionWarning
+Solution: Please update the Gradle version to at least Gradle 8.14.4.
+
+
+> Task :custom-cards:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :custom-cards:processResources NO-SOURCE
+> Task :custom-cards:processTestResources NO-SOURCE
+
+> Task :custom-cards:compileKotlin
+w: file:///home/runner/work/arcana_table/arcana_table/android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ContinueQuestion.kt:28:96 No cast needed.
+
+> Task :custom-cards:compileJava NO-SOURCE
+> Task :custom-cards:classes UP-TO-DATE
+
+> Task :custom-cards:exportCards
+ARCANA-CUSTOM-CARDS cards=248 bytes=299605
+
+> Task :custom-cards:jar
+> Task :custom-cards:compileTestKotlin
+> Task :custom-cards:compileTestJava NO-SOURCE
+> Task :custom-cards:testClasses UP-TO-DATE
+> Task :custom-cards:test
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_6-1793063564738.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/arcana_table/arcana_table/android/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 2m 9s
+5 actionable tasks: 5 executed
+EXECUTING SOURCE-PINNED FULL-VALIDATION STEP: Prove source-built Ugin and additional Eldrazi Temple regression executed
+PASS: Ugin real engine scenarios {'name': 'com.arcanatable.customcards.UginTheIneffableScenarioTest', 'tests': '22', 'skipped': '0', 'failures': '0', 'errors': '0', 'timestamp': '2026-10-27T01:14:44.147Z', 'hostname': 'runnervmtai0g', 'time': '0.758'}
+Ugin, the Ineffable	card
+EXECUTING SOURCE-PINNED FULL-VALIDATION STEP: Enforce 94 original Eldrazi slots and Azlask scenarios on packaged card assets
+Original Eldrazi Incursion indexed: 94/100; missing: ['Benthic Anomaly', 'Angelic Aberration', 'Hideous Taskmaster', 'Twins of Discord', 'Mutated Cultist', 'Opal Palace']
+Index presence does not establish rules correctness or playable APK integration.
+PASS: bundled custom-card index/JSONL agree and include Temple, Crossroads, Azlask
+PASS: 3 of 3 strict Azlask rules tests executed on upgraded engine

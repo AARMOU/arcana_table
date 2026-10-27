@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.DrownerOfHopeScenarioTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:14.314Z" hostname="runnervmtai0g" time="0.226">
+  <properties/>
+  <testcase name="illegalNoncreatureTargetDoesNotSpendTheSacrificeCost" classname="com.arcanatable.customcards.DrownerOfHopeScenarioTest" time="0.054"/>
+  <testcase name="enteringCreatesTwoFunctionalEldraziScions" classname="com.arcanatable.customcards.DrownerOfHopeScenarioTest" time="0.008"/>
+  <testcase name="sacrificingScionAsCostTapsTargetCreature" classname="com.arcanatable.customcards.DrownerOfHopeScenarioTest" time="0.063"/>
+  <testcase name="noncreatureEldraziScionPermanentCanPayTheOracleCost" classname="com.arcanatable.customcards.DrownerOfHopeScenarioTest" time="0.052"/>
+  <testcase name="cannotSacrificeAnOpponentsScionOrARegularCreature" classname="com.arcanatable.customcards.DrownerOfHopeScenarioTest" time="0.048"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

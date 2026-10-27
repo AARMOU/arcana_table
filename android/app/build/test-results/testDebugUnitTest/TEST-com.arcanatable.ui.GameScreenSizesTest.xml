@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ui.GameScreenSizesTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:18:19.955Z" hostname="runnervmtai0g" time="7.334">
+  <properties/>
+  <testcase name="foldableCover" classname="com.arcanatable.ui.GameScreenSizesTest" time="1.743"/>
+  <testcase name="phonePortrait" classname="com.arcanatable.ui.GameScreenSizesTest" time="2.071"/>
+  <testcase name="foldableUnfolded" classname="com.arcanatable.ui.GameScreenSizesTest" time="1.505"/>
+  <testcase name="phoneLandscape" classname="com.arcanatable.ui.GameScreenSizesTest" time="2.015"/>
+  <system-out><![CDATA[[audit] foldable-cover: 0 enabled clickable nodes without a visible label
+[audit] phone-portrait: 0 enabled clickable nodes without a visible label
+[audit] foldable-unfolded: 2 enabled clickable nodes without a visible label
+[audit] phone-landscape: 2 enabled clickable nodes without a visible label
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

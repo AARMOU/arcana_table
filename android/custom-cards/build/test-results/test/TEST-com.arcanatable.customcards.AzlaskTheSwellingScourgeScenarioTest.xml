@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.AzlaskTheSwellingScourgeScenarioTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:09.901Z" hostname="runnervmtai0g" time="0.192">
+  <properties/>
+  <testcase name="onlyFriendlyColorlessDeathsGiveExperienceIncludingAzlaskItself" classname="com.arcanatable.customcards.AzlaskTheSwellingScourgeScenarioTest" time="0.061"/>
+  <testcase name="scionsAndSpawnsGainIndestructibleAndAnnihilatorButUnrelatedCreaturesDoNot" classname="com.arcanatable.customcards.AzlaskTheSwellingScourgeScenarioTest" time="0.067"/>
+  <testcase name="wubrgIsRequiredAndPumpUsesExperienceAtResolutionOnExistingFriendlyCreatures" classname="com.arcanatable.customcards.AzlaskTheSwellingScourgeScenarioTest" time="0.064"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

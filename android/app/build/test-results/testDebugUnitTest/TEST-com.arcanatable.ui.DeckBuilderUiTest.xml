@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ui.DeckBuilderUiTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:18:04.852Z" hostname="runnervmtai0g" time="3.122">
+  <properties/>
+  <testcase name="foldCoverBuildsAndAutosaves" classname="com.arcanatable.ui.DeckBuilderUiTest" time="1.093"/>
+  <testcase name="libraryTilesAndFiltersPanel" classname="com.arcanatable.ui.DeckBuilderUiTest" time="1.264"/>
+  <testcase name="foldUnfoldedBuildsAndAutosaves" classname="com.arcanatable.ui.DeckBuilderUiTest" time="0.765"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.WifiHostTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:47.615Z" hostname="runnervmtai0g" time="0.159">
+  <properties/>
+  <testcase name="lanLinkCarriesMessagesBothWays" classname="com.arcanatable.WifiHostTest" time="0.004"/>
+  <testcase name="twoPeoplePlayThroughOneHost" classname="com.arcanatable.WifiHostTest" time="0.153"/>
+  <testcase name="portAlreadyInUseIsReportedNotSilent" classname="com.arcanatable.WifiHostTest" time="0.002"/>
+  <system-out><![CDATA[[wifi-host] turn=5 interactive={host=6, guest=6} lands={host=2, guest=2} mulligans=[host, guest]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

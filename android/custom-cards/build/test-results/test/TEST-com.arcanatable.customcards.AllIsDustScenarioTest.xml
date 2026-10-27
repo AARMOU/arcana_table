@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.AllIsDustScenarioTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:08.849Z" hostname="runnervmtai0g" time="0.179">
+  <properties/>
+  <testcase name="bothPlayersSacrificeColoredPermanentsButKeepColorlessArtifactsAndLands" classname="com.arcanatable.customcards.AllIsDustScenarioTest" time="0.068"/>
+  <testcase name="allDeathsAreSimultaneousSoADyingObserverSeesOtherPlayersCreatures" classname="com.arcanatable.customcards.AllIsDustScenarioTest" time="0.055"/>
+  <testcase name="sacrificeIgnoresIndestructibleHexproofAndPermanentTypeButPreservesDevoid" classname="com.arcanatable.customcards.AllIsDustScenarioTest" time="0.055"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ui.QuickUiTipsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:18:28.497Z" hostname="runnervmtai0g" time="0.55">
+  <properties/>
+  <testcase name="notNowDismissesTheFirstLaunchOfferAcrossRecreation" classname="com.arcanatable.ui.QuickUiTipsTest" time="0.224"/>
+  <testcase name="openTutorialsShowsTheOfflineHubAndRemembersTheOffer" classname="com.arcanatable.ui.QuickUiTipsTest" time="0.155"/>
+  <testcase name="popupActionsRemainVisibleInLandscape" classname="com.arcanatable.ui.QuickUiTipsTest" time="0.171"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

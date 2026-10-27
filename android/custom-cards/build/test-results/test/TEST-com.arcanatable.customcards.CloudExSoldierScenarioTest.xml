@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.CloudExSoldierScenarioTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:12.006Z" hostname="runnervmtai0g" time="0.059">
+  <properties/>
+  <testcase name="entersEquippingItselfThenDrawsForEquippedAttackers" classname="com.arcanatable.customcards.CloudExSoldierScenarioTest" time="0.059"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

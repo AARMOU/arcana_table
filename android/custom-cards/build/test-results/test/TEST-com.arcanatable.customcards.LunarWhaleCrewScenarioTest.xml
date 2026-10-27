@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.LunarWhaleCrewScenarioTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:27.767Z" hostname="runnervmtai0g" time="0.623">
+  <properties/>
+  <testcase name="opponentsCreatureCannotCrew" classname="com.arcanatable.customcards.LunarWhaleCrewScenarioTest" time="0.053"/>
+  <testcase name="zeroPowerAloneIsNotEnough" classname="com.arcanatable.customcards.LunarWhaleCrewScenarioTest" time="0.053"/>
+  <testcase name="emptyCrewIsRejectedWhichIsWhatArcanaSent" classname="com.arcanatable.customcards.LunarWhaleCrewScenarioTest" time="0.049"/>
+  <testcase name="uncrewedWhaleCannotAttack" classname="com.arcanatable.customcards.LunarWhaleCrewScenarioTest" time="0.047"/>
+  <testcase name="hostJsonCarriesTheFieldsArcanaReads" classname="com.arcanatable.customcards.LunarWhaleCrewScenarioTest" time="0.057"/>
+  <testcase name="whaleControlledSinceTurnStartAttacksOnceCrewed" classname="com.arcanatable.customcards.LunarWhaleCrewScenarioTest" time="0.054"/>
+  <testcase name="severalCreaturesCanCrewTogether" classname="com.arcanatable.customcards.LunarWhaleCrewScenarioTest" time="0.048"/>
+  <testcase name="engineOffersCrewWithEligibleCreaturesAndRequiredPower" classname="com.arcanatable.customcards.LunarWhaleCrewScenarioTest" time="0.056"/>
+  <testcase name="tappedCreatureCannotCrewAndIsNotOffered" classname="com.arcanatable.customcards.LunarWhaleCrewScenarioTest" time="0.052"/>
+  <testcase name="summoningSickOnePowerCreatureCrewsTheWhale" classname="com.arcanatable.customcards.LunarWhaleCrewScenarioTest" time="0.051"/>
+  <testcase name="whaleCastThisTurnCannotAttackAfterCrewing" classname="com.arcanatable.customcards.LunarWhaleCrewScenarioTest" time="0.051"/>
+  <testcase name="crewLastsUntilEndOfTurn" classname="com.arcanatable.customcards.LunarWhaleCrewScenarioTest" time="0.05"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

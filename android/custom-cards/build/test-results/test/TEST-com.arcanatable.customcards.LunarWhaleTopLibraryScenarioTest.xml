@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.LunarWhaleTopLibraryScenarioTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:28.392Z" hostname="runnervmtai0g" time="0.448">
+  <properties/>
+  <testcase name="ownerSeesOnlyTopCardThroughMaskedProjectionWithoutPriority" classname="com.arcanatable.customcards.LunarWhaleTopLibraryScenarioTest" time="0.076"/>
+  <testcase name="attackingWhaleAllowsLandFromTopWithNormalLandDrop" classname="com.arcanatable.customcards.LunarWhaleTopLibraryScenarioTest" time="0.058"/>
+  <testcase name="onlyActualTopCardCanBeCast" classname="com.arcanatable.customcards.LunarWhaleTopLibraryScenarioTest" time="0.053"/>
+  <testcase name="sorceryTimingStillAppliesAfterAttack" classname="com.arcanatable.customcards.LunarWhaleTopLibraryScenarioTest" time="0.051"/>
+  <testcase name="topSpellMustStillHaveEnoughMana" classname="com.arcanatable.customcards.LunarWhaleTopLibraryScenarioTest" time="0.052"/>
+  <testcase name="attackingWhaleAllowsPaidSpellFromTop" classname="com.arcanatable.customcards.LunarWhaleTopLibraryScenarioTest" time="0.064"/>
+  <testcase name="noWhaleMeansNoPrivateTopAccess" classname="com.arcanatable.customcards.LunarWhaleTopLibraryScenarioTest" time="0.045"/>
+  <testcase name="neitherCrewNorUnattackedWhaleGivesLandPermission" classname="com.arcanatable.customcards.LunarWhaleTopLibraryScenarioTest" time="0.048"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

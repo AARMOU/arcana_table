@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.TutorialPriorityHostTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:41.869Z" hostname="runnervmtai0g" time="0.182">
+  <properties/>
+  <testcase name="trainingWaitsForTheLearnersRealPriorityPass" classname="com.arcanatable.TutorialPriorityHostTest" time="0.093"/>
+  <testcase name="ordinaryGameStillAutoPassesItsOwnPracticeSpell" classname="com.arcanatable.TutorialPriorityHostTest" time="0.089"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

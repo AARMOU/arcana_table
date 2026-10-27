@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.EldraziDisplacerScenarioTest" tests="13" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:15.027Z" hostname="runnervmtai0g" time="0.613">
+  <properties/>
+  <testcase name="anotherRejectsSelfAndNoncreaturesWithoutSpendingMana" classname="com.arcanatable.customcards.EldraziDisplacerScenarioTest" time="0.051"/>
+  <testcase name="targetBlinkedInResponseIsANewObjectAndIsNotBlinkedAgain" classname="com.arcanatable.customcards.EldraziDisplacerScenarioTest" time="0.051"/>
+  <testcase name="targetLeavingBeforeResolutionIsNotReturnedFromItsNewZone" classname="com.arcanatable.customcards.EldraziDisplacerScenarioTest" time="0.068"/>
+  <testcase name="coloredManaCannotPayTheRequiredColorlessButCanPayTheGenericPart" classname="com.arcanatable.customcards.EldraziDisplacerScenarioTest" time="0.079"/>
+  <testcase name="ownCreatureReturnsTappedAsANewObjectWithCountersAndDamageCleared" classname="com.arcanatable.customcards.EldraziDisplacerScenarioTest" time="0.053"/>
+  <testcase name="devoidIsColorlessOnTheBattlefieldAndStackWithWhiteIdentity" classname="com.arcanatable.customcards.EldraziDisplacerScenarioTest" time="0.004"/>
+  <testcase name="totalCostStillRequiresThreeMana" classname="com.arcanatable.customcards.EldraziDisplacerScenarioTest" time="0.048"/>
+  <testcase name="exiledTokenCeasesToExistAndNeverReenters" classname="com.arcanatable.customcards.EldraziDisplacerScenarioTest" time="0.049"/>
+  <testcase name="opposingCreatureReturnsToItsOwnerTapped" classname="com.arcanatable.customcards.EldraziDisplacerScenarioTest" time="0.048"/>
+  <testcase name="auraGoesToGraveyardAndEquipmentStaysUnattached" classname="com.arcanatable.customcards.EldraziDisplacerScenarioTest" time="0.053"/>
+  <testcase name="reentryRunsTheCreaturesEnterTrigger" classname="com.arcanatable.customcards.EldraziDisplacerScenarioTest" time="0.05"/>
+  <testcase name="stolenCreatureReturnsUnderItsOwnerRatherThanItsPreviousController" classname="com.arcanatable.customcards.EldraziDisplacerScenarioTest" time="0.052"/>
+  <testcase name="opponentsHexproofAndShroudPreventTargetingButOwnHexproofDoesNot" classname="com.arcanatable.customcards.EldraziDisplacerScenarioTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

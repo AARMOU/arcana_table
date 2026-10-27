@@ -1,0 +1,6 @@
+android/app/src/main/java/com/arcanatable/TableArgentum.kt
+android/app/src/main/java/com/arcanatable/TableController.kt
+android/app/src/main/java/com/arcanatable/TableOverlays.kt
+android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
+android/app/src/main/java/com/arcanatable/TableWifi.kt
+android/app/src/test/java/com/arcanatable/ui/ArgentumResilienceUiTest.kt

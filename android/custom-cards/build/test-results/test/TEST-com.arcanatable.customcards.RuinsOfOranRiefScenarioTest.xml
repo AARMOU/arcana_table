@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.RuinsOfOranRiefScenarioTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:37.632Z" hostname="runnervmtai0g" time="0.262">
+  <properties/>
+  <testcase name="entersTappedAndAddsCounterToColorlessCreatureWhichEnteredThisTurn" classname="com.arcanatable.customcards.RuinsOfOranRiefScenarioTest" time="0.049"/>
+  <testcase name="tappedEntryPreventsEitherModeAndUntappedManaActuallyPaysForSpell" classname="com.arcanatable.customcards.RuinsOfOranRiefScenarioTest" time="0.053"/>
+  <testcase name="anActualCastStopsBeingEligibleOnTheNextTurn" classname="com.arcanatable.customcards.RuinsOfOranRiefScenarioTest" time="0.053"/>
+  <testcase name="rejectsColoredCreatureColorlessNoncreatureAndCreatureFromEarlierTurnWithoutTapping" classname="com.arcanatable.customcards.RuinsOfOranRiefScenarioTest" time="0.057"/>
+  <testcase name="mayTargetAnOpponentsColorlessCreatureThatEnteredThisTurn" classname="com.arcanatable.customcards.RuinsOfOranRiefScenarioTest" time="0.05"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

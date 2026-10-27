@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.TutorialPracticeScenariosTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:41.606Z" hostname="runnervmtai0g" time="0.262">
+  <properties/>
+  <testcase name="stackDrillHasValidTargetInstantAndManaSources" classname="com.arcanatable.TutorialPracticeScenariosTest" time="0.069"/>
+  <testcase name="combatBeginsWithActualGrizzlyBearsPermanent" classname="com.arcanatable.TutorialPracticeScenariosTest" time="0.071"/>
+  <testcase name="mulliganDrillUsesTwoRegisteredSeats" classname="com.arcanatable.TutorialPracticeScenariosTest" time="0.056"/>
+  <testcase name="firstTurnHasLandAndCastableOneManaCreatureInRealHand" classname="com.arcanatable.TutorialPracticeScenariosTest" time="0.066"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

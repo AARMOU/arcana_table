@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.GreyKnightParagonScenarioTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:24.281Z" hostname="runnervmtai0g" time="0.206">
+  <properties/>
+  <testcase name="anAttackingDemonIsExiledInsteadOfDestroyed" classname="com.arcanatable.customcards.GreyKnightParagonScenarioTest" time="0.075"/>
+  <testcase name="enteringOutsideCombatDoesNotDestroyANonattackingCreature" classname="com.arcanatable.customcards.GreyKnightParagonScenarioTest" time="0.07"/>
+  <testcase name="flashesIntoOpponentsCombatAndDestroysAnAttackingNonDemon" classname="com.arcanatable.customcards.GreyKnightParagonScenarioTest" time="0.061"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

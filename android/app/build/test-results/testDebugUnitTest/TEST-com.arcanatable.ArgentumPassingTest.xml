@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ArgentumPassingTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:16:36.084Z" hostname="runnervmtai0g" time="0.002">
+  <properties/>
+  <testcase name="gameLogParsesWholeGameWithOwnershipAndTurnMarkers" classname="com.arcanatable.ArgentumPassingTest" time="0.0"/>
+  <testcase name="snapshotKeepsTheFullLogAndTheRecentFeed" classname="com.arcanatable.ArgentumPassingTest" time="0.001"/>
+  <testcase name="stopsWhenYourNextTurnStarts" classname="com.arcanatable.ArgentumPassingTest" time="0.0"/>
+  <testcase name="passesThroughTheOpponentsTurn" classname="com.arcanatable.ArgentumPassingTest" time="0.001"/>
+  <testcase name="keepsPassingTheRestOfTheTurnItStartedOn" classname="com.arcanatable.ArgentumPassingTest" time="0.0"/>
+  <testcase name="passLabelNamesWhereArgentumWillStop" classname="com.arcanatable.ArgentumPassingTest" time="0.0"/>
+  <testcase name="stopsForBlocksSpellsAndDecisions" classname="com.arcanatable.ArgentumPassingTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

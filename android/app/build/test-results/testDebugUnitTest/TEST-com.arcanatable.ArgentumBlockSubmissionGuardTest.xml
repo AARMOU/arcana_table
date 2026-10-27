@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ArgentumBlockSubmissionGuardTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:16:36.021Z" hostname="runnervmtai0g" time="0.011">
+  <properties/>
+  <testcase name="unrelatedConnectionErrorsDoNotClearSubmittedDeclaration" classname="com.arcanatable.ArgentumBlockSubmissionGuardTest" time="0.01"/>
+  <testcase name="acceptedBlockersSuppressDuplicateUntilCombatAdvances" classname="com.arcanatable.ArgentumBlockSubmissionGuardTest" time="0.0"/>
+  <testcase name="secondCombatThisTurnAndNewGameCanDeclareAgain" classname="com.arcanatable.ArgentumBlockSubmissionGuardTest" time="0.001"/>
+  <testcase name="invalidNonCombatActionDoesNotReopenAcceptedBlockers" classname="com.arcanatable.ArgentumBlockSubmissionGuardTest" time="0.0"/>
+  <testcase name="invalidAssignmentAllowsCorrectionInSameBlockStep" classname="com.arcanatable.ArgentumBlockSubmissionGuardTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

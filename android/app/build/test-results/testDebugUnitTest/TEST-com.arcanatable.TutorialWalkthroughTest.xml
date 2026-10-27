@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.TutorialWalkthroughTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:42.069Z" hostname="runnervmtai0g" time="5.493">
+  <properties/>
+  <testcase name="stackLessonCanBeCompleted" classname="com.arcanatable.TutorialWalkthroughTest" time="1.01"/>
+  <testcase name="openingHandLessonCanBeCompleted" classname="com.arcanatable.TutorialWalkthroughTest" time="1.278"/>
+  <testcase name="firstTurnLessonCanBeCompleted" classname="com.arcanatable.TutorialWalkthroughTest" time="2.215"/>
+  <testcase name="combatLessonCanBeCompleted" classname="com.arcanatable.TutorialWalkthroughTest" time="0.99"/>
+  <system-out><![CDATA[Lesson stack completed:
+  state PRECOMBAT_MAIN turn 1 active=0 stack=[] legal=[PassPriority, PlayLand, CastSpell, ActivateAbility]
+STEP 1 open (tap)
+    tap stack-button: open -> last-first
+STEP 2 last-first (next)
+STEP 3 priority (next)
+STEP 4 opponent-cast (next)
+STEP 5 respond (event:SpellCast)
+  learner: CastSpell during respond
+  state PRECOMBAT_MAIN turn 1 active=0 stack=[Giant Growth] legal=[PassPriority, ActivateAbility]
+    event SpellCast: respond -> inspect-stack
+STEP 6 inspect-stack (next)
+STEP 7 pass (event:PriorityPassed)
+  learner: PassPriority during pass
+  state PRECOMBAT_MAIN turn 1 active=0 stack=[] legal=[PassPriority, PlayLand, ActivateAbility]
+    event PriorityPassed: pass -> close
+STEP 8 close (tap)
+    tap stack-close: close -> DONE
+Lesson opening-hand completed:
+STEP 1 seven (next)
+STEP 2 lands (next)
+STEP 3 play-draw (next)
+STEP 4 mulligan (event:HandMulliganed)
+  learner: mulligan during mulligan
+    event HandMulliganed: mulligan -> bottom
+STEP 5 bottom (next)
+STEP 6 keep (event:HandKept)
+  learner: keepHand during keep
+  learner: chooseBottomCards during keep
+  state DRAW turn 1 active=0 stack=[] legal=[]
+    event HandKept: keep -> zoom-dismiss
+  state PRECOMBAT_MAIN turn 1 active=0 stack=[] legal=[]
+  state BEGIN_COMBAT turn 1 active=0 stack=[] legal=[]
+  state DECLARE_ATTACKERS turn 1 active=0 stack=[] legal=[]
+  state END_COMBAT turn 1 active=0 stack=[] legal=[]
+  state POSTCOMBAT_MAIN turn 1 active=0 stack=[] legal=[]
+  state END turn 1 active=0 stack=[] legal=[]
+  state UPKEEP turn 2 active=1 stack=[] legal=[]
+  state DRAW turn 2 active=1 stack=[] legal=[]
+  state PRECOMBAT_MAIN turn 2 active=1 stack=[] legal=[]
+  state PRECOMBAT_MAIN turn 2 active=1 stack=[] legal=[PassPriority, PlayLand]
+STEP 7 zoom-dismiss (next)
+Lesson first-turn completed:
+  state PRECOMBAT_MAIN turn 1 active=0 stack=[] legal=[PassPriority, PlayLand]
+STEP 1 welcome (next)
+STEP 2 hand-handle (tap)
+    tap hand-handle: hand-handle -> forest
+STEP 3 forest (event:LandPlayed)
+  learner: PlayLand during forest
+  state PRECOMBAT_MAIN turn 1 active=0 stack=[] legal=[PassPriority, CastSpell, ActivateAbility]
+    event LandPlayed: forest -> board-land
+STEP 4 board-land (next)
+STEP 5 make-mana (event:ManaAdded)
+  learner: ActivateAbility during make-mana
+  state PRECOMBAT_MAIN turn 1 active=0 stack=[] legal=[PassPriority, CastSpell, ActivateAbility]
+    event ManaAdded: make-mana -> pool
+STEP 6 pool (next)
+STEP 7 cast-elf (event:SpellCast)
+  learner: CastSpell during cast-elf
+  state PRECOMBAT_MAIN turn 1 active=0 stack=[Elvish Mystic] legal=[PassPriority, ActivateAbility]
+    event SpellCast: cast-elf -> spell-stack
+STEP 8 spell-stack (next)
+STEP 9 resolve (event:SpellResolved)
+  learner: PassPriority during resolve
+  state PRECOMBAT_MAIN turn 1 active=0 stack=[] legal=[PassPriority, ActivateAbility]
+    event SpellResolved: resolve -> inspect
+STEP 10 inspect (hold)
+    hold battlefield-card:Elvish Mystic: inspect -> sickness
+STEP 11 sickness (next)
+STEP 12 pass (event:PriorityPassed)
+  learner: PassPriority during pass
+  state BEGIN_COMBAT turn 1 active=0 stack=[] legal=[]
+  state DECLARE_ATTACKERS turn 1 active=0 stack=[] legal=[]
+  state END_COMBAT turn 1 active=0 stack=[] legal=[]
+    event AttackersDeclared: pass -> combat-skip
+  state POSTCOMBAT_MAIN turn 1 active=0 stack=[] legal=[]
+  state POSTCOMBAT_MAIN turn 1 active=0 stack=[] legal=[PassPriority, ActivateAbility]
+STEP 13 combat-skip (event:AttackersDeclared)
+STEP 14 finish-turn (event:TurnAdvanced)
+  learner: PassPriority during finish-turn
+  state END turn 1 active=0 stack=[] legal=[]
+  state UPKEEP turn 2 active=1 stack=[] legal=[]
+    event TurnAdvanced: finish-turn -> opponent
+  state DRAW turn 2 active=1 stack=[] legal=[]
+  state PRECOMBAT_MAIN turn 2 active=1 stack=[] legal=[]
+  state BEGIN_COMBAT turn 2 active=1 stack=[] legal=[]
+  state DECLARE_ATTACKERS turn 2 active=1 stack=[] legal=[]
+  state END_COMBAT turn 2 active=1 stack=[] legal=[]
+  state POSTCOMBAT_MAIN turn 2 active=1 stack=[] legal=[]
+  state END turn 2 active=1 stack=[] legal=[]
+  state CLEANUP turn 2 active=1 stack=[] legal=[]
+  state UPKEEP turn 3 active=0 stack=[] legal=[]
+  state DRAW turn 3 active=0 stack=[] legal=[]
+  state PRECOMBAT_MAIN turn 3 active=0 stack=[] legal=[]
+  state PRECOMBAT_MAIN turn 3 active=0 stack=[] legal=[PassPriority, PlayLand, ActivateAbility]
+STEP 15 opponent (next)
+STEP 16 complete (next)
+Lesson combat completed:
+  state PRECOMBAT_MAIN turn 3 active=0 stack=[] legal=[PassPriority, PlayLand]
+STEP 1 combat-step (next)
+STEP 2 ready (next)
+STEP 3 attack (event:AttackersDeclared)
+  learner: PassPriority during attack
+  state BEGIN_COMBAT turn 3 active=0 stack=[] legal=[]
+  state DECLARE_ATTACKERS turn 3 active=0 stack=[] legal=[]
+  state DECLARE_ATTACKERS turn 3 active=0 stack=[] legal=[DeclareAttackers]
+  learner: DeclareAttackers during attack
+  state DECLARE_BLOCKERS turn 3 active=0 stack=[] legal=[]
+    event AttackersDeclared: attack -> block
+  state DECLARE_BLOCKERS turn 3 active=0 stack=[] legal=[]
+  state COMBAT_DAMAGE turn 3 active=0 stack=[] legal=[]
+  state END_COMBAT turn 3 active=0 stack=[] legal=[]
+  state POSTCOMBAT_MAIN turn 3 active=0 stack=[] legal=[]
+  state POSTCOMBAT_MAIN turn 3 active=0 stack=[] legal=[PassPriority, PlayLand]
+STEP 4 block (next)
+STEP 5 blocked (next)
+STEP 6 damage (next)
+STEP 7 life (next)
+STEP 8 keywords (next)
+STEP 9 postcombat (next)
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

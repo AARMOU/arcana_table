@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.GameRulesTest" tests="36" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:32.575Z" hostname="runnervmtai0g" time="0.042">
+  <properties/>
+  <testcase name="rejectsMalformedOrUnsupportedManaSymbols" classname="com.arcanatable.GameRulesTest" time="0.004"/>
+  <testcase name="carriesTriggerPromptsAcrossOnlineSnapshots" classname="com.arcanatable.GameRulesTest" time="0.005"/>
+  <testcase name="fallsBackToSeatOrderForInvalidOrder" classname="com.arcanatable.GameRulesTest" time="0.002"/>
+  <testcase name="detectsAsEntersCreatureTypeChoicesButIgnoresFaceDownCards" classname="com.arcanatable.GameRulesTest" time="0.005"/>
+  <testcase name="doesNotAutoTrackManaAbilitiesWithAdditionalCosts" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="estimatesRequiredAndOptionalTargetCounts" classname="com.arcanatable.GameRulesTest" time="0.001"/>
+  <testcase name="wrapsFinalPhaseToNextPlayerWithoutAdvancingRoundUntilOrderCompletes" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="reportsHybridCostsForManualPayment" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="aiChumpBlocksOnlyLethalNonTrampleAttack" classname="com.arcanatable.GameRulesTest" time="0.003"/>
+  <testcase name="untapStepRemovesOneStunCounterInsteadOfUntapping" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="targetPickerCandidatesIncludeGameObjectsAndRespectHiddenHands" classname="com.arcanatable.GameRulesTest" time="0.002"/>
+  <testcase name="parsesUnconditionalLifeDrawAndTokenEffects" classname="com.arcanatable.GameRulesTest" time="0.001"/>
+  <testcase name="aiDoesNotGuessVariablePowerOrBlockUnblockableAttacker" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="menaceAttackerGetsTwoBlockersWhenTheyCanStopIt" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="parsesPrintedCombatStatsWithoutGuessingVariableValues" classname="com.arcanatable.GameRulesTest" time="0.001"/>
+  <testcase name="eliminatedSeatsDoNotDelayRoundCounter" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="leavesPoolUnchangedWhenCostCannotBePaid" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="parsesSimpleTargetPlayerEffectsForTargetPrompts" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="leavesTargetedOrConditionalCardEffectsManual" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="turnCounterChangesAfterEveryEligiblePlayerHasTakenATurn" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="onlySpellResolutionMovesItsCardOutOfTheStack" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="carriesChosenTargetsOnStackAcrossOnlineSnapshots" classname="com.arcanatable.GameRulesTest" time="0.01"/>
+  <testcase name="followsRandomizedTurnOrderAndWraps" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="rejectsNegativeManaCosts" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="summarizesRepeatedMainDeckNamesAcrossPrintingRowsButOmitsCommander" classname="com.arcanatable.GameRulesTest" time="0.001"/>
+  <testcase name="paysColoredSymbolsBeforeGeneric" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="recognizesSimpleCastDrawAndCreatureEntryTriggerEvents" classname="com.arcanatable.GameRulesTest" time="0.001"/>
+  <testcase name="identifiesSimpleCreatureEntryLifeTriggers" classname="com.arcanatable.GameRulesTest" time="0.001"/>
+  <testcase name="doesNotPartiallyApplyAnUnrecognizedSpell" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="advancesOnePhaseWithoutChangingTurnOwner" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="spendsColorlessBeforeColoredMana" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="parsesSimpleManaSymbolsWithoutRegex" classname="com.arcanatable.GameRulesTest" time="0.001"/>
+  <testcase name="aiChoosesProfitableBlockAndDoesNotReuseAssignedBlocker" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="flyingAttackerNeedsFlyingOrReachBlocker" classname="com.arcanatable.GameRulesTest" time="0.0"/>
+  <testcase name="detectsManaRocksFlexibleManaAndDualLandChoices" classname="com.arcanatable.GameRulesTest" time="0.002"/>
+  <testcase name="refusesToPayWrongColor" classname="com.arcanatable.GameRulesTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

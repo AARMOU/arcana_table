@@ -1,0 +1,1 @@
+Worker deployment is a separate gate: deployed PR268 relay lacks PR283 reconfigure support.

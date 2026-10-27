@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.OfflineAiLargeBoardTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:30.009Z" hostname="runnervmtai0g" time="3.908">
+  <properties/>
+  <testcase name="crowdedTargetSearchReturnsALegalActionAndKeepsProgressing" classname="com.arcanatable.customcards.OfflineAiLargeBoardTest" time="0.15"/>
+  <testcase name="crowdedBlockingReturnsLegalAssignments" classname="com.arcanatable.customcards.OfflineAiLargeBoardTest" time="1.705"/>
+  <testcase name="manyAffordableTokenAbilitiesDoNotCauseUnboundedSimulation" classname="com.arcanatable.customcards.OfflineAiLargeBoardTest" time="0.191"/>
+  <testcase name="crowdedCombatReturnsALegalDeclaration" classname="com.arcanatable.customcards.OfflineAiLargeBoardTest" time="1.861"/>
+  <system-out><![CDATA[[mobile-ai] targeted permanents=280 ms=84 action=CastSpell
+[mobile-ai] blockers permanents=280 ms=769 action=DeclareBlockers
+[mobile-ai] token-abilities=140 permanents=140 ms=165 action=PlayLand
+[mobile-ai] combat permanents=140 ms=191 action=DeclareAttackers
+[mobile-ai] combat permanents=280 ms=857 action=DeclareAttackers
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

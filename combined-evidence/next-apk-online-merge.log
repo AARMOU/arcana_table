@@ -1,0 +1,10 @@
+Auto-merging android/app/src/main/java/com/arcanatable/HomeScreen.kt
+Auto-merging android/app/src/main/java/com/arcanatable/TableArgentum.kt
+CONFLICT (content): Merge conflict in android/app/src/main/java/com/arcanatable/TableArgentum.kt
+Auto-merging android/app/src/main/java/com/arcanatable/TableController.kt
+Auto-merging android/app/src/main/java/com/arcanatable/TableOverlays.kt
+CONFLICT (content): Merge conflict in android/app/src/main/java/com/arcanatable/TableOverlays.kt
+Auto-merging android/app/src/main/java/com/arcanatable/TableWifi.kt
+Auto-merging android/app/src/main/java/com/arcanatable/engine/LocalArgentumHost.kt
+CONFLICT (content): Merge conflict in android/app/src/main/java/com/arcanatable/engine/LocalArgentumHost.kt
+Automatic merge failed; fix conflicts and then commit the result.

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.EldraziConfluenceScenarioTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:14.547Z" hostname="runnervmtai0g" time="0.371">
+  <properties/>
+  <testcase name="explicitColorlessSymbolsRejectFourColoredMana" classname="com.arcanatable.customcards.EldraziConfluenceScenarioTest" time="0.048"/>
+  <testcase name="minusModeCannotTargetANoncreature" classname="com.arcanatable.customcards.EldraziConfluenceScenarioTest" time="0.05"/>
+  <testcase name="oneOfEachMode" classname="com.arcanatable.customcards.EldraziConfluenceScenarioTest" time="0.063"/>
+  <testcase name="sameModeThreeTimesMakesThreeScionsThatSacrificeForColorless" classname="com.arcanatable.customcards.EldraziConfluenceScenarioTest" time="0.054"/>
+  <testcase name="repeatedMinusThreeKillsAndOwnCreatureBlinksBackTapped" classname="com.arcanatable.customcards.EldraziConfluenceScenarioTest" time="0.053"/>
+  <testcase name="explicitColorlessSymbolsAllowTwoColorlessAndTwoColored" classname="com.arcanatable.customcards.EldraziConfluenceScenarioTest" time="0.05"/>
+  <testcase name="blinkCannotTargetALand" classname="com.arcanatable.customcards.EldraziConfluenceScenarioTest" time="0.052"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

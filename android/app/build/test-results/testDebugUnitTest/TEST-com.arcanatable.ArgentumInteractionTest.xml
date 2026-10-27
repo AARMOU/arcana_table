@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ArgentumInteractionTest" tests="20" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:16:36.035Z" hostname="runnervmtai0g" time="0.047">
+  <properties/>
+  <testcase name="combatResolutionIsNativeAndDefaultsAreAccepted" classname="com.arcanatable.ArgentumInteractionTest" time="0.002"/>
+  <testcase name="attackPlanUsesOnlyServerListedAttackersAndTargets" classname="com.arcanatable.ArgentumInteractionTest" time="0.002"/>
+  <testcase name="combatResolutionMirrorsArgentumValidation" classname="com.arcanatable.ArgentumInteractionTest" time="0.006"/>
+  <testcase name="xCostRangeAndValue" classname="com.arcanatable.ArgentumInteractionTest" time="0.0"/>
+  <testcase name="blockPlanReadsAttackersFromStateAndRespectsMaxBlocks" classname="com.arcanatable.ArgentumInteractionTest" time="0.001"/>
+  <testcase name="onlyUnknownDecisionTypesNeedHandling" classname="com.arcanatable.ArgentumInteractionTest" time="0.001"/>
+  <testcase name="livePlayLandActionTargetsACardInTheProjectedHand" classname="com.arcanatable.ArgentumInteractionTest" time="0.013"/>
+  <testcase name="responseShapesMatchArgentumTypes" classname="com.arcanatable.ArgentumInteractionTest" time="0.0"/>
+  <testcase name="noAttackIsAnEmptyDeclaration" classname="com.arcanatable.ArgentumInteractionTest" time="0.001"/>
+  <testcase name="liveCleanupDiscardDecisionIsNative" classname="com.arcanatable.ArgentumInteractionTest" time="0.004"/>
+  <testcase name="twoSlotActionsSendGroupCountsAndRespectPrefixes" classname="com.arcanatable.ArgentumInteractionTest" time="0.004"/>
+  <testcase name="damageAndDistributionValidation" classname="com.arcanatable.ArgentumInteractionTest" time="0.0"/>
+  <testcase name="cardTargetsKeepArgentumZoneSpelling" classname="com.arcanatable.ArgentumInteractionTest" time="0.0"/>
+  <testcase name="manaAbilitiesAreNeverOfferedAsManualActions" classname="com.arcanatable.ArgentumInteractionTest" time="0.001"/>
+  <testcase name="liveLegalActionsAreAllPresentable" classname="com.arcanatable.ArgentumInteractionTest" time="0.003"/>
+  <testcase name="manaColourAndXAreFilledIn" classname="com.arcanatable.ArgentumInteractionTest" time="0.001"/>
+  <testcase name="liveStateUpdateProjectsOntoArcanaTable" classname="com.arcanatable.ArgentumInteractionTest" time="0.004"/>
+  <testcase name="multiTargetActionsBuildArgentumShape" classname="com.arcanatable.ArgentumInteractionTest" time="0.001"/>
+  <testcase name="pileSplitReplacementAndBudgetMirrorValidators" classname="com.arcanatable.ArgentumInteractionTest" time="0.002"/>
+  <testcase name="orderingItemsReadEitherField" classname="com.arcanatable.ArgentumInteractionTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

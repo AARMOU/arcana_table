@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.SkorpekhLordScenarioTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:40.877Z" hostname="runnervmtai0g" time="0.105">
+  <properties/>
+  <testcase name="unearthReturnsWithHasteAndExilesAtNextEndStep" classname="com.arcanatable.customcards.SkorpekhLordScenarioTest" time="0.006"/>
+  <testcase name="unearthExilesInsteadOfReturningToHand" classname="com.arcanatable.customcards.SkorpekhLordScenarioTest" time="0.048"/>
+  <testcase name="grantsOnlyOtherAlliedArtifactCreaturesPowerAndMenace" classname="com.arcanatable.customcards.SkorpekhLordScenarioTest" time="0.047"/>
+  <testcase name="unearthCannotBeActivatedOutsideSorceryTiming" classname="com.arcanatable.customcards.SkorpekhLordScenarioTest" time="0.004"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

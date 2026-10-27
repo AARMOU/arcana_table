@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ZonePlaySourceTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:47.775Z" hostname="runnervmtai0g" time="0.001">
+  <properties/>
+  <testcase name="wrongOrStaleSourceCannotMoveCard" classname="com.arcanatable.ZonePlaySourceTest" time="0.0"/>
+  <testcase name="castFromGraveyardLeavesOtherZonesAlone" classname="com.arcanatable.ZonePlaySourceTest" time="0.0"/>
+  <testcase name="landEntryPreservesZoneOfOrigin" classname="com.arcanatable.ZonePlaySourceTest" time="0.001"/>
+  <testcase name="castFromExileLeavesGraveyardAndHandAlone" classname="com.arcanatable.ZonePlaySourceTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

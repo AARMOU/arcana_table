@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.OfflineCommanderGameTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:38.385Z" hostname="runnervmtai0g" time="1.294">
+  <properties/>
+  <testcase name="commanderDeckPlaysOffline" classname="com.arcanatable.OfflineCommanderGameTest" time="1.294"/>
+  <system-out><![CDATA[[offline-commander] setup 132 ms vs Baylen (EDHREC average); notes=[Left out 1 card(s) Argentum can't run offline (Not A Real Card) and filled with basic lands. Your saved deck is unchanged.]
+[offline-commander] turn=15 actions=55 over=true life=Offline AI=41, You=-6 decisions=[YesNoDecision, SelectCardsDecision]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

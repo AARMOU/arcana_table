@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.AiEndStepCascadeProfileTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:04.497Z" hostname="runnervmtai0g" time="3.853">
+  <properties/>
+  <testcase name="aiProcessorWithoutUnusedUndoPreservesExactRulesTransition" classname="com.arcanatable.customcards.AiEndStepCascadeProfileTest" time="0.098"/>
+  <testcase name="mobileAiPreservesPassOnlyControlOutcomeThroughTwoHundredTriggers" classname="com.arcanatable.customcards.AiEndStepCascadeProfileTest" time="3.755"/>
+  <system-out><![CDATA[AI_ENDSTEP_PROFILE ai=false windows=402 aiChoices=0 peakStack=200 aiMs=0 resolutionMs=1239 wallMs=1240 food=400 life=1200
+AI_ENDSTEP_PROFILE ai=true windows=402 aiChoices=201 peakStack=200 aiMs=1429 resolutionMs=942 wallMs=2372 food=400 life=1200
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

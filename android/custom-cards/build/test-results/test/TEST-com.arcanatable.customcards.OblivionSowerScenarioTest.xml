@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.OblivionSowerScenarioTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:29.756Z" hostname="runnervmtai0g" time="0.252">
+  <properties/>
+  <testcase name="mayChooseZeroExiledLandsWithoutReversingTheExile" classname="com.arcanatable.customcards.OblivionSowerScenarioTest" time="0.047"/>
+  <testcase name="castTriggerExilesFourAndLetsYouTakeAnyOwnedLandsFromExile" classname="com.arcanatable.customcards.OblivionSowerScenarioTest" time="0.048"/>
+  <testcase name="preexistingExiledLandsMayBeChosenEvenWhenTopFourAreNonlands" classname="com.arcanatable.customcards.OblivionSowerScenarioTest" time="0.05"/>
+  <testcase name="ownLandsAndNonlandsAreNotChoicesButOpponentOwnedLandsInAnotherExileBucketAre" classname="com.arcanatable.customcards.OblivionSowerScenarioTest" time="0.05"/>
+  <testcase name="enteringWithoutCastingDoesNotExileOrStealAnything" classname="com.arcanatable.customcards.OblivionSowerScenarioTest" time="0.057"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

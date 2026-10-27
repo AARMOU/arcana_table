@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.AiDifficultyTest" tests="11" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:02.326Z" hostname="runnervmtai0g" time="2.166">
+  <properties/>
+  <testcase name="normalIsExactlyThePreDifficultyMobileAi" classname="com.arcanatable.customcards.AiDifficultyTest" time="0.064"/>
+  <testcase name="crowdedBoardsStayBoundedAtEveryLevel" classname="com.arcanatable.customcards.AiDifficultyTest" time="0.001"/>
+  <testcase name="hardStillSavesTheDragonWithSpellskite" classname="com.arcanatable.customcards.AiDifficultyTest" time="0.69"/>
+  <testcase name="easyHesitatingStillOnlyMakesLegalPlays" classname="com.arcanatable.customcards.AiDifficultyTest" time="0.833"/>
+  <testcase name="aLevelsBudgetNeverOutlastsTheSharedBurst" classname="com.arcanatable.customcards.AiDifficultyTest" time="0.051"/>
+  <testcase name="everyLevelMakesALegalPlayInARealEnginePosition" classname="com.arcanatable.customcards.AiDifficultyTest" time="0.523"/>
+  <testcase name="onlyEasyHesitatesAndBrutalStaysWithinHalfAgainHardsWork" classname="com.arcanatable.customcards.AiDifficultyTest" time="0.0"/>
+  <testcase name="eachLevelSearchesAtLeastAsMuchAsTheOneBelow" classname="com.arcanatable.customcards.AiDifficultyTest" time="0.001"/>
+  <testcase name="thinkingTimeGrowsWithTheSeatsButNormalTablesKeepTheirBudget" classname="com.arcanatable.customcards.AiDifficultyTest" time="0.0"/>
+  <testcase name="hardAndBrutalPlayArgentumsServerStrategy" classname="com.arcanatable.customcards.AiDifficultyTest" time="0.0"/>
+  <testcase name="storedNamesAndSliderPositionsMapToLevels" classname="com.arcanatable.customcards.AiDifficultyTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

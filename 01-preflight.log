@@ -1,0 +1,8 @@
+EXECUTING SOURCE-PINNED FULL-VALIDATION STEP: Fetch and verify green upgraded-engine candidate evidence
+/tmp/upgrade-candidate.zip: OK
+/tmp/upgrade-candidate.patch: OK
+/tmp/upgrade-candidate.patch:498268: trailing whitespace.
+ 
+/tmp/upgrade-candidate.patch:498273: trailing whitespace.
+ 
+warning: 2 lines add whitespace errors.

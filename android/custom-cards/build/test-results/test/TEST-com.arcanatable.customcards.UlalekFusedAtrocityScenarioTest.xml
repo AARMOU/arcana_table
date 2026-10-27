@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" tests="18" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:44.956Z" hostname="runnervmtai0g" time="0.555">
+  <properties/>
+  <testcase name="payingCopiesTheEldraziSpellAndThePermanentCopyBecomesAToken" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.048"/>
+  <testcase name="eachHalfCanBePaidWithColorlessMana" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.003"/>
+  <testcase name="otherSpellsYouControlAreCopiedAndCopiesCanBeRetargeted" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.05"/>
+  <testcase name="coloredManaCannotPayTheColorlessCost" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.048"/>
+  <testcase name="printedCostIsFiveColorlessHybridSymbolsWithFiveColorIdentityAndDevoid" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.002"/>
+  <testcase name="opponentsActivatedAbilitiesAreNotCopiedEvenWhenTheyAreOnTheStack" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.048"/>
+  <testcase name="withNoOtherObjectsOnlyTheTriggeringSpellIsCopied" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.053"/>
+  <testcase name="opponentsEldraziCastDoesNotTriggerMyUlalek" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.05"/>
+  <testcase name="mixedColorlessAndColoredPaymentWorks" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.003"/>
+  <testcase name="otherTriggeredAbilitiesAreCopiedButUlaleksOwnIsNot" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.048"/>
+  <testcase name="activatedAbilitiesAreCopiedWithTheirTargets" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.05"/>
+  <testcase name="opponentsSpellsAreNotCopied" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.049"/>
+  <testcase name="castingUlalekItselfDoesNotTriggerItWhenItIsNotOnTheBattlefield" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.003"/>
+  <testcase name="manaOfOneColorCannotPayTheOtherColorsHalves" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.002"/>
+  <testcase name="commanderCastFromCommandZoneWithHybridCostAndTax" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.003"/>
+  <testcase name="eachHalfCanBePaidWithItsColor" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.003"/>
+  <testcase name="nonEldraziSpellsDoNotTrigger" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.044"/>
+  <testcase name="decliningMakesNoCopiesAndKeepsTheMana" classname="com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest" time="0.048"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

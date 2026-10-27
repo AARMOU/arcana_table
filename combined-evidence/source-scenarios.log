@@ -1,0 +1,226 @@
+gradle-locked: 'shlock' not found; running ./gradlew unlocked
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+Calculating task graph as no cached configuration is available for tasks: :mtg-sdk:test --tests com.wingedsheep.sdk.scripting.StackObjectCopySdkTest :rules-engine:test --tests com.wingedsheep.engine.scenarios.StackObjectCopyEngineTest --tests com.wingedsheep.engine.scenarios.EldraziTempleManaRestrictionTest --tests com.wingedsheep.engine.scenarios.CorruptedCrossroadsDevoidRestrictionTest
+> Task :buildSrc:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :buildSrc:generateExternalPluginSpecBuilders UP-TO-DATE
+> Task :buildSrc:extractPrecompiledScriptPluginPlugins UP-TO-DATE
+> Task :buildSrc:compilePluginsBlocks UP-TO-DATE
+> Task :buildSrc:generatePrecompiledScriptPluginAccessors UP-TO-DATE
+> Task :buildSrc:generateScriptPluginAdapters UP-TO-DATE
+> Task :buildSrc:compileKotlin UP-TO-DATE
+> Task :buildSrc:compileJava NO-SOURCE
+> Task :buildSrc:compileGroovy NO-SOURCE
+> Task :buildSrc:pluginDescriptors UP-TO-DATE
+> Task :buildSrc:processResources UP-TO-DATE
+> Task :buildSrc:classes UP-TO-DATE
+> Task :buildSrc:jar UP-TO-DATE
+> Task :mtg-sdk:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :mtg-sdk:processResources NO-SOURCE
+> Task :mtg-sdk:koverFindJar
+> Task :mtg-sdk:processTestResources
+> Task :rules-engine:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :rules-engine:processResources UP-TO-DATE
+> Task :mtg-sdk-tooling:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :mtg-sets:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :mtg-sets:1993-1999:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :mtg-sets:core:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :mtg-sets:2000-2002:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :mtg-sets:2003-2007:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :mtg-sets:2008-2016:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :mtg-sets:2017-2022:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :mtg-sets:2023:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :mtg-sets:2024:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :mtg-sets:2025:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :mtg-sets:2026:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :rules-engine:processTestFixturesResources NO-SOURCE
+> Task :mtg-sdk-tooling:processResources NO-SOURCE
+> Task :mtg-sets:processResources UP-TO-DATE
+> Task :rules-engine:koverFindJar
+> Task :rules-engine:processTestResources
+> Task :mtg-sets:1993-1999:processResources NO-SOURCE
+> Task :mtg-sets:2000-2002:processResources NO-SOURCE
+> Task :mtg-sets:2003-2007:processResources NO-SOURCE
+> Task :mtg-sets:2008-2016:processResources NO-SOURCE
+> Task :mtg-sets:2017-2022:processResources NO-SOURCE
+> Task :mtg-sets:2023:processResources NO-SOURCE
+> Task :mtg-sets:2024:processResources NO-SOURCE
+> Task :mtg-sets:2025:processResources NO-SOURCE
+> Task :mtg-sets:2026:processResources NO-SOURCE
+> Task :mtg-sets:core:processResources UP-TO-DATE
+> Task :mtg-sdk:compileKotlin UP-TO-DATE
+> Task :mtg-sdk:compileJava NO-SOURCE
+> Task :mtg-sdk:classes UP-TO-DATE
+> Task :mtg-sdk:jar UP-TO-DATE
+> Task :rules-engine:compileKotlin UP-TO-DATE
+> Task :rules-engine:compileJava NO-SOURCE
+> Task :rules-engine:classes UP-TO-DATE
+> Task :rules-engine:jar UP-TO-DATE
+> Task :mtg-sdk:compileTestKotlin
+> Task :mtg-sdk:compileTestJava NO-SOURCE
+> Task :mtg-sdk:testClasses
+> Task :mtg-sdk-tooling:compileKotlin UP-TO-DATE
+> Task :mtg-sdk-tooling:compileJava NO-SOURCE
+> Task :mtg-sets:core:compileKotlin UP-TO-DATE
+> Task :mtg-sets:core:compileJava NO-SOURCE
+> Task :mtg-sets:1993-1999:compileKotlin UP-TO-DATE
+> Task :mtg-sets:1993-1999:compileJava NO-SOURCE
+> Task :mtg-sets:2000-2002:compileKotlin UP-TO-DATE
+> Task :mtg-sets:2000-2002:compileJava NO-SOURCE
+> Task :mtg-sets:2003-2007:compileKotlin UP-TO-DATE
+> Task :mtg-sets:2003-2007:compileJava NO-SOURCE
+> Task :mtg-sets:2008-2016:compileKotlin UP-TO-DATE
+> Task :mtg-sets:2008-2016:compileJava NO-SOURCE
+> Task :mtg-sets:2017-2022:compileKotlin UP-TO-DATE
+> Task :mtg-sets:2017-2022:compileJava NO-SOURCE
+> Task :mtg-sets:2023:compileKotlin UP-TO-DATE
+> Task :mtg-sets:2023:compileJava NO-SOURCE
+> Task :mtg-sets:2024:compileKotlin UP-TO-DATE
+> Task :mtg-sets:2024:compileJava NO-SOURCE
+> Task :mtg-sets:2025:compileKotlin UP-TO-DATE
+> Task :mtg-sets:2025:compileJava NO-SOURCE
+> Task :mtg-sets:2026:compileKotlin UP-TO-DATE
+> Task :mtg-sets:2026:compileJava NO-SOURCE
+> Task :mtg-sets:compileKotlin UP-TO-DATE
+> Task :mtg-sets:compileJava NO-SOURCE
+
+> Task :mtg-sdk:test
+
+StackObjectCopySdkTest > existing targeted-copy JSON still decodes and uses the same wire name PASSED
+
+StackObjectCopySdkTest > controlled stack copies round-trip with player and ability kinds PASSED
+
+> Task :mtg-sdk-tooling:classes UP-TO-DATE
+> Task :mtg-sdk-tooling:jar UP-TO-DATE
+> Task :mtg-sets:classes UP-TO-DATE
+> Task :mtg-sets:jar UP-TO-DATE
+> Task :mtg-sets:1993-1999:classes UP-TO-DATE
+> Task :mtg-sets:1993-1999:jar UP-TO-DATE
+> Task :mtg-sets:2000-2002:classes UP-TO-DATE
+> Task :mtg-sets:2000-2002:jar UP-TO-DATE
+> Task :mtg-sets:2003-2007:classes UP-TO-DATE
+> Task :mtg-sets:2003-2007:jar UP-TO-DATE
+> Task :mtg-sets:2008-2016:classes UP-TO-DATE
+> Task :mtg-sets:2008-2016:jar UP-TO-DATE
+> Task :mtg-sets:2017-2022:classes UP-TO-DATE
+> Task :mtg-sets:2017-2022:jar UP-TO-DATE
+> Task :mtg-sets:2023:classes UP-TO-DATE
+> Task :mtg-sets:2023:jar UP-TO-DATE
+> Task :mtg-sets:2024:classes UP-TO-DATE
+> Task :mtg-sets:2024:jar UP-TO-DATE
+> Task :mtg-sets:2025:classes UP-TO-DATE
+> Task :mtg-sets:2025:jar UP-TO-DATE
+> Task :mtg-sets:2026:classes UP-TO-DATE
+> Task :mtg-sets:2026:jar UP-TO-DATE
+> Task :mtg-sets:core:classes UP-TO-DATE
+> Task :mtg-sets:core:jar UP-TO-DATE
+> Task :rules-engine:compileTestFixturesKotlin
+> Task :rules-engine:compileTestFixturesJava NO-SOURCE
+> Task :rules-engine:testFixturesClasses UP-TO-DATE
+> Task :rules-engine:testFixturesJar
+> Task :rules-engine:compileTestKotlin
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/EmergeFromQualityTest.kt:92:32 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Map<EntityId, String>'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/GrantedEmergeTest.kt:106:58 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Map<EntityId, String>'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/GrantedEmergeTest.kt:123:92 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Map<EntityId, String>'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/GrantedEmergeTest.kt:135:32 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Map<EntityId, String>'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/GrantedEmergeTest.kt:183:54 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Map<EntityId, String>'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/handlers/actions/ability/GrantedCrewTest.kt:77:67 No cast needed.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/combat/EnlistTest.kt:327:39 Redundant call of conversion method.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/mechanics/combat/RandomizedBlockerPilesTest.kt:260:49 Unnecessary non-null assertion (!!) on a non-null receiver of type 'List<List<EntityId>>'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/multiplayer/TwoHeadedGiantTeamPriorityTest.kt:151:66 Unnecessary non-null assertion (!!) on a non-null receiver of type 'EntityId'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/AdditionalCostChoicePayLifeTest.kt:57:35 Unnecessary non-null assertion (!!) on a non-null receiver of type 'AdditionalCostData'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/AnyPlayerDiscardActivationScenarioTest.kt:47:42 Unnecessary non-null assertion (!!) on a non-null receiver of type 'AdditionalCostData'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/DungeonTest.kt:326:33 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ClientDungeon'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/DungeonTest.kt:327:33 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ClientDungeon'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/FaceDownCopyTest.kt:88:24 Unnecessary non-null assertion (!!) on a non-null receiver of type 'CreatureStats'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/FaceDownRetainedCopyTest.kt:92:20 Unnecessary non-null assertion (!!) on a non-null receiver of type 'CreatureStats'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/GrantEscapeTest.kt:340:36 No cast needed.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/GrantNextSpellKeywordTest.kt:109:50 No cast needed.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/MutateTest.kt:142:24 No cast needed.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/RevealFromHandAdditionalCostTest.kt:143:49 Unnecessary non-null assertion (!!) on a non-null receiver of type 'AdditionalCostInfo'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/ScopedManaProductionTest.kt:237:93 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ManaSourceTag'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/SourceKeyedRedirectShieldTest.kt:93:47 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ChosenDamageSource'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/SourceKeyedRedirectShieldTest.kt:93:97 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ChosenDamageSource'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/SourceZoneIdentityTest.kt:160:40 Unnecessary safe call on a non-null receiver of type 'Map<String, List<EntityId>>'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/state/LegacyEffectContinuationLiftTest.kt:115:23 Redundant creation of Json format. Creating instances for each usage can be slow.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/state/ObjectIdentityTest.kt:236:40 Unnecessary safe call on a non-null receiver of type 'TriggerContext'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/state/ObjectIdentityTest.kt:422:17 Unnecessary non-null assertion (!!) on a non-null receiver of type 'EffectContext'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/state/ObjectIdentityTest.kt:423:17 Unnecessary non-null assertion (!!) on a non-null receiver of type 'EffectContext'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/state/ObjectIdentityTest.kt:424:17 Unnecessary non-null assertion (!!) on a non-null receiver of type 'EffectContext'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/state/ObjectIdentityTest.kt:426:17 Unnecessary non-null assertion (!!) on a non-null receiver of type 'EffectContext'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/targeting/AbilitySourceTargetingTest.kt:70:21 No cast needed.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/triggers/TriggerWaveInStateTest.kt:108:98 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/rules-engine/src/test/kotlin/com/wingedsheep/engine/view/ScheduledTriggerBadgeTest.kt:144:26 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+
+> Task :rules-engine:compileTestJava NO-SOURCE
+> Task :rules-engine:testClasses
+
+> Task :rules-engine:test
+
+CorruptedCrossroadsDevoidRestrictionTest > printed devoid creature is eligible for colored restricted mana PASSED
+
+CorruptedCrossroadsDevoidRestrictionTest > ordinary colorless artifact without devoid is not eligible PASSED
+
+CorruptedCrossroadsDevoidRestrictionTest > ordinary colored nondevoid spell is not eligible PASSED
+
+CorruptedCrossroadsDevoidRestrictionTest > even a devoid source does not license activating abilities PASSED
+
+CorruptedCrossroadsDevoidRestrictionTest > a face-down colorless spell without the devoid keyword is ineligible PASSED
+
+CorruptedCrossroadsDevoidRestrictionTest > failure to supply spell card types does not accidentally allow the restriction PASSED
+
+EldraziTempleManaRestrictionTest > restricted colorless mana accepts a colorless Eldrazi spell and source ability PASSED
+
+EldraziTempleManaRestrictionTest > restricted colorless mana refuses colored Eldrazi spells and source abilities PASSED
+
+EldraziTempleManaRestrictionTest > restricted mana refuses other colorless spells, other abilities and contextless costs PASSED
+
+EldraziTempleManaRestrictionTest > real mana pool pays exact two colorless symbols only for qualifying spend PASSED
+
+EldraziTempleManaRestrictionTest > mixed unrestricted and Temple mana cannot launder an ineligible payment PASSED
+
+EldraziTempleManaRestrictionTest > the restriction survives serialization and retains subtype identity PASSED
+
+EldraziTempleManaRestrictionTest > battlefield subtype replacement rejects mana spent on a former Eldrazi's ability PASSED
+
+StackObjectCopyEngineTest > spells are copied before abilities, and each group may be freely ordered PASSED
+
+StackObjectCopyEngineTest > a frozen batch includes existing spell copies exactly once and supports order save and resume PASSED
+
+StackObjectCopyEngineTest > opponents' stack objects and the currently resolving ability are excluded PASSED
+
+StackObjectCopyEngineTest > other pending batch-copy triggers can be copied without copying the resolving one PASSED
+
+StackObjectCopyEngineTest > empty stacks and uncopyable objects create no copies PASSED
+
+StackObjectCopyEngineTest > ability copies emit copy events without triggering or activating again PASSED
+
+StackObjectCopyEngineTest > an ability's new targets use its original source's color, not the copier's color PASSED
+
+StackObjectCopyEngineTest > keeping an ability target retains its old battlefield visit, while explicit reselection captures the new visit PASSED
+
+StackObjectCopyEngineTest > targetless permanent spell copies resolve into token permanents PASSED
+
+StackObjectCopyEngineTest > optional colorless payment may be declined and colored mana cannot substitute for it PASSED
+
+StackObjectCopyEngineTest > paying the optional cost consumes two colorless mana and copies the spell PASSED
+
+StackObjectCopyEngineTest > a departed ability source keeps its last known color when choosing new targets PASSED
+
+StackObjectCopyEngineTest > a copied optional trigger does not inherit a resolution consent choice PASSED
+
+StackObjectCopyEngineTest > ordering answers cannot omit, duplicate, or invent objects PASSED
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/__run_4-1793063422902.json
+Kotlin build report is written to file:///home/runner/work/arcana_table/arcana_table/combined-argentum/build/reports/kotlin-build/argentum-engine-build-2026-10-27-01-12-29-0.txt
+
+[Incubating] Problems report is available at: file:///home/runner/work/arcana_table/arcana_table/combined-argentum/build/reports/problems/problems-report.html
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.6.1/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD SUCCESSFUL in 2m 9s
+50 actionable tasks: 10 executed, 40 up-to-date
+Configuration cache entry stored.

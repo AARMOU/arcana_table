@@ -1,0 +1,3227 @@
+diff --git a/android/app/src/main/assets/tutorials/catalog.json b/android/app/src/main/assets/tutorials/catalog.json
+index f357eaca..39e019f0 100644
+--- a/android/app/src/main/assets/tutorials/catalog.json
++++ b/android/app/src/main/assets/tutorials/catalog.json
+@@ -45,8 +45,8 @@
+             "event": "LandPlayed"
+           },
+           "title": "Play a land",
+-          "body": "Tap Forest in your hand and choose Play Land. Lands enter the battlefield without being cast as spells.",
+-          "hint": "Choose Play Land"
++          "body": "Tap Forest in your hand and choose to play it. Playing a land isn't casting a spell, and you can play one land each turn.",
++          "hint": "Play Forest"
+         },
+         {
+           "id": "board-land",
+@@ -68,8 +68,8 @@
+             "event": "ManaAdded"
+           },
+           "title": "Make green mana",
+-          "body": "Select Forest's mana ability. Its green mana can help you cast your next spell.",
+-          "hint": "Use Forest's mana ability"
++          "body": "Tap your Forest and choose its mana ability to add green mana. You can also skip this: casting a spell pays from your untapped lands automatically.",
++          "hint": "Tap Forest for mana"
+         },
+         {
+           "id": "pool",
+@@ -97,12 +97,12 @@
+         {
+           "id": "spell-stack",
+           "screen": "stack",
+-          "target": "argentum-stack",
++          "target": "stack-items",
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Spells use the stack",
+-          "body": "Casting a creature puts the spell on the stack. It enters the battlefield after it resolves.",
++          "body": "Casting a creature puts the spell on the stack. Here it is, waiting to resolve. It enters the battlefield when it resolves.",
+           "hint": "Next"
+         },
+         {
+@@ -114,8 +114,8 @@
+             "event": "SpellResolved"
+           },
+           "title": "Let it resolve",
+-          "body": "Pass priority when you're ready. Once both players pass in succession, the top spell resolves.",
+-          "hint": "Tap Pass as needed"
++          "body": "Tap Pass. Your opponent gets a chance to respond; when you've both passed, the top spell resolves and Elvish Mystic enters the battlefield.",
++          "hint": "Tap Pass"
+         },
+         {
+           "id": "inspect",
+@@ -131,7 +131,7 @@
+         {
+           "id": "sickness",
+           "screen": "board",
+-          "target": "card-zoom",
++          "target": "battlefield-card:Elvish Mystic",
+           "advance": {
+             "kind": "next"
+           },
+@@ -148,20 +148,20 @@
+             "event": "PriorityPassed"
+           },
+           "title": "Keep the turn moving",
+-          "body": "Pass gives the other player a chance to act. When everyone passes on an empty stack, the game moves to the next step.",
++          "body": "Tap Pass. When every player passes with nothing on the stack, the game moves on to the next step.",
+           "hint": "Tap Pass"
+         },
+         {
+           "id": "combat-skip",
+           "screen": "board",
+-          "target": "legal-action-sheet",
++          "target": "bottom-bar-pass-button",
+           "advance": {
+             "kind": "event",
+             "event": "AttackersDeclared"
+           },
+           "title": "No attack this time",
+-          "body": "Elvish Mystic cannot attack yet. When combat asks you to choose attackers, confirm the legal no-attackers choice.",
+-          "hint": "Declare no attackers"
++          "body": "Elvish Mystic arrived this turn, so it can't attack yet. With no creature able to attack, the game moves straight past combat; if it ever asks for attackers, confirm with none.",
++          "hint": "Keep passing"
+         },
+         {
+           "id": "finish-turn",
+@@ -172,8 +172,8 @@
+             "event": "TurnAdvanced"
+           },
+           "title": "Finish your turn",
+-          "body": "Continue taking the legal Pass or no-action choices until the opponent's turn begins.",
+-          "hint": "Continue to opponent's turn"
++          "body": "Keep tapping Pass until your opponent's turn begins.",
++          "hint": "Pass to the opponent's turn"
+         },
+         {
+           "id": "opponent",
+@@ -183,7 +183,7 @@
+             "kind": "next"
+           },
+           "title": "Watch the opponent",
+-          "body": "Use the opponent tab to inspect their battlefield. Your hand remains private.",
++          "body": "Tap the opponent's tab to see their battlefield. Their hand stays hidden, just like yours is hidden from them.",
+           "hint": "Next"
+         },
+         {
+@@ -194,8 +194,8 @@
+             "kind": "next"
+           },
+           "title": "First turn complete",
+-          "body": "You've played a land, made mana, cast a creature, and passed priority. Continue with the Field Guide whenever you're ready.",
+-          "hint": "Open Field Guide"
++          "body": "You played a land, made mana, cast a creature and passed priority. More lessons are in Settings › Learn & tutorials whenever you want them.",
++          "hint": "Done"
+         }
+       ]
+     },
+@@ -231,7 +231,7 @@
+             "kind": "tap"
+           },
+           "title": "Choose a deck",
+-          "body": "Open Change deck to choose one of the decks included in this release.",
++          "body": "Change deck lets you pick any of your decks: the included ones and any you've imported.",
+           "hint": "Tap Change deck"
+         },
+         {
+@@ -248,12 +248,12 @@
+         {
+           "id": "resume",
+           "screen": "home",
+-          "target": "home-resume",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Resume safely",
+-          "body": "If a saved offline game is available, Resume returns to that game instead of starting over.",
++          "body": "When you have a saved offline game, a RESUME button appears here on Home and takes you back to it instead of starting over.",
+           "hint": "Next"
+         },
+         {
+@@ -275,7 +275,7 @@
+             "kind": "next"
+           },
+           "title": "Tutorials are always here",
+-          "body": "You can replay any lesson from Help and Tutorials without changing your game.",
++          "body": "You can replay any lesson from Settings › Learn & tutorials. Lessons never change your game.",
+           "hint": "Done"
+         }
+       ]
+@@ -310,8 +310,8 @@
+           "advance": {
+             "kind": "next"
+           },
+-          "title": "Two players for launch",
+-          "body": "This release is focused on one human against one AI. Multiplayer options should stay out of the tutorial until supported.",
++          "title": "How many players",
++          "body": "Offline, choose 2, 3 or 4 players. Each extra player is an AI opponent with its own deck. To play with friends, choose Play with a friend.",
+           "hint": "Next"
+         },
+         {
+@@ -333,30 +333,30 @@
+             "kind": "tap"
+           },
+           "title": "Pick the AI's deck",
+-          "body": "Choose an included opponent deck. Different commanders create different challenges.",
++          "body": "Choose a deck for the AI, or leave it on Random. With more than one AI, the others get random decks.",
+           "hint": "Choose an AI deck"
+         },
+         {
+-          "id": "start",
++          "id": "save-note",
+           "screen": "setup",
+-          "target": "setup-start",
++          "target": null,
+           "advance": {
+-            "kind": "tap"
++            "kind": "next"
+           },
+-          "title": "Ready to play",
+-          "body": "Start creates a new game. The tutorial itself always uses a disposable practice game instead.",
+-          "hint": "Tap Start in demo"
++          "title": "Practice is separate",
++          "body": "Practice lessons never replace your saved offline game. Choosing a deck or AI deck here is a real choice, and stays for your next game.",
++          "hint": "Done"
+         },
+         {
+-          "id": "save-note",
++          "id": "start",
+           "screen": "setup",
+-          "target": null,
++          "target": "setup-start",
+           "advance": {
+             "kind": "next"
+           },
+-          "title": "Practice is separate",
+-          "body": "Tutorial scenarios never overwrite your normal offline checkpoint or deck selection.",
+-          "hint": "Done"
++          "title": "Ready to play",
++          "body": "PLAY starts a real game against the AI with these choices. Tap it when you're ready; that ends this lesson. Practice lessons always use a separate game.",
++          "hint": "Tap PLAY, or Next to finish"
+         }
+       ]
+     },
+@@ -414,18 +414,18 @@
+             "event": "HandMulliganed"
+           },
+           "title": "Try one mulligan",
+-          "body": "This practice hand has poor mana. Tap Mulligan to draw a new hand and follow the game's instructions.",
+-          "hint": "Tap Mulligan"
++          "body": "This practice hand is almost all lands, so it has nothing to cast. Tap Mulligan to shuffle it away and draw a new seven.",
++          "hint": "Tap MULLIGAN"
+         },
+         {
+           "id": "bottom",
+           "screen": "mulligan",
+-          "target": "mulligan-bottom-choice",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Follow the game's mulligan prompts",
+-          "body": "You may need to put cards on the bottom of your library after deciding to keep, depending on the mulligan procedure. Arcana walks you through it.",
++          "body": "After a mulligan you still draw seven, then put one card on the bottom of your library for each mulligan you took. Arcana asks which cards once you keep.",
+           "hint": "Next"
+         },
+         {
+@@ -437,8 +437,8 @@
+             "event": "HandKept"
+           },
+           "title": "Keep this hand",
+-          "body": "Keep Hand accepts your opening cards once you've completed any required choices.",
+-          "hint": "Tap Keep Hand"
++          "body": "Tap KEEP. If Arcana asks, choose the card to put on the bottom of your library.",
++          "hint": "Tap KEEP"
+         },
+         {
+           "id": "zoom-dismiss",
+@@ -448,7 +448,7 @@
+             "kind": "next"
+           },
+           "title": "You can inspect without choosing",
+-          "body": "Card previews should never count as a keep or mulligan. Close previews before making your choice.",
++          "body": "Pressing and holding a card to read it never counts as keeping or taking a mulligan, so look as much as you like before you decide.",
+           "hint": "Done"
+         }
+       ]
+@@ -630,7 +630,7 @@
+             "kind": "next"
+           },
+           "title": "Choose an action",
+-          "body": "Casting, playing a land and activating abilities are different actions. Read the offered choice before confirming.",
++          "body": "This sheet lists only what Argentum allows with that card right now: play, cast, or an ability. Choose one, or close the sheet.",
+           "hint": "Next"
+         },
+         {
+@@ -641,7 +641,7 @@
+             "kind": "next"
+           },
+           "title": "Why isn't Cast shown?",
+-          "body": "You might lack mana, be outside a legal timing window, or need priority. Arcana should explain when an action is unavailable.",
++          "body": "A card can't be cast without enough mana, at the wrong time (most spells need your main phase), or while another player has priority. Wait for your chance, or check the stack.",
+           "hint": "Next"
+         },
+         {
+@@ -658,13 +658,13 @@
+         {
+           "id": "close",
+           "screen": "board",
+-          "target": "hand-handle",
++          "target": null,
+           "advance": {
+-            "kind": "tap"
++            "kind": "next"
+           },
+           "title": "Back to the table",
+-          "body": "Collapse the drawer any time to see more of the battlefield.",
+-          "hint": "Done"
++          "body": "Tap outside the drawer, or its ✕, to close your hand and return to the table.",
++          "hint": "Next"
+         }
+       ]
+     },
+@@ -694,12 +694,12 @@
+         {
+           "id": "symbols",
+           "screen": "board",
+-          "target": "mana-pips",
++          "target": "hand-card:Elvish Mystic",
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Read the mana symbols",
+-          "body": "Colored symbols require that color of mana. A number in a gray circle is generic mana, payable with any mana type.",
++          "body": "A card's cost is in its top-right corner. Colored symbols need that color of mana; a number is generic mana, payable with any type. Elvish Mystic costs one green.",
+           "hint": "Next"
+         },
+         {
+@@ -746,18 +746,18 @@
+             "event": "SpellCast"
+           },
+           "title": "Pay to cast a spell",
+-          "body": "Choose a legal Cast action. Arcana should display the cost and let Argentum validate payment.",
++          "body": "Tap Elvish Mystic and choose to cast it. Argentum checks the cost and timing, and Arcana pays from your mana.",
+           "hint": "Choose Cast"
+         },
+         {
+           "id": "autopay",
+           "screen": "board",
+-          "target": "payment-prompt",
++          "target": "argentum-mana-summary",
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Auto-payment and choices",
+-          "body": "Arcana may offer mana payment help. You stay in control of choices, and Argentum decides whether a payment is legal.",
++          "body": "Arcana pays costs from your untapped lands for you. When a choice matters, like which color to make, it asks you.",
+           "hint": "Next"
+         },
+         {
+@@ -844,7 +844,7 @@
+         {
+           "id": "resolved",
+           "screen": "board",
+-          "target": "argentum-stack",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+@@ -860,7 +860,7 @@
+             "kind": "hold"
+           },
+           "title": "Pass until your next turn",
+-          "body": "Press and hold Pass to use Arcana's auto-pass convenience. It is distinct from one ordinary pass.",
++          "body": "Press and hold Pass to keep passing until your next turn. One tap is a single pass; holding is a shortcut.",
+           "hint": "Press and hold Pass"
+         },
+         {
+@@ -871,18 +871,18 @@
+             "kind": "next"
+           },
+           "title": "Stop auto-passing",
+-          "body": "You should be able to cancel auto-pass at any time. The tutorial should never enable it without your action.",
++          "body": "Auto-pass stops by itself when something needs your attention, and you can turn it off at any time.",
+           "hint": "Next"
+         },
+         {
+           "id": "help",
+           "screen": "board",
+-          "target": "help-priority",
++          "target": "bottom-bar-pass-button",
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Ask why the game is waiting",
+-          "body": "When a decision or response is pending, Arcana should indicate who must act and what is waiting.",
++          "body": "The Pass button's label tells you what passing will do next, like going to combat or ending your turn. If it glows, the game is waiting for your response.",
+           "hint": "Done"
+         }
+       ]
+@@ -907,7 +907,7 @@
+             "kind": "tap"
+           },
+           "title": "Open the stack",
+-          "body": "Open the stack panel. Your opponent is passive in this exercise; you'll put a real spell on the stack next.",
++          "body": "Tap STACK to open the stack panel. It's empty now; you'll put a real spell on it in a moment. Your opponent won't respond in this practice.",
+           "hint": "Tap STACK"
+         },
+         {
+@@ -918,7 +918,7 @@
+             "kind": "next"
+           },
+           "title": "Last in, first out",
+-          "body": "The newest spell or ability normally resolves first after everyone passes.",
++          "body": "Spells and abilities wait here until they resolve. The newest one resolves first, after every player passes.",
+           "hint": "Next"
+         },
+         {
+@@ -929,7 +929,7 @@
+             "kind": "next"
+           },
+           "title": "Who can respond?",
+-          "body": "Argentum tracks whose opportunity it is. Only legal actions for that game state should be offered.",
++          "body": "Whoever has priority may act. Arcana only offers actions Argentum says are legal right now.",
+           "hint": "Next"
+         },
+         {
+@@ -939,8 +939,8 @@
+           "advance": {
+             "kind": "next"
+           },
+-          "title": "Prepare your instant",
+-          "body": "You control Grizzly Bears and two untapped Forests. Close the stack panel, then open your hand to cast an instant.",
++          "title": "Get your instant ready",
++          "body": "You control Grizzly Bears and two untapped Forests. Tap NEXT and your hand opens so you can cast an instant.",
+           "hint": "Next"
+         },
+         {
+@@ -952,7 +952,7 @@
+             "event": "SpellCast"
+           },
+           "title": "Cast Giant Growth",
+-          "body": "Choose Giant Growth in your hand, then target your Grizzly Bears. Argentum validates the target and adds the spell to the stack.",
++          "body": "Tap Giant Growth, choose to cast it, then pick your Grizzly Bears as the target.",
+           "hint": "Choose Cast and target your Bears"
+         },
+         {
+@@ -975,8 +975,8 @@
+             "event": "PriorityPassed"
+           },
+           "title": "Pass to resolve",
+-          "body": "Pass priority so the training opponent can pass too. Argentum then resolves Giant Growth and your Bears get +3/+3 until end of turn.",
+-          "hint": "Use PASS PRIORITY"
++          "body": "Tap PASS PRIORITY. Your opponent passes too, Giant Growth resolves, and your Bears get +3/+3 until end of turn.",
++          "hint": "Tap PASS PRIORITY"
+         },
+         {
+           "id": "close",
+@@ -986,8 +986,8 @@
+             "kind": "tap"
+           },
+           "title": "Return to your battlefield",
+-          "body": "Close the stack panel and return to the battlefield. You used real Argentum rules and priorities.",
+-          "hint": "Done"
++          "body": "Giant Growth resolved and the stack is empty. Tap CLOSE to go back to the battlefield.",
++          "hint": "Tap CLOSE"
+         }
+       ]
+     },
+@@ -997,7 +997,7 @@
+       "section": "Learn Magic",
+       "minutes": 5,
+       "startScreen": "board",
+-      "description": "Practice attackers, blockers, damage and summoning sickness.",
++      "description": "Attack with a creature, see how combat damage works, and learn what changes when creatures block.",
+       "scenario": "fixed-combat",
+       "availability": [
+         "release:offline-two-player"
+@@ -1011,8 +1011,8 @@
+             "kind": "next"
+           },
+           "title": "Enter combat",
+-          "body": "Combat has steps for attackers, blockers and damage. Argentum handles the exact timing.",
+-          "hint": "Next"
++          "body": "Your Grizzly Bears have been with you since your last turn, so they can attack. Tap Pass to leave your main phase and go to combat.",
++          "hint": "Tap Pass"
+         },
+         {
+           "id": "ready",
+@@ -1022,75 +1022,74 @@
+             "kind": "next"
+           },
+           "title": "Choose an eligible attacker",
+-          "body": "A creature usually needs to have been under your control since the start of your turn to attack, unless it has haste.",
++          "body": "A creature can attack if you've controlled it since the start of your turn, unless it has haste. Your Bears qualify.",
+           "hint": "Next"
+         },
+         {
+           "id": "attack",
+           "screen": "board",
+-          "target": "combat-attackers",
++          "target": "bottom-bar-pass-button",
+           "advance": {
+             "kind": "event",
+             "event": "AttackersDeclared"
+           },
+           "title": "Declare attackers",
+-          "body": "Choose your eligible creature and confirm the attack. It usually becomes tapped.",
+-          "hint": "Declare an attacker"
++          "body": "Tap Pass to go to attackers. On the attack board, tap Grizzly Bears, then confirm. Attacking taps the creature.",
++          "hint": "Choose Grizzly Bears, then confirm"
+         },
+         {
+           "id": "block",
+           "screen": "board",
+-          "target": "opponent-blocker",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+-          "title": "The defender can block",
+-          "body": "Your opponent may assign an untapped, eligible creature to block. Not every creature can block every attacker.",
++          "title": "Blocking",
++          "body": "Your opponent has no creatures, so nothing can block this time. In other games, the defending player may block with untapped creatures.",
+           "hint": "Next"
+         },
+         {
+           "id": "blocked",
+           "screen": "board",
+-          "target": "combat-blocks",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Combat pairs creatures",
+-          "body": "Blocked attackers normally deal combat damage to blockers instead of the defending player, unless an ability changes that.",
++          "body": "A blocked attacker deals its damage to the blocker instead of the player, unless an ability like trample says otherwise.",
+           "hint": "Next"
+         },
+         {
+           "id": "damage",
+           "screen": "board",
+-          "target": "combat-damage",
++          "target": null,
+           "advance": {
+-            "kind": "event",
+-            "event": "CombatDamageDealt"
++            "kind": "next"
+           },
+           "title": "Damage happens",
+-          "body": "Power determines damage dealt. Damage on a creature stays marked until cleanup unless an effect removes it.",
+-          "hint": "Resolve combat"
++          "body": "With no blockers, your Bears dealt combat damage straight to your opponent: 2 damage, equal to their power.",
++          "hint": "Next"
+         },
+         {
+           "id": "life",
+           "screen": "board",
+-          "target": "opponent-life",
++          "target": "opponent-tab",
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Life totals update",
+-          "body": "An unblocked attacker normally deals combat damage to the defending player.",
++          "body": "Your opponent's life went down by 2: you can see it on their tab. Damage to creatures wears off at the end of the turn; life lost stays lost.",
+           "hint": "Next"
+         },
+         {
+           "id": "keywords",
+           "screen": "board",
+-          "target": "card-zoom",
++          "target": "battlefield-card:Grizzly Bears",
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Keywords matter",
+-          "body": "Flying, reach, first strike, trample and deathtouch can change combat. Read the individual card when uncertain.",
++          "body": "Flying, reach, first strike, trample and deathtouch can change combat. Press and hold any creature to read its abilities.",
+           "hint": "Next"
+         },
+         {
+@@ -1126,7 +1125,7 @@
+             "kind": "next"
+           },
+           "title": "What is Commander?",
+-          "body": "Commander decks normally contain exactly 100 cards including the commander. Your commander leads your deck.",
++          "body": "Commander decks normally have exactly 100 cards including the commander. On this practice board your commander is Ayula, Queen Among Bears.",
+           "hint": "Next"
+         },
+         {
+@@ -1134,27 +1133,27 @@
+           "screen": "board",
+           "target": "commander-chip",
+           "advance": {
+-            "kind": "tap"
++            "kind": "next"
+           },
+           "title": "The command zone",
+-          "body": "Your commander begins in the command zone. Tap it to see legal actions, including casting when permitted.",
+-          "hint": "Tap commander"
++          "body": "Your commander starts in the command zone, shown by this chip. Tapping it opens Argentum's actions for it, including Cast when you can afford it.",
++          "hint": "Next"
+         },
+         {
+           "id": "cast",
+           "screen": "board",
+-          "target": "commander-action",
++          "target": "commander-chip",
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Cast your commander",
+-          "body": "The commander is cast as a spell and follows normal timing restrictions unless an ability changes them.",
++          "body": "A commander is cast as a spell, with normal timing: Ayula is a creature, so your main phase with an empty stack.",
+           "hint": "Next"
+         },
+         {
+           "id": "tax",
+           "screen": "board",
+-          "target": "commander-tax",
++          "target": "commander-chip",
+           "advance": {
+             "kind": "next"
+           },
+@@ -1165,45 +1164,45 @@
+         {
+           "id": "returns",
+           "screen": "board",
+-          "target": "commander-zone-choice",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Where does the commander go?",
+-          "body": "When your commander changes zones, the game's applicable commander replacement or state-based choice may let you move it back to the command zone.",
++          "body": "If your commander would go to your graveyard or exile, you may move it back to the command zone instead. Cast it again later, paying commander tax.",
+           "hint": "Next"
+         },
+         {
+           "id": "damage",
+           "screen": "board",
+-          "target": "commander-damage",
++          "target": "opponent-tab",
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Track commander combat damage",
+-          "body": "Taking 21 combat damage from the same commander over the game causes a loss, even if your life is still above zero.",
++          "body": "Taking 21 combat damage from the same commander over the game makes a player lose, even with life left. Starting life in Commander is 40.",
+           "hint": "Next"
+         },
+         {
+           "id": "color",
+           "screen": "board",
+-          "target": "deck-colors",
++          "target": "commander-chip",
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Color identity matters",
+-          "body": "The cards in your Commander deck must fit within your commander's color identity.",
++          "body": "Every card in a Commander deck must fit your commander's color identity. Ayula is green, so this deck is green.",
+           "hint": "Next"
+         },
+         {
+           "id": "legal",
+           "screen": "board",
+-          "target": "legal-action-sheet",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Let Argentum adjudicate",
+-          "body": "The tutorial teaches the concept; Argentum remains the authority for timing, targets, costs and card effects.",
++          "body": "Lessons explain the rules; Argentum applies them. If an action isn't offered, the game doesn't allow it right now.",
+           "hint": "Done"
+         }
+       ]
+@@ -1250,7 +1249,7 @@
+             "kind": "tap"
+           },
+           "title": "Graveyard",
+-          "body": "Many cards go here after dying, resolving or being discarded. Tap Graveyard to inspect them.",
++          "body": "Cards go here after dying, resolving or being discarded. There's a Llanowar Elves in yours. Tap Graveyard to look.",
+           "hint": "Tap Graveyard"
+         },
+         {
+@@ -1261,18 +1260,18 @@
+             "kind": "tap"
+           },
+           "title": "Exile",
+-          "body": "Exile is a separate zone. Exiled cards aren't automatically playable unless an effect allows it.",
++          "body": "Exile is a separate zone. Exiled cards aren't playable unless an effect says so. There's a Forest in yours. Tap Exile to look.",
+           "hint": "Tap Exile"
+         },
+         {
+           "id": "library",
+           "screen": "board",
+-          "target": "quick-library",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Library",
+-          "body": "Your library is your draw pile. Most cards in it stay hidden and in a meaningful order.",
++          "body": "Your library is your draw pile: the number on your seat shows how many cards are left. Cards in it stay hidden and in order.",
+           "hint": "Next"
+         },
+         {
+@@ -1289,34 +1288,34 @@
+         {
+           "id": "tokens",
+           "screen": "board",
+-          "target": "battlefield-token",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Tokens represent permanents",
+-          "body": "Tokens can be creatures or other permanents. They aren't physical cards in the library or graveyard.",
++          "body": "Tokens are permanents created by effects. They work like cards on the battlefield but aren't real cards: they vanish if they leave it.",
+           "hint": "Next"
+         },
+         {
+           "id": "counters",
+           "screen": "board",
+-          "target": "battlefield-counters",
++          "target": "battlefield-card:Grizzly Bears",
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Counters change objects",
+-          "body": "A +1/+1 counter changes a creature's stats. Other counter types can affect other parts of the game.",
++          "body": "Counters change objects. These Grizzly Bears have a +1/+1 counter, so they're 3/3. Hold the card to see it.",
+           "hint": "Next"
+         },
+         {
+           "id": "play-from-zone",
+           "screen": "board",
+-          "target": "legal-action-sheet",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Some effects grant special permission",
+-          "body": "Playing from graveyard, exile or the library requires an effect that allows it. Arcana should show legal actions when permitted.",
++          "body": "You can only play cards from your graveyard, exile or library when an effect allows it. When one does, the card's legal actions include it.",
+           "hint": "Done"
+         }
+       ]
+@@ -1401,13 +1400,13 @@
+         },
+         {
+           "id": "configure",
+-          "screen": "settings",
+-          "target": "quick-actions-config",
++          "screen": "layout",
++          "target": "layout-quick-actions",
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Customize the strip",
+-          "body": "Adjust UI can change which quick tools appear and where they sit.",
++          "body": "Adjust UI lets you choose which quick actions appear and in what order.",
+           "hint": "Next"
+         },
+         {
+@@ -1418,7 +1417,7 @@
+             "kind": "next"
+           },
+           "title": "Keep your place",
+-          "body": "Closing a panel should return you to the view and zoom you were using.",
++          "body": "Closing a panel takes you back to the view you were using. TABLE shows everyone at once.",
+           "hint": "Done"
+         }
+       ]
+@@ -1449,34 +1448,34 @@
+         {
+           "id": "action-feed",
+           "screen": "board",
+-          "target": "argentum-feed",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Recent plays",
+-          "body": "Card and ability notifications show the important actions happening around the table.",
++          "body": "During a game, the strip under the table shows recent plays: what was cast or activated, and by whom.",
+           "hint": "Next"
+         },
+         {
+           "id": "inspect",
+           "screen": "board",
+-          "target": "played-card-popup",
++          "target": null,
+           "advance": {
+-            "kind": "tap"
++            "kind": "next"
+           },
+           "title": "Inspect a recent card",
+-          "body": "Tap a recent-play notification to inspect the relevant card when a preview is available.",
+-          "hint": "Tap the card notice"
++          "body": "Tap a recent-play notice to see the card large. When the AI plays a card, a pop-up shows it too (you can turn that off in Adjust UI).",
++          "hint": "Next"
+         },
+         {
+           "id": "target",
+           "screen": "board",
+-          "target": "targeting-alert",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+           "title": "When something targets you",
+-          "body": "A targeting alert should stay visible while the corresponding stack item requires attention.",
++          "body": "When an opponent's spell or ability targets you or your permanents, an alert stays up until it resolves.",
+           "hint": "Next"
+         },
+         {
+@@ -1493,12 +1492,12 @@
+         {
+           "id": "ai",
+           "screen": "board",
+-          "target": "engine-status",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+           "title": "The AI is thinking",
+-          "body": "On large board states, Argentum may be processing many actions. Status feedback is not an invitation to tap repeatedly.",
++          "body": "On big boards the AI can take a moment to think. The status shows it's working; there's no need to tap again.",
+           "hint": "Next"
+         },
+         {
+@@ -1545,19 +1544,19 @@
+             "kind": "next"
+           },
+           "title": "Deck groups",
+-          "body": "Included Wizards of the Coast precons and Argentum premades should be clearly grouped without duplicates.",
++          "body": "Decks are grouped: WOTC PRECONS, ARCANA, ARGENTUM PREMADE DECKS, and YOUR OTHER DECKS for decks you've imported.",
+           "hint": "Next"
+         },
+         {
+           "id": "preview",
+           "screen": "decks",
+-          "target": "deck-preview",
++          "target": "deck-select",
+           "advance": {
+-            "kind": "tap"
++            "kind": "next"
+           },
+           "title": "Inspect before choosing",
+-          "body": "Review the commander's name, deck colors and any available deck summary.",
+-          "hint": "Tap a deck"
++          "body": "Each deck shows its name and commander. The one you're playing is outlined and marked PLAYING.",
++          "hint": "Next"
+         },
+         {
+           "id": "select",
+@@ -1573,12 +1572,12 @@
+         {
+           "id": "search",
+           "screen": "decks",
+-          "target": "deck-search",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+-          "title": "Search a large collection",
+-          "body": "If searching is available, find included decks by deck or commander name.",
++          "title": "Your imported decks",
++          "body": "Decks you add with Import new are listed under YOUR OTHER DECKS, ready to choose like any other.",
+           "hint": "Next"
+         },
+         {
+@@ -1588,8 +1587,8 @@
+           "advance": {
+             "kind": "next"
+           },
+-          "title": "Importing comes later",
+-          "body": "User deck import and full deck editing are not part of the first public release tutorial. Unlock this chapter when the product ships the feature.",
++          "title": "Bring your own deck",
++          "body": "Import new on the Home screen adds a deck from a pasted list. Imported decks appear in Change deck alongside the included ones.",
+           "hint": "Next"
+         },
+         {
+@@ -1653,14 +1652,25 @@
+         {
+           "id": "reorder",
+           "screen": "layout",
+-          "target": "layout-move",
++          "target": "layout-sizes",
+           "advance": {
+             "kind": "next"
+           },
+-          "title": "Move controls thoughtfully",
+-          "body": "Put frequent actions within reach, but keep important game state visible.",
++          "title": "Resize the table",
++          "body": "Change card size, board spacing, hand tray height and button sizes. Changes save as you make them, separately for portrait and landscape.",
+           "hint": "Next"
+         },
++        {
++          "id": "bottom",
++          "screen": "layout",
++          "target": "layout-sizes",
++          "title": "Your bottom controls",
++          "body": "Pass, Hand and Table are the controls you use most in a game. Bottom button size here makes them bigger or smaller to suit your thumbs.",
++          "hint": "Next",
++          "advance": {
++            "kind": "next"
++          }
++        },
+         {
+           "id": "restore",
+           "screen": "layout",
+@@ -1669,7 +1679,7 @@
+             "kind": "next"
+           },
+           "title": "Undo and restore",
+-          "body": "Provide an obvious way back to the default layout. A tutorial must never overwrite your personalized layout.",
++          "body": "Reset puts the layout back to Arcana's default whenever you want.",
+           "hint": "Next"
+         },
+         {
+@@ -1691,7 +1701,7 @@
+             "kind": "next"
+           },
+           "title": "Notifications",
+-          "body": "Choose how the game lets you know it needs your attention.",
++          "body": "Choose how Arcana gets your attention when it's your turn or the game needs you.",
+           "hint": "Next"
+         },
+         {
+@@ -1702,19 +1712,8 @@
+             "kind": "next"
+           },
+           "title": "Help and diagnostics",
+-          "body": "This section includes support tools and the planned engine-running notification switch.",
++          "body": "Support tools live here: the engine running notice, connection checks and the diagnostic log.",
+           "hint": "Next"
+-        },
+-        {
+-          "id": "bottom",
+-          "screen": "board",
+-          "target": "bottom-bar",
+-          "advance": {
+-            "kind": "next"
+-          },
+-          "title": "Your bottom controls",
+-          "body": "The Pass, Hand and Table controls are the primary navigation and action area.",
+-          "hint": "Done"
+         }
+       ]
+     },
+@@ -1788,12 +1787,12 @@
+         {
+           "id": "reset",
+           "screen": "menu",
+-          "target": "menu-reset",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Resetting is destructive",
+-          "body": "Never confirm Reset game or Clear all data while practicing. The tutorial must not open destructive actions.",
++          "body": "Room & game holds Reset game and Reset and clear all data. They end your match or erase your data. Lessons never use them; only choose them when you mean it.",
+           "hint": "Next"
+         },
+         {
+@@ -1862,7 +1861,7 @@
+             "kind": "next"
+           },
+           "title": "Zoom the full table",
+-          "body": "Pinch to zoom the table overview. Your zoom preference should not be reset by a tutorial.",
++          "body": "Pinch the table overview to zoom in on a busy board.",
+           "hint": "Next"
+         },
+         {
+@@ -1884,7 +1883,7 @@
+             "kind": "next"
+           },
+           "title": "Customize per posture",
+-          "body": "Personalize controls for compact and expanded layouts, without letting a tutorial overwrite either configuration.",
++          "body": "Adjust UI lets you rearrange the game controls. Arcana fits the layout to the folded or unfolded screen.",
+           "hint": "Done"
+         }
+       ]
+@@ -1910,7 +1909,7 @@
+             "kind": "tap"
+           },
+           "title": "Replay any lesson",
+-          "body": "Open Tutorials from Help and choose a chapter. You can skip or restart freely.",
++          "body": "Open Learn & tutorials here to replay any lesson. You can exit or restart a lesson at any time.",
+           "hint": "Tap Tutorials"
+         },
+         {
+@@ -1918,15 +1917,15 @@
+           "screen": "settings",
+           "target": "setting-help-diagnostics",
+           "advance": {
+-            "kind": "tap"
++            "kind": "next"
+           },
+           "title": "Help and diagnostics",
+-          "body": "Open the support tools when Arcana behaves unexpectedly.",
+-          "hint": "Tap Help and diagnostics"
++          "body": "The Help & diagnostics section has the tools to use when Arcana behaves unexpectedly.",
++          "hint": "Next"
+         },
+         {
+           "id": "log",
+-          "screen": "diagnostics",
++          "screen": "settings",
+           "target": "diagnostic-log",
+           "advance": {
+             "kind": "next"
+@@ -1937,7 +1936,7 @@
+         },
+         {
+           "id": "export",
+-          "screen": "diagnostics",
++          "screen": "settings",
+           "target": "diagnostic-export",
+           "advance": {
+             "kind": "next"
+@@ -1948,24 +1947,24 @@
+         },
+         {
+           "id": "status",
+-          "screen": "diagnostics",
+-          "target": "engine-running-toggle",
++          "screen": "settings",
++          "target": "engine-processing-toggle",
+           "advance": {
+             "kind": "next"
+           },
+-          "title": "Engine-running notification",
+-          "body": "The persistent engine-running notification is intended to be optional from this menu once the release-polish toggle is integrated.",
++          "title": "Engine running notice",
++          "body": "Turn this on to show a banner with the elapsed time while Argentum works out a big turn.",
+           "hint": "Next"
+         },
+         {
+           "id": "self-test",
+-          "screen": "diagnostics",
++          "screen": "settings",
+           "target": "engine-self-test",
+           "advance": {
+             "kind": "next"
+           },
+           "title": "Engine self-test",
+-          "body": "When supported, a self-test can help separate rules-engine problems from UI problems.",
++          "body": "The engine self-test checks the rules engine on its own, which helps tell an engine problem from a display problem.",
+           "hint": "Next"
+         },
+         {
+@@ -1976,7 +1975,7 @@
+             "kind": "next"
+           },
+           "title": "Back to playing",
+-          "body": "Help never changes a match unless you explicitly start a separate test or choose a destructive action.",
++          "body": "Help tools never change your match.",
+           "hint": "Done"
+         }
+       ]
+@@ -2018,7 +2017,7 @@
+         {
+           "id": "cost",
+           "screen": "board",
+-          "target": "mana-pips",
++          "target": "hand-card:any",
+           "advance": {
+             "kind": "next"
+           },
+@@ -2029,7 +2028,7 @@
+         {
+           "id": "target",
+           "screen": "board",
+-          "target": "targeting-selection",
++          "target": null,
+           "advance": {
+             "kind": "next"
+           },
+@@ -2056,7 +2055,7 @@
+             "kind": "next"
+           },
+           "title": "What if the action looks wrong?",
+-          "body": "Check the game log and export diagnostics. A genuine rules bug shouldn't be hidden by manually inventing an action.",
++          "body": "If an action looks wrong, check the game log, then export diagnostics from Settings so the problem can be fixed.",
+           "hint": "Done"
+         }
+       ]
+diff --git a/android/app/src/main/java/com/arcanatable/AdjustUiPage.kt b/android/app/src/main/java/com/arcanatable/AdjustUiPage.kt
+index 4d3a041d..805d2642 100644
+--- a/android/app/src/main/java/com/arcanatable/AdjustUiPage.kt
++++ b/android/app/src/main/java/com/arcanatable/AdjustUiPage.kt
+@@ -58,6 +58,7 @@ internal fun AdjustUiPage(
+     val label = { id: String -> catalog.firstOrNull { it.id == id }?.label ?: id }
+     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+         Surface(Modifier.fillMaxWidth(.96f).fillMaxHeight(.94f), shape = RoundedCornerShape(18.dp), color = Panel) {
++          Box(Modifier.fillMaxSize()) {
+             Column(Modifier.fillMaxSize().padding(14.dp)) {
+                 Row(verticalAlignment = Alignment.CenterVertically) {
+                     Column(Modifier.weight(1f)) {
+@@ -104,7 +105,7 @@ internal fun AdjustUiPage(
+                     }
+                 }
+                 Column(Modifier.weight(1f).fillMaxWidth().padding(top = 7.dp).verticalScroll(rememberScrollState())) {
+-                    AdjustSection("TABLE SIZE")
++                    Box(Modifier.tutorialTarget("layout-sizes")) { AdjustSection("TABLE SIZE") }
+                     AdjustSlider("Card size", cardSize, .75f..1.4f, { "${(it * 100).toInt()}%" }, onCardSize)
+                     AdjustSlider("Board spacing", spacing, .5f..2f, { "${(it * 100).toInt()}%" }, onSpacing)
+                     AdjustSlider("Hand tray height", handHeight, .38f.. .95f, { "${(it * 100).toInt()}%" }, onHandHeight)
+@@ -114,7 +115,7 @@ internal fun AdjustUiPage(
+                     Row(horizontalArrangement = Arrangement.spacedBy(5.dp)) { HandArrangement.entries.forEach { item ->
+                         FilterChip(selected = item == arrangement, onClick = { onArrangement(item) }, label = { Text(item.label, fontSize = 9.sp) }, colors = FilterChipDefaults.filterChipColors(selectedContainerColor = Mint, selectedLabelColor = Ink, labelColor = SoftWhite))
+                     } }
+-                    AdjustSection("QUICK ACTIONS")
++                    Box(Modifier.tutorialTarget("layout-quick-actions")) { AdjustSection("QUICK ACTIONS") }
+                     Text("Choose and order the shortcuts shown during an Argentum game.", color = Muted, fontSize = 10.sp)
+                     actions.forEachIndexed { index, id ->
+                         Row(Modifier.fillMaxWidth().heightIn(min = 42.dp), verticalAlignment = Alignment.CenterVertically) {
+@@ -145,10 +146,12 @@ internal fun AdjustUiPage(
+                     AdjustSlider("Combat card size", combatSize, .65f..1.35f, { "${(it * 100).toInt()}%" }, onCombatSize)
+                 }
+                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+-                    TextButton(onClick = onReset, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("RESET TO DEFAULT", color = Color(0xFFE5B2A7), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
++                    TextButton(onClick = onReset, modifier = Modifier.weight(1f).heightIn(min = 48.dp).tutorialTarget("layout-reset")) { Text("RESET TO DEFAULT", color = Color(0xFFE5B2A7), fontSize = 10.sp, fontWeight = FontWeight.Bold) }
+                     Button(onClick = onDismiss, modifier = Modifier.weight(1f).heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = PanelLight)) { Text("DONE", color = Mint, fontWeight = FontWeight.Black) }
+                 }
+             }
++            TutorialLayer(Modifier.matchParentSize())
++          }
+         }
+     }
+ }
+diff --git a/android/app/src/main/java/com/arcanatable/ArgentumCardPick.kt b/android/app/src/main/java/com/arcanatable/ArgentumCardPick.kt
+index ae3c89a8..f9ac2c6d 100644
+--- a/android/app/src/main/java/com/arcanatable/ArgentumCardPick.kt
++++ b/android/app/src/main/java/com/arcanatable/ArgentumCardPick.kt
+@@ -171,7 +171,7 @@ fun androidx.compose.foundation.layout.BoxScope.StackPile(stack: List<ArgentumSt
+     val cardWidth = 72.dp
+     val peek = 22.dp
+     val shown = stack.take(5).reversed() // oldest first, so the top item is drawn last (in front)
+-    Column(Modifier.align(Alignment.CenterEnd).padding(end = 8.dp).width(cardWidth + 8.dp).testTag("stack-pile"), horizontalAlignment = Alignment.CenterHorizontally) {
++    Column(Modifier.align(Alignment.CenterEnd).padding(end = 8.dp).width(cardWidth + 8.dp).testTag("stack-pile").tutorialTarget("argentum-stack"), horizontalAlignment = Alignment.CenterHorizontally) {
+         Text("STACK · ${stack.size}", color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.6.sp,
+             modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(Color(0xE6101615)).clickable(onClick = onOpenStack).padding(horizontal = 6.dp, vertical = 3.dp))
+         Box(Modifier.width(cardWidth).padding(top = 4.dp)) {
+diff --git a/android/app/src/main/java/com/arcanatable/ArgentumCombatBoard.kt b/android/app/src/main/java/com/arcanatable/ArgentumCombatBoard.kt
+index ab7793e1..a3e8c723 100644
+--- a/android/app/src/main/java/com/arcanatable/ArgentumCombatBoard.kt
++++ b/android/app/src/main/java/com/arcanatable/ArgentumCombatBoard.kt
+@@ -141,6 +141,8 @@ private fun CombatBoardFrame(
+     extraButton: (@Composable () -> Unit)? = null,
+     onDismiss: () -> Unit,
+     topExtra: (@Composable () -> Unit)? = null,
++    /** The running lesson's instruction; the board covers the coach card, so it shows here. */
++    tutorialCue: Pair<String, String>? = null,
+ ) {
+     val config = LocalConfiguration.current
+     val combatScale = LocalContext.current.getSharedPreferences("arcana_options", android.content.Context.MODE_PRIVATE)
+@@ -180,7 +182,7 @@ private fun CombatBoardFrame(
+                     Text(hint, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
+                     val topSection: @Composable () -> Unit = {
+                         Text(topLabel, color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
+-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
++                        Row(Modifier.fillMaxWidth().tutorialTarget("combat-top").horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                             top.forEach { piece ->
+                                 CombatTile(piece, tileWidth, selected = false, linked = piece.id in linkedIds, enabled = topEnabled(piece.id),
+                                     onClick = { onTop(piece.id) }, onBounds = { bounds["t:${piece.id}"] = it }, badge = topBadge(piece.id))
+@@ -191,7 +193,7 @@ private fun CombatBoardFrame(
+                     }
+                     val bottomSection: @Composable () -> Unit = {
+                         Text(bottomLabel, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
+-                        Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
++                        Row(Modifier.fillMaxWidth().tutorialTarget("combat-bottom").horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                             bottom.forEach { piece ->
+                                 CombatTile(piece, tileWidth, selected = piece.id == selectedId, linked = piece.id in linkedIds, enabled = bottomEnabled(piece.id),
+                                     onClick = { onBottom(piece.id) }, onBounds = { bounds["b:${piece.id}"] = it }, badge = bottomBadge(piece.id))
+@@ -207,7 +209,7 @@ private fun CombatBoardFrame(
+                         Spacer(Modifier.heightIn(min = 46.dp))
+                         bottomSection()
+                     }
+-                    Column(Modifier.fillMaxWidth().heightIn(max = 120.dp).verticalScroll(rememberScrollState()).padding(top = 6.dp).testTag("combat-summary")) {
++                    Column(Modifier.fillMaxWidth().heightIn(max = 120.dp).verticalScroll(rememberScrollState()).padding(top = 6.dp).testTag("combat-summary").tutorialTarget("combat-summary")) {
+                         summary.forEach { Text(it, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
+                         if (summary.isEmpty()) Text("Nothing assigned yet.", color = Muted, fontSize = 11.sp)
+                         warning?.let { Text(it, color = CounterGold, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp)) }
+@@ -217,11 +219,12 @@ private fun CombatBoardFrame(
+                         extraButton?.invoke()
+                         Spacer(Modifier.weight(1f))
+                         TextButton(enabled = confirmEnabled, onClick = onConfirm,
+-                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(if (confirmEnabled) Mint else PanelLight)) {
++                            modifier = Modifier.tutorialTarget("combat-confirm").clip(RoundedCornerShape(8.dp)).background(if (confirmEnabled) Mint else PanelLight)) {
+                             Text(confirmLabel, color = if (confirmEnabled) Ink else Muted, fontWeight = FontWeight.Black)
+                         }
+                     }
+                 }
++                TutorialLayer(Modifier.matchParentSize())
+             }
+         }
+     }
+@@ -233,7 +236,7 @@ private fun CombatBoardFrame(
+  * Argentum lists can be used, and Argentum validates the result (flying, menace, ...).
+  */
+ @Composable
+-fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit) {
++fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, tutorialCue: Pair<String, String>? = null) {
+     var selection by remember(plan) { mutableStateOf(plan.mandatory.filterKeys { it in plan.blockers }) }
+     var pending by remember(plan) { mutableStateOf<String?>(null) }
+     val attackers = plan.attackers.map(piece)
+@@ -273,6 +276,7 @@ fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece,
+         onConfirm = { onConfirm(plan.buildAction(selection)) },
+         extraButton = { if (selection.isNotEmpty()) TextButton(onClick = { selection = plan.mandatory.filterKeys { it in plan.blockers }; pending = null }) { Text("CLEAR", color = Muted) } },
+         onDismiss = onDismiss,
++        tutorialCue = tutorialCue,
+     )
+ }
+ 
+@@ -282,7 +286,7 @@ fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece,
+  * creature, then the player or planeswalker it attacks.
+  */
+ @Composable
+-fun ArgentumAttackBoard(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, opponentBlockers: List<Pair<String, List<GameCard>>> = emptyList()) {
++fun ArgentumAttackBoard(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, opponentBlockers: List<Pair<String, List<GameCard>>> = emptyList(), tutorialCue: Pair<String, String>? = null) {
+     var selection by remember(plan) { mutableStateOf(plan.options.filter { it.mandatory }.associate { it.attackerId to it.targets.first() }) }
+     var pending by remember(plan) { mutableStateOf<String?>(null) }
+     val targets = plan.options.flatMap { it.targets }.distinct()
+@@ -344,6 +348,7 @@ fun ArgentumAttackBoard(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece
+         },
+         onDismiss = onDismiss,
+         topExtra = if (opponentBlockers.isEmpty()) null else ({ OpponentBlockersStrip(opponentBlockers) }),
++        tutorialCue = tutorialCue,
+     )
+ }
+ 
+diff --git a/android/app/src/main/java/com/arcanatable/ArgentumScreens.kt b/android/app/src/main/java/com/arcanatable/ArgentumScreens.kt
+index 3641a639..2645da81 100644
+--- a/android/app/src/main/java/com/arcanatable/ArgentumScreens.kt
++++ b/android/app/src/main/java/com/arcanatable/ArgentumScreens.kt
+@@ -139,8 +139,8 @@ import org.json.JSONObject
+ @Composable
+ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hidManaAbilities: Boolean, busy: Boolean, manaChoices: List<JSONObject> = emptyList(), stackCount: (JSONObject) -> Int = { 1 }, onChooseMany: (JSONObject, Int) -> Unit = { _, _ -> }, onChoose: (JSONObject) -> Unit, onDismiss: () -> Unit, onSecretNudge: () -> Unit = {}, tutorialCue: Pair<String, String>? = null) {
+     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
+-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 24.dp)) {
+-            tutorialCue?.let { TutorialInlineCue(it.first, it.second) }
++      Box {
++        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 24.dp).tutorialTarget("legal-action-sheet")) {
+             if (card != null) Row(verticalAlignment = Alignment.Top) {
+                 Box(Modifier.width(118.dp).aspectRatio(0.716f).clip(RoundedCornerShape(8.dp)).background(card.color)) {
+                     val url = card.imageUrl
+@@ -211,6 +211,8 @@ internal fun ArgentumActionSheet(card: GameCard?, choices: List<JSONObject>, hid
+                 TextButton(onClick = onDismiss, modifier = Modifier.align(Alignment.CenterEnd).heightIn(min = 48.dp)) { Text("CLOSE", color = Muted) }
+             }
+         }
++        TutorialLayer(Modifier.matchParentSize())
++      }
+     }
+ }
+ 
+@@ -231,20 +233,12 @@ internal fun ArgentumOpeningHandScreen(
+     Dialog(onDismissRequest = {}, properties = DialogProperties(usePlatformDefaultWidth = false, dismissOnBackPress = false, dismissOnClickOutside = false)) {
+       CompositionLocalProvider(LocalCardZoom provides handZoom) {
+         Surface(Modifier.fillMaxSize(), color = Ink) {
++          Box(Modifier.fillMaxSize()) {
+             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(18.dp)) {
+                 Text("ARGENTUM", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp)
+                 Text(title, color = SoftWhite, fontSize = 24.sp, fontWeight = FontWeight.Black)
+-                Text(subtitle, color = Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+-                tutorialStep?.let { step ->
+-                    TutorialInlineCue(step.title, step.body + "  " + step.hint)
+-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+-                        TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
+-                        if (step.actionKind == "next") TextButton(onClick = onTutorialNext) {
+-                            Text("NEXT", color = Mint)
+-                        }
+-                    }
+-                }
+-                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
++                Text(subtitle, color = Muted, fontSize = 13.sp, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp).tutorialTarget("opening-hand-header"))
++                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth().then(if (selectable) Modifier.tutorialTarget("mulligan-bottom-choice") else Modifier)) {
+                     val grid = HandLayout.compute(cards.size, maxWidth.value, maxHeight.value, HandArrangement.AUTO_FIT, 1.25f)
+                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(HandLayout.GAP.dp)) {
+                         cards.chunked(grid.columns.coerceAtLeast(1)).forEach { row ->
+@@ -252,7 +246,7 @@ internal fun ArgentumOpeningHandScreen(
+                                 row.forEach { card ->
+                                     val chosen = card.id in selection
+                                     Box(Modifier.width(grid.cardWidth.dp)) {
+-                                        CardFace(card, Modifier.width(grid.cardWidth.dp).testTag("opening-hand-card"), onClick = { if (selectable) onToggle(card) },
++                                        CardFace(card, Modifier.width(grid.cardWidth.dp).testTag("opening-hand-card").then(if (card.id == cards.firstOrNull()?.id) Modifier.tutorialTarget("opening-hand-card") else Modifier), onClick = { if (selectable) onToggle(card) },
+                                             onLongClick = {}, showCounters = false, glow = chosen) // hold → handZoom
+                                         if (chosen) Text("BOTTOM", color = Ink, fontSize = 9.sp, fontWeight = FontWeight.Black,
+                                             modifier = Modifier.align(Alignment.TopCenter).padding(4.dp).clip(RoundedCornerShape(5.dp)).background(Mint).padding(horizontal = 6.dp, vertical = 2.dp))
+@@ -264,11 +258,13 @@ internal fun ArgentumOpeningHandScreen(
+                 }
+                 Text("Hold a card to see it large.", color = Muted, fontSize = 11.sp, modifier = Modifier.padding(vertical = 8.dp))
+                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+-                    if (secondaryLabel != null) OutlinedButton(onClick = onSecondary, enabled = secondaryEnabled, modifier = Modifier.weight(1f).heightIn(min = 54.dp)) { Text(secondaryLabel, fontWeight = FontWeight.Bold) }
+-                    Button(onClick = onPrimary, enabled = primaryEnabled, modifier = Modifier.weight(if (secondaryLabel != null) 1.4f else 1f).heightIn(min = 54.dp),
++                    if (secondaryLabel != null) OutlinedButton(onClick = onSecondary, enabled = secondaryEnabled, modifier = Modifier.weight(1f).heightIn(min = 54.dp).tutorialTarget("mulligan-button")) { Text(secondaryLabel, fontWeight = FontWeight.Bold) }
++                    Button(onClick = onPrimary, enabled = primaryEnabled, modifier = Modifier.weight(if (secondaryLabel != null) 1.4f else 1f).heightIn(min = 54.dp).tutorialTarget(if (selectable) "mulligan-bottom-confirm" else "keep-hand"),
+                         colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { Text(primaryLabel, fontWeight = FontWeight.Black) }
+                 }
+             }
++            TutorialLayer(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing))
++          }
+         }
+         CardZoomOverlay(handZoom)
+       }
+diff --git a/android/app/src/main/java/com/arcanatable/HomeScreen.kt b/android/app/src/main/java/com/arcanatable/HomeScreen.kt
+index a07fbd07..698ad15f 100644
+--- a/android/app/src/main/java/com/arcanatable/HomeScreen.kt
++++ b/android/app/src/main/java/com/arcanatable/HomeScreen.kt
+@@ -32,6 +32,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.IconButton
+ import androidx.compose.material3.ModalBottomSheet
++import androidx.compose.material3.rememberModalBottomSheetState
+ import androidx.compose.material3.OutlinedButton
+ import androidx.compose.material3.RadioButton
+ import androidx.compose.material3.Text
+@@ -120,7 +121,7 @@ fun ArcanaHomeScreen(
+                 Text("ARGENTUM GAME MAY STILL BE RUNNING", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                 Text("Arcana closed or lost its connection during a game. It won't reconnect on its own; resume when you're ready.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+-                    Button(onClick = onResume, modifier = Modifier.weight(1f).heightIn(min = 48.dp), colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { Text("RESUME GAME", fontWeight = FontWeight.Black) }
++                    Button(onClick = onResume, modifier = Modifier.weight(1f).heightIn(min = 48.dp).tutorialTarget("home-resume"), colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) { Text("RESUME GAME", fontWeight = FontWeight.Black) }
+                     OutlinedButton(onClick = onDismissResume, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("END THAT GAME") }
+                 }
+             }
+@@ -132,7 +133,7 @@ fun ArcanaHomeScreen(
+                 Text("Restore the complete Argentum engine state, including the stack, pending decisions and private zones.",
+                     color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                 Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+-                    Button(onClick = onResumeOffline, modifier = Modifier.weight(1f).heightIn(min = 48.dp),
++                    Button(onClick = onResumeOffline, modifier = Modifier.weight(1f).heightIn(min = 48.dp).tutorialTarget("home-resume"),
+                         colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink)) {
+                         Text("RESUME", fontWeight = FontWeight.Black)
+                     }
+@@ -237,19 +238,15 @@ internal fun PlaySheet(
+     // Play with a friend: null = not chosen; 1 host on Wi-Fi, 2 join on Wi-Fi, 3 host online, 4 join online.
+     var friendMode by remember { mutableStateOf<Int?>(null) }
+     var showAllDecks by remember { mutableStateOf(false) }
+-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
++    // During a lesson the sheet opens fully, so every control a step points at is on screen.
++    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel,
++        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = tutorialStep != null)) {
++        Box {
+         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+             Text("How do you want to play?", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
+-            tutorialStep?.let { step ->
+-                TutorialInlineCue(step.title, step.body + "  " + step.hint)
+-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+-                    TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
+-                    if (step.actionKind == "next") TextButton(onClick = onTutorialNext) { Text("NEXT", color = Mint) }
+-                }
+-            }
+-            Text(deckName?.let { "Your deck: $it" } ?: "No deck yet: offline uses a quick Portal duel.", color = Muted, fontSize = 14.sp)
++            Text(deckName?.let { "Your deck: $it" } ?: "No deck yet: offline uses a quick Portal duel.", color = Muted, fontSize = 14.sp, modifier = Modifier.tutorialTarget("setup-human-deck"))
+             PlayOption("Offline vs AI", "Runs on your phone. No internet needed.", selected = !online && friendMode == null, onClick = { online = false; friendMode = null }, tag = "play-offline-option") {
+-                Text("PLAYERS", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
++                Text("PLAYERS", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.tutorialTarget("setup-players"))
+                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                     DeckChip("2 · you vs AI", aiCount == 1) { onAiCount(1) }
+                     if (ReleaseFeatures.multiplayerPreviewEnabled) {
+@@ -258,7 +255,7 @@ internal fun PlaySheet(
+                     }
+                 }
+                 if (!ReleaseFeatures.multiplayerPreviewEnabled) Text("Four-player support coming soon.", color = Muted, fontSize = 12.sp)
+-                Text(if (aiCount > 1) "FIRST AI'S DECK (the others are random)" else "AI'S DECK", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
++                Text(if (aiCount > 1) "FIRST AI'S DECK (the others are random)" else "AI'S DECK", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.tutorialTarget("setup-ai-deck"))
+                 val shown = if (showAllDecks) aiDecks else aiDecks.filter { !it.builtIn || it.id in setOf("tokens_win", "artificer_v4", "ayula_bears", "sliver_overlord", "hazel_squirrels", "mabel_heir", "velociraptor_beefcake") || it.id == aiDeckId }
+                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                     DeckChip("Random", aiDeckId == null) { onAiDeck(null) }
+@@ -279,10 +276,12 @@ internal fun PlaySheet(
+             PlayOption("Online with Argentum", "Not yet available", selected = false, onClick = { Toast.makeText(context, "Not yet available", Toast.LENGTH_SHORT).show() }, tag = "play-online-option", disabled = true) {}
+             Button(
+                 onClick = { when { online -> onOnline(); friendMode == 1 -> onWifiHost(); friendMode == 2 -> onWifiJoin(); friendMode == 3 -> onOnlineHost(); friendMode == 4 -> onOnlineJoin(); else -> onOffline() } },
+-                modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp).testTag("play-start"),
++                modifier = Modifier.fillMaxWidth().heightIn(min = 60.dp).testTag("play-start").tutorialTarget("setup-start"),
+                 colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
+             ) { Text(when { online -> "PLAY WITH ARGENTUM"; friendMode == 1 -> "HOST A WI-FI GAME"; friendMode == 2 -> "JOIN A WI-FI GAME"; friendMode == 3 -> "HOST AN ONLINE GAME"; friendMode == 4 -> "JOIN AN ONLINE GAME"; aiCount > 1 -> "PLAY OFFLINE · ${aiCount + 1} PLAYERS"; else -> "PLAY OFFLINE VS AI" }, fontSize = 17.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
+         }
++        TutorialLayer(Modifier.matchParentSize())
++        }
+     }
+ }
+ 
+@@ -290,7 +289,8 @@ internal fun PlaySheet(
+ private fun PlayOption(title: String, subtitle: String, selected: Boolean, onClick: () -> Unit, tag: String, disabled: Boolean = false, extra: @Composable () -> Unit) {
+     Column(
+         Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).border(if (selected) 2.dp else 1.dp, if (selected) Mint else PanelLight, RoundedCornerShape(18.dp))
+-            .background(if (selected) PanelLight else Panel).clickable(onClick = onClick).padding(14.dp).testTag(tag),
++            .background(if (selected) PanelLight else Panel).clickable(onClick = onClick).padding(14.dp).testTag(tag)
++            .then(if (tag == "play-offline-option") Modifier.tutorialTarget("setup-offline") else Modifier),
+         verticalArrangement = Arrangement.spacedBy(10.dp),
+     ) {
+         Row(verticalAlignment = Alignment.CenterVertically) {
+@@ -315,16 +315,12 @@ private fun DeckChip(label: String, selected: Boolean, onClick: () -> Unit) {
+ @OptIn(ExperimentalMaterial3Api::class)
+ @Composable
+ internal fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit, onDeckBuilder: (() -> Unit)? = null, tutorialStep: ArcanaLessonStep? = null, onTutorialNext: () -> Unit = {}, onTutorialExit: () -> Unit = {}) {
+-    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
++    // During a lesson the sheet opens fully, so every control a step points at is on screen.
++    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel,
++        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = tutorialStep != null)) {
++        Box {
+         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
+             Text("Choose your deck", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
+-            tutorialStep?.let { step ->
+-                TutorialInlineCue(step.title, step.body + "  " + step.hint)
+-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+-                    TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
+-                    if (step.actionKind == "next") TextButton(onClick = onTutorialNext) { Text("NEXT", color = Mint) }
+-                }
+-            }
+             listOf(
+                 DeckChoiceCategory.PRECON to "WOTC PRECONS",
+                 DeckChoiceCategory.ARCANA to "ARCANA",
+@@ -332,12 +328,14 @@ internal fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick:
+                 DeckChoiceCategory.OTHER to "YOUR OTHER DECKS"
+             ).filter { ReleaseFeatures.deckImportEnabled || it.first != DeckChoiceCategory.OTHER }.forEach { (category, heading) ->
+                 val list = decks.filter { it.category == category }
+-                Text(heading, color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
++                Text(heading, color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp)
++                    .then(if (category == DeckChoiceCategory.PRECON) Modifier.tutorialTarget("deck-categories") else Modifier))
+                 if (list.isEmpty()) Text(if (ReleaseFeatures.deckImportEnabled) "None yet. Import a deck and it lands here." else "No decks in this group.", color = Muted, fontSize = 13.sp)
+                 list.forEach { d ->
+                     Row(
+                         Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(if (d.id == activeId) PanelLight else Panel)
+-                            .border(1.dp, if (d.id == activeId) Mint else PanelLight, RoundedCornerShape(12.dp)).clickable { onPick(d) }.heightIn(min = 52.dp).padding(horizontal = 14.dp, vertical = 10.dp),
++                            .border(1.dp, if (d.id == activeId) Mint else PanelLight, RoundedCornerShape(12.dp)).clickable { onPick(d) }.heightIn(min = 52.dp).padding(horizontal = 14.dp, vertical = 10.dp)
++                            .then(if (d.id == (decks.firstOrNull { it.id == activeId } ?: decks.firstOrNull())?.id) Modifier.tutorialTarget("deck-select") else Modifier),
+                         verticalAlignment = Alignment.CenterVertically,
+                     ) {
+                         Column(Modifier.weight(1f)) {
+@@ -358,5 +356,7 @@ internal fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick:
+                 }
+             }
+         }
++        TutorialLayer(Modifier.matchParentSize())
++        }
+     }
+ }
+diff --git a/android/app/src/main/java/com/arcanatable/MainActivity.kt b/android/app/src/main/java/com/arcanatable/MainActivity.kt
+index 58841e28..a293125d 100644
+--- a/android/app/src/main/java/com/arcanatable/MainActivity.kt
++++ b/android/app/src/main/java/com/arcanatable/MainActivity.kt
+@@ -242,18 +242,12 @@ internal fun TableScreenContent(darkMode: Boolean, onToggleTheme: () -> Unit, on
+             TableMainLayout()
+             TableOverlays()
+             TableOverlaysB()
+-            tutorialLesson?.let { lesson ->
+-                if (!tutorialHubOpen && !(tutorialPracticeActive && tutorialLoading)) {
+-                    TutorialCoachOverlay(
+-                        lesson = lesson,
+-                        index = tutorialStepIndex,
+-                        practice = tutorialPracticeActive,
+-                        onNext = { tutorialAdvance() },
+-                        onSkip = { stopTutorial() },
+-                        avoidTableOverlay = showHand || argentumActionChoices.isNotEmpty() || stackOpen
+-                    )
+-                }
++            // The coach draws on whichever window is on top: here, or the dialog/sheet a step opened.
++            val coachModel = tutorialLesson?.takeIf { !tutorialHubOpen && !(tutorialPracticeActive && tutorialLoading) }?.let { lesson ->
++                TutorialCoachModel(lesson, tutorialStepIndex, tutorialGated && !tutorialStepSatisfied, onNext = { tutorialAdvance() }, onSkip = { stopTutorial() })
+             }
++            SideEffect { TutorialCoachState.model = coachModel }
++            TutorialLayer(base = true)
+             SnackbarHost(
+                 hostState = automaticActionSnackbar,
+                 modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(horizontal = 12.dp, vertical = 4.dp),
+diff --git a/android/app/src/main/java/com/arcanatable/TableBoardViews.kt b/android/app/src/main/java/com/arcanatable/TableBoardViews.kt
+index c6c3e145..ff2a50fd 100644
+--- a/android/app/src/main/java/com/arcanatable/TableBoardViews.kt
++++ b/android/app/src/main/java/com/arcanatable/TableBoardViews.kt
+@@ -841,7 +841,7 @@ internal fun HandSheet(cards: List<GameCard>, isLandscape: Boolean, availableHei
+             val rows = cards.chunked(grid.columns.coerceAtLeast(1))
+             val container = if (grid.rows == 1) Modifier.fillMaxWidth().horizontalScroll(handScrollState)
+                 else Modifier.fillMaxWidth().heightIn(max = areaHeight).verticalScroll(handScrollState)
+-            Column(container.testTag("hand-grid"), verticalArrangement = Arrangement.spacedBy(gap)) {
++            Column(container.testTag("hand-grid").tutorialTarget("hand-grid"), verticalArrangement = Arrangement.spacedBy(gap)) {
+             rows.forEach { rowCards -> Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+             rowCards.forEach { card ->
+                 var coordinates by remember(card.id) { mutableStateOf<LayoutCoordinates?>(null) }
+diff --git a/android/app/src/main/java/com/arcanatable/TableController.kt b/android/app/src/main/java/com/arcanatable/TableController.kt
+index d8c83426..cf3bbf38 100644
+--- a/android/app/src/main/java/com/arcanatable/TableController.kt
++++ b/android/app/src/main/java/com/arcanatable/TableController.kt
+@@ -385,114 +385,145 @@ internal class TableController(
+     var tutorialHubOpen by mutableStateOf(false)
+     var tutorialChapterId by mutableStateOf<String?>(null)
+     var tutorialStepIndex by mutableStateOf(0)
++    /** A temporary practice game is running for the lesson (never saved over the player's game). */
+     var tutorialPracticeActive by mutableStateOf(false)
++    /** The lesson is a drill: its action steps wait for the real move instead of offering NEXT. */
++    var tutorialGated by mutableStateOf(false)
+     var tutorialLoading by mutableStateOf(false)
+-    var tutorialStartTurn by mutableStateOf(0)
+-    var tutorialPassPending by mutableStateOf(false)
++    /** Snapshot-to-event detection for practice lessons (TutorialProgress.kt, shared with tests). */
++    internal val tutorialEvents = TutorialEventDetector()
++    var tutorialPassPending: Boolean
++        get() = tutorialEvents.passPending
++        set(value) { tutorialEvents.passPending = value }
+     var tutorialMulliganPending by mutableStateOf(false)
+-    var tutorialKeepPending by mutableStateOf(false)
+-    private val tutorialMilestones = TutorialMilestones()
++    var tutorialKeepPending: Boolean
++        get() = tutorialEvents.keepPending
++        set(value) { tutorialEvents.keepPending = value }
++    /** The running lesson; [tutorialStepIndex] mirrors its position for the UI. */
++    private var tutorialRun: TutorialRun? = null
+     internal val tutorialChapters: List<ArcanaLesson> by lazy { loadTutorialLessons(context) }
+     internal val tutorialLesson: ArcanaLesson? get() = tutorialChapters.firstOrNull { it.id == tutorialChapterId }
+     internal val tutorialStep: ArcanaLessonStep? get() = tutorialLesson?.steps?.getOrNull(tutorialStepIndex)
++    /**
++     * The step index whose player view the lesson keeps: the table snaps back to TABLE when the
++     * game starts, the hand closes or the pager settles, which would hide what the step points at.
++     */
++    var tutorialHoldsPlayerView by mutableIntStateOf(-1)
++    /** The game already did the current step's action (the lesson caught up); it only needs NEXT. */
++    var tutorialStepSatisfied by mutableStateOf(false)
+ 
+     fun tutorialAdvance() {
+-        val lesson = tutorialLesson ?: return
+-        if (tutorialStepIndex < lesson.steps.lastIndex) {
+-            tutorialStepIndex++
+-            tutorialRouteScreen()
+-            // Combat and stack resolution can finish while an explanation is open.
+-            // Consume only confirmed milestones, preserving all informational steps.
+-            if (tutorialPracticeActive && tutorialMilestones.completes(tutorialStep)) tutorialAdvance()
+-        } else {
++        val run = tutorialRun ?: return
++        run.next()
++        syncTutorialRun(run)
++    }
++
++    fun tutorialSignal(kind: String, key: String) {
++        val run = tutorialRun ?: return
++        if (run.signal(kind, key)) syncTutorialRun(run)
++    }
++
++    private fun syncTutorialRun(run: TutorialRun) {
++        if (run.finished) {
+             val preferences = context.getSharedPreferences("arcana_tutorials", Context.MODE_PRIVATE)
+             val completed = preferences.getStringSet("practiced_chapters", emptySet()).orEmpty().toMutableSet()
+-            if (tutorialPracticeActive) completed.add(lesson.id)
+-            preferences.edit().putStringSet("practiced_chapters", completed).apply()
++            if (run.practice) completed.add(run.lesson.id)
++            // Finishing a lesson on screen counts as done in the Learn list too.
++            val read = preferences.getStringSet("read_chapters", emptySet()).orEmpty() + run.lesson.id
++            preferences.edit().putStringSet("practiced_chapters", completed).putStringSet("read_chapters", read).apply()
+             stopTutorial()
++            return
+         }
+-    }
+-
+-    fun tutorialSignal(kind: String, key: String) {
+-        if (tutorialPracticeActive && kind == "event") tutorialMilestones.observe(key)
+-        val step = tutorialStep ?: return
+-        if (TutorialStepGate.accepts(step, kind, key)) tutorialAdvance()
++        tutorialStepIndex = run.index
++        tutorialStepSatisfied = run.satisfied
++        tutorialRouteScreen()
+     }
+ 
+     fun tutorialSnapshot(previous: ArgentumTableSnapshot?, current: ArgentumTableSnapshot) {
+         if (!tutorialPracticeActive) return
+-        if (tutorialStartTurn == 0) tutorialStartTurn = current.turnNumber
+-        val old = previous?.players?.getOrNull(previous.viewingPlayer)
+-        val now = current.players.getOrNull(current.viewingPlayer) ?: return
+-        if (old != null) {
+-            fun wasInHand(name: String) = old.hand.any { it.name == name }
+-            fun isInHand(name: String) = now.hand.any { it.name == name }
+-            fun nowInPlay(name: String) = now.battlefield.any { it.name == name }
+-            val oldForests = old.battlefield.filter { it.name == "Forest" }.map { it.id }.toSet()
+-            if (old.hand.count { it.name == "Forest" } > now.hand.count { it.name == "Forest" } &&
+-                now.battlefield.any { it.name == "Forest" && it.id !in oldForests })
+-                tutorialSignal("event", "LandPlayed")
+-            if (now.manaPool.values.sum() > old.manaPool.values.sum()) tutorialSignal("event", "ManaAdded")
+-            val spellName = tutorialStep?.takeIf { it.event == "SpellCast" }
+-                ?.target?.removePrefix("hand-card:")
+-            if (!spellName.isNullOrBlank() && wasInHand(spellName) && !isInHand(spellName) &&
+-                (current.stack.any { it.name == spellName } || nowInPlay(spellName) ||
+-                    now.graveyard.any { it.name == spellName }))
+-                tutorialSignal("event", "SpellCast")
+-            if (old.battlefield.none { it.name == "Elvish Mystic" } && nowInPlay("Elvish Mystic")) tutorialSignal("event", "SpellResolved")
+-            if (previous.stepKey == "DECLARE_ATTACKERS" && current.stepKey != previous.stepKey) tutorialSignal("event", "AttackersDeclared")
+-            val oldOpp = previous.players.getOrNull(1 - previous.viewingPlayer)
+-            val newOpp = current.players.getOrNull(1 - current.viewingPlayer)
+-            if (oldOpp != null && newOpp != null && newOpp.life < oldOpp.life) tutorialSignal("event", "CombatDamageDealt")
+-        }
+-        if (tutorialPassPending && previous != null && current.interactionEpoch != previous.interactionEpoch) {
+-            tutorialPassPending = false
+-            tutorialSignal("event", "PriorityPassed")
+-        }
+-        if (current.turnNumber > tutorialStartTurn || current.activePlayer != current.viewingPlayer && previous?.activePlayer == previous?.viewingPlayer) {
+-            tutorialSignal("event", "TurnAdvanced")
+-        }
+-        if (tutorialKeepPending) {
+-            tutorialKeepPending = false
+-            tutorialSignal("event", "HandKept")
+-        }
++        tutorialEvents.detect(previous, current, { tutorialStep }) { tutorialSignal("event", it) }
+     }
+ 
+-    fun stopTutorial() {
++    fun stopTutorial(reopenHub: Boolean = true) {
+         val wasPractice = tutorialPracticeActive
+         tutorialPracticeActive = false
+-        tutorialMilestones.clear()
++        tutorialGated = false
++        tutorialStepSatisfied = false
++        tutorialHoldsPlayerView = -1
++        tutorialRun = null
++        tutorialEvents.reset()
+         stackOpen = false
+         tutorialChapterId = null
+         tutorialStepIndex = 0
+         tutorialLoading = false
+-        tutorialPassPending = false
+         tutorialMulliganPending = false
+-        tutorialKeepPending = false
+         if (wasPractice && argentumEnabled) closeArgentumSession(false)
+-        tutorialHubOpen = true
++        topMenuExpanded = false
++        if (reopenHub) tutorialHubOpen = true
+     }
+ 
++    /** Lessons whose steps happen on the game table need a game running. */
++    internal fun tutorialNeedsBoard(lesson: ArcanaLesson): Boolean =
++        lesson.steps.any { it.screen in setOf("board", "stack", "menu", "mulligan") }
++
++    /**
++     * Start a lesson the way the player expects: drills get their own practice game; lessons
++     * about the table use the game in progress, or a ready practice board when there is none;
++     * lessons about Home, Settings and the deck picker run where they are.
++     */
++    fun startTutorial(id: String, startingIndex: Int = 0) {
++        val lesson = tutorialChapters.firstOrNull { it.id == id } ?: return
++        when {
++            id in TutorialPracticeScenarios.supported && !argentumEnabled && !offlineStarting -> startTutorialPractice(id)
++            tutorialNeedsBoard(lesson) && !argentumEnabled -> startTutorialPractice(id, scenario = TutorialPracticeScenarios.TOUR, startingIndex = startingIndex)
++            else -> startTutorialCoach(id, startingIndex)
++        }
++    }
++
++    /** Opens the screen each step is about and closes whatever would cover it. */
+     fun tutorialRouteScreen() {
+-        if (tutorialPracticeActive) {
+-            val step = tutorialStep
+-            if (step?.screen == "stack" && argentumSnapshot?.stack?.isNotEmpty() == true) {
+-                showHand = false
+-                stackOpen = true
+-            } else if (step?.screen == "board") {
+-                stackOpen = false
+-                showHand = step.target?.startsWith("hand-card:") == true
++        val step = tutorialStep ?: return
++        val target = step.target.orEmpty()
++        val game = argentumEnabled
++        fun closeGameOverlays() { stackOpen = false; topMenuExpanded = false; topMenuSection = null; argentumActionChoices = emptyList() }
++        fun closeHomeSheets() { playSheetOpen = false; deckPickerOpen = false }
++        when (step.screen) {
++            "home" -> { closeGameOverlays(); showHand = false; optionsOpen = false; layoutLabOpen = false; closeHomeSheets(); homeOpen = true }
++            "setup" -> { optionsOpen = false; deckPickerOpen = false; homeOpen = true; playSheetOpen = true }
++            "decks" -> { optionsOpen = false; playSheetOpen = false; homeOpen = true; deckPickerOpen = true }
++            "settings", "diagnostics" -> { closeGameOverlays(); showHand = false; closeHomeSheets(); layoutLabOpen = false; if (!game) homeOpen = true; optionsOpen = true }
++            "layout" -> { closeGameOverlays(); showHand = false; optionsOpen = false; layoutLabOpen = true }
++            "board" -> if (game) {
++                homeOpen = false; optionsOpen = false; layoutLabOpen = false; closeHomeSheets()
++                stackOpen = false; topMenuExpanded = false; topMenuSection = null
++                // A step about the legal-actions sheet keeps the sheet (and hand) the player just opened,
++                // or opens it for a card in hand when they moved on with NEXT instead of tapping one.
++                if (target == "legal-action-sheet" && argentumActionChoices.isEmpty() && !tutorialGated)
++                    players.getOrNull(localSeat)?.hand?.firstOrNull()?.let { openArgentumActions(it) }
++                if (target != "legal-action-sheet") {
++                    argentumActionChoices = emptyList()
++                    // The hand drawer opens for steps about cards in hand, and stays shut otherwise.
++                    showHand = target.startsWith("hand-card:") || target == "hand-grid" || target == "hand-drawer-grip"
++                }
++                if (target == "your-tab" || target.startsWith("battlefield-") || target == "argentum-mana-summary" || target == "commander-chip" ||
++                    target.startsWith("quick-") || target == "stack-button" || target == "bottom-bar-pass-button") {
++                    showOverview = false; selectedPlayer = localSeat
++                    tutorialHoldsPlayerView = tutorialStepIndex
++                } else tutorialHoldsPlayerView = -1
++            }
++            // A drill only shows the stack when something is on it; a tour shows it whenever asked.
++            "stack" -> if (game && (!tutorialGated || argentumSnapshot?.stack?.isNotEmpty() == true)) {
++                homeOpen = false; showHand = false; optionsOpen = false; stackOpen = true
++            }
++            "menu" -> if (game) {
++                homeOpen = false; showHand = false; optionsOpen = false; stackOpen = false
++                topMenuSection = when (target) {
++                    "menu-legal-actions", "menu-mtg-rules", "menu-game-log" -> "tools"
++                    "menu-reset" -> "game"
++                    else -> null
++                }
++                topMenuExpanded = true
+             }
+-            return
+-        }
+-        when (tutorialStep?.screen) {
+-            "home" -> { homeOpen = true; optionsOpen = false; playSheetOpen = false; deckPickerOpen = false }
+-            "setup" -> { homeOpen = true; optionsOpen = false; playSheetOpen = true }
+-            "settings", "diagnostics", "layout" -> { homeOpen = true; playSheetOpen = false; optionsOpen = true }
+-            "decks" -> { homeOpen = true; optionsOpen = false; deckPickerOpen = true }
+-            "board" -> if (argentumEnabled) { homeOpen = false; optionsOpen = false }
+-            "stack" -> if (argentumEnabled) stackOpen = true
+-            "menu" -> { if (argentumEnabled) homeOpen = false; topMenuSection = null; topMenuExpanded = tutorialStep?.target != "game-menu" }
+         }
+     }
+ 
+@@ -501,31 +532,34 @@ internal class TableController(
+         tutorialHubOpen = false
+         tutorialChapterId = id
+         tutorialStepIndex = startingIndex.coerceIn(0, lesson.steps.lastIndex)
+-        tutorialPracticeActive = false
++        tutorialGated = false
++        tutorialRun = TutorialRun(lesson, practice = false, startIndex = tutorialStepIndex)
+         tutorialRouteScreen()
+     }
+ 
+-    fun startTutorialPractice(id: String) {
++    fun startTutorialPractice(id: String, scenario: String = id, startingIndex: Int = 0) {
+         if (argentumEnabled || offlineStarting) {
+             message = "Finish your current game before opening a practice match. Your save will be preserved."
+             return
+         }
+-        if (id !in TutorialPracticeScenarios.supported) {
++        if (scenario !in TutorialPracticeScenarios.supported && scenario != TutorialPracticeScenarios.TOUR) {
+             message = "This activity is not yet available as a practice game."
+             return
+         }
++        val drill = scenario in TutorialPracticeScenarios.supported
+         tutorialHubOpen = false
+         tutorialChapterId = id
+-        tutorialStepIndex = 0
+-        tutorialStartTurn = 0
+-        tutorialMilestones.clear()
++        tutorialStepIndex = if (drill) 0 else startingIndex
++        tutorialEvents.reset()
++        tutorialRun = tutorialChapters.firstOrNull { it.id == id }?.let { TutorialRun(it, practice = drill, startIndex = tutorialStepIndex) }
++        tutorialGated = drill
+         tutorialPracticeActive = true
+         tutorialLoading = true
+         offlineStarting = true
+         argentumLastError = null
+         scope.launch {
+             try {
+-                if (id == TutorialPracticeScenarios.MULLIGAN) {
++                if (scenario == TutorialPracticeScenarios.MULLIGAN) {
+                     val (seats, registry) = withContext(Dispatchers.IO) { TutorialPracticeScenarios.openingHand(offlineLibrary()) }
+                     argentumSocket.localHostFactory = { emit ->
+                         com.arcanatable.engine.LocalArgentumHost(
+@@ -546,10 +580,16 @@ internal class TableController(
+                     check(argentumStatus == ArgentumConnectionStatus.CONNECTED &&
+                         argentumSocket.createCommanderPracticeLobby(vsAi = true)) { "Tutorial engine connection failed." }
+                 } else {
+-                    val scenario = withContext(Dispatchers.IO) { TutorialPracticeScenarios.build(id, offlineLibrary()) }
+-                    launchOfflineCheckpoint(scenario.seats, scenario.registry, scenario.checkpoint.toString())
++                    val built = withContext(Dispatchers.IO) { TutorialPracticeScenarios.build(scenario, offlineLibrary()) }
++                    launchOfflineCheckpoint(built.seats, built.registry, built.checkpoint.toString())
+                 }
+-                recordDiagnostic("Tutorial practice started: $id", DiagnosticCategory.ENGINE)
++                // Route the first step only once the board has loaded: loading the players resets the
++                // view to TABLE, which would otherwise undo it.
++                var waited = 0
++                while (argentumSnapshot == null && !argentumMulliganPrompt && waited++ < 100) delay(100)
++                delay(600)
++                tutorialRouteScreen()
++                recordDiagnostic("Tutorial practice started: $id ($scenario)", DiagnosticCategory.ENGINE)
+             } catch (failed: Throwable) {
+                 argentumSocket.close()
+                 argentumSocket.localHostFactory = null
+@@ -559,6 +599,8 @@ internal class TableController(
+                 homeOpen = true
+                 tutorialChapterId = null
+                 tutorialPracticeActive = false
++                tutorialGated = false
++                tutorialRun = null
+                 tutorialHubOpen = true
+                 message = "Tutorial could not start: ${failed.message ?: failed.javaClass.simpleName}"
+                 recordDiagnostic("Tutorial preparation failed: ${failed.message}", DiagnosticCategory.ERROR)
+diff --git a/android/app/src/main/java/com/arcanatable/TableDialogs.kt b/android/app/src/main/java/com/arcanatable/TableDialogs.kt
+index 54d462d0..e4fffd32 100644
+--- a/android/app/src/main/java/com/arcanatable/TableDialogs.kt
++++ b/android/app/src/main/java/com/arcanatable/TableDialogs.kt
+@@ -759,15 +759,6 @@ internal fun OptionsPage(
+                     Text("OPTIONS", color = SoftWhite, fontWeight = FontWeight.Black, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                     IconButton(onClick = onDismiss, modifier = Modifier.size(44.dp)) { Icon(Icons.Filled.Close, "Close options", tint = Muted) }
+                 }
+-                tutorialStep?.let { step ->
+-                    TutorialInlineCue(step.title, step.body + "  " + step.hint)
+-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+-                        TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
+-                        if (step.actionKind == "next") TextButton(onClick = onTutorialNext) {
+-                            Text("NEXT", color = Mint)
+-                        }
+-                    }
+-                }
+                 Section("APPEARANCE", top = 8.dp)
+                 TextButton(onClick = onToggleTheme, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Theme  ·  ${if (darkMode) "Dark" else "Light"}", color = SoftWhite, modifier = Modifier.fillMaxWidth()) }
+                 SettingsToggle("Reduce swipe animation", "Skip the animated jump when switching player tabs.", reducedSwipeMotion, onReducedMotion, Modifier)
+@@ -793,7 +784,7 @@ internal fun OptionsPage(
+                     Switch(checked = backgroundAlertsEnabled, onCheckedChange = onToggleBackgroundAlerts)
+                 }
+                 Section("HELP & DIAGNOSTICS")
+-                Row(Modifier.fillMaxWidth().heightIn(min = 60.dp), verticalAlignment = Alignment.CenterVertically) {
++                Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).tutorialTarget("engine-processing-toggle"), verticalAlignment = Alignment.CenterVertically) {
+                     Column(Modifier.weight(1f).padding(end = 8.dp)) {
+                         Text("Engine running notice", color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                         Text("Show the in-game processing banner and elapsed time while Argentum works.", color = Muted, fontSize = 10.sp)
+@@ -831,6 +822,7 @@ internal fun OptionsPage(
+                 }
+                 Text("Saved decks are kept when game data is cleared.", color = Muted, fontSize = 10.sp)
+             }
++            TutorialLayer()
+             }
+         }
+     }
+diff --git a/android/app/src/main/java/com/arcanatable/TableEffects.kt b/android/app/src/main/java/com/arcanatable/TableEffects.kt
+index f79f354f..801d014a 100644
+--- a/android/app/src/main/java/com/arcanatable/TableEffects.kt
++++ b/android/app/src/main/java/com/arcanatable/TableEffects.kt
+@@ -277,7 +277,8 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
+     }
+     LaunchedEffect(argentumTurnKey) {
+         val (_, active) = argentumTurnKey ?: return@LaunchedEffect
+-        if (active != localSeat || !autoOpenHand || !argentumEnabled) return@LaunchedEffect
++        // A lesson decides when the hand opens; opening it here would cover what the lesson points at.
++        if (active != localSeat || !autoOpenHand || !argentumEnabled || tutorialChapterId != null) return@LaunchedEffect
+         delay(350)
+         if (argentumPendingDecision == null && argentumAttackPlan == null && argentumBlockPlan == null &&
+             argentumActionChoices.isEmpty() && !gameEndedOnline) showHand = true
+@@ -369,8 +370,19 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
+         observedChatCount = chatMessages.size
+         if (chatOpen) unreadChatCount = 0
+     }
++    // A lesson step about your own board keeps your player view while that step is showing.
++    LaunchedEffect(showOverview, tutorialHoldsPlayerView, tutorialStepIndex) {
++        if (showOverview && tutorialChapterId != null && tutorialHoldsPlayerView == tutorialStepIndex) {
++            delay(50)
++            if (showOverview && tutorialHoldsPlayerView == tutorialStepIndex) { showOverview = false; selectedPlayer = localSeat }
++        }
++    }
+     LaunchedEffect(gameStartedOnline) {
+-        if (gameStartedOnline) { homeOpen = false; showOverview = true; showHand = false; lobbyOpen = false }
++        if (gameStartedOnline) {
++            homeOpen = false; showOverview = true; showHand = false; lobbyOpen = false
++            // A lesson that just started its practice game puts back the view its step needs.
++            if (tutorialChapterId != null) tutorialRouteScreen()
++        }
+     }
+     LaunchedEffect(gameEndedOnline) {
+         if (gameEndedOnline) { gameTimerRunning = false; turnTimerRunning = false; showOverview = true; showHand = false }
+diff --git a/android/app/src/main/java/com/arcanatable/TableHelpers.kt b/android/app/src/main/java/com/arcanatable/TableHelpers.kt
+index c0e8a9d7..348d1fc0 100644
+--- a/android/app/src/main/java/com/arcanatable/TableHelpers.kt
++++ b/android/app/src/main/java/com/arcanatable/TableHelpers.kt
+@@ -319,6 +319,9 @@ internal fun ZoneChip(name: String, count: Int, enabled: Boolean = true, onClick
+ internal fun QuickActionChip(label: String, enabled: Boolean, onClick: () -> Unit) {
+     val target = when {
+         label.startsWith("STACK") -> "stack-button"
++        label.startsWith("GRAVEYARD") -> "quick-graveyard"
++        label.startsWith("EXILE") -> "quick-exile"
++        label.startsWith("LIBRARY") -> "quick-library"
+         label.startsWith("GAME LOG") -> "quick-log"
+         label.startsWith("PASS TO MY TURN") || label.startsWith("STOP AUTO-PASS") -> "quick-pass-to-turn"
+         label.startsWith("HAND") -> "hand-handle"
+diff --git a/android/app/src/main/java/com/arcanatable/TableMainLayout.kt b/android/app/src/main/java/com/arcanatable/TableMainLayout.kt
+index 5b626578..8595b661 100644
+--- a/android/app/src/main/java/com/arcanatable/TableMainLayout.kt
++++ b/android/app/src/main/java/com/arcanatable/TableMainLayout.kt
+@@ -217,20 +217,15 @@ internal fun TableController.TableMainLayout() {
+             Box(Modifier) {
+                 IconButton(onClick = { run { topMenuSection = null; topMenuExpanded = true; TutorialActions.tap("game-menu") } }, modifier = Modifier.size(46.dp).tutorialTarget("game-menu")) { Icon(Icons.Filled.MoreVert, "App menu", tint = SoftWhite) }
+                 DropdownMenu(expanded = topMenuExpanded, onDismissRequest = { topMenuExpanded = false; topMenuSection = null }) {
+-                    tutorialStep?.takeIf { it.screen == "menu" }?.let { step ->
+-                        DropdownMenuItem(
+-                            text = { Column { Text("TUTORIAL · " + step.title, color = Mint, fontWeight = FontWeight.Bold); Text(step.body, fontSize = 11.sp) } },
+-                            onClick = { if (step.actionKind == "next") tutorialAdvance() },
+-                            enabled = step.actionKind == "next"
+-                        )
+-                    }
++                    // A running lesson's coach, with its buttons, inside the menu where the player is looking.
++                    TutorialLayer(Modifier.widthIn(max = 320.dp), compact = true)
+                     if (topMenuSection == null) {
+-                        DropdownMenuItem(text = { Text("Learn & tutorials") }, onClick = { topMenuExpanded = false; topMenuSection = null; tutorialHubOpen = true })
+-                        DropdownMenuItem(text = { Text("Game tools") }, modifier = Modifier, onClick = { run { topMenuSection = "tools"; TutorialActions.tap("menu-game-tools") } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+-                        DropdownMenuItem(text = { Text("Room & game") }, modifier = Modifier, onClick = { run { topMenuSection = "game" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
++                        DropdownMenuItem(text = { Text("Learn & tutorials") }, modifier = Modifier.tutorialTarget("menu-tutorials"), onClick = { topMenuExpanded = false; topMenuSection = null; tutorialHubOpen = true })
++                        DropdownMenuItem(text = { Text("Game tools") }, modifier = Modifier.tutorialTarget("menu-game-tools"), onClick = { run { topMenuSection = "tools"; TutorialActions.tap("menu-game-tools") } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
++                        DropdownMenuItem(text = { Text("Room & game") }, modifier = Modifier.tutorialTarget("menu-room-game"), onClick = { run { topMenuSection = "game" } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                         DropdownMenuItem(text = { Text("What's new") }, onClick = { topMenuExpanded = false; changelogOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                         DropdownMenuItem(text = { Text("Adjust UI") }, onClick = { topMenuExpanded = false; topMenuSection = null; layoutLabOpen = true }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+-                        DropdownMenuItem(text = { Text("Options") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; optionsOpen = true } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
++                        DropdownMenuItem(text = { Text("Options") }, modifier = Modifier.tutorialTarget("menu-options"), onClick = { run { topMenuExpanded = false; topMenuSection = null; optionsOpen = true } }, contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp))
+                     } else {
+                         DropdownMenuItem(text = { Text("‹  MAIN MENU") }, modifier = Modifier, onClick = { run { topMenuSection = null } })
+                         when (topMenuSection) {
+@@ -244,10 +239,10 @@ internal fun TableController.TableMainLayout() {
+                                 if (!argentumEnabled && gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Add token") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; tokenTarget = selectedPlayer; tokenPickerOpen = true } })
+                                 if (!argentumEnabled && gameInProgress && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Mana pool · ${trackedMana(selectedPlayer)}") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; manaTarget = selectedPlayer; manaPoolOpen = true } })
+                                 if (!argentumEnabled && !gameEndedOnline && (!onlineMode || selectedPlayer == localSeat)) DropdownMenuItem(text = { Text("Search / browse library") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; librarySearchPlayer = selectedPlayer } })
+-                                if (argentumEnabled && gameInProgress) DropdownMenuItem(text = { Text("Argentum legal actions · ${ArgentumActions.visibleChoices(argentumSnapshot?.legalActions.orEmpty()).size}") }, onClick = { topMenuExpanded = false; topMenuSection = null; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } })
++                                if (argentumEnabled && gameInProgress) DropdownMenuItem(text = { Text("Argentum legal actions · ${ArgentumActions.visibleChoices(argentumSnapshot?.legalActions.orEmpty()).size}") }, modifier = Modifier.tutorialTarget("menu-legal-actions"), onClick = { topMenuExpanded = false; topMenuSection = null; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } })
+                                 if (gameInProgress) DropdownMenuItem(text = { Text("Stack and priority · $visibleStackCount") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; stackOpen = true } })
+-                                DropdownMenuItem(text = { Text("Game log") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; logOpen = true } })
+-                                DropdownMenuItem(text = { Text("MTG rules") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; rulesOpen = true } })
++                                DropdownMenuItem(text = { Text("Game log") }, modifier = Modifier.tutorialTarget("menu-game-log"), onClick = { run { topMenuExpanded = false; topMenuSection = null; logOpen = true } })
++                                DropdownMenuItem(text = { Text("MTG rules") }, modifier = Modifier.tutorialTarget("menu-mtg-rules"), onClick = { run { topMenuExpanded = false; topMenuSection = null; rulesOpen = true } })
+                             }
+                             "game" -> {
+                                 if (argentumOffline && !tutorialPracticeActive && wifiRole == null && argentumSnapshot != null && !gameEndedOnline)
+@@ -266,7 +261,7 @@ internal fun TableController.TableMainLayout() {
+                                     if (endProposalBy < 0) { endProposalBy = localSeat; endVotes = mapOf(localSeat to true); logAction(localSeat, "proposed ending the game") }
+                                 } })
+                                 if (onlineMode) DropdownMenuItem(text = { Text("Leave game…") }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; if (argentumEnabled) argentumLeaveConfirm = true else lobbyOpen = true } })
+-                                if (!onlineMode || localSeat == 0 && gameEndedOnline) DropdownMenuItem(text = { Text("Reset game", color = Color(0xFFE9978B)) }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; resetConfirmOpen = true } })
++                                if (!onlineMode || localSeat == 0 && gameEndedOnline) DropdownMenuItem(text = { Text("Reset game", color = Color(0xFFE9978B)) }, modifier = Modifier.tutorialTarget("menu-reset"), onClick = { run { topMenuExpanded = false; topMenuSection = null; resetConfirmOpen = true } })
+                                 if (!onlineMode) DropdownMenuItem(text = { Text("Reset and clear all data", color = Color(0xFFE9978B)) }, modifier = Modifier, onClick = { run { topMenuExpanded = false; topMenuSection = null; clearAllConfirmOpen = true } })
+                             }
+                         }
+@@ -492,7 +487,7 @@ internal fun TableController.TableMainLayout() {
+                 ) else Text("Tap a player to inspect their board", color = Muted, fontSize = 10.sp, modifier = Modifier.weight(1f))
+                 if (argentumEnabled) {
+                     if (passToMyTurnFrom != null) HeaderButton("AUTO-PASSING · STOP", onClick = { run { togglePassToMyTurn() } }, modifier = Modifier, onLongClick = { run { togglePassToMyTurn() } })
+-                    else if (argentumPrimaryLabel != null) PassButton(argentumPrimaryLabel!!, onClick = { run { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, canRespond = argentumCanRespond && respondGlow, modifier = Modifier, onLongClick = { run { togglePassToMyTurn() } })
++                    else if (argentumPrimaryLabel != null) PassButton(argentumPrimaryLabel!!, onClick = { run { argentumPrimary() } }, enabled = !argentumAwaitingUpdate, canRespond = argentumCanRespond && respondGlow, modifier = Modifier, onLongClick = { run { TutorialActions.hold("bottom-bar-pass-button"); togglePassToMyTurn() } })
+                     else Text(when { gameEndedOnline -> "GAME OVER"; argentumSnapshot == null -> "WAITING FOR ARGENTUM"; argentumPendingDecision != null -> "YOUR CHOICE IS NEEDED"; argentumAwaitingUpdate -> if (argentumSlow) "STILL WORKING…" else if (argentumOffline) "ENGINE THINKING…" else "WAITING FOR ARGENTUM"; wifiRole != null -> "WAITING FOR ${(argentumSnapshot?.let { players.getOrNull(it.priorityPlayer)?.name } ?: "YOUR FRIEND").uppercase()}…"; else -> "OPPONENT HAS PRIORITY" }, color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 8.dp))
+                 } else {
+                 if (gameInProgress && !gameEndedOnline && !players[activePlayer].isComputer && (!onlineMode || localSeat == activePlayer)) HeaderButton("NEXT · ${phaseSteps[phaseIndex]}", onClick = { run { if (argentumEnabled) sendArgentumPriority() else advanceStep() } }, enabled = !argentumAwaitingUpdate, modifier = Modifier)
+diff --git a/android/app/src/main/java/com/arcanatable/TableOverlays.kt b/android/app/src/main/java/com/arcanatable/TableOverlays.kt
+index 580b4d96..db1581ae 100644
+--- a/android/app/src/main/java/com/arcanatable/TableOverlays.kt
++++ b/android/app/src/main/java/com/arcanatable/TableOverlays.kt
+@@ -252,8 +252,9 @@ internal fun TableController.TableOverlays() {
+                 onAiCount = { offlineAiCount = ReleaseFeatures.aiCount(it); optionPrefs.edit().putInt("offline_ai_count", offlineAiCount).apply() },
+                 onOffline = {
+                     playSheetOpen = false
+-                    if (tutorialChapterId != null && !tutorialPracticeActive) TutorialActions.tap("setup-start")
+-                    else run { startOfflineGame() }
++                    // PLAY always starts the game; a Choose-a-game lesson ends here, its job done.
++                    if (tutorialChapterId != null && !tutorialPracticeActive) { TutorialActions.tap("setup-start"); stopTutorial(reopenHub = false) }
++                    run { startOfflineGame() }
+                 },
+                 onOnline = { playSheetOpen = false; run { startArgentumPractice(vsAi = true) } },
+                 onCreateRoom = { playSheetOpen = false; run { startArgentumPractice(vsAi = false) } },
+@@ -268,9 +269,9 @@ internal fun TableController.TableOverlays() {
+             )
+             val pickDeck: (DeckChoice) -> Unit = { choice ->
+                     deckPickerOpen = false
+-                    if (tutorialChapterId != null && !tutorialPracticeActive) {
+-                        TutorialActions.tap("deck-select")
+-                    } else {
++                    // Choosing a deck during the deck lesson really chooses it, then the lesson moves on.
++                    if (tutorialChapterId != null && !tutorialPracticeActive) TutorialActions.tap("deck-select")
++                    run {
+                     activeDeckId = choice.id; saveActiveDeck(context, choice.id)
+                     recordDiagnostic("Deck chosen: ${choice.name}", DiagnosticCategory.ACTION)
+                     // Also put it on your table (card art, online play). Offline games read the choice directly.
+@@ -517,7 +518,6 @@ internal fun TableController.TableOverlays() {
+             argentumActionChoices = emptyList(); argentumActionCard = null; chooseArgentumLegalAction(info)
+         },
+         onChoose = { info -> argentumActionChoices = emptyList(); argentumActionCard = null; argentumStackUse = null; chooseArgentumLegalAction(info) },
+-        tutorialCue = tutorialStep?.takeIf { tutorialChapterId != null }?.let { it.title to it.hint },
+         onSecretNudge = { if (wifiRole != null) argentumSocket.send("arcanaNudge") },
+             onDismiss = { argentumActionChoices = emptyList(); argentumActionCard = null }
+     )
+@@ -823,7 +823,8 @@ internal fun TableController.TableOverlays() {
+                     argentumAttackPlan = null
+                 } else message = "Could not send the attack declaration. Refresh and try again."
+             },
+-            onDismiss = { argentumAttackPlan = null })
++            onDismiss = { argentumAttackPlan = null },
++            )
+     }
+     argentumBlockPlan?.let { plan ->
+         ArgentumBlockBoard(plan, ::argentumPiece, busy = argentumAwaitingUpdate,
+@@ -910,7 +911,7 @@ internal fun TableController.TableOverlays() {
+                         .clickable { }
+                 ) {
+                     Box(
+-                        Modifier.fillMaxWidth().height(36.dp)
++                        Modifier.fillMaxWidth().height(36.dp).tutorialTarget("hand-drawer-grip")
+                             .pointerInput(configuration.screenHeightDp) {
+                                 var dragDistance = 0f
+                                 val screenHeightPx = with(density) { configuration.screenHeightDp.dp.toPx() }.coerceAtLeast(1f)
+@@ -935,9 +936,6 @@ internal fun TableController.TableOverlays() {
+                     Text("DRAG UP TO EXPAND · DRAG DOWN TO SHRINK", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 6.dp))
+                     HandSheet(
+                         cards = players.getOrNull(handSeat.coerceIn(players.indices))?.hand.orEmpty(), isLandscape = isLandscape,
+-                        tutorialCue = tutorialStep?.takeIf { tutorialChapterId != null }?.let { it.title to it.hint },
+-                        tutorialStep = if (tutorialChapterId != null) tutorialStep else null,
+-                        onTutorialNext = { tutorialAdvance() }, onTutorialExit = { stopTutorial() },
+                         availableHeight = LocalConfiguration.current.screenHeightDp.dp * effectiveHandFraction,
+                         stackCount = visibleStackCount,
+                         highlightedCardId = highlightedHandCardId,
+diff --git a/android/app/src/main/java/com/arcanatable/TableOverlaysB.kt b/android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
+index b9789fd7..fd49d11a 100644
+--- a/android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
++++ b/android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
+@@ -806,9 +806,8 @@ internal fun TableController.TableOverlaysB() {
+ 
+     if (tutorialHubOpen) TutorialHubDialog(
+         onDismiss = { tutorialHubOpen = false },
+-        onPractice = { startTutorialPractice(it) },
+-        onCoach = { id, index -> startTutorialCoach(id, index) },
+-        practiceEnabled = !argentumEnabled && !offlineStarting
++        onStart = { id, index -> startTutorial(id, index) },
++        gameRunning = argentumEnabled
+     )
+     if (optionsOpen) OptionsPage(
+         darkMode = darkMode, timerVisible = turnTimerVisible,
+@@ -837,10 +836,12 @@ internal fun TableController.TableOverlaysB() {
+         onReconnect = if (argentumEnabled && argentumStatus != ArgentumConnectionStatus.CONNECTED && argentumStatus != ArgentumConnectionStatus.REPLACED) ({
+             recordDiagnostic("Player chose Reconnect (Options)", DiagnosticCategory.CONNECTION); argentumSocket.retryNow()
+         }) else null,
+-        onViewDiagnostics = { optionsOpen = false; diagnosticViewerOpen = true },
+-        onExportDiagnostics = { exportDiagnosticLog() },
++        // While a lesson is pointing at these links, tapping one moves the lesson on instead of
++        // leaving Settings, so the lesson stays on screen.
++        onViewDiagnostics = { if (tutorialChapterId == null) { optionsOpen = false; diagnosticViewerOpen = true } },
++        onExportDiagnostics = { if (tutorialChapterId == null) exportDiagnosticLog() },
+         onWhatsNew = { optionsOpen = false; changelogOpen = true },
+-        onTutorials = { optionsOpen = false; tutorialHubOpen = true },
++        onTutorials = { if (tutorialChapterId == null) { optionsOpen = false; tutorialHubOpen = true } },
+         engineTrialResult = engineTrialResult,
+         onEngineSelfTest = {
+             engineTrialResult = "Running an AI-vs-AI game on this phone…"
+@@ -1028,39 +1029,41 @@ internal fun TableController.TableOverlaysB() {
+         )
+     }
+ 
+-    if (stackOpen && argentumEnabled) AlertDialog(
+-        onDismissRequest = { stackOpen = false },
+-        title = { Text("Argentum stack and priority") },
+-        text = {
+-            Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+-                val stackItems = argentumSnapshot?.stack.orEmpty()
+-                Text(if (stackItems.isEmpty()) "The Argentum stack is empty." else "ON THE STACK · ${stackItems.size}", color = Mint, fontWeight = FontWeight.Bold)
+-                tutorialStep?.takeIf { tutorialPracticeActive || tutorialChapterId != null }?.let { step ->
+-                    TutorialInlineCue(step.title, step.body + "  " + step.hint)
+-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+-                        TextButton(onClick = { stopTutorial(); stackOpen = false }) { Text("EXIT LESSON") }
+-                        if (step.actionKind == "next") TextButton(onClick = { tutorialAdvance() }) { Text("NEXT") }
++    if (stackOpen && argentumEnabled) Dialog(onDismissRequest = { stackOpen = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
++        Surface(Modifier.fillMaxWidth(0.94f).heightIn(max = 620.dp), shape = RoundedCornerShape(18.dp), color = Panel) {
++            Box {
++            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
++                Text("Argentum stack and priority", color = SoftWhite, fontSize = 20.sp, fontWeight = FontWeight.Bold)
++                Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
++                    val snap = argentumSnapshot
++                    val stackItems = snap?.stack.orEmpty()
++                    Text(if (stackItems.isEmpty()) "The Argentum stack is empty." else "ON THE STACK · ${stackItems.size}  ·  top resolves first", color = Mint, fontWeight = FontWeight.Bold)
++                    val priorityName = snap?.let { s -> s.players.getOrNull(s.priorityPlayer)?.let { if (s.priorityPlayer == s.viewingPlayer) "You" else it.name } }
++                    Text("PRIORITY · ${priorityName ?: "—"}", color = CounterGold, fontSize = 12.sp, fontWeight = FontWeight.Bold,
++                        modifier = Modifier.tutorialTarget("priority-indicator"))
++                    Box(Modifier.fillMaxWidth().heightIn(min = 48.dp).tutorialTarget("stack-items")) { StackCardList(stackItems) }
++                    Text("Argentum controls priority and resolves the stack. Arcana displays the server state and offers only server-provided actions.", color = Muted, fontSize = 12.sp)
++                    TextButton(onClick = { stackOpen = false; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } }, enabled = argentumSnapshot?.legalActions?.isNotEmpty() == true) {
++                        Text("VIEW LEGAL ACTIONS", color = Mint)
+                     }
+                 }
+-                StackCardList(stackItems)
+-                Text("Argentum controls priority and resolves the stack. Arcana displays the server state and offers only server-provided actions.", color = Muted, fontSize = 12.sp)
+-                TextButton(onClick = { stackOpen = false; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } }, enabled = argentumSnapshot?.legalActions?.isNotEmpty() == true) {
+-                    Text("VIEW LEGAL ACTIONS", color = Mint)
++                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
++                    TextButton(onClick = { stackOpen = false; TutorialActions.tap("stack-close") }, modifier = Modifier.heightIn(min = 48.dp).tutorialTarget("stack-close")) { Text("CLOSE", color = SoftWhite) }
++                    TextButton(onClick = {
++                        // The stack drill's next gesture is CLOSE. Keep the real sheet open
++                        // through the confirmed pass so that control remains available.
++                        if (!tutorialGated) stackOpen = false
++                        sendArgentumPriority()
++                    }, enabled = !argentumAwaitingUpdate && argentumSnapshot?.legalActions?.any { it.optJSONObject("action")?.optString("type") == "PassPriority" } == true,
++                        modifier = Modifier.heightIn(min = 48.dp).tutorialTarget("stack-pass")) {
++                        Text("PASS PRIORITY", color = Mint, fontWeight = FontWeight.Bold)
++                    }
+                 }
+             }
+-        },
+-        confirmButton = {
+-            TextButton(onClick = {
+-                // The stack drill's next gesture is CLOSE. Keep the real sheet open
+-                // through the confirmed pass so that control remains available.
+-                if (!tutorialPracticeActive) stackOpen = false
+-                sendArgentumPriority()
+-            }, enabled = !argentumAwaitingUpdate && argentumSnapshot?.legalActions?.any { it.optJSONObject("action")?.optString("type") == "PassPriority" } == true) {
+-                Text("PASS PRIORITY", color = Mint)
++            TutorialLayer(Modifier.matchParentSize())
+             }
+-        },
+-        dismissButton = { TextButton(onClick = { stackOpen = false; TutorialActions.tap("stack-close") }) { Text("CLOSE") } }
+-    ) else if (stackOpen) StackPriorityDialog(
++        }
++    } else if (stackOpen) StackPriorityDialog(
+         players = players, stack = stackActions, priorityPlayer = priorityPlayer, passedCount = priorityPassed.size,
+         eligibleCount = players.count { !it.isEliminated }, canResolve = stackActions.isNotEmpty() && stackActions.none { !it.targetsConfirmed } && players.filterNot { it.isEliminated }.all { it.id in priorityPassed },
+         canAct = !gameEndedOnline && stackActions.none { !it.targetsConfirmed } && players.getOrNull(priorityPlayer)?.isEliminated == false && (if (onlineMode) priorityPlayer == localSeat else priorityPlayer == selectedPlayer),
+diff --git a/android/app/src/main/java/com/arcanatable/TutorialCoach.kt b/android/app/src/main/java/com/arcanatable/TutorialCoach.kt
+index 7424efc3..fd24f3c0 100644
+--- a/android/app/src/main/java/com/arcanatable/TutorialCoach.kt
++++ b/android/app/src/main/java/com/arcanatable/TutorialCoach.kt
+@@ -1,3 +1,5 @@
++@file:OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
++
+ package com.arcanatable
+ 
+ import androidx.compose.foundation.background
+@@ -22,13 +24,29 @@ import androidx.compose.material3.OutlinedButton
+ import androidx.compose.material3.Surface
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.DisposableEffect
++import androidx.compose.ui.composed
+ import androidx.compose.runtime.mutableStateMapOf
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.geometry.Rect
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.input.pointer.pointerInput
+-import androidx.compose.ui.layout.boundsInRoot
++import androidx.compose.ui.layout.boundsInWindow
++import androidx.compose.foundation.ExperimentalFoundationApi
++import androidx.compose.foundation.relocation.BringIntoViewRequester
++import androidx.compose.foundation.relocation.bringIntoViewRequester
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.SideEffect
++import kotlinx.coroutines.delay
++import androidx.compose.ui.layout.positionInWindow
++import androidx.compose.ui.geometry.Offset
++import androidx.compose.ui.platform.LocalView
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.setValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.mutableStateListOf
++import androidx.compose.runtime.remember
+ import androidx.compose.ui.layout.onGloballyPositioned
+ import androidx.compose.ui.platform.LocalDensity
+ import androidx.compose.ui.platform.testTag
+@@ -38,13 +56,108 @@ import androidx.compose.ui.unit.sp
+ 
+ /**
+  * Bounds of opt-in Compose tutorial targets. These are only layout coordinates, never card data.
+- * A missing/hidden target is shown as a non-blocking instructional panel, not a fake hotspot.
++ * Each is kept with the window it was laid out in: Settings, the Play sheet, the deck picker and
++ * other dialogs are separate windows, and a coach can only highlight controls in its own window.
+  */
+ internal object TutorialTargets {
++    /** Bounds in the target's own window. */
+     val bounds = mutableStateMapOf<String, Rect>()
++    /** The root view of the window each target is in. */
++    val windows = mutableStateMapOf<String, android.view.View>()
++    /** The id actually on screen in [root]: "hand-card:any" means whichever card in hand is showing. */
++    fun resolve(target: String, root: android.view.View): String? {
++        if (!target.endsWith(":any")) return target.takeIf { windows[it] === root }
++        val prefix = target.removeSuffix("any")
++        return bounds.entries.filter { (id, r) -> id.startsWith(prefix) && windows[id] === root && r.width > 1f && r.height > 1f }
++            .minByOrNull { (_, r) -> r.left + r.top * 10f }?.key
++    }
++    /** Which on-screen control last reported each id (two copies of a card share one id). */
++    internal val owners = HashMap<String, Any>()
++}
++internal fun Modifier.tutorialTarget(id: String): Modifier = composed {
++    val root = LocalView.current.rootView
++    // When this control's step comes up, scroll any list it sits in so it is on screen.
++    val requester = remember { BringIntoViewRequester() }
++    val wanted = TutorialCoachState.model?.let { m -> m.lesson.steps.getOrNull(m.index)?.target } == id
++    LaunchedEffect(wanted) { if (wanted) { delay(150); runCatching { requester.bringIntoView() } } }
++    val owner = remember { Any() }
++    // A control that leaves the screen must not leave its highlight behind on an empty spot,
++    // but another copy still showing (a second Forest, the other hand button) keeps it.
++    DisposableEffect(id, root) {
++        onDispose {
++            if (TutorialTargets.owners[id] === owner) {
++                TutorialTargets.owners.remove(id); TutorialTargets.bounds.remove(id); TutorialTargets.windows.remove(id)
++            }
++        }
++    }
++    bringIntoViewRequester(requester).onGloballyPositioned {
++        if (it.isAttached) {
++            val rect = it.boundsInWindow()
++            // An offscreen or collapsed copy never replaces a visible one.
++            if (rect.width > 1f && rect.height > 1f || TutorialTargets.owners[id] == null || TutorialTargets.owners[id] === owner) {
++                TutorialTargets.bounds[id] = rect; TutorialTargets.windows[id] = root; TutorialTargets.owners[id] = owner
++            }
++        }
++    }
++}
++
++/** What the coach shows right now; set by the activity, drawn by the topmost [TutorialLayer]. */
++internal class TutorialCoachModel(
++    val lesson: ArcanaLesson,
++    val index: Int,
++    val practice: Boolean,
++    val onNext: () -> Unit,
++    val onSkip: () -> Unit,
++)
++
++internal object TutorialCoachState {
++    var model by mutableStateOf<TutorialCoachModel?>(null)
++    /** Layers in the order their windows opened; the last one is on top and draws the coach. */
++    internal val layers = mutableStateListOf<Any>()
++    /** The window the coach was last drawn in (checked by the tutorial audit test). */
++    internal var drawnIn: android.view.View? = null
+ }
+-internal fun Modifier.tutorialTarget(id: String): Modifier =
+-    this.onGloballyPositioned { TutorialTargets.bounds[id] = it.boundsInRoot() }
++
++/**
++ * Where the coach is drawn. The activity has one, and every dialog or sheet a lesson visits ends
++ * its content with one. Only the most recently opened layer draws, so the coach card and its
++ * buttons are always on the window the player is looking at, never hidden behind it.
++ */
++@Composable
++internal fun TutorialLayer(modifier: Modifier = Modifier.fillMaxSize(), base: Boolean = false, compact: Boolean = false) {
++    val key = remember { Any() }
++    DisposableEffect(key) {
++        // The activity's own layer is always underneath every dialog, whatever composed first.
++        if (base) TutorialCoachState.layers.add(0, key) else TutorialCoachState.layers.add(key)
++        onDispose { TutorialCoachState.layers.remove(key) }
++    }
++    if (TutorialCoachState.layers.lastOrNull() !== key) return
++    val model = TutorialCoachState.model ?: return
++    val window = LocalView.current.rootView
++    SideEffect { TutorialCoachState.drawnIn = window }
++    if (compact) TutorialCompactCard(model, modifier)
++    else TutorialCoachOverlay(model.lesson, model.index, model.practice, model.onNext, model.onSkip, modifier = modifier)
++}
++
++/** The coach inside a small popup (the game menu): same words and buttons, no screen shade. */
++@Composable
++private fun TutorialCompactCard(model: TutorialCoachModel, modifier: Modifier) {
++    val step = model.lesson.steps.getOrNull(model.index) ?: return
++    Column(modifier.padding(horizontal = 10.dp, vertical = 6.dp).background(Color(0xFF12241F), RoundedCornerShape(10.dp))
++        .border(1.dp, Color(0xFFE6B65C), RoundedCornerShape(10.dp)).padding(10.dp).testTag("tutorial-coach-tip"),
++        verticalArrangement = Arrangement.spacedBy(4.dp)) {
++        Text("${model.index + 1} / ${model.lesson.steps.size} · " + step.title, color = Color(0xFFE6B65C), fontWeight = FontWeight.Black, fontSize = 13.sp)
++        Text(step.body, color = Color.White, fontSize = 12.sp, lineHeight = 16.sp)
++        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
++            OutlinedButton(onClick = model.onSkip, modifier = Modifier.height(40.dp)) { Text("EXIT") }
++            if (stepHasNext(step, model.practice)) Button(onClick = model.onNext, modifier = Modifier.height(40.dp)) { Text("NEXT") }
++            else Text(step.hint.ifBlank { "Use the highlighted control" }, color = Color(0xFFE6B65C), fontSize = 11.sp, modifier = Modifier.weight(1f))
++        }
++    }
++}
++
++/** Gated drill steps wait for the real control; everything else can always move on with NEXT. */
++internal fun stepHasNext(step: ArcanaLessonStep, practice: Boolean): Boolean = step.actionKind == "next" || !practice
+ 
+ /** Activity-local actions emitted by real control handlers, not by touching the coach overlay. */
+ /** Pure gate: only a corresponding engine event or gesture may complete an actionable step. */
+@@ -102,15 +215,20 @@ internal fun TutorialCoachOverlay(
+     onNext: () -> Unit,
+     onSkip: () -> Unit,
+     avoidTableOverlay: Boolean = false,
++    modifier: Modifier = Modifier.fillMaxSize(),
+ ) {
+     val step = lesson.steps.getOrNull(index) ?: return
+     val gold = Color(0xFFE6B65C)
+     val muted = Color(0xFFBAC6BE)
+     val density = LocalDensity.current
+-    BoxWithConstraints(Modifier.fillMaxSize().testTag("tutorial-coach")) {
++    val root = LocalView.current.rootView
++    var origin by remember { mutableStateOf(Offset.Zero) }
++    BoxWithConstraints(modifier.testTag("tutorial-coach").onGloballyPositioned { origin = it.positionInWindow() }) {
+         val maxW = maxWidth
+         val maxH = maxHeight
+-        val rect = if (avoidTableOverlay) null else step.target?.let(TutorialTargets.bounds::get)
++        // Only a control in this same window can be highlighted here.
++        val rect = if (avoidTableOverlay) null else step.target?.let { TutorialTargets.resolve(it, root) }
++            ?.let(TutorialTargets.bounds::get)?.translate(-origin)
+         val valid = rect != null && rect.width > 1f && rect.height > 1f
+         val target = if (valid) rect else null
+         val left = if (target == null) 0.dp else with(density) { target.left.toDp() }.coerceIn(0.dp, maxW)
+@@ -153,7 +271,7 @@ internal fun TutorialCoachOverlay(
+                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp),
+                     verticalAlignment = Alignment.CenterVertically) {
+                     OutlinedButton(onClick = onSkip, modifier = Modifier.height(45.dp)) { Text("EXIT") }
+-                    if (step.actionKind == "next" || !practice) {
++                    if (stepHasNext(step, practice)) {
+                         Button(onClick = onNext, modifier = Modifier.height(45.dp)) { Text("NEXT") }
+                     } else {
+                         Text(step.hint.ifBlank { "Use the highlighted control" },
+diff --git a/android/app/src/main/java/com/arcanatable/TutorialHubDialog.kt b/android/app/src/main/java/com/arcanatable/TutorialHubDialog.kt
+index 94401eb2..b03e3d97 100644
+--- a/android/app/src/main/java/com/arcanatable/TutorialHubDialog.kt
++++ b/android/app/src/main/java/com/arcanatable/TutorialHubDialog.kt
+@@ -40,6 +40,7 @@ import androidx.compose.ui.platform.LocalContext
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
++import androidx.compose.ui.platform.testTag
+ import androidx.compose.ui.window.Dialog
+ import androidx.compose.ui.window.DialogProperties
+ import org.json.JSONObject
+@@ -66,7 +67,11 @@ internal data class ArcanaLesson(
+ )
+ 
+ internal fun loadTutorialLessons(context: Context): List<ArcanaLesson> = runCatching {
+-    val json = context.assets.open("tutorials/catalog.json").bufferedReader().use { it.readText() }
++    parseTutorialLessons(context.assets.open("tutorials/catalog.json").bufferedReader().use { it.readText() })
++}.getOrDefault(emptyList())
++
++/** The bundled catalog as lessons; shared with the tests that walk each lesson. */
++internal fun parseTutorialLessons(json: String): List<ArcanaLesson> = run {
+     val chapters = JSONObject(json).getJSONArray("chapters")
+     (0 until chapters.length()).map { index ->
+         val chapter = chapters.getJSONObject(index)
+@@ -92,7 +97,7 @@ internal fun loadTutorialLessons(context: Context): List<ArcanaLesson> = runCatc
+             }
+         )
+     }
+-}.getOrDefault(emptyList())
++}
+ 
+ private val TutorialFelt = Color(0xFF101B18)
+ private val TutorialPanel = Color(0xFF1B2A25)
+@@ -103,9 +108,10 @@ private val TutorialGold = Color(0xFFE6B65C)
+ @Composable
+ internal fun TutorialHubDialog(
+     onDismiss: () -> Unit,
+-    onPractice: (String) -> Unit = {},
+-    onCoach: (String, Int) -> Unit = { _, _ -> },
+-    practiceEnabled: Boolean = false
++    /** Run the lesson in the app from this step (a practice board is set up when it needs one). */
++    onStart: (String, Int) -> Unit = { _, _ -> },
++    /** A game is in progress: table lessons use it instead of a practice board. */
++    gameRunning: Boolean = false,
+ ) {
+     val context = LocalContext.current
+     val chapters = remember(context) { loadTutorialLessons(context) }
+@@ -117,6 +123,7 @@ internal fun TutorialHubDialog(
+     var query by rememberSaveable { mutableStateOf("") }
+     var chapterId by rememberSaveable { mutableStateOf<String?>(null) }
+     var stepIndex by rememberSaveable { mutableStateOf(0) }
++    var reading by rememberSaveable { mutableStateOf(false) }
+     var showGlossary by rememberSaveable { mutableStateOf(false) }
+     val current = chapters.firstOrNull { it.id == chapterId }
+ 
+@@ -130,7 +137,8 @@ internal fun TutorialHubDialog(
+                     Text("ARCANA  /  LEARN", color = TutorialGold, fontSize = 12.sp, fontWeight = FontWeight.Black,
+                         modifier = Modifier.weight(1f))
+                     TextButton(onClick = {
+-                        if (current != null || showGlossary) { chapterId = null; showGlossary = false }
++                        if (reading) reading = false
++                        else if (current != null || showGlossary) { chapterId = null; showGlossary = false }
+                         else onDismiss()
+                     }) { Text(if (current != null || showGlossary) "BACK" else "CLOSE", color = TutorialText) }
+                 }
+@@ -165,12 +173,13 @@ internal fun TutorialHubDialog(
+                         ) {
+                             Text("START HERE", color = TutorialGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                             Text("Your first turn", color = TutorialText, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+-                            Text("Play a real, isolated Argentum practice turn. You can also read every step without leaving your game.",
++                            Text(if (gameRunning) "A game is in progress, so this follows along on it. Leave the game to play the practice turn instead."
++                                else "Play a real practice turn against a passive opponent. Your saved game is never touched.",
+                                 color = TutorialMuted, fontSize = 12.sp)
+                             Button(
+-                                onClick = { if (practiceEnabled) onPractice(intro.id) else { chapterId = intro.id; stepIndex = 0 } },
+-                                modifier = Modifier.heightIn(min = 48.dp)
+-                            ) { Text(if (practiceEnabled) "PLAY THE FIRST TURN" else "READ FIRST TURN") }
++                                onClick = { onStart(intro.id, 0) },
++                                modifier = Modifier.heightIn(min = 48.dp).testTag("tutorial-start-first-turn")
++                            ) { Text(if (gameRunning) "FOLLOW ON MY GAME" else "PLAY THE FIRST TURN") }
+                         }
+                     }
+                     Row(verticalAlignment = Alignment.CenterVertically) {
+@@ -206,7 +215,7 @@ internal fun TutorialHubDialog(
+                             Row(
+                                 modifier = Modifier.fillMaxWidth()
+                                     .background(TutorialPanel, RoundedCornerShape(12.dp))
+-                                    .clickable { chapterId = lesson.id; stepIndex = 0 }
++                                    .clickable { chapterId = lesson.id; stepIndex = 0; reading = false }
+                                     .padding(12.dp),
+                                 verticalAlignment = Alignment.CenterVertically
+                             ) {
+@@ -221,6 +230,32 @@ internal fun TutorialHubDialog(
+                             }
+                         }
+                     }
++                } else if (!reading) {
++                    // Chapter overview: one clear way in, plus a text-only option.
++                    val drill = current.id in TutorialPracticeScenarios.supported
++                    val table = current.steps.any { it.screen in setOf("board", "stack", "menu", "mulligan") }
++                    Text(current.section.uppercase() + "  /  " + current.minutes + " MIN  /  " + current.steps.size + " STEPS",
++                        color = TutorialGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
++                    Text(current.title, color = TutorialText, fontSize = 24.sp, fontWeight = FontWeight.Bold)
++                    Text(current.description, color = TutorialText, fontSize = 15.sp, lineHeight = 21.sp)
++                    Text(when {
++                        drill && !gameRunning -> "You'll play it in a practice game. Each step waits for you to do it on the real table. Your saved game is never touched."
++                        table && !gameRunning -> "Opens a practice Commander board so every control is there to see. Your saved game is never touched."
++                        table -> "Runs on your current game. Nothing is played for you."
++                        else -> "Highlights each control on the real screen."
++                    }, color = TutorialMuted, fontSize = 12.sp, lineHeight = 17.sp)
++                    LazyColumn(Modifier.weight(1f).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
++                        items(current.steps.size) { n ->
++                            Text("${n + 1}.  " + current.steps[n].title, color = TutorialMuted, fontSize = 13.sp,
++                                modifier = Modifier.fillMaxWidth().clickable { stepIndex = n; reading = true }.padding(vertical = 5.dp))
++                        }
++                    }
++                    Button(onClick = { onStart(current.id, 0) }, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp).testTag("tutorial-start")) {
++                        Text("START LESSON", fontWeight = FontWeight.Black)
++                    }
++                    OutlinedButton(onClick = { stepIndex = 0; reading = true }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
++                        Text("READ IT HERE INSTEAD")
++                    }
+                 } else {
+                     Text(current.section.uppercase() + "  /  " + current.minutes + " MIN",
+                         color = TutorialGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+@@ -228,14 +263,9 @@ internal fun TutorialHubDialog(
+                     Row(verticalAlignment = Alignment.CenterVertically) {
+                         Text("STEP " + (stepIndex + 1).toString() + " OF " + current.steps.size.toString(),
+                             color = TutorialMuted, fontSize = 11.sp, modifier = Modifier.weight(1f))
+-                        TextButton(onClick = { onCoach(current.id, stepIndex) }) {
++                        TextButton(onClick = { onStart(current.id, if (current.id in TutorialPracticeScenarios.supported) 0 else stepIndex) }) {
+                             Text("SHOW ON SCREEN", color = TutorialGold, fontSize = 11.sp)
+                         }
+-                        if (practiceEnabled && current.id in TutorialPracticeScenarios.supported) {
+-                            TextButton(onClick = { onPractice(current.id) }) {
+-                                Text("PRACTICE", color = TutorialGold, fontSize = 11.sp)
+-                            }
+-                        }
+                     }
+                     val step = current.steps.getOrNull(stepIndex)
+                     if (step != null) {
+@@ -252,7 +282,7 @@ internal fun TutorialHubDialog(
+                                 Text("TRY: " + step.hint, color = TutorialGold, fontSize = 12.sp)
+                             }
+                             if (step.actionKind != "next") {
+-                                Text("Use SHOW ON SCREEN to highlight the control in Arcana, or PRACTICE for supported engine-backed drills.",
++                                Text("SHOW ON SCREEN runs this step in the app so you can do it yourself.",
+                                     color = TutorialMuted, fontSize = 12.sp)
+                             }
+                         }
+@@ -269,6 +299,7 @@ internal fun TutorialHubDialog(
+                                     if (current.id !in readIds) readIds.add(current.id)
+                                     prefs.edit().putStringSet("read_chapters", readIds.toSet()).apply()
+                                     chapterId = null
++                                    reading = false
+                                     stepIndex = 0
+                                 }
+                             },
+diff --git a/android/app/src/main/java/com/arcanatable/TutorialPracticeScenarios.kt b/android/app/src/main/java/com/arcanatable/TutorialPracticeScenarios.kt
+index 18431057..b151eaf9 100644
+--- a/android/app/src/main/java/com/arcanatable/TutorialPracticeScenarios.kt
++++ b/android/app/src/main/java/com/arcanatable/TutorialPracticeScenarios.kt
+@@ -14,6 +14,8 @@ import com.wingedsheep.engine.handlers.effects.ZoneTransitionService
+ import com.wingedsheep.engine.registry.CardRegistry
+ import com.wingedsheep.engine.state.GameState
+ import com.wingedsheep.engine.state.components.identity.CardComponent
++import com.wingedsheep.engine.state.components.battlefield.CountersComponent
++import com.wingedsheep.sdk.core.CounterType
+ import com.wingedsheep.sdk.core.Format
+ import com.wingedsheep.sdk.core.Step
+ import com.wingedsheep.sdk.core.Zone
+@@ -33,16 +35,66 @@ internal object TutorialPracticeScenarios {
+     const val COMBAT = "combat"
+     const val STACK = "stack"
+     const val MULLIGAN = "opening-hand"
++    /** A ready Commander board for lessons that explain the table rather than drill one action. */
++    const val TOUR = "tour"
+ 
++    /** Drills: every step waits for the learner to do it in the real game. */
+     val supported = setOf(FIRST_TURN, COMBAT, STACK, MULLIGAN)
+ 
+     fun build(id: String, library: OfflineCardLibrary): TestScenarioGame = when (id) {
+         FIRST_TURN -> firstTurn(library)
+         COMBAT -> combat(library)
+         STACK -> stack(library)
++        TOUR -> tour(library)
+         else -> error("Unknown checkpoint tutorial $id")
+     }
+ 
++    const val YOUR_COMMANDER = "Ayula, Queen Among Bears"
++    const val OPPONENT_COMMANDER = "Tetsuko Umezawa, Fugitive"
++
++    /**
++     * Your third turn of a two-player Commander game, main phase, with something in every zone:
++     * commanders in the command zone, Forests and a Grizzly Bears (with a +1/+1 counter, able to
++     * attack) on the battlefield, Forest / Elvish Mystic / Giant Growth in hand, a card in the
++     * graveyard and one in exile. The opponent passes every turn.
++     */
++    private fun tour(library: OfflineCardLibrary): TestScenarioGame {
++        val you = LocalSeat("You", listOf("Grizzly Bears", "Elvish Mystic", "Giant Growth", "Llanowar Elves") + List(36) { "Forest" }, YOUR_COMMANDER)
++        val ai = LocalSeat("Training Opponent", List(40) { "Island" }, OPPONENT_COMMANDER)
++        val registry = CardRegistry().apply { register(library.load((you.deck + ai.deck + listOf(YOUR_COMMANDER, OPPONENT_COMMANDER)).toSet())) }
++        val services = EngineServices(registry)
++        val config = GameConfig(
++            players = listOf(
++                PlayerConfig(name = you.name, deck = Deck(you.deck), playerId = LocalArgentumHost.HUMAN_ID, startingLife = 40, commanderCardNames = listOf(YOUR_COMMANDER)),
++                PlayerConfig(name = ai.name, deck = Deck(ai.deck), playerId = LocalArgentumHost.AI_ID, startingLife = 40, commanderCardNames = listOf(OPPONENT_COMMANDER)),
++            ),
++            skipMulligans = true,
++            startingPlayerIndex = 0,
++            format = Format.Commander(),
++            seed = 12025L,
++        )
++        var state = GameInitializer(registry, services.printingRegistry).initializeGame(config).state
++        state = passToMain(state, services, afterTurn = 0)
++        val zones = ZoneTransitionService(registry, services.predicateEvaluator)
++        val bears = yourCard(state, "Grizzly Bears", Zone.LIBRARY, Zone.HAND)
++        state = zones.moveToZone(state, bears, Zone.BATTLEFIELD).state
++        repeat(2) { state = zones.moveToZone(state, yourCard(state, "Forest", Zone.HAND, Zone.LIBRARY), Zone.BATTLEFIELD).state }
++        // The passive opponent keeps seven cards through its turn, so setup never stops for a discard.
++        state = zones.moveToZone(state, state.getZone(LocalArgentumHost.AI_ID, Zone.HAND).first(), Zone.BATTLEFIELD).state
++        // A full real turn cycle: the Bears lose summoning sickness and it is your turn again.
++        state = passToMain(state, services, afterTurn = state.turnNumber)
++        for (name in listOf("Forest", "Elvish Mystic", "Giant Growth")) {
++            if (state.getZone(LocalArgentumHost.HUMAN_ID, Zone.HAND).none { state.getEntity(it)?.get<CardComponent>()?.name == name })
++                state = zones.moveToZone(state, yourCard(state, name, Zone.LIBRARY), Zone.HAND).state
++        }
++        state = zones.moveToZone(state, yourCard(state, "Llanowar Elves", Zone.LIBRARY, Zone.HAND), Zone.GRAVEYARD).state
++        state = zones.moveToZone(state, yourCard(state, "Forest", Zone.LIBRARY), Zone.EXILE).state
++        state = state.updateEntity(bears) { c ->
++            c.with((c.get<CountersComponent>() ?: CountersComponent()).withAdded(CounterType.PLUS_ONE_PLUS_ONE, 1))
++        }
++        return TestScenarioGame(listOf(you, ai), registry, checkpoint(state, you, ai))
++    }
++
+     fun openingHand(library: OfflineCardLibrary): Pair<List<LocalSeat>, CardRegistry> {
+         val you = LocalSeat("You", listOf("Elvish Mystic", "Grizzly Bears") + List(38) { "Forest" }, null)
+         val opponent = LocalSeat("Training Opponent", List(40) { "Island" }, null)
+diff --git a/android/app/src/main/java/com/arcanatable/TutorialProgress.kt b/android/app/src/main/java/com/arcanatable/TutorialProgress.kt
+new file mode 100644
+index 00000000..f1fec57d
+--- /dev/null
++++ b/android/app/src/main/java/com/arcanatable/TutorialProgress.kt
+@@ -0,0 +1,128 @@
++package com.arcanatable
++
++/**
++ * Where a tutorial lesson is and how it moves on. Pure (no Android or Compose state) so the
++ * same logic that runs in the app is what the engine walkthrough tests drive.
++ *
++ * Gated steps in a practice lesson only advance on the matching gesture or Argentum event.
++ * A real game can get ahead of the text, though: the learner can cast before tapping a land for
++ * mana, or Argentum can skip a combat step nobody can use. So while the lesson WAITS on an
++ * event, a later game milestone that makes that wait pointless moves it on to the step that
++ * milestone completes, shown as done with a NEXT button, instead of leaving the learner stuck. Explanations the
++ * learner is reading are never skipped: milestones that happen meanwhile complete their step
++ * when the learner reaches it, and a priority pass never counts for a later pass prompt.
++ */
++internal class TutorialRun(val lesson: ArcanaLesson, val practice: Boolean, startIndex: Int = 0) {
++    var index: Int = startIndex.coerceIn(0, (lesson.steps.size - 1).coerceAtLeast(0))
++        private set
++    var finished: Boolean = false
++        private set
++    /** The current step's action already happened in the game; it stays up until NEXT. */
++    var satisfied: Boolean = false
++        private set
++    private val milestones = TutorialMilestones()
++
++    val step: ArcanaLessonStep? get() = if (finished) null else lesson.steps.getOrNull(index)
++
++    /** NEXT on the coach card, or the last step's button. */
++    fun next() = moveTo(index + 1)
++
++    /** A gesture ("tap"/"hold" + target) or an Argentum event ("event" + name). Returns true if the step changed. */
++    fun signal(kind: String, key: String): Boolean {
++        if (finished) return false
++        if (practice && kind == "event") milestones.observe(key)
++        val current = step ?: return false
++        if (TutorialStepGate.accepts(current, kind, key)) { moveTo(index + 1); return true }
++        if (!practice || kind != "event" || current.actionKind != "event" || key !in CATCH_UP_EVENTS) return false
++        val ahead = catchUpIndex(key) ?: return false
++        // Land on the step the game just did, shown as done, so its explanation is never jumped over.
++        moveTo(ahead, landDone = true)
++        return true
++    }
++
++    /** The later step [event] satisfies, if nothing but explanations and gestures stand between. */
++    private fun catchUpIndex(event: String): Int? {
++        for (j in index + 1..lesson.steps.lastIndex) {
++            val s = lesson.steps[j]
++            if (s.actionKind == "event") return j.takeIf { s.event == event }
++        }
++        return null
++    }
++
++    private companion object {
++        /** Game progress that can't be undone, so it can stand in for an earlier wait. */
++        val CATCH_UP_EVENTS = setOf("SpellCast", "SpellResolved", "AttackersDeclared", "CombatDamageDealt", "TurnAdvanced")
++    }
++
++    private fun moveTo(target: Int, landDone: Boolean = false) {
++        satisfied = false
++        if (target > lesson.steps.lastIndex) { finished = true; return }
++        index = target
++        // Landed on a step the game already did: show it as done and wait for NEXT.
++        if (landDone) { satisfied = true; return }
++        // Combat and stack resolution can finish while an explanation is open.
++        if (practice && milestones.completes(step)) moveTo(index + 1)
++    }
++}
++
++/**
++ * Turns two consecutive Argentum snapshots into the tutorial events they show happened.
++ * [step] is read before each check because an event can move the lesson on.
++ */
++internal class TutorialEventDetector {
++    var startTurn = 0
++    /** Set when Arcana sends PassPriority / Keep Hand; consumed by the next snapshot. */
++    var passPending = false
++    var keepPending = false
++
++    fun reset() { startTurn = 0; passPending = false; keepPending = false }
++
++    fun detect(previous: ArgentumTableSnapshot?, current: ArgentumTableSnapshot, step: () -> ArcanaLessonStep?, emit: (String) -> Unit) {
++        if (startTurn == 0) startTurn = current.turnNumber
++        val old = previous?.players?.getOrNull(previous.viewingPlayer)
++        val now = current.players.getOrNull(current.viewingPlayer) ?: return
++        // The pass you just made comes first, then what it caused (a resolution, a new step).
++        if (passPending && previous != null && current.interactionEpoch != previous.interactionEpoch) {
++            passPending = false
++            emit("PriorityPassed")
++        }
++        if (previous != null && old != null) {
++            fun isLand(c: GameCard) = "land" in c.type.lowercase()
++            val oldIds = (old.battlefield + old.graveyard + old.exile).map { it.id }.toSet()
++            val oldLands = old.battlefield.filter(::isLand).map { it.id }.toSet()
++            if (now.hand.count(::isLand) < old.hand.count(::isLand) && now.battlefield.any { isLand(it) && it.id !in oldLands })
++                emit("LandPlayed")
++            if (now.manaPool.values.sum() > old.manaPool.values.sum()) emit("ManaAdded")
++            // One of your nonland cards left your hand for the stack or straight to where it lands.
++            val handNames = old.hand.filterNot(::isLand).map { it.name }.distinct()
++            if (handNames.any { name ->
++                    old.hand.count { it.name == name } > now.hand.count { it.name == name } &&
++                        (current.stack.any { it.name == name } || (now.battlefield + now.graveyard + now.exile).any { it.name == name && it.id !in oldIds })
++                }) emit("SpellCast")
++            // Something on the stack resolved, or a spell you cast arrived on the battlefield.
++            val stackShrank = previous.stack.isNotEmpty() && current.stack.size < previous.stack.size
++            val arrived = now.battlefield.any { c -> !isLand(c) && c.id !in oldIds && previous.stack.any { it.name == c.name } }
++            if (stackShrank || arrived) emit("SpellResolved")
++            val yourTurn = previous.activePlayer == previous.viewingPlayer
++            if (previous.stepKey == "DECLARE_ATTACKERS" && current.stepKey != previous.stepKey) emit("AttackersDeclared")
++            // Argentum moves straight past combat when you have no creature that can attack.
++            else if (yourTurn && previous.stepKey in BEFORE_ATTACKS && (current.stepKey in AFTER_ATTACKS || current.turnNumber > previous.turnNumber))
++                emit("AttackersDeclared")
++            val oldOpp = previous.players.getOrNull(1 - previous.viewingPlayer)
++            val newOpp = current.players.getOrNull(1 - current.viewingPlayer)
++            if (oldOpp != null && newOpp != null && newOpp.life < oldOpp.life) emit("CombatDamageDealt")
++        }
++        // Your turn ended: a later turn number, or the opponent became the active player.
++        if (current.turnNumber > startTurn || (previous != null && current.activePlayer != current.viewingPlayer && previous.activePlayer == previous.viewingPlayer))
++            emit("TurnAdvanced")
++        if (keepPending) {
++            keepPending = false
++            emit("HandKept")
++        }
++    }
++
++    companion object {
++        private val BEFORE_ATTACKS = setOf("UNTAP", "UPKEEP", "DRAW", "PRECOMBAT_MAIN", "BEGIN_COMBAT")
++        private val AFTER_ATTACKS = setOf("END_COMBAT", "POSTCOMBAT_MAIN", "END", "CLEANUP")
++    }
++}
+diff --git a/android/app/src/test/java/com/arcanatable/TutorialRunTest.kt b/android/app/src/test/java/com/arcanatable/TutorialRunTest.kt
+new file mode 100644
+index 00000000..0ae3ed27
+--- /dev/null
++++ b/android/app/src/test/java/com/arcanatable/TutorialRunTest.kt
+@@ -0,0 +1,82 @@
++package com.arcanatable
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++import java.io.File
++
++/** How a practice lesson moves on when the real game gets ahead of (or around) the text. */
++class TutorialRunTest {
++    private val lessons = parseTutorialLessons(File("src/main/assets/tutorials/catalog.json").readText())
++    private fun run(lesson: String, atStep: String): TutorialRun {
++        val l = lessons.first { it.id == lesson }
++        return TutorialRun(l, practice = true, startIndex = l.steps.indexOfFirst { it.id == atStep })
++    }
++
++    @Test fun castingWithoutTappingForManaFirstDoesNotStrandTheLesson() {
++        val r = run("first-turn", "make-mana")
++        assertTrue(r.signal("event", "SpellCast"))
++        // The lesson lands on the step the learner just did, marked done, and NEXT moves on.
++        assertEquals("cast-elf", r.step?.id)
++        assertTrue(r.satisfied)
++        r.next()
++        assertEquals("spell-stack", r.step?.id)
++        assertFalse(r.satisfied)
++    }
++
++    @Test fun skippedCombatDoesNotStrandTheLesson() {
++        val r = run("first-turn", "combat-skip")
++        assertTrue(r.signal("event", "TurnAdvanced"))
++        assertEquals("finish-turn", r.step?.id)
++        assertTrue(r.satisfied)
++        r.next()
++        assertEquals("opponent", r.step?.id)
++    }
++
++    @Test fun explanationsAreNeverSkippedByEarlyMilestones() {
++        val r = run("first-turn", "board-land")
++        assertFalse(r.signal("event", "SpellCast"))
++        assertEquals("board-land", r.step?.id)
++        val combat = run("combat", "block")
++        assertFalse(combat.signal("event", "CombatDamageDealt"))
++        assertEquals("block", combat.step?.id)
++    }
++
++    @Test fun aPriorityPassNeverCompletesALaterPassPrompt() {
++        val r = run("first-turn", "resolve")
++        assertFalse(r.signal("event", "PriorityPassed"))
++        assertEquals("resolve", r.step?.id)
++        assertTrue(r.signal("event", "SpellResolved"))
++        assertEquals("inspect", r.step?.id)
++        // Holding to read the card and reading the next tip still has to happen.
++        assertTrue(r.signal("hold", "battlefield-card:Elvish Mystic"))
++        r.next()
++        assertEquals("pass", r.step?.id)
++    }
++
++    @Test fun milestonesSeenDuringAnExplanationCompleteTheirStepOnArrival() {
++        val r = run("first-turn", "inspect")
++        r.signal("event", "TurnAdvanced") // the turn ended while the learner was reading
++        assertEquals("inspect", r.step?.id)
++        r.signal("hold", "battlefield-card:Elvish Mystic")
++        r.next() // sickness -> pass
++        assertEquals("pass", r.step?.id)
++    }
++
++    @Test fun guidedReadingOnlyMovesOnTheMatchingGestureOrNext() {
++        val l = lessons.first { it.id == "first-turn" }
++        val r = TutorialRun(l, practice = false, startIndex = l.steps.indexOfFirst { it.id == "make-mana" })
++        assertFalse(r.signal("event", "SpellCast"))
++        r.next()
++        assertEquals("pool", r.step?.id)
++    }
++
++    @Test fun finishingTheLastStepEndsTheRun() {
++        val l = lessons.first { it.id == "stack" }
++        val r = TutorialRun(l, practice = true, startIndex = l.steps.lastIndex)
++        assertTrue(r.signal("tap", "stack-close"))
++        assertTrue(r.finished)
++        assertEquals(null, r.step)
++    }
++}
+diff --git a/android/app/src/test/java/com/arcanatable/TutorialWalkthroughTest.kt b/android/app/src/test/java/com/arcanatable/TutorialWalkthroughTest.kt
+new file mode 100644
+index 00000000..92645ef5
+--- /dev/null
++++ b/android/app/src/test/java/com/arcanatable/TutorialWalkthroughTest.kt
+@@ -0,0 +1,222 @@
++package com.arcanatable
++
++import com.arcanatable.engine.LocalArgentumHost
++import com.arcanatable.engine.OfflineCardLibrary
++import org.json.JSONArray
++import org.json.JSONObject
++import org.junit.Assert.assertTrue
++import org.junit.Assert.fail
++import org.junit.Test
++import java.io.File
++import java.util.concurrent.LinkedBlockingQueue
++import java.util.concurrent.TimeUnit
++
++/**
++ * Plays every engine-backed practice lesson from its first step to its last, the way a learner
++ * following the coach would: tap what it says to tap, choose the Argentum action it describes,
++ * pass when it says pass. The real offline host runs the rules, and the lesson moves on only
++ * through [TutorialRun] and [TutorialEventDetector], the same code the app uses. A step that
++ * can't be completed fails with a trace of the game and the actions Argentum offered.
++ */
++class TutorialWalkthroughTest {
++    private val lessons = parseTutorialLessons(File("src/main/assets/tutorials/catalog.json").readText())
++    private val library = OfflineCardLibrary(open = { path -> File("src/main/assets/$path").takeIf(File::exists)?.inputStream() })
++
++    private fun lesson(id: String) = lessons.first { it.id == id }
++
++    /** A learner at the table: the host's messages in, actions out, the lesson watching. */
++    private inner class Table(val run: TutorialRun, makeHost: ((JSONObject) -> Unit) -> LocalArgentumHost) {
++        private val inbox = LinkedBlockingQueue<JSONObject>()
++        val host = makeHost { inbox.put(it) }
++        val detector = TutorialEventDetector()
++        var mulliganPending = false
++        var snapshot: ArgentumTableSnapshot? = null
++        var message: JSONObject? = null
++        var mulligan: JSONObject? = null
++        var bottom: JSONObject? = null
++        val trace = mutableListOf<String>()
++        /** Every step the learner was shown. */
++        val seen = linkedSetOf<String>()
++
++        /** Reads messages until Argentum waits on the learner again. */
++        fun settle(timeoutSeconds: Long = 30) {
++            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
++            while (System.nanoTime() < deadline) {
++                val m = inbox.poll(if (waiting()) 300 else 1000, TimeUnit.MILLISECONDS) ?: if (waiting()) return else continue
++                when (m.optString("type")) {
++                    "error" -> fail("Argentum error during ${run.step?.id}: $m\n${trace.joinToString("\n")}")
++                    "mulliganDecision" -> {
++                        mulligan = m
++                        if (mulliganPending) { mulliganPending = false; signal("event", "HandMulliganed") }
++                    }
++                    "chooseBottomCards" -> bottom = m
++                    "stateUpdate" -> {
++                        mulligan = null; bottom = null
++                        val next = ArgentumTableSnapshot.parse(m.getJSONObject("state"), m.optJSONArray("legalActions") ?: JSONArray(), m.optString("interactionEpoch"))
++                        val previous = snapshot
++                        snapshot = next; message = m
++                        trace += "  state ${next.stepKey} turn ${next.turnNumber} active=${next.activePlayer} stack=${next.stack.map { it.name }} legal=${next.legalActions.map { it.getJSONObject("action").optString("type") }.distinct()}"
++                        detector.detect(previous, next, { run.step }) { signal("event", it) }
++                    }
++                }
++            }
++            if (!waiting()) fail("Timed out waiting for Argentum during ${run.step?.id}\n${trace.joinToString("\n")}")
++        }
++
++        private fun waiting(): Boolean = mulligan != null || bottom != null ||
++            (message?.optBoolean("interactive", true) == true && inbox.isEmpty())
++
++        fun signal(kind: String, key: String) {
++            val before = run.step?.id
++            if (run.signal(kind, key)) trace += "    $kind $key: $before -> ${run.step?.id ?: "DONE"}"
++        }
++
++        fun legal(): List<JSONObject> = snapshot?.legalActions.orEmpty()
++        fun actionOf(type: String, predicate: (JSONObject) -> Boolean = { true }) =
++            legal().firstOrNull { it.getJSONObject("action").optString("type") == type && predicate(it.getJSONObject("action")) }
++
++        fun serverId(card: GameCard) = snapshot!!.serverCardIds.getValue(card.id)
++        val you get() = snapshot!!.players[snapshot!!.viewingPlayer]
++
++        /** Sends a legal action the way the app does (PlayCardDecision wrapping included). */
++        fun submit(action: JSONObject) {
++            val m = message!!
++            val decision = m.optJSONObject("pendingDecision")
++            val type = action.optString("type")
++            val outbound = if (decision?.optString("type") == "PlayCardDecision" && type in setOf("CastSpell", "PlayLand"))
++                JSONObject().put("type", "SubmitDecision").put("playerId", decision.optString("playerId"))
++                    .put("response", JSONObject().put("type", "PlayCardResponse").put("decisionId", decision.optString("id")).put("action", JSONObject(action.toString())))
++            else action
++            trace += "  learner: $type during ${run.step?.id}"
++            if (type == "PassPriority") detector.passPending = true
++            message = null // wait for the reply
++            host.receive(JSONObject().put("type", "submitAction").put("interactionEpoch", m.getString("interactionEpoch")).put("action", outbound))
++            settle()
++        }
++
++        fun pass() {
++            val pass = actionOf("PassPriority") ?: return declareAttackers(all = false)
++            submit(pass.getJSONObject("action"))
++        }
++
++        fun declareAttackers(all: Boolean) {
++            val info = legal().firstOrNull { it.getJSONObject("action").optString("type") == "DeclareAttackers" }
++                ?: throw AssertionError("No PassPriority or DeclareAttackers to continue during ${run.step?.id}\n${trace.joinToString("\n")}")
++            val plan = ArgentumAttackPlan.from(info)!!
++            submit(plan.buildAction(if (all) plan.options.associate { it.attackerId to it.targets.first() } else emptyMap()))
++        }
++
++        fun send(type: String, extra: JSONObject = JSONObject()) {
++            trace += "  learner: $type during ${run.step?.id}"
++            mulligan = null; bottom = null; message = null
++            host.receive(JSONObject(extra.toString()).put("type", type))
++            settle()
++        }
++    }
++
++    /** Plays [lessonId] to the end, failing on the first step a learner can't complete. */
++    private fun walk(lessonId: String, makeHost: ((JSONObject) -> Unit) -> LocalArgentumHost, attack: Boolean) {
++        val table = Table(TutorialRun(lesson(lessonId), practice = true), makeHost)
++        try {
++            table.host.receive(JSONObject().put("type", "createQuickGameLobby"))
++            table.settle()
++            var actions = 0
++            while (!table.run.finished) {
++                check(actions++ < 120) { "Lesson $lessonId never finished\n${table.trace.joinToString("\n")}" }
++                val step = table.run.step!!
++                table.seen += step.id
++                val before = step.id
++                table.trace += "STEP ${table.run.index + 1} ${step.id} (${step.actionKind}${step.event?.let { ":$it" }.orEmpty()})"
++                when (step.actionKind) {
++                    "next" -> table.run.next()
++                    "tap" -> table.signal("tap", step.target ?: "")
++                    "hold" -> {
++                        val target = step.target ?: ""
++                        val zone = target.substringBefore(':')
++                        val any = table.you.let { if (zone == "hand-card") it.hand else it.battlefield }.firstOrNull()?.name
++                        table.signal("hold", if (target.endsWith(":any") && any != null) "$zone:$any" else target)
++                    }
++                    // The game already did it (the lesson caught up): the coach shows NEXT.
++                    "event" -> if (table.run.satisfied) table.run.next() else learnerActsFor(table, step, attack)
++                }
++                if (!table.run.finished && table.run.step?.id == before && step.actionKind != "next") {
++                    // One more natural action (e.g. a second pass) before declaring the step stuck.
++                    learnerActsFor(table, step, attack)
++                    if (!table.run.finished && table.run.step?.id == before)
++                        fail("Lesson $lessonId is stuck at step ${table.run.index + 1} \"${step.title}\" (${step.id}).\n${table.trace.joinToString("\n")}")
++                }
++            }
++            assertTrue(table.run.finished)
++            // Following every instruction, nothing may be skipped: each explanation was on screen.
++            val skipped = table.run.lesson.steps.map { it.id }.filterNot { it in table.seen }
++            assertTrue("Lesson $lessonId skipped steps a learner should see: $skipped\n${table.trace.joinToString("\n")}", skipped.isEmpty())
++            println("Lesson $lessonId completed:\n${table.trace.joinToString("\n")}")
++        } finally {
++            table.host.shutdown()
++        }
++    }
++
++    /** What the coach text asks the learner to do for an event step. */
++    private fun learnerActsFor(table: Table, step: ArcanaLessonStep, attack: Boolean) {
++        when (step.event) {
++            "LandPlayed" -> {
++                val land = table.you.hand.first { "land" in it.type.lowercase() }
++                val play = table.actionOf("PlayLand") { it.optString("cardId") == table.serverId(land) }
++                    ?: return fail("No PlayLand for ${land.name}; offered ${table.legal().map { it.getJSONObject("action") }}")
++                table.submit(play.getJSONObject("action"))
++            }
++            "ManaAdded" -> {
++                val lands = table.you.battlefield.filter { "land" in it.type.lowercase() && !it.tapped }.map(table::serverId).toSet()
++                val ability = table.legal().firstOrNull { info ->
++                    val a = info.getJSONObject("action")
++                    a.optString("type").contains("Activate") && (a.optString("sourceId") in lands || a.optString("cardId") in lands)
++                } ?: return fail("Step \"${step.title}\": Argentum offers no mana ability for an untapped land. Offered: " +
++                    table.legal().map { it.getJSONObject("action").optString("type") } + "\n${table.trace.joinToString("\n")}")
++                table.submit(ability.getJSONObject("action"))
++            }
++            "SpellCast" -> {
++                val name = step.target?.removePrefix("hand-card:")
++                val card = table.you.hand.first { it.name == name }
++                val cast = table.actionOf("CastSpell") { it.optString("cardId") == table.serverId(card) }
++                    ?: return fail("No CastSpell for $name during ${step.id}; offered ${table.legal().map { it.getJSONObject("action").optString("type") }}\n${table.trace.joinToString("\n")}")
++                val action = JSONObject(cast.getJSONObject("action").toString())
++                if (cast.optBoolean("requiresTargets")) {
++                    val creature = table.you.battlefield.first { "creature" in it.type.lowercase() }
++                    action.put("targets", JSONArray().put(JSONObject().put("type", "Permanent").put("entityId", table.serverId(creature))))
++                }
++                table.submit(action)
++            }
++            "AttackersDeclared" -> if (table.actionOf("DeclareAttackers") != null) table.declareAttackers(all = attack) else table.pass()
++            "HandMulliganed" -> { table.mulliganPending = true; table.send("mulligan") }
++            "HandKept" -> {
++                table.detector.keepPending = true
++                table.send("keepHand")
++                table.bottom?.let { b ->
++                    val hand = b.getJSONArray("hand")
++                    val ids = (0 until b.optInt("cardsToPutOnBottom")).map { hand.getString(it) }
++                    table.send("chooseBottomCards", JSONObject().put("cardIds", JSONArray(ids)))
++                }
++            }
++            else -> table.pass() // SpellResolved, PriorityPassed, TurnAdvanced, CombatDamageDealt
++        }
++    }
++
++    private fun checkpointHost(id: String): ((JSONObject) -> Unit) -> LocalArgentumHost {
++        val scenario = TutorialPracticeScenarios.build(id, library)
++        return { emit -> LocalArgentumHost(scenario.registry, scenario.seats[0], scenario.seats[1], paceMs = 0,
++            resumeCheckpoint = scenario.checkpoint.toString(), tutorialPassiveOpponent = true, emit = emit) }
++    }
++
++    @Test fun firstTurnLessonCanBeCompleted() = walk(TutorialPracticeScenarios.FIRST_TURN, checkpointHost(TutorialPracticeScenarios.FIRST_TURN), attack = false)
++
++    @Test fun combatLessonCanBeCompleted() = walk(TutorialPracticeScenarios.COMBAT, checkpointHost(TutorialPracticeScenarios.COMBAT), attack = true)
++
++    @Test fun stackLessonCanBeCompleted() = walk(TutorialPracticeScenarios.STACK, checkpointHost(TutorialPracticeScenarios.STACK), attack = false)
++
++    @Test fun openingHandLessonCanBeCompleted() {
++        val (seats, registry) = TutorialPracticeScenarios.openingHand(library)
++        walk(TutorialPracticeScenarios.MULLIGAN, { emit ->
++            LocalArgentumHost(registry, seats[0], seats[1], paceMs = 0, gameSeed = 12025L, tutorialPassiveOpponent = true, emit = emit)
++        }, attack = false)
++    }
++}
+diff --git a/android/app/src/test/java/com/arcanatable/ui/TutorialAuditUiTest.kt b/android/app/src/test/java/com/arcanatable/ui/TutorialAuditUiTest.kt
+new file mode 100644
+index 00000000..5aee646d
+--- /dev/null
++++ b/android/app/src/test/java/com/arcanatable/ui/TutorialAuditUiTest.kt
+@@ -0,0 +1,262 @@
++package com.arcanatable.ui
++
++import android.content.Context
++import androidx.compose.ui.test.hasAnyAncestor
++import androidx.compose.ui.test.hasTestTag
++import androidx.compose.ui.test.hasText
++import androidx.compose.ui.test.junit4.createEmptyComposeRule
++import androidx.compose.ui.test.onAllNodesWithText
++import androidx.compose.ui.test.performClick
++import androidx.test.core.app.ActivityScenario
++import androidx.test.core.app.ApplicationProvider
++import com.arcanatable.MainActivity
++import com.arcanatable.TableController
++import com.arcanatable.TutorialCoachState
++import com.arcanatable.chooseArgentumLegalAction
++import com.arcanatable.sendArgentumPriority
++import com.arcanatable.submitArgentumAction
++import com.arcanatable.openArgentumCombat
++import com.arcanatable.openArgentumActions
++import com.arcanatable.TutorialPracticeScenarios
++import com.arcanatable.TutorialTargets
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++import java.io.File
++
++/**
++ * Walks every tutorial chapter in the real app the way a player does (Learn → chapter →
++ * SHOW ON SCREEN, or PRACTICE for the engine drills) and checks each step:
++ *  - the coach card is visible and on top of whatever screen the step needs;
++ *  - the step's screen actually opened;
++ *  - the highlighted control exists on screen (or the step deliberately has none);
++ *  - the step can be finished by its own button or the highlighted control.
++ * Writes tutorial-audit.txt next to the screenshots, one line per step.
++ */
++@RunWith(RobolectricTestRunner::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++@Config(sdk = [34], qualifiers = "w411dp-h891dp-port-xxhdpi")
++class TutorialAuditUiTest {
++    @get:Rule val rule = createEmptyComposeRule()
++
++    @Before fun skipFirstLaunchOffer() {
++        ApplicationProvider.getApplicationContext<Context>().getSharedPreferences("arcana_options", Context.MODE_PRIVATE)
++            .edit().putBoolean("tutorial_offer_seen", true).putBoolean("quick_ui_tips_disabled", true).commit()
++        rule.mainClock.autoAdvance = false
++    }
++
++    private val report = StringBuilder()
++    private val problems = mutableListOf<String>()
++
++    private fun screenOf(t: TableController): String = when {
++        t.tutorialHubOpen -> "hub"
++        t.argentumMulliganPrompt || t.argentumBottomCardIds != null -> "mulligan"
++        t.layoutLabOpen -> "layout"
++        t.diagnosticViewerOpen -> "diagnostics"
++        t.optionsOpen -> "settings"
++        t.playSheetOpen -> "setup"
++        t.deckPickerOpen -> "decks"
++        t.homeOpen -> "home"
++        t.stackOpen -> "stack"
++        t.topMenuExpanded -> "menu"
++        t.argentumEnabled || t.players.isNotEmpty() -> "board"
++        else -> "?"
++    }
++
++    private fun coachShown() = rule.onAllNodes(hasTestTag("tutorial-coach-tip")).fetchSemanticsNodes().isNotEmpty()
++    private fun nextButton() = hasText("NEXT") and hasAnyAncestor(hasTestTag("tutorial-coach-tip"))
++
++    private fun audit(chapter: String) {
++        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
++            UiTestSupport.settle(rule)
++            lateinit var t: TableController
++            scenario.onActivity { t = checkNotNull(it.tableController) }
++            // The same entry point as START LESSON in Learn.
++            t.startTutorial(chapter)
++            if (t.tutorialPracticeActive) UiTestSupport.awaitReal(rule, 120_000, "practice game for $chapter") {
++                !t.tutorialLoading && (t.argentumSnapshot != null || t.argentumMulliganPrompt)
++            }
++            val practice = t.tutorialPracticeActive
++            UiTestSupport.settle(rule, 1_000)
++            val lesson = checkNotNull(t.tutorialLesson) { "lesson $chapter did not start" }
++            var guard = 0
++            while (t.tutorialLesson != null && guard++ < lesson.steps.size + 3) {
++                val index = t.tutorialStepIndex
++                val step = lesson.steps[index]
++                UiTestSupport.settle(rule, 600)
++                val top = topWindow()
++                val resolved = step.target?.let { TutorialTargets.resolve(it, top) }
++                val bounds = resolved?.let { TutorialTargets.bounds[it] }
++                // The control must be on the window the player is looking at, not hidden behind it.
++                val targetOk = step.target == null || (bounds != null && bounds.width > 1f && bounds.height > 1f)
++                val coachCount = rule.onAllNodes(hasTestTag("tutorial-coach-tip")).fetchSemanticsNodes().size
++                val screen = screenOf(t)
++                val wantScreen = step.screen.ifBlank { "board" }
++                val screenOk = screen == wantScreen
++                val coach = coachShown()
++                val hasNext = rule.onAllNodes(nextButton()).fetchSemanticsNodes().isNotEmpty()
++                val coachOnTop = TutorialCoachState.layers.isNotEmpty() && coachInTopWindow(top)
++                val name = "tutorial-$chapter-${"%02d".format(index + 1)}-${step.id}"
++                scenario.onActivity { UiTestSupport.screenshot(it, name) }
++                // Advance the way a player would: NEXT if offered, otherwise the step's own control.
++                var how: String
++                if (hasNext) {
++                    rule.onNode(nextButton()).performClick()
++                    how = "next"
++                } else {
++                    how = "gated-${step.actionKind}"
++                    when (step.actionKind) {
++                        "tap", "hold" -> { tapLikeThePlayer(t, step.target.orEmpty()); t.tutorialSignal(step.actionKind, resolved ?: step.target.orEmpty()) }
++                        // Play the drill for real: land, mana, cast, pass, attack.
++                        "event" -> {
++                            val played = playFor(t, step.event.orEmpty()) { t.tutorialLesson == null || t.tutorialStepIndex != index }
++                            if (!played) { how += "-forced"; t.tutorialAdvance() }
++                        }
++                    }
++                    UiTestSupport.awaitReal(rule, 20_000, "engine after ${step.id}") { !t.argentumAwaitingUpdate }
++                }
++                UiTestSupport.settle(rule, 400)
++                val moved = t.tutorialLesson == null || t.tutorialStepIndex != index
++                // An action step the engine didn't confirm is forced on (the engine walkthrough test covers
++                // those); a step that NEXT or its own control couldn't move is a real problem.
++                if (!moved && step.actionKind == "event") { how += "-forced"; t.tutorialAdvance(); UiTestSupport.settle(rule, 300) }
++                else if (!moved) { how += "-STUCK"; t.tutorialAdvance(); UiTestSupport.settle(rule, 300) }
++                val flags = buildList {
++                    if (!coach) add("NO-COACH")
++                    if (coachCount > 1) add("DUPLICATE-COACH($coachCount)")
++                    if (coach && !coachOnTop) add("COACH-BEHIND-WINDOW")
++                    if (!screenOk) add("SCREEN(want=$wantScreen got=$screen)")
++                    if (!targetOk) add("NO-TARGET(${step.target})")
++                    if (!moved && step.actionKind != "event") add("STUCK")
++                }
++                val line = "$chapter #${index + 1} ${step.id} [${step.actionKind}] screen=$screen target=${step.target} -> $how ${if (flags.isEmpty()) "OK" else flags.joinToString(" ")}"
++                report.appendLine(line)
++                if (flags.isNotEmpty()) problems += line
++            }
++            if (t.tutorialLesson != null) { problems += "$chapter: never finished"; report.appendLine("$chapter: NEVER FINISHED") }
++            if (t.tutorialLesson != null || practice) t.stopTutorial()
++        }
++    }
++
++    /** The topmost app window (the activity, or the dialog/sheet/popup on top of it). */
++    private fun topWindow(): android.view.View {
++        val global = Class.forName("android.view.WindowManagerGlobal")
++        val instance = global.getMethod("getInstance").invoke(null)
++        @Suppress("UNCHECKED_CAST")
++        val views = (global.getDeclaredField("mViews").apply { isAccessible = true }.get(instance) as List<android.view.View>)
++        return views.last { it.isAttachedToWindow && it.width > 0 }.rootView
++    }
++
++    /** True when the coach card is drawn in [top], the window the player is looking at. */
++    private fun coachInTopWindow(top: android.view.View): Boolean = TutorialCoachState.drawnIn === top
++
++    /** What the highlighted control's own handler does (the same state changes as a real tap). */
++    private fun tapLikeThePlayer(t: TableController, target: String) {
++        when (target) {
++            "hand-handle" -> t.showHand = !t.showHand
++            "stack-button" -> t.stackOpen = true
++            "stack-close" -> t.stackOpen = false
++            "game-menu" -> { t.topMenuSection = null; t.topMenuExpanded = true }
++            "menu-game-tools" -> t.topMenuSection = "tools"
++            "home-settings" -> t.optionsOpen = true
++            "home-change-deck" -> t.deckPickerOpen = true
++            "home-play" -> t.playSheetOpen = true
++            "setting-adjust-ui" -> { t.optionsOpen = false; t.layoutLabOpen = true }
++            "table-tab" -> t.showOverview = true
++            "your-tab" -> { t.showOverview = false; t.selectedPlayer = t.localSeat }
++            "opponent-tab" -> { t.showOverview = false; t.selectedPlayer = 1 - t.localSeat }
++            else -> if (target.startsWith("hand-card:")) {
++                // Tapping a card in hand opens its legal-actions sheet.
++                val snap = t.argentumSnapshot
++                val hand = snap?.players?.getOrNull(snap.viewingPlayer)?.hand.orEmpty()
++                val name = target.removePrefix("hand-card:")
++                (hand.firstOrNull { it.name == name } ?: hand.firstOrNull())?.let { t.openArgentumActions(it) }
++            }
++        }
++        UiTestSupport.settle(rule, 300)
++    }
++
++    /**
++     * Does the real move a drill step waits for, through the same calls the table's buttons make,
++     * repeating passes (each only once Argentum offers one) until [moved].
++     */
++    private fun playFor(t: TableController, event: String, moved: () -> Boolean): Boolean {
++        fun legal() = t.argentumSnapshot?.legalActions.orEmpty()
++        fun type(i: org.json.JSONObject) = i.optJSONObject("action")?.optString("type").orEmpty()
++        fun desc(i: org.json.JSONObject) = i.optString("description")
++        fun pick(match: (org.json.JSONObject) -> Boolean): Boolean {
++            val info = legal().firstOrNull(match) ?: return false
++            val snap = t.argentumSnapshot ?: return false
++            if (info.optBoolean("requiresTargets")) {
++                // Target your own creature, as the lesson says (Giant Growth on Grizzly Bears).
++                val you = snap.players[snap.viewingPlayer]
++                val creature = you.battlefield.firstOrNull { "creature" in it.type.lowercase() } ?: return false
++                val serverId = snap.serverCardIds[creature.id] ?: return false
++                val action = org.json.JSONObject(info.getJSONObject("action").toString())
++                    .put("targets", org.json.JSONArray().put(org.json.JSONObject().put("type", "Permanent").put("entityId", serverId)))
++                return t.submitArgentumAction(action, com.arcanatable.ArgentumActions.epochFor(info, snap.interactionEpoch) ?: return false)
++            }
++            t.chooseArgentumLegalAction(info); return true
++        }
++        fun passUntilMoved(): Boolean {
++            repeat(8) {
++                runCatching { UiTestSupport.awaitReal(rule, 15_000, "a pass to be offered") { moved() || (!t.argentumAwaitingUpdate && legal().any { type(it) == "PassPriority" }) } }
++                    .onFailure { return moved() }
++                if (moved()) return true
++                t.sendArgentumPriority()
++                runCatching { UiTestSupport.awaitReal(rule, 15_000, "pass confirmed") { !t.argentumAwaitingUpdate } }
++                UiTestSupport.settle(rule, 300)
++                if (moved()) return true
++            }
++            return moved()
++        }
++        return when (event) {
++            "LandPlayed" -> pick { type(it) == "PlayLand" }
++            "ManaAdded" -> pick { type(it).contains("Activate") && ("Add" in desc(it) || "mana" in desc(it).lowercase()) }
++            "SpellCast" -> pick { type(it) == "CastSpell" && ("Elvish Mystic" in desc(it) || "Giant Growth" in desc(it)) }
++            "AttackersDeclared" -> {
++                // Pass into combat, then declare Grizzly Bears on the real attack board.
++                repeat(4) {
++                    if (moved()) return true
++                    if (legal().any { type(it) == "DeclareAttackers" }) {
++                        t.openArgentumCombat(); UiTestSupport.settle(rule, 500)
++                        val plan = t.argentumAttackPlan ?: return false
++                        t.submitArgentumAction(plan.buildAction(plan.options.associate { it.attackerId to it.targets.first() }),
++                            com.arcanatable.ArgentumActions.epochFor(plan.legalAction, t.argentumSnapshot?.interactionEpoch) ?: return false)
++                        t.argentumAttackPlan = null
++                        runCatching { UiTestSupport.awaitReal(rule, 15_000, "attack confirmed") { moved() } }
++                        return moved()
++                    }
++                    if (!passUntilMoved() && legal().none { type(it) == "DeclareAttackers" }) return moved()
++                }
++                moved()
++            }
++            "SpellResolved", "PriorityPassed", "TurnAdvanced" -> passUntilMoved()
++            else -> false
++        }
++    }
++
++    private fun writeReport(name: String) {
++        val dir = File(System.getProperty("arcana.screenshots") ?: "build/screenshots").apply { mkdirs() }
++        File(dir, "$name.txt").writeText(report.toString() + "\nPROBLEMS: ${problems.size}\n" + problems.joinToString("\n"))
++    }
++
++    private fun run(name: String, chapters: List<String>) {
++        try { chapters.forEach { c -> runCatching { audit(c) }.onFailure { problems += "$c: CRASH ${it.javaClass.simpleName}: ${it.message?.take(300)}"; report.appendLine("$c: CRASH $it") } } }
++        finally { writeReport(name) }
++        assertTrue("Tutorial problems:\n" + problems.joinToString("\n"), problems.isEmpty())
++    }
++
++    @Test fun appControlChapters() = run("tutorial-audit-app",
++        listOf("home", "setup", "table", "quick-actions", "opponents", "decks", "settings", "tools", "mobile", "help"))
++
++    @Test fun learnMagicChapters() = run("tutorial-audit-magic",
++        listOf("cards", "mana", "turns", "commander", "zones", "unavailable-actions"))
++
++    @Test fun practiceChapters() = run("tutorial-audit-practice", listOf("first-turn", "opening-hand", "stack", "combat"))
++}
+diff --git a/android/app/src/test/java/com/arcanatable/ui/TutorialScreensTest.kt b/android/app/src/test/java/com/arcanatable/ui/TutorialScreensTest.kt
+index 2a9654e3..1bcd9d66 100644
+--- a/android/app/src/test/java/com/arcanatable/ui/TutorialScreensTest.kt
++++ b/android/app/src/test/java/com/arcanatable/ui/TutorialScreensTest.kt
+@@ -30,10 +30,14 @@ class TutorialScreensTest {
+         rule.onNodeWithText("Learn to play").assertExists()
+         // Both the featured activity and the curriculum row have this title.
+         rule.onAllNodesWithText("Your first turn").assertCountEquals(2)
+-        rule.onNodeWithText("READ FIRST TURN").assertExists()
+-        rule.onNodeWithText("READ FIRST TURN").performClick()
++        rule.onNodeWithText("PLAY THE FIRST TURN").assertExists()
++        // A chapter opens to one clear way in, plus a text-only option.
++        rule.onNodeWithText("Home and navigation").performClick()
+         UiTestSupport.settle(rule, 300)
+-        rule.onNodeWithText("STEP 1 OF 16").assertExists()
++        rule.onNodeWithText("START LESSON").assertExists()
++        rule.onNodeWithText("READ IT HERE INSTEAD").performClick()
++        UiTestSupport.settle(rule, 300)
++        rule.onNodeWithText("STEP 1 OF 6").assertExists()
+     }
+ 
+     @Test @Config(sdk = [34], qualifiers = "w344dp-h882dp-port-xxhdpi")

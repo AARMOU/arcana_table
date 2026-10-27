@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.CardLibraryTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:16:43.632Z" hostname="runnervmtai0g" time="0.528">
+  <properties/>
+  <testcase name="operatorsFilterAndCombine" classname="com.arcanatable.CardLibraryTest" time="0.043"/>
+  <testcase name="colorlessAndIdentityColorless" classname="com.arcanatable.CardLibraryTest" time="0.01"/>
+  <testcase name="libraryIsTheShippedCatalogWithoutTokens" classname="com.arcanatable.CardLibraryTest" time="0.003"/>
+  <testcase name="replacementSuggestionsStayPlayableOnColorAndExplained" classname="com.arcanatable.CardLibraryTest" time="0.071"/>
+  <testcase name="emptyResultsAndUnknownOperatorsAreReported" classname="com.arcanatable.CardLibraryTest" time="0.242"/>
+  <testcase name="negationRaritySetPowerKeyword" classname="com.arcanatable.CardLibraryTest" time="0.041"/>
+  <testcase name="commanderReplacementOnlyOffersCommanders" classname="com.arcanatable.CardLibraryTest" time="0.016"/>
+  <testcase name="commanderLegalityAndEligibility" classname="com.arcanatable.CardLibraryTest" time="0.032"/>
+  <testcase name="suggestionsArePrefixFirst" classname="com.arcanatable.CardLibraryTest" time="0.013"/>
+  <testcase name="searchIsFastEnoughForTyping" classname="com.arcanatable.CardLibraryTest" time="0.028"/>
+  <testcase name="typoTolerantFallbackIsFlagged" classname="com.arcanatable.CardLibraryTest" time="0.021"/>
+  <testcase name="doubleFacedAndSplitCardsFoundByEitherName" classname="com.arcanatable.CardLibraryTest" time="0.005"/>
+  <testcase name="exactPartialAndCaseInsensitiveNames" classname="com.arcanatable.CardLibraryTest" time="0.002"/>
+  <testcase name="editDistanceHandlesTranspositions" classname="com.arcanatable.CardLibraryTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

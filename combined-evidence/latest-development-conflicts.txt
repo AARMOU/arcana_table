@@ -1,0 +1,3 @@
+android/app/src/main/java/com/arcanatable/HomeScreen.kt
+android/app/src/main/java/com/arcanatable/TableController.kt
+android/app/src/main/java/com/arcanatable/TableDialogs.kt

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.BismuthMindrenderScenarioTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:10.506Z" hostname="runnervmtai0g" time="0.186">
+  <properties/>
+  <testcase name="castColorlessWithMenaceAndNoTriggerWithoutCombatDamage" classname="com.arcanatable.customcards.BismuthMindrenderScenarioTest" time="0.057"/>
+  <testcase name="decliningLeavesTheCardInExileAndCostsNoLife" classname="com.arcanatable.customcards.BismuthMindrenderScenarioTest" time="0.056"/>
+  <testcase name="exilesUntilNonlandAndYouMayCastItForLife" classname="com.arcanatable.customcards.BismuthMindrenderScenarioTest" time="0.073"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

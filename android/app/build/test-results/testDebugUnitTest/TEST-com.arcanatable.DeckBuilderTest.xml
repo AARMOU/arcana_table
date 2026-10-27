@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.DeckBuilderTest" tests="14" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:16:55.619Z" hostname="runnervmtai0g" time="0.426">
+  <properties/>
+  <testcase name="savedTextRoundTripsThroughBothParsers" classname="com.arcanatable.DeckBuilderTest" time="0.008"/>
+  <testcase name="validationReportsEachProblemWithoutChangingTheDeck" classname="com.arcanatable.DeckBuilderTest" time="0.089"/>
+  <testcase name="savedDeckOperationsProtectOtherDecks" classname="com.arcanatable.DeckBuilderTest" time="0.001"/>
+  <testcase name="builtDeckLoadsIntoTheOfflineEngineLikeAnImport" classname="com.arcanatable.DeckBuilderTest" time="0.067"/>
+  <testcase name="statsCountCurveColorsAndUnsupported" classname="com.arcanatable.DeckBuilderTest" time="0.0"/>
+  <testcase name="commanderRules" classname="com.arcanatable.DeckBuilderTest" time="0.0"/>
+  <testcase name="importedListsKeepEveryZoneAndUnreadLines" classname="com.arcanatable.DeckBuilderTest" time="0.002"/>
+  <testcase name="basicsAndAnyNumberCardsMayRepeat" classname="com.arcanatable.DeckBuilderTest" time="0.067"/>
+  <testcase name="groupingKeepsUnknownCardsVisible" classname="com.arcanatable.DeckBuilderTest" time="0.002"/>
+  <testcase name="bannedCardsAreWarned" classname="com.arcanatable.DeckBuilderTest" time="0.129"/>
+  <testcase name="legalDeckHasNoErrors" classname="com.arcanatable.DeckBuilderTest" time="0.058"/>
+  <testcase name="sideboardMovesAndReplace" classname="com.arcanatable.DeckBuilderTest" time="0.0"/>
+  <testcase name="undoRedoAndHistoryLimit" classname="com.arcanatable.DeckBuilderTest" time="0.001"/>
+  <testcase name="editsAddRemoveCountAndCommander" classname="com.arcanatable.DeckBuilderTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

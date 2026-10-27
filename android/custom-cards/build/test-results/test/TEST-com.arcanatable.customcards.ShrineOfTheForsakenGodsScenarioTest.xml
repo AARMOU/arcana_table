@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.ShrineOfTheForsakenGodsScenarioTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:39.358Z" hostname="runnervmtai0g" time="0.194">
+  <properties/>
+  <testcase name="restrictedManaCannotPayForAnAbilityOfAColorlessSource" classname="com.arcanatable.customcards.ShrineOfTheForsakenGodsScenarioTest" time="0.051"/>
+  <testcase name="devoidSpellCanSpendRestrictedManaDespiteItsPrintedColoredManaCost" classname="com.arcanatable.customcards.ShrineOfTheForsakenGodsScenarioTest" time="0.047"/>
+  <testcase name="coloredSpellCannotSpendRestrictedManaEvenForItsGenericPart" classname="com.arcanatable.customcards.ShrineOfTheForsakenGodsScenarioTest" time="0.046"/>
+  <testcase name="fewerThanSevenLandsCannotActivateDoubleColorlessAbility" classname="com.arcanatable.customcards.ShrineOfTheForsakenGodsScenarioTest" time="0.003"/>
+  <testcase name="sevenLandsUnlockTheDoubleColorlessAbilityAndItCanPayForColorlessSpell" classname="com.arcanatable.customcards.ShrineOfTheForsakenGodsScenarioTest" time="0.047"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

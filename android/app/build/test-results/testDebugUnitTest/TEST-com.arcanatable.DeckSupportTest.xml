@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.DeckSupportTest" tests="20" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:16:56.298Z" hostname="runnervmtai0g" time="0.58">
+  <properties/>
+  <testcase name="searchRanksExactThenPrefixThenWordStart" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="swapRewritesOnlyTheMatchingLineAndKeepsStructure" classname="com.arcanatable.DeckSupportTest" time="0.001"/>
+  <testcase name="missingCreatureStatsDoNotInventPowerOrToughness" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="reportCountsCopiesAndNeverClaimsVerification" classname="com.arcanatable.DeckSupportTest" time="0.001"/>
+  <testcase name="shippedLibraryMatchesOfflineEngineForEveryCustomCardAndPreconEntry" classname="com.arcanatable.DeckSupportTest" time="0.271"/>
+  <testcase name="parsesManaBoxAndMoxfieldStyleListsWithCommanderAndSideboard" classname="com.arcanatable.DeckSupportTest" time="0.001"/>
+  <testcase name="swapRefusesCsvAndMissingLines" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="cardsDoNotInheritKeywordLabelsFromCreatedTokensOrAnimationEffects" classname="com.arcanatable.DeckSupportTest" time="0.054"/>
+  <testcase name="suggestionsStayInTypeAndCommanderIdentityAndSkipDeckCards" classname="com.arcanatable.DeckSupportTest" time="0.001"/>
+  <testcase name="offlineSearchResultsRetainCreatureStatsOracleTextAndKeywords" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="nestedEffectStatisticsAreNotOriginalCardStatistics" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="doubleFacedNamesMatchFrontFaceAndTokensAreNotDeckCards" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="argentumDefinitionWinsOverCustomOfSameName" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="shippedLibrarySuggestionsAreSupportedAndCarryImages" classname="com.arcanatable.DeckSupportTest" time="0.248"/>
+  <testcase name="parsesCsvExportWithZoneColumn" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="explicitLibraryColorIdentityOverridesTextHeuristics" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="shippedCustomCardMetadataMatchesActualJsonlDefinitions" classname="com.arcanatable.DeckSupportTest" time="0.001"/>
+  <testcase name="swapSplitsMultipleCopiesAndRewritesCommanderLines" classname="com.arcanatable.DeckSupportTest" time="0.001"/>
+  <testcase name="manaValueAndColorsFromCost" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <testcase name="decodesLibraryLineFieldsAndEscapes" classname="com.arcanatable.DeckSupportTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

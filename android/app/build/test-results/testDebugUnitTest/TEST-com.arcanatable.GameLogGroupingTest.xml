@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.GameLogGroupingTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:32.548Z" hostname="runnervmtai0g" time="0.015">
+  <properties/>
+  <testcase name="manualSandboxLogsDoNotCollapseWithoutStructuredProvenance" classname="com.arcanatable.GameLogGroupingTest" time="0.003"/>
+  <testcase name="turnMarkersAlwaysBreakGrouping" classname="com.arcanatable.GameLogGroupingTest" time="0.001"/>
+  <testcase name="exactConsecutiveEventsCollapseButOriginalLogRemainsIntact" classname="com.arcanatable.GameLogGroupingTest" time="0.008"/>
+  <testcase name="aDifferentTargetOrOutcomeInterruptsAGroup" classname="com.arcanatable.GameLogGroupingTest" time="0.001"/>
+  <testcase name="differentControllersAndHiddenInformationDoNotConflate" classname="com.arcanatable.GameLogGroupingTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

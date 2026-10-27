@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.SpawnbedProtectorScenarioTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:41.946Z" hostname="runnervmtai0g" time="0.19">
+  <properties/>
+  <testcase name="cannotReturnNonEldraziCreatureOrEldraziNoncreatureCard" classname="com.arcanatable.customcards.SpawnbedProtectorScenarioTest" time="0.048"/>
+  <testcase name="targetExiledInResponseCausesEntireEndStepTriggerToFizzleWithoutScions" classname="com.arcanatable.customcards.SpawnbedProtectorScenarioTest" time="0.045"/>
+  <testcase name="endStepWithoutGraveyardTargetStillCreatesTwoSacrificeForColorlessScions" classname="com.arcanatable.customcards.SpawnbedProtectorScenarioTest" time="0.005"/>
+  <testcase name="returnsOneChosenOwnEldraziCreatureCardAndCreatesTwoScions" classname="com.arcanatable.customcards.SpawnbedProtectorScenarioTest" time="0.046"/>
+  <testcase name="cannotReturnOpponentsEldraziFromOpponentsGraveyard" classname="com.arcanatable.customcards.SpawnbedProtectorScenarioTest" time="0.046"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

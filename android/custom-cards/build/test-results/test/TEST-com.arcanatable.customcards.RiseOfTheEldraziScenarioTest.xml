@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.RiseOfTheEldraziScenarioTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:37.113Z" hostname="runnervmtai0g" time="0.316">
+  <properties/>
+  <testcase name="destroysTargetPermanentDrawsFourTakesAnExtraTurnAndExilesItself" classname="com.arcanatable.customcards.RiseOfTheEldraziScenarioTest" time="0.052"/>
+  <testcase name="destroysPermanentAndTakesExtraTurnWhenPlayerTargetBecomesIllegal" classname="com.arcanatable.customcards.RiseOfTheEldraziScenarioTest" time="0.052"/>
+  <testcase name="drawsForPlayerWhenPermanentTargetBecomesIllegal" classname="com.arcanatable.customcards.RiseOfTheEldraziScenarioTest" time="0.051"/>
+  <testcase name="rejectsPlayerAsPermanentTarget" classname="com.arcanatable.customcards.RiseOfTheEldraziScenarioTest" time="0.063"/>
+  <testcase name="requiresThreeTrueColorlessManaAndBothTargetKinds" classname="com.arcanatable.customcards.RiseOfTheEldraziScenarioTest" time="0.047"/>
+  <testcase name="doesNotResolveOrTakeExtraTurnWhenBothTargetsBecomeIllegal" classname="com.arcanatable.customcards.RiseOfTheEldraziScenarioTest" time="0.051"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

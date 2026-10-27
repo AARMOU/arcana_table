@@ -1,0 +1,692 @@
+diff --git a/android/app/src/main/java/com/arcanatable/ArgentumBlockSubmissionGuard.kt b/android/app/src/main/java/com/arcanatable/ArgentumBlockSubmissionGuard.kt
+new file mode 100644
+index 00000000..e15788cc
+--- /dev/null
++++ b/android/app/src/main/java/com/arcanatable/ArgentumBlockSubmissionGuard.kt
+@@ -0,0 +1,43 @@
++package com.arcanatable
++
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.setValue
++
++/**
++ * Client-only guard for a successfully transmitted DeclareBlockers action.
++ *
++ * Argentum may offer DeclareBlockers again after accepting a declaration while
++ * still in DECLARE_BLOCKERS (the B136 device trace shows this at v75/v114).
++ * Do not invent any game action or mark an invalid declaration as accepted:
++ * a server INVALID_ACTION releases the guard except when the response confirms
++ * blockers were already declared. A new combat declaration after leaving the
++ * step starts fresh, including multiple combat phases in one turn.
++ */
++internal class ArgentumBlockSubmissionGuard {
++    var submitted by mutableStateOf(false)
++        private set
++    private var inBlockStep = false
++
++    fun onStep(step: String) {
++        val nowInBlockStep = step.equals("DECLARE_BLOCKERS", ignoreCase = true)
++        if (!nowInBlockStep || !inBlockStep) submitted = false
++        inBlockStep = nowInBlockStep
++    }
++
++    fun markSent() { submitted = true }
++
++    fun onError(code: String, detail: String) {
++        if (code != "INVALID_ACTION" || !submitted) return
++        if (!detail.contains("Blockers have already been declared", ignoreCase = true)) {
++            // Illegal assignment (flying, menace, protection, etc.): allow a
++            // corrected resubmission while the board still retains the choices.
++            submitted = false
++        }
++    }
++
++    fun reset() {
++        submitted = false
++        inBlockStep = false
++    }
++}
+diff --git a/android/app/src/main/java/com/arcanatable/ArgentumCombatBoard.kt b/android/app/src/main/java/com/arcanatable/ArgentumCombatBoard.kt
+index ab7793e1..aeaae6eb 100644
+--- a/android/app/src/main/java/com/arcanatable/ArgentumCombatBoard.kt
++++ b/android/app/src/main/java/com/arcanatable/ArgentumCombatBoard.kt
+@@ -233,7 +233,7 @@ private fun CombatBoardFrame(
+  * Argentum lists can be used, and Argentum validates the result (flying, menace, ...).
+  */
+ @Composable
+-fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit) {
++fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, busy: Boolean, warning: String? = null, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit) {
+     var selection by remember(plan) { mutableStateOf(plan.mandatory.filterKeys { it in plan.blockers }) }
+     var pending by remember(plan) { mutableStateOf<String?>(null) }
+     val attackers = plan.attackers.map(piece)
+@@ -267,7 +267,7 @@ fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece,
+             if (cap <= 1 || next.size >= cap) pending = null
+         },
+         summary = blockSummary(attackers, blockers, selection),
+-        warning = null,
++        warning = warning,
+         confirmLabel = if (selection.isEmpty()) "NO BLOCKS" else "BLOCK WITH ${selection.size}",
+         confirmEnabled = !busy,
+         onConfirm = { onConfirm(plan.buildAction(selection)) },
+diff --git a/android/app/src/main/java/com/arcanatable/ArgentumOutcomeLog.kt b/android/app/src/main/java/com/arcanatable/ArgentumOutcomeLog.kt
+index 0a6fa78c..7817bb60 100644
+--- a/android/app/src/main/java/com/arcanatable/ArgentumOutcomeLog.kt
++++ b/android/app/src/main/java/com/arcanatable/ArgentumOutcomeLog.kt
+@@ -18,14 +18,21 @@ internal object ArgentumOutcomeLog {
+                 if (reason == null) name else "$name ($reason)"
+             }
+         }
++        val matchUnfinished = packet.optBoolean("matchUnfinished")
+         val parts = mutableListOf(
+-            "Argentum game over: winner=$winner",
++            if (matchUnfinished) "Argentum human eliminated (match unfinished): winner=none"
++                else "Argentum game over: winner=$winner",
+             "losers=${losers.ifEmpty { listOf("not supplied") }.joinToString(", ")}",
+             "result=${packet.optString("reason", "UNKNOWN")}"
+         )
++        if (matchUnfinished) {
++            parts += "remainingPlayers=${packet.optInt("activePlayersRemaining")}"
++            known(packet.optString("eliminatedPlayerName"))?.let { parts += "eliminated=$it" }
++            if (!packet.isNull("eliminationLife")) parts += "life=${packet.optInt("eliminationLife")}"
++        }
+         known(packet.optString("engineReason"))?.let { parts += "engineReason=$it" }
+         known(packet.optString("sourceCard"))?.let { parts += "source=$it" }
+-        known(packet.optString("winCondition"))?.let { parts += "condition=$it" }
++        known(packet.optString("winCondition"))?.let { parts += "${if (matchUnfinished) "eliminationDetail" else "condition"}=$it" }
+         val artifact = known(packet.optString("artifactName"))
+         if (artifact != null && !packet.isNull("artifactCount")) {
+             parts += "verifiedArtifactGroup=$artifact x${packet.optInt("artifactCount")}"
+diff --git a/android/app/src/main/java/com/arcanatable/TableArgentum.kt b/android/app/src/main/java/com/arcanatable/TableArgentum.kt
+index fffa9bad..15f10404 100644
+--- a/android/app/src/main/java/com/arcanatable/TableArgentum.kt
++++ b/android/app/src/main/java/com/arcanatable/TableArgentum.kt
+@@ -164,7 +164,14 @@ internal fun TableController.argentumName(id: String): String =
+ internal fun TableController.openArgentumCombat(): Boolean {
+     val actions = argentumSnapshot?.legalActions.orEmpty()
+     actions.firstNotNullOfOrNull { ArgentumAttackPlan.from(it) }?.let { argentumAttackPlan = it; recordDiagnostic("Opened attack declaration (${it.options.size} possible attackers)", DiagnosticCategory.ACTION); return true }
+-    actions.firstNotNullOfOrNull { ArgentumBlockPlan.from(it, argentumLastStateJson) }?.let { argentumBlockPlan = it; recordDiagnostic("Opened block declaration (${it.blockers.size} possible blockers)", DiagnosticCategory.ACTION); return true }
++    if (!argentumBlockGuard.submitted) {
++        actions.firstNotNullOfOrNull { ArgentumBlockPlan.from(it, argentumLastStateJson) }?.let {
++            argentumBlockPlan = it
++            argentumLastError = null
++            recordDiagnostic("Opened block declaration (${it.blockers.size} possible blockers)", DiagnosticCategory.ACTION)
++            return true
++        }
++    }
+     return false
+ }
+ 
+@@ -243,6 +250,10 @@ internal fun TableController.openArgentumActions(card: GameCard) {
+ internal fun TableController.chooseArgentumLegalAction(info: JSONObject) {
+     val action = info.optJSONObject("action") ?: return
+     val type = action.optString("type")
++    if (type == "DeclareBlockers" && argentumBlockGuard.submitted) {
++        message = "Blockers already submitted. Pass priority to continue combat."
++        return
++    }
+     if (type == "DeclareAttackers" || type == "DeclareBlockers") { if (!openArgentumCombat()) message = "Argentum's combat declaration is no longer available."; return }
+     if (!info.optBoolean("isAffordable", true)) {
+         message = "Not enough spendable mana yet. Activate Treasure, Goose/Food, or other conditional mana sources first."
+@@ -385,7 +396,8 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
+             gameTimerRunning = true
+             turnTimerRunning = true
+             setArgentumGameActive(true)
+-            argentumGameOverDismissed = false; argentumGameOverText = null; argentumWon = null
++            argentumGameOverDismissed = false; argentumGameOverText = null; argentumWon = null; argentumMatchUnfinished = false
++            argentumBlockGuard.reset()
+             recordDiagnostic("Argentum game started", DiagnosticCategory.ENGINE)
+         }
+         "stateUpdate" -> {
+@@ -396,6 +408,43 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
+                 argentumLastCompletedEngineMs = incoming.optLong("engineMs", -1).takeIf { it >= 0 }
+                 if (argentumLocalPlayersBackup == null) argentumLocalPlayersBackup = loadSavedPlayers(context) ?: players.toList()
+                 val snapshot = ArgentumTableSnapshot.parse(state, incoming.optJSONArray("legalActions") ?: JSONArray(), incoming.optString("interactionEpoch").takeUnless { it.isBlank() || it == "null" })
++                // One transition-specific diagnostic, not a continuous life-total trace.
++                // These values come from consecutive authoritative masked snapshots.
++                val currentYou = snapshot.players.getOrNull(snapshot.viewingPlayer)
++                val previousYou = currentYou?.let { player ->
++                    argentumSnapshot?.players?.firstOrNull { it.id == player.id }
++                }
++                if (currentYou?.isEliminated == true && previousYou?.isEliminated == false) {
++                    recordDiagnostic(
++                        "Argentum player elimination: life ${previousYou.life} → ${currentYou.life}; commanderDamage=${currentYou.commanderDamageReceived}",
++                        DiagnosticCategory.ENGINE,
++                    )
++                }
++                // Combat-stage evidence is critical for distinguishing ordinary damage from
++                // first-strike or commander-damage elimination while life remains above zero.
++                // Emit only when this viewer's authoritative values change, not for each snapshot.
++                if (currentYou != null && previousYou != null &&
++                    snapshot.stepKey in setOf("FIRST_STRIKE_COMBAT_DAMAGE", "COMBAT_DAMAGE") &&
++                    (currentYou.life != previousYou.life ||
++                        currentYou.commanderDamageReceived != previousYou.commanderDamageReceived)) {
++                    recordDiagnostic(
++                        "Argentum combat ${snapshot.stepKey}: life ${previousYou.life} → ${currentYou.life}; " +
++                            "commanderDamage ${previousYou.commanderDamageReceived} → ${currentYou.commanderDamageReceived}; " +
++                            "eliminated=${currentYou.isEliminated}",
++                        DiagnosticCategory.ENGINE,
++                    )
++                }
++                // Close the retained block board only when combat has truly moved on.
++                // A rejected INVALID_ACTION during DECLARE_BLOCKERS must not wipe selections.
++                argentumBlockGuard.onStep(snapshot.stepKey)
++                if (argentumBlockPlan != null &&
++                    (!snapshot.stepKey.equals("DECLARE_BLOCKERS", ignoreCase = true) ||
++                        argentumBlockGuard.submitted)) {
++                    // The accepted state can remain DECLARE_BLOCKERS while priority passes.
++                    // Never reopen the stale declaration; after INVALID_ACTION, the guard
++                    // releases the latch so the retained assignments can be corrected.
++                    argentumBlockPlan = null
++                }
+                 val nextDecision = incoming.optJSONObject("pendingDecision")
+                 argentumLastStateJson = state
+                 if (nextDecision?.optString("id") != argentumPendingDecision?.optString("id")) {
+@@ -441,7 +490,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
+                 turnNumber = snapshot.turnNumber
+                 phaseIndex = phaseSteps.indexOfFirst { it.equals(snapshot.stepName, true) }.takeIf { it >= 0 }
+                     ?: phaseSteps.indexOfFirst { it.equals(snapshot.phaseName, true) }.takeIf { it >= 0 } ?: 3
+-                gameEndedOnline = snapshot.gameOver
++                if (!argentumMatchUnfinished) gameEndedOnline = snapshot.gameOver
+                 if (snapshot.gameOver && argentumOffline && wifiRole == null) {
+                     OfflineCheckpointStore.clear(context)
+                     offlineResumeAvailable = false
+@@ -519,6 +568,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
+         }
+         "mulliganComplete" -> { argentumMulliganPrompt = false; argentumAwaitingUpdate = false }
+         "gameOver" -> {
++            argentumMatchUnfinished = incoming.optBoolean("matchUnfinished")
+             setArgentumGameActive(false)
+             gameEndedOnline = true
+             argentumAwaitingUpdate = false
+@@ -542,6 +592,11 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
+             recordDiagnostic("Note from host: ${incoming.optString("message")}", DiagnosticCategory.ENGINE)
+         } else {
+             argentumLastError = incoming.optString("message", "Argentum returned an error."); message = argentumLastError; argentumAwaitingUpdate = false; argentumXChecking = null
++            argentumBlockGuard.onError(incoming.optString("code"), argentumLastError.orEmpty())
++            if (argentumBlockGuard.submitted && argentumLastError?.contains("Blockers have already been declared", ignoreCase = true) == true) {
++                argentumBlockPlan = null
++                message = "Blockers already declared. Pass priority to continue combat."
++            }
+             recordDiagnostic("Argentum error ${incoming.optString("code")}: ${argentumLastError}", DiagnosticCategory.ERROR)
+         }
+     }
+@@ -742,7 +797,7 @@ internal fun TableController.closeArgentumSession(concede: Boolean) {
+     argentumSnapshot = null
+     argentumPendingDecision = null
+     argentumActionChoices = emptyList(); argentumActionCard = null; argentumComposer = null
+-    argentumAttackPlan = null; argentumBlockPlan = null
++    argentumAttackPlan = null; argentumBlockPlan = null; argentumBlockGuard.reset()
+     playPopup = null; playFeed = emptyList(); playBanner = null; recapText = null; aiRecaps = emptyList(); argentumStackUse = null; argentumAutoYes = emptyMap()
+     argentumLocalPlayersBackup?.let { players = it; argentumLocalPlayersBackup = null }
+     argentumDeckForLobby = null
+@@ -750,6 +805,7 @@ internal fun TableController.closeArgentumSession(concede: Boolean) {
+     argentumLobbySubmitted = false
+     gameStartedOnline = false
+     gameEndedOnline = false
++    argentumMatchUnfinished = false
+     gameTimerRunning = false
+     turnTimerRunning = false
+     homeOpen = true
+diff --git a/android/app/src/main/java/com/arcanatable/TableController.kt b/android/app/src/main/java/com/arcanatable/TableController.kt
+index b4b208f3..9b846365 100644
+--- a/android/app/src/main/java/com/arcanatable/TableController.kt
++++ b/android/app/src/main/java/com/arcanatable/TableController.kt
+@@ -412,6 +412,7 @@ internal class TableController(
+     var argentumLastStateJson by run { mutableStateOf<JSONObject?>(null) }
+     var argentumAttackPlan by run { mutableStateOf<ArgentumAttackPlan?>(null) }
+     var argentumBlockPlan by run { mutableStateOf<ArgentumBlockPlan?>(null) }
++    val argentumBlockGuard = ArgentumBlockSubmissionGuard()
+     var argentumDeferredDecisionId by run { mutableStateOf<String?>(null) }
+     var argentumOrderSelection by run { mutableStateOf<List<String>>(emptyList()) }
+     var argentumModeSelection by run { mutableStateOf<Set<Int>>(emptySet()) }
+@@ -469,6 +470,7 @@ internal class TableController(
+     var argentumMulliganInfo by run { mutableStateOf<Triple<Int, Boolean, Int>?>(null) } // count, on the play, cards to bottom
+     var argentumGameOverText by run { mutableStateOf<String?>(null) }
+     var argentumWon by run { mutableStateOf<Boolean?>(null) }
++    var argentumMatchUnfinished by run { mutableStateOf(false) }
+     var argentumBudgetCounts by run { mutableStateOf<Map<Int, Int>>(emptyMap()) }
+     var argentumReplacementPick by run { mutableStateOf(0 to 0) }
+     val argentumReportedUnsupported = run { mutableSetOf<String>() }
+@@ -568,7 +570,10 @@ internal class TableController(
+     val gameInProgress get() = if (argentumEnabled) argentumSnapshot != null && argentumStatus == ArgentumConnectionStatus.CONNECTED && argentumSnapshot?.gameOver != true
+         else if (onlineMode) gameStartedOnline && roomConnected && !gameEndedOnline else localGameStarted
+     val visibleStackCount get() = if (argentumEnabled) argentumSnapshot?.targets?.values?.count { it.type == "Spell" } ?: 0 else stackActions.size
+-    val argentumLegalTypes get() = argentumSnapshot?.legalActions.orEmpty().mapNotNull { it.optJSONObject("action")?.optString("type") }.toSet()
++    val argentumLegalTypes get() = argentumSnapshot?.legalActions.orEmpty()
++        .mapNotNull { it.optJSONObject("action")?.optString("type") }
++        .filterNot { it == "DeclareBlockers" && argentumBlockGuard.submitted }
++        .toSet()
+     // Display ids of cards Argentum offers an action for (play, cast, activate) — drawn with a glow.
+     val argentumPlayableIds: Set<Int> get() = argentumSnapshot?.let { snap ->
+         val byServer = snap.serverCardIds.entries.associate { it.value to it.key }
+diff --git a/android/app/src/main/java/com/arcanatable/TableDialogs.kt b/android/app/src/main/java/com/arcanatable/TableDialogs.kt
+index 13b21614..46008577 100644
+--- a/android/app/src/main/java/com/arcanatable/TableDialogs.kt
++++ b/android/app/src/main/java/com/arcanatable/TableDialogs.kt
+@@ -1505,12 +1505,55 @@ internal fun DeckEditorDialog(
+     renameCard?.let { card -> AlertDialog(onDismissRequest = { renameCard = null }, title = { Text("Rename card") }, text = { OutlinedTextField(renameValue, { renameValue = it }, singleLine = true, label = { Text("Card name") }) }, confirmButton = { TextButton(onClick = { if (renameValue.isNotBlank()) onRename(card, renameValue.trim()); renameCard = null }) { Text("SAVE") } }, dismissButton = { TextButton(onClick = { renameCard = null }) { Text("CANCEL") } }) }
+ }
+ 
++/**
++ * Argentum's per-defender commanderDamage is keyed by commanderName, whereas manually tracked
++ * tables historically use the opposing seat ID. Do not treat a missing seat-ID lookup as zero.
++ * Extra source keys (partners, a missing commander portrait, or imported legacy data) must remain
++ * visible as separate commanders, never be summed toward the 21-damage threshold.
++ */
++internal data class CommanderDamageTrackerSource(val playerId: String, val playerName: String, val commanderName: String?)
++internal data class CommanderDamageTrackerRow(val label: String, val key: String, val amount: Int)
++
++internal fun commanderDamageTrackerRows(
++    received: Map<String, Int>,
++    opponents: List<CommanderDamageTrackerSource>,
++): List<CommanderDamageTrackerRow> {
++    val represented = mutableSetOf<String>()
++    val rows = opponents.map { source ->
++        val commanderName = source.commanderName?.takeIf(String::isNotBlank)
++        val key = when {
++            commanderName != null && commanderName in received -> commanderName
++            source.playerId in received -> source.playerId
++            else -> source.playerId  // Preserve manual-table storage for an unset count.
++        }
++        represented += key
++        CommanderDamageTrackerRow(
++            label = source.playerName + (commanderName?.let { " · $it" } ?: ""),
++            key = key,
++            amount = received[key] ?: 0,
++        )
++    }.toMutableList()
++    // A second partner commander / hidden commander with recorded damage must not disappear.
++    for ((key, amount) in received) {
++        if (key.isNotBlank() && key !in represented && amount > 0) {
++            rows += CommanderDamageTrackerRow("Commander · $key", key, amount)
++        }
++    }
++    return rows
++}
++
+ @Composable
+-internal fun PlayerTrackerDialog(player: TablePlayer, players: List<TablePlayer>, playerIndex: Int, onUpdate: (TablePlayer) -> Unit, onDismiss: () -> Unit) {
++internal fun PlayerTrackerDialog(player: TablePlayer, players: List<TablePlayer>, playerIndex: Int, onUpdate: (TablePlayer) -> Unit, onDismiss: () -> Unit, engineAuthoritative: Boolean = false) {
+     var search by remember { mutableStateOf("") }
+     var custom by remember { mutableStateOf("") }
+     val common = listOf("Poison", "Energy", "Experience", "Rad", "Lore", "Ticket", "Shield", "Stun", "Finality", "The Ring tempts you", "Monarch", "Initiative", "City's Blessing", "Day/Night")
+     val matches = common.filter { it.contains(search, true) }
++    val damageRows = commanderDamageTrackerRows(
++        player.commanderDamageReceived,
++        players.indices.filter { it != playerIndex }.map { index ->
++            players[index].let { CommanderDamageTrackerSource(it.id, it.name, it.commanderName) }
++        },
++    )
+     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+         Surface(Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.88f), shape = RoundedCornerShape(14.dp), color = Panel) {
+             Column(Modifier.padding(14.dp)) {
+@@ -1527,15 +1570,24 @@ internal fun PlayerTrackerDialog(player: TablePlayer, players: List<TablePlayer>
+                             ActionPill("+ CAST") { onUpdate(player.copy(commanderCastCount = player.commanderCastCount + 1)) }
+                         }
+                     }
+-                    item { Text("COMMANDER DAMAGE RECEIVED", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
+-                    items(players.indices.filter { it != playerIndex }.size) { row ->
+-                        val source = players[players.indices.filter { it != playerIndex }[row]]
+-                        val amount = player.commanderDamageReceived[source.id] ?: 0
++                    item {
++                        Text("COMMANDER DAMAGE RECEIVED", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
++                        if (engineAuthoritative) Text("Tracked by Argentum · read only", color = Muted, fontSize = 9.sp)
++                    }
++                    items(damageRows.size) { row ->
++                        val record = damageRows[row]
++                        val amount = record.amount
+                         Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).background(PanelLight).padding(horizontal = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+-                            Text("${source.name}${source.commanderName?.let { " · $it" }.orEmpty()}", color = SoftWhite, fontSize = 9.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+-                            TextButton(onClick = { onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived.toMutableMap().apply { if (amount <= 1) remove(source.id) else put(source.id, amount - 1) })) }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text("−", color = SoftWhite) }
++                            Text(record.label, color = SoftWhite, fontSize = 9.sp, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
++                            if (!engineAuthoritative) TextButton(onClick = {
++                                onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived.toMutableMap().apply {
++                                    if (amount <= 1) remove(record.key) else put(record.key, amount - 1)
++                                }))
++                            }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text("−", color = SoftWhite) }
+                             Text("$amount", color = if (amount >= 21) Color(0xFFE9978B) else Mint, fontWeight = FontWeight.Bold)
+-                            TextButton(onClick = { onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived + (source.id to amount + 1))) }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text("+", color = Mint) }
++                            if (!engineAuthoritative) TextButton(onClick = {
++                                onUpdate(player.copy(commanderDamageReceived = player.commanderDamageReceived + (record.key to amount + 1)))
++                            }, modifier = Modifier.sizeIn(minWidth = 40.dp, minHeight = 42.dp)) { Text("+", color = Mint) }
+                         }
+                     }
+                     item { Text("COUNTERS AND STATUS", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp)) }
+diff --git a/android/app/src/main/java/com/arcanatable/TableOverlays.kt b/android/app/src/main/java/com/arcanatable/TableOverlays.kt
+index 81c23e76..3969f748 100644
+--- a/android/app/src/main/java/com/arcanatable/TableOverlays.kt
++++ b/android/app/src/main/java/com/arcanatable/TableOverlays.kt
+@@ -420,7 +420,7 @@ internal fun TableController.TableOverlays() {
+         val won = argentumWon ?: argentumSnapshot?.winnerName?.let { it == players.getOrNull(localSeat)?.name }
+         AlertDialog(
+             onDismissRequest = { argentumGameOverDismissed = true },
+-            title = { Text(when (won) { true -> "Victory"; false -> "Defeat"; null -> "Game over" }, fontWeight = FontWeight.Black, color = when (won) { true -> Mint; false -> Color(0xFFFFB4A8); null -> SoftWhite }) },
++            title = { Text(if (argentumMatchUnfinished) "Eliminated" else when (won) { true -> "Victory"; false -> "Defeat"; null -> "Game over" }, fontWeight = FontWeight.Black, color = if (argentumMatchUnfinished) Color(0xFFFFB4A8) else when (won) { true -> Mint; false -> Color(0xFFFFB4A8); null -> SoftWhite }) },
+             text = {
+                 Column {
+                     Text(argentumGameOverText ?: argentumSnapshot?.winnerName?.let { "$it won." } ?: "The game has ended.", color = SoftWhite)
+@@ -819,11 +819,16 @@ internal fun TableController.TableOverlays() {
+     }
+     argentumBlockPlan?.let { plan ->
+         ArgentumBlockBoard(plan, ::argentumPiece, busy = argentumAwaitingUpdate,
++            warning = argentumLastError?.takeIf { it.contains("block", ignoreCase = true) },
+             onConfirm = { action ->
+                 val epoch = ArgentumActions.epochFor(plan.legalAction, argentumSnapshot?.interactionEpoch)
+                 if (epoch != null && submitArgentumAction(action, epoch)) {
++                    argentumLastError = null
++                    argentumBlockGuard.markSent()
+                     recordDiagnostic("Declared ${action.optJSONObject("blockers")?.length() ?: 0} blocker(s)", DiagnosticCategory.ACTION)
+-                    argentumBlockPlan = null
++                    // The next authoritative snapshot either confirms this declaration
++                    // (hide the board and offer priority) or an INVALID_ACTION releases
++                    // the latch and preserves this plan's selections for correction.
+                 } else message = "Could not send the block declaration. Refresh and try again."
+             },
+             onDismiss = { argentumBlockPlan = null })
+diff --git a/android/app/src/main/java/com/arcanatable/TableOverlaysB.kt b/android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
+index 2499c582..125afcc3 100644
+--- a/android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
++++ b/android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
+@@ -1083,6 +1083,7 @@ internal fun TableController.TableOverlaysB() {
+ 
+     if (trackerPlayer in players.indices) PlayerTrackerDialog(
+         player = players[trackerPlayer], players = players, playerIndex = trackerPlayer,
++        engineAuthoritative = argentumEnabled,
+         onUpdate = { updated ->
+             val target = trackerPlayer
+             updatePlayer(target) { updated }
+diff --git a/android/app/src/main/java/com/arcanatable/engine/GameOutcomeDetails.kt b/android/app/src/main/java/com/arcanatable/engine/GameOutcomeDetails.kt
+index 1004a5b7..8138a2a3 100644
+--- a/android/app/src/main/java/com/arcanatable/engine/GameOutcomeDetails.kt
++++ b/android/app/src/main/java/com/arcanatable/engine/GameOutcomeDetails.kt
+@@ -21,6 +21,53 @@ import org.json.JSONObject
+  * `winCondition` and `losers` describe what actually ended the game.
+  */
+ internal object GameOutcomeDetails {
++    /**
++     * Local, viewer-relative terminal notice when all human seats have been eliminated but
++     * Argentum has NOT finished the match. This is not a draw and it does not imply an AI won.
++     * Retain the viewer's own authoritative PlayerLostEvent, rather than blaming the last
++     * opponent spell or another seat's earlier elimination.
++     */
++    fun toHumanEliminatedMessage(
++        state: GameState,
++        viewer: EntityId,
++        nameFor: (EntityId) -> String,
++        events: List<GameEvent>,
++        cardExists: (String) -> Boolean = { false },
++    ): JSONObject {
++        val playerLoss = events.filterIsInstance<PlayerLostEvent>().lastOrNull { it.playerId == viewer }
++        val storedReason = state.getEntity(viewer)?.get<PlayerLostComponent>()?.reason?.name
++        val reason = playerLoss?.reason?.name ?: storedReason ?: "UNKNOWN"
++        val detail = playerLoss?.message?.takeIf(String::isNotBlank)
++        val sourceCard = detail?.substringBefore(':')?.takeIf {
++            it != detail && it.isNotBlank() && it.length <= 100 && cardExists(it)
++        }
++        val life = state.getEntity(viewer)?.get<LifeTotalComponent>()?.life
++        val stillPlaying = state.activePlayers.size
++        val description = buildString {
++            append("You were eliminated")
++            if (reason != "UNKNOWN") append(" (").append(reason.replace('_', ' ').lowercase()).append(")")
++            append(".")
++            if (detail != null) append(" ").append(detail)
++            if (stillPlaying > 0) {
++                append(" ").append(stillPlaying).append(" other player(s) were still active.")
++            }
++            append(" The local game stopped because no human-controlled seats remained; no winner was determined.")
++        }
++        return toMessage(state, viewer, nameFor, events, cardExists)
++            .put("reason", "YOU_LOST") // Existing client compatibility; not a completed match.
++            .put("winnerId", JSONObject.NULL)
++            .put("winnerName", JSONObject.NULL)
++            .put("engineReason", reason)
++            .put("winCondition", detail ?: JSONObject.NULL)
++            .put("sourceCard", sourceCard ?: JSONObject.NULL)
++            .put("matchUnfinished", true)
++            .put("eliminatedPlayerId", viewer.value)
++            .put("eliminatedPlayerName", nameFor(viewer))
++            .put("eliminationLife", life ?: JSONObject.NULL)
++            .put("activePlayersRemaining", stillPlaying)
++            .put("message", description)
++    }
++
+     fun toMessage(
+         state: GameState,
+         viewer: EntityId,
+diff --git a/android/app/src/main/java/com/arcanatable/engine/LocalArgentumHost.kt b/android/app/src/main/java/com/arcanatable/engine/LocalArgentumHost.kt
+index cbd39fca..0320c19f 100644
+--- a/android/app/src/main/java/com/arcanatable/engine/LocalArgentumHost.kt
++++ b/android/app/src/main/java/com/arcanatable/engine/LocalArgentumHost.kt
+@@ -692,7 +692,7 @@ class LocalArgentumHost(
+             val current = state ?: return
+             if (current.gameOver || shockOffers.isNotEmpty()) break
+             // Everyone at this phone (and the Wi-Fi guest) is out: stop instead of watching the AIs finish.
+-            if (people().none { it in current.activePlayers }) { peopleOut(); break }
++            if (people().none { it in current.activePlayers }) { peopleOut(events.toList()); events.clear(); break }
+             if ((current.turnNumber to current.step) != lastShown) flush(paceMs / 3)
+             else if (System.nanoTime() - lastProgressNanos >= 1_000_000_000L) flush(0)
+             val decision = current.pendingDecision
+@@ -887,12 +887,22 @@ class LocalArgentumHost(
+ 
+     private var peopleOutSent = false
+ 
+-    /** Every person has lost while AIs play on: the game is over for them. */
+-    private fun peopleOut() {
++    /**
++     * Every human-controlled seat has been eliminated. Stop the local engine for these viewers,
++     * but do not fabricate a completed game or discard the authoritative elimination events.
++     */
++    private fun peopleOut(pendingEvents: List<GameEvent> = emptyList()) {
+         if (peopleOutSent) return
++        // This captures the final PlayerLostEvent before any state snapshot clears a burst.
++        sendState(pendingEvents, interactive = false)
++        val current = state ?: return
+         peopleOutSent = true
+-        sendState(emptyList(), interactive = false)
+-        people().forEach { emitTo(it, JSONObject().put("type", "gameOver").put("winnerId", JSONObject.NULL).put("reason", "YOU_LOST")) }
++        val evidence = observedLossEvents.toList()
++        people().forEach { seat ->
++            emitTo(seat, GameOutcomeDetails.toHumanEliminatedMessage(
++                current, seat, { seatOf(it).name }, evidence,
++            ) { registry.getCard(it) != null })
++        }
+     }
+ 
+     private fun finishIfOver(events: List<GameEvent>) {
+@@ -906,6 +916,9 @@ class LocalArgentumHost(
+ 
+     /** Sends every person their own view of the game. */
+     private fun sendState(events: List<GameEvent>, interactive: Boolean = true) {
++        // Never overwrite a terminal human-elimination notice with a later non-terminal progress
++        // snapshot from the still-alive AI-only state.
++        if (peopleOutSent) return
+         // Retain elimination events across the host's intermediate AI/progress flushes. A
+         // PlayerLostEvent and the final GameEndedEvent need not be delivered in one update.
+         observedLossEvents += events.filterIsInstance<com.wingedsheep.engine.core.PlayerLostEvent>()
+diff --git a/android/app/src/test/java/com/arcanatable/ArgentumBackendTest.kt b/android/app/src/test/java/com/arcanatable/ArgentumBackendTest.kt
+index 87874a8b..c08ac025 100644
+--- a/android/app/src/test/java/com/arcanatable/ArgentumBackendTest.kt
++++ b/android/app/src/test/java/com/arcanatable/ArgentumBackendTest.kt
+@@ -84,4 +84,55 @@ class ArgentumBackendTest {
+         assertEquals(2, projected.players[1].library.size)
+         assertEquals("Sol Ring", projected.players[0].battlefield.single().name)
+     }
++    @Test fun commanderDamageProjectionAndTrackerUseCommanderNameNotSeatId() {
++        val state = JSONObject().apply {
++            put("viewingPlayerId", "p1")
++            put("activePlayerId", "p2")
++            put("players", JSONArray()
++                .put(JSONObject().put("playerId", "p1").put("name", "You").put("life", 8)
++                    .put("commanderDamage", JSONArray().put(JSONObject()
++                        .put("commanderName", "Animar, Soul of Elements").put("commanderId", "cmd-2").put("amount", 20))))
++                .put(JSONObject().put("playerId", "p2").put("name", "AI · Animar").put("life", 41)))
++            put("cards", JSONObject().put("cmd-2", JSONObject()
++                .put("id", "cmd-2").put("name", "Animar, Soul of Elements")
++                .put("typeLine", "Legendary Creature — Elemental")
++                .put("ownerId", "p2").put("controllerId", "p2").put("isCommander", true)))
++            put("zones", JSONArray().put(JSONObject()
++                .put("zoneId", JSONObject().put("zoneType", "COMMAND").put("ownerId", "p2"))
++                .put("cardIds", JSONArray().put("cmd-2")).put("size", 1)))
++        }
++        val projected = ArgentumTableSnapshot.parse(state)
++        assertEquals("Animar, Soul of Elements", projected.players[1].commanderName)
++        val rows = commanderDamageTrackerRows(projected.players[0].commanderDamageReceived,
++            listOf(CommanderDamageTrackerSource(projected.players[1].id, projected.players[1].name,
++                projected.players[1].commanderName)))
++        assertEquals(1, rows.size)
++        assertEquals("Animar, Soul of Elements", rows.single().key)
++        assertEquals(20, rows.single().amount)
++    }
++
++    @Test fun commanderDamageTrackerPreservesLegacySeatAndSeparatePartnerCommanderCounts() {
++        val sources = listOf(CommanderDamageTrackerSource("p2", "Opponent", "First Commander"))
++        val manual = commanderDamageTrackerRows(mapOf("p2" to 7), sources)
++        assertEquals("p2", manual.single().key)
++        assertEquals(7, manual.single().amount)
++
++        val engine = commanderDamageTrackerRows(mapOf("First Commander" to 13, "Partner Commander" to 9), sources)
++        assertEquals(2, engine.size)
++        assertEquals("First Commander", engine[0].key)
++        assertEquals(13, engine[0].amount)
++        assertEquals("Partner Commander", engine[1].key)
++        assertEquals(9, engine[1].amount)
++        assertTrue(engine.none { it.amount >= 21 })
++    }
++
++    @Test fun commanderDamageTrackerDoesNotHideUnknownEngineSource() {
++        val rows = commanderDamageTrackerRows(mapOf("Unknown Commander" to 21),
++            listOf(CommanderDamageTrackerSource("p2", "Opponent", null)))
++        assertEquals(2, rows.size)
++        assertEquals(0, rows[0].amount)
++        assertEquals("Unknown Commander", rows[1].key)
++        assertEquals(21, rows[1].amount)
++    }
++
+ }
+diff --git a/android/app/src/test/java/com/arcanatable/ArgentumBlockSubmissionGuardTest.kt b/android/app/src/test/java/com/arcanatable/ArgentumBlockSubmissionGuardTest.kt
+new file mode 100644
+index 00000000..842c06f6
+--- /dev/null
++++ b/android/app/src/test/java/com/arcanatable/ArgentumBlockSubmissionGuardTest.kt
+@@ -0,0 +1,53 @@
++package com.arcanatable
++
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/** Replays the first accepted blocker action and later rejected duplicate from B136. */
++class ArgentumBlockSubmissionGuardTest {
++    @Test fun acceptedBlockersSuppressDuplicateUntilCombatAdvances() {
++        val guard = ArgentumBlockSubmissionGuard()
++        guard.onStep("DECLARE_BLOCKERS")
++        assertFalse(guard.submitted)
++        guard.markSent()
++        guard.onStep("DECLARE_BLOCKERS")  // v75: same step, action already accepted
++        assertTrue(guard.submitted)
++        guard.onError("INVALID_ACTION", "Blockers have already been declared")
++        assertTrue(guard.submitted)
++        guard.onStep("COMBAT_DAMAGE")
++        assertFalse(guard.submitted)
++    }
++
++    @Test fun invalidAssignmentAllowsCorrectionInSameBlockStep() {
++        val guard = ArgentumBlockSubmissionGuard()
++        guard.onStep("DECLARE_BLOCKERS")
++        guard.markSent()
++        guard.onError("INVALID_ACTION", "Creature with flying cannot be blocked by this creature")
++        assertFalse(guard.submitted)
++        guard.markSent()
++        guard.onStep("DECLARE_BLOCKERS")
++        assertTrue(guard.submitted)
++    }
++
++    @Test fun secondCombatThisTurnAndNewGameCanDeclareAgain() {
++        val guard = ArgentumBlockSubmissionGuard()
++        guard.onStep("DECLARE_BLOCKERS")
++        guard.markSent()
++        guard.onStep("END_COMBAT")
++        guard.onStep("DECLARE_BLOCKERS")
++        assertFalse(guard.submitted)
++        guard.markSent()
++        guard.reset()
++        guard.onStep("DECLARE_BLOCKERS")
++        assertFalse(guard.submitted)
++    }
++
++    @Test fun unrelatedConnectionErrorsDoNotClearSubmittedDeclaration() {
++        val guard = ArgentumBlockSubmissionGuard()
++        guard.onStep("DECLARE_BLOCKERS")
++        guard.markSent()
++        guard.onError("WIFI", "Connection interrupted")
++        assertTrue(guard.submitted)
++    }
++}
+diff --git a/android/app/src/test/java/com/arcanatable/GameOutcomeDetailsTest.kt b/android/app/src/test/java/com/arcanatable/GameOutcomeDetailsTest.kt
+index 444d7603..eda9439a 100644
+--- a/android/app/src/test/java/com/arcanatable/GameOutcomeDetailsTest.kt
++++ b/android/app/src/test/java/com/arcanatable/GameOutcomeDetailsTest.kt
+@@ -5,6 +5,9 @@ import com.wingedsheep.engine.core.GameEndReason
+ import com.wingedsheep.engine.core.GameEndedEvent
+ import com.wingedsheep.engine.core.PlayerLostEvent
+ import com.wingedsheep.engine.state.GameState
++import com.wingedsheep.engine.state.ComponentContainer
++import com.wingedsheep.engine.state.components.player.PlayerLostComponent
++import com.wingedsheep.engine.state.components.player.LossReason
+ import com.wingedsheep.sdk.model.EntityId
+ import org.json.JSONArray
+ import org.json.JSONObject
+@@ -118,6 +121,52 @@ class GameOutcomeDetailsTest {
+         assertTrue(ArgentumOutcomeLog.banner(noWinner, null, emptyMap()).contains("No winner."))
+     }
+ 
++    @Test fun lastHumanEliminatedFromFourPlayerPodDoesNotDeclareWinnerOrDraw() {
++        val ai2 = EntityId("offline-ai-2")
++        val ai3 = EntityId("offline-ai-3")
++        val state = GameState(
++            turnOrder = listOf(winner, loser, ai2, ai3),
++            entities = mapOf(winner to ComponentContainer.of(PlayerLostComponent(LossReason.LIFE_ZERO))),
++            winnerId = null,
++            gameOver = false,
++        )
++        val packet = GameOutcomeDetails.toHumanEliminatedMessage(
++            state, winner, names,
++            listOf(PlayerLostEvent(winner, GameEndReason.LIFE_ZERO, "Combat damage reduced life to 0.")),
++        )
++        assertEquals("gameOver", packet.getString("type"))
++        assertEquals("YOU_LOST", packet.getString("reason"))
++        assertTrue(packet.getBoolean("matchUnfinished"))
++        assertEquals(3, packet.getInt("activePlayersRemaining"))
++        assertTrue(packet.isNull("winnerId"))
++        assertEquals("offline-you", packet.getString("eliminatedPlayerId"))
++        assertEquals("LIFE_ZERO", packet.getString("engineReason"))
++        assertEquals("Combat damage reduced life to 0.", packet.getString("winCondition"))
++        assertEquals("LIFE_ZERO", packet.getJSONArray("losers").getJSONObject(0).getString("reason"))
++        assertTrue(packet.getString("message").contains("3 other player(s) were still active"))
++        assertTrue(ArgentumOutcomeLog.diagnostic(packet, emptyMap()).contains("match unfinished"))
++        assertTrue(ArgentumOutcomeLog.banner(packet, "offline-you", emptyMap()).contains("You were eliminated"))
++        assertFalse(ArgentumOutcomeLog.banner(packet, "offline-you", emptyMap()).contains("No winner."))
++    }
++
++    @Test fun unknownEliminationReasonIsMarkedUnknownRatherThanBlamingAnotherPlayer() {
++        val ai2 = EntityId("offline-ai-2")
++        // Deliberately unavailable viewer state: a legacy/partial terminal notice must not
++        // borrow another player's card-effect reason.
++        val state = GameState(
++            turnOrder = listOf(loser, ai2),
++            entities = mapOf(ai2 to ComponentContainer.of(PlayerLostComponent(LossReason.CARD_EFFECT))),
++            winnerId = null,
++            gameOver = false,
++        )
++        val previous = PlayerLostEvent(ai2, GameEndReason.CARD_EFFECT, "Old card effect.")
++        val packet = GameOutcomeDetails.toHumanEliminatedMessage(state, winner, names, listOf(previous))
++        assertEquals("UNKNOWN", packet.getString("engineReason"))
++        assertTrue(packet.isNull("winCondition"))
++        assertFalse(packet.getString("message").contains("Old card effect"))
++        assertTrue(packet.getBoolean("matchUnfinished"))
++    }
++
+     @Test fun legacyOnlinePacketStillProvidesAnEndMessage() {
+         val packet = JSONObject().put("winnerId", "seat-2").put("reason", "YOU_LOST")
+         assertTrue(ArgentumOutcomeLog.banner(packet, "seat-1", mapOf("seat-2" to "Opponent")).contains("Opponent won."))

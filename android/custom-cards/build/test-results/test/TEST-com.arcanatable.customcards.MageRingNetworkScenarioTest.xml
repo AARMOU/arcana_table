@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.MageRingNetworkScenarioTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:28.841Z" hostname="runnervmtai0g" time="0.01">
+  <properties/>
+  <testcase name="mayNotRemoveMoreCountersThanAreAvailable" classname="com.arcanatable.customcards.MageRingNetworkScenarioTest" time="0.003"/>
+  <testcase name="tapsForOneColorlessWithoutCounters" classname="com.arcanatable.customcards.MageRingNetworkScenarioTest" time="0.002"/>
+  <testcase name="storesCountersThenPaysAChosenNumberForThatMuchColorlessMana" classname="com.arcanatable.customcards.MageRingNetworkScenarioTest" time="0.005"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

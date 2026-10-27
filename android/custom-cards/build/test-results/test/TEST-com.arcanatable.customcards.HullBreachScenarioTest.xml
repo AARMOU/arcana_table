@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.HullBreachScenarioTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:24.914Z" hostname="runnervmtai0g" time="0.054">
+  <properties/>
+  <testcase name="thirdModeDestroysBothChosenArtifactAndEnchantment" classname="com.arcanatable.customcards.HullBreachScenarioTest" time="0.054"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

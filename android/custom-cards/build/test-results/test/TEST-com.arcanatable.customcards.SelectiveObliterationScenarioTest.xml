@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.SelectiveObliterationScenarioTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:39.018Z" hostname="runnervmtai0g" time="0.335">
+  <properties/>
+  <testcase name="exileIsNotTargetingOrDestructionAndAppliesToNoncreaturePermanents" classname="com.arcanatable.customcards.SelectiveObliterationScenarioTest" time="0.048"/>
+  <testcase name="eachPlayerKeepsOnlyTheirOwnChosenMonocolor" classname="com.arcanatable.customcards.SelectiveObliterationScenarioTest" time="0.049"/>
+  <testcase name="usesCurrentControllerChoiceButExilesIntoTheOwnersZone" classname="com.arcanatable.customcards.SelectiveObliterationScenarioTest" time="0.047"/>
+  <testcase name="colorlessLandsArtifactsAndDevoidCreaturesSurviveEveryChoice" classname="com.arcanatable.customcards.SelectiveObliterationScenarioTest" time="0.049"/>
+  <testcase name="jsonExportIsByteStableAndPreservesTheEntirePipeline" classname="com.arcanatable.customcards.SelectiveObliterationScenarioTest" time="0.001"/>
+  <testcase name="multicolorIsExiledEvenWhenItIncludesTheChosenColor" classname="com.arcanatable.customcards.SelectiveObliterationScenarioTest" time="0.047"/>
+  <testcase name="threePlayersChooseInApnapOrderBeforeAnyPermanentLeaves" classname="com.arcanatable.customcards.SelectiveObliterationScenarioTest" time="0.048"/>
+  <testcase name="allColoredManaCannotPayAndMixedManaPaysExactlyTwoRequiredColorless" classname="com.arcanatable.customcards.SelectiveObliterationScenarioTest" time="0.046"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

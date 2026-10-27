@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.InquisitorGreyfaxScenarioTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:25.029Z" hostname="runnervmtai0g" time="0.25">
+  <properties/>
+  <testcase name="losingTheOnlyTargetBeforeResolutionAlsoPreventsInvestigating" classname="com.arcanatable.customcards.InquisitorGreyfaxScenarioTest" time="0.054"/>
+  <testcase name="wisdomAffectsOnlyOtherCreaturesYouControlAndFollowsSourceLeaving" classname="com.arcanatable.customcards.InquisitorGreyfaxScenarioTest" time="0.071"/>
+  <testcase name="huntTapsAnEnemyAndCreatesAClueThatCanBeSacrificedToDraw" classname="com.arcanatable.customcards.InquisitorGreyfaxScenarioTest" time="0.054"/>
+  <testcase name="huntCannotTargetYourOwnCreature" classname="com.arcanatable.customcards.InquisitorGreyfaxScenarioTest" time="0.07"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

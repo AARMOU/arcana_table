@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ui.HomeScreenSizesTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:18:27.291Z" hostname="runnervmtai0g" time="1.036">
+  <properties/>
+  <testcase name="phonePortrait" classname="com.arcanatable.ui.HomeScreenSizesTest" time="0.17"/>
+  <testcase name="foldableUnfolded" classname="com.arcanatable.ui.HomeScreenSizesTest" time="0.192"/>
+  <testcase name="foldableCoverScreen" classname="com.arcanatable.ui.HomeScreenSizesTest" time="0.151"/>
+  <testcase name="phoneLandscape" classname="com.arcanatable.ui.HomeScreenSizesTest" time="0.16"/>
+  <testcase name="multiplayerOnlyShowsUnifiedLobbyRoutes" classname="com.arcanatable.ui.HomeScreenSizesTest" time="0.127"/>
+  <testcase name="scenariosOpenFromHeaderWithoutHuntingBelowDeck" classname="com.arcanatable.ui.HomeScreenSizesTest" time="0.236"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

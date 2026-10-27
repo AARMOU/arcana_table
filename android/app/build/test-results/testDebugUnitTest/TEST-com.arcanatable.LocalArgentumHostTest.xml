@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.LocalArgentumHostTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:17:33.419Z" hostname="runnervmtai0g" time="0.569">
+  <properties/>
+  <testcase name="offlineGameRunsThroughArcanasProtocol" classname="com.arcanatable.LocalArgentumHostTest" time="0.569"/>
+  <system-out><![CDATA[[offline-host] messages=201 turn=18 passes=18 decisions=8 over=true first=[connected, quickGameLobbyState, gameStarted, mulliganDecision]
+]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

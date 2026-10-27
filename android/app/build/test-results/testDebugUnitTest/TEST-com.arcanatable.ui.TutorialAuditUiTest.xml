@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.ui.TutorialAuditUiTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:18:29.136Z" hostname="runnervmtai0g" time="62.716">
+  <properties/>
+  <testcase name="learnMagicChapters" classname="com.arcanatable.ui.TutorialAuditUiTest" time="17.088"/>
+  <testcase name="appControlChapters" classname="com.arcanatable.ui.TutorialAuditUiTest" time="15.637"/>
+  <testcase name="practiceChapters" classname="com.arcanatable.ui.TutorialAuditUiTest" time="29.991"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

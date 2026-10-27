@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.SufferThePastScenarioTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:42.213Z" hostname="runnervmtai0g" time="0.436">
+  <properties/>
+  <testcase name="oneTargetLeavingGraveyardBeforeResolutionOnlyCountsRemainingExile" classname="com.arcanatable.customcards.SufferThePastScenarioTest" time="0.047"/>
+  <testcase name="theSameCardCannotBeChosenTwiceForX" classname="com.arcanatable.customcards.SufferThePastScenarioTest" time="0.047"/>
+  <testcase name="xTargetsAreExiledAndLifeChangesByTheNumberActuallyExiled" classname="com.arcanatable.customcards.SufferThePastScenarioTest" time="0.049"/>
+  <testcase name="playerBecomingHexproofOnTheStackStillExilesCardsButOnlyGainsLife" classname="com.arcanatable.customcards.SufferThePastScenarioTest" time="0.053"/>
+  <testcase name="threePlayersOnlyTheTargetedPlayersGraveyardAndLifeAreAffected" classname="com.arcanatable.customcards.SufferThePastScenarioTest" time="0.047"/>
+  <testcase name="cardTargetsMustComeFromTheTargetedPlayersGraveyard" classname="com.arcanatable.customcards.SufferThePastScenarioTest" time="0.045"/>
+  <testcase name="canTargetYourOwnGraveyard" classname="com.arcanatable.customcards.SufferThePastScenarioTest" time="0.055"/>
+  <testcase name="zeroXExilesNothingAndChangesNoLife" classname="com.arcanatable.customcards.SufferThePastScenarioTest" time="0.046"/>
+  <testcase name="cannotCastWithMoreTargetsThanCardsInChosenGraveyard" classname="com.arcanatable.customcards.SufferThePastScenarioTest" time="0.046"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

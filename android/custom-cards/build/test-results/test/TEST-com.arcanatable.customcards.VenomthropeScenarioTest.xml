@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.VenomthropeScenarioTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:46.674Z" hostname="runnervmtai0g" time="0.002">
+  <properties/>
+  <testcase name="hasAllThreePrintedKeywordsAndExactStats" classname="com.arcanatable.customcards.VenomthropeScenarioTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

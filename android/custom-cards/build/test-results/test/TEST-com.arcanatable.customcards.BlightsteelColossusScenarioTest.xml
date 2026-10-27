@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.arcanatable.customcards.BlightsteelColossusScenarioTest" tests="1" skipped="0" failures="0" errors="0" timestamp="2026-10-27T01:14:10.896Z" hostname="runnervmtai0g" time="0.007">
+  <properties/>
+  <testcase name="graveyardReplacementShufflesColossusIntoOwnersLibrary" classname="com.arcanatable.customcards.BlightsteelColossusScenarioTest" time="0.007"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

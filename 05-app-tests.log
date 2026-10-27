@@ -1,0 +1,84 @@
+To honour the JVM settings for this build a single-use Daemon process will be forked. For more on this, please refer to https://docs.gradle.org/8.13/userguide/gradle_daemon.html#sec:disabling_the_daemon in the Gradle documentation.
+Daemon will be stopped at the end of the build 
+
+> Configure project :app
+w: ⚠️ Deprecated Gradle Version
+The used Gradle version (Gradle 8.13) is deprecated and will not be supported in future Kotlin Gradle Plugin releases.
+The minimum supported Gradle version will become Gradle 8.14.4 in Kotlin 2.5.0.
+
+This warning can be suppressed in 'gradle.properties':
+    kotlin.suppressGradlePluginWarnings=DeprecatedGradleVersionWarning
+Solution: Please update the Gradle version to at least Gradle 8.14.4.
+
+
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:generateDebugBuildConfig
+> Task :app:checkDebugAarMetadata
+> Task :app:processDebugNavigationResources
+> Task :app:compileDebugNavigationResources
+> Task :app:generateDebugResValues
+> Task :app:mapDebugSourceSetPaths
+> Task :app:generateDebugResources
+> Task :app:packageDebugResources
+> Task :app:mergeDebugResources
+> Task :app:createDebugCompatibleScreenManifests
+> Task :app:extractDeepLinksDebug
+> Task :app:parseDebugLocalResources
+> Task :app:processDebugMainManifest
+> Task :app:processDebugManifest
+> Task :app:processDebugManifestForPackage
+> Task :app:javaPreCompileDebug
+> Task :app:preDebugUnitTestBuild UP-TO-DATE
+> Task :app:javaPreCompileDebugUnitTest FROM-CACHE
+> Task :app:mergeDebugShaders
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets
+> Task :app:processDebugResources
+> Task :app:processDebugUnitTestManifest
+> Task :app:packageDebugUnitTestForUnitTest
+> Task :app:generateDebugUnitTestConfig
+> Task :app:compileDebugKotlin
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/ArgentumCloud.kt:161:29 'when' expression over a subject of type 'Any?' is not exhaustive. Add a 'null' or 'else' branch.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/CloudRoomClient.kt:50:33 The corresponding parameter in the supertype 'WebSocketListener' is named 'webSocket'. This may cause problems when calling this function with named arguments.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/CloudRoomClient.kt:63:36 The corresponding parameter in the supertype 'WebSocketListener' is named 'webSocket'. This may cause problems when calling this function with named arguments.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/CloudRoomClient.kt:85:36 The corresponding parameter in the supertype 'WebSocketListener' is named 'webSocket'. This may cause problems when calling this function with named arguments.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/CloudRoomClient.kt:90:35 The corresponding parameter in the supertype 'WebSocketListener' is named 'webSocket'. This may cause problems when calling this function with named arguments.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/CloudRoomClient.kt:95:36 The corresponding parameter in the supertype 'WebSocketListener' is named 'webSocket'. This may cause problems when calling this function with named arguments.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/DeckBuilderScreen.kt:240:108 Unnecessary safe call on a non-null receiver of type 'DeckSummary'.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/DeckBuilderScreen.kt:369:25 'fun TabRow(selectedTabIndex: Int, modifier: Modifier = ..., containerColor: Color = ..., contentColor: Color = ..., indicator: ComposableFunction1<List<TabPosition>, Unit> = ..., divider: ComposableFunction0<Unit> = ..., tabs: ComposableFunction0<Unit>): Unit' is deprecated. Replaced with PrimaryTabRow and SecondaryTabRow.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/DeckImport.kt:132:39 Unnecessary non-null assertion (!!) on a non-null receiver of type 'String'.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/LanConnectionService.kt:48:132 'static field WIFI_MODE_FULL_HIGH_PERF: Int' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/PlayFeed.kt:122:38 Unnecessary safe call on a non-null receiver of type 'JSONObject'.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/StackUse.kt:33:33 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'JSONObject?'.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/TableController.kt:1694:146 Unnecessary safe call on a non-null receiver of type 'ScryfallCard'.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/TableController.kt:1697:105 Unnecessary safe call on a non-null receiver of type 'String'.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/TableDialogs.kt:1481:62 Unnecessary non-null assertion (!!) on a non-null receiver of type 'SupportedCardCatalog'.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/TableEffects.kt:411:27 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/TableEffects.kt:412:27 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/TableMainLayout.kt:213:39 'val Icons.Filled.Chat: ImageVector' is deprecated. Use the AutoMirrored version at Icons.AutoMirrored.Filled.Chat.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/main/java/com/arcanatable/TableOverlays.kt:356:78 Unnecessary safe call on a non-null receiver of type 'JSONObject'.
+
+> Task :app:compileDebugJavaWithJavac
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:bundleDebugClassesToRuntimeJar
+> Task :app:processDebugJavaRes
+
+> Task :app:compileDebugUnitTestKotlin
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/test/java/com/arcanatable/LunarWhaleCrewTest.kt:52:88 Unnecessary non-null assertion (!!) on a non-null receiver of type 'ArgentumCrew'.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/test/java/com/arcanatable/LunarWhaleTopLibraryTest.kt:81:17 Only safe (?.) or non-null asserted (!!.) calls are allowed on a nullable receiver of type 'JSONObject?'.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/test/java/com/arcanatable/OfflineLagFixTest.kt:111:27 Unnecessary non-null assertion (!!) on a non-null receiver of type 'Pair<String, Int>'.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/test/java/com/arcanatable/OfflineLagFixTest.kt:111:45 Unnecessary non-null assertion (!!) on a non-null receiver of type 'JSONObject'.
+w: file:///home/runner/work/arcana_table/arcana_table/android/app/src/testDebug/java/com/arcanatable/TestScenariosTest.kt:281:36 Unnecessary non-null assertion (!!) on a non-null receiver of type 'JSONObject'.
+
+> Task :app:compileDebugUnitTestJavaWithJavac NO-SOURCE
+> Task :app:processDebugUnitTestJavaRes
+> Task :app:testDebugUnitTest
+gradle/actions: Writing build results to /home/runner/work/_temp/.gradle-actions/build-results/apptests-1793063690669.json
+
+[Incubating] Problems report is available at: file:///home/runner/work/arcana_table/arcana_table/android/build/reports/problems/problems-report.html
+
+BUILD SUCCESSFUL in 4m 44s
+31 actionable tasks: 30 executed, 1 from cache

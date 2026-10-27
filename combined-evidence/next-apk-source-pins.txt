@@ -1,0 +1,15 @@
+Build134 release source PR #265: 1751f1893cc4706572d4f4382e6b0a137bf46536
+Build134 upgraded engine and Eldrazi gates: PR #260 b32e499a65f0a4a9b70367a67ea00f91eef8dbaa
+weekly-automation bfce3f0d24c3a8cad28a5a729df3dbba16dd079b
+table-ui 44105eead435b0e3b759b7d631a659990b7388e3
+ai-difficulty e99b4954ad80885af0e338f7df87b1b4587bc5df
+cross-network-multiplayer 6641f1883f54ca3a13c8faa7ef0b01b05976ef74
+claude-fullscreen-ready-lobby 79dcd0c58837305fcd1f8790fbf052af214d204b (PR283)
+quiet-import-notices 82eb18a96ddf80a9bd31b7adf2cc244b588e2f25 (PR287; six-file diff only)
+PR282 8e4702065dff96ba7ce0a64cd5d420fb54def43d
+advanced-deck-library 5a64b631b9d7185c7fb4102a58afa9aa237746c0
+unified-multiplayer-lobby cdcfe759501d044c73b35cba4e6838ffa1ef8b82
+combat-outcome-and-commander-tracker c7f95db09560be4249d89b1288f2dccebe14a45e
+ugin-integration 49f7f7389b940accf2e2321130407e579cb2ee4c
+eldrazi-temple-projected-subtypes e57c462d17075ad3d1f2eee249d75edb04b2572a
+claude-tutorial-all-20-chapters dfccf7ff456e953f099930c426b8dee5554314ba
