@@ -57,6 +57,24 @@ class WorkflowAuditTest(unittest.TestCase):
         self.assertTrue(any('contiguous' in x for x in audit(
             a, b.replace(step, '').replace('      - name: gate 4\n', step + '      - name: gate 4\n'))))
 
+    def test_contiguous_packaging_before_final_shared_gate_rejected(self):
+        a, b = fixture()
+        marker = '      - name: Build installable combined test APK\n'
+        before, packaging = b.split(marker, 1)
+        packaging = marker + packaging
+        moved = before.replace('      - name: gate 27\n', packaging + '      - name: gate 27\n')
+        self.assertEqual(len(steps(moved)), 36)
+        self.assertTrue(any('must follow all shared release gates' in x for x in audit(a, moved)))
+
+    def test_contiguous_packaging_before_first_shared_gate_rejected(self):
+        a, b = fixture()
+        marker = '      - name: Build installable combined test APK\n'
+        before, packaging = b.split(marker, 1)
+        packaging = marker + packaging
+        moved = before.replace('      - name: gate 1\n', packaging + '      - name: gate 1\n')
+        self.assertEqual(len(steps(moved)), 36)
+        self.assertTrue(any('must follow all shared release gates' in x for x in audit(a, moved)))
+
     def test_commented_upload_condition_does_not_count(self):
         a, b = fixture()
         self.assertTrue(any('upload' in x for x in audit(
