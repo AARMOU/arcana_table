@@ -13,6 +13,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -51,6 +54,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -191,6 +195,39 @@ internal object TutorialActions {
     fun hold(target: String) { onGesture?.invoke(target, "hold") }
 }
 
+
+/**
+ * The coach lives in a region disjoint from the highlighted control; the real
+ * card content can scroll inside that region instead of relying on a fixed
+ * estimated text height. Coordinates are relative to the coach window.
+ */
+internal data class TutorialCoachTarget(val left: Dp, val top: Dp, val right: Dp, val bottom: Dp)
+internal data class TutorialCoachRegion(
+    val x: Dp, val y: Dp, val width: Dp, val height: Dp,
+    val bottomAligned: Boolean = false,
+    val dock: String = "top",
+)
+
+internal fun tutorialCoachRegion(maxW: Dp, maxH: Dp, target: TutorialCoachTarget?): TutorialCoachRegion {
+    val margin = 12.dp
+    val gap = 10.dp
+    val cardWidth = (maxW - 2 * margin).coerceAtLeast(1.dp).coerceAtMost(360.dp)
+    val fullHeight = (maxH - 2 * margin).coerceAtLeast(1.dp)
+    if (target == null) return TutorialCoachRegion(margin, margin, cardWidth, fullHeight)
+    val above = (target.top - gap - margin).coerceAtLeast(0.dp)
+    val below = (maxH - target.bottom - gap - margin).coerceAtLeast(0.dp)
+    val left = (target.left - gap - margin).coerceAtLeast(0.dp)
+    val right = (maxW - target.right - gap - margin).coerceAtLeast(0.dp)
+    // A wide unfolded phone can use a side rail when the target splits a short window.
+    if (maxOf(above, below) < 180.dp && maxOf(left, right) >= 220.dp) {
+        return if (right >= left)
+            TutorialCoachRegion(target.right + gap, margin, right.coerceAtMost(360.dp), fullHeight, dock = "right")
+        else TutorialCoachRegion(margin, margin, left.coerceAtMost(360.dp), fullHeight, dock = "left")
+    }
+    return if (below >= above)
+        TutorialCoachRegion(margin, target.bottom + gap, cardWidth, below.coerceAtLeast(1.dp), dock = "below")
+    else TutorialCoachRegion(margin, margin, cardWidth, above.coerceAtLeast(1.dp), bottomAligned = true, dock = "above")
+}
 
 /**
  * Coach marks displayed above the actual table. The genuine game remains underneath.
