@@ -17,10 +17,10 @@ on:
         required: false
         type: string
       version_code:
-        description: "Fast debug APK integer versionCode (>=136). No production signing."
+        description: "Next fast debug APK integer versionCode (>=137). No production signing."
         required: false
         type: string
-        default: "136"
+        default: "137"
 
 permissions:
   contents: read
@@ -173,6 +173,20 @@ jobs:
       - name: Install Android compile SDK
         shell: bash
         run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Require reviewed final tutorial and B137 regression source in assembled tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s android/app/src/main/java/com/arcanatable/ArgentumBlockSubmissionGuard.kt
+          test -s android/app/src/test/java/com/arcanatable/ArgentumBlockSubmissionGuardTest.kt
+          test -s android/app/src/test/java/com/arcanatable/MultiplayerLobbyVisibilityTest.kt
+          test -s android/app/src/test/java/com/arcanatable/TutorialWalkthroughTest.kt
+          test -s android/app/src/test/java/com/arcanatable/TutorialRunTest.kt
+          test -s android/app/src/test/java/com/arcanatable/ui/TutorialAuditUiTest.kt
+          grep -F 'class TutorialRun' android/app/src/main/java/com/arcanatable/TutorialProgress.kt
+          grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+          grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' android/app/src/main/java/com/arcanatable/TableArgentum.kt
+          echo 'PASS: no pre-tutorial or pre-lobby/blocker source may reach assembly'
       - name: Stamp isolated FAST TEST version without changing repository
         shell: bash
         env:
@@ -194,7 +208,13 @@ jobs:
             --tests 'com.arcanatable.ui.ArgentumResilienceUiTest' \
             --tests 'com.arcanatable.GameOutcomeDetailsTest' \
             --tests 'com.arcanatable.ArgentumBackendTest' \
-            --tests 'com.arcanatable.UginExportedRuntimeTest'
+            --tests 'com.arcanatable.UginExportedRuntimeTest' \
+            --tests 'com.arcanatable.MultiplayerLobbyVisibilityTest' \
+            --tests 'com.arcanatable.ArgentumBlockSubmissionGuardTest' \
+            --tests 'com.arcanatable.TutorialRunTest' \
+            --tests 'com.arcanatable.TutorialWalkthroughTest' \
+            --tests 'com.arcanatable.ui.TutorialAuditUiTest' \
+            --tests 'com.arcanatable.ui.TutorialScreensTest'
       - name: Fail if any focused Android test did not execute cleanly
         shell: bash
         run: |
@@ -204,7 +224,10 @@ jobs:
           root=Path('android/app/build/test-results/testDebugUnitTest')
           names=['HomeScreenSizesTest','DeckBuilderUiTest','DeckSupportTest','ReleaseFeaturesTest',
                  'TutorialPracticeScenariosTest','TutorialPriorityHostTest','ArgentumResilienceUiTest',
-                 'GameOutcomeDetailsTest','ArgentumBackendTest','UginExportedRuntimeTest']
+                 'GameOutcomeDetailsTest','ArgentumBackendTest','UginExportedRuntimeTest',
+                 'MultiplayerLobbyVisibilityTest','ArgentumBlockSubmissionGuardTest',
+                 'TutorialRunTest','TutorialWalkthroughTest','TutorialAuditUiTest',
+                 'TutorialScreensTest']
           for name in names:
               xml=list(root.glob('TEST-*'+name+'.xml'))
               assert len(xml)==1,(name,xml)
@@ -212,7 +235,7 @@ jobs:
               assert int(tree.get('tests','0'))>0,(name,'no tests')
               for key in ('failures','errors','skipped'):
                   assert int(tree.get(key,'0'))==0,(name,key,tree.attrib)
-          print('PASS: all ten focused Android/Compose suites ran, 0 failures/errors/skips')
+          print('PASS: all sixteen focused Android/Compose suites ran, 0 failures/errors/skips')
           PY
       - name: Verify package, original logo, tutorials and debug-only signature
         shell: bash
