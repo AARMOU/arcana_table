@@ -20,7 +20,7 @@ INDEXES = [
 ]
 OUTPUT = ROOT / "investigation/argentum-six-precons/eldrazi-cardkit-report"
 
-# SHA-256 of sorted "original card name\\tquantity\\n" records from the
+# SHA-256 of sorted "original card name\tquantity\n" records from the
 # immutable original Wizards deck manifests. Only names and counts are pinned:
 # metadata/order changes do not masquerade as substitutions. These digests
 # were independently calculated from manifest blob dcc6ce418422d221a87df04e233d4f1df7c9cc05.
@@ -43,10 +43,10 @@ def original_deck_digest(cards: list[dict]) -> str:
         if name in seen:
             raise ValueError(f"Duplicate original card name: {name}")
         seen.add(name)
-        rows.append(f"{name}\\t{quantity}")
+        rows.append(f"{name}\t{quantity}")
     if not rows:
         raise ValueError("Empty original deck")
-    canonical = "\\n".join(sorted(rows)) + "\\n"
+    canonical = "\n".join(sorted(rows)) + "\n"
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
