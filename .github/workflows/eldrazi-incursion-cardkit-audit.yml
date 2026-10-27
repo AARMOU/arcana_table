@@ -67,6 +67,8 @@ jobs:
           assert report["noPaidWorkerAuthorization"] is True
           assert report["originalDeckIdentityVerified"] is True
           assert report["allExportIndexParityVerified"] is True, "Ghost upstream index entries could inflate coverage"
+          assert report["sharedIndexKindsVerified"] is True, "Cross-library card/token conflict not checked"
+          assert report["sharedIndexNameCount"] >= 0
           assert report["allExportCount"] > 0, "Missing upstream serialized definitions"
           assert "android/app/src/main/assets/argentum/all-cards.jsonl" in report["inputSha256"]
           assert report["customExportIndexParityVerified"] is True, "Ghost custom index entries could inflate coverage"
