@@ -5,6 +5,7 @@ on:
     paths:
       - '.github/workflows/b137-issue-07-tutorial-layout-no-apk.yml'
       - 'android/app/src/main/java/com/arcanatable/TutorialCoach.kt'
+      - 'android/app/src/main/java/com/arcanatable/ArgentumScreens.kt'
       - 'android/app/src/test/java/com/arcanatable/TutorialCoachPlacementTest.kt'
       - 'android/app/src/test/java/com/arcanatable/ui/TutorialAuditUiTest.kt'
 permissions:
