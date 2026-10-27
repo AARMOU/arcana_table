@@ -54,6 +54,7 @@ jobs:
           test "$(git -C argentum-engine rev-parse HEAD)" = 7fb073337e4389cfabe2ebf4c6416633a7fc63d2
           test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt)" = 0e024338ec2d66c185ddec4aa1d61435845acf97
           test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt)" = 11c075d7480a9fb59911c6115ea2513d2e28ddf4
+          test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py)" = c18100b5ecab5e059bc226321397a3bef5871b6d
           test "$(git -C temple-port hash-object engine-upgrade/eldrazi-temple/port_to_upgraded.py)" = 9078e8e3c5e245593d4ab6155fdde70965ac088a
           test "$(git -C temple-gameplay hash-object engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt)" = f2b88843a34bf39dd5c54370f21c6bc85bb02426
           sha256sum android/app/libs/argentum-*.jar > /tmp/temple-committed-jars.sha
@@ -323,9 +324,20 @@ jobs:
               assert classes and max(classes) <= 61, max(classes)
           print("Runner-only Java 17 AI JAR now contains original filter implementation")
           PY
-      - name: Export Temple, run real custom-card and Android unit tests
+      - name: Export Temple against the upgraded SDK
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test :app:testDebugUnitTest
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+      - name: Test exact legacy JSONL wire migration and port shipped library in runner only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --self-test
+          python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --apply android/app/src/main/assets/argentum/all-cards.jsonl
+          # No checked-in assets, runtime JARs, or original deck manifests may change.
+          git diff --exit-code -- android/app/src/main/assets/argentum/all-cards.jsonl
+      - name: Run real custom-card and Android unit tests against matching SDK and library
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
       - name: Assert upgraded engine, Android scenarios, exact deck delta and deterministic export
         shell: bash
         run: |
