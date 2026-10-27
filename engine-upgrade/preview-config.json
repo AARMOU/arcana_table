@@ -1,5 +1,5 @@
 {
-  "upstream": "7fb073337e4389cfabe2ebf4c6416633a7fc63d2",
+  "upstream": "621552754f6e9901ba5b11242f669b8f8816c5d6",
   "validated_commit": "369b7ff442e1b0815d505a9599902d18008364ea",
   "validation_run": 39840218785,
   "expected_tests": 210,

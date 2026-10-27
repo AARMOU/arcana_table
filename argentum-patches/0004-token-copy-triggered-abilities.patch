@@ -54,7 +54,7 @@ index 38feb6809d..efab5f322f 100644
              // have no CardDefinition, so granted abilities live in GameState.grantedActivatedAbilities,
              // which the legal-action enumerator and ActivateAbilityHandler consult for any entity.
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenExecutor.kt
-index 8ea11fb1ca..abe51a05db 100644
+index 9310174780..ef939d299b 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenExecutor.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/token/CreateTokenExecutor.kt
 @@ -299,7 +299,9 @@ class CreateTokenExecutor(
@@ -68,7 +68,7 @@ index 8ea11fb1ca..abe51a05db 100644
              )
  
              val components = mutableListOf<Component>(
-@@ -428,24 +430,8 @@ class CreateTokenExecutor(
+@@ -434,24 +436,8 @@ class CreateTokenExecutor(
              }
          }
  
