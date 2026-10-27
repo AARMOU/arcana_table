@@ -55,8 +55,10 @@ def migrate(value, counts):
     return converted
 
 
-def migrate_jsonl(path):
+def migrate_jsonl(path, expected_mana=1, minimum_counters=1):
     path = Path(path)
+    if expected_mana < 0 or minimum_counters < 0:
+        raise ValueError("Negative migration expectations are invalid")
     original_hash = hashlib.sha256(path.read_bytes()).hexdigest()
     counts = {OLD_MANA: 0, OLD_COUNTERS: 0}
     rows = 0
@@ -79,8 +81,10 @@ def migrate_jsonl(path):
                     else:
                         output.write(json.dumps(new, ensure_ascii=False, separators=(",", ":")) + "\n")
                     rows += 1
-        if rows == 0 or any(v == 0 for v in counts.values()):
-            raise ValueError(f"Expected both legacy wire shapes in full library; found {counts}")
+        if (rows == 0 or counts[OLD_MANA] != expected_mana
+                or counts[OLD_COUNTERS] < minimum_counters):
+            raise ValueError(f"Unexpected legacy wire counts for {path.name}: {counts}; "
+                             f"expected mana={expected_mana}, counters>={minimum_counters}")
         os.replace(temporary, path)
     finally:
         if os.path.exists(temporary):
@@ -124,6 +128,28 @@ class MigrationTests(unittest.TestCase):
                 migrate({"type": tag, "newUnknownSemantic": True},
                         {OLD_MANA: 0, OLD_COUNTERS: 0})
 
+    def test_custom_jsonl_migrates_chosen_type_without_counter_effects(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "custom-cards.jsonl"
+            card = {"name": "Unclaimed Territory", "script": {"activatedAbilities": [
+                {"effect": {"type": OLD_MANA, "creatureOnly": True}}]}}
+            path.write_text(json.dumps(card) + "\n", encoding="utf-8")
+            migrate_jsonl(path, expected_mana=1, minimum_counters=0)
+            updated = json.loads(path.read_text())
+            self.assertEqual(updated["name"], "Unclaimed Territory")
+            self.assertEqual(updated["script"]["activatedAbilities"][0]["effect"],
+                             {"type": "AddManaOfChoice",
+                              "restriction": {"type": "OfChosenType", "creatureOnly": True}})
+
+    def test_custom_jsonl_rejects_unexpected_missing_mana_without_writing(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "custom-cards.jsonl"
+            original = json.dumps({"name": "Unrelated", "script": {}}) + "\n"
+            path.write_text(original, encoding="utf-8")
+            with self.assertRaises(ValueError):
+                migrate_jsonl(path, expected_mana=1, minimum_counters=0)
+            self.assertEqual(path.read_text(), original)
+
     def test_unrelated_card_content_unchanged(self):
         counts = {OLD_MANA: 0, OLD_COUNTERS: 0}
         old = {"name": "Eldrazi Temple", "script": {"activatedAbilities": [
@@ -136,12 +162,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--self-test", action="store_true")
     parser.add_argument("--apply")
+    parser.add_argument("--expected-mana", type=int, default=1)
+    parser.add_argument("--minimum-counters", type=int, default=1)
     args = parser.parse_args()
     if args.self_test:
         result = unittest.defaultTestLoader.loadTestsFromTestCase(MigrationTests)
         if not unittest.TextTestRunner(verbosity=2).run(result).wasSuccessful():
             raise SystemExit(1)
     elif args.apply:
-        migrate_jsonl(args.apply)
+        migrate_jsonl(args.apply, args.expected_mana, args.minimum_counters)
     else:
         parser.error("Specify --self-test or --apply")
