@@ -45,8 +45,8 @@ jobs:
           assets = Path("android/app/src/main/assets/argentum/custom-cards.jsonl")
           source = test.read_text(encoding="utf-8")
           match = re.search(
-              r"fun cardsDoNotInheritKeywordLabelsFromCreatedTokensOrAnimationEffects\\(\\)"
-              r"[\\s\\S]*?val names = setOf\\(([\\s\\S]*?)\\)", source
+              r"fun cardsDoNotInheritKeywordLabelsFromCreatedTokensOrAnimationEffects\(\)"
+              r"[\s\S]*?val names = setOf\(([\s\S]*?)\)", source
           )
           if not match or not assets.is_file():
               sys.exit("FAIL: keyword-probe test or pinned custom-card JSONL missing")
