@@ -55,7 +55,7 @@ jobs:
           test "$(git -C argentum-engine rev-parse HEAD)" = 7fb073337e4389cfabe2ebf4c6416633a7fc63d2
           test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt)" = 0e024338ec2d66c185ddec4aa1d61435845acf97
           test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt)" = 11c075d7480a9fb59911c6115ea2513d2e28ddf4
-          test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py)" = c18100b5ecab5e059bc226321397a3bef5871b6d
+          test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py)" = 39b91c7c30b30aed3d3e97c80768ba1e1f119a60
           test "$(git -C temple-port hash-object engine-upgrade/eldrazi-temple/port_to_upgraded.py)" = 9078e8e3c5e245593d4ab6155fdde70965ac088a
           test "$(git -C temple-gameplay hash-object engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt)" = f2b88843a34bf39dd5c54370f21c6bc85bb02426
           sha256sum android/app/libs/argentum-*.jar > /tmp/temple-committed-jars.sha
@@ -333,10 +333,24 @@ jobs:
         run: |
           set -euo pipefail
           python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --self-test
-          python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --apply android/app/src/main/assets/argentum/all-cards.jsonl
-          # This runner-only JSONL rewrite must be real; never commit it to source.
-          if git diff --quiet -- android/app/src/main/assets/argentum/all-cards.jsonl; then echo "Legacy ABI port made no change" >&2; exit 1; fi
-          git diff --check -- android/app/src/main/assets/argentum/all-cards.jsonl
+          compat=engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py
+          assets=android/app/src/main/assets/argentum
+          python3 "$compat" --apply "$assets/all-cards.jsonl" --expected-mana 1 --minimum-counters 1
+          # Exported custom-cards.jsonl is also consumed by OfflineCardLibrary,
+          # and may contain legacy wire shapes even when the committed asset did not.
+          # Keep the migration confined to disposable CI assets, never production.
+          python3 "$compat" --apply "$assets/custom-cards.jsonl" --expected-mana 1 --minimum-counters 0
+          for asset in all-cards.jsonl custom-cards.jsonl; do
+            if git diff --quiet -- "$assets/$asset"; then
+              echo "Legacy ABI port made no change to $asset" >&2
+              exit 1
+            fi
+            git diff --check -- "$assets/$asset"
+            if grep -Eq '"type"[[:space:]]*:[[:space:]]*"(DoubleCounterPlacement|AddAnyColorManaSpendOnChosenType)"' "$assets/$asset"; then
+              echo "Legacy wire type remains in $asset" >&2
+              exit 1
+            fi
+          done
       - name: Run real custom-card and Android unit tests against matching SDK and library
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
@@ -425,6 +439,9 @@ jobs:
           PY
           sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/temple-export-1.sha
           (cd android && ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards)
+          # Reapply the same deterministic, strict runner-only ABI migration:
+          # the export task emits legacy custom-card wire shapes before migration.
+          python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --apply android/app/src/main/assets/argentum/custom-cards.jsonl --expected-mana 1 --minimum-counters 0
           sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/temple-export-2.sha
           diff -u /tmp/temple-export-1.sha /tmp/temple-export-2.sha
           git diff --check
