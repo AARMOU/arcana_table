@@ -852,6 +852,8 @@ internal fun TableController.TableOverlays() {
     argentumAttackPlan?.let { plan ->
         ArgentumAttackBoard(plan, ::argentumPiece, busy = argentumAwaitingUpdate,
             opponentBlockers = argentumSnapshot?.let { snap -> opponentBlockers(snap.players, snap.viewingPlayer) }.orEmpty(),
+            players = argentumSnapshot?.players.orEmpty(),
+            viewerId = argentumSnapshot?.let { snap -> snap.players.getOrNull(snap.viewingPlayer)?.id },
             onConfirm = { action ->
                 val epoch = ArgentumActions.epochFor(plan.legalAction, argentumSnapshot?.interactionEpoch)
                 if (epoch != null && submitArgentumAction(action, epoch)) {
@@ -865,6 +867,7 @@ internal fun TableController.TableOverlays() {
     argentumBlockPlan?.let { plan ->
         ArgentumBlockBoard(plan, ::argentumPiece, busy = argentumAwaitingUpdate,
             warning = argentumLastError?.takeIf { it.contains("block", ignoreCase = true) },
+            defender = argentumSnapshot?.let { snap -> snap.players.getOrNull(snap.viewingPlayer) },
             onConfirm = { action ->
                 val epoch = ArgentumActions.epochFor(plan.legalAction, argentumSnapshot?.interactionEpoch)
                 if (epoch != null && submitArgentumAction(action, epoch)) {

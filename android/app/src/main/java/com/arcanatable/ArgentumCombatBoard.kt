@@ -59,7 +59,6 @@ import org.json.JSONObject
 data class CombatPiece(val id: String, val name: String, val card: GameCard? = null, val life: Int? = null)
 
 private val CombatKeywords = listOf("FLYING", "REACH", "FIRST_STRIKE", "DOUBLE_STRIKE", "TRAMPLE", "DEATHTOUCH", "LIFELINK", "MENACE", "VIGILANCE", "INDESTRUCTIBLE", "HEXPROOF", "SHADOW", "HORSEMANSHIP")
-private val StandoutCombatKeywords = setOf("trample", "flying", "deathtouch", "first strike", "double strike", "menace")
 
 /** "2/2 first strike" — power/toughness and combat keywords, as on the summary line. */
 fun combatStats(card: GameCard?): String {
@@ -84,273 +83,15 @@ fun blockSummary(attackers: List<CombatPiece>, blockers: List<CombatPiece>, sele
     }
 }
 
-@Composable
-private fun CombatTile(piece: CombatPiece, width: androidx.compose.ui.unit.Dp, selected: Boolean, linked: Boolean, enabled: Boolean,
-                       onClick: () -> Unit, onBounds: (Rect) -> Unit, badge: String? = null) {
-    var zoomed by remember { mutableStateOf<PickCard?>(null) }
-    val ring = when { selected -> CounterGold; linked -> Mint; else -> Color.Transparent }
-    Column(
-        Modifier.width(width).onGloballyPositioned { onBounds(it.boundsInRoot()) }.testTag("combat-${piece.id}"),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Box(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).border(3.dp, ring, RoundedCornerShape(10.dp)).padding(3.dp)) {
-            // The board itself shows who attacks and blocks, so the card's own combat badge is dropped.
-            if (piece.card != null) CardFace(piece.card.copy(combatRole = null), Modifier.fillMaxWidth(), onClick = { if (enabled) onClick() }, onLongClick = { zoomed = piece.card.toCombatPick() }, showCounters = true)
-            else Box(
-                Modifier.fillMaxWidth().aspectRatio(1.1f).clip(RoundedCornerShape(8.dp)).background(PanelLight)
-                    .clickable(enabled = enabled, onClick = onClick),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(piece.name, color = SoftWhite, fontSize = 11.sp, fontWeight = FontWeight.Black, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    piece.life?.let { Text("$it", color = Mint, fontSize = 22.sp, fontWeight = FontWeight.Black) }
-                }
-            }
-            if (badge != null) Text(badge, color = Ink, fontSize = 10.sp, fontWeight = FontWeight.Black,
-                modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).clip(RoundedCornerShape(5.dp)).background(Mint).padding(horizontal = 5.dp, vertical = 2.dp))
-        }
-        if (piece.card != null) Text(piece.name, color = SoftWhite, fontSize = 9.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 2.dp))
-        piece.card?.let { card ->
-            if (card.power != null && card.toughness != null) Text("${card.power}/${card.toughness}", color = Muted, fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            combatKeywords(card).forEach { keyword ->
-                Text(keyword, color = if (keyword in StandoutCombatKeywords) Color(0xFFFFB4A8) else CounterGold, fontSize = 7.sp, fontWeight = FontWeight.Black, maxLines = 1,
-                    modifier = Modifier.padding(top = 2.dp).clip(RoundedCornerShape(3.dp)).background(Panel).padding(horizontal = 3.dp, vertical = 1.dp))
-            }
-        }
-    }
-    zoomed?.let { PickZoom(it) { zoomed = null } }
-}
-
 private fun GameCard.toCombatPick() = PickCard(id.toString(), name, imageUrl?.takeIf { !isFaceDown }, type, group = "Combat", groupOrder = 0, isToken = isToken)
 
-private fun combatKeywords(card: GameCard): List<String> = card.keywords.map { it.uppercase().replace(' ', '_') }
+/** Combat keywords on a creature as players say them ("FIRST_STRIKE" → "first strike"). */
+internal fun combatKeywords(card: GameCard): List<String> = card.keywords.map { it.uppercase().replace(' ', '_') }
     .filter { it in CombatKeywords }.distinct().map { it.lowercase().replace('_', ' ') }
-
-@Composable
-private fun CombatBoardFrame(
-    title: String, hint: String, topLabel: String, bottomLabel: String,
-    top: List<CombatPiece>, bottom: List<CombatPiece>,
-    links: List<Pair<String, String>>, // bottom id → top id
-    selectedId: String?, linkedIds: Set<String>,
-    topEnabled: (String) -> Boolean, bottomEnabled: (String) -> Boolean,
-    topBadge: (String) -> String? = { null },
-    bottomBadge: (String) -> String? = { null },
-    onTop: (String) -> Unit, onBottom: (String) -> Unit,
-    summary: List<String>, warning: String?,
-    confirmLabel: String, confirmEnabled: Boolean, onConfirm: () -> Unit,
-    extraButton: (@Composable () -> Unit)? = null,
-    onDismiss: () -> Unit,
-    topExtra: (@Composable () -> Unit)? = null,
-) {
-    val config = LocalConfiguration.current
-    val combatScale = LocalContext.current.getSharedPreferences("arcana_options", android.content.Context.MODE_PRIVATE)
-        .getFloat("adjust_combat_card_scale", 1f).coerceIn(.65f, 1.35f)
-    val screenWidth = config.screenWidthDp
-    // Short screens (phone landscape) put the two rows side by side so both stay visible.
-    val sideBySide = config.screenHeightDp < 520 && screenWidth > config.screenHeightDp
-    val tileWidth = (when {
-        sideBySide -> ((config.screenHeightDp - 230) * 0.68f).coerceIn(58f, 104f).dp
-        screenWidth >= 900 -> 118.dp; screenWidth >= 600 -> 108.dp; else -> 92.dp
-    }) * combatScale
-    val bounds = remember { mutableStateMapOf<String, Rect>() }
-    var origin by remember { mutableStateOf(Offset.Zero) }
-    val lineColor = Mint
-    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxSize().padding(8.dp), shape = RoundedCornerShape(16.dp), color = Ink) {
-            Box(Modifier.fillMaxSize().onGloballyPositioned { origin = it.boundsInRoot().topLeft }.testTag("combat-board")) {
-                // Lines between linked cards, drawn behind the cards so they show in the gaps.
-                Canvas(Modifier.fillMaxSize()) {
-                    links.forEach { (from, to) ->
-                        val a = bounds["b:$from"] ?: return@forEach
-                        val b = bounds["t:$to"] ?: return@forEach
-                        if (kotlin.math.abs(a.top - b.top) < 40f) {
-                            // Same row (side-by-side layout): arc underneath both cards so each link stays visible.
-                            val start = Offset(a.center.x, a.bottom) - origin
-                            val end = Offset(b.center.x, b.bottom) - origin
-                            val path = androidx.compose.ui.graphics.Path().apply {
-                                moveTo(start.x, start.y)
-                                quadraticTo((start.x + end.x) / 2, maxOf(start.y, end.y) + 50f, end.x, end.y)
-                            }
-                            drawPath(path, lineColor.copy(alpha = 0.9f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 6f, cap = StrokeCap.Round))
-                        } else drawLine(lineColor.copy(alpha = 0.9f), a.center - origin, b.center - origin, strokeWidth = 6f, cap = StrokeCap.Round)
-                    }
-                }
-                Column(Modifier.fillMaxSize().padding(12.dp)) {
-                    Text(title, color = SoftWhite, fontSize = 15.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
-                    Text(hint, color = Muted, fontSize = 11.sp, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
-                    val topSection: @Composable () -> Unit = {
-                        Text(topLabel, color = CounterGold, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
-                        Row(Modifier.fillMaxWidth().tutorialTarget("combat-top").horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            top.forEach { piece ->
-                                CombatTile(piece, tileWidth, selected = false, linked = piece.id in linkedIds, enabled = topEnabled(piece.id),
-                                    onClick = { onTop(piece.id) }, onBounds = { bounds["t:${piece.id}"] = it }, badge = topBadge(piece.id))
-                            }
-                            if (top.isEmpty()) Text("Nothing here.", color = Muted, fontSize = 12.sp)
-                        }
-                        topExtra?.invoke()
-                    }
-                    val bottomSection: @Composable () -> Unit = {
-                        Text(bottomLabel, color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
-                        Row(Modifier.fillMaxWidth().tutorialTarget("combat-bottom").horizontalScroll(rememberScrollState()).padding(vertical = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            bottom.forEach { piece ->
-                                CombatTile(piece, tileWidth, selected = piece.id == selectedId, linked = piece.id in linkedIds, enabled = bottomEnabled(piece.id),
-                                    onClick = { onBottom(piece.id) }, onBounds = { bounds["b:${piece.id}"] = it }, badge = bottomBadge(piece.id))
-                            }
-                            if (bottom.isEmpty()) Text("No creatures can do this right now.", color = Muted, fontSize = 12.sp)
-                        }
-                    }
-                    if (sideBySide) Row(Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(28.dp)) {
-                        Column(Modifier.weight(1f)) { topSection() }
-                        Column(Modifier.weight(1f)) { bottomSection() }
-                    } else Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                        topSection()
-                        Spacer(Modifier.heightIn(min = 46.dp))
-                        bottomSection()
-                    }
-                    Column(Modifier.fillMaxWidth().heightIn(max = 120.dp).verticalScroll(rememberScrollState()).padding(top = 6.dp).testTag("combat-summary").tutorialTarget("combat-summary")) {
-                        summary.forEach { Text(it, color = SoftWhite, fontSize = 12.sp, fontWeight = FontWeight.Bold) }
-                        if (summary.isEmpty()) Text("Nothing assigned yet.", color = Muted, fontSize = 11.sp)
-                        warning?.let { Text(it, color = CounterGold, fontSize = 11.sp, modifier = Modifier.padding(top = 3.dp)) }
-                    }
-                    Row(Modifier.fillMaxWidth().padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                        TextButton(onClick = onDismiss) { Text("LATER", color = Muted) }
-                        extraButton?.invoke()
-                        Spacer(Modifier.weight(1f))
-                        TextButton(enabled = confirmEnabled, onClick = onConfirm,
-                            modifier = Modifier.tutorialTarget("combat-confirm").clip(RoundedCornerShape(8.dp)).background(if (confirmEnabled) Mint else PanelLight)) {
-                            Text(confirmLabel, color = if (confirmEnabled) Ink else Muted, fontWeight = FontWeight.Black)
-                        }
-                    }
-                }
-                TutorialLayer(Modifier.matchParentSize())
-            }
-        }
-    }
-}
-
-/**
- * Block declaration on a board: attackers on top, your possible blockers underneath. Tap a
- * blocker, then the attacker it blocks; tap a selected blocker again to clear it. Only blockers
- * Argentum lists can be used, and Argentum validates the result (flying, menace, ...).
- */
-@Composable
-fun ArgentumBlockBoard(plan: ArgentumBlockPlan, piece: (String) -> CombatPiece, busy: Boolean, warning: String? = null, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit) {
-    var selection by remember(plan) { mutableStateOf(plan.mandatory.filterKeys { it in plan.blockers }) }
-    var pending by remember(plan) { mutableStateOf<String?>(null) }
-    val attackers = plan.attackers.map(piece)
-    val blockers = plan.blockers.map(piece)
-    val links = selection.flatMap { (blocker, list) -> list.map { blocker to it } }
-    CombatBoardFrame(
-        title = "DECLARE BLOCKERS",
-        hint = if (pending != null) "Now tap the attacker ${piece(pending!!).name} should block. Tap it again to clear." else "Tap one of your creatures, then the attacker it blocks.",
-        topLabel = "ATTACKING YOU", bottomLabel = "YOUR BLOCKERS",
-        top = attackers, bottom = blockers, links = links,
-        selectedId = pending, linkedIds = links.flatMap { listOf(it.first, it.second) }.toSet(),
-        topEnabled = { pending != null }, bottomEnabled = { true },
-        topBadge = { id -> selection.count { id in it.value }.takeIf { it > 0 }?.let { "×$it" } },
-        onBottom = { id ->
-            pending = when {
-                pending == id && selection[id] != null -> { selection = selection - id; null }
-                pending == id -> null
-                else -> id
-            }
-        },
-        onTop = { attacker ->
-            val blocker = pending ?: return@CombatBoardFrame
-            val cap = plan.maxBlocks[blocker] ?: 1
-            val current = selection[blocker].orEmpty()
-            val next = when {
-                attacker in current -> current - attacker
-                cap > 1 -> (current + attacker).take(cap)
-                else -> listOf(attacker)
-            }
-            selection = if (next.isEmpty()) selection - blocker else selection + (blocker to next)
-            if (cap <= 1 || next.size >= cap) pending = null
-        },
-        summary = blockSummary(attackers, blockers, selection),
-        warning = warning,
-        confirmLabel = if (selection.isEmpty()) "NO BLOCKS" else "BLOCK WITH ${selection.size}",
-        confirmEnabled = !busy,
-        onConfirm = { onConfirm(plan.buildAction(selection)) },
-        extraButton = { if (selection.isNotEmpty()) TextButton(onClick = { selection = plan.mandatory.filterKeys { it in plan.blockers }; pending = null }) { Text("CLEAR", color = Muted) } },
-        onDismiss = onDismiss,
-    )
-}
-
-/**
- * Attack declaration on the same board in reverse: what you can attack on top, your possible
- * attackers underneath. With a single defender, tapping a creature toggles it; otherwise tap the
- * creature, then the player or planeswalker it attacks.
- */
-@Composable
-fun ArgentumAttackBoard(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece, busy: Boolean, onConfirm: (JSONObject) -> Unit, onDismiss: () -> Unit, opponentBlockers: List<Pair<String, List<GameCard>>> = emptyList()) {
-    var selection by remember(plan) { mutableStateOf(plan.options.filter { it.mandatory }.associate { it.attackerId to it.targets.first() }) }
-    var pending by remember(plan) { mutableStateOf<String?>(null) }
-    val targets = plan.options.flatMap { it.targets }.distinct()
-    val single = targets.size == 1
-    val optionFor = plan.options.associateBy { it.attackerId }
-    val missing = plan.missingMandatory(selection)
-    // Identical creatures (same name, stats and choices) share one tile: tapping it sends the whole stack.
-    val groups = attackGroups(plan, piece)
-    val groupOf = groups.flatMap { g -> g.value.map { it to g.key } }.toMap()
-    fun members(rep: String) = groups[rep] ?: listOf(rep)
-    val links = selection.map { (attacker, target) -> (groupOf[attacker] ?: attacker) to target }.distinct()
-    CombatBoardFrame(
-        title = "DECLARE ATTACKERS",
-        hint = when {
-            pending != null -> "Now tap what ${piece(pending!!).name} attacks."
-            single -> "Tap the creatures you want to attack with. A stack (×N) attacks together."
-            else -> "Tap a creature, then the player or planeswalker it attacks."
-        },
-        topLabel = "YOU CAN ATTACK", bottomLabel = "YOUR CREATURES",
-        top = targets.map(piece), bottom = groups.keys.map(piece), links = links,
-        selectedId = pending, linkedIds = (links.map { it.first } + selection.values).toSet(),
-        topEnabled = { target -> pending?.let { target in optionFor[it]?.targets.orEmpty() } ?: false },
-        bottomEnabled = { true },
-        topBadge = { id -> selection.count { it.value == id }.takeIf { it > 0 }?.let { "×$it" } },
-        bottomBadge = { rep -> members(rep).size.takeIf { it > 1 }?.let { n -> val on = members(rep).count { it in selection }; if (on in 1 until n) "$on/$n" else "×$n" } },
-        onBottom = { rep ->
-            val option = optionFor[rep] ?: return@CombatBoardFrame
-            val group = members(rep)
-            val anyOn = group.any { it in selection }
-            when {
-                anyOn && (single || option.targets.size == 1 || pending == rep) -> {
-                    selection = selection - group.filterNot { optionFor[it]?.mandatory == true }.toSet(); pending = null
-                }
-                single || option.targets.size == 1 -> selection = selection + group.associateWith { option.targets.first() }
-                pending == rep -> pending = null
-                else -> pending = rep
-            }
-        },
-        onTop = { target ->
-            val rep = pending ?: return@CombatBoardFrame
-            members(rep).forEach { a -> if (target in optionFor[a]?.targets.orEmpty()) selection = selection + (a to target) }
-            pending = null
-        },
-        summary = selection.entries.groupBy { (attacker, target) -> Triple(piece(attacker).name, combatStats(piece(attacker).card), target) }.map { (key, list) ->
-            val (name, stats, target) = key
-            listOf(if (list.size > 1) "${list.size} × $name" else name, stats).filter(String::isNotBlank).joinToString(" ") + " → " + piece(target).name
-        },
-        warning = if (missing.isNotEmpty()) "Must attack: ${missing.joinToString { piece(it).name }}" else null,
-        confirmLabel = if (selection.isEmpty()) "NO ATTACK" else "ATTACK WITH ${selection.size}",
-        confirmEnabled = !busy && missing.isEmpty(),
-        onConfirm = { onConfirm(plan.buildAction(selection)) },
-        extraButton = {
-            if (selection.size < plan.options.size) TextButton(onClick = {
-                val target = targets.firstOrNull()
-                selection = plan.options.associate { o -> o.attackerId to (selection[o.attackerId] ?: target?.takeIf { it in o.targets } ?: o.targets.first()) }
-                pending = null
-            }) { Text("ALL", color = Mint, fontWeight = FontWeight.Black) }
-            else TextButton(onClick = { selection = plan.options.filter { it.mandatory }.associate { it.attackerId to it.targets.first() }; pending = null }) { Text("CLEAR", color = Muted) }
-        },
-        onDismiss = onDismiss,
-        topExtra = if (opponentBlockers.isEmpty()) null else ({ OpponentBlockersStrip(opponentBlockers) }),
-    )
-}
 
 /** Attack options grouped into stacks of identical creatures; key = the stack's first creature. */
 fun attackGroups(plan: ArgentumAttackPlan, piece: (String) -> CombatPiece): Map<String, List<String>> =
-    plan.options.groupBy { o -> val p = piece(o.attackerId); listOf(p.name, combatStats(p.card), o.targets.joinToString(","), o.mandatory.toString(), p.card?.counters?.toString().orEmpty()) }
+    plan.options.groupBy { o -> listOf(stackKey(piece(o.attackerId)), o.targets.joinToString(",")) }
         .values.associate { list -> list.first().attackerId to list.map { it.attackerId } }
 
 /**
@@ -439,7 +180,7 @@ fun opponentBlockers(players: List<TablePlayer>, you: Int): List<Pair<String, Li
  * toughness and blocking keywords. Hold a card to see it large.
  */
 @Composable
-private fun OpponentBlockersStrip(groups: List<Pair<String, List<GameCard>>>) {
+internal fun OpponentBlockersStrip(groups: List<Pair<String, List<GameCard>>>) {
     var zoomed by remember { mutableStateOf<PickCard?>(null) }
     Column(Modifier.fillMaxWidth().padding(top = 4.dp).testTag("opponent-blockers")) {
         groups.forEach { (name, cards) ->
