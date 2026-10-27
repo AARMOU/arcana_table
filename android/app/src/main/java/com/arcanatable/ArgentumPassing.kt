@@ -14,6 +14,27 @@ object ArgentumPassing {
         return if (stop.equals("Pass", ignoreCase = true)) "PASS" else "PASS → ${stop.uppercase()}"
     }
 
+    /**
+     * In auto-pass mode, only stop for an actual target on you or an owned/controlled card.
+     * Unknown targets fail closed: guessing would silently miss a chance to respond.
+     * Untargeted spells/abilities, including opponents' own-board effects, are passed over.
+     */
+    fun interruptingStackItem(
+        stack: List<ArgentumStackItem>,
+        targets: Map<String, ArgentumTargetRef>,
+        localPlayerId: String?,
+    ): String? {
+        if (localPlayerId.isNullOrBlank()) return stack.firstOrNull()?.name
+        return stack.firstOrNull { item ->
+            (item.targetNames.isNotEmpty() && item.targetIds.isEmpty()) ||
+                item.targetIds.any { id ->
+                    id == localPlayerId || targets[id]?.let { target ->
+                        target.ownerId == localPlayerId || target.controllerId == localPlayerId
+                    } ?: true
+                }
+        }?.name
+    }
+
     enum class Step {
         /** Send Argentum's PassPriority now. */
         PASS,
@@ -28,9 +49,9 @@ object ArgentumPassing {
     data class Outcome(val step: Step, val reason: String? = null)
 
     /**
-     * One tick of "Pass to my turn". Stops for any decision, for being attacked (a block
-     * declaration), for an attack declaration, for an opponent's spell or ability on the stack,
-     * and when the player's next turn begins.
+     * One tick of auto-pass. Stop for required decisions/combat declarations, a stack
+     * item targeting you or your cards, game over, or your next turn. Skip non-threatening
+     * opponent spells and abilities. Only send Argentum's real legal PassPriority action.
      */
     fun next(
         startTurn: Int,
@@ -50,7 +71,7 @@ object ArgentumPassing {
         hasPendingDecision -> Outcome(Step.INTERRUPTED, "Argentum needs a choice from you.")
         "DeclareBlockers" in legalActionTypes -> Outcome(Step.INTERRUPTED, "You're being attacked. Declare blockers.")
         "DeclareAttackers" in legalActionTypes -> Outcome(Step.INTERRUPTED, "You can declare attackers.")
-        opponentStackItem != null -> Outcome(Step.INTERRUPTED, "$opponentStackItem is on the stack. You can respond.")
+        opponentStackItem != null -> Outcome(Step.INTERRUPTED, "$opponentStackItem targets you or your cards. You can respond.")
         "PassPriority" in legalActionTypes && priorityPlayer == localSeat -> Outcome(Step.PASS)
         "PassPriority" in legalActionTypes && priorityPlayer < 0 -> Outcome(Step.PASS)
         else -> Outcome(Step.WAIT)
