@@ -103,7 +103,7 @@ def audit(release: str, preview: str) -> list[str]:
         # changes to its own workflow on its frozen validation branch;
         # the debug APK preview must remain manual-only. Hash pins alone
         # cannot express this security property in synthetic regressions.
-        trigger_block = re.search(r'(?ms)^on:\n(.*?)(?=^[a-z][\\w-]*:|\\Z)', header)
+        trigger_block = re.search(r'(?ms)^on:\n(.*?)(?=^[a-z][a-z_-]*:|\Z)', header)
         expected_triggers = (
             "  push:\n"
             "    branches: [gpt/release-upgraded-validation-20261025]\n"
