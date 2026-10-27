@@ -12,9 +12,25 @@ def fixture():
     preview_common = common.copy()
     preview_common[0] = preview_common[0].replace(RELEASE_SCOPE, PREVIEW_SCOPE)
     prefix = 'on:\n  workflow_dispatch:\npermissions:\n  contents: read\n  actions: read\njobs:\n  compatibility:\n    steps:\n'
-    extras = ['      - name: Build installable combined test APK\n        run: echo build\n',
-              '      - name: Verify installable APK and record provenance\n        run: echo verify\n',
-              '      - name: Upload APK only when every integrated source, card, AI, and app gate passed\n        if: success()\n        uses: actions/upload-artifact@v4\n        with:\n          if-no-files-found: error\n']
+    extras = [
+        '      - name: Build installable combined test APK\n'
+        '        run: |\n'
+        '          ./gradlew --no-daemon :app:assembleDebug\n',
+        '      - name: Verify installable APK and record provenance\n'
+        '        run: |\n'
+        '          test -s android/app/build/outputs/apk/debug/app-debug.apk\n'
+        "          grep -F \"package: name='com.arcanatable.argentum' versionCode='134'\" combined-evidence/package-info.txt\n"
+        '          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk\n'
+        '          sha256sum android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/apk.sha256\n',
+        '      - name: Upload APK only when every integrated source, card, AI, and app gate passed\n'
+        '        if: success()\n'
+        '        uses: actions/upload-artifact@v4\n'
+        '        with:\n'
+        '          name: arcana-combined-argentum-eldrazi94-build134-logo-polish-debug-apk\n'
+        '          retention-days: 14\n'
+        '          if-no-files-found: error\n'
+        '          path: android/app/build/outputs/apk/debug/app-debug.apk\n',
+    ]
     release_prefix = prefix.replace(
         'on:\n  workflow_dispatch:\n',
         "on:\n  push:\n    branches: [gpt/release-upgraded-validation-20261025]\n"
@@ -138,6 +154,43 @@ class WorkflowAuditTest(unittest.TestCase):
     def test_step_removal_rejected(self):
         a, b = fixture()
         self.assertTrue(audit(a, b.replace('      - name: gate 4\n        run: echo 4\n', '')))
+
+    def test_preview_build_must_remain_debug(self):
+        a, b = fixture()
+        self.assertTrue(any('preview build' in x for x in audit(
+            a, b.replace(':app:assembleDebug', ':app:assembleRelease'))))
+
+    def test_preview_verify_must_enforce_debug_identity(self):
+        a, b = fixture()
+        self.assertTrue(any('preview identity' in x for x in audit(
+            a, b.replace("com.arcanatable.argentum' versionCode='134'",
+                         "com.arcanatable' versionCode='134'"))))
+
+    def test_preview_verify_cannot_be_skipped(self):
+        a, b = fixture()
+        self.assertTrue(any('preview identity' in x for x in audit(
+            a, b.replace('      - name: Verify installable APK and record provenance\n',
+                         '      - name: Verify installable APK and record provenance\n'
+                         '        if: false\n'))))
+
+    def test_preview_upload_cannot_target_production_bundle(self):
+        a, b = fixture()
+        self.assertTrue(any('only reviewed debug APK' in x for x in audit(
+            a, b.replace('path: android/app/build/outputs/apk/debug/app-debug.apk',
+                         'path: android/app/build/outputs/bundle/release/app-release.aab'))))
+
+    def test_preview_upload_cannot_add_second_path(self):
+        a, b = fixture()
+        self.assertTrue(any('only reviewed debug APK' in x for x in audit(
+            a, b.replace('          path: android/app/build/outputs/apk/debug/app-debug.apk\n',
+                         '          path: android/app/build/outputs/apk/debug/app-debug.apk\n'
+                         '          path: android/app/build/outputs/bundle/release/app-release.aab\n'))))
+
+    def test_preview_upload_cannot_continue_on_error(self):
+        a, b = fixture()
+        self.assertTrue(any('only reviewed debug APK' in x for x in audit(
+            a, b.replace('        if: success()\n',
+                         '        continue-on-error: true\n        if: success()\n'))))
 
     def test_git_blob_hash(self):
         self.assertEqual(git_blob_sha(b'hello\n'), 'ce013625030ba8dba906f756967f9e9ca394464a')
