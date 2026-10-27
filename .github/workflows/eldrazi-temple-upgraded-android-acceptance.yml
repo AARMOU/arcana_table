@@ -1,0 +1,514 @@
+name: Eldrazi Temple upgraded-engine Android candidate (no APK)
+# #152/#150: GPT-owned stacked #162. Runner-only source build and Android registry.
+# No production runtime JAR, tracked card export, deck, APK, signing, or merge writes.
+on:
+  push:
+    branches: [gpt/eldrazi-temple-card-candidate-20261024]
+    paths:
+      - '.github/workflows/eldrazi-temple-upgraded-android-acceptance.yml'
+      - 'engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt'
+      - 'engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt'
+      - 'engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: temple-upgraded-android-candidate
+  cancel-in-progress: true
+
+jobs:
+  candidate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - name: Checkout exact GPT-owned card candidate
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Checkout verified upgraded mana-source port
+        uses: actions/checkout@v4
+        with:
+          repository: AARMOU/arcana_table
+          ref: 8ef19f2e22eb861eb5cccf73fd6c485ce47a364f
+          path: temple-port
+          persist-credentials: false
+      - name: Checkout verified original gameplay scenarios
+        uses: actions/checkout@v4
+        with:
+          repository: AARMOU/arcana_table
+          ref: c2fb681f08c93549ed9a6f0b8a23dafb7ea06de9
+          path: temple-gameplay
+          persist-credentials: false
+      - name: Checkout exact upgraded Argentum
+        uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 7fb073337e4389cfabe2ebf4c6416633a7fc63d2
+          path: argentum-engine
+          persist-credentials: false
+      - name: Fail closed on card, port, and upstream provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C temple-port rev-parse HEAD)" = 8ef19f2e22eb861eb5cccf73fd6c485ce47a364f
+          test "$(git -C temple-gameplay rev-parse HEAD)" = c2fb681f08c93549ed9a6f0b8a23dafb7ea06de9
+          test "$(git -C argentum-engine rev-parse HEAD)" = 7fb073337e4389cfabe2ebf4c6416633a7fc63d2
+          test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt)" = 0e024338ec2d66c185ddec4aa1d61435845acf97
+          test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt)" = 11c075d7480a9fb59911c6115ea2513d2e28ddf4
+          test "$(git hash-object engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py)" = fbfe1367e7244e4331784e2cbabbc0992815726d
+          test "$(git -C temple-port hash-object engine-upgrade/eldrazi-temple/port_to_upgraded.py)" = 9078e8e3c5e245593d4ab6155fdde70965ac088a
+          test "$(git -C temple-gameplay hash-object engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt)" = f2b88843a34bf39dd5c54370f21c6bc85bb02426
+          sha256sum android/app/libs/argentum-*.jar > /tmp/temple-committed-jars.sha
+          git diff --check
+      - name: Port exact restriction and both positive/negative engine suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 temple-port/engine-upgrade/eldrazi-temple/port_to_upgraded.py argentum-engine
+          cp temple-port/engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          cp temple-gameplay/engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleGameplayScenarioTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          # Gameplay tests import the real Temple DSL definition. Compile an isolated
+          # test-source copy in rules-engine (Android custom-cards is not an SDK dependency).
+          # Keep the pinned candidate source identical to the Android runner copy.
+          temple_test_source=argentum-engine/rules-engine/src/test/kotlin/com/arcanatable/customcards/cards/EldraziTemple.kt
+          test ! -e "$temple_test_source"
+          mkdir -p "$(dirname "$temple_test_source")"
+          cp engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt "$temple_test_source"
+          cmp -s engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt "$temple_test_source"
+          git -C argentum-engine diff --check
+      - name: Port missing copyable token triggers and departure LKI (runner only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Restore semantics of the existing Arcana 0004/0005 patches against
+          # exact upgraded source. Old patch hunks cannot be applied blindly:
+          # upstream now has separate donatedTriggeredAbilities on basic tokens.
+          test "$(git hash-object argentum-patches/0004-token-copy-triggered-abilities.patch)" = 365a0a2db208f1dfe34ec033978b16a56ce59bf8
+          test "$(git hash-object argentum-patches/0005-last-known-negative-subtype.patch)" = 759c27c1d7e9f25c0c9e685831f369b78344c179
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          root = Path("argentum-engine/rules-engine/src/main/kotlin/com/wingedsheep/engine")
+          sources = {
+              "handlers/effects/token/CreateTokenExecutor.kt": "8ea11fb1ca6e1b0f843c649751f0c56d39fe704c",
+              "handlers/effects/token/CreateTokenCopyOfTargetExecutor.kt": "38feb6809d72bd7249d5ead435d2dbb6e1d9ff22",
+              "event/TriggerMatcher.kt": "823d936d560abe0c0dbff5331713261073126c89",
+          }
+          def replace_once(text, old, new):
+              assert text.count(old) == 1, f"Upstream source anchor drift: {old[:100]!r}"
+              return text.replace(old, new, 1)
+
+          def remove_between_once(text, start, end):
+              assert text.count(start) == text.count(end) == 1, (start, end)
+              a, b = text.index(start), text.index(end)
+              assert a < b and b-a < 1600, "Unexpected trigger-grant block"
+              return text[:a] + text[b:]
+
+          for relative, expected_sha in sources.items():
+              path = root / relative
+              actual = subprocess.check_output(
+                  ["git", "-C", "argentum-engine", "hash-object",
+                   str(path.relative_to("argentum-engine"))], text=True
+              ).strip()
+              assert actual == expected_sha, (relative, actual, expected_sha)
+              text = path.read_text()
+              if relative.endswith("/CreateTokenExecutor.kt"):
+                  # Upstream's donated triggers are independent copiable text.
+                  # The explicitly created token triggers must also be copiable.
+                  text = replace_once(
+                      text, "copyTriggeredAbilities = donatedTriggers,",
+                      "copyTriggeredAbilities = donatedTriggers + effect.triggeredAbilities,"
+                  )
+                  text = remove_between_once(
+                      text,
+                      "        // If triggered abilities are specified, grant them permanently to each created token\n",
+                      "        // If activated abilities are specified, grant them permanently"
+                  )
+                  assert "copyTriggeredAbilities = donatedTriggers + effect.triggeredAbilities" in text
+              elif relative.endswith("/CreateTokenCopyOfTargetExecutor.kt"):
+                  text = replace_once(
+                      text,
+                      "        val tokenCard = withAddedStatics(CopyExceptionApplier.apply(targetCard, exceptions, context.resolvingTriggeredAbility))\n"
+                      "            .copy(ownerId = controllerId, isDoubleFaced = false)",
+                      "        val tokenCard = withAddedStatics(CopyExceptionApplier.apply(targetCard, exceptions, context.resolvingTriggeredAbility))\n"
+                      "            .let { copied -> copied.copy(\n"
+                      "                ownerId = controllerId,\n"
+                      "                isDoubleFaced = false,\n"
+                      "                copyTriggeredAbilities = copied.copyTriggeredAbilities + effect.triggeredAbilities,\n"
+                      "            ) }"
+                  )
+                  text = remove_between_once(
+                      text,
+                      "            for (ability in effect.triggeredAbilities) {\n",
+                      "            // Activated abilities granted to the copy"
+                  )
+                  assert "copyTriggeredAbilities = copied.copyTriggeredAbilities + effect.triggeredAbilities" in text
+              else:
+                  # Leaving/dying predicates must consult the departed permanent's
+                  # last-known types, rather than its post-move graveyard types.
+                  subtype_branch = (
+                      "                    is com.wingedsheep.sdk.scripting.predicates.CardPredicate.NotSubtype -> {\n"
+                      "                        if (event.toZone == Zone.BATTLEFIELD) {\n"
+                      "                            !projected.hasSubtype(event.entityId, predicate.subtype.value)\n"
+                      "                        } else {\n"
+                      "                            isFaceDown || typeLine?.hasSubtype(predicate.subtype) == false\n"
+                      "                        }\n"
+                      "                    }\n"
+                  )
+                  text = replace_once(
+                      text,
+                      "                    is com.wingedsheep.sdk.scripting.predicates.CardPredicate.HasAnyOfSubtypes -> {",
+                      subtype_branch + "                    is com.wingedsheep.sdk.scripting.predicates.CardPredicate.HasAnyOfSubtypes -> {"
+                  )
+                  assert text.count(subtype_branch) == 1
+              path.write_text(text)
+              print(f"Ported existing Arcana trigger/LKI semantics: {relative}")
+          PY
+          git -C argentum-engine diff --check
+      - name: Compile disposable Argentum libraries for Android Java 17
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The exact upstream source defaults to JVM 21 (class major 65),
+          # while Arcana Android targets Java 17 (class major 61). Never
+          # weaken the JAR bytecode gate: test a runner-only toolchain port.
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("argentum-engine/buildSrc/src/main/kotlin/kotlin-jvm.gradle.kts")
+          src = p.read_text()
+          before = "    jvmToolchain(21)"
+          assert src.count(before) == 1, "Unexpected upstream toolchain convention"
+          p.write_text(src.replace(before, "    jvmToolchain(17)", 1))
+          assert p.read_text().count("    jvmToolchain(17)") == 1
+          PY
+          git -C argentum-engine diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: |
+            17
+            21
+      - name: Test upgraded SDK
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:test
+      - name: Test 14 real upgraded-engine Temple scenarios
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :rules-engine:test --tests 'com.wingedsheep.engine.scenarios.EldraziTemple*'
+      - name: Build temporary matching runtime JARs
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar
+      - name: Inject matching runtime and exact Temple registry in disposable runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil, struct, zipfile
+          modules = {
+              "mtg-sdk": "com/wingedsheep/sdk/model/CardDefinition.class",
+              "mtg-sdk-tooling": "com/wingedsheep/sdk/tooling/CardLoader.class",
+              "rules-engine": "com/wingedsheep/engine/core/GameAction.class",
+              "ai": "com/wingedsheep/ai/engine/AIPlayer.class",
+          }
+          for module, marker in modules.items():
+              sources = [p for p in Path(f"argentum-engine/{module}/build/libs").glob("*.jar")
+                         if "sources" not in p.name and "javadoc" not in p.name
+                         and marker in zipfile.ZipFile(p).namelist()]
+              assert len(sources) == 1, (module, sources)
+              dest = Path("android/app/libs") / f"argentum-{module}.jar"
+              shutil.copyfile(sources[0], dest)  # runner only, never commit/push
+              with zipfile.ZipFile(dest) as jar:
+                  versions = [struct.unpack(">H", jar.read(n)[6:8])[0]
+                              for n in jar.namelist() if n.endswith(".class")]
+              assert versions and max(versions) <= 61, (module, max(versions))
+          dest = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziTemple.kt")
+          assert not dest.exists(), "Temple already registered: refuse duplicate ownership"
+          shutil.copyfile("engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt", dest)
+          test = Path("android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldraziTempleScenarioTest.kt")
+          assert not test.exists(), "Temple scenario already exists: refuse overwrite"
+          shutil.copyfile("engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt", test)
+          registry = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt")
+          content = registry.read_text()
+          anchor = "val entries: List<Entry> = listOf(\n"
+          assert content.count(anchor) == 1 and "Entry(EldraziTemple," not in content
+          registry.write_text(content.replace(anchor, anchor + '        Entry(EldraziTemple, "M3C", "Eldrazi Incursion"),\n', 1))
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android SDK 36
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Port Primal Wellspring mana-spend copy rider to upgraded SDK (runner only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The pinned upgraded SDK removed CopySpellWhenSpent and models the same
+          # delayed trigger via TriggersWhenSpent + CopyTargetSpell. Preserve the
+          # actual spell-copy behavior; do not remove Primal Amulet from registry.
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          src = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt")
+          before = "ManaSpellRider.CopySpellWhenSpent(GameObjectFilter.InstantOrSorcery)"
+          after = ("ManaSpellRider.TriggersWhenSpent(\n"
+                   "                GameObjectFilter.InstantOrSorcery,\n"
+                   "                Effects.CopyTargetSpell(EffectTarget.TriggeringEntity),\n"
+                   "            )")
+          content = src.read_text()
+          assert content.count(before) == 1, "Primal Wellspring API shape changed; manual review required"
+          assert "import com.wingedsheep.sdk.dsl.*" in content
+          assert "import com.wingedsheep.sdk.scripting.targets.EffectTarget" in content
+          upstream = Path("argentum-engine/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/ManaSpellRider.kt").read_text()
+          assert "data class TriggersWhenSpent(" in upstream and "CopySpellWhenSpent" not in upstream
+          src.write_text(content.replace(before, after, 1))
+          assert src.read_text().count("Effects.CopyTargetSpell(EffectTarget.TriggeringEntity)") == 1
+          print("Primal Wellspring's instant/sorcery mana-copy trigger preserved using upgraded SDK API")
+          PY
+          git diff --check
+      - name: Restore exact mobile retargeting AI regression behavior (runner only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # The pinned upstream AI does not include Arcana's existing
+          # RetargetingCandidateFilter, which is imported by the unchanged
+          # AiRetargetingSearchTest. Port the original tested source and
+          # search-pruning hook, not a test stub or an excluded test.
+          test "$(git hash-object argentum-patches/0007-ai-bounded-stack-search.patch)" = 7c8cc175a9c33e76e4a881a498fbcd4d090511b8
+          filter=ai/src/main/kotlin/com/wingedsheep/ai/engine/RetargetingCandidateFilter.kt
+          test ! -e "argentum-engine/$filter"
+          git -C argentum-engine apply --check --include="$filter" ../argentum-patches/0007-ai-bounded-stack-search.patch
+          git -C argentum-engine apply --include="$filter" ../argentum-patches/0007-ai-bounded-stack-search.patch
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path("argentum-engine/ai/src/main/kotlin/com/wingedsheep/ai/engine/Strategist.kt")
+          src = p.read_text()
+          old = "        } else candidatesFrom(legalActions)\n"
+          new = ("        } else candidatesFrom(legalActions).filter {\n"
+                 "            !useMeaningfulFilter || RetargetingCandidateFilter.hasPotentialEffect(state, it, simulator.cardRegistry)\n"
+                 "        }\n")
+          assert src.count(old) == 1, "Upgraded Strategist candidate selection changed: review required"
+          assert src.count("RetargetingCandidateFilter.hasPotentialEffect") == 0
+          assert "useMeaningfulFilter" in src and "simulator.cardRegistry" in src
+          p.write_text(src.replace(old, new, 1))
+          filter_source = Path("argentum-engine/ai/src/main/kotlin/com/wingedsheep/ai/engine/RetargetingCandidateFilter.kt").read_text()
+          assert "object RetargetingCandidateFilter" in filter_source
+          assert "effect !is ChangeTargetEffect" in filter_source
+          assert "return candidates.any" in filter_source
+          print("Restored real retargeting AI optimization; existing positive/negative JUnit tests remain mandatory")
+          PY
+          git -C argentum-engine diff --check
+          # Rebuild only the temporary matching AI JAR, now containing the
+          # real filter. Never change committed Android/runtime binaries.
+          # Gradle 9 buildSrc itself requires a Java 21 *launcher*, even though
+          # the pinned source convention above targets Java 17 classfiles.
+          # setup-java switched JAVA_HOME to 17 for Android; restore 21 only
+          # for this subprocess, then enforce classfile major <=61 below.
+          test -x "${JAVA_HOME_21_X64:?}/bin/java"
+          (export JAVA_HOME="$JAVA_HOME_21_X64"; export PATH="$JAVA_HOME/bin:$PATH"; cd argentum-engine && ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :ai:jar)
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil, struct, zipfile
+          jars = [p for p in Path("argentum-engine/ai/build/libs").glob("*.jar")
+                  if "sources" not in p.name and "javadoc" not in p.name
+                  and "com/wingedsheep/ai/engine/RetargetingCandidateFilter.class" in zipfile.ZipFile(p).namelist()]
+          assert len(jars) == 1, jars
+          dest = Path("android/app/libs/argentum-ai.jar")
+          shutil.copyfile(jars[0], dest)
+          with zipfile.ZipFile(dest) as z:
+              classes = [struct.unpack(">H", z.read(n)[6:8])[0]
+                         for n in z.namelist() if n.endswith(".class")]
+              assert classes and max(classes) <= 61, max(classes)
+          print("Runner-only Java 17 AI JAR now contains original filter implementation")
+          PY
+      - name: Export Temple against the upgraded SDK
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+      - name: Test exact legacy JSONL wire migration and port shipped library in runner only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --self-test
+          compat=engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py
+          assets=android/app/src/main/assets/argentum
+          # Original all-cards JSONL contains three chosen-type mana effects and
+          # six counter doublers: 5 bare sealed-class strings + 4 tagged objects
+          # across the two ABI families.  Require all nine, not just object tags.
+          python3 "$compat" --apply "$assets/all-cards.jsonl" --expected-mana 3 --minimum-counters 6
+          # Exported custom-cards.jsonl is also consumed by OfflineCardLibrary.
+          # The pinned SDK's AddAnyColorManaSpendOnChosenType DSL factory emits
+          # *new* AddManaOfChoice wire format, so its generated legacy-mana count
+          # is exactly zero; committed pre-export assets may still be stale.
+          # Accept no old mana wire there, but port any legacy counter shapes.
+          python3 "$compat" --apply "$assets/custom-cards.jsonl" --expected-mana 0 --minimum-counters 0
+          # all-cards must change; custom-cards may already be current SDK ABI.
+          if git diff --quiet -- "$assets/all-cards.jsonl"; then
+            echo "Legacy ABI port made no change to all-cards.jsonl" >&2
+            exit 1
+          fi
+          for asset in all-cards.jsonl custom-cards.jsonl; do
+            git diff --check -- "$assets/$asset"
+            if grep -Eq 'DoubleCounterPlacement|AddAnyColorManaSpendOnChosenType' "$assets/$asset"; then
+              echo "Unmigrated legacy wire tag remains in $asset" >&2
+              exit 1
+            fi
+          done
+      - name: Attribute any remaining legacy decoder failure to its exact card (runner only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path("android/app/src/main/java/com/arcanatable/engine/OfflineGame.kt")
+          text = source.read_text()
+          old_base = 'if (kind != "card" || name in wanted) out += CardLoader.fromJsonPreservingIds(line)'
+          new_base = """if (kind != "card" || name in wanted) {
+                      try {
+                          out += CardLoader.fromJsonPreservingIds(line)
+                      } catch (error: Exception) {
+                          System.err.println("[temple-abi-diagnostic] library=$base row=$i card=$name legacyCounter=${line.contains("DoubleCounterPlacement")} legacyMana=${line.contains("AddAnyColorManaSpendOnChosenType")}")
+                          throw error
+                      }
+                  }"""
+          old_custom = 'if (name in customWanted) out += CardLoader.fromJsonPreservingIds(line)'
+          new_custom = """if (name in customWanted) {
+                      try {
+                          out += CardLoader.fromJsonPreservingIds(line)
+                      } catch (error: Exception) {
+                          System.err.println("[temple-abi-diagnostic] library=custom-cards row=$i card=$name legacyCounter=${line.contains("DoubleCounterPlacement")} legacyMana=${line.contains("AddAnyColorManaSpendOnChosenType")}")
+                          throw error
+                      }
+                  }"""
+          assert text.count(old_base) == text.count(old_custom) == 1, "OfflineCardLibrary source drift; do not patch blindly"
+          source.write_text(text.replace(old_base, new_base).replace(old_custom, new_custom))
+          assert source.read_text().count("[temple-abi-diagnostic]") == 2
+          PY
+          # Verify the *actual* files the app tests will open immediately before Gradle starts.
+          sha256sum android/app/src/main/assets/argentum/{all-cards,custom-cards}.jsonl
+      - name: Run real custom-card and Android unit tests against matching SDK and library
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
+      - name: Assert upgraded engine, Android scenarios, exact deck delta and deterministic export
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, subprocess, xml.etree.ElementTree as ET
+          def suite(path, expected):
+              assert path.is_file(), f"Missing JUnit evidence: {path}"
+              root = ET.parse(path).getroot()
+              cases = list(root.iter("testcase"))
+              assert len(cases) == expected, (path, len(cases), expected)
+              assert not any(c.find(x) is not None for c in cases for x in ("failure","error","skipped")), path
+              return {c.get("name") for c in cases}
+          e = Path("argentum-engine/rules-engine/build/test-results/test")
+          suite(e/"TEST-com.wingedsheep.engine.scenarios.EldraziTempleManaRestrictionTest.xml", 7)
+          suite(e/"TEST-com.wingedsheep.engine.scenarios.EldraziTempleGameplayScenarioTest.xml", 7)
+          a = Path("android/custom-cards/build/test-results/test")
+          cases = suite(a/"TEST-com.arcanatable.customcards.EldraziTempleScenarioTest.xml", 18)
+          required = {
+              "restrictedManaPaysRealColorlessEldraziActivatedAbility",
+              "restrictedManaRejectsColoredEldraziActivatedAbilityWithoutLaundering",
+              "restrictedManaRejectsNonEldraziColorlessActivatedAbility",
+              "restrictedManaPaysDevoidEldraziActivatedAbilityWithPrintedBlueCost",
+              "restrictedManaPaysGenericCostOfColorlessEldraziAbility",
+              "restrictedManaRejectsGenericCostOfColoredEldraziAbility",
+              "restrictedManaPaysGenericCostOfDevoidEldraziSpellWithPrintedBlueCost",
+              "restrictedManaRejectsGenericCostOfColoredEldraziSpell",
+              "restrictedManaRejectsDevoidNonEldraziSpellEvenThoughColorless",
+              "restrictedManaRejectsDevoidNonEldraziActivatedAbility",
+          }
+          assert required <= cases, sorted(required-cases)
+          for root in (a, Path("android/app/build/test-results/testDebugUnitTest"),
+                       Path("argentum-engine/mtg-sdk/build/test-results/test")):
+              files = list(root.glob("TEST-*.xml"))
+              assert files, f"Missing suite XML: {root}"
+              for f in files:
+                  r = ET.parse(f).getroot()
+                  assert int(r.get("failures",0)) == int(r.get("errors",0)) == 0, f
+          assets = Path("android/app/src/main/assets/argentum")
+          index_path = assets/"custom-cards.index.tsv"
+          jsonl_path = assets/"custom-cards.jsonl"
+          rows = index_path.read_text().splitlines()
+          assert rows.count("Eldrazi Temple\tcard") == 1
+          definitions = [json.loads(s) for s in jsonl_path.read_text().splitlines() if s.strip()]
+          temple = [r for r in definitions if r.get("name") == "Eldrazi Temple"]
+          assert len(temple) == 1
+          abilities = temple[0]["script"]["activatedAbilities"]
+          assert len(abilities) == 2, "Both mana abilities must survive Android JSONL serialization"
+          assert all(a.get("cost") == "CostTap" and a.get("timing") == "ManaAbility"
+                     and a.get("isManaAbility") is True for a in abilities), "Both modes must tap as mana abilities"
+          first, second = (a["effect"] for a in abilities)
+          assert first == {"type":"AddColorlessMana","amount":{"type":"Fixed","amount":1}}, (
+              "First Temple mode must remain unrestricted {C}", first)
+          assert second == {
+              "type":"AddColorlessMana",
+              "amount":{"type":"Fixed","amount":2},
+              "restriction":{"type":"ColorlessSubtypeSpellsOrAbilitiesOnly","subtype":"Eldrazi"},
+          }, ("Second Temple mode lost its exact source/spell restriction", second)
+          def before(path):
+              return subprocess.check_output(["git","show",f"HEAD:android/app/src/main/assets/argentum/{path}"],text=True)
+          def names(text):
+              return {line.split("\t",1)[0] for line in text.splitlines() if line.strip()}
+          prior = names(before("custom-cards.index.tsv"))
+          current = names(index_path.read_text())
+          assert current-prior == {"Eldrazi Temple"} and not prior-current
+          manifest = json.loads(Path("investigation/argentum-six-precons/deck-manifest.json").read_text())
+          all_cards = names((assets/"all-cards.index.tsv").read_text())
+          # This PR is based on the older isolated Temple source, which does
+          # not yet index Morophon. Never borrow counts from the newer shared
+          # integration branch; enforce the actual exact-HEAD baseline.
+          assert "Eldrazi Temple" not in all_cards and "Eldrazi Temple" not in prior
+          counts = {}
+          for deck in manifest["decks"]:
+              if deck["name"] not in ("Eldrazi Incursion","Eldrazi Unbound"):
+                  continue
+              temple_slots = sum(c["quantity"] for c in deck["cards"] if c["name"] == "Eldrazi Temple")
+              assert temple_slots == 1, (deck["name"], temple_slots)
+              def count(custom):
+                  return sum(c["quantity"] for c in deck["cards"] if c["name"] in all_cards or c["name"] in custom)
+              before_count, after_count = count(prior), count(current)
+              # An unrelated indexed card must not masquerade as the Temple
+              # increment: verify exact name, one-copy official manifest slot,
+              # and unchanged inventory of every other original card.
+              newly_indexed = {c["name"] for c in deck["cards"]
+                               if c["name"] in current - prior and c["name"] not in all_cards}
+              assert newly_indexed == {"Eldrazi Temple"}, (deck["name"], newly_indexed)
+              assert after_count - before_count == temple_slots, (deck["name"], before_count, after_count)
+              counts[deck["name"]] = [before_count, after_count]
+          assert counts == {"Eldrazi Incursion":[75,76],"Eldrazi Unbound":[75,76]}, counts
+          Path("temple-upgraded-android-proof.json").write_text(json.dumps({
+              "head":subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),
+              "upgradedArgentum":"7fb073337e4389cfabe2ebf4c6416633a7fc63d2",
+              "indexedCandidateOnly":counts, "engineScenarios":14,
+              "androidCardScenarios":18,"integrated":False},indent=2)+"\n")
+          print("Temple upgraded-engine source + Android candidate scenarios and exact original-deck delta verified")
+          PY
+          sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/temple-export-1.sha
+          # Force a genuine second export; an UP-TO-DATE task would not test determinism.
+          (cd android && ./gradlew --no-daemon --max-workers=2 --rerun-tasks :custom-cards:exportCards)
+          # Reapply the same deterministic, strict runner-only ABI migration:
+          # the export task emits legacy custom-card wire shapes before migration.
+          python3 engine-upgrade/eldrazi-temple/candidate/port_legacy_serialized_mana_and_counters.py --apply android/app/src/main/assets/argentum/custom-cards.jsonl --expected-mana 0 --minimum-counters 0
+          sha256sum android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/temple-export-2.sha
+          diff -u /tmp/temple-export-1.sha /tmp/temple-export-2.sha
+          git diff --check
+          echo "Only disposable CI runner runtime/assets modified; no APK, merge, or production JAR replacement."
+      - name: Upload review-only test evidence (no binaries or APK)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: temple-upgraded-android-candidate-proof
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            temple-upgraded-android-proof.json
+            argentum-engine/rules-engine/build/test-results/test/TEST-*EldraziTemple*.xml
+            argentum-engine/mtg-sdk/build/test-results/test/TEST-*.xml
+            android/custom-cards/build/test-results/test/TEST-*.xml
+            android/app/build/test-results/testDebugUnitTest/TEST-*.xml
