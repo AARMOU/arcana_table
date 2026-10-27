@@ -1,0 +1,90 @@
+name: Turbo next APK — pinned source and cache tests ONLY (NO APK)
+# Safe when preparing: Python policy/unit checks and exact git source join only.
+on:
+  push:
+    branches:
+      - gpt/b137-turbo-prep-20261026
+    paths:
+      - .github/workflows/b137-turbo-source-preflight.yml
+      - .github/workflows/fast-test-apk-manual.yml
+      - tools/fast_apk_snapshot.py
+      - tools/turbo_tutorial_port.py
+      - tools/tests/test_fast_apk_snapshot.py
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: arcana-turbo-next-bundle-sources-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  source-only:
+    name: Validate cache safety and 23-file tutorial/lobby/combat join (NO APK)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify fast workflow dispatch-only and source/input cache tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m py_compile tools/fast_apk_snapshot.py tools/turbo_tutorial_port.py
+          python3 -m unittest discover -s tools/tests -p test_fast_apk_snapshot.py -v
+          grep -F "OUTCOME_SHA: c7f95db09560be4249d89b1288f2dccebe14a45e" .github/workflows/release-look-followup-build134.yml
+          grep -F "LOBBY_FIX_SHA: cdcfe759501d044c73b35cba4e6838ffa1ef8b82" .github/workflows/release-look-followup-build134.yml
+      - name: Compose EXACT Next APK source on throwaway runner without Gradle/APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! python3 tools/fast_apk_snapshot.py source; then
+            echo "::error title=Source-only integration::Review all tutorial/combat conflicts before app compilation"
+            git diff --name-only --diff-filter=U || true
+            for file in $(git diff --name-only --diff-filter=U); do
+              echo "::group::Conflict markers in $file"
+              awk '/^<<<<<<< / {inside=1; n=0} inside && n++ < 100 {print} /^>>>>>>> / {inside=0}' "$file" | head -400
+              echo '::endgroup::'
+            done
+            exit 1
+          fi
+          grep -F "claude-tutorial-all-20-chapters dfccf7ff456e953f099930c426b8dee5554314ba" combined-evidence/next-apk-source-pins.txt
+          grep -F 'argentumBlockGuard.onStep(snapshot.stepKey)' android/app/src/main/java/com/arcanatable/TableArgentum.kt
+          grep -F 'val hostLobbyState = wifiMultiLobbyState' android/app/src/main/java/com/arcanatable/TableMultiLobby.kt
+          test -s android/app/src/test/java/com/arcanatable/ui/TutorialAuditUiTest.kt
+          test -s android/app/src/test/java/com/arcanatable/MultiplayerLobbyVisibilityTest.kt
+          test -s android/app/src/test/java/com/arcanatable/ArgentumBlockSubmissionGuardTest.kt
+          git diff --check
+          echo "PASS: full reviewed source + immutable engine-cache safety; NO APK, Gradle, signing or Worker deploy"
+      - name: Download previously verified Build 136 engine cache — NO APK
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 40417570112
+          name: arcana-fast-engine-b136-pinned
+          path: fast-engine-bundle
+      - name: Verify original seed or block reuse until fresh manual seed is built (NO APK)
+        shell: bash
+        env:
+          FAST_SEED_RUN_ID: "40417570112"
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          data=json.loads(Path('fast-engine-bundle/manifest.json').read_text())
+          assert data['schema']==1
+          assert str(data['seed_run_id'])=='40417570112'
+          assert len(data['files'])==9
+          print('Downloaded exact historical B136 sealed 9-file seed manifest')
+          PY
+          if python3 tools/fast_apk_snapshot.py restore --bundle fast-engine-bundle > turbo-cache-compatibility.log 2>&1; then
+            echo 'PASS: old Build 136 engine snapshot is byte-for-byte compatible'
+            echo 'TURBO_EXISTING_SEED=REUSABLE' >> "$GITHUB_STEP_SUMMARY"
+          else
+            cat turbo-cache-compatibility.log
+            grep -F 'REJECT stale/mismatched engine cache: source/patches/custom cards changed' turbo-cache-compatibility.log
+            echo '::warning title=One fresh seed needed::Old B136 engine inputs differ from the next-bundle assembled source. No binary reused. Run seed-engine in the existing manual Turbo workflow after owner authorizes engine seeding; do NOT build APK yet.'
+            echo 'TURBO_EXISTING_SEED=STALE; NEW MANUAL SEED REQUIRED, NO APK' >> "$GITHUB_STEP_SUMMARY"
+          fi
