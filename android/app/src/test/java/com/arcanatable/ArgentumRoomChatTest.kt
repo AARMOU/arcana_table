@@ -9,6 +9,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import org.json.JSONObject
 import org.junit.Assert.*
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.TimeUnit
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -86,6 +88,62 @@ class ArgentumRoomChatTest {
         t.resetRoomChat()
         assertTrue(t.chatMessages.isEmpty())
         assertEquals(0L, t.roomChatNextId)
+    }
+
+    @Test fun realWifiSocketsRelayGuestToGuestAndHostToBoth() {
+        val t = controller()
+        val room = room()
+        t.wifiMultiLobby = room
+        val welcomed = LinkedBlockingQueue<EntityId>()
+        lateinit var server: ArgentumLanMultiServer
+        server = ArgentumLanMultiServer("Host", room.friendSeatIds(),
+            onGuest = { id, _ ->
+                val index = ArgentumCloudMultiHost.seatNumber(id)!!
+                if (room.seatGuestAt(id, seat("Guest $index")) && server.admitGuest(id)) welcomed.offer(id)
+            },
+            onGuestMessage = { id, packet ->
+                if (packet.optString("type") == ArgentumRoomChat.REQUEST)
+                    t.receiveRoomChatFromGuest(id, packet)
+            },
+            onGuestLeft = { },
+        )
+        t.wifiServer = server
+        val a = ArgentumLanGuest()
+        val b = ArgentumLanGuest()
+        val receivedA = LinkedBlockingQueue<JSONObject>()
+        val receivedB = LinkedBlockingQueue<JSONObject>()
+        a.onMessage = { receivedA.offer(it) }
+        b.onMessage = { receivedB.offer(it) }
+        try {
+            server.start()
+            assertTrue("host socket bound: ${server.bindError}", server.awaitReady(10_000))
+            a.connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "Guest 1"))
+            assertNotNull("first guest admitted", welcomed.poll(5, TimeUnit.SECONDS))
+            b.connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "Guest 2"))
+            assertNotNull("second guest admitted", welcomed.poll(5, TimeUnit.SECONDS))
+            assertTrue(a.send(ArgentumRoomChat.request("from one")!!))
+            val firstA = receivedA.poll(5, TimeUnit.SECONDS)
+            val firstB = receivedB.poll(5, TimeUnit.SECONDS)
+            assertEquals(ArgentumRoomChat.DELIVERY, firstA?.optString("type"))
+            assertEquals(ArgentumRoomChat.DELIVERY, firstB?.optString("type"))
+            assertEquals("from one", firstB?.optString("text"))
+            assertEquals(firstA?.optLong("id"), firstB?.optLong("id"))
+            assertEquals(1, firstB?.optInt("seat"))
+            assertTrue(b.send(ArgentumRoomChat.request("from two")!!))
+            val secondA = receivedA.poll(5, TimeUnit.SECONDS)
+            val secondB = receivedB.poll(5, TimeUnit.SECONDS)
+            assertEquals("from two", secondA?.optString("text"))
+            assertEquals(secondA?.optLong("id"), secondB?.optLong("id"))
+            assertEquals(2, secondA?.optInt("seat"))
+            assertTrue(t.sendTableChat("host to everyone"))
+            assertEquals("host to everyone", receivedA.poll(5, TimeUnit.SECONDS)?.optString("text"))
+            assertEquals("host to everyone", receivedB.poll(5, TimeUnit.SECONDS)?.optString("text"))
+            assertEquals(listOf("from one", "from two", "host to everyone"), t.chatMessages.map { it.text })
+        } finally {
+            a.close()
+            b.close()
+            server.close()
+        }
     }
 
     @Test fun hostCanSendWithoutForwardingThroughRulesEngine() {
