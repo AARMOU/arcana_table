@@ -115,6 +115,144 @@ def audit(release: str, preview: str) -> list[str]:
             problems.append('preview is no longer manual-only' if name == 'preview' else
                             'release: workflow triggers changed; review before activation')
     if len(extras) == 3:
+        build, verify, upload = (body for _, body in extras)
+        # Preview-only steps have no release counterpart. Validate their
+        # security-critical behavior explicitly rather than treating any
+        # correctly named step as safe. Blob pins still guard the full files.
+        if (not re.search(r'(?m)^          \\./gradlew [^\\n]*:app:assembleDebug\\b', build)
+                or re.search(r'(?m)^        (?:if|continue-on-error):', build)):
+            problems.append('preview build must assemble the debug APK without skip/continue-on-error')
+        required_verify = (
+            r'^          test -s android/app/build/outputs/apk/debug/app-debug\\.apk        if (re.findall(r'^        if: [^\n]+$', upload, re.M) != ['        if: success()']
+                or not re.search(r'^          if-no-files-found: error$', upload, re.M)
+                or not re.search(r'^        uses: actions/upload-artifact@v4$', upload, re.M)):
+            problems.append('preview upload success/fail-closed conditions changed')
+    return problems
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('release', type=Path)
+    parser.add_argument('preview', type=Path)
+    args = parser.parse_args()
+    raw_release, raw_preview = args.release.read_bytes(), args.preview.read_bytes()
+    problems = audit(raw_release.decode('utf-8'), raw_preview.decode('utf-8'))
+    for label, actual, expected in [('release', git_blob_sha(raw_release), RELEASE_BLOB),
+                                    ('preview', git_blob_sha(raw_preview), PREVIEW_BLOB)]:
+        if actual != expected:
+            problems.append(f'{label} blob changed: {actual} != reviewed {expected}; re-audit before accepting')
+    if problems:
+        for problem in problems:
+            print('FAIL:', problem)
+        return 1
+    print('PASS: frozen 33 shared steps (28 named, 5 unnamed); 3 preview-only steps; read-only permissions; manual preview')
+    print('NOTICE: preview upload-artifact@v4 remains tag-referenced; pin/review before authorized activation')
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
+,
+            r'^          grep -F "package: name=\\x27com\\.arcanatable\\.argentum\\x27 versionCode=\\x27134\\x27',
+            r'^          .*apksigner" verify --print-certs android/app/build/outputs/apk/debug/app-debug\\.apk',
+            r'^          sha256sum android/app/build/outputs/apk/debug/app-debug\\.apk > combined-evidence/apk\\.sha256        if (re.findall(r'^        if: [^\n]+$', upload, re.M) != ['        if: success()']
+                or not re.search(r'^          if-no-files-found: error$', upload, re.M)
+                or not re.search(r'^        uses: actions/upload-artifact@v4$', upload, re.M)):
+            problems.append('preview upload success/fail-closed conditions changed')
+    return problems
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('release', type=Path)
+    parser.add_argument('preview', type=Path)
+    args = parser.parse_args()
+    raw_release, raw_preview = args.release.read_bytes(), args.preview.read_bytes()
+    problems = audit(raw_release.decode('utf-8'), raw_preview.decode('utf-8'))
+    for label, actual, expected in [('release', git_blob_sha(raw_release), RELEASE_BLOB),
+                                    ('preview', git_blob_sha(raw_preview), PREVIEW_BLOB)]:
+        if actual != expected:
+            problems.append(f'{label} blob changed: {actual} != reviewed {expected}; re-audit before accepting')
+    if problems:
+        for problem in problems:
+            print('FAIL:', problem)
+        return 1
+    print('PASS: frozen 33 shared steps (28 named, 5 unnamed); 3 preview-only steps; read-only permissions; manual preview')
+    print('NOTICE: preview upload-artifact@v4 remains tag-referenced; pin/review before authorized activation')
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
+,
+        )
+        if (any(not re.search(pattern, verify, re.M) for pattern in required_verify)
+                or re.search(r'(?m)^        (?:if|continue-on-error):', verify)):
+            problems.append('preview identity/signature/hash verification was weakened or made skippable')
+        if (re.findall(r'(?m)^          path: [^\\n]+        if (re.findall(r'^        if: [^\n]+$', upload, re.M) != ['        if: success()']
+                or not re.search(r'^          if-no-files-found: error$', upload, re.M)
+                or not re.search(r'^        uses: actions/upload-artifact@v4$', upload, re.M)):
+            problems.append('preview upload success/fail-closed conditions changed')
+    return problems
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('release', type=Path)
+    parser.add_argument('preview', type=Path)
+    args = parser.parse_args()
+    raw_release, raw_preview = args.release.read_bytes(), args.preview.read_bytes()
+    problems = audit(raw_release.decode('utf-8'), raw_preview.decode('utf-8'))
+    for label, actual, expected in [('release', git_blob_sha(raw_release), RELEASE_BLOB),
+                                    ('preview', git_blob_sha(raw_preview), PREVIEW_BLOB)]:
+        if actual != expected:
+            problems.append(f'{label} blob changed: {actual} != reviewed {expected}; re-audit before accepting')
+    if problems:
+        for problem in problems:
+            print('FAIL:', problem)
+        return 1
+    print('PASS: frozen 33 shared steps (28 named, 5 unnamed); 3 preview-only steps; read-only permissions; manual preview')
+    print('NOTICE: preview upload-artifact@v4 remains tag-referenced; pin/review before authorized activation')
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
+, upload) !=
+                ['          path: android/app/build/outputs/apk/debug/app-debug.apk']
+                or re.findall(r'(?m)^          name: [^\\n]+        if (re.findall(r'^        if: [^\n]+$', upload, re.M) != ['        if: success()']
+                or not re.search(r'^          if-no-files-found: error$', upload, re.M)
+                or not re.search(r'^        uses: actions/upload-artifact@v4$', upload, re.M)):
+            problems.append('preview upload success/fail-closed conditions changed')
+    return problems
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('release', type=Path)
+    parser.add_argument('preview', type=Path)
+    args = parser.parse_args()
+    raw_release, raw_preview = args.release.read_bytes(), args.preview.read_bytes()
+    problems = audit(raw_release.decode('utf-8'), raw_preview.decode('utf-8'))
+    for label, actual, expected in [('release', git_blob_sha(raw_release), RELEASE_BLOB),
+                                    ('preview', git_blob_sha(raw_preview), PREVIEW_BLOB)]:
+        if actual != expected:
+            problems.append(f'{label} blob changed: {actual} != reviewed {expected}; re-audit before accepting')
+    if problems:
+        for problem in problems:
+            print('FAIL:', problem)
+        return 1
+    print('PASS: frozen 33 shared steps (28 named, 5 unnamed); 3 preview-only steps; read-only permissions; manual preview')
+    print('NOTICE: preview upload-artifact@v4 remains tag-referenced; pin/review before authorized activation')
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())
+, upload) !=
+                ['          name: arcana-combined-argentum-eldrazi94-build134-logo-polish-debug-apk']
+                or re.search(r'(?m)^        continue-on-error:', upload)):
+            problems.append('preview upload must contain only the reviewed debug APK artifact')
         upload = extras[2][1]
         if (re.findall(r'^        if: [^\n]+$', upload, re.M) != ['        if: success()']
                 or not re.search(r'^          if-no-files-found: error$', upload, re.M)
