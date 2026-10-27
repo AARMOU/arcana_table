@@ -21,16 +21,21 @@ Visit the [Arcana Table project page](https://aarmou.github.io/arcana_table/).
 
 ## Source code
 
-The Android app and internet room service source are in [android/](android/). This is Build 67 (version 0.15.48), a source-only update. The APK in the source archive was from Build 66 and is intentionally not included here. Installable APKs should be published separately as GitHub Releases.
+The Android app and internet room service source are in [android/](android/), with ongoing app integration developed and validated on dedicated branches. **Do not treat the `main` branch's historical Android snapshot as the current Build 138 release source.** The latest owner-directed release candidate integrates six feature PRs in an isolated CI runner; see [Build 138 production-package evidence](https://github.com/AARMOU/arcana_table/actions/runs/40512660878) and [PR #309](https://github.com/AARMOU/arcana_table/pull/309).
+
+**Build 138 as of October 27, 2026:** The `com.arcanatable` Google Play release AAB (versionCode 138) passed compilation and validation and was signed using the existing Play upload key. Google Play Console acceptance and rollout are **not verified**. The unsigned CI artifact is not a signed installable release, and the signed bundle is not available from the public repository.
+
+Features in the candidate include offline Argentum-powered games with AI, categorized Commander premades, enabled import/editor tools, 20 interactive tutorial chapters with practice, and an early Wi-Fi/internet multiplayer preview with a four-seat lobby, room chat and private hands. These features still need physical-device acceptance. Standalone developer test-scenario boards are **debug-only**, not included in the Play release.
 
 Open the android folder in Android Studio to build the app. See [android/README.md](android/README.md) for features, requirements, and build notes. The internet room service is in [android/cloud-room/](android/cloud-room/).
 
 ## Project page and Pages deployment
 
-- index.html — responsive project site.
-- .github/workflows/pages.yml — publishes only the landing page with GitHub Actions when the page or workflow changes on main.
+- [index.html](index.html) — responsive project site with Build 138 features, milestones since Build 121, testing limits, and screenshots clearly labeled as earlier captures.
+- [closed-testing.html](closed-testing.html) — invitation-request information aligned to the Build 138 candidate.
+- [.github/workflows/pages.yml](.github/workflows/pages.yml) — publishes the landing page, closed-testing information, privacy policy, static assets, and control dashboard when approved site changes land on `main`.
 
-Edit index.html to update the site. The Android source is stored separately under android/ and is not included in the published Pages artifact.
+Site changes are staged in a separate PR before merging to `main`; the Pages workflow does not deploy a development branch automatically. The Android source is not included in the published Pages artifact.
 
 ## Disclaimer
 
