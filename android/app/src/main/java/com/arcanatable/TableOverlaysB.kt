@@ -140,6 +140,24 @@ import kotlinx.coroutines.CoroutineScope
 /** Overlays and dialogs drawn over the table (part 2: rooms, lobby, deck import, local-rules dialogs). */
 @Composable
 internal fun TableController.TableOverlaysB() {
+    var cardRequestOpen by remember { mutableStateOf(false) }
+    var cardRequestSelected by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var cardRequestSending by remember { mutableStateOf(false) }
+    var cardRequestFeedback by remember { mutableStateOf<String?>(null) }
+    var cardRequestCompleted by remember { mutableStateOf(false) }
+    var cardRequestId by remember { mutableStateOf(java.util.UUID.randomUUID().toString()) }
+    val cardRequestNames = remember(importText, supportCatalog) {
+        if (importText.isBlank()) emptyList()
+        else supportCatalog?.check(parseDeckList(importText))?.unsupportedNames.orEmpty()
+    }
+    val openCardRequest: () -> Unit = {
+        cardRequestSelected = cardRequestNames.take(10).toSet()
+        cardRequestId = java.util.UUID.randomUUID().toString()
+        cardRequestSending = false
+        cardRequestCompleted = false
+        cardRequestFeedback = null
+        cardRequestOpen = true
+    }
             Box(Modifier.fillMaxSize()) {
 
 
@@ -496,6 +514,16 @@ internal fun TableController.TableOverlaysB() {
                                     "Not in Argentum: ${supportReport.unsupportedNames.take(8).joinToString()}${if (supportReport.unsupportedNames.size > 8) ", +${supportReport.unsupportedNames.size - 8} more" else ""}",
                                     color = CounterGold, fontSize = 10.sp, maxLines = 3, overflow = TextOverflow.Ellipsis
                                 )
+                                if (supportReport.unsupportedNames.isNotEmpty()) {
+                                    OutlinedButton(
+                                        onClick = openCardRequest,
+                                        enabled = !importing && !argentumDeckLoading,
+                                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp).heightIn(min = 48.dp)
+                                    ) {
+                                        Text("REQUEST MISSING CARDS (" + supportReport.unsupportedNames.size + ")", fontSize = 11.sp, color = Mint)
+                                    }
+                                    Text("Optional. Review the names before submitting a public card request.", fontSize = 10.sp, color = Muted)
+                                }
                             } else Text(if (supportCatalogFailed) "Argentum library check unavailable in this build." else "Checking Argentum's card library…", color = Muted, fontSize = 10.sp)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -514,6 +542,89 @@ internal fun TableController.TableOverlaysB() {
             }
         }
     }
+
+
+    // Requests never change the deck or start a paid card-implementation worker.
+    if (cardRequestOpen) AlertDialog(
+        onDismissRequest = { if (!cardRequestSending) cardRequestOpen = false },
+        title = { Text("Request missing cards") },
+        text = {
+            Column(
+                modifier = Modifier.heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.55f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Choose unsupported card names to share with Arcana's public request tracker. We never send your decklist, name, room, or device details.",
+                    color = Muted, fontSize = 12.sp)
+                if (cardRequestNames.size > 10) {
+                    Text("Select up to 10 names per request. You can request the others separately.",
+                        color = CounterGold, fontSize = 11.sp)
+                }
+                cardRequestNames.take(40).forEach { name ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = name in cardRequestSelected,
+                            enabled = !cardRequestSending && !cardRequestCompleted,
+                            onCheckedChange = { checked ->
+                                cardRequestSelected = when {
+                                    checked && cardRequestSelected.size < 10 -> cardRequestSelected + name
+                                    !checked -> cardRequestSelected - name
+                                    else -> cardRequestSelected
+                                }
+                            }
+                        )
+                        Text(name, color = SoftWhite, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                    }
+                }
+                if (!CardRequestApi.isConfigured) Text(
+                    "This build does not yet have a request service configured. No information has been sent.",
+                    color = CounterGold, fontSize = 11.sp
+                )
+                cardRequestFeedback?.let { Text(it, fontSize = 12.sp, color = if (cardRequestCompleted) Mint else CounterGold) }
+                if (cardRequestSending) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (cardRequestCompleted) {
+                        cardRequestOpen = false
+                    } else {
+                        val stillMissing = supportCatalog?.check(parseDeckList(importText))?.unsupportedNames.orEmpty().toSet()
+                        val namesToSend = cardRequestSelected.filter { it in stillMissing }
+                        if (namesToSend.isEmpty()) {
+                            cardRequestFeedback = "All selected names are now indexed. Nothing was sent."
+                        } else {
+                            cardRequestSending = true
+                            cardRequestFeedback = null
+                            scope.launch {
+                                try {
+                                    val receipt = CardRequestApi.submit(namesToSend, cardRequestId)
+                                    cardRequestCompleted = true
+                                    cardRequestFeedback = if (receipt.pending)
+                                        "Request queued. GitHub tracker update is pending; no need to resubmit."
+                                    else "Submitted " + receipt.accepted + " card name(s) to Arcana's request tracker."
+                                } catch (error: Exception) {
+                                    cardRequestFeedback = error.message ?: "Submission failed. You can retry without losing your deck."
+                                } finally {
+                                    cardRequestSending = false
+                                }
+                            }
+                        }
+                    }
+                },
+                enabled = !cardRequestSending && (cardRequestCompleted ||
+                    (CardRequestApi.isConfigured && cardRequestSelected.isNotEmpty()))
+            ) { Text(if (cardRequestCompleted) "DONE" else if (cardRequestSending) "SENDING…" else "SEND REQUEST", color = Mint) }
+        },
+        dismissButton = { TextButton(
+            enabled = !cardRequestSending,
+            onClick = { cardRequestOpen = false }
+        ) { Text(if (cardRequestCompleted) "CLOSE" else "CANCEL") } },
+        containerColor = Panel,
+        titleContentColor = SoftWhite,
+        textContentColor = Muted
+    )
 
     if (argentumDeckPickerOpen) Dialog(onDismissRequest = { argentumDeckPickerOpen = false }) {
         Surface(
@@ -666,6 +777,7 @@ internal fun TableController.TableOverlaysB() {
                                 importReviewMessage = "Removed ${overflow.size} card(s) over the deck limit."
                             }
                         ) { Text("TRIM EXCESS", color = Mint) }
+                    if (cardRequestNames.isNotEmpty()) TextButton(onClick = openCardRequest, enabled = !importAutoFixInProgress) { Text("REQUEST MISSING CARDS", color = Mint) }
                     if (cardsNeedingReview.isNotEmpty()) TextButton(onClick = { if (!importAutoFixInProgress) { importReviewOpen = false; deckEditorOpen = true } }, enabled = !importAutoFixInProgress, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text("OPEN EDITOR", color = Mint)
                     }
