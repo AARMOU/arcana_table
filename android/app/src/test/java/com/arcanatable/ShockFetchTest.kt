@@ -34,7 +34,7 @@ class ShockFetchTest {
         val trail = ArrayDeque<String>()
         fun note(entry: String) { trail.addLast(entry); while (trail.size > 40) trail.removeFirst() }
         fun send(action: JSONObject) {
-            note("submit ${action.optString(\"type\")} ${action.toString().take(180)}")
+            note("submit ${action.optString("type")} ${action.toString().take(180)}")
             host.receive(JSONObject().put("type", "submitAction").put("action", action).put("interactionEpoch", "offline"))
         }
         var lastMsgType = "none"
