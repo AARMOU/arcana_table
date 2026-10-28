@@ -24,6 +24,8 @@ def verify_patch(data: bytes, expected_sha: str = PATCH_SHA256) -> None:
     paths = re.findall(rb"^diff --git a/([^\n]+?) b/([^\n]+)$", data, re.MULTILINE)
     if not paths or any(a != b for a, b in paths):
         raise ValueError("unexpected patch path mapping")
+    if any(a.startswith(b"/") or b".." in a.split(b"/") or b"\\" in a for a, _ in paths):
+        raise ValueError("unsafe absolute, parent-traversal, or backslash patch path")
     if any(a.startswith(b"android/app/libs/") and a.endswith(b".jar") for a, _ in paths):
         raise ValueError("generated Argentum JAR must not be part of source patch")
     if any(b"Build134ReleaseScopeTest.kt" in a for a, _ in paths):
