@@ -17,6 +17,9 @@ import java.util.Locale
 data class CardRequestReceipt(val accepted: Int, val pending: Boolean, val trackerUrl: String)
 
 object CardRequestApi {
+    /** Stable public client identity; Cloudflare blocks some generic HTTP clients (Error 1010). */
+    internal const val USER_AGENT = "ArcanaTable-CardRequests/1.0"
+
     val isConfigured: Boolean
         get() = BuildConfig.CARD_REQUEST_ENDPOINT.startsWith("https://", ignoreCase = true)
 
@@ -42,6 +45,7 @@ object CardRequestApi {
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("Accept", "application/json")
+            setRequestProperty("User-Agent", USER_AGENT)
         }
         try {
             connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
