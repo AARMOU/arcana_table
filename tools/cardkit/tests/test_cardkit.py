@@ -135,6 +135,14 @@ class RefsTests(unittest.TestCase):
         self.assertTrue(lib)
         self.assertTrue(any(repo.UPSTREAM_COMMIT in refs.where(m.ref.card, "library") for m in lib))
 
+    def test_unexported_custom_sources_are_not_similarity_evidence(self):
+        with mock.patch.object(repo, "custom_index_names", return_value=set()):
+            refs.index.cache_clear()
+            try:
+                self.assertFalse(any(r.source == "custom" for r in refs.index().refs))
+            finally:
+                refs.index.cache_clear()
+
 
 class SdkTests(unittest.TestCase):
     def test_committed_index_has_real_members_only(self):
@@ -163,12 +171,23 @@ class PatternTests(unittest.TestCase):
     def test_committed_pattern_index_is_current(self):
         self.assertTrue(patterns.write(check=True), "run `tools/cardkit/cardkit patterns`")
 
+    def test_unexported_registration_is_not_a_verified_pattern(self):
+        with mock.patch.object(repo, "custom_index_names", return_value=set()):
+            self.assertEqual(patterns.build(), {}, "a source/registry/test alone is not shipped evidence")
+
 
 class ReadinessTests(unittest.TestCase):
     def test_registered_tested_custom_card(self):
         v = readiness.classify("Space Marine Scout")
         self.assertEqual(v["readiness"], "IMPLEMENTED_AND_TESTED")
         self.assertEqual(v["source"], "custom:custom-card-scenario-test")
+
+    def test_registered_but_unexported_card_is_not_counted_playable(self):
+        with mock.patch.object(repo, "custom_index_names", return_value=set()):
+            state, reasons, source = readiness.implementation_state("Space Marine Scout")
+        self.assertEqual(state, "NEEDS_REVIEW")
+        self.assertEqual(source, "custom")
+        self.assertIn("missing from exported", " ".join(reasons))
 
     def test_argentum_library_card(self):
         v = readiness.classify("Sol Ring")

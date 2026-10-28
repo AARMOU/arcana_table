@@ -81,9 +81,10 @@ def constructs(text: str) -> set[tuple[str, str]]:
 
 def build() -> dict:
     registered = {e.val for e in repo.registry_entries()}
+    exported = repo.custom_index_names()
     usage: dict[tuple[str, str], list[dict]] = defaultdict(list)
     for c in repo.card_sources():
-        if c.val not in registered or c.is_scaffold:
+        if c.val not in registered or c.is_scaffold or repo.normalize_name(c.name) not in exported:
             continue
         test = repo.own_test(c.val)
         tests = repo.tests_by_val().get(c.val, [])

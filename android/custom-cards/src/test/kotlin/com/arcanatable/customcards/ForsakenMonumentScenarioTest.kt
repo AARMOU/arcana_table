@@ -4,6 +4,7 @@ import com.arcanatable.customcards.cards.ForsakenMonument
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.sdk.core.Color
+import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.dsl.Effects
 import com.wingedsheep.sdk.dsl.card
 import com.wingedsheep.sdk.model.EntityId
@@ -19,6 +20,28 @@ class ForsakenMonumentScenarioTest {
             typeLine = "Creature — Eldrazi"
             power = 3
             toughness = 3
+        })
+        registerCard(card("Monument Devoid Probe") {
+            manaCost = "{1}{R}"
+            colorIdentity = "R"
+            typeLine = "Creature — Eldrazi"
+            power = 1
+            toughness = 1
+            keywords(Keyword.DEVOID)
+        })
+        registerCard(card("Monument Colored Eldrazi Probe") {
+            manaCost = "{1}{R}"
+            colorIdentity = "R"
+            typeLine = "Creature — Eldrazi"
+            power = 1
+            toughness = 1
+        })
+        registerCard(card("Monument Green Cost Probe") {
+            manaCost = "{1}{G}"
+            colorIdentity = "G"
+            typeLine = "Creature — Eldrazi"
+            power = 2
+            toughness = 2
         })
     }
 
@@ -82,11 +105,44 @@ class ForsakenMonumentScenarioTest {
         assertNull(d.passPriority(d.player1).error)
         assertEquals(d.player2, d.priorityPlayer)
         val action = d.abilityActions(d.player2, theirWastes).firstOrNull()?.action as? ActivateAbility
-        if (action != null) {
-            assertNull(d.submit(action).error)
-            d.resolveAll()
-            assertEquals("opponent's {C} is not doubled", 1, d.manaPool(d.player2).colorless)
-        }
+        assertNotNull("opponent must have a legal Wastes mana action at priority", action)
+        assertNull(d.submit(action!!).error)
+        d.resolveAll()
+        assertEquals("opponent's {C} is not doubled", 1, d.manaPool(d.player2).colorless)
+    }
+
+    @Test fun manaGrantedWithoutTappingDoesNotReceiveMonumentBonus() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        // Mana entering the pool is not itself a tap-for-{C} event.
+        // The bonus must be tied to an actual permanent tapped for colorless.
+        d.giveColorlessMana(d.player1, 2)
+        assertEquals("directly granted {C}{C} receives no Monument bonus", 2, d.manaPool(d.player1).colorless)
+
+        val wastes = d.putLandOnBattlefield(d.player1, "Wastes")
+        d.tapForMana(d.player1, wastes)
+        assertEquals("only the real Wastes tap adds one extra {C}", 4, d.manaPool(d.player1).colorless)
+    }
+
+    @Test fun rejectedUnaffordableColorlessCastDoesNotCreateMonumentTrigger() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val probe = d.putCardInHand(d.player1, "Monument Colorless Probe")
+
+        // A failed attempt to pay {2} is not a cast event and must be atomic:
+        // it must not spend the available {C} or create Monument's life trigger.
+        d.giveColorlessMana(d.player1, 1)
+        assertNotNull("unaffordable colorless spell must be rejected", d.castSpell(d.player1, probe).error)
+        assertEquals("rejected cast must not consume the mana", 1, d.manaPool(d.player1).colorless)
+        d.resolveAll()
+        assertEquals("rejected cast must not create a Monument trigger", before, d.getLifeTotal(d.player1))
+
+        // The same card can subsequently be legally cast with sufficient mana.
+        d.giveColorlessMana(d.player1, 1)
+        assertNull("the now-affordable cast must succeed", d.castSpell(d.player1, probe).error)
+        d.resolveStack()
+        assertEquals("exactly one successful cast triggers exactly two life", before + 2, d.getLifeTotal(d.player1))
     }
 
     @Test fun withoutMonumentNoExtraMana() {
@@ -105,6 +161,189 @@ class ForsakenMonumentScenarioTest {
         assertNull(d.castSpell(d.player1, probe).error)
         d.resolveStack()
         assertEquals(before + 2, d.getLifeTotal(d.player1))
+    }
+
+    @Test fun colorlessNonCreatureSpellAlsoGainsTwoLife() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val ring = d.putCardInHand(d.player1, "Sol Ring")
+        d.giveColorlessMana(d.player1, 1)
+        assertNull(d.castSpell(d.player1, ring).error)
+        d.resolveStack()
+        assertEquals("a colorless artifact spell also triggers Monument", before + 2, d.getLifeTotal(d.player1))
+    }
+
+    @Test fun opponentsMonumentDoesNotTriggerFromMyColorlessCast() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player2, "Forsaken Monument")
+        val theirLife = d.getLifeTotal(d.player2)
+        val myLife = d.getLifeTotal(d.player1)
+        val probe = d.putCardInHand(d.player1, "Monument Colorless Probe")
+        d.giveColorlessMana(d.player1, 2)
+        assertNull(d.castSpell(d.player1, probe).error)
+        d.resolveStack()
+        assertEquals("opponent's Monument cannot gain life from my spell", theirLife, d.getLifeTotal(d.player2))
+        assertEquals("I do not control a Monument", myLife, d.getLifeTotal(d.player1))
+    }
+
+    @Test fun manaBonusEndsWhenMonumentLeavesBattlefield() {
+        val d = setup()
+        val monument = d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val first = d.putLandOnBattlefield(d.player1, "Wastes")
+        d.tapForMana(d.player1, first)
+        assertEquals(2, d.manaPool(d.player1).colorless)
+        d.moveToGraveyard(monument)
+        val second = d.putLandOnBattlefield(d.player1, "Wastes")
+        d.tapForMana(d.player1, second)
+        assertEquals("the second tap gets no additional {C} after Monument leaves", 3, d.manaPool(d.player1).colorless)
+    }
+
+    @Test fun castTriggerSurvivesMonumentLeavingBeforeItResolves() {
+        val d = setup()
+        val monument = d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val probe = d.putCardInHand(d.player1, "Monument Colorless Probe")
+        d.giveColorlessMana(d.player1, 2)
+        assertNull(d.castSpell(d.player1, probe).error)
+        // A cast trigger already created on the stack must survive losing its source.
+        d.moveToGraveyard(monument)
+        d.resolveStack()
+        assertEquals("the existing cast trigger survives Monument leaving", before + 2, d.getLifeTotal(d.player1))
+    }
+
+    @Test fun colorlessCastAfterMonumentLeavesCannotCreateItsLifeTrigger() {
+        val d = setup()
+        val monument = d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        d.moveToGraveyard(monument)
+        val before = d.getLifeTotal(d.player1)
+        val probe = d.putCardInHand(d.player1, "Monument Colorless Probe")
+        d.giveColorlessMana(d.player1, 2)
+        assertNull(d.castSpell(d.player1, probe).error)
+        d.resolveStack()
+        assertEquals("a later cast cannot trigger a Monument in the graveyard", before, d.getLifeTotal(d.player1))
+    }
+
+    @Test fun devoidCreatureIsColorlessDespiteRedManaCost() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val devoid = d.putCardInHand(d.player1, "Monument Devoid Probe")
+        d.giveColorlessMana(d.player1, 1)
+        d.giveMana(d.player1, Color.RED, 1)
+        assertNull(d.castSpell(d.player1, devoid).error)
+        d.resolveStack()
+        assertEquals("Devoid is colorless even when its casting cost contains {R}", before + 2, d.getLifeTotal(d.player1))
+        val permanent = d.findPermanent(d.player1, "Monument Devoid Probe")
+        assertNotNull("Devoid creature resolves to battlefield", permanent)
+        assertEquals("Devoid creature gets the colorless anthem", 3 to 3, d.stats(permanent!!))
+    }
+
+    @Test fun coloredEldraziWithoutDevoidDoesNotTriggerOrReceiveAnthem() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val colored = d.putCardInHand(d.player1, "Monument Colored Eldrazi Probe")
+        d.giveColorlessMana(d.player1, 1)
+        d.giveMana(d.player1, Color.RED, 1)
+        assertNull(d.castSpell(d.player1, colored).error)
+        d.resolveStack()
+        assertEquals("Eldrazi subtype alone does not make a spell colorless", before, d.getLifeTotal(d.player1))
+        val permanent = d.findPermanent(d.player1, "Monument Colored Eldrazi Probe")
+        assertNotNull("colored Eldrazi resolves to battlefield", permanent)
+        assertEquals("colored Eldrazi does not receive the anthem", 1 to 1, d.stats(permanent!!))
+    }
+
+    @Test fun puttingAColorlessCreatureDirectlyOntoBattlefieldIsNotCasting() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val creature = d.putCreatureOnBattlefield(d.player1, "Monument Colorless Probe")
+        assertEquals("the colorless creature still receives Monument's anthem", 5 to 5, d.stats(creature))
+        d.resolveAll()
+        assertEquals("entering without being cast must not create a cast trigger", before, d.getLifeTotal(d.player1))
+    }
+
+    @Test fun eachSeparateColorlessCastGainsExactlyTwoLife() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+
+        val first = d.putCardInHand(d.player1, "Monument Colorless Probe")
+        d.giveColorlessMana(d.player1, 2)
+        assertNull(d.castSpell(d.player1, first).error)
+        d.resolveStack()
+        assertEquals("the first colorless spell generates one trigger", before + 2, d.getLifeTotal(d.player1))
+
+        val second = d.putCardInHand(d.player1, "Sol Ring")
+        d.giveColorlessMana(d.player1, 1)
+        assertNull(d.castSpell(d.player1, second).error)
+        d.resolveStack()
+        assertEquals("the second colorless spell generates its own trigger", before + 4, d.getLifeTotal(d.player1))
+    }
+
+    @Test fun colorlessSpellPaidWithColoredManaStillTriggersLifeGain() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val probe = d.putCardInHand(d.player1, "Monument Colorless Probe")
+        // Generic {2} may be paid using colored mana; that does not change spell color.
+        d.giveMana(d.player1, Color.RED, 2)
+        assertNull(d.castSpell(d.player1, probe).error)
+        d.resolveStack()
+        assertEquals("colored payment does not make a colorless spell colored", before + 2, d.getLifeTotal(d.player1))
+        val permanent = d.findPermanent(d.player1, "Monument Colorless Probe")
+        assertNotNull(permanent)
+        assertEquals(5 to 5, d.stats(permanent!!))
+    }
+
+    @Test fun coloredSpellPaidPartlyWithColorlessManaDoesNotTriggerLifeGain() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val probe = d.putCardInHand(d.player1, "Monument Green Cost Probe")
+        // Paying the generic portion with {C} does not make this {1}{G} spell colorless.
+        d.giveColorlessMana(d.player1, 1)
+        d.giveMana(d.player1, Color.GREEN, 1)
+        assertNull(d.castSpell(d.player1, probe).error)
+        d.resolveStack()
+        assertEquals("colorless payment does not change the spell's green color", before, d.getLifeTotal(d.player1))
+        val permanent = d.findPermanent(d.player1, "Monument Green Cost Probe")
+        assertNotNull(permanent)
+        assertEquals(2 to 2, d.stats(permanent!!))
+    }
+
+    @Test fun opposingMonumentsIndependentlyBuffTheirOwnCreaturesAndCastTriggers() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        d.putPermanentOnBattlefield(d.player2, "Forsaken Monument")
+        val mine = d.putCreatureOnBattlefield(d.player1, "Monument Colorless Probe")
+        val theirs = d.putCreatureOnBattlefield(d.player2, "Monument Colorless Probe")
+        assertEquals("my Monument buffs only my colorless creature", 5 to 5, d.stats(mine))
+        assertEquals("opponent's Monument buffs only their colorless creature", 5 to 5, d.stats(theirs))
+
+        val myLife = d.getLifeTotal(d.player1)
+        val theirLife = d.getLifeTotal(d.player2)
+        val ring = d.putCardInHand(d.player1, "Sol Ring")
+        d.giveColorlessMana(d.player1, 1)
+        assertNull(d.castSpell(d.player1, ring).error)
+        d.resolveStack()
+        assertEquals("my colorless cast triggers only my Monument", myLife + 2, d.getLifeTotal(d.player1))
+        assertEquals("opponent's Monument must not trigger from my cast", theirLife, d.getLifeTotal(d.player2))
+    }
+
+    @Test fun opposingMonumentCannotKeepMyManaBonusAfterMineLeaves() {
+        val d = setup()
+        val mine = d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        d.putPermanentOnBattlefield(d.player2, "Forsaken Monument")
+        val first = d.putLandOnBattlefield(d.player1, "Wastes")
+        d.tapForMana(d.player1, first)
+        assertEquals("my own Monument adds exactly one bonus {C}", 2, d.manaPool(d.player1).colorless)
+
+        d.moveToGraveyard(mine)
+        val second = d.putLandOnBattlefield(d.player1, "Wastes")
+        d.tapForMana(d.player1, second)
+        assertEquals("opponent's surviving Monument cannot add mana to my pool", 3, d.manaPool(d.player1).colorless)
     }
 
     @Test fun coloredSpellsGainNoLife() {

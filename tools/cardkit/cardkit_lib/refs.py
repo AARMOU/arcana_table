@@ -171,8 +171,10 @@ def clause_index() -> Index:
 def index() -> Index:
     refs: list[RefLine] = []
     seen: set[tuple[str, str]] = set()
+    registered = {e.val for e in repo.registry_entries()}
+    exported = repo.custom_index_names()
     for c in repo.card_sources():
-        if c.is_scaffold:
+        if c.is_scaffold or c.val not in registered or repo.normalize_name(c.name) not in exported:
             continue
         for line in text.split_lines(c.props.get("oracleText", "")):
             norm = text.normalize_line(line, c.name)
