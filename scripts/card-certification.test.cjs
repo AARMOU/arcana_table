@@ -4,12 +4,14 @@ const assert=require('node:assert/strict');
 const C=require('./card-certification.cjs');
 const SHA='a'.repeat(40), OLD='b'.repeat(40);
 const pr=(more={})=>({number:353,title:'Implement Blood for the Blood God!',body:'Fixes #352',
-  user:{login:'copilot-swe-agent[bot]'},head:{sha:SHA},...more});
+  user:{login:'copilot-swe-agent[bot]'},head:{sha:SHA},base:{sha:'d'.repeat(40)},...more});
 const unit=(more={})=>({number:352,state:'open',title:'[Arcana Queue] Blood for the Blood God!',...more});
 const check=(name,conclusion='success',sha=SHA,status='completed')=>({name,head_sha:sha,status,conclusion});
 const green=()=>[check('Arcana Cardkit / toolkit'),check('Arcana Development CI / cards-and-android')];
 const proof=(more={})=>({source:'independent-oracle-runner',provenanceVerified:true,oracleReviewed:true,
-  headSha:SHA,issue:352,runConclusion:'success',positiveCases:3,negativeCases:2,
+  headSha:SHA,issue:352,integrationBaseSha:'d'.repeat(40),testHeadSha:'e'.repeat(40),
+  testRunHeadSha:'e'.repeat(40),cardImplementationAncestorVerified:true,testOnlyDeltaVerified:true,
+  runConclusion:'success',positiveCases:3,negativeCases:2,
   noSkippedCases:true,noUnresolvedRulesGaps:true,
   runUrl:'https://github.com/AARMOU/arcana_table/actions/runs/40735018029',...more});
 
@@ -36,7 +38,9 @@ test('invalid origin, incomplete head, or wrong queue unit blocks',()=>{
 });
 test('independent proof is exact-SHA, real-run, positive+negative, no skipped or open gaps',()=>{
   const changes=[
-    {headSha:OLD},{issue:777},{source:'copilot-claim'},{provenanceVerified:false},
+    {headSha:OLD},{issue:777},{integrationBaseSha:OLD},{testHeadSha:'bad'},
+    {testRunHeadSha:OLD},{cardImplementationAncestorVerified:false},{testOnlyDeltaVerified:false},
+    {source:'copilot-claim'},{provenanceVerified:false},
     {oracleReviewed:false},{runConclusion:'failure'},{positiveCases:0},{negativeCases:0},
     {noSkippedCases:false},{noUnresolvedRulesGaps:false},{runUrl:'https://evil.example/123'},
   ];
