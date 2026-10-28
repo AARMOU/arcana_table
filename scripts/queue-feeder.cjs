@@ -46,8 +46,38 @@ function ownerSelections(openIssues = []) {
 // Cardkit decklist (ManaBox text) of the owner's selected cards. The default `gaps` run only covers
 // the six precon decks, so without this second classification no card outside those decks could
 // ever become Copilot-eligible or be routed anywhere else.
-function requestedDeck(openIssues = []) {
-  return ownerSelections(openIssues).map(r => '1 ' + r.name.replace(/[\r\n]+/g, ' ') + '\n').join('');
+function requestedDeck(openIssues = [], demand = []) {
+  const names = [...ownerSelections(openIssues).map(r => r.name), ...demand.slice(0, MAX_DEMAND_CLASSIFIED).map(d => d.name)];
+  const seen = new Set();
+  return names.filter(n => { const k = F.normName(n); if (seen.has(k)) return false; seen.add(k); return true; })
+    .map(n => '1 ' + n.replace(/[\r\n]+/g, ' ') + '\n').join('');
+}
+
+// ---- Public app demand (owner decision 2026-10-28: "public demand only") --------------------------
+// The app's "Request missing cards" button goes to the card-request Worker, which keeps one comment per
+// card on #321 (written with the owner's token, so the comments are OWNER-authored) carrying an opt-in
+// request count. Any player can press that button, so demand is a VOTE ONLY: it reorders cards Cardkit
+// already says Copilot can do. It never creates a [Card Work] issue, never routes to GPT, never jumps
+// ahead of the owner's own requests and never bypasses any dispatcher gate.
+const DEMAND_ISSUE = 321;
+const DEMAND_MARKER = '<!-- arcana-card-request-v1 -->';
+const MAX_DEMAND_CLASSIFIED = 50;
+
+function publicDemand(comments = []) {
+  const votes = new Map();
+  for (const c of comments) {
+    // Only the Worker's own comments: OWNER-authored, marker first. A stranger's lookalike is ignored.
+    if (c?.author_association !== 'OWNER' || c?.user?.type !== 'User' || String(c?.user?.login || '').toLowerCase() !== OWNER) continue;
+    const body = String(c.body || '');
+    if (!body.startsWith(DEMAND_MARKER + '\n')) continue;
+    const name = (body.match(/^\*\*Requested card:\*\* (.+?)\s*$/m) || [])[1];
+    const count = Number((body.match(/^\*\*Opt-in requests:\*\* (\d{1,6})\s*$/m) || [])[1]);
+    if (!name || name.length > 141 || /[\r\n<>`@]/.test(name) || !Number.isSafeInteger(count) || count < 1) continue;
+    const k = F.normName(name);
+    const prev = votes.get(k);
+    if (!prev || count > prev.votes) votes.set(k, { name, votes: count });
+  }
+  return [...votes.values()].sort((a, b) => b.votes - a.votes || a.name.localeCompare(b.name));
 }
 
 const verifiedGaps = g => !!(g && g.dispatch && g.dispatch.claimsVerified === true && g.dispatch.dispatchable === true);
@@ -91,7 +121,7 @@ function outcomeOf(v) {
 
 // gaps: Cardkit `gaps --claims-from-github` JSON for the six precons. requestedGaps: the same for the
 // owner's selected cards (optional). openIssues: open issues (REST shape).
-function candidates({ gaps, requestedGaps = null, openIssues = [], max = 5 }) {
+function candidates({ gaps, requestedGaps = null, openIssues = [], demand = [], max = 5 }) {
   if (!verifiedGaps(gaps))
     return { ok: false, reason: 'Cardkit could not verify open-PR claims; no suggestions (fail closed).', names: [], alreadyQueued: [] };
   const units = openIssues.filter(i => trustedIssue(i) && String(i.title || '').startsWith('[Arcana Queue]'));
@@ -130,8 +160,15 @@ function candidates({ gaps, requestedGaps = null, openIssues = [], max = 5 }) {
       (v.claimedBy || v.readiness !== 'SUPPORTED' || v.route !== 'copilot');
   });
   // Owner priorities first. Unknown / unsupported owner requests NEVER become units.
-  const names = [...new Set([...requested.map(r => r.name), ...available])].slice(0, max);
-  return { ok: true, reason: null, names, requested, blockedRequests, workRequests, resolvedRequests, notReady,
+  // Public demand reorders only what is already Copilot-ready; ties keep Cardkit's order.
+  const votesOf = new Map(demand.map(d => [F.normName(d.name), d.votes]));
+  const byDemand = available.map((n, i) => ({ n, i, v: votesOf.get(F.normName(n)) || 0 }))
+    .sort((a, b) => b.v - a.v || a.i - b.i).map(x => x.n);
+  const names = [...new Set([...requested.map(r => r.name), ...byDemand])].slice(0, max);
+  const isReady = n => ready.has(F.normName(n));
+  const publicRequests = demand.slice(0, 30).map(d => ({ name: d.name, votes: d.votes,
+    status: isReady(d.name) ? 'copilot-ready' : isQueued(d.name) ? 'queued' : 'not-copilot-ready' }));
+  return { ok: true, reason: null, names, requested, blockedRequests, workRequests, resolvedRequests, notReady, publicRequests,
     requestedClassified: requestedVerified, alreadyQueued, eligibleNames: available, available: copilot.length };
 }
 
@@ -156,6 +193,7 @@ function queuePayload({ result, units = [], base, baseSha, now = new Date(), run
     alreadyQueued: result?.alreadyQueued || [], blockedRequests: result?.blockedRequests || [], suggestions,
     workRequests: result?.workRequests || [], resolvedRequests: result?.resolvedRequests || [],
     notReady: result?.notReady || [], requestedClassified: !!result?.requestedClassified,
+    publicRequests: result?.publicRequests || [],
     // This is the ENTIRE unclaimed Cardkit SUPPORTED/copilot allowlist for
     // owner-facing preflight. Never infer eligibility from the first 3 suggestions.
     // Above this bound, fail closed instead of publishing an incomplete allowlist.
@@ -174,6 +212,8 @@ function queueSummary(p) {
   ...ready.map(s => `${s.name}${s.requestedIssue ? ' (owner selected #' + s.requestedIssue + ')' : ''}: ${s.newIssueUrl ? '[open prefilled queue issue](' + s.newIssueUrl + ')' : 'body in JSON below'}`),
   ...(p.blockedRequests?.length ? ['Owner-selected cards not Cardkit Copilot-ready (NO assignment): ' +
     p.blockedRequests.map(r => r.name + ' (#' + r.issue + ', ' + (r.outcome || 'unclassified') + ')').join(', ').slice(0, 900)] : []),
+  ...((p.publicRequests || []).length ? ['Public app demand (#321, votes reorder Copilot-ready cards only): ' +
+    p.publicRequests.slice(0, 12).map(d => d.name + ' ×' + d.votes + (d.status === 'copilot-ready' ? ' (ready)' : '')).join(', ').slice(0, 600)] : []),
   ...(work.created ? ['Card work for GPT opened: #' + work.created.issue + ' (' + work.created.name + ').'] : []),
   ...((work.closed || []).length ? ['Card work handed back to the Copilot queue: ' + work.closed.map(c => '#' + c.issue + ' (' + c.name + ')').join(', ') + '.'] : []),
   ...((p.autoQueue?.stuck || []).length ? ['Queue issues Copilot cannot take now (dispatcher will skip them; owner review): ' +
@@ -333,6 +373,6 @@ function needsSiteRefresh(previous, payload) {
     previous && /^[a-f0-9]{40}$/.test(String(previous.baseSha || '')) && previous.baseSha !== payload.baseSha);
 }
 
-module.exports = { candidates, ownerSelections, requestedDeck, outcomeOf, newIssueUrl, queuePayload, queueSummary,
+module.exports = { candidates, ownerSelections, requestedDeck, publicDemand, DEMAND_ISSUE, outcomeOf, newIssueUrl, queuePayload, queueSummary,
   chooseAutoQueue, createNextAutoQueue, planCardWork, syncCardWork, cardWorkTitle, cardWorkBody, needsSiteRefresh,
   CARD_WORK_MARKER };

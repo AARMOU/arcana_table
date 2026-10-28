@@ -206,9 +206,10 @@ test('feeder workflow classifies owner requests in the no-secret job and routes 
   const y = fs.readFileSync('.github/workflows/arcana-queue-feeder.yml', 'utf8');
   const suggest = y.slice(y.indexOf('  suggest:'), y.indexOf('  publish:'));
   const publish = y.slice(y.indexOf('  publish:'));
-  assert.match(suggest, /requestedDeck\(openIssues\)/);
+  assert.match(suggest, /requestedDeck\(openIssues,demand\)/);
+  assert.match(suggest, /issue_number:DEMAND_ISSUE/);
   assert.match(suggest, /gaps --claims-from-github --deck \.\.\/requested\.txt/);
-  assert.match(suggest, /requestedGaps,openIssues,max\}\)/);
+  assert.match(suggest, /requestedGaps,openIssues,demand,max\}\)/);
   assert.ok(!/\$\{\{\s*secrets\./.test(suggest), 'suggest job stays secret-free');
   assert.match(publish, /Q\.syncCardWork\(/);
   assert.match(publish, /workflow_id:'pages\.yml'/);
@@ -222,4 +223,46 @@ test('control site lets the owner file blocked cards, shows routing, and still n
   assert.match(js, /routed to GPT/);
   assert.match(js, /Preflight\.assessCard\(identity\.name,eligibility\)/);
   assert.ok(!/POST|PUT|PATCH|DELETE|createWorkflowDispatch|issues\.create/.test(js));
+});
+
+// ---- Public app demand (#321): votes reorder Copilot-ready cards only --------------------------------
+const workerComment = (name, votes, extra = {}) => ({ author_association: 'OWNER', user: { login: 'AARMOU', type: 'User' },
+  body: ['<!-- arcana-card-request-v1 -->', '**Requested card:** ' + name, '**Opt-in requests:** ' + votes,
+    '**Status:** Needs library, duplicate-claim and rules-engine verification.'].join('\n'), ...extra });
+
+test('public demand trusts only the Worker\'s owner-authored marker comments', () => {
+  const d = Q.publicDemand([
+    workerComment('Treasure Nabber', 2), workerComment('Shield Sphere', 5), workerComment('Arachnogenesis', 1),
+    workerComment('Fake Card', 999, { author_association: 'NONE', user: { login: 'stranger', type: 'User' } }),
+    { ...workerComment('No Marker', 50), body: '**Requested card:** No Marker\n**Opt-in requests:** 50' },
+    workerComment('@someone', 9), workerComment('Bad Count', 'many'),
+  ]);
+  assert.deepEqual(d, [{ name: 'Shield Sphere', votes: 5 }, { name: 'Treasure Nabber', votes: 2 }, { name: 'Arachnogenesis', votes: 1 }]);
+});
+
+test('demand reorders only Copilot-ready cards, after the owner\'s own requests', () => {
+  const precons = gaps([card('Celestine, the Living Saint', 'SUPPORTED', 'copilot'), card('Darksteel Monolith', 'SUPPORTED', 'copilot')]);
+  const owner = request(20, ['Darksteel Monolith']);
+  const demand = [{ name: 'Shield Sphere', votes: 9 }, { name: 'Celestine, the Living Saint', votes: 3 }, { name: 'Treasure Nabber', votes: 2 }];
+  const requested = gaps([card('Darksteel Monolith', 'SUPPORTED', 'copilot'), card('Shield Sphere', 'SUPPORTED', 'copilot'),
+    card('Treasure Nabber', 'NEEDS_REVIEW', 'gpt')]);
+  const r = Q.candidates({ gaps: precons, requestedGaps: requested, openIssues: [owner], demand, max: 5 });
+  // Owner first, then by votes; Treasure Nabber is not Copilot-ready and never becomes a unit.
+  assert.deepEqual(r.names, ['Darksteel Monolith', 'Shield Sphere', 'Celestine, the Living Saint']);
+  assert.deepEqual(r.publicRequests.map(x => [x.name, x.status]),
+    [['Shield Sphere', 'copilot-ready'], ['Celestine, the Living Saint', 'copilot-ready'], ['Treasure Nabber', 'not-copilot-ready']]);
+  // Demand never creates GPT work: only owner selections do.
+  assert.deepEqual(r.workRequests, []);
+  assert.ok(!r.blockedRequests.some(b => b.name === 'Treasure Nabber'));
+  const p = Q.queuePayload({ result: r, units: [], base: BASE, baseSha: SHA });
+  assert.equal(Q.planCardWork(p, []).create, null);
+  assert.match(Q.queueSummary(p).join('\n'), /Shield Sphere ×9 \(ready\)/);
+});
+
+test('public demand is classified with the owner selections, capped and de-duplicated', () => {
+  const many = Array.from({ length: 80 }, (_, i) => ({ name: 'Card ' + i, votes: 80 - i }));
+  const deck = Q.requestedDeck([request(21, ['Card 0', 'Broodlord'])], many).trim().split('\n');
+  assert.equal(deck[0], '1 Card 0');
+  assert.equal(deck[1], '1 Broodlord');
+  assert.equal(deck.length, 2 + 49); // owner's 2 + top 50 demand, minus the duplicate Card 0
 });
