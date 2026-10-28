@@ -116,6 +116,7 @@ test("only open Copilot card PRs on open [Arcana Queue] units can be decided", a
 test("sign-in: owner only, signed state, allow-listed return, session never contains a readable token", async () => {
   const login = await worker.fetch(new Request(W + "/auth/login?return=" + encodeURIComponent(PWA + "/arcana_table/control/")), ENV, {}, fakeGitHub().fetchImpl);
   assert.equal(login.status, 302);
+  assert.equal(login.headers.get('Cache-Control'), 'no-store', 'GitHub login redirect must not be cached');
   const to = new URL(login.headers.get("Location"));
   assert.equal(to.origin + to.pathname, "https://github.com/login/oauth/authorize");
   assert.equal(to.searchParams.get("scope"), "public_repo");
@@ -124,6 +125,7 @@ test("sign-in: owner only, signed state, allow-listed return, session never cont
   assert.equal(bad.status, 400);
   const cb = await worker.fetch(new Request(W + `/auth/callback?code=c&state=${encodeURIComponent(state)}`), ENV, {}, fakeGitHub().fetchImpl);
   assert.equal(cb.status, 302);
+  assert.equal(cb.headers.get('Cache-Control'), 'no-store', 'OAuth callback with encrypted session must not be cached');
   const back = cb.headers.get("Location");
   assert.ok(back.startsWith(PWA + "/arcana_table/control/#review-session="));
   const blob = decodeURIComponent(back.split("#review-session=")[1]);

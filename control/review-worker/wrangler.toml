@@ -3,4 +3,9 @@
 # Var: GITHUB_OAUTH_CLIENT_ID (public). The OAuth app's callback URL is https://<worker host>/auth/callback.
 name = "arcana-review"
 main = "src/index.mjs"
-compatibility_date = "2026-10-01"
+compatibility_date = "2026-10-27"
+
+# Workers Caching (distinct from caches.default, which does not persist on workers.dev).
+# All OAuth/session/decision responses must be Cache-Control: no-store.
+[cache]
+enabled = true

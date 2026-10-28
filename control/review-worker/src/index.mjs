@@ -74,6 +74,10 @@ const json = (data, status = 200, origin = null) => new Response(JSON.stringify(
   status, headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
     ...(origin === PWA_ORIGIN ? { "Access-Control-Allow-Origin": PWA_ORIGIN, "Vary": "Origin" } : {}) } });
 const page = (text, status) => new Response(text, { status, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" } });
+// Native Workers Caching is enabled globally; OAuth redirects carry session state or signed
+// return URLs and must NEVER be cached at Cloudflare or by a browser.
+const authRedirect = location => new Response(null, { status: 302, headers: {
+  Location: location, "Cache-Control": "no-store", "Referrer-Policy": "no-referrer" } });
 
 function gh(token, fetchImpl) {
   return async (path, init = {}) => {
@@ -150,7 +154,7 @@ export default {
       to.searchParams.set("state", state);
       to.searchParams.set("allow_signup", "false");
       to.searchParams.set("redirect_uri", url.origin + "/auth/callback");
-      return Response.redirect(to.toString(), 302);
+      return authRedirect(to.toString());
     }
 
     if (url.pathname === "/auth/callback" && request.method === "GET") {
@@ -166,7 +170,7 @@ export default {
       const me = await gh(t.access_token, fetchImpl)("https://api.github.com/user");
       if (!me.ok || String(me.body?.login || "").toLowerCase() !== OWNER) return page("Only the repository owner can review cards.", 403);
       const session = await sealSession(env.SESSION_SECRET, { t: t.access_token, login: me.body.login, exp: now() + SESSION_TTL_S });
-      return Response.redirect(st.r + "#review-session=" + encodeURIComponent(session), 302);
+      return authRedirect(st.r + "#review-session=" + encodeURIComponent(session));
     }
 
     if (url.pathname === "/v1/decision") {

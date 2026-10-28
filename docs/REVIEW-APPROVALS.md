@@ -32,10 +32,10 @@ Arcana Control's Overview has **Cards awaiting your review**. Tap a card to see 
 
 Arcana Control's read-only overview and card queue query the allowlisted
 `/v1/public/github?path=...` endpoint on the review Worker, not the viewer's
-unauthenticated GitHub REST API allowance. The Worker caches each allowlisted
-public endpoint at Cloudflare's edge for 15 minutes. When GitHub is rate-limited
-or unavailable, an existing cached response can be displayed for up to 24
-hours and is explicitly labeled stale. If no cache exists, the dashboard says
+unauthenticated GitHub REST API allowance. Native Cloudflare Workers Caching (Wrangler >=4.69, enabled on workers.dev) caches each allowlisted
+public endpoint for 15 minutes. Cloudflare can serve an expired response during
+background revalidation for up to 1 hour, or when the Worker returns a 5xx for
+up to 24 hours. The dashboard labels data older than 15 minutes as stale. If no cache exists, the dashboard says
 the feed is unavailable rather than fabricating data.
 
 The cache contains only publicly visible repository API responses. It does not
@@ -43,9 +43,12 @@ use the owner's OAuth session or return OAuth tokens; private billing amounts
 never enter the public cache. Cached statuses are informational **only**:
 owner reviews still use the authenticated `/v1/decision` path, and dispatch/
 admission decisions still use their existing authenticated, fail-closed checks.
-The Cloudflare cache is per edge location, so occasional cold-cache requests
-still reach GitHub. A freshly deployed Worker or a new edge location may need
-a successful GitHub response before it can serve stale data.
+Workers Caching uses an upper/lower tier and is available on workers.dev;
+the older caches.default API does not reliably cache there and must not be used.
+A newly deployed Worker may need a successful GitHub response to warm its new
+cache version. All OAuth redirects, owner decision responses and errors explicitly
+carry Cache-Control: no-store. Workers Cache can bill cached requests at the
+standard Cloudflare Workers request rate; review that operational cost before deployment.
 
 The worker is deployed **manually only**, via the owner-confirmed deployment
 workflow; merging a site change does not deploy the Worker. Deploy the Worker
