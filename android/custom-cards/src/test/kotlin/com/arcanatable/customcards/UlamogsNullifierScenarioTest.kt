@@ -82,4 +82,41 @@ class UlamogsNullifierScenarioTest {
             d.getGraveyardCardNames(d.player2).contains("Island"))
     }
 
+
+    @Test fun mixedOwnAndOpponentExilesProcessOnlyOpponentOwnedCards() {
+        val d = setup()
+        d.putCardInExile(d.player1, "Island")
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Grizzly Bears")
+
+        d.respondToOwnBears(Choices(yes = true, pick = listOf("Sol Ring", "Grizzly Bears")))
+
+        assertTrue("Processing two opponent-owned cards must counter the spell",
+            d.permanentsNamed(d.player1, "Grizzly Bears").isEmpty())
+        assertEquals("The controller's own exiled card is ineligible and must stay exiled",
+            listOf("Island"), d.getExileCardNames(d.player1))
+        assertTrue("Both opponent-owned cards must leave exile",
+            d.getExileCardNames(d.player2).isEmpty())
+        assertEquals(listOf("Grizzly Bears", "Sol Ring"),
+            d.getGraveyardCardNames(d.player2).sorted())
+        assertFalse("Own exiled card cannot be processed",
+            d.getGraveyardCardNames(d.player1).contains("Island"))
+    }
+
+    @Test fun decliningWithThreeEligibleCardsDoesNotMoveAnyOrCounter() {
+        val d = setup()
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Grizzly Bears")
+        d.putCardInExile(d.player2, "Island")
+
+        d.respondToOwnBears(Choices(yes = false))
+
+        assertEquals("Declining processing must leave the spell to resolve",
+            1, d.permanentsNamed(d.player1, "Grizzly Bears").size)
+        assertEquals(listOf("Grizzly Bears", "Island", "Sol Ring"),
+            d.getExileCardNames(d.player2).sorted())
+        assertTrue("Declining processing cannot move exiled cards",
+            d.getGraveyardCardNames(d.player2).isEmpty())
+    }
+
 }
