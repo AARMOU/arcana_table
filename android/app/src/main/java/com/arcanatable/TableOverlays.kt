@@ -165,6 +165,21 @@ internal fun TableController.TableOverlays() {
             feedOpen = playFeedOpen, onToggleFeed = { playFeedOpen = !playFeedOpen; runCatching { context.getSharedPreferences("arcana-table-ui", Context.MODE_PRIVATE).edit().putBoolean("playFeedOpen", playFeedOpen).apply() } },
             popupDurationSeconds = playedPopupSeconds,
             onDismissBanner = { playBanner = null }, onDismissRecap = { recapText = null })
+        val pickDeck: (DeckChoice) -> Unit = { choice ->
+                deckPickerOpen = false
+                // Choosing a deck during the deck lesson really chooses it, then the lesson moves on.
+                if (tutorialChapterId != null && !tutorialPracticeActive) TutorialActions.tap("deck-select")
+                run {
+                activeDeckId = choice.id; saveActiveDeck(context, choice.id)
+                recordDiagnostic("Deck chosen: ${choice.name}", DiagnosticCategory.ACTION)
+                // Also put it on your table (card art, online play). Offline games read the choice directly.
+                val text = preconDecks.firstOrNull { "precon:${it.id}" == choice.id }?.decklist
+                    ?: savedDecks.firstOrNull { it.name == choice.id }?.text
+                    ?: premadeDecks.firstOrNull { "builtin:${it.id}" == choice.id }?.let { d -> "Commander\n1 ${d.commander}\nDeck\n" + d.cards.filterNot { it == d.commander }.groupingBy { it }.eachCount().entries.joinToString("\n") { (n, c) -> "$c $n" } }
+                if (text != null) { selectedPlayer = localSeat; importDeck(text, saveAsMine = false) }
+                }
+        }
+
         if (homeOpen) {
             if (offlineDiscardConfirm) AlertDialog(
                 onDismissRequest = { offlineDiscardConfirm = false },
@@ -280,36 +295,39 @@ internal fun TableController.TableOverlays() {
                 } },
                 tutorialStep = if (tutorialChapterId != null) tutorialStep else null,
             )
-            val pickDeck: (DeckChoice) -> Unit = { choice ->
-                    deckPickerOpen = false
-                    // Choosing a deck during the deck lesson really chooses it, then the lesson moves on.
-                    if (tutorialChapterId != null && !tutorialPracticeActive) TutorialActions.tap("deck-select")
-                    run {
-                    activeDeckId = choice.id; saveActiveDeck(context, choice.id)
-                    recordDiagnostic("Deck chosen: ${choice.name}", DiagnosticCategory.ACTION)
-                    // Also put it on your table (card art, online play). Offline games read the choice directly.
-                    val text = preconDecks.firstOrNull { "precon:${it.id}" == choice.id }?.decklist
-                        ?: savedDecks.firstOrNull { it.name == choice.id }?.text
-                        ?: premadeDecks.firstOrNull { "builtin:${it.id}" == choice.id }?.let { d -> "Commander\n1 ${d.commander}\nDeck\n" + d.cards.filterNot { it == d.commander }.groupingBy { it }.eachCount().entries.joinToString("\n") { (n, c) -> "$c $n" } }
-                    if (text != null) { selectedPlayer = localSeat; importDeck(text, saveAsMine = false) }
-                    }
-            }
             if (deckPickerOpen) DeckPickerSheet(deckChoices, activeDeckId,
                 onPick = pickDeck,
                 onImport = { deckPickerOpen = false; selectedPlayer = localSeat; importError = null; importOpen = true },
                 onDismiss = { deckPickerOpen = false },
                 onDeckBuilder = if (DeckBuilderFlag.enabled) { { deckPickerOpen = false; deckBuilderOpen = true } } else null,
                 tutorialStep = if (tutorialChapterId != null) tutorialStep else null)
-            if (deckBuilderOpen && DeckBuilderFlag.enabled) DeckManagerDialog(
-                decks = savedDecks,
-                loadCatalog = { loadSupportCatalog() },
-                onDecksChanged = { updated -> savedDecks = updated; saveSavedDecks(context, updated) },
-                onPlay = { deck ->
-                    deckBuilderOpen = false
-                    pickDeck(DeckChoice(deck.name, deck.name, deck.commander, builtIn = false, category = DeckChoiceCategory.OTHER))
-                },
-                onDismiss = { deckBuilderOpen = false })
         }
+        // The import dialog is also available while playing, so the builder must not
+        // be restricted to the home-screen branch of this overlay.
+        if (deckBuilderOpen && DeckBuilderFlag.enabled) DeckManagerDialog(
+            decks = savedDecks,
+            loadCatalog = { loadSupportCatalog() },
+            onDecksChanged = { updated -> savedDecks = updated; saveSavedDecks(context, updated) },
+            onPlay = { deck ->
+                deckBuilderOpen = false
+                if (deckBuilderReturnToImport) {
+                    // Preserve the chosen seat and let the importer confirm before
+                    // replacing its deck. This also works for an AI lobby seat.
+                    deckBuilderReturnToImport = false
+                    importText = deck.text
+                    importError = null
+                    importOpen = true
+                } else {
+                    pickDeck(DeckChoice(deck.name, deck.name, deck.commander, builtIn = false, category = DeckChoiceCategory.OTHER))
+                }
+            },
+            onDismiss = {
+                deckBuilderOpen = false
+                if (deckBuilderReturnToImport) {
+                    deckBuilderReturnToImport = false
+                    importOpen = true
+                }
+            })
 
     if (argentumEnabled && argentumSnapshot == null && !homeOpen) {
         Surface(Modifier.fillMaxSize(), color = Ink) {

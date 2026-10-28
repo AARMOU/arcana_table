@@ -66,6 +66,12 @@ internal fun DeckManagerDialog(
     onDismiss: () -> Unit,
 ) {
     val context = LocalContext.current
+    val introPrefs = remember(context) { context.getSharedPreferences("arcana_options", Context.MODE_PRIVATE) }
+    var showBuilderIntro by remember { mutableStateOf(!introPrefs.getBoolean("deck_builder_intro_seen_v1", false)) }
+    val dismissBuilderIntro = {
+        introPrefs.edit().putBoolean("deck_builder_intro_seen_v1", true).apply()
+        showBuilderIntro = false
+    }
     var editing by rememberSaveable { mutableStateOf<String?>(null) }   // saved name, "" for a new deck
     var importing by rememberSaveable { mutableStateOf(false) }
     var importText by rememberSaveable { mutableStateOf("") }
@@ -186,6 +192,26 @@ internal fun DeckManagerDialog(
             }
         }
     }
+    if (showBuilderIntro) AlertDialog(
+        onDismissRequest = dismissBuilderIntro,
+        title = { Text("About the Deck Builder") },
+        text = {
+            Text(
+                "Arcana's card library is growing. Not every card, commander, or mechanic is available yet.\n\n" +
+                    "A card appearing in the builder means it is in this app's library, not that every interaction has been tested. " +
+                    "Unsupported cards are flagged rather than silently replaced.\n\n" +
+                    "You can create, import, and save decks now. More cards and rules support will arrive in future updates."
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = dismissBuilderIntro, modifier = Modifier.testTag("deck-builder-intro-continue")) {
+                Text("GOT IT")
+            }
+        },
+        containerColor = Panel,
+        titleContentColor = SoftWhite,
+        textContentColor = SoftWhite,
+    )
     if (importing) AlertDialog(
         onDismissRequest = { importing = false },
         title = { Text("Paste a deck list") },
