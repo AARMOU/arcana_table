@@ -56,7 +56,7 @@ test('invalid, incomplete, stale or duplicate candidates cannot be enqueued', as
     const a = Q.chooseAutoQueue(bad, []);
     assert.equal(!!a.suggestion, false);
   }
-  const duplicate = [{ title, body: BODY, assignees: [] }];
+  const duplicate = [{ title, body: BODY, assignees: [], author_association: 'OWNER' }];
   assert.equal(Q.chooseAutoQueue(payload(), duplicate).pendingIssue, undefined);
   // A pending actionable queue unit must be known by number to wake dispatch.
   duplicate[0].number = 222;
@@ -92,6 +92,8 @@ test('untrusted public ready-looking issues cannot monopolize the pending queue 
   const outsider = [{ number: 99, title: '[Arcana Queue] Fake Card', body: BODY, assignees: [], author_association: 'NONE',
     user: { login: 'stranger', type: 'User' } }];
   assert.equal(Q.chooseAutoQueue(p, outsider).suggestion.name, CARD);
+  const gaps = { dispatch: { claimsVerified: true, dispatchable: true, copilot: [CARD] } };
+  assert.deepEqual(Q.candidates({ gaps, openIssues: outsider }).names, [CARD]);
 });
 test('bot provenance rejects missing marker, wrong issuer, edits and untrusted comments', () => {
   const base = { authorAssociation: 'NONE', authorLogin: 'github-actions[bot]', authorType: 'Bot',
