@@ -141,6 +141,7 @@ import kotlinx.coroutines.CoroutineScope
 @Composable
 internal fun TableController.TableOverlaysB() {
     var cardRequestOpen by remember { mutableStateOf(false) }
+    var cardRequestVisibleCount by remember { mutableIntStateOf(40) }
     var cardRequestSelected by remember { mutableStateOf<Set<String>>(emptySet()) }
     var cardRequestSending by remember { mutableStateOf(false) }
     var cardRequestFeedback by remember { mutableStateOf<String?>(null) }
@@ -151,6 +152,7 @@ internal fun TableController.TableOverlaysB() {
         else supportCatalog?.check(parseDeckList(importText))?.unsupportedNames.orEmpty()
     }
     val openCardRequest: () -> Unit = {
+        cardRequestVisibleCount = 40
         cardRequestSelected = cardRequestNames.take(10).toSet()
         cardRequestId = java.util.UUID.randomUUID().toString()
         cardRequestSending = false
@@ -553,7 +555,7 @@ internal fun TableController.TableOverlaysB() {
                     Text("Select up to 10 names per request. You can request the others separately.",
                         color = CounterGold, fontSize = 11.sp)
                 }
-                cardRequestNames.take(40).forEach { name ->
+                cardRequestNames.take(cardRequestVisibleCount).forEach { name ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(
                             checked = name in cardRequestSelected,
@@ -568,6 +570,12 @@ internal fun TableController.TableOverlaysB() {
                         )
                         Text(name, color = SoftWhite, fontSize = 12.sp, modifier = Modifier.weight(1f))
                     }
+                }
+                if (cardRequestNames.size > cardRequestVisibleCount) {
+                    TextButton(
+                        onClick = { cardRequestVisibleCount = (cardRequestVisibleCount + 40).coerceAtMost(cardRequestNames.size) },
+                        enabled = !cardRequestSending && !cardRequestCompleted
+                    ) { Text("SHOW MORE (${cardRequestNames.size - cardRequestVisibleCount} remaining)", color = Mint) }
                 }
                 if (!CardRequestApi.isConfigured) Text(
                     "This build does not yet have a request service configured. No information has been sent.",
