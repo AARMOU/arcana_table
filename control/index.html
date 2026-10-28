@@ -28,6 +28,15 @@
     @media(max-width:720px){.worker-counts{grid-template-columns:repeat(3,minmax(0,1fr))}.worker-counts b{font-size:18px}}
     @media(max-width:370px){.hero h2{font-size:22px}.metric{padding:11px}.metric-label{font-size:9px}.lane-grid{grid-template-columns:1fr}.lane{display:flex;gap:12px;align-items:center}.lane h3{margin:0}.lane-status{margin:4px 0}.lane-top .tag{display:none}}
     @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;scroll-behavior:auto!important}}
+
+    .assignment-panel{border-color:#2d5b5b;margin-bottom:20px}
+    .assignment-main{padding:18px 21px 20px}
+    .assignment-card-name{font-size:21px;font-weight:820;letter-spacing:-.025em;line-height:1.25}
+    .assignment-detail{font-size:13px;color:var(--muted);margin-top:6px}
+    .assignment-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:15px}
+    .assignment-links a{border:1px solid var(--line);border-radius:10px;padding:8px 12px;color:var(--teal);font-size:12px;font-weight:730;text-decoration:none}
+    .assignment-links a:hover{background:var(--surface2)}
+    .assignment-links a[hidden]{display:none}
   </style>
 </head>
 <body>
@@ -64,6 +73,20 @@
             <div class="metric"><div class="metric-top"><span class="metric-label">Running workflows</span><span class="metric-icon amber">◷</span></div><div class="metric-num" id="runningCount">—</div><p class="metric-sub">Within the latest 30 runs</p></div>
             <div class="metric"><div class="metric-top"><span class="metric-label">AI credit usage level</span><span class="metric-icon purple">◈</span></div><div class="metric-num unknown" id="budgetNum">Unknown</div><p class="metric-sub" id="budgetSub">No verified billing feed</p></div>
           </div>
+
+          <section class="panel assignment-panel" aria-label="Latest Copilot assignment">
+            <div class="panel-head"><div><div class="panel-heading">Current Copilot assignment</div><div class="panel-sub">Live issue, agent and PR evidence · read only</div></div><span class="tag gray" id="assignmentStage" role="status">Checking…</span></div>
+            <div class="assignment-main">
+              <div class="assignment-card-name" id="assignmentCard">Checking the dispatcher…</div>
+              <div class="assignment-detail" id="assignmentDetail">Assignment does not mean Copilot has started coding.</div>
+              <div class="assignment-links">
+                <a id="assignmentIssue" href="https://github.com/AARMOU/arcana_table/issues" target="_blank" rel="noopener noreferrer" hidden>View issue ↗</a>
+                <a id="assignmentPr" href="https://github.com/AARMOU/arcana_table/pulls" target="_blank" rel="noopener noreferrer" hidden>View PR ↗</a>
+                <a id="assignmentAgentRun" href="https://github.com/AARMOU/arcana_table/actions" target="_blank" rel="noopener noreferrer" hidden>Agent run ↗</a>
+              </div>
+              <p class="fine" id="assignmentFresh">Waiting for public GitHub status.</p>
+            </div>
+          </section>
           <section class="panel" aria-label="Weekly Argentum upgrade" style="margin-bottom:20px"><div class="panel-head"><div><div class="panel-heading">🪿 Weekly Argentum upgrade</div><div class="panel-sub">Mondays 09:17 UTC · scheduled from main · read-only</div></div><a class="more-link" href="https://github.com/AARMOU/arcana_table/actions/workflows/argentum-weekly-upgrade.yml" target="_blank" rel="noopener noreferrer">Workflow ↗</a></div><div class="rows"><div class="list-row"><span class="row-icon neutral">↻</span><div class="row-main"><div class="row-title" id="upgradeStatus">Checking latest upgrade…</div><div class="row-sub" id="upgradeDetail">Live GitHub Actions evidence, not a guarantee of engine compatibility</div></div><a class="tag gray" id="upgradeLink" href="https://github.com/AARMOU/arcana_table/actions/workflows/argentum-weekly-upgrade.yml" target="_blank" rel="noopener noreferrer">Runs ↗</a></div></div><div class="notice" style="margin:12px"><span><strong>Safety:</strong> A failed compatibility check blocks an upgrade; it does not modify your installed APK. Passing automation may propose a PR, never automatically merge or release.</span></div></section>
           <div class="two-col">
             <section class="panel" aria-label="Recent CI runs"><div class="panel-head"><div><div class="panel-heading">Recent workflow runs</div><div class="panel-sub">Latest GitHub Actions results</div></div><a class="more-link" href="https://github.com/AARMOU/arcana_table/actions" target="_blank" rel="noopener noreferrer">View all ↗</a></div><div class="rows" id="runList"><div class="empty">Retrieving runs…</div></div></section>
@@ -157,7 +180,82 @@
         else{text('liabValue','—');text('liabDetail','Per-unit liabilities appear once the dispatcher reaches an admission decision. The 10% reserve always applies.');}
         const action=d.action||(d.billing&&!d.billing.ok?d.billing.action:null);if(!d.dispatchReady||action){$('blockerBox').hidden=false;text('blockerTitle',d.state+(d.reason?': '+d.reason:''));text('blockerAction',action||'See the dispatcher run summary.');}
         const w=d.workers;if(w){text('wRunning',String(w.running));text('wPending',String(w.pendingPickup));text('wQueued',String(w.queued));text('wDone',String(w.completed));text('wBlocked',String(w.blocked));text('copilotLaneTag',w.running?w.running+' running':'Idle');text('copilotLaneStatus',w.running+' running · '+w.queued+' queued · '+w.blocked+' blocked');const list=$('workerList');list.replaceChildren();const order={working:0,repairing:0,'pending-pickup':1,halted:2,queued:3,review:4};(w.list||[]).slice().sort((a,b)=>(order[a.state]??5)-(order[b.state]??5)||a.n-b.n).forEach(u=>{const st={working:{klass:'running',tag:'amber',label:'Running'},repairing:{klass:'running',tag:'amber',label:'Repairing'},'pending-pickup':{klass:'running',tag:'amber',label:'Pending pickup'},halted:{klass:'failure',tag:'red',label:'Blocked'},queued:{klass:'neutral',tag:'blue',label:'Queued'},review:{klass:'success',tag:'green',label:'Completed'}}[u.state]||{klass:'neutral',tag:'gray',label:u.state};addRow(list,'#'+Number(u.n),[u.reason,u.skip,u.holdsSlot?'holds a slot':'',u.recentlyFinished?'credits may still be billing':''].filter(Boolean).join(' · ')||u.state,ROOT+'/issues/'+Number(u.n),st);});if(!(w.list||[]).length)list.append(e('div','empty','No Copilot work units.'));text('workerMeta','Run '+(d.runId||'?')+' · '+timeAgo(d.checkedAt));}}
-      async function fetchControl(){try{const st=await fetchStatus();renderBilling(st);renderDispatcher(st);if(!st.billing&&!st.dispatcher)text('readyDetail','No status comments published yet on issue #78.');}catch(err){text('readyDetail','Status feed unavailable: '+err.message);}}
+
+      // COPILOT_PURE_START — test pure selection and lifecycle separately from DOM and network.
+      function selectCopilotAssignment(d){
+        if(!d || !d.workers) return null;
+        const units=Array.isArray(d.workers.list)?d.workers.list:[];
+        const valid=u=>Number.isSafeInteger(u?.n)&&u.n>0;
+        const active=units.find(u=>valid(u)&&['working','pending-pickup','repairing'].includes(u.state));
+        if(active)return {number:active.n,kind:'active'};
+        if(d.result==='confirmed'&&Number.isSafeInteger(d.issue)&&d.issue>0)return {number:d.issue,kind:'confirmed'};
+        const recent=units.find(u=>valid(u)&&u.recentlyFinished);
+        if(recent)return {number:recent.n,kind:'recent'};
+        return null;
+      }
+      function copilotStage(pr,run,kind){
+        if(run && ['in_progress','queued','waiting','pending','requested'].includes(run.status))
+          return {label:'Agent running',tag:'amber',detail:'A Copilot cloud-agent run is active on this PR branch.'};
+        if(run && run.status==='completed' && run.conclusion==='success' && pr)
+          return {label:'Agent finished',tag:'green',detail:'Copilot finished its agent run. The PR needs review; this does not certify the card.'};
+        if(run && run.status==='completed' && run.conclusion!=='success')
+          return {label:'Run '+(run.conclusion||'ended'),tag:'red',detail:'Copilot agent run did not finish successfully. Inspect the run and PR.'};
+        if(pr)return {label:'PR opened',tag:'blue',detail:'Copilot opened a PR. Agent completion is not verified from this feed.'};
+        if(kind==='recent')return {label:'Recently finished',tag:'gray',detail:'Last dispatcher snapshot reports a recent Copilot session; no PR link verified.'};
+        if(kind==='active')return {label:'Assigned / active',tag:'amber',detail:'Dispatcher reports an active unit; actual agent execution is not yet verified.'};
+        return {label:'Assigned',tag:'amber',detail:'Assignment confirmed; Copilot pickup has not yet been independently verified.'};
+      }
+      // COPILOT_PURE_END
+      let assignmentRequest=0;
+      function showAssignmentLink(id, url, label){
+        const a=$(id),ok=typeof url==='string'&&url.startsWith(ROOT+'/');
+        a.hidden=!ok;
+        if(ok){a.href=safelyLink(url);a.textContent=label;}
+      }
+      function showAssignment(candidate,issue,pr,run,checkedAt,warning){
+        const stage=candidate?copilotStage(pr,run,candidate.kind):{label:'No active assignment',tag:'gray',detail:'No currently assigned or recently finished Copilot card in the latest dispatcher snapshot.'};
+        text('assignmentStage',stage.label);
+        $('assignmentStage').className='tag '+stage.tag;
+        text('assignmentCard',candidate?(issue?.title||'Card request #'+candidate.number):'No current card reported');
+        text('assignmentDetail',(pr?'PR #'+pr.number+' · '+pr.title+'. ':'')+stage.detail+(warning?' · Some GitHub details unavailable.':''));
+        showAssignmentLink('assignmentIssue',candidate?ROOT+'/issues/'+candidate.number:null,'Issue #'+(candidate?.number||''));
+        showAssignmentLink('assignmentPr',pr?.html_url,pr?'PR #'+pr.number:'');
+        showAssignmentLink('assignmentAgentRun',run?.html_url,'Agent run');
+        text('assignmentFresh',(candidate?.kind==='recent'?'Most recent unit · ':'Latest dispatcher snapshot · ')+(checkedAt?timeAgo(checkedAt):'time unknown')+(checkedAt&&ageHours(checkedAt)>6?' · status may be stale':''));
+      }
+      async function fetchCopilotAssignment(d){
+        const request=++assignmentRequest;
+        const candidate=selectCopilotAssignment(d);
+        if(!candidate){showAssignment(null,null,null,null,d?.checkedAt||null,false);return;}
+        showAssignment(candidate,null,null,null,d.checkedAt,false);
+        let issue=null,pr=null,run=null,warning=false;
+        try{
+          const info=await api('/issues/'+candidate.number);
+          if(request!==assignmentRequest)return;
+          issue=info.data;
+        }catch{warning=true;}
+        try{
+          const {data:events}=await api('/issues/'+candidate.number+'/timeline?per_page=100');
+          if(request!==assignmentRequest)return;
+          const refs=Array.isArray(events)?events.filter(x=>x.event==='cross-referenced' && x.actor?.login==='Copilot' && x.source?.issue?.user?.login==='Copilot' &&
+            x.source?.issue?.pull_request && String(x.source?.issue?.html_url||'').startsWith(ROOT+'/pull/')):[];
+          const latest=refs[refs.length-1]?.source?.issue;
+          if(latest && Number.isSafeInteger(latest.number) && latest.number>0){
+            const detail=await api('/pulls/'+latest.number);
+            if(request!==assignmentRequest)return;
+            if(detail.data?.user?.login==='Copilot' && detail.data?.head?.repo?.full_name===REPO)pr=detail.data;
+          }
+        }catch{warning=true;}
+        if(pr?.head?.ref){
+          try{
+            const result=await api('/actions/runs?branch='+encodeURIComponent(pr.head.ref)+'&per_page=20');
+            if(request!==assignmentRequest)return;
+            run=(Array.isArray(result.data?.workflow_runs)?result.data.workflow_runs:[]).find(x=>x.name==='Running Copilot cloud agent'&&x.head_branch===pr.head.ref)||null;
+          }catch{warning=true;}
+        }
+        if(request===assignmentRequest)showAssignment(candidate,issue,pr,run,d.checkedAt,warning);
+      }
+      async function fetchControl(){try{const st=await fetchStatus();renderBilling(st);renderDispatcher(st);fetchCopilotAssignment(st.dispatcher?.data||null);if(!st.billing&&!st.dispatcher)text('readyDetail','No status comments published yet on issue #78.');}catch(err){text('readyDetail','Status feed unavailable: '+err.message);fetchCopilotAssignment(null);}}
       let loading=false;
       async function refresh(){if(loading)return;fetchUpgrade();fetchControl();loading=true;$('refresh').disabled=true;$('refreshIcon').classList.add('spin');text('connectionText','Checking GitHub…');$('connectionDot').className='pulse';const checks=await Promise.allSettled([api('/pulls?state=open&sort=updated&direction=desc&per_page=100'),api('/actions/runs?per_page=30'),fetchNotes()]);let successful=0;const failures=[];checks.forEach((result,i)=>{if(result.status==='fulfilled'){try{if(i===0)renderPRs(result.value.data);if(i===1)renderRuns(result.value.data);if(i===2)renderNotes(result.value);successful++;}catch(err){failures.push(err.message);}}else{failures.push(result.reason?.message||'Network request failed');}});if(checks[0].status==='rejected'){text('prCount','—');text('prSub','Unavailable');$('prList').replaceChildren(e('div','empty','Cannot fetch pull requests. Use the GitHub links to inspect directly.'));}if(checks[1].status==='rejected'){text('ciResult','Unknown');text('ciSub','Workflow feed unavailable');text('runningCount','—');$('runList').replaceChildren(e('div','empty','Cannot fetch workflow runs.'));}if(checks[2].status==='rejected')$('noteList').replaceChildren(e('div','empty','Cannot fetch coordination notes.'));$('connectionDot').className='pulse '+(successful===3?'ok':'warn');text('connectionText',successful===3?'GitHub data · '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'}):successful?'Partial data · '+failures.length+' issue(s)':'GitHub unavailable');text('fetchedAt',successful?'Last checked '+new Date().toLocaleString()+(failures.length?' · Some feeds unavailable':''):'Refresh to retry · '+(failures[0]||'Connection unavailable'));$('refresh').disabled=false;$('refreshIcon').classList.remove('spin');loading=false;}
       $('refresh').addEventListener('click',refresh);
