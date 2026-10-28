@@ -36,6 +36,7 @@ class AbstruseArchaicScenarioTest {
         val originalTarget = d.putCreatureOnBattlefield(p, "Grizzly Bears")
         val newTarget = d.putCreatureOnBattlefield(p, "Grizzly Bears")
         val regenerate = d.cardRegistry.getCard("Yavimaya Hollow")!!.script.activatedAbilities[1]
+        val copyAbility = d.cardRegistry.getCard("Abstruse Archaic")!!.script.activatedAbilities.single()
         val murder = d.putCardInHand(opponent, "Murder")
         d.removeSummoningSickness(archaic)
         d.giveColorlessMana(p, 1)
@@ -46,9 +47,9 @@ class AbstruseArchaicScenarioTest {
         )).error)
         val originalAbility = d.getTopOfStack()!!
 
-        assertNull(d.activate(p, archaic).error)
-        assertTrue(d.state.pendingDecision is com.wingedsheep.engine.core.ChooseTargetsDecision)
-        assertNull(d.submitTargetSelection(p, listOf(originalAbility)).error)
+        assertNull(d.submit(ActivateAbility(
+            p, archaic, copyAbility.id, targets = listOf(ChosenTarget.Spell(originalAbility)),
+        )).error)
         d.resolveAll(Choices(targets = listOf(newTarget)))
 
         d.passPriority(p)
@@ -78,8 +79,10 @@ class AbstruseArchaicScenarioTest {
         assertEquals("Attacking puts the colorless source's trigger on the stack", 1, d.stackSize)
         val trigger = d.getTopOfStack()!!
         d.giveColorlessMana(p, 1)
-        assertNull(d.activate(p, archaic).error)
-        assertNull(d.submitTargetSelection(p, listOf(trigger)).error)
+        val copyAbility = d.cardRegistry.getCard("Abstruse Archaic")!!.script.activatedAbilities.single()
+        assertNull(d.submit(ActivateAbility(
+            p, archaic, copyAbility.id, targets = listOf(ChosenTarget.Spell(trigger)),
+        )).error)
         d.resolveAll()
 
         assertTrue("The original annihilator trigger and its copy each resolve",
@@ -97,12 +100,16 @@ class AbstruseArchaicScenarioTest {
         d.removeSummoningSickness(mother)
         d.giveColorlessMana(p, 1)
         val protection = d.cardRegistry.getCard("Mother of Runes")!!.script.activatedAbilities.single()
+        val copyAbility = d.cardRegistry.getCard("Abstruse Archaic")!!.script.activatedAbilities.single()
 
         assertNull(d.submit(ActivateAbility(
             p, mother, protection.id, targets = listOf(ChosenTarget.Permanent(bear)),
         )).error)
+        val coloredAbility = d.getTopOfStack()!!
         assertNotNull("A white source does not satisfy the colorless-source restriction",
-            d.activate(p, archaic).error)
+            d.submit(ActivateAbility(
+                p, archaic, copyAbility.id, targets = listOf(ChosenTarget.Spell(coloredAbility)),
+            )).error)
         assertFalse(d.isTapped(archaic))
         assertEquals(1, d.stackSize)
     }
@@ -122,8 +129,12 @@ class AbstruseArchaicScenarioTest {
         assertEquals(1, d.stackSize)
         assertNull(d.passPriority(opponent).error)
         d.giveColorlessMana(p, 1)
+        val copyAbility = d.cardRegistry.getCard("Abstruse Archaic")!!.script.activatedAbilities.single()
+        val opponentAbility = d.getTopOfStack()!!
         assertNotNull("An opponent's ability is not controlled by Abstruse Archaic",
-            d.activate(p, archaic).error)
+            d.submit(ActivateAbility(
+                p, archaic, copyAbility.id, targets = listOf(ChosenTarget.Spell(opponentAbility)),
+            )).error)
         assertFalse(d.isTapped(archaic))
     }
 }
