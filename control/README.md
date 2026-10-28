@@ -63,3 +63,11 @@ Tests: `node --test control/dashboard.test.cjs control/card-queue.test.cjs`. Mer
 The Pages workflow builds `card-gaps.json` and `argentum-catalog.json` from the same integration-branch checkout and source SHA; neither JSON file is cached by the service worker. New integration changes require a new Pages deployment (manual site workflow dispatch is available). No importer, card implementation, Android game APK, billing or dispatcher behavior changes.
 
 Tests: `node --test control/dashboard.test.cjs control/card-queue.test.cjs tools/tests/argentum-catalog.test.cjs`.
+
+## Current Copilot assignment panel (overview)
+
+On the opening **Overview** screen, the **Current Copilot assignment** card shows the latest evidence-backed card/issue, separate stages for **assigned / pickup unverified**, **PR opened**, **agent running**, and **agent finished**, and links directly to the issue, Copilot PR, and cloud-agent run when available. The card resolves one work unit from the latest trusted dispatcher status snapshot posted by github-actions[bot] to #78: an active worker first, the most recently confirmed assignment second, or a recently finished unit as a fallback. It does not automatically declare that an agent started merely because the dispatcher assigned Copilot.
+
+For that issue, the public browser makes read-only GitHub GET requests to the issue, its timeline, and a Copilot-authored cross-referenced PR (if one exists). For a verified PR it checks **only that PR branch** for a GitHub Actions `Running Copilot cloud agent` run. An agent workflow that finished successfully means the **agent run** finished; it does **not** mean the card is playable, merged or validated. PR titles remain visible so blocker/scaffold PRs are not confused with card completion. Unknown or stale data remains explicitly labeled; no GitHub write capability, billing amount, private token, or worker trigger was added.
+
+This panel refreshes on manual dashboard **Refresh**, as permitted by the public API rate limit, rather than assuming a continuous live connection. Its read-only status is based on the currently published dispatcher report and may lag an assignment until the next dispatcher snapshot.
