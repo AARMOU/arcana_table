@@ -142,3 +142,9 @@ test('an approved card that cannot run yet says why it is waiting',()=>{
   const src=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
   assert.ok(src.includes("'Approved — waiting: ' + reasonText(unit.skip)"));
 });
+test('closed issues are never shown as candidates and verdict age is shown',()=>{
+  const src=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
+  assert.ok(src.includes("if (info.state !== 'open') { row.remove();"));
+  assert.ok(src.includes('function render(container, units, checkedAt)'));
+  assert.ok(html.includes("window.ArcanaAuthorize.render($('authorizationList'),w.list||[],d.checkedAt);"));
+});
