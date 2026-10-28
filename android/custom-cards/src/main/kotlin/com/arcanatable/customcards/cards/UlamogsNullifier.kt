@@ -17,7 +17,7 @@ import com.wingedsheep.sdk.scripting.references.Player
  * player's exile zone and then filter by actual card ownership; the latter
  * matters when a card is exiled under another player's effects.
  *
- * Keep this source UNREGISTERED until executable Argentum tests prove the
+ * CARDKIT-SCAFFOLD: unregistered, unfinished validation candidate.\n * Keep this source UNREGISTERED until executable Argentum tests prove the
  * entire processing/countering transaction and replacement interactions.
  */
 val UlamogsNullifier = card("Ulamog's Nullifier") {
