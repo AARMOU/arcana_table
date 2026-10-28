@@ -287,6 +287,9 @@ object CustomCards {
         Entry(ZhulodokVoidGorger, "CMM", "Eldrazi Unbound"),
         // The Ruinous Powers. Needs engine patches 0008 + 0009 (engine-upgrade/ulalek).
         Entry(AbaddonTheDespoiler, "40K", "The Ruinous Powers"),
+        // Eldrazi lands. Need the Eldrazi engine patches (engine-upgrade/eldrazi-temple, eldrazi-combined).
+        Entry(EldraziTemple, "M3C", "Eldrazi Incursion"),
+        Entry(CorruptedCrossroads, "M3C", "Eldrazi Incursion"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)

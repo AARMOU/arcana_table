@@ -1,0 +1,24 @@
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index f8fd5303..b16ede57 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -1381,6 +1381,7 @@ Families:
+ - `ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly(subtype: String)` — "Spend this mana only to cast colorless subtype spells or activate abilities of colorless subtype." Both the spell and the ability's SOURCE must be colorless.
+ - `ManaRestriction.CostsContainingXOnly` — "Spend this mana only on costs that contain {X}." Satisfied by casting a spell whose mana cost contains {X}, and by activating an ability whose mana cost contains {X} — both are costs, so unlike Sp…
+ - `ManaRestriction.CreatureSpellsOnly` — "Spend this mana only to cast creature spells."
++- `ManaRestriction.DevoidSpellsOnly` — Restricted mana for spells carrying the Devoid keyword (not all colorless spells).
+ - `ManaRestriction.DisturbCostOnly` — "Spend this mana only to pay a disturb cost." Satisfied only by casting a spell for its disturb alternative cost (CR 702.146a — cast transformed from the graveyard).
+ - `ManaRestriction.EquipAbilityActivationOnly` — "Spend this mana only to activate equip abilities." Satisfied only by paying the cost of an **equip** ability (CR 702.6a — "Cost: Attach this permanent to target creature you control.
+ - `ManaRestriction.FaceDownSpellsOnly` — "Spend this mana only to cast face-down spells." Satisfied by casting a card face down for its morph (CR 702.37a) or disguise (CR 702.168a) cost — a spell with no name and no characteristics but "2…
+diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+index 7a9ba452..a5ebc163 100644
+--- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
++++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+@@ -1703,6 +1703,7 @@ LinkCollectionToPermanentEffect — Effect — Mechtitan Core — MoveCollection
+ LoyaltyActivationPermission — StaticAbility — The Wandering Emperor — GrantLoyaltyActivationPermissionEffect, EquipAbilitiesAtInstantSpeed — renames and widens the grandfathered ExtraLoyaltyActivation with an instantSpeed axis, mirroring GrantLoyaltyActivationPermissionEffect (no net new type); the effect records a player-wide grant that outlives its source, where this permission must lapse with its source ability, and EquipAbilitiesAtInstantSpeed covers equip, not loyalty abilities
+ LoyaltyDamageFloor — ReplacementEffect — Deification — LifeLossFloor, PreventDamagePerCounter — LifeLossFloor floors a player's life total and keys off a LifeLossEvent that never sees a planeswalker; PreventDamagePerCounter spends counters to prevent damage, while this leaves the damage dealt in full and floors only the loyalty it removes
+ ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly — ManaRestriction — Eldrazi Temple — ManaRestriction.ColorlessSpellsOnly, ManaRestriction.SubtypeSpellsOrAbilitiesOnly — ColorlessSpellsOnly rejects every ability activation; SubtypeSpellsOrAbilitiesOnly permits colored Eldrazi abilities, so neither can constrain both subtype and colorlessness of a source while also admitting spells
++ManaRestriction.DevoidSpellsOnly — ManaRestriction — Corrupted Crossroads — ManaRestriction.ColorlessSpellsOnly, ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly — ColorlessSpellsOnly also admits colorless non-devoid spells such as artifacts, and ColorlessSubtypeSpellsOrAbilitiesOnly keys on a subtype and admits abilities; devoid is a keyword on the spell, so neither can express it
+ MarkMustAttackEffect — Effect — Sizzling Soloist — MarkMustAttackThisTurnEffect (renamed into this), MarkMustBlockThisTurnEffect — renames MarkMustAttackThisTurnEffect and gives it a window axis (this turn / its controller's next combat phase), no net new type; the blocking mirror is a floating effect with its own blocker-side semantics and no cross-turn window
+ MaxCounters — StaticAbility — Rasputin Dreamweaver — CantReceiveCounters, CapCounterPlacementThisTurn — CantReceiveCounters is an all-kinds group prohibition projected as a flag that cost legality reads, with no kind or number to carry a limit; CapCounterPlacementThisTurn is a replacement that caps one placement then locks the recipient for the turn, blind to the counters already on it
+ MeldEffect — Effect — Titania, Voice of Gaea — ExileAndReturnTransformedEffect, ReturnSelfFromZoneTransformedEffect — both move one double-faced object and return it on a face of its own card; meld exiles two separate cards and returns them as one object whose characteristics come from a third definition (the meld result), with a pair check (CR 701.42b/c) neither has an axis for

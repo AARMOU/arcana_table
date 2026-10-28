@@ -1,0 +1,49 @@
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
+index 8e468c2c..cfb38181 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/AbilityPaymentContextBuilder.kt
+@@ -50,6 +50,12 @@ internal fun buildAbilityPaymentContext(
+         },
+         isAbilitySourceOnBattlefield = sourceId in projected.getBaseState().getBattlefield(),
+         subtypes = subtypes,
++        // Battlefield subtype-changing effects are authoritative for "abilities of [subtype]" (layer 4).
++        abilitySourceSubtypes = if (sourceId in projected.getBaseState().getBattlefield()) {
++            projected.getSubtypes(sourceId)
++        } else {
++            null
++        },
+         isEquipAbilityActivation = ability?.isEquipAbility == true,
+         hasXInCost = ability?.cost?.extractManaCost()?.hasX == true,
+     )
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
+index 4dab0800..ef8f0407 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/ManaPool.kt
+@@ -132,6 +132,13 @@ data class SpellPaymentContext(
+      * matching and the auto-tap solver rather than to the [com.wingedsheep.sdk.core.ManaCost].
+      */
+     val colorlessAsAnyColor: Boolean = false,
++    /**
++     * Current subtypes of a battlefield ability source, from the layer projection only (null off the
++     * battlefield or for spells). [subtypes] unions printed and projected values for restrictions that
++     * must still see printed types; "abilities of colorless Eldrazi" asks what the permanent IS now, so a
++     * former Eldrazi that became only a Frog no longer qualifies (CR 613: characteristics after layer 4).
++     */
++    val abilitySourceSubtypes: Set<String>? = null,
+ ) {
+     init {
+         require(!isEquipAbilityActivation || isAbilityActivation) {
+@@ -188,9 +195,10 @@ fun ManaRestriction.isSatisfiedBy(context: SpellPaymentContext): Boolean = when
+     is ManaRestriction.LegendarySpellsOnly -> !context.isAbilityActivation && context.isLegendary
+     is ManaRestriction.ColorlessSpellsOnly -> context.isSpellCast && context.isColorless
+     is ManaRestriction.ColorlessSubtypeSpellsOrAbilitiesOnly ->
+-        context.subtypes.any { it.equals(subtype, ignoreCase = true) } &&
+-            ((context.isSpellCast && context.isColorless) ||
+-                (context.isAbilityActivation && context.isAbilitySourceColorless))
++        (context.isSpellCast && context.isColorless &&
++            context.subtypes.any { it.equals(subtype, ignoreCase = true) }) ||
++            (context.isAbilityActivation && context.isAbilitySourceColorless &&
++                (context.abilitySourceSubtypes ?: context.subtypes).any { it.equals(subtype, ignoreCase = true) })
+     is ManaRestriction.DevoidSpellsOnly -> context.isSpellCast && context.isDevoid
+     is ManaRestriction.SpellsWithExactColorCount -> context.isSpellCast && context.colorCount == count
+     is ManaRestriction.CostsContainingXOnly -> (context.isSpellCast || context.isAbilityActivation) && context.hasXInCost
