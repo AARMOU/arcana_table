@@ -162,3 +162,69 @@ test('owner selections never fake an actionable queue unit or suppress eligibili
   const p = Q.queuePayload({ result: r, units: [{ name: CARD, body: BODY }], base: BASE, baseSha: SHA });
   assert.equal(Q.chooseAutoQueue(p, [request]).suggestion.name, CARD);
 });
+
+const optInComment = (name, count, overrides = {}) => ({
+  author_association: 'OWNER', user: { login: 'AARMOU', type: 'User' },
+  body: '<!-- arcana-card-request-v1 -->\n**Requested card:** ' + name +
+    '\\n**Opt-in requests:** ' + count +
+    '\\n**Status:** Needs library, duplicate-claim and rules-engine verification.',
+  ...overrides,
+});
+const ownerRequest = (number, names, when = '2026-10-28T11:00:00Z') => ({
+  number, title: '[Card Request] ' + names.join(', '),
+  author_association: 'OWNER', user: { login: 'AARMOU', type: 'User' },
+  created_at: when, body: '## Cards requested\\n' + names.map(n => '- ' + n + ' — Not indexed').join('\\n') +
+    '\\n\\n## Source and triage',
+});
+test('popular opt-in cards rank first even over less-requested owner priority cards', () => {
+  const gaps = { dispatch: { claimsVerified: true, dispatchable: true,
+    copilot: ['Card Without Requests', 'One Vote', 'Ten Votes', 'Two Votes'] } };
+  const req = ownerRequest(700, ['One Vote']);
+  const requestComments = [optInComment('Ten Votes', 10), optInComment('Two Votes', 2)];
+  const r = Q.candidates({ gaps, openIssues: [req], requestComments, max: 4 });
+  assert.deepEqual(r.names, ['Ten Votes', 'Two Votes', 'One Vote', 'Card Without Requests']);
+  assert.deepEqual(r.demand.map(x => [x.name, x.totalRequests]), [
+    ['Ten Votes', 10], ['Two Votes', 2], ['One Vote', 1]]);
+  assert.deepEqual(r.requested, [{ name: 'One Vote', issue: 700 }]);
+});
+test('repeated genuine owner requests each count, but duplicates within one issue do not', () => {
+  const issues = [ownerRequest(701, ['Card A', 'Card A']), ownerRequest(702, ['Card A'])];
+  assert.equal(Q.ownerDemandCounts(issues).get('card a'), 2);
+  const gaps = { dispatch: { claimsVerified: true, dispatchable: true, copilot: ['Card B', 'Card A'] } };
+  const r = Q.candidates({ gaps, openIssues: issues, requestComments: [optInComment('Card B', 1)] });
+  assert.deepEqual(r.names, ['Card A', 'Card B']);
+  assert.equal(r.demand[0].totalRequests, 2);
+});
+test('spoofed demand, malformed counts, duplicate snapshots and untrusted issues do not inflate votes', () => {
+  const honest = optInComment('Real Card', 4);
+  const comments = [
+    honest, optInComment('Real Card', 2), optInComment('Real Card', 4),
+    optInComment('Fake Card', 999999, { author_association: 'NONE', user: { login: 'outsider', type: 'User' } }),
+    optInComment('Fake Card', 888888, { user: { login: 'github-actions[bot]', type: 'Bot' } }),
+    optInComment('Fake Card', 1000001), optInComment('Fake Card', -1),
+    optInComment('Fake Card', '3.5'),
+    optInComment('Fake Card', 5, { body: 'ordinary discussion **Requested card:** Fake Card' }),
+  ];
+  assert.equal(Q.demandCounts(comments).get('real card'), 4);
+  assert.equal(Q.demandCounts(comments).has('fake card'), false);
+  const gaps = { dispatch: { claimsVerified: true, dispatchable: true, copilot: ['Fake Card', 'Real Card'] } };
+  const r = Q.candidates({ gaps, requestComments: comments });
+  assert.deepEqual(r.names, ['Real Card', 'Fake Card']);
+});
+test('request demand cannot bypass Cardkit claim and engine gates or create duplicate worker issues', () => {
+  const gaps = { dispatch: { claimsVerified: true, dispatchable: true, copilot: ['Eligible Card'] } };
+  const req = ownerRequest(710, ['Blocked Card']);
+  const r = Q.candidates({ gaps, openIssues: [req],
+    requestComments: [optInComment('Blocked Card', 500), optInComment('Eligible Card', 1)] });
+  assert.deepEqual(r.names, ['Eligible Card']);
+  assert.equal(r.blockedRequests[0].name, 'Blocked Card');
+  const g = { dispatch: { claimsVerified: false, dispatchable: false, copilot: ['Eligible Card'] } };
+  assert.deepEqual(Q.candidates({ gaps:g,requestComments:[optInComment('Eligible Card',99)] }).names, []);
+});
+test('stable tie-breaks: owner request age then original Cardkit ordering, no owner request vote twice', () => {
+  const gaps={dispatch:{claimsVerified:true,dispatchable:true,copilot:['C','B','A','No votes']}};
+  const requests=[ownerRequest(720,['B']),ownerRequest(721,['A'],'2026-10-28T12:00:00Z')];
+  const comments=[optInComment('C',1),optInComment('B',1),optInComment('A',1)];
+  const r=Q.candidates({gaps,openIssues:requests,requestComments:comments});
+  assert.deepEqual(r.names,['B','A','C','No votes']);
+});
