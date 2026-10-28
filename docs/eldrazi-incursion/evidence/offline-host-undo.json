@@ -1,0 +1,22 @@
+{
+  "scope": "Real LocalArgentumHost, engine, AI, assets, and repository app test class in standalone JVM harness; no host/engine mocks. Android framework jar is present for compiling OfflineCheckpointStore; persistence methods are not exercised by these three tests. Normal Android CI remains required.",
+  "runtime": "Committed B131 jars unchanged",
+  "tests": 3,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "cases": [
+    "londonMulliganDownToSix",
+    "theAiTurnIsShownStepByStep",
+    "playingALandCanBeUndone"
+  ],
+  "previousFailure": {
+    "run": 40217188658,
+    "artifact": 12608123651,
+    "test": "OfflineHostFlowTest.playingALandCanBeUndone",
+    "message": "no stateUpdate message",
+    "location": "OfflineHostFlowTest.kt:73 before PlayLand selection",
+    "interpretation": "Unseeded engine shuffle can produce an opening hand without lands; the priority-only loop does not answer cleanup discard decisions. The XML establishes the timeout location; it does not record the exact opening hand."
+  },
+  "fix": "Seed actual GameConfig via existing gameSeed parameter. Give undo-only case 40 Forests so it always has a legal land in opening hand. Preserve all undo assertions and close host in finally."
+}

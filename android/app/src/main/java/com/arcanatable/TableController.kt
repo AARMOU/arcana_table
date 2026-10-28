@@ -255,7 +255,7 @@ internal class TableController(
     var autoOpenHand by run { mutableStateOf(optionPrefs.getBoolean("adjust_auto_open_hand", true)) }
     var playedPopupSeconds by run { mutableFloatStateOf(optionPrefs.getFloat("adjust_notice_seconds", 4f).coerceIn(1f, 8f)) }
     var combatCardScale by run { mutableFloatStateOf(optionPrefs.getFloat("adjust_combat_card_scale", 1f).coerceIn(.65f, 1.35f)) }
-    var showEngineStatus by run { mutableStateOf(optionPrefs.getBoolean("show_engine_status", true)) }
+    var showEngineStatus by run { mutableStateOf(optionPrefs.getBoolean("show_engine_status", BuildConfig.DEBUG)) }
     val defaultQuickActionOrder get() = argentumQuickActionIds.joinToString("|")
     var nextId by run { mutableIntStateOf(20) }
     // Seat indexes always stay inside the current player list. Ending a 3–4 player game swaps the
@@ -293,9 +293,13 @@ internal class TableController(
         runCatching { AppPreconDeck("fallout_mutant_menace", "Fallout: Mutant Menace", "The Wise Mothman", context.assets.open("precons/fallout_mutant_menace.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
         runCatching { AppPreconDeck("fallout_science", "Fallout: Science!", "Dr. Madison Li", context.assets.open("precons/fallout_science.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
         runCatching { AppPreconDeck("bloomburrow_family_matters", "Bloomburrow: Family Matters", "Zinnia, Valley's Voice", context.assets.open("precons/bloomburrow_family_matters.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
-        runCatching { AppPreconDeck("bloomburrow_peace_offering", "Bloomburrow: Peace Offering", "Ms. Bumbleflower", context.assets.open("precons/bloomburrow_peace_offering.txt").bufferedReader().use { it.readText() }) }.getOrNull()
+        runCatching { AppPreconDeck("bloomburrow_peace_offering", "Bloomburrow: Peace Offering", "Ms. Bumbleflower", context.assets.open("precons/bloomburrow_peace_offering.txt").bufferedReader().use { it.readText() }) }.getOrNull(),
+        // Original Eldrazi Incursion (M3C). Cards Argentum can't play yet are left out and filled with basics.
+        runCatching { AppPreconDeck("eldrazi_incursion", "Eldrazi Incursion (M3C)", "Ulalek, Fused Atrocity", context.assets.open("precons/eldrazi_incursion.txt").bufferedReader().use { it.readText() }) }.getOrNull()
     ).filterNotNull()
     var savedDecksOpen by run { mutableStateOf(false) }
+    /** Developer-preview deck builder (see [DeckBuilderFlag]). */
+    var deckBuilderOpen by run { mutableStateOf(false) }
     var localDeckSyncConfirmed by run { mutableStateOf(false) }
     // Structured, redacted diagnostic log (DiagnosticLog.kt). Legacy free-text entries are migrated on load.
     val diagnosticLog = run { DiagnosticLog().apply { restore(optionPrefs.getString("diagnostic_events", "").orEmpty()) } }
@@ -322,6 +326,8 @@ internal class TableController(
     var tokenTarget by run { mutableIntStateOf(0) }
     var counterTarget by run { mutableStateOf<Pair<Int, Int>?>(null) }
     var preview by run { mutableStateOf<CardPreview?>(null) }
+    /** Read-only private top-library look from Argentum's per-seat masked view; no priority needed. */
+    var argentumTopLibraryOpen by run { mutableStateOf(false) }
     var rulesOpen by run { mutableStateOf(false) }
     var battlefieldBounds by run { mutableStateOf<Rect?>(null) }
     var handSheetBounds by run { mutableStateOf<Rect?>(null) }
@@ -379,7 +385,194 @@ internal class TableController(
     var changelogOpen by run { mutableStateOf(false) }
     var lobbyOpen by run { mutableStateOf(false) }
     var homeOpen by run { mutableStateOf(true) }
-    var quickUiTipsOpen by mutableStateOf(!optionPrefs.getBoolean("quick_ui_tips_disabled", false))
+    var quickUiTipsOpen by mutableStateOf(!optionPrefs.getBoolean("tutorial_offer_seen", false))
+    var tutorialHubOpen by mutableStateOf(false)
+    var tutorialChapterId by mutableStateOf<String?>(null)
+    var tutorialStepIndex by mutableStateOf(0)
+    var tutorialPracticeActive by mutableStateOf(false)
+    var tutorialLoading by mutableStateOf(false)
+    var tutorialStartTurn by mutableStateOf(0)
+    var tutorialPassPending by mutableStateOf(false)
+    var tutorialMulliganPending by mutableStateOf(false)
+    var tutorialKeepPending by mutableStateOf(false)
+    private val tutorialMilestones = TutorialMilestones()
+    internal val tutorialChapters: List<ArcanaLesson> by lazy { loadTutorialLessons(context) }
+    internal val tutorialLesson: ArcanaLesson? get() = tutorialChapters.firstOrNull { it.id == tutorialChapterId }
+    internal val tutorialStep: ArcanaLessonStep? get() = tutorialLesson?.steps?.getOrNull(tutorialStepIndex)
+
+    fun tutorialAdvance() {
+        val lesson = tutorialLesson ?: return
+        if (tutorialStepIndex < lesson.steps.lastIndex) {
+            tutorialStepIndex++
+            tutorialRouteScreen()
+            // Combat and stack resolution can finish while an explanation is open.
+            // Consume only confirmed milestones, preserving all informational steps.
+            if (tutorialPracticeActive && tutorialMilestones.completes(tutorialStep)) tutorialAdvance()
+        } else {
+            val preferences = context.getSharedPreferences("arcana_tutorials", Context.MODE_PRIVATE)
+            val completed = preferences.getStringSet("practiced_chapters", emptySet()).orEmpty().toMutableSet()
+            if (tutorialPracticeActive) completed.add(lesson.id)
+            preferences.edit().putStringSet("practiced_chapters", completed).apply()
+            stopTutorial()
+        }
+    }
+
+    fun tutorialSignal(kind: String, key: String) {
+        if (tutorialPracticeActive && kind == "event") tutorialMilestones.observe(key)
+        val step = tutorialStep ?: return
+        if (TutorialStepGate.accepts(step, kind, key)) tutorialAdvance()
+    }
+
+    fun tutorialSnapshot(previous: ArgentumTableSnapshot?, current: ArgentumTableSnapshot) {
+        if (!tutorialPracticeActive) return
+        if (tutorialStartTurn == 0) tutorialStartTurn = current.turnNumber
+        val old = previous?.players?.getOrNull(previous.viewingPlayer)
+        val now = current.players.getOrNull(current.viewingPlayer) ?: return
+        if (old != null) {
+            fun wasInHand(name: String) = old.hand.any { it.name == name }
+            fun isInHand(name: String) = now.hand.any { it.name == name }
+            fun nowInPlay(name: String) = now.battlefield.any { it.name == name }
+            val oldForests = old.battlefield.filter { it.name == "Forest" }.map { it.id }.toSet()
+            if (old.hand.count { it.name == "Forest" } > now.hand.count { it.name == "Forest" } &&
+                now.battlefield.any { it.name == "Forest" && it.id !in oldForests })
+                tutorialSignal("event", "LandPlayed")
+            if (now.manaPool.values.sum() > old.manaPool.values.sum()) tutorialSignal("event", "ManaAdded")
+            val spellName = tutorialStep?.takeIf { it.event == "SpellCast" }
+                ?.target?.removePrefix("hand-card:")
+            if (!spellName.isNullOrBlank() && wasInHand(spellName) && !isInHand(spellName) &&
+                (current.stack.any { it.name == spellName } || nowInPlay(spellName) ||
+                    now.graveyard.any { it.name == spellName }))
+                tutorialSignal("event", "SpellCast")
+            if (old.battlefield.none { it.name == "Elvish Mystic" } && nowInPlay("Elvish Mystic")) tutorialSignal("event", "SpellResolved")
+            if (previous.stepKey == "DECLARE_ATTACKERS" && current.stepKey != previous.stepKey) tutorialSignal("event", "AttackersDeclared")
+            val oldOpp = previous.players.getOrNull(1 - previous.viewingPlayer)
+            val newOpp = current.players.getOrNull(1 - current.viewingPlayer)
+            if (oldOpp != null && newOpp != null && newOpp.life < oldOpp.life) tutorialSignal("event", "CombatDamageDealt")
+        }
+        if (tutorialPassPending && previous != null && current.interactionEpoch != previous.interactionEpoch) {
+            tutorialPassPending = false
+            tutorialSignal("event", "PriorityPassed")
+        }
+        if (current.turnNumber > tutorialStartTurn || current.activePlayer != current.viewingPlayer && previous?.activePlayer == previous?.viewingPlayer) {
+            tutorialSignal("event", "TurnAdvanced")
+        }
+        if (tutorialKeepPending) {
+            tutorialKeepPending = false
+            tutorialSignal("event", "HandKept")
+        }
+    }
+
+    fun stopTutorial() {
+        val wasPractice = tutorialPracticeActive
+        tutorialPracticeActive = false
+        tutorialMilestones.clear()
+        stackOpen = false
+        tutorialChapterId = null
+        tutorialStepIndex = 0
+        tutorialLoading = false
+        tutorialPassPending = false
+        tutorialMulliganPending = false
+        tutorialKeepPending = false
+        if (wasPractice && argentumEnabled) closeArgentumSession(false)
+        tutorialHubOpen = true
+    }
+
+    fun tutorialRouteScreen() {
+        if (tutorialPracticeActive) {
+            val step = tutorialStep
+            if (step?.screen == "stack" && argentumSnapshot?.stack?.isNotEmpty() == true) {
+                showHand = false
+                stackOpen = true
+            } else if (step?.screen == "board") {
+                stackOpen = false
+                showHand = step.target?.startsWith("hand-card:") == true
+            }
+            return
+        }
+        when (tutorialStep?.screen) {
+            "home" -> { homeOpen = true; optionsOpen = false; playSheetOpen = false; deckPickerOpen = false }
+            "setup" -> { homeOpen = true; optionsOpen = false; playSheetOpen = true }
+            "settings", "diagnostics", "layout" -> { homeOpen = true; playSheetOpen = false; optionsOpen = true }
+            "decks" -> { homeOpen = true; optionsOpen = false; deckPickerOpen = true }
+            "board" -> if (argentumEnabled) { homeOpen = false; optionsOpen = false }
+            "stack" -> if (argentumEnabled) stackOpen = true
+            "menu" -> { if (argentumEnabled) homeOpen = false; topMenuSection = null; topMenuExpanded = tutorialStep?.target != "game-menu" }
+        }
+    }
+
+    fun startTutorialCoach(id: String, startingIndex: Int = 0) {
+        val lesson = tutorialChapters.firstOrNull { it.id == id } ?: return
+        tutorialHubOpen = false
+        tutorialChapterId = id
+        tutorialStepIndex = startingIndex.coerceIn(0, lesson.steps.lastIndex)
+        tutorialPracticeActive = false
+        tutorialRouteScreen()
+    }
+
+    fun startTutorialPractice(id: String) {
+        if (argentumEnabled || offlineStarting) {
+            message = "Finish your current game before opening a practice match. Your save will be preserved."
+            return
+        }
+        if (id !in TutorialPracticeScenarios.supported) {
+            message = "This activity is not yet available as a practice game."
+            return
+        }
+        tutorialHubOpen = false
+        tutorialChapterId = id
+        tutorialStepIndex = 0
+        tutorialStartTurn = 0
+        tutorialMilestones.clear()
+        tutorialPracticeActive = true
+        tutorialLoading = true
+        offlineStarting = true
+        argentumLastError = null
+        scope.launch {
+            try {
+                if (id == TutorialPracticeScenarios.MULLIGAN) {
+                    val (seats, registry) = withContext(Dispatchers.IO) { TutorialPracticeScenarios.openingHand(offlineLibrary()) }
+                    argentumSocket.localHostFactory = { emit ->
+                        com.arcanatable.engine.LocalArgentumHost(
+                            registry, seats[0], seats[1], gameSeed = 12025L,
+                            tutorialPassiveOpponent = true, emit = emit
+                        )
+                    }
+                    offlineRestoreRequested = true
+                    argentumOffline = true
+                    argentumLobbySubmitted = true
+                    argentumLocalPlayersBackup = players.toList()
+                    argentumEnabled = true
+                    homeOpen = false
+                    lobbyOpen = false
+                    argentumSocket.connect(seats[0].name)
+                    var tries = 0
+                    while (argentumStatus != ArgentumConnectionStatus.CONNECTED && tries++ < 30) delay(100)
+                    check(argentumStatus == ArgentumConnectionStatus.CONNECTED &&
+                        argentumSocket.createCommanderPracticeLobby(vsAi = true)) { "Tutorial engine connection failed." }
+                } else {
+                    val scenario = withContext(Dispatchers.IO) { TutorialPracticeScenarios.build(id, offlineLibrary()) }
+                    launchOfflineCheckpoint(scenario.seats, scenario.registry, scenario.checkpoint.toString())
+                }
+                recordDiagnostic("Tutorial practice started: $id", DiagnosticCategory.ENGINE)
+            } catch (failed: Throwable) {
+                argentumSocket.close()
+                argentumSocket.localHostFactory = null
+                argentumEnabled = false
+                argentumOffline = false
+                offlineRestoreRequested = false
+                homeOpen = true
+                tutorialChapterId = null
+                tutorialPracticeActive = false
+                tutorialHubOpen = true
+                message = "Tutorial could not start: ${failed.message ?: failed.javaClass.simpleName}"
+                recordDiagnostic("Tutorial preparation failed: ${failed.message}", DiagnosticCategory.ERROR)
+            } finally {
+                offlineStarting = false
+                tutorialLoading = false
+            }
+        }
+    }
+
     var lobbyCreated by run { mutableStateOf(false) }
     var lobbyJoinMode by run { mutableStateOf(false) }
     var lobbyReadyPlayers by run { mutableStateOf(emptySet<Int>()) }
@@ -488,9 +681,10 @@ internal class TableController(
     /** Turn number when "Pass to my turn" was switched on; null when it is off. */
     var passToMyTurnFrom by run { mutableStateOf<Int?>(null) }
     var followActivePlayer by run { mutableStateOf(optionPrefs.getBoolean("follow_active_player", true)) }
+    var respondToOwnStack by run { mutableStateOf(optionPrefs.getBoolean("respond_to_own_stack", false)) }
     var quietOpponentTurns by run { mutableStateOf(optionPrefs.getBoolean("quiet_opponent_turns", false)) }
     /** Offline games: how many AI opponents (1 = a duel, 3 = a four-player game). */
-    var offlineAiCount by run { mutableStateOf(optionPrefs.getInt("offline_ai_count", 1).coerceIn(1, 3)) }
+    var offlineAiCount by run { mutableStateOf(ReleaseFeatures.aiCount(optionPrefs.getInt("offline_ai_count", 1))) }
     var argentumPingResult by run { mutableStateOf<String?>(null) }
     var engineTrialResult by run { mutableStateOf<String?>(null) }
     var lastOpponentViewed by run { mutableIntStateOf(-1) }
@@ -1365,13 +1559,33 @@ internal class TableController(
     }
 
     fun importDeck(text: String, saveAsMine: Boolean = true) {
-        val entries = parseDeckList(text)
-        if (entries.isEmpty()) { importError = "No card names found. Try a list such as ‘2 Sol Ring’."; return }
+        if (!ReleaseFeatures.deckImportEnabled && saveAsMine) {
+            importError = "Deck importing is coming soon. Choose a premade deck for this release."
+            return
+        }
+        val initial = parseDeckListDetailed(text)
+        if (initial.gameBlockers.isNotEmpty()) {
+            importError = initial.gameBlockers.joinToString(" ") + " " +
+                initial.diagnostics.take(3).joinToString(" ")
+            return
+        }
+        if (initial.playableEntries.isEmpty()) { importError = "No card names found. Try a list such as ‘2 Sol Ring’."; return }
         importing = true
         importError = null
         scope.launch {
             try {
-                val found = Scryfall.lookup(entries).toMutableMap()
+                val catalog = loadSupportCatalog()
+                val parsed = parseDeckListDetailed(text, catalog)
+                if (parsed.gameBlockers.isNotEmpty()) {
+                    importError = parsed.gameBlockers.joinToString(" ") + " " +
+                        parsed.diagnostics.take(3).joinToString(" ")
+                    return@launch
+                }
+                val entries = parsed.playableEntries
+                val found = offlineImportMatches(entries, catalog).toMutableMap()
+                // Scryfall enriches supported local definitions when reachable. Failed requests
+                // must never discard the bundled definitions or a player's unknown card name.
+                found.putAll(Scryfall.lookup(entries))
                 val autoFixedEntries = mutableSetOf<DeckEntry>()
                 val autoFixedNames = mutableListOf<Pair<String, String>>()
                 val unmatchedEntries = entries.filterNot { it in found }
@@ -1395,7 +1609,9 @@ internal class TableController(
                     val nameConflict = match != null && !match.name.equals(entry.name, ignoreCase = true) && entry !in autoFixedEntries
                     val issue = when {
                         nameConflict -> "Requested ${entry.name}, but ${entry.setCode?.uppercase()} #${entry.collectorNumber} resolves to ${match?.name}. You’ll need to resolve it manually in the editor."
-                        match == null && printingRequested -> "Could not verify ${entry.name} in ${entry.setCode?.uppercase()} #${entry.collectorNumber}. You’ll need to resolve it manually in the editor."
+                        printingRequested && (match?.setCode?.equals(entry.setCode, ignoreCase = true) != true ||
+                            match.collectorNumber?.equals(entry.collectorNumber, ignoreCase = true) != true) ->
+                            "Could not verify the requested printing of ${entry.name} in ${entry.setCode?.uppercase()} #${entry.collectorNumber}. Offline rules data may still be available; check the printing in the editor."
                         match == null -> "Could not match ‘${entry.name}’ to a Magic card. You’ll need to resolve it manually in the editor."
                         else -> null
                     }
@@ -1541,6 +1757,10 @@ internal class TableController(
 
     fun addAiOpponent() {
         topMenuExpanded = false
+        if (!ReleaseFeatures.multiplayerPreviewEnabled) {
+            message = "Four-player support is coming soon. This release supports two players."
+            return
+        }
         if (onlineMode && (!lobbyCreated || lobbyJoinMode || gameStartedOnline)) {
             message = "Only the host can add an AI player before the game starts."
             return
@@ -1595,13 +1815,19 @@ internal class TableController(
         val active = activeDeckId
         val precon = active?.takeIf { it.startsWith("precon:") }?.removePrefix("precon:")?.let { id -> preconDecks.firstOrNull { it.id == id } }
         val premade = active?.takeIf { it.startsWith("builtin:") }?.removePrefix("builtin:")?.let { id -> premadeDecks.firstOrNull { it.id == id } }
-        val saved = active?.let { a -> savedDecks.firstOrNull { it.name == a } }
+        val saved = active?.takeIf { ReleaseFeatures.deckImportEnabled }?.let { a -> savedDecks.firstOrNull { it.name == a } }
         return when {
             precon != null -> parseDeckList(precon.decklist).let { entries -> entries.flatMap { entry -> List(entry.count) { entry.name } } to precon.commander }
             premade != null -> premade.cards to premade.commander
-            saved != null -> parseDeckList(saved.text).let { e -> e.flatMap { x -> List(x.count) { x.name } } to (saved.commander ?: e.firstOrNull { it.commander }?.name) }
-            else -> seat?.takeIf { it.deckLoaded }?.let { (it.library + it.hand).filterNot { c -> c.isToken || c.name == "Hidden card" }.map { c -> c.name } }.orEmpty() to
-                seat?.takeIf { it.deckLoaded }?.commanderName?.takeIf(String::isNotBlank)
+            saved != null -> parseDeckList(saved.text).let { e ->
+                val commander = saved.commander ?: e.firstOrNull { it.commander }?.name
+                val names = e.flatMap { x -> List(x.count) { x.name } }
+                // An MTGO sideboard commander can be inferred during import but is not
+                // present in the compatibility parser's playable entries without a catalog.
+                (if (commander != null && names.none { it.equals(commander, true) }) names + commander else names) to commander
+            }
+            else -> seat?.takeIf { it.deckLoaded && ReleaseFeatures.deckImportEnabled }?.let { (it.library + it.hand).filterNot { c -> c.isToken || c.name == "Hidden card" }.map { c -> c.name } }.orEmpty() to
+                seat?.takeIf { it.deckLoaded && ReleaseFeatures.deckImportEnabled }?.commanderName?.takeIf(String::isNotBlank)
         }
     }
 
@@ -1614,7 +1840,7 @@ internal class TableController(
                 try {
                     val library = offlineLibrary()
                     val decks = runCatching { context.assets.open("argentum/commander-decks.json").bufferedReader().use { it.readText() } }.getOrNull()
-                    result = com.arcanatable.engine.OfflineGameSetup.build(library, lobbyPlayerName.ifBlank { "You" }, names, commander, decks, aiDeckId = aiDeckId, aiCount = aiCount)
+                    result = com.arcanatable.engine.OfflineGameSetup.build(library, lobbyPlayerName.ifBlank { "You" }, names, commander, decks, aiDeckId = aiDeckId, aiCount = ReleaseFeatures.aiCount(aiCount))
                 } catch (t: Throwable) { failure = t }
             }, "argentum-offline-setup", 256L shl 20)
             worker.start(); worker.join()
@@ -1659,6 +1885,10 @@ internal class TableController(
 
     /** Request a full, unmasked engine checkpoint at the next action boundary. */
     fun saveOfflineGame() {
+        if (tutorialPracticeActive) {
+            message = "Tutorial games are temporary and cannot overwrite your saved match."
+            return
+        }
         if (!argentumOffline || wifiRole != null || argentumSocket.runningLocalHost == null ||
             argentumSnapshot?.gameOver != false) {
             message = "Only active offline vs AI games can be saved."
@@ -1714,10 +1944,15 @@ internal class TableController(
         registry: com.wingedsheep.engine.registry.CardRegistry,
         checkpoint: String,
     ) {
+        require(ReleaseFeatures.multiplayerPreviewEnabled || seats.size == 2) {
+            "This release can resume two-player games only. Your saved game was preserved."
+        }
+        if (!tutorialPracticeActive) respondToOwnStack = JSONObject(checkpoint).optBoolean("respondToOwnStack")
         argentumSocket.localHostFactory = { emit ->
             com.arcanatable.engine.LocalArgentumHost(
                 registry, seats[0], seats[1], emit = emit,
-                extraOpponents = seats.drop(2), resumeCheckpoint = checkpoint
+                extraOpponents = seats.drop(2), resumeCheckpoint = checkpoint,
+                tutorialPassiveOpponent = tutorialPracticeActive
             )
         }
         offlineRestoreRequested = true
@@ -1771,13 +2006,20 @@ internal class TableController(
         argentumLastError = null
         scope.launch {
             try {
+                // Saved text might predate current parsing. Refuse unplayable partner/companion
+                // decks rather than losing a commander when the singular engine slot starts.
+                activeDeckId?.let { id -> savedDecks.firstOrNull { it.name == id } }?.let { saved ->
+                    val parsed = parseDeckListDetailed(saved.text, loadSupportCatalog())
+                    val blockers = parsed.gameBlockers
+                    if (blockers.isNotEmpty()) error(blockers.joinToString(" ") + " " + parsed.diagnostics.take(3).joinToString(" "))
+                }
                 val (names, commander) = activeDeckCards()
                 val started = System.currentTimeMillis()
                 val prepared = prepareOfflineSetup(names, commander, offlineAiDeckId, offlineAiCount)
                 val (setup, registry) = prepared
                 recordDiagnostic("Offline game prepared in ${System.currentTimeMillis() - started} ms: ${setup.you.commander ?: "Portal"} vs ${setup.aiDeckName} (${setup.extraAis.size + 2} players)", DiagnosticCategory.ENGINE)
                 setup.notes.forEach { recordDiagnostic("Offline: $it", DiagnosticCategory.ENGINE) }
-                argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, setup.you, setup.ai, emit = emit, extraOpponents = setup.extraAis).also { it.quietOpponentTurns = quietOpponentTurns } }
+                argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, setup.you, setup.ai, emit = emit, extraOpponents = setup.extraAis).also { it.quietOpponentTurns = quietOpponentTurns; it.respondToOwnStack = respondToOwnStack } }
                 argentumOffline = true
                 argentumDeckForLobby = null
                 argentumCommanderForLobby = null

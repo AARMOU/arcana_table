@@ -7,6 +7,19 @@ on:
   pull_request:
     paths:
       - android/custom-cards/**
+      - android/app/src/main/java/**
+      - android/app/src/test/**
+      - android/app/src/testRelease/**
+      - android/app/src/main/assets/tutorials/**
+      - android/app/src/main/AndroidManifest.xml
+      - android/app/src/main/res/**
+      - android/app/src/test/java/com/arcanatable/LauncherBrandingTest.kt
+      - tools/verify_launcher_branding.py
+      - tools/check_android_regex.py
+      - tools/tests/test_android_regex.py
+      - AGENTS.md
+      - android/app/src/main/java/com/arcanatable/DeckSupport.kt
+      - android/app/src/test/java/com/arcanatable/DeckSupportTest.kt
       - android/app/src/main/assets/argentum/custom-cards.*
       - .github/workflows/arcana-development-ci.yml
   workflow_dispatch:
@@ -21,6 +34,12 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - name: Reject Android-incompatible regex patterns before build
+        run: |
+          python3 -m unittest discover -s tools/tests -p 'test_android_regex.py'
+          python3 tools/check_android_regex.py
+      - name: Verify release app launcher uses the original Arcana logo
+        run: python3 tools/verify_launcher_branding.py
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -40,7 +59,7 @@ jobs:
       # tests need the debug-only ui-test-manifest and can't launch there.
       - name: Check release build has no debug test scenarios
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest'
+        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest' --tests 'com.arcanatable.LauncherBrandingTest' --tests 'com.arcanatable.ReleaseVariantScopeTest'
       - name: Check exported index consistency
         run: |
           python3 - <<'PY'
@@ -78,5 +97,6 @@ jobs:
           path: |
             android/custom-cards/build/test-results/
             android/app/build/test-results/
+            android/app/build/screenshots/
             android/app/src/main/assets/argentum/custom-cards.index.tsv
             android/app/src/main/assets/argentum/custom-cards.jsonl

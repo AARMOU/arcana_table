@@ -99,6 +99,7 @@ class LocalArgentumHost(
     private val resumeCheckpoint: String? = null,
     /** Optional reproducible shuffle for scenario tests; normal games keep the engine's randomness. */
     private val gameSeed: Long? = null,
+    private val tutorialPassiveOpponent: Boolean = false,
     private val emit: (JSONObject) -> Unit,
 ) {
     private val worker = Executors.newSingleThreadExecutor { r -> Thread(null, r, "argentum-local", 256L shl 20) }
@@ -180,6 +181,12 @@ class LocalArgentumHost(
      */
     var quietOpponentTurns: Boolean = false
 
+    private val ownStackResponders = mutableSetOf<EntityId>()
+    /** Opt-in, per-human-seat priority stops; never applied to the AI. */
+    var respondToOwnStack: Boolean
+        get() = humanId in ownStackResponders
+        set(enabled) { if (enabled) ownStackResponders.add(humanId) else ownStackResponders.remove(humanId) }
+
     val isWifi: Boolean get() = guestEmit != null
 
     private fun people(): List<EntityId> = if (guestEmit != null) listOf(humanId, aiId) else listOf(humanId)
@@ -232,6 +239,9 @@ class LocalArgentumHost(
                 concede(aiId)
             }
             "requestUndo" -> undo(from)
+            "setRespondToOwnStack" -> {
+                if (message.optBoolean("enabled")) ownStackResponders.add(from) else ownStackResponders.remove(from)
+            }
             "setQuietOpponentTurns" -> if (from == humanId) quietOpponentTurns = message.optBoolean("enabled")
             "arcanaNudge" -> if (isWifi) emitTo(other(from), JSONObject().put("type", "arcanaNudge"))
             "ping" -> emitTo(from, JSONObject().put("type", "pong"))
@@ -312,6 +322,7 @@ class LocalArgentumHost(
             .put("version", version)
             .put("mulliganPhase", mulliganPhase)
             .put("quietOpponentTurns", quietOpponentTurns)
+            .put("respondToOwnStack", respondToOwnStack)
             .put("peopleOutSent", peopleOutSent)
             .put("gameLogs", JSONObject().also { logs ->
                 gameLogs.forEach { (seat, events) ->
@@ -364,6 +375,7 @@ class LocalArgentumHost(
         version = record.getLong("version")
         mulliganPhase = record.getBoolean("mulliganPhase")
         quietOpponentTurns = record.optBoolean("quietOpponentTurns")
+        respondToOwnStack = record.optBoolean("respondToOwnStack")
         peopleOutSent = record.optBoolean("peopleOutSent")
         undoCheckpoint = decodeUndo("undoCheckpoint")
         preCombatCheckpoint = decodeUndo("preCombatCheckpoint")
@@ -638,7 +650,8 @@ class LocalArgentumHost(
             if (!isPerson(priority)) {
                 val bot = ais[priority] ?: break
                 val startedChoice = System.nanoTime()
-                val chosen = timed("aiChoice") { OfflineAiPolicy.think { bot.chooseAction(current) } }
+                val chosen = if (tutorialPassiveOpponent) safePass(current, priority)
+                    else timed("aiChoice") { OfflineAiPolicy.think { bot.chooseAction(current) } }
                 val choiceType = if (chosen is PassPriority) "aiChoicePass" else "aiChoiceAction"
                 phaseNanos[choiceType] = (phaseNanos[choiceType] ?: 0L) + System.nanoTime() - startedChoice
                 countDiagnostic(if (chosen is PassPriority) "aiPassChoices" else "aiActionChoices")
@@ -647,6 +660,10 @@ class LocalArgentumHost(
                 if (chosen !is PassPriority) flush(paceMs)
                 continue
             }
+            // Practice must expose the real priority window after casting. Ordinary own-stack
+            // auto-pass would otherwise resolve the lesson's spell before the learner can
+            // inspect it or explicitly pass. The engine still validates every submitted action.
+            if (tutorialPassiveOpponent && current.stack.isNotEmpty()) break
             // Human auto-pass needs only engine PriorityActions, not the FULL/enriched UI menu.
             // Interactive state updates still build and send the original complete legal-action DTO.
             val shouldPass = OfflineHumanAutoPass.shouldPass(
@@ -660,6 +677,7 @@ class LocalArgentumHost(
                 },
                 quietOpponentTurn = priority == humanId && quietOpponentTurns,
                 stackTargetsPlayer = { stackTargetsYou(current, priority) },
+                ownStackStops = if (priority in ownStackResponders) com.wingedsheep.engine.legalactions.OwnStackStop.entries.toSet() else emptySet(),
             )
             if (!shouldPass) break
             if (!apply(safePass(current, priority), events, priority)) break

@@ -389,7 +389,7 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
         }
         if (!stackCycleActive || triggerPrompts.isNotEmpty() || paymentCard != null || manaPoolOpen || manaChoicePrompt != null || creatureTypeChoicePrompt != null || pendingStackOpen) return@LaunchedEffect
         delay(250)
-        if (stackActions.isEmpty() && triggerPrompts.isEmpty() && paymentCard == null && !manaPoolOpen && manaChoicePrompt == null && creatureTypeChoicePrompt == null && !pendingStackOpen) {
+        if (stackActions.isEmpty() && triggerPrompts.isEmpty() && paymentCard == null && !manaPoolOpen && manaChoicePrompt == null && creatureTypeChoicePrompt == null && !pendingStackOpen && !tutorialPracticeActive) {
             stackOpen = false
             stackCycleActive = false
         }

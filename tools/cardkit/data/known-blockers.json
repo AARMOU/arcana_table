@@ -121,6 +121,21 @@
       "reason": "reveal-or-pay additional cost",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
+    },
+    "Azlask, the Swelling Scourge": {
+      "reason": "dies-trigger subject filter cannot test colorless: TriggerMatcher.matchesCardPredicate has no branch for CardPredicate.IsColorless (throws IllegalStateException at runtime); TriggeringEntityWas accepts only type/subtype predicates",
+      "source": "claude/eldrazi-incursion-tonight-20261024 scenario run 2026-10-25 (AzlaskTheSwellingScourgeScenarioTest)",
+      "verified": false
+    },
+    "Benthic Anomaly": {
+      "reason": "Exact total power/toughness over the per-opponent chosen collection needs a supported collection-stat aggregate. Documented API exposes collection mana-value sum but not power/toughness sum; composing StoreNumber inside ForEachInCollection loses updatedStoredNumbers. Reproduced primitive probe: direct stored power passes; 2+3 power collection accumulation returns 0, expected 5. This proves the attempted composition fails, not that no engine extension can express the card.",
+      "source": "investigation/eldrazi-incursion/benthic-anomaly/result.xml; pinned ForEachExecutor.processItems; docs/agents/generated/sdk-api.md",
+      "verified": true
+    },
+    "Hideous Taskmaster": {
+      "reason": "Per-opponent targeting does not retain each chosen creature’s original controller: a creature transferred to a different opponent before resolution is incorrectly stolen. Reproduced on committed #171 runtime; 9 positive/negative scenarios pass, controller-change scenario fails. No exact registration until target-controller binding is supported.",
+      "source": "investigation/eldrazi-incursion/hideous-taskmaster/result.xml; pinned ResolutionTargetValidator.kt per-opponent exclusion; WotC LOTR release notes In the Darkness Bind Them same wording",
+      "verified": true
     }
   },
   "keywords": {

@@ -143,6 +143,97 @@ class DeckSupportTest {
         assertTrue(sample.suggestReplacements("Creature — Elf", 1.0, setOf('G'), null, requireLegendary = true).isEmpty())
     }
 
+    @Test fun offlineSearchResultsRetainCreatureStatsOracleTextAndKeywords() {
+        val line = """{"name":"Emberwing Test","manaCost":"{2}{W}","typeLine":"Creature — Angel","oracleText":"Flying\n{R}: Emberwing Test gains haste until end of turn.","creatureStats":{"power":2,"toughness":3},"keywords":["FLYING","VIGILANCE"]}"""
+        val card = SupportedCardCatalog.parseLibraryLine(line, custom = false, kind = "card")!!
+        val result = card.toScryfallCard()
+        assertEquals("Flying\n{R}: Emberwing Test gains haste until end of turn.", result.oracleText)
+        assertEquals("2", result.power)
+        assertEquals("3", result.toughness)
+        assertEquals(listOf("Flying", "Vigilance"), result.keywords)
+        assertEquals(3.0, result.manaValue!!, 0.0)
+        // With no explicit identity override, a red activated ability must not be offered
+        // as a replacement in a white-only Commander deck.
+        assertEquals(setOf('W', 'R'), card.colors)
+        val catalog = SupportedCardCatalog(listOf(card))
+        assertTrue(catalog.suggestReplacements("Creature — Angel", 3.0, setOf('W'), setOf('W')).isEmpty())
+        assertEquals("Emberwing Test",
+            catalog.suggestReplacements("Creature — Angel", 3.0, setOf('W'), setOf('W', 'R')).single().name)
+    }
+
+    @Test fun explicitLibraryColorIdentityOverridesTextHeuristics() {
+        val line = """{"name":"Custom Override","manaCost":"{G}","typeLine":"Creature — Wizard","oracleText":"{R}: Deal damage.","creatureStats":{"power":"*","toughness":"2"},"colorIdentityOverride":["BLUE"]}"""
+        val card = SupportedCardCatalog.parseLibraryLine(line, custom = true, kind = "card")!!
+        assertEquals(setOf('U'), card.colors)
+        assertEquals("*", card.toScryfallCard().power)
+        assertEquals("2", card.toScryfallCard().toughness)
+    }
+
+
+    @Test fun shippedCustomCardMetadataMatchesActualJsonlDefinitions() {
+        val library = File(assets, "argentum/custom-cards.jsonl")
+        assumeTrue("custom-card JSONL present", library.isFile)
+        val raw = library.useLines { lines ->
+            lines.firstOrNull { JSONObject(it).optString("name") == "Ancient Copper Dragon" }
+        } ?: error("Ancient Copper Dragon missing from custom export")
+        val card = SupportedCardCatalog.parseLibraryLine(raw, custom = true, kind = "card")!!
+        val preview = card.toScryfallCard()
+        assertEquals("6", preview.power)
+        assertEquals("5", preview.toughness)
+        assertTrue(preview.oracleText.orEmpty().contains("d20"))
+        assertTrue("Flying" in preview.keywords)
+    }
+
+    @Test fun missingCreatureStatsDoNotInventPowerOrToughness() {
+        val line = """{"name":"Statless Test","manaCost":"{1}{U}","typeLine":"Instant","oracleText":"Draw a card.","keywords":[]}"""
+        val preview = SupportedCardCatalog.parseLibraryLine(line, custom = false, kind = "card")!!.toScryfallCard()
+        assertNull(preview.power)
+        assertNull(preview.toughness)
+        assertEquals(emptyList<String>(), preview.keywords)
+        assertEquals("Draw a card.", preview.oracleText)
+    }
+
+    @Test fun cardsDoNotInheritKeywordLabelsFromCreatedTokensOrAnimationEffects() {
+        val customFile = File(assets, "argentum/custom-cards.jsonl")
+        val upstreamFile = File(assets, "argentum/all-cards.jsonl")
+        assumeTrue("custom-card JSONL present", customFile.isFile)
+        assertTrue("upstream Argentum library must be present", upstreamFile.isFile)
+        val names = setOf(
+            "Sai, Master Thopterist", "Celestial Colonnade", "Springleaf Parade",
+            "Black Market Connections", "Tyranid Invasion",
+        )
+        // Upgraded Argentum adopts some former Arcana custom cards (e.g. Black
+        // Market Connections). Their printed keywords must remain correct in
+        // either source, and a migrated card must not disappear or be shadowed.
+        fun matchingRows(file: File): Map<String, String> = file.useLines { lines ->
+            lines.mapNotNull { line ->
+                val name = SupportedCardCatalog.jsonString(line, "name")
+                name?.takeIf { it in names }?.let { it to line }
+            }.toMap()
+        }
+        val customRows = matchingRows(customFile)
+        val upstreamRows = matchingRows(upstreamFile)
+        assertEquals("every probed card must remain in the shipped library",
+            names, customRows.keys + upstreamRows.keys)
+        assertTrue("upstream cards must not retain shadowing custom definitions",
+            customRows.keys.intersect(upstreamRows.keys).isEmpty())
+        (customRows.mapValues { true to it.value } + upstreamRows.mapValues { false to it.value })
+            .forEach { (name, source) ->
+                val (custom, line) = source
+                val preview = SupportedCardCatalog.parseLibraryLine(line, custom = custom, kind = "card")!!.toScryfallCard()
+                assertEquals("$name must not inherit token or animation keyword labels",
+                    emptyList<String>(), preview.keywords)
+            }
+    }
+
+    @Test fun nestedEffectStatisticsAreNotOriginalCardStatistics() {
+        val line = """{"name":"Token Creator","manaCost":"{2}{G}","typeLine":"Sorcery","oracleText":"Create a 3/3 token.","script":{"spellEffect":{"type":"CreateToken","creatureStats":{"power":3,"toughness":3},"keywords":["TRAMPLE"]}}}"""
+        val preview = SupportedCardCatalog.parseLibraryLine(line, custom = false, kind = "card")!!.toScryfallCard()
+        assertNull(preview.power)
+        assertNull(preview.toughness)
+        assertEquals(emptyList<String>(), preview.keywords)
+    }
+
     // ---- Saved deck list swaps ----
 
     @Test fun swapRewritesOnlyTheMatchingLineAndKeepsStructure() {

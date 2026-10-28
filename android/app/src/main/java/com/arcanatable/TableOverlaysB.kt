@@ -694,6 +694,53 @@ internal fun TableController.TableOverlaysB() {
         })
     }
 
+    // The Lunar Whale (and other LookAtTopOfLibrary grants) do not use priority.
+    // Read only the viewer's individually authorized top card from the masked engine view;
+    // casting/land play, unlike looking, MUST be offered by Argentum as a legal action.
+    if (argentumTopLibraryOpen) {
+        val snap = argentumSnapshot?.takeIf { it.viewingPlayer == localSeat }
+        val top = snap?.topLibraryCard
+        val playChoices = if (snap != null && top != null)
+            ArgentumActions.forCardServerId(snap.legalActions, snap.serverCardIds[top.id])
+                .filter { it.optJSONObject("action")?.optString("type") in setOf("CastSpell", "PlayLand") }
+        else emptyList()
+        AlertDialog(
+            onDismissRequest = { argentumTopLibraryOpen = false },
+            title = { Text("Top of your library · private") },
+            text = {
+                if (top == null) Text("Argentum is not currently allowing you to look at the top card.", color = Muted)
+                else Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(top.name, color = SoftWhite)
+                    Text(top.type, color = Muted)
+                    if (!top.manaCost.isNullOrBlank()) ManaCostPips(top.manaCost.orEmpty())
+                    Text(top.oracleText.orEmpty(), color = SoftWhite)
+                    Text(
+                        if (playChoices.isEmpty()) "You may look without priority. Playing or casting is not currently legal."
+                        else "Argentum controls timing, available land plays, targets, and mana payment.",
+                        color = Muted
+                    )
+                }
+            },
+            confirmButton = {
+                if (top != null && playChoices.isNotEmpty())
+                    TextButton(onClick = {
+                        argentumTopLibraryOpen = false
+                        openArgentumActions(top)
+                    }) { Text("PLAY / CAST OPTIONS", color = Mint) }
+            },
+            dismissButton = {
+                Row {
+                    if (top != null) TextButton(onClick = {
+                        argentumTopLibraryOpen = false
+                        preview = CardPreview(localSeat, top, fromHand = false, canManipulate = false)
+                    }) { Text("LARGE VIEW", color = Muted) }
+                    TextButton(onClick = { argentumTopLibraryOpen = false }) { Text("CLOSE", color = Muted) }
+                }
+            },
+            containerColor = Panel, titleContentColor = SoftWhite, textContentColor = Muted
+        )
+    }
+
     preview?.let { item ->
         CardPreviewPopup(item = item, onDismiss = { preview = null })
     }
@@ -804,9 +851,15 @@ internal fun TableController.TableOverlaysB() {
         }
     }
 
+    if (tutorialHubOpen) TutorialHubDialog(
+        onDismiss = { tutorialHubOpen = false },
+        onPractice = { startTutorialPractice(it) },
+        onCoach = { id, index -> startTutorialCoach(id, index) },
+        practiceEnabled = !argentumEnabled && !offlineStarting
+    )
     if (optionsOpen) OptionsPage(
         darkMode = darkMode, timerVisible = turnTimerVisible,
-        backgroundAlertsEnabled = backgroundAlertsEnabled,
+        backgroundAlertsEnabled = backgroundAlertsEnabled, showEngineStatus = showEngineStatus,
         followActivePlayer = followActivePlayer,
         connectionLabel = when {
             argentumEnabled && wifiRole == "online-host" -> "Online game with a friend · you are hosting"
@@ -834,6 +887,7 @@ internal fun TableController.TableOverlaysB() {
         onViewDiagnostics = { optionsOpen = false; diagnosticViewerOpen = true },
         onExportDiagnostics = { exportDiagnosticLog() },
         onWhatsNew = { optionsOpen = false; changelogOpen = true },
+        onTutorials = { optionsOpen = false; tutorialHubOpen = true },
         engineTrialResult = engineTrialResult,
         onEngineSelfTest = {
             engineTrialResult = "Running an AI-vs-AI game on this phone…"
@@ -852,17 +906,22 @@ internal fun TableController.TableOverlaysB() {
             }
         },
         onFollowActivePlayer = { value -> run { followActivePlayer = value; optionPrefs.edit().putBoolean("follow_active_player", value).apply() } },
+        respondToOwnStack = respondToOwnStack,
+        onRespondToOwnStack = { value -> respondToOwnStack = value; optionPrefs.edit().putBoolean("respond_to_own_stack", value).apply(); if (argentumOffline) argentumSocket.send("setRespondToOwnStack", JSONObject().put("enabled", value)) },
         quietOpponentTurns = quietOpponentTurns,
         onQuietOpponentTurns = { value -> quietOpponentTurns = value; optionPrefs.edit().putBoolean("quiet_opponent_turns", value).apply(); if (argentumOffline) argentumSocket.send("setQuietOpponentTurns", JSONObject().put("enabled", value)) },
         reducedSwipeMotion = reducedSwipeMotion, cardSizeScale = cardSizeScale,
-        onOpenLayoutLab = { run { optionsOpen = false; layoutLabOpen = true } },
+        onOpenLayoutLab = { run { optionsOpen = false; layoutLabOpen = true; TutorialActions.tap("setting-adjust-ui") } },
         onToggleTheme = { run { onToggleTheme() } },
         onToggleTimerVisibility = { run { turnTimerVisible = !turnTimerVisible } },
         onToggleBackgroundAlerts = { enabled -> run { setBackgroundAlerts(enabled) } },
+        onShowEngineStatus = { value -> showEngineStatus = value; optionPrefs.edit().putBoolean("show_engine_status", value).apply() },
         onReducedMotion = { value -> run { reducedSwipeMotion = value; optionPrefs.edit().putBoolean("reduced_swipe_motion", value).apply() } },
         onCardSizeScale = { value -> run { cardSizeScale = value; optionPrefs.edit().putFloat("card_size_scale", value).putFloat("layout_card_size_$layoutOrientationSuffix", value).apply() } },
         onClearAllData = { run { optionsOpen = false; clearAllConfirmOpen = true } },
-        onDismiss = { run { optionsOpen = false } }
+        onDismiss = { run { optionsOpen = false } },
+        tutorialStep = if (tutorialChapterId != null) tutorialStep else null,
+        onTutorialNext = { tutorialAdvance() }, onTutorialExit = { stopTutorial() }
     )
     if (layoutLabOpen) AdjustUiPage(
         orientationName = if (isLandscape) "LANDSCAPE" else "PORTRAIT",
@@ -1025,6 +1084,13 @@ internal fun TableController.TableOverlaysB() {
             Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val stackItems = argentumSnapshot?.stack.orEmpty()
                 Text(if (stackItems.isEmpty()) "The Argentum stack is empty." else "ON THE STACK · ${stackItems.size}", color = Mint, fontWeight = FontWeight.Bold)
+                tutorialStep?.takeIf { tutorialPracticeActive || tutorialChapterId != null }?.let { step ->
+                    TutorialInlineCue(step.title, step.body + "  " + step.hint)
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { stopTutorial(); stackOpen = false }) { Text("EXIT LESSON") }
+                        if (step.actionKind == "next") TextButton(onClick = { tutorialAdvance() }) { Text("NEXT") }
+                    }
+                }
                 StackCardList(stackItems)
                 Text("Argentum controls priority and resolves the stack. Arcana displays the server state and offers only server-provided actions.", color = Muted, fontSize = 12.sp)
                 TextButton(onClick = { stackOpen = false; run { argentumActionCard = null; argentumActionChoices = argentumSnapshot?.legalActions.orEmpty().ifEmpty { listOf(JSONObject().put("__none", true)) } } }, enabled = argentumSnapshot?.legalActions?.isNotEmpty() == true) {
@@ -1033,11 +1099,16 @@ internal fun TableController.TableOverlaysB() {
             }
         },
         confirmButton = {
-            TextButton(onClick = { stackOpen = false; sendArgentumPriority() }, enabled = !argentumAwaitingUpdate && argentumSnapshot?.legalActions?.any { it.optJSONObject("action")?.optString("type") == "PassPriority" } == true) {
+            TextButton(onClick = {
+                // The stack drill's next gesture is CLOSE. Keep the real sheet open
+                // through the confirmed pass so that control remains available.
+                if (!tutorialPracticeActive) stackOpen = false
+                sendArgentumPriority()
+            }, enabled = !argentumAwaitingUpdate && argentumSnapshot?.legalActions?.any { it.optJSONObject("action")?.optString("type") == "PassPriority" } == true) {
                 Text("PASS PRIORITY", color = Mint)
             }
         },
-        dismissButton = { TextButton(onClick = { stackOpen = false }) { Text("CLOSE") } }
+        dismissButton = { TextButton(onClick = { stackOpen = false; TutorialActions.tap("stack-close") }) { Text("CLOSE") } }
     ) else if (stackOpen) StackPriorityDialog(
         players = players, stack = stackActions, priorityPlayer = priorityPlayer, passedCount = priorityPassed.size,
         eligibleCount = players.count { !it.isEliminated }, canResolve = stackActions.isNotEmpty() && stackActions.none { !it.targetsConfirmed } && players.filterNot { it.isEliminated }.all { it.id in priorityPassed },

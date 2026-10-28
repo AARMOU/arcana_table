@@ -1,0 +1,188 @@
+name: Eldrazi Incursion 93-slot Temple and Crossroads source integration
+# Validate #152 and #178 together from pinned source candidates on an isolated runner only. Never commit runtime jars,
+# export files, Android builds, or change any production/release flag.
+on:
+  push:
+    branches: [gpt/eldrazi-93-slot-restricted-mana-integration-20261025, gpt/eldrazi-93-slot-acceptance-repair-20261025]
+    paths:
+      - 'engine-upgrade/**'
+      - '.github/workflows/eldrazi-restricted-mana-combined.yml'
+      - 'android/app/src/test/java/com/arcanatable/EldraziIncursionPlayableTest.kt'
+  pull_request:
+    branches: [gpt/eldrazi-91-slot-apk-inventory-gate-20261025]
+    paths:
+      - 'engine-upgrade/**'
+      - '.github/workflows/eldrazi-restricted-mana-combined.yml'
+permissions:
+  contents: read
+concurrency:
+  group: eldrazi-restricted-mana-combined-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  card-source-scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: argentum-engine
+          persist-credentials: false
+      - name: Apply required pinned patches and exact restricted-colorless Eldrazi source change
+        run: |
+          set -euo pipefail
+          python3 engine-upgrade/audit_patches.py
+          git -C argentum-engine apply --check "$GITHUB_WORKSPACE/engine-upgrade/eldrazi-temple/patches/0001-colorless-eldrazi-source-mana.patch"
+          git -C argentum-engine apply "$GITHUB_WORKSPACE/engine-upgrade/eldrazi-temple/patches/0001-colorless-eldrazi-source-mana.patch"
+          git -C argentum-engine apply --check "$GITHUB_WORKSPACE/engine-upgrade/eldrazi-combined/patches/0002-devoid-after-temple.patch"
+          git -C argentum-engine apply "$GITHUB_WORKSPACE/engine-upgrade/eldrazi-combined/patches/0002-devoid-after-temple.patch"
+          cp engine-upgrade/eldrazi-temple/engine-tests/EldraziTempleManaRestrictionTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          cp engine-upgrade/corrupted-crossroads/engine-tests/CorruptedCrossroadsDevoidRestrictionTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          git -C argentum-engine diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Recheck exact mana restrictions in real engine
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :rules-engine:test --tests 'com.wingedsheep.engine.scenarios.EldraziTempleManaRestrictionTest' --tests 'com.wingedsheep.engine.scenarios.CorruptedCrossroadsDevoidRestrictionTest'
+      - name: Build candidate runtime JARs in this throwaway workspace
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar
+      - name: Use only temporary SDK/runtime jars for Android custom-card tests
+        run: |
+          python3 - <<'PY'
+          import hashlib, shutil, struct, zipfile
+          from pathlib import Path
+          libs = Path("android/app/libs")
+          markers = {"mtg-sdk": "com/wingedsheep/sdk/model/CardDefinition.class",
+                     "mtg-sdk-tooling": "com/wingedsheep/sdk/tooling/CardLoader.class",
+                     "rules-engine": "com/wingedsheep/engine/core/GameAction.class",
+                     "ai": "com/wingedsheep/ai/engine/AIPlayer.class"}
+          for module, ident in markers.items():
+              jars = [p for p in Path(f"argentum-engine/{module}/build/libs").glob("*.jar")
+                      if "sources" not in p.name and "javadoc" not in p.name and ident in zipfile.ZipFile(p).namelist()]
+              assert len(jars) == 1, (module, jars)
+              dest = libs / f"argentum-{module}.jar"
+              shutil.copyfile(jars[0], dest)  # runner only; no git staging/commit/push
+              with zipfile.ZipFile(dest) as z:
+                  versions = [struct.unpack(">H", z.read(n)[6:8])[0] for n in z.namelist() if n.endswith(".class")]
+              assert max(versions) <= 61, (dest, max(versions))
+              print(f"temporary {dest.name}: {hashlib.sha256(dest.read_bytes()).hexdigest()}")
+          PY
+      - name: Inject unshipped candidate card and register it in runner only
+        run: |
+          set -euo pipefail
+          dest=android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziTemple.kt
+          test ! -e "$dest"
+          cp engine-upgrade/eldrazi-temple/candidate/EldraziTemple.kt "$dest"
+          cp engine-upgrade/eldrazi-temple/candidate/EldraziTempleScenarioTest.kt android/custom-cards/src/test/kotlin/com/arcanatable/customcards/
+          dest=android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CorruptedCrossroads.kt
+          test ! -e "$dest"
+          cp engine-upgrade/corrupted-crossroads/candidate/CorruptedCrossroads.kt "$dest"
+          cp engine-upgrade/corrupted-crossroads/candidate/CorruptedCrossroadsScenarioTest.kt android/custom-cards/src/test/kotlin/com/arcanatable/customcards/
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt")
+          content = path.read_text()
+          needle = "val entries: List<Entry> = listOf(\n"
+          assert content.count(needle) == 1
+          path.write_text(content.replace(needle, needle + '        Entry(EldraziTemple, "M3C", "Six WotC precons"),\n' + '        Entry(CorruptedCrossroads, "M3C", "Six WotC precons"),\n', 1))
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export candidate definitions (uncommitted and not shipped)
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          grep -F '"name":"Eldrazi Temple"' app/src/main/assets/argentum/custom-cards.jsonl > /dev/null
+          grep -F '"name":"Corrupted Crossroads"' app/src/main/assets/argentum/custom-cards.jsonl > /dev/null
+      - name: Enforce original Incursion candidate inventory >=93 after runner export
+        run: python3 tools/eldrazi/check_original_inventory.py --minimum 93
+      - name: Run executable card scenarios against patched temporary runtime
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.EldraziTempleScenarioTest' --tests 'com.arcanatable.customcards.CorruptedCrossroadsScenarioTest'
+      - name: Compile and test Android app without packaging an APK
+        working-directory: android
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+
+      - name: Assert Android app unit-test XML exists and is green
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          files = list(Path("android/app/build/test-results/testDebugUnitTest").glob("TEST-*.xml"))
+          assert files, "No full-app testDebugUnitTest XML: compile/test gate not verified"
+          total = failures = errors = skipped = 0
+          for path in files:
+              root = ET.parse(path).getroot()
+              total += int(root.get("tests", 0))
+              failures += int(root.get("failures", 0))
+              errors += int(root.get("errors", 0))
+              skipped += int(root.get("skipped", 0))
+          print(f"Full Android app unit tests: {total} tests, {failures} failures, {errors} errors, {skipped} skipped")
+          assert total > 0 and failures == 0 and errors == 0, "Full Android app unit tests failed"
+          PY
+
+      - name: Verify deterministic candidate export in runner
+        working-directory: android
+        run: |
+          set -euo pipefail
+          sha256sum app/src/main/assets/argentum/custom-cards.jsonl app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/temple-first.sha
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          sha256sum app/src/main/assets/argentum/custom-cards.jsonl app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/temple-second.sha
+          diff -u /tmp/temple-first.sha /tmp/temple-second.sha
+      - name: Count actual engine and card test XML
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          suites = {
+              "temple-engine": ("argentum-engine", "EldraziTempleManaRestrictionTest", 5),
+              "crossroads-engine": ("argentum-engine", "CorruptedCrossroadsDevoidRestrictionTest", 6),
+              "temple-android": ("android/custom-cards", "EldraziTempleScenarioTest", 8),
+              "crossroads-android": ("android/custom-cards", "CorruptedCrossroadsScenarioTest", 6),
+          }
+          total = 0
+          for name, (root, class_name, minimum) in suites.items():
+              matches = list(Path(root).glob(f"**/build/test-results/**/TEST-*{class_name}.xml"))
+              assert len(matches) == 1, f"{name}: expected exactly one {class_name} XML, got {matches}"
+              elem = ET.parse(matches[0]).getroot()
+              counts = {key: int(elem.get(key, 0)) for key in ("tests", "failures", "errors", "skipped")}
+              print(f"{name} {class_name}: {counts} from {matches[0]}")
+              assert counts["tests"] >= minimum, f"{name}: required at least {minimum} executed tests"
+              assert counts["failures"] == counts["errors"] == counts["skipped"] == 0, (
+                  f"{name}: no failing, errored or skipped tests allowed"
+              )
+              total += counts["tests"]
+          assert total >= 25
+          print(f"Combined Temple + Crossroads engine and Android scenarios: {total} tests, all passed")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eldrazi-93-slot-temple-crossroads-source-test-evidence
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            engine-upgrade/patch-report.json
+            argentum-engine/rules-engine/build/test-results/test/TEST-*EldraziTemple*.xml
+            argentum-engine/rules-engine/build/test-results/test/TEST-*CorruptedCrossroads*.xml
+            android/custom-cards/build/test-results/test/TEST-*EldraziTemple*.xml
+            android/custom-cards/build/test-results/test/TEST-*CorruptedCrossroads*.xml
+            android/app/build/test-results/testDebugUnitTest/TEST-*.xml

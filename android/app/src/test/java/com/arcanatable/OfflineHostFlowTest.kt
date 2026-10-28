@@ -22,12 +22,12 @@ class OfflineHostFlowTest {
     private val cards = File("src/main/assets/argentum/por-cards.jsonl").bufferedReader().useLines { EmbeddedEngineTrial.loadCards(it) }
     private val inbox = LinkedBlockingQueue<JSONObject>()
 
-    private fun host(seed: Int = 3): LocalArgentumHost {
+    private fun host(seed: Int = 3, humanDeck: List<String>? = null): LocalArgentumHost {
         val registry = CardRegistry().apply { register(cards) }
         val random = Random(seed)
-        val you = LocalSeat("You", EmbeddedEngineTrial.monoDeck(cards, Color.GREEN, random).cards, null)
+        val you = LocalSeat("You", humanDeck ?: EmbeddedEngineTrial.monoDeck(cards, Color.GREEN, random).cards, null)
         val ai = LocalSeat("Offline AI", EmbeddedEngineTrial.monoDeck(cards, Color.RED, random).cards, null)
-        return LocalArgentumHost(registry, you, ai, paceMs = 0) { inbox.put(it) }.also {
+        return LocalArgentumHost(registry, you, ai, paceMs = 0, gameSeed = seed.toLong()) { inbox.put(it) }.also {
             it.receive(JSONObject().put("type", "connect"))
             it.receive(JSONObject().put("type", "createQuickGameLobby"))
         }
@@ -63,26 +63,31 @@ class OfflineHostFlowTest {
     }
 
     @Test fun playingALandCanBeUndone() {
-        val host = host()
-        next("mulliganDecision"); host.receive(JSONObject().put("type", "keepHand"))
-        var state: JSONObject
-        var playLand: JSONObject? = null
-        var guard = 0
-        // Pass until it's our main phase with a land to play.
-        while (playLand == null && guard++ < 200) {
-            state = next("stateUpdate")
-            val legal = state.optJSONArray("legalActions") ?: JSONArray()
-            val actions = (0 until legal.length()).map { legal.getJSONObject(it).getJSONObject("action") }
-            playLand = actions.firstOrNull { it.optString("type") == "PlayLand" }
-            if (playLand == null) actions.firstOrNull { it.optString("type") in setOf("PassPriority", "DeclareAttackers", "DeclareBlockers") }?.let { action(host, it) }
+        // Undo needs a land in the first hand. A random spell-only hand could reach
+        // cleanup's discard decision, which this priority-only loop cannot answer.
+        val host = host(humanDeck = List(40) { "Forest" })
+        try {
+            next("mulliganDecision"); host.receive(JSONObject().put("type", "keepHand"))
+            var state: JSONObject
+            var playLand: JSONObject? = null
+            var guard = 0
+            // Pass until it's our main phase with a land to play.
+            while (playLand == null && guard++ < 200) {
+                state = next("stateUpdate")
+                val legal = state.optJSONArray("legalActions") ?: JSONArray()
+                val actions = (0 until legal.length()).map { legal.getJSONObject(it).getJSONObject("action") }
+                playLand = actions.firstOrNull { it.optString("type") == "PlayLand" }
+                if (playLand == null) actions.firstOrNull { it.optString("type") in setOf("PassPriority", "DeclareAttackers", "DeclareBlockers") }?.let { action(host, it) }
+            }
+            assertNotNull("reached a main phase with a land in hand", playLand)
+            val handBefore = handSize(playLandState(host, playLand!!, undoExpected = true))
+            host.receive(JSONObject().put("type", "requestUndo"))
+            val afterUndo = next("stateUpdate")
+            assertFalse(afterUndo.getBoolean("undoAvailable"))
+            assertEquals(handBefore + 1, handSize(afterUndo))
+        } finally {
+            host.shutdown()
         }
-        assertNotNull("reached a main phase with a land in hand", playLand)
-        val handBefore = handSize(playLandState(host, playLand!!, undoExpected = true))
-        host.receive(JSONObject().put("type", "requestUndo"))
-        val afterUndo = next("stateUpdate")
-        assertFalse(afterUndo.getBoolean("undoAvailable"))
-        assertEquals(handBefore + 1, handSize(afterUndo))
-        host.shutdown()
     }
 
     private fun playLandState(host: LocalArgentumHost, playLand: JSONObject, undoExpected: Boolean): JSONObject {

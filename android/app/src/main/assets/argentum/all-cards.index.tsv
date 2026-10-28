@@ -12,6 +12,7 @@ Just One Glass	token
 Map	token
 Sword	token
 Cragflame	token
+Icingdeath, Frost Tongue	token
 Mutavault	token
 Sorcerer Role	token
 Monster Role	token
@@ -1162,6 +1163,7 @@ Cursed Totem	card
 Daring Apprentice	card
 Dirtwater Wraith	card
 Disempower	card
+Dissipate	card
 Divine Retribution	card
 Dwarven Miner	card
 Dwarven Nomad	card
@@ -1609,6 +1611,7 @@ Bottomless Pit	card
 Burgeoning	card
 Hermit Druid	card
 Honor Guard	card
+Intruder Alarm	card
 Mulch	card
 Overgrowth	card
 Primal Rage	card
@@ -1749,6 +1752,7 @@ Wildfire	card
 Wind Sail	card
 Absolute Grace	card
 Absolute Law	card
+Abundance	card
 Abyssal Horror	card
 Angelic Page	card
 Annul	card
@@ -2266,6 +2270,7 @@ Silverglade Elemental	card
 Sizzle	card
 Skull of Ramos	card
 Snorting Gahr	card
+Snuff Out	card
 Soothing Balm	card
 Squee, Goblin Nabob	card
 Squeeze	card
@@ -4249,6 +4254,8 @@ Ink-Eyes, Servant of Oni	card
 Takenuma Bleeder	card
 Hidetsugu's Second Rite	card
 Michiko Konda, Truth Seeker	card
+Pithing Needle	card
+Reki, the History of Kamigawa	card
 Agrus Kos, Wojek Veteran	card
 Auratouched Mage	card
 Autochthon Wurm	card
@@ -4572,6 +4579,7 @@ Deathmark	card
 Field Marshal	card
 Flashfreeze	card
 Krovikan Scoundrel	card
+Mishra's Bauble	card
 Phyrexian Ironfoot	card
 Rite of Flame	card
 Ronom Unicorn	card
@@ -4734,6 +4742,7 @@ Blind Phantasm	card
 Dryad Arbor	card
 Fomori Nomad	card
 Foresee	card
+Grinning Ignus	card
 Mass of Ghouls	card
 Nessian Courser	card
 New Benalia	card
@@ -5135,6 +5144,7 @@ Zealous Guardian	card
 Archon of Justice	card
 Cascade Bluffs	card
 Duskdale Wurm	card
+Fetid Heath	card
 Flooded Grove	card
 Rugged Prairie	card
 Scarecrone	card
@@ -5378,6 +5388,7 @@ Arid Mesa	card
 Baloth Woodcrasher	card
 Bladetusk Boar	card
 Blazing Torch	card
+Bloodchief Ascension	card
 Bloodghast	card
 Bog Tatters	card
 Burst Lightning	card
@@ -5437,6 +5448,7 @@ Plated Geopede	card
 Rampaging Baloths	card
 Reckless Scholar	card
 Rite of Replication	card
+Roil Elemental	card
 Scalding Tarn	card
 Scute Mob	card
 Scythe Tiger	card
@@ -5491,6 +5503,7 @@ Pilgrim's Eye	card
 Pulse Tracker	card
 Raging Ravine	card
 Seer's Sundial	card
+Terra Eternal	card
 Affa Guard Hound	card
 Akoum Boulderfoot	card
 Ancient Stirrings	card
@@ -5669,6 +5682,7 @@ Infiltration Lens	card
 Kuldotha Forgemaster	card
 Kuldotha Rebirth	card
 Lifesmith	card
+Liquimetal Coating	card
 Loxodon Wayfarer	card
 Lumengrid Drake	card
 Lux Cannon	card
@@ -5720,6 +5734,7 @@ Consecrated Sphinx	card
 Go for the Throat	card
 Green Sun's Zenith	card
 Hexplate Golem	card
+Ichor Wellspring	card
 Kuldotha Flamefiend	card
 Lumengrid Gargoyle	card
 Massacre Wurm	card
@@ -5744,6 +5759,7 @@ Forced Worship	card
 Gitaxian Probe	card
 Karn Liberated	card
 Loxodon Convert	card
+Mindcrank	card
 Noxious Revival	card
 Phyrexian Metamorph	card
 Phyrexian Obliterator	card
@@ -6103,6 +6119,7 @@ Trading Post	card
 Watercourser	card
 Wild Guess	card
 Yeva's Forcemage	card
+Goblin Electromancer	card
 Abrupt Decay	card
 Aerial Predation	card
 Aquus Steed	card
@@ -6371,6 +6388,8 @@ Toxic Deluge	card
 Courser of Kruphix	card
 Cyclops of One-Eyed Pass	card
 Great Hart	card
+Heroes' Podium	card
+Kiora's Follower	card
 Stratus Walk	card
 Swordwise Centaur	card
 Temple of Enlightenment	card
@@ -6951,6 +6970,7 @@ Outnumber	card
 Plated Crusher	card
 Prairie Stream	card
 Resolute Blademaster	card
+Retreat to Coralhelm	card
 Retreat to Hagra	card
 Retreat to Valakut	card
 Sandstone Bridge	card
@@ -6998,6 +7018,7 @@ Endbringer	card
 Expedite	card
 Make a Stand	card
 Meandering River	card
+Mina and Denn, Wildborn	card
 Ruin in Their Wake	card
 Scion Summoner	card
 Sphinx of the Final Word	card
@@ -7091,6 +7112,7 @@ Odric, Lunarch Marshal	card
 Olivia's Bloodsworn	card
 Open the Armory	card
 Pack Guardian	card
+Port Town	card
 Press for Answers	card
 Pyre Hound	card
 Quilled Wolf	card
@@ -7475,6 +7497,7 @@ Firebrand Archer	card
 Fraying Sanity	card
 Gift of Strength	card
 Harrier Naga	card
+Hour of Revelation	card
 Marauding Boneslasher	card
 Overcome	card
 Quarry Beetle	card
@@ -7517,6 +7540,7 @@ Drover of the Mighty	card
 Dusk Legion Dreadnought	card
 Encampment Keeper	card
 Fathom Fleet Firebrand	card
+Field of Ruin	card
 Fiery Cannonade	card
 Firecannon Blast	card
 Frenzied Raptor	card
@@ -7664,6 +7688,7 @@ Thrashing Brontodon	card
 Vampire Champion	card
 Vampire Revenant	card
 Voracious Vampire	card
+Wayward Swordtooth	card
 World Shaper	card
 Zetalpa, Primal Dawn	card
 Academy Drake	card
@@ -7901,6 +7926,7 @@ Yawgmoth's Vile Offering	card
 Zahid, Djinn of the Lamp	card
 Zhalfirin Void	card
 Bountiful Promenade	card
+Chakram Retriever	card
 Grothama, All-Devouring	card
 Inner Demon	card
 Luxury Suite	card
@@ -8165,6 +8191,7 @@ Humongulus	card
 Hydroid Krasis	card
 Ill-Gotten Inheritance	card
 Impassioned Orator	card
+Incubation Druid	card
 Justiciar's Portal	card
 Noxious Groodion	card
 Orzhov Locket	card
@@ -8198,6 +8225,7 @@ Swirling Torrent	card
 Sylvan Brushstrider	card
 Syndicate Guildmage	card
 Territorial Boar	card
+Teysa Karlov	card
 Thirsting Shade	card
 Tin Street Dodger	card
 Titanic Brawl	card
@@ -8218,6 +8246,7 @@ Band Together	card
 Banehound	card
 Battlefield Promotion	card
 Blast Zone	card
+Bolas's Citadel	card
 Bolt Bend	card
 Bond of Flourishing	card
 Bulwark Giant	card
@@ -8241,6 +8270,7 @@ Elite Guardmage	card
 Enforcer Griffin	card
 Erratic Visionary	card
 Eternal Taskmaster	card
+Evolution Sage	card
 Finale of Revelation	card
 Gideon's Company	card
 Goblin Assailant	card
@@ -8254,6 +8284,7 @@ Jace, Wielder of Mysteries	card
 Jaya's Greeting	card
 Karn, the Great Creator	card
 Kasmina, Enigmatic Mentor	card
+Kiora, Behemoth Beckoner	card
 Kraul Stinger	card
 Kronch Wrangler	card
 Law-Rune Enforcer	card
@@ -8359,6 +8390,7 @@ Scuttling Sliver	card
 Segovian Angel	card
 Settle Beyond Reality	card
 Silent Clearing	card
+Sisay, Weatherlight Captain	card
 Sling-Gang Lieutenant	card
 Smiting Helix	card
 Springbloom Druid	card
@@ -8413,8 +8445,10 @@ Moldervine Reclamation	card
 Mystic Forge	card
 Nightpack Ambusher	card
 Octoprophet	card
+Omnath, Locus of the Roil	card
 Pyroclastic Elemental	card
 Rapacious Dragon	card
+Risen Reef	card
 Savannah Sage	card
 Silverback Shaman	card
 Sorin, Imperious Bloodlord	card
@@ -8438,6 +8472,7 @@ Castle Embereth	card
 Castle Vantress	card
 Charming Prince	card
 Chittering Witch	card
+Chulane, Teller of Tales	card
 Faeburrow Elder	card
 Faerie Formation	card
 Faerie Vandal	card
@@ -8555,6 +8590,7 @@ Taranika, Akroan Veteran	card
 Terror of Mount Velus	card
 Thassa's Oracle	card
 Thaumaturge's Familiar	card
+Thryx, the Sudden Storm	card
 Thundering Chariot	card
 Transcendent Envoy	card
 Triton Waverider	card
@@ -8572,6 +8608,7 @@ Fierce Guardianship	card
 Martial Impetus	card
 Molten Echoes	card
 Nesting Grounds	card
+Twinning Staff	card
 Adaptive Shimmerer	card
 Aegis Turtle	card
 Almighty Brushwagg	card
@@ -8636,6 +8673,7 @@ Savai Sabertooth	card
 Savai Triome	card
 Serrated Scorpion	card
 Shredded Sails	card
+Song of Creation	card
 Splendor Mare	card
 Spontaneous Flight	card
 Springjaw Trap	card
@@ -8712,6 +8750,7 @@ Trusty Retriever	card
 Shorecomber Crab	card
 Trove Warden	card
 Ancient Greenwarden	card
+Ashaya, Soul of the Wild	card
 Attended Healer	card
 Blood Price	card
 Branchloft Pathway	card
@@ -8730,9 +8769,11 @@ Grotag Night-Runner	card
 Highborn Vampire	card
 Iridescent Hornbeetle	card
 Luminarch Aspirant	card
+Maddening Cacophony	card
 Magmatic Channeler	card
 Marauding Blight-Priest	card
 Mesa Lynx	card
+Moraug, Fury of Akoum	card
 Murasa Brute	card
 Needleverge Pathway	card
 Nissa of Shadowed Boughs	card
@@ -8740,11 +8781,14 @@ Nullpriest of Oblivion	card
 Omnath, Locus of Creation	card
 Prowling Felidar	card
 Riverglide Pathway	card
+Roiling Regrowth	card
+Ruin Crab	card
 Scale the Heights	card
 Scute Swarm	card
 Skyclave Apparition	card
 Spitfire Lagac	card
 Swarm Shambler	card
+Valakut Exploration	card
 Aesi, Tyrant of Gyre Strait	card
 Annoyed Altisaur	card
 Anointer of Valor	card
@@ -8766,6 +8810,7 @@ Natural Reclamation	card
 Pride of the Perfect	card
 Rejuvenating Springs	card
 Reshape the Earth	card
+Rograkh, Son of Rohgahh	card
 Slash the Ranks	card
 Spectator Seating	card
 Training Center	card
@@ -8809,6 +8854,7 @@ Elven Ambush	card
 Elven Bow	card
 Elvish Warmaster	card
 Esika's Chariot	card
+Esika, God of the Tree	card
 Feed the Serpent	card
 Firja, Judge of Valor	card
 Frostpeak Yeti	card
@@ -8834,6 +8880,7 @@ Iron Verdict	card
 Jaspera Sentinel	card
 Karfell Kennel-Master	card
 Kaya's Onslaught	card
+Koma, Cosmos Serpent	card
 Littjara Glade-Warden	card
 Littjara Kinseekers	card
 Maja, Bretagard Protector	card
@@ -8867,6 +8914,7 @@ Toski, Bearer of Secrets	card
 Undersea Invader	card
 Valkyrie Harbinger	card
 Vault Robber	card
+Vega, the Watcher	card
 Vengeful Reaper	card
 Volatile Fjord	card
 Warhorn Blast	card
@@ -8884,102 +8932,279 @@ Tivash, Gloom Summoner	card
 Veyran, Voice of Duality	card
 Wake the Past	card
 Academic Dispute	card
+Academic Probation	card
 Access Tunnel	card
+Accomplished Alchemist	card
 Aether Helix	card
 Ageless Guardian	card
 Arcane Subtraction	card
 Archmage Emeritus	card
 Archway Commons	card
+Ardent Dustspeaker	card
+Arrogant Poet	card
+Augmenter Pugilist	card
+Baleful Mastery	card
 Basic Conjuration	card
+Bayou Groff	card
 Beaming Defiance	card
 Beledros Witherbloom	card
+Biblioplex Assistant	card
 Big Play	card
+Biomathematician	card
 Blade Historian	card
+Blex, Vexing Pest	card
+Blood Age General	card
 Blood Researcher	card
+Blot Out the Sky	card
+Body of Research	card
+Bookwurm	card
 Brackish Trudge	card
 Burrog Befuddler	card
 Bury in Books	card
+Callous Bloodmage	card
 Campus Guide	card
+Charge Through	card
+Clever Lumimancer	card
+Closing Statement	card
+Codie, Vociferous Codex	card
+Cogwork Archivist	card
 Combat Professor	card
+Confront the Past	card
+Conspiracy Theorist	card
+Containment Breach	card
+Crackle with Power	card
 Cram Session	card
+Creative Outburst	card
+Crushing Disappointment	card
 Culling Ritual	card
+Culmination of Studies	card
 Curate	card
 Daemogoth Titan	card
+Daemogoth Woe-Eater	card
 Deadly Brew	card
+Decisive Denial	card
 Defend the Campus	card
+Detention Vortex	card
+Devastating Mastery	card
+Devouring Tendrils	card
+Dina, Soul Steeper	card
 Divide by Zero	card
+Double Major	card
+Draconic Intervention	card
+Dragon's Approach	card
+Dragonsguard Elite	card
+Dramatic Finale	card
 Dream Strix	card
+Dueling Coach	card
+Eager First-Year	card
+Ecological Appreciation	card
+Efreet Flamepainter	card
+Elemental Expressionist	card
+Elemental Masterpiece	card
 Elemental Summoning	card
+Elite Spellbinder	card
+Emergent Sequence	card
 Enthusiastic Study	card
 Environmental Sciences	card
 Essence Infusion	card
+Eureka Moment	card
 Excavated Wall	card
+Exhilarating Elocution	card
 Expanded Anatomy	card
 Expel	card
+Explosive Welcome	card
+Exponential Growth	card
 Expressive Iteration	card
+Extus, Oriq Overlord	card
 Eyetwitch	card
+Fervent Mastery	card
 Field Trip	card
 First Day of Class	card
 Flamescroll Celebrant	card
+Flunk	card
+Fortifying Draught	card
+Fractal Summoning	card
+Fracture	card
+Frost Trickster	card
 Frostboil Snarl	card
 Fuming Effigy	card
+Furycalm Snarl	card
 Galazeth Prismari	card
 Gnarled Professor	card
+Go Blank	card
+Golden Ratio	card
 Guiding Voice	card
 Hall Monitor	card
+Hall of Oracles	card
+Harness Infinity	card
 Heated Debate	card
+Hofri Ghostforge	card
+Honor Troll	card
+Humiliate	card
 Hunt for Specimens	card
 Igneous Inspiration	card
+Illuminate History	card
+Illustrious Historian	card
+Infuse with Vitality	card
+Ingenious Mastery	card
 Inkling Summoning	card
+Introduction to Annihilation	card
 Introduction to Prophecy	card
+Jadzi, Oracle of Arcavios	card
+Karok Wrangler	card
+Kasmina, Enigma Sage	card
+Kelpie Guide	card
+Kianne, Dean of Substance	card
+Killian, Ink Duelist	card
 Lash of Malice	card
+Leech Fanatic	card
+Leonin Lightscribe	card
 Letter of Acceptance	card
+Leyline Invocation	card
+Lorehold Apprentice	card
 Lorehold Campus	card
 Lorehold Command	card
+Lorehold Excavation	card
+Lorehold Pledgemage	card
+Maelstrom Muse	card
+Mage Duel	card
+Mage Hunter	card
+Mage Hunters' Onslaught	card
+Magma Opus	card
+Make Your Mark	card
+Manifestation Sage	card
+Mascot Exhibition	card
+Mascot Interception	card
+Master Symmetrist	card
+Mavinda, Students' Advocate	card
+Mentor's Guidance	card
+Mercurial Transformation	card
+Mila, Crafty Companion	card
 Moldering Karok	card
 Mortality Spear	card
 Multiple Choice	card
 Necroblossom Snarl	card
+Necrotic Fumes	card
 Needlethorn Drake	card
 Novice Dissector	card
 Oggyar Battle-Seer	card
+Oriq Loremage	card
 Overgrown Arch	card
 Owlin Shieldmage	card
+Pest Summoning	card
+Pestilent Cauldron	card
+Pigment Storm	card
 Pilgrim of the Ages	card
 Pillardrop Rescuer	card
+Pillardrop Warden	card
+Plargg, Dean of Chaos	card
 Plumb the Forbidden	card
 Poet's Quill	card
 Pop Quiz	card
+Practical Research	card
+Prismari Apprentice	card
 Prismari Campus	card
+Prismari Command	card
+Prismari Pledgemage	card
+Professor Onyx	card
 Professor of Symbology	card
+Professor of Zoomancy	card
 Professor's Warning	card
+Promising Duskmage	card
+Quandrix Apprentice	card
 Quandrix Campus	card
+Quandrix Command	card
+Quandrix Cultivator	card
+Quandrix Pledgemage	card
 Quintorius, Field Historian	card
+Radiant Scrollwielder	card
 Reckless Amplimancer	card
+Reconstruct History	card
+Reduce to Memory	card
+Reflective Golem	card
+Reject	card
 Relic Sloth	card
+Resculpt	card
+Retriever Phoenix	card
+Returned Pastcaller	card
 Rip Apart	card
 Rise of Extus	card
+Rootha, Mercurial Artist	card
+Rowan, Scholar of Sparks	card
+Rushed Rebirth	card
 Scurrid Colony	card
 Secret Rendezvous	card
+Sedgemoor Witch	card
+Selfless Glyphweaver	card
+Semester's End	card
+Serpentine Curve	card
+Shadewing Laureate	card
+Shadrix Silverquill	card
+Shaile, Dean of Radiance	card
+Shineshadow Snarl	card
+Show of Confidence	card
+Silverquill Apprentice	card
 Silverquill Campus	card
+Silverquill Command	card
+Silverquill Pledgemage	card
+Silverquill Silencer	card
+Snow Day	card
+Solve the Equation	card
 Soothsayer Adept	card
 Sparring Regimen	card
+Spectacle Mage	card
+Specter of the Fens	card
+Spell Satchel	card
 Spined Karok	card
 Spirit Summoning	card
+Spiteful Squad	card
 Springmane Cervin	card
+Square Up	card
+Star Pupil	card
 Start from Scratch	card
+Stonebinder's Familiar	card
 Stonebound Mentor	card
 Stonerise Spirit	card
 Storm-Kiln Artist	card
+Strict Proctor	card
+Strixhaven Stadium	card
 Study Break	card
 Sudden Breakthrough	card
+Symmetry Sage	card
+Tanazir Quandrix	card
 Tangletrap	card
 Teach by Example	card
+Teachings of the Archaics	card
+Team Pennant	card
+Tempted by the Oriq	card
+Tend the Pests	card
+Tenured Inkcaster	card
+Test of Talents	card
+The Biblioplex	card
+Thrilling Discovery	card
+Thunderous Orator	card
+Tome Shredder	card
+Torrent Sculptor	card
 Twinscroll Shaman	card
 Umbral Juke	card
+Unwilling Ingredient	card
+Uvilda, Dean of Perfection	card
+Valentin, Dean of the Vein	card
+Vanishing Verse	card
+Velomachus Lorehold	card
+Venerable Warsinger	card
+Verdant Mastery	card
+Vineglimmer Snarl	card
+Vortex Runner	card
+Wandering Archaic	card
 Waterfall Aerialist	card
+Witherbloom Apprentice	card
 Witherbloom Campus	card
+Witherbloom Command	card
+Witherbloom Pledgemage	card
 Wormhole Serpent	card
+Zephyr Boots	card
+Zimone, Quandrix Prodigy	card
 Academy Manufactor	card
 Arcbound Mouser	card
 Arcbound Prototype	card
@@ -8993,6 +9218,7 @@ Chatterstorm	card
 Chitterspitter	card
 Crack Open	card
 Darkmoss Bridge	card
+Dauthi Voidwalker	card
 Drey Keeper	card
 Drossforge Bridge	card
 Duskshell Crawler	card
@@ -9019,6 +9245,7 @@ Kitchen Imp	card
 Late to Dinner	card
 Lens Flare	card
 Lightning Spear	card
+Liquimetal Torque	card
 Marble Gargoyle	card
 Mental Journey	card
 Mistvault Bridge	card
@@ -9035,12 +9262,14 @@ Rift Sower	card
 Rishadan Dockhand	card
 Rustvale Bridge	card
 Sanctum Weaver	card
+Scurry Oak	card
 Silverbluff Bridge	card
 Sinister Starfish	card
 Slag Strider	card
 Slagwoods Bridge	card
 Sol Talisman	card
 Soul of Migration	card
+Squirrel Sanctuary	card
 Squirrel Sovereign	card
 Steelfin Whale	card
 Storm God's Oracle	card
@@ -9056,6 +9285,7 @@ Thornglint Bridge	card
 Thought Monitor	card
 Tireless Provisioner	card
 Vedalken Infiltrator	card
+Verdant Command	card
 Vermin Gorger	card
 Viashino Lashclaw	card
 Vile Entomber	card
@@ -9063,97 +9293,328 @@ World-Weary	card
 Yavimaya, Cradle of Growth	card
 Mantle of the Ancients	card
 +2 Mace	card
+Aberrant Mind Sorcerer	card
+Acererak the Archlich	card
 Adult Gold Dragon	card
+Air-Cult Elemental	card
 Arborea Pegasus	card
+Arcane Investigator	card
+Armory Veteran	card
+Asmodeus the Archfiend	card
+Baleful Beholder	card
+Bar the Gate	card
+Barbarian Class	card
+Bard Class	card
+Barrowin of Clan Undurr	card
+Battle Cry Goblin	card
 Black Dragon	card
+Blink Dog	card
+Blue Dragon	card
 Boots of Speed	card
+Brazen Dwarf	card
+Bruenor Battlehammer	card
 Bulette	card
 Bull's Strength	card
+Burning Hands	card
+Cave of the Frost Dragon	card
 Celestial Unicorn	card
+Chaos Channeler	card
+Check for Traps	card
+Choose Your Weapon	card
+Circle of Dreams Druid	card
+Circle of the Moon Druid	card
+Clattering Skeletons	card
+Cleric Class	card
+Clever Conjurer	card
+Cloister Gargoyle	card
+Compelled Duel	card
+Contact Other Plane	card
+Critical Hit	card
+Dancing Sword	card
+Dawnbringer Cleric	card
 Deadly Dispute	card
+Death-Priest of Myrkul	card
+Delina, Wild Mage	card
+Delver's Torch	card
+Demilich	card
+Demogorgon's Clutches	card
+Den of the Bugbear	card
+Devoted Paladin	card
+Devour Intellect	card
 Dire Wolf Prowler	card
+Displacer Beast	card
+Divine Smite	card
+Djinni Windseer	card
+Dragon Turtle	card
+Dragon's Disciple	card
+Dragon's Fire	card
 Drider	card
+Drizzt Do'Urden	card
 Druid Class	card
 Dueling Rapier	card
 Dungeon Crawler	card
+Dungeon Descent	card
 Dungeon Map	card
+Dwarfhold Champion	card
+Earth-Cult Elemental	card
+Ebondeath, Dracolich	card
+Eccentric Apprentice	card
+Ellywick Tumblestrum	card
 Elturgard Ranger	card
 Eye of Vecna	card
 Eyes of the Beholder	card
+Farideh's Fireball	card
+Farideh, Devil's Chosen	card
+Fates' Reversal	card
+Feign Death	card
+Feywild Trickster	card
+Fifty Feet of Rope	card
+Fighter Class	card
+Find the Path	card
+Flameskull	card
+Flumph	card
+Fly	card
+Forsworn Paladin	card
+Froghemoth	card
+Gelatinous Cube	card
 Gloom Stalker	card
 Gnoll Hunter	card
+Goblin Javelineer	card
+Goblin Morningstar	card
+Grand Master of Flowers	card
 Grazilaxx, Illithid Scholar	card
 Greataxe	card
+Green Dragon	card
+Gretchen Titchwillow	card
 Grim Bounty	card
+Grim Wanderer	card
+Guardian of Faith	card
+Guild Thief	card
+Half-Elf Monk	card
+Hall of Storm Giants	card
+Hama Pashar, Ruin Seeker	card
+Hand of Vecna	card
+Herald of Hadar	card
 Hill Giant Herdgorger	card
+Hired Hexblade	card
+Hive of the Eye Tyrant	card
 Hoard Robber	card
+Hoarding Ogre	card
+Hobgoblin Bandit Lord	card
 Hobgoblin Captain	card
 Hulking Bugbear	card
+Hunter's Mark	card
+Icingdeath, Frost Tyrant	card
 Improvised Weaponry	card
+Inferno of the Star Mounts	card
 Ingenious Smith	card
+Inspiring Bard	card
+Instrument of the Bards	card
+Intrepid Outlander	card
+Iron Golem	card
+Iymrith, Desert Doom	card
+Jaded Sell-Sword	card
+Kalain, Reclusive Painter	card
+Keen-Eared Sentry	card
+Kick in the Door	card
+Krydle of Baldur's Gate	card
+Lair of the Hydra	card
+Leather Armor	card
+Lightfoot Rogue	card
+Loathsome Troll	card
+Long Rest	card
 Loyal Warhound	card
 Lurking Roper	card
+Magic Missile	card
+Manticore	card
+Meteor Swarm	card
+Mimic	card
+Mind Flayer	card
+Minimus Containment	card
+Minion of the Mighty	card
+Minsc, Beloved Ranger	card
+Monk Class	card
+Monk of the Open Hand	card
+Moon-Blessed Cleric	card
+Mordenkainen	card
+Mordenkainen's Polymorph	card
 Nadaar, Selfless Paladin	card
+Neverwinter Dryad	card
+Ochre Jelly	card
 Old Gnawbone	card
 Orb of Dragonkind	card
+Orcus, Prince of Undeath	card
+Oswald Fiddlebender	card
+Owlbear	card
+Paladin Class	card
 Paladin's Shield	card
+Pixie Guide	card
+Planar Ally	card
+Plate Armor	card
+Plundering Barbarian	card
 Portable Hole	card
 Potion of Healing	card
+Power Word Kill	card
+Power of Persuasion	card
+Precipitous Drop	card
+Price of Loyalty	card
 Priest of Ancient Lore	card
 Prosperous Innkeeper	card
 Purple Worm	card
+Rally Maneuver	card
+Ranger Class	card
+Ranger's Hawk	card
 Ranger's Longbow	card
+Ray of Enfeeblement	card
+Ray of Frost	card
+Reaper's Talisman	card
+Red Dragon	card
 Rimeshield Frost Giant	card
+Rogue Class	card
 Rust Monster	card
+Scaled Herbalist	card
+Scion of Stygia	card
+Secret Door	card
 Sepulcher Ghoul	card
 Shambling Ghast	card
+Shessra, Death's Whisper	card
+Shocking Grasp	card
+Shortcut Seeker	card
 Silver Raven	card
+Skeletal Swarming	card
+Skullport Merchant	card
+Sorcerer Class	card
 Soulknife Spy	card
+Spare Dagger	card
+Sphere of Annihilation	card
+Spiked Pit Trap	card
+Split the Party	card
+Spoils of the Hunt	card
 Steadfast Paladin	card
+Sudden Insight	card
+Swarming Goblins	card
+Sylvan Shepherd	card
+Targ Nar, Demon-Fang Gnoll	card
+Tasha's Hideous Laughter	card
+Teleportation Circle	card
+Temple of the Dragon Queen	card
+The Blackstaff of Waterdeep	card
+The Book of Vile Darkness	card
+The Deck of Many Things	card
+The Tarrasque	card
+Thieves' Tools	card
+Tiamat	card
+Tiger-Tribe Hunter	card
+Treasure Chest	card
 Treasure Vault	card
 Trelasarra, Moon Dancer	card
+Trickster's Talisman	card
+Triumphant Adventurer	card
+True Polymorph	card
 Underdark Basilisk	card
 Unexpected Windfall	card
+Valor Singer	card
 Vampire Spawn	card
+Varis, Silverymoon Ranger	card
+Veteran Dungeoneer	card
+Volo, Guide to Monsters	card
+Vorpal Sword	card
+Wandering Troubadour	card
+Warlock Class	card
+Werewolf Pack Leader	card
+Westgate Regent	card
+White Dragon	card
+Wight	card
+Wild Shape	card
+Wish	card
 Wizard Class	card
+Wizard's Spellbook	card
+Xanathar, Guild Kingpin	card
+Xorn	card
+You Come to a River	card
+You Come to the Gnoll Camp	card
+You Find Some Prisoners	card
+You Find a Cursed Idol	card
+You Find the Villains' Lair	card
+You Happen On a Glade	card
+You Hear Something on Watch	card
+You Meet in a Tavern	card
+You See a Guard Approach	card
+You See a Pair of Goblins	card
+You're Ambushed on the Road	card
+Yuan-Ti Fang-Blade	card
+Yuan-Ti Malison	card
+Zalto, Fire Giant Duke	card
+Zariel, Archduke of Avernus	card
+Zombie Ogre	card
 Abandon the Post	card
 Adeline, Resplendent Cathar	card
 Ambitious Farmhand	card
 Angelfire Ignition	card
 Arcane Infusion	card
 Ardent Elementalist	card
+Arlinn, the Pack's Hope	card
 Arrogant Outlaw	card
+Augur of Autumn	card
 Baithook Angler	card
 Baneblade Scoundrel	card
 Bat Whisperer	card
+Beloved Beggar	card
+Bereaved Survivor	card
+Bird Admirer	card
 Bladestitched Skaab	card
 Blessed Defiance	card
+Blood Pact	card
+Bloodline Culling	card
+Bloodthirsty Adversary	card
 Bloodtithe Collector	card
 Borrowed Time	card
 Bounding Wolf	card
 Bramble Armor	card
+Briarbridge Tracker	card
+Brimstone Vandal	card
 Brood Weaver	card
+Brutal Cathar	card
+Burly Breaker	card
+Burn Down the House	card
+Burn the Accursed	card
+Can't Stay Away	card
 Candlegrove Witch	card
+Candlelit Cavalry	card
 Candletrap	card
 Cathar Commando	card
 Cathar's Call	card
+Cathartic Pyre	card
+Celestus Sanctifier	card
 Champion of the Perished	card
 Chaplain of Alms	card
 Clarion Cathars	card
 Component Collector	card
 Consider	card
+Consuming Blob	card
+Contortionist Troupe	card
+Corpse Cobble	card
+Covert Cutpurse	card
 Covetous Castaway	card
 Crawl from the Cellar	card
 Croaking Counterpart	card
+Crossroads Candleguide	card
 Curse of Leeches	card
+Curse of Shaken Faith	card
 Curse of Silence	card
 Curse of Surveillance	card
+Dawnhart Mentor	card
 Dawnhart Rejuvenator	card
 Dawnhart Wardens	card
+Deathbonnet Sprout	card
+Defend the Celestus	card
 Defenestrate	card
 Dennick, Pious Apprentice	card
 Deserted Beach	card
-Dissipate	card
+Devoted Grafkeeper	card
+Dire-Strain Rampage	card
+Diregraf Horde	card
+Diregraf Rebirth	card
 Dreadhound	card
 Drownyard Amalgam	card
 Dryad's Revival	card
@@ -9165,97 +9626,179 @@ Ecstatic Awakener	card
 Electric Revelation	card
 Enduring Angel	card
 Fading Hope	card
+Faithful Mending	card
 Falcon Abomination	card
+Falkenrath Perforator	card
 Falkenrath Pit Fighter	card
 Famished Foragers	card
+Fangblade Brigand	card
 Fateful Absence	card
 Festival Crasher	card
 Firmament Sage	card
+Flame Channeler	card
 Flare of Faith	card
 Fleshtaker	card
 Flip the Switch	card
+Florian, Voldaren Scion	card
 Foul Play	card
 Galedrifter	card
 Galvanic Iteration	card
+Gavony Dawnguard	card
 Gavony Silversmith	card
 Gavony Trapper	card
+Geistflame Reservoir	card
 Geistwave	card
+Ghoulcaller's Harvest	card
 Ghoulish Procession	card
+Gisa, Glorious Resurrector	card
+Grafted Identity	card
 Graveyard Trespasser	card
 Grizzly Ghoul	card
+Hallowed Respite	card
+Harvesttide Infiltrator	card
+Harvesttide Sentry	card
 Haunted Ridge	card
 Hedgewitch's Mask	card
+Heirloom Mirror	card
+Hobbling Zombie	card
 Homestead Courage	card
+Hostile Hostel	card
+Hound Tamer	card
 Howl of the Hunt	card
+Hungry for More	card
 Infernal Grasp	card
 Intrepid Adversary	card
+Jack-o'-Lantern	card
 Jadar, Ghoulcaller of Nephalia	card
+Jerren, Corrupted Bishop	card
 Join the Dance	card
+Katilda, Dawnhart Prime	card
+Kessig Naturalist	card
 Lambholt Harrier	card
 Larder Zombie	card
 Lier, Disciple of the Drowned	card
 Liesa, Forgotten Archangel	card
 Light Up the Night	card
 Locked in the Cemetery	card
+Lord of the Forsaken	card
 Loyal Gryff	card
 Ludevic, Necrogenius	card
+Lunar Frenzy	card
 Lunarch Veteran	card
 Malevolent Hermit	card
+Mask of Griselbrand	card
 Memory Deluge	card
+Might of the Old Ways	card
+Moonrager's Slash	card
 Moonsilver Key	card
+Moonveil Regent	card
 Morbid Opportunist	card
+Morkrut Behemoth	card
 Mounted Dreadknight	card
+Mourning Patrol	card
 Mysterious Tome	card
+Mystic Skull	card
 Nebelgast Intruder	card
+Necrosynthesis	card
 Neonate's Rush	card
+No Way Out	card
 Novice Occultist	card
+Obsessive Astronomer	card
 Odric's Outrider	card
+Old Stickfingers	card
+Olivia's Midnight Ambush	card
 Ominous Roost	card
 Organ Hoarder	card
 Otherworldly Gaze	card
+Outland Liberator	card
 Overgrown Farmland	card
 Overwhelmed Archivist	card
+Pack's Betrayal	card
+Path to the Festival	card
 Patrician Geist	card
 Pestilent Wolf	card
 Phantom Carriage	card
+Play with Fire	card
+Poppet Stitcher	card
+Primal Adversary	card
+Purifying Dragon	card
 Raze the Effigy	card
+Reckless Stormseeker	card
+Rem Karolus, Stalwart Slayer	card
+Revenge of the Drowned	card
 Rise of the Ants	card
+Rite of Harmony	card
 Rite of Oblivion	card
 Ritual Guardian	card
 Ritual of Hope	card
 Rockfall Vale	card
 Rootcoil Creeper	card
+Rotten Reunion	card
 Sacred Fire	card
 Saryth, the Viper's Fang	card
 Search Party Captain	card
+Secrets of the Key	card
 Seize the Storm	card
 Shadowbeast Sighting	card
+Shady Traveler	card
 Shipwreck Marsh	card
+Shipwreck Sifters	card
 Siege Zombie	card
 Sigarda's Splendor	card
+Sigarda, Champion of Light	card
 Sigardian Savior	card
+Silver Bolt	card
+Siphon Insight	card
 Skaab Wrangler	card
+Slaughter Specialist	card
+Slogurk, the Overslime	card
+Sludge Monster	card
+Smoldering Egg	card
 Snarling Wolf	card
 Soul-Guide Gryff	card
+Spectral Adversary	card
+Spellrune Painter	card
+Startle	card
+Stolen Vitality	card
+Storm Skreelix	card
 Storm the Festival	card
 Stromkirk Bloodthief	card
 Stuffed Bear	card
 Sungold Barrage	card
 Sungold Sentinel	card
+Sunrise Cavalier	card
 Sunset Revelry	card
 Sunstreak Phoenix	card
+Suspicious Stowaway	card
+Tainted Adversary	card
 Tapping at the Window	card
+Tavern Ruffian	card
 Teferi, Who Slows the Sunset	card
+The Celestus	card
 The Meathook Massacre	card
+Thraben Exorcism	card
+Tireless Hauler	card
+Tovolar's Huntmaster	card
+Tovolar, Dire Overlord	card
 Triskaidekaphile	card
+Turn the Earth	card
 Unblinking Observer	card
 Unnatural Growth	card
+Unnatural Moonrise	card
+Vadrik, Astral Archmage	card
+Vampire Socialite	card
 Vanquish the Horde	card
+Vengeful Strangler	card
+Village Watch	card
 Voldaren Ambusher	card
+Voldaren Stinger	card
+Wake to Slaughter	card
 Willow Geist	card
+Winterthorn Blessing	card
 Wrenn and Seven	card
 Crossway Troublemakers	card
 Storm of Souls	card
+Wedding Ring	card
 Aim for the Head	card
 Alchemist's Gambit	card
 Alchemist's Retrieval	card
@@ -9510,6 +10053,7 @@ Wolf Strike	card
 Wolfkin Outcast	card
 Wretched Throng	card
 Kappa Cannoneer	card
+Yoshimaru, Ever Faithful	card
 Acquisition Octopus	card
 Akki Ember-Keeper	card
 Akki Ronin	card
@@ -10043,6 +10587,7 @@ Ziatora's Proving Ground	card
 Ziatora, the Incinerator	card
 Aarakocra Sneak	card
 Avenging Hunter	card
+Black Market Connections	card
 Bonecaller Cleric	card
 Breath Weapon	card
 Bronze Walrus	card
@@ -10058,6 +10603,7 @@ Dragonborn Looter	card
 Earth Tremor	card
 Feywild Caretaker	card
 Gluntch, the Bestower	card
+Jaheira, Friend of the Forest	card
 Passageway Seer	card
 Pseudodragon Familiar	card
 Reckless Barbarian	card
@@ -10309,6 +10855,7 @@ Yavimaya Steelcrusher	card
 Yotia Declares War	card
 Zar Ojanen, Scion of Efrava	card
 Zur, Eternal Schemer	card
+Commissar Severina Raine	card
 Saw in Half	card
 Aeronaut Cavalry	card
 Aeronaut's Wings	card
@@ -11755,6 +12302,8 @@ Witch's Mark	card
 Witchstalker Frenzy	card
 Woodland Acolyte	card
 Yenna, Redtooth Regent	card
+Chimil, the Inner Sun	card
+Ripples of Potential	card
 Abuelo's Awakening	card
 Abuelo, Ancestral Echo	card
 Abyssal Gorestalker	card
@@ -11800,7 +12349,6 @@ Cavern Stomper	card
 Cavernous Maw	card
 Cenote Scout	card
 Child of the Volcano	card
-Chimil, the Inner Sun	card
 Chupacabra Echo	card
 Clay-Fired Bricks	card
 Coati Scavenger	card
@@ -13977,6 +14525,7 @@ Wretched Doll	card
 Zahur, Glory's Past	card
 Colossal Grave-Reaver	card
 Jaws of Defeat	card
+Zurgo Stormrender	card
 Abzan Devotee	card
 Abzan Monument	card
 Adorned Crocodile	card
@@ -14229,6 +14778,8 @@ Yathan Roadwatcher	card
 Yathan Tombguard	card
 Zurgo's Vanguard	card
 Zurgo, Thunder's Decree	card
+Kefka, Dancing Mad	card
+Tataru Taru	card
 A Realm Reborn	card
 Absolute Virtue	card
 Adelbert Steiner	card
@@ -15252,7 +15803,10 @@ Zuko's Exile	card
 Zuko, Conflicted	card
 Zuko, Exiled Prince	card
 Aang, Airbending Master	card
+Avatar Kyoshi, Earthbender	card
+Bumi, Eclectic Earthbender	card
 Capital Guard	card
+Earthbending Student	card
 Earthshape	card
 Kyoshi Warrior Guard	card
 Mai and Zuko	card
@@ -15519,11 +16073,16 @@ Wistfulness	card
 Christine Chapel, Combat Medic	card
 Defense Force Aggressor	card
 Direct Hit	card
+Exocomp	card
 Gorn Captain	card
 Kirk, Enterprising Captain	card
+Klingon Strike Force	card
+Kolinahr Priest	card
+Spock, Logical Choice	card
 Starfleet Crew	card
 Talarian Hook Spider	card
 Warship Flight Crew	card
+Worf, Chief Tactical Officer	card
 Action News Crew	card
 Agent Bishop, Man in Black	card
 Anchovy & Banana Pizza	card

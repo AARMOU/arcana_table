@@ -1,0 +1,228 @@
+diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
+index c993572589..3da5ba7c3b 100644
+--- a/docs/card-sdk-language-reference.md
++++ b/docs/card-sdk-language-reference.md
+@@ -11975,7 +11975,7 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+   has left. The legal action carries `maxAdditionalManaForCounters` (a picker bound; the client shows an
+   amount selector before mana payment). Only creature *spells* as cast — never a permanent put onto the
+   battlefield by an effect.
+-- `GrantKeywordToOwnSpells(keyword, spellFilter = Creature, keywordParameter = null, fromZone = null)` — while this
++- `GrantKeywordToOwnSpells(keyword, spellFilter = Creature, keywordParameter = null, fromZone = null, maxManaValue = null, duringYourTurnOnly = false)` — while this
+   permanent is on the battlefield, spells its controller casts matching `spellFilter` effectively have `keyword`
+   ("you cast" semantics). `fromZone` narrows it to spells cast **from** that zone — "Spells you cast from exile have
+   convoke" (**Hoarding Broodlord**: `GrantKeywordToOwnSpells(CONVOKE, GameObjectFilter.Any, fromZone = Zone.EXILE)`).
+@@ -11988,6 +11988,15 @@ riders, matching how the engine already treats e.g. City of Brass's damage durin
+   - **Cost-modifying keywords** (CONVOKE, DELVE, IMPROVISE) surface in the cast enumerator / alternative-payment handler —
+     e.g. **Eirdu, Carrier of Dawn** (`GrantKeywordToOwnSpells(CONVOKE, Creature)`), **Teval, Arbiter of Virtue**
+     (`DELVE`), **Ironheart, Clever Champion** (`IMPROVISE`, `GameObjectFilter.Noncreature`).
++  - **CASCADE** granted this way (no printed self-cast trigger needed) becomes one cast trigger per matching grant,
++    synthesized by `CastTriggers` next to storm; the grant's mana-value predicates read the mana value **as cast**
++    (X included). "Cascade, cascade" is two grants. **Zhulodok, Void Gorger** = two
++    `GrantKeywordToOwnSpells(CASCADE, Any.withCardPredicate(IsColorless).manaValueAtLeast(7), fromZone = HAND)`.
++    `maxManaValue` (a `DynamicAmount`, evaluated for the grant's controller at cast) caps the spell's mana value and
++    `duringYourTurnOnly` limits the grant to its controller's turn — **Abaddon the Despoiler**:
++    `GrantKeywordToOwnSpells(CASCADE, Any, fromZone = HAND, maxManaValue = TurnTracking(EachOpponent, LIFE_LOST_AMOUNT),
++    duringYourTurnOnly = true)`. Only granted cascade evaluates `maxManaValue`; every other reader of a capped grant
++    fails closed.
+   - **STORM** (and other "each instance triggers separately" cast keywords) are counted by
+     `GrantedKeywordResolver.countGrants` when `CastSpellHandler` builds the spell's storm triggers — one storm
+     instance per matching grant (CR 702.40b), added to the printed-keyword count. **Prismari, the Inspiration** =
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index 188259b12d..2db39bc858 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -1862,7 +1862,7 @@ Families:
+ - `GrantHexproofToController` — You have hexproof.
+ - `GrantKeyword(keyword: String, filter: GroupFilter)` — Grants a keyword (or ability flag) to a filtered set of permanents.
+ - `GrantKeywordByCounter(keyword: Keyword, counterType: CounterType, controllerOnly: Boolean)` — Grants a keyword to all creatures that have a specific counter type.
+-- `GrantKeywordToOwnSpells(keyword: Keyword, spellFilter: GameObjectFilter, keywordParameter: Int?, fromZone: Zone?)` — Grants a keyword (typically a cost-modifying one like CONVOKE or DELVE) to spells cast by this permanent's controller that match spellFilter.
++- `GrantKeywordToOwnSpells(keyword: Keyword, spellFilter: GameObjectFilter, keywordParameter: Int?, fromZone: Zone?, maxManaValue: DynamicAmount?, duringYourTurnOnly: Boolean)` — Grants a keyword (typically a cost-modifying one like CONVOKE or DELVE) to spells cast by this permanent's controller that match spellFilter.
+ - `GrantLandwalkOfChosenType(filter: GroupFilter)` — Grants the landwalk keyword matching the basic land type chosen as the source entered (resolved at projection time from the source's `CastChoicesComponent`): Plains→Plainswalk, Island→Islandwalk, S…
+ - `GrantMadnessToOwnedCards(filter: GameObjectFilter)` — Grants madness (CR 702.35) to cards the granter's controller **owns** that match filter and aren't on the battlefield, with the madness cost equal to each card's own mana cost.
+ - `GrantMayCastFromLinkedExile(filter: GameObjectFilter, duringYourTurnOnly: Boolean, additionalCost: AdditionalCost?, ownedByYou: Boolean, withoutPayingManaCost: Boolean, oncePerTurn: Boolean, maxManaValue: DynamicAmount?, exiledThisTurnOnly: Boolean, entersWithCounter: CounterType?, withAnyManaType: Boolean)` — You may cast cards exiled with this permanent (linked via LinkedExileComponent).
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
+index 08ed04ecad..171fd30f41 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/SpellStaticAbilities.kt
+@@ -335,6 +335,13 @@ data class GrantMayCastFromLinkedExile(
+  * @property fromZone When set, only spells cast **from** this zone gain the keyword — "Spells you
+  *   cast from exile have convoke" (Hoarding Broodlord) → `fromZone = Zone.EXILE`. The zone is the
+  *   one the spell left when it was cast (CR 601.2a), not where it is now; null means any zone.
++ * @property maxManaValue When set, only spells whose mana value **as cast** (X included) is at most
++ *   this amount gain the keyword, evaluated for this permanent's controller when the spell is cast —
++ *   "spells you cast from your hand with mana value X or less have cascade, where X is the total
++ *   amount of life your opponents have lost this turn" (Abaddon the Despoiler). Only consumers that
++ *   can evaluate a dynamic amount honour it (granted cascade); every other consumer fails closed.
++ * @property duringYourTurnOnly When true, the grant applies only during its controller's turn
++ *   ("During your turn, …"). Same reading as [MayPlayCardsFromExile.duringYourTurnOnly].
+  */
+ @SerialName("GrantKeywordToOwnSpells")
+ @Serializable
+@@ -342,21 +349,26 @@ data class GrantKeywordToOwnSpells(
+     val keyword: Keyword,
+     val spellFilter: GameObjectFilter = GameObjectFilter.Creature,
+     val keywordParameter: Int? = null,
+-    val fromZone: Zone? = null
++    val fromZone: Zone? = null,
++    val maxManaValue: DynamicAmount? = null,
++    val duringYourTurnOnly: Boolean = false
+ ) : StaticAbility {
+     override val description: String = buildString {
+-        append(
+-            if (spellFilter == GameObjectFilter.Any) "Spells"
+-            else "${spellFilter.description.replaceFirstChar { it.uppercase() }} spells"
+-        )
++        if (duringYourTurnOnly) append("During your turn, ")
++        val subject = if (spellFilter == GameObjectFilter.Any) "spells"
++            else "${spellFilter.description} spells"
++        append(if (duringYourTurnOnly) subject else subject.replaceFirstChar { it.uppercase() })
+         append(" you cast")
+         fromZone?.let { append(" from ${it.displayName.lowercase()}") }
++        maxManaValue?.let { append(" with mana value ${it.description} or less") }
+         append(" have ${keyword.displayName.lowercase()}")
+         keywordParameter?.let { append(" $it") }
+     }
+     override fun applyTextReplacement(replacer: TextReplacer): StaticAbility {
+         val newFilter = spellFilter.applyTextReplacement(replacer)
+-        return if (newFilter !== spellFilter) copy(spellFilter = newFilter) else this
++        val newMax = maxManaValue?.applyTextReplacement(replacer)
++        return if (newFilter !== spellFilter || newMax !== maxManaValue)
++            copy(spellFilter = newFilter, maxManaValue = newMax) else this
+     }
+ }
+ 
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt
+index 8a3a67c70c..fd32cd6619 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastSpellHandler.kt
+@@ -185,7 +185,7 @@ class CastSpellHandler(
+         cardRegistry, zoneResolver, costCalculator, castCostTotaller, stackResolver, predicateEvaluator
+     )
+     private val grantedKeywordResolver = com.wingedsheep.engine.mechanics.mana.GrantedKeywordResolver(cardRegistry)
+-    private val castTriggers = CastTriggers(predicateEvaluator, grantedKeywordResolver, stackResolver)
++    private val castTriggers = CastTriggers(predicateEvaluator, grantedKeywordResolver, stackResolver, conditionEvaluator)
+     private val castValidator = CastValidator(
+         cardRegistry, turnManager, costCalculator, alternativePaymentHandler, costHandler, targetValidator,
+         conditionEvaluator, zoneResolver, castPermissionUtils, castCostTotaller, castCostPayer,
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
+index c6129a854f..9d50e5cc69 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/actions/spell/CastTriggers.kt
+@@ -67,7 +67,17 @@ internal class CastTriggers(
+     private val predicateEvaluator: PredicateEvaluator,
+     private val grantedKeywordResolver: GrantedKeywordResolver,
+     private val stackResolver: StackResolver,
++    /** Evaluates a granted keyword's mana-value cap (Abaddon's X) for the grant's controller. */
++    private val conditionEvaluator: com.wingedsheep.engine.handlers.ConditionEvaluator? = null,
+ ) {
++    private val manaValueCap = conditionEvaluator?.let { conditions ->
++        GrantedKeywordResolver.ManaValueCap { state, amount, sourceId, controllerId ->
++            conditions.amounts.evaluate(
++                state, amount,
++                com.wingedsheep.engine.handlers.EffectContext(sourceId = sourceId, controllerId = controllerId)
++            )
++        }
++    }
+ 
+     /**
+      * A triggered ability of the spell itself, put on the stack above it: "when you cast this
+@@ -180,7 +190,7 @@ internal class CastTriggers(
+                 predicateEvaluator.matches(state, state.projectedState, action.cardId, grant.spellFilter, context)
+         }
+         return emblems + grantedKeywordResolver.countGrants(
+-            state, action.playerId, cardDef, Keyword.CASCADE, action.cardId
++            state, action.playerId, cardDef, Keyword.CASCADE, action.cardId, manaValueCap
+         )
+     }
+ 
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
+index 6c40226995..fb8f3bac54 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/mana/GrantedKeywordResolver.kt
+@@ -14,6 +14,7 @@ import com.wingedsheep.sdk.scripting.GameObjectFilter
+ import com.wingedsheep.sdk.scripting.GrantKeywordToOwnSpells
+ import com.wingedsheep.sdk.scripting.KeywordAbility
+ import com.wingedsheep.sdk.scripting.predicates.CardPredicate
++import com.wingedsheep.sdk.scripting.values.DynamicAmount
+ 
+ /**
+  * Resolves whether a spell being cast effectively has a given keyword, either because it is
+@@ -26,6 +27,29 @@ import com.wingedsheep.sdk.scripting.predicates.CardPredicate
+ class GrantedKeywordResolver(
+     private val cardRegistry: CardRegistry
+ ) {
++    /**
++     * Evaluates a grant's [GrantKeywordToOwnSpells.maxManaValue] for the grant's controller. Only
++     * consumers holding a dynamic-amount evaluator supply one (granted cascade in CastTriggers);
++     * without it a mana-value-capped grant fails closed.
++     */
++    fun interface ManaValueCap {
++        fun evaluate(state: GameState, amount: DynamicAmount, sourceId: EntityId, controllerId: EntityId): Int
++    }
++
++    /** The parts of a grant that depend on game state rather than on the spell's printed card. */
++    private fun grantActive(
++        state: GameState,
++        grant: GrantKeywordToOwnSpells,
++        sourceId: EntityId,
++        controllerId: EntityId,
++        castManaValue: () -> Int,
++        cap: ManaValueCap?
++    ): Boolean {
++        if (grant.duringYourTurnOnly && state.activePlayerId != controllerId) return false
++        val max = grant.maxManaValue ?: return true
++        return cap != null && castManaValue() <= cap.evaluate(state, max, sourceId, controllerId)
++    }
++
+     /**
+      * Does [cardDef], if cast by [playerId] in [state], effectively have [keyword]?
+      *
+@@ -70,7 +94,7 @@ class GrantedKeywordResolver(
+             ?.let { cardRegistry.getCard(it.cardDefinitionId) } ?: return null
+         return sourceDef.script.staticAbilities
+             .filterIsInstance<GrantKeywordToOwnSpells>()
+-            .firstOrNull { it.keyword == Keyword.CASUALTY && grantApplies(it, cardDef) { spellZone } }
++            .firstOrNull { it.keyword == Keyword.CASUALTY && it.maxManaValue == null && grantApplies(it, cardDef) { spellZone } }
+             ?.keywordParameter
+             ?.let { KeywordAbility.Casualty(it) }
+     }
+@@ -84,7 +108,8 @@ class GrantedKeywordResolver(
+         playerId: EntityId,
+         cardDef: CardDefinition,
+         keyword: Keyword,
+-        spellId: EntityId? = null
++        spellId: EntityId? = null,
++        manaValueCap: ManaValueCap? = null
+     ): EntityId? {
+         findNextSpellRider(state, playerId, cardDef, keyword)?.let { return it }
+         val spellZone by lazy(LazyThreadSafetyMode.NONE) { castZone(state, spellId) }
+@@ -98,7 +123,8 @@ class GrantedKeywordResolver(
+             for (ability in sourceDef.script.staticAbilities) {
+                 if (ability is GrantKeywordToOwnSpells &&
+                     ability.keyword == keyword &&
+-                    grantApplies(ability, cardDef, { spellZone }, { castManaValue })
++                    grantApplies(ability, cardDef, { spellZone }, { castManaValue }) &&
++                    grantActive(state, ability, permanentId, controllerId, { castManaValue }, manaValueCap)
+                 ) {
+                     return permanentId
+                 }
+@@ -118,7 +144,8 @@ class GrantedKeywordResolver(
+         playerId: EntityId,
+         cardDef: CardDefinition,
+         keyword: Keyword,
+-        spellId: EntityId? = null
++        spellId: EntityId? = null,
++        manaValueCap: ManaValueCap? = null
+     ): Int {
+         var count = state.pendingNextSpellKeywords.count { riderApplies(it, playerId, cardDef, keyword) }
+         val spellZone by lazy(LazyThreadSafetyMode.NONE) { castZone(state, spellId) }
+@@ -132,7 +159,8 @@ class GrantedKeywordResolver(
+             for (ability in sourceDef.script.staticAbilities) {
+                 if (ability is GrantKeywordToOwnSpells &&
+                     ability.keyword == keyword &&
+-                    grantApplies(ability, cardDef, { spellZone }, { castManaValue })
++                    grantApplies(ability, cardDef, { spellZone }, { castManaValue }) &&
++                    grantActive(state, ability, permanentId, controllerId, { castManaValue }, manaValueCap)
+                 ) {
+                     count++
+                 }
