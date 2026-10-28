@@ -17,6 +17,7 @@ const MARKERS = {
   billing: '<!-- arcana-control-status-v1:billing -->',
   dispatcher: '<!-- arcana-control-status-v1:dispatcher -->',
   queue: '<!-- arcana-control-status-v1:queue -->',
+  review: '<!-- arcana-control-status-v1:review -->',
 };
 const MAX_UNITS_LISTED = 40;
 const isBot = c => c?.user?.type === 'Bot' && c?.user?.login === 'github-actions[bot]';
