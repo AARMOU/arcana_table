@@ -807,7 +807,7 @@
     {
      "card": "Malanthrope",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
-     "lines": 53,
+     "lines": 54,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
     }
    ]
@@ -1174,7 +1174,7 @@
     {
      "card": "Malanthrope",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
-     "lines": 53,
+     "lines": 54,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
     },
     {
@@ -6806,7 +6806,7 @@
     {
      "card": "Malanthrope",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
-     "lines": 53,
+     "lines": 54,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
     }
    ]
@@ -7257,7 +7257,7 @@
     {
      "card": "Malanthrope",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
-     "lines": 53,
+     "lines": 54,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
     }
    ]
