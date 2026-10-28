@@ -4,6 +4,7 @@ import com.arcanatable.customcards.cards.ForsakenMonument
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.sdk.core.Color
+import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.dsl.Effects
 import com.wingedsheep.sdk.dsl.card
 import com.wingedsheep.sdk.model.EntityId
@@ -19,6 +20,21 @@ class ForsakenMonumentScenarioTest {
             typeLine = "Creature — Eldrazi"
             power = 3
             toughness = 3
+        })
+        registerCard(card("Monument Devoid Probe") {
+            manaCost = "{1}{R}"
+            colorIdentity = "R"
+            typeLine = "Creature — Eldrazi"
+            power = 1
+            toughness = 1
+            keywords(Keyword.DEVOID)
+        })
+        registerCard(card("Monument Colored Eldrazi Probe") {
+            manaCost = "{1}{R}"
+            colorIdentity = "R"
+            typeLine = "Creature — Eldrazi"
+            power = 1
+            toughness = 1
         })
     }
 
@@ -165,6 +181,36 @@ class ForsakenMonumentScenarioTest {
         assertNull(d.castSpell(d.player1, probe).error)
         d.resolveStack()
         assertEquals("a later cast cannot trigger a Monument in the graveyard", before, d.getLifeTotal(d.player1))
+    }
+
+    @Test fun devoidCreatureIsColorlessDespiteRedManaCost() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val devoid = d.putCardInHand(d.player1, "Monument Devoid Probe")
+        d.giveColorlessMana(d.player1, 1)
+        d.giveMana(d.player1, Color.RED, 1)
+        assertNull(d.castSpell(d.player1, devoid).error)
+        d.resolveStack()
+        assertEquals("Devoid is colorless even when its casting cost contains {R}", before + 2, d.getLifeTotal(d.player1))
+        val permanent = d.findPermanent(d.player1, "Monument Devoid Probe")
+        assertNotNull("Devoid creature resolves to battlefield", permanent)
+        assertEquals("Devoid creature gets the colorless anthem", 3 to 3, d.stats(permanent!!))
+    }
+
+    @Test fun coloredEldraziWithoutDevoidDoesNotTriggerOrReceiveAnthem() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val colored = d.putCardInHand(d.player1, "Monument Colored Eldrazi Probe")
+        d.giveColorlessMana(d.player1, 1)
+        d.giveMana(d.player1, Color.RED, 1)
+        assertNull(d.castSpell(d.player1, colored).error)
+        d.resolveStack()
+        assertEquals("Eldrazi subtype alone does not make a spell colorless", before, d.getLifeTotal(d.player1))
+        val permanent = d.findPermanent(d.player1, "Monument Colored Eldrazi Probe")
+        assertNotNull("colored Eldrazi resolves to battlefield", permanent)
+        assertEquals("colored Eldrazi does not receive the anthem", 1 to 1, d.stats(permanent!!))
     }
 
     @Test fun coloredSpellsGainNoLife() {
