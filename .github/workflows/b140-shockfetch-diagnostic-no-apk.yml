@@ -58,7 +58,7 @@ jobs:
             status=$?
             mkdir -p "shockfetch-attempts/attempt-$attempt"
             cp app/build/test-results/testDebugUnitTest/TEST-*ShockFetchTest.xml "shockfetch-attempts/attempt-$attempt/" || true
-            printf '%s\\n' "$status" > "shockfetch-attempts/attempt-$attempt/exit-code.txt"
+            printf '%s\n' "$status" > "shockfetch-attempts/attempt-$attempt/exit-code.txt"
             echo "::endgroup::"
             if (( status != 0 )); then failures=$((failures + 1)); fi
           done
