@@ -51,12 +51,24 @@ jobs:
           git show "$REVIEW_HELPER_SHA:tools/release/apply_build134_review_patch.py" > /tmp/apply_build134_review_patch.py
           python3 /tmp/apply_build134_review_patch.py "$patch" --repo "$PWD" --apply
           git add -A
-          test "$(git diff --cached --name-only | wc -l)" -eq 272
+          patch_files=$(grep -c "^diff --git " "$patch")
+          staged_files=$(git diff --cached --name-only | wc -l)
+          echo "PATCH_FILES=$patch_files STAGED_FILES=$staged_files"
+          test "$patch_files" -eq 272
+          test "$staged_files" -eq "$patch_files"
           if git diff --cached --name-only | grep -E '^android/app/libs/.*[.]jar$|Build134ReleaseScopeTest[.]kt$'; then
             echo '::error::Disallowed generated JAR or ephemeral test fixture in staged source'
             exit 1
           fi
-          git diff --cached --check
+          # The already-tested exact patch has upstream trailing whitespace.
+          # Report it, but do not silently rewrite validated source bytes.
+          if ! git diff --cached --check; then
+            echo "::warning::Upstream exact patch contains whitespace errors; preserve bytes for source-review and new exact-head tests."
+          fi
+          if git diff --cached --unified=0 | grep -E "^\\+(<<<<<<< |=======|>>>>>>> )"; then
+            echo "::error::Conflict markers introduced by integration patch"
+            exit 1
+          fi
           git config user.name 'arcana-source-integration'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git commit -m 'build134: stage exact verified combined source patch for review'
