@@ -1,0 +1,243 @@
+name: B140 Eldrazi lands (engine jars + Temple + Crossroads)
+# Claude lane (#81). Adds Eldrazi Temple and Corrupted Crossroads to B140.
+# 1. Rebuilds the four runtime jars from wingedsheep/argentum-engine@61e71e5 + Arcana's mandatory patch
+#    series + Eldrazi Temple 0001 + Eldrazi Devoid 0002, and runs the engine suites with their specs.
+# 2. Against those jars: custom-card compile, export (only the two lands may change), Cardkit
+#    (sdk-index regenerated from the new jar), card scenarios, Android debug and release unit tests and a
+#    debug compile. Every gate runs; results are posted as check annotations.
+# 3. ONLY if every gate and both engine suites pass, commits the four jars, the regenerated custom-card
+#    data, the regenerated Cardkit SDK index and a provenance manifest to THIS branch. Never builds or
+#    uploads an APK/AAB, signs, deploys, merges, or touches any other branch.
+on:
+  push:
+    branches: [claude/b140-eldrazi-lands-20261028]
+    paths:
+      - .github/workflows/b140-eldrazi-lands.yml
+      - engine-upgrade/**
+      - argentum-patches/**
+      - android/**
+      - tools/cardkit/**
+      - docs/agents/generated/**
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: b140-eldrazi-lands
+  cancel-in-progress: true
+
+env:
+  UPSTREAM: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+
+jobs:
+  engine-tests:
+    name: engine ${{ matrix.suite }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [sdk-rules-ai, set-scenarios]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: ${{ env.UPSTREAM }}
+          path: argentum-engine
+          persist-credentials: false
+      - name: Apply engine source (mandatory series, Ulalek stage, Eldrazi patches, engine specs)
+        run: bash engine-upgrade/build140/apply_engine.sh
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: SDK, rules engine (incl. Temple/Crossroads/Ulalek specs) and AI suites
+        if: matrix.suite == 'sdk-rules-ai'
+        working-directory: argentum-engine
+        run: bash ../engine-upgrade/build140/run_gradle.sh engine-sdk-rules-ai ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:test :rules-engine:test :ai:test
+      - name: Every set's card scenario suite
+        if: matrix.suite == 'set-scenarios'
+        working-directory: argentum-engine
+        run: bash ../engine-upgrade/build140/run_gradle.sh engine-set-scenarios ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sets:scenarioTest
+      - name: Count engine test results
+        if: always()
+        run: |
+          python3 engine-upgrade/build140/count_junit.py "engine ${{ matrix.suite }}" "argentum-engine/**/build/test-results/**/TEST-*.xml" | tee engine-summary.txt
+          python3 engine-upgrade/build140/count_junit.py "engine-eldrazi-specs ${{ matrix.suite }}" "argentum-engine/**/build/test-results/**/TEST-*.xml" "EldraziTemple|CorruptedCrossroads|GrantedCascade" | tee -a engine-summary.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: engine-${{ matrix.suite }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            engine-summary.txt
+            engine-source.txt
+            gradle-logs/
+            engine-upgrade/patch-report.json
+            argentum-engine/**/build/test-results/**/TEST-*.xml
+
+  app-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    outputs:
+      all_gates: ${{ steps.verdict.outputs.all_gates }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: ${{ env.UPSTREAM }}
+          path: argentum-engine
+          persist-credentials: false
+      - name: Apply engine source (same script as the engine job)
+        run: bash engine-upgrade/build140/apply_engine.sh
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build the four Java 17 runtime jars and the card corpus
+        working-directory: argentum-engine
+        run: bash ../engine-upgrade/build140/run_gradle.sh build-jars ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar :arcana-export:run
+      - name: Install candidate jars in this workspace; record hashes and symbol presence
+        run: |
+          set -o pipefail
+          python3 engine-upgrade/build140/install_candidate.py | tee candidate-summary.txt
+          grep -E '^(jar|symbol|corpus) ' candidate-summary.txt | while IFS= read -r l; do echo "::notice title=candidate::$l"; done
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - id: custom_compile
+        name: "Gate 1: :custom-cards:compileKotlin"
+        continue-on-error: true
+        working-directory: android
+        run: bash ../engine-upgrade/build140/run_gradle.sh gate1-custom-compile ./gradlew --no-daemon --max-workers=2 :custom-cards:compileKotlin
+      - id: export
+        name: "Gate 2: re-export custom cards; only the two Eldrazi lands may change"
+        continue-on-error: true
+        run: |
+          set -e
+          (cd android && bash ../engine-upgrade/build140/run_gradle.sh gate2-export ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards)
+          python3 engine-upgrade/build140/check_export.py
+      - id: cardkit
+        name: "Gate 3: Cardkit (SDK index regenerated from the new jar; tests, check, docs)"
+        continue-on-error: true
+        run: |
+          set -e
+          tools/cardkit/cardkit sdk-index
+          tools/cardkit/cardkit patterns --check || { echo "::error title=gate3-cardkit::pattern index stale"; exit 1; }
+          python3 -m unittest discover -s tools/cardkit/tests 2>&1 | tee cardkit-tests.txt
+          grep -qE '^OK' cardkit-tests.txt || { grep -E '^(FAIL|ERROR):' cardkit-tests.txt | head -8 | while IFS= read -r l; do echo "::error title=gate3-cardkit::$l"; done; exit 1; }
+          tools/cardkit/cardkit check
+          tools/cardkit/cardkit docs-check
+          python3 investigation/argentum-six-precons/coverage-audit.py | while IFS= read -r l; do echo "::notice title=coverage::$l"; done
+      - id: custom_tests
+        name: "Gate 4: custom-card scenarios (incl. Temple, Crossroads, Ulalek, Abaddon)"
+        continue-on-error: true
+        working-directory: android
+        run: bash ../engine-upgrade/build140/run_gradle.sh gate4-custom-tests ./gradlew --no-daemon --max-workers=2 :custom-cards:test
+      - id: app_debug
+        name: "Gate 5: Android debug unit tests (incl. EldraziIncursionPlayableTest)"
+        continue-on-error: true
+        working-directory: android
+        run: bash ../engine-upgrade/build140/run_gradle.sh gate5-app-debug ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+      - id: app_release
+        name: "Gate 6: Android release unit tests"
+        continue-on-error: true
+        working-directory: android
+        run: bash ../engine-upgrade/build140/run_gradle.sh gate6-app-release ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest
+      - id: assemble
+        name: "Gate 7: compile the debug app (stays in CI, never uploaded)"
+        continue-on-error: true
+        working-directory: android
+        run: bash ../engine-upgrade/build140/run_gradle.sh gate7-assemble-debug ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
+      - name: Count app and custom-card results
+        if: always()
+        run: |
+          {
+            python3 engine-upgrade/build140/count_junit.py custom-cards "android/custom-cards/build/test-results/**/TEST-*.xml"
+            python3 engine-upgrade/build140/count_junit.py eldrazi-lands "android/custom-cards/build/test-results/**/TEST-*.xml" "EldraziTemple|CorruptedCrossroads"
+            python3 engine-upgrade/build140/count_junit.py app-debug "android/app/build/test-results/testDebugUnitTest/TEST-*.xml"
+            python3 engine-upgrade/build140/count_junit.py incursion-playable "android/app/build/test-results/testDebugUnitTest/TEST-*.xml" "EldraziIncursionPlayable"
+            python3 engine-upgrade/build140/count_junit.py app-release "android/app/build/test-results/testReleaseUnitTest/TEST-*.xml"
+          } | tee -a candidate-summary.txt
+      - id: verdict
+        name: Gate verdict
+        if: always()
+        run: |
+          g="compile=${{ steps.custom_compile.outcome }} export=${{ steps.export.outcome }} cardkit=${{ steps.cardkit.outcome }} custom-tests=${{ steps.custom_tests.outcome }} app-debug=${{ steps.app_debug.outcome }} app-release=${{ steps.app_release.outcome }} assemble-debug=${{ steps.assemble.outcome }}"
+          echo "$g" | tee -a candidate-summary.txt
+          if echo "$g" | grep -qvE '^(\S+=success ?)+$'; then
+            echo "::error title=gates::$g"; echo "all_gates=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=gates::$g"; echo "all_gates=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Stage generated files for the commit job
+        if: steps.verdict.outputs.all_gates == 'true'
+        run: |
+          python3 engine-upgrade/build140/write_manifest.py
+          mkdir -p generated
+          tar -cf generated/generated.tar android/app/libs/argentum-*.jar \
+            android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv \
+            docs/agents/generated/sdk-api.json docs/agents/generated/sdk-api.md engine-upgrade/build140/runtime-manifest.json
+      - uses: actions/upload-artifact@v4
+        if: steps.verdict.outputs.all_gates == 'true'
+        with:
+          name: generated
+          retention-days: 7
+          path: generated/generated.tar
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: app-candidate
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            candidate-summary.txt
+            cardkit-tests.txt
+            gradle-logs/
+            android/custom-cards/build/test-results/
+            android/app/build/test-results/
+      - name: Fail if any gate failed (all gates already ran)
+        if: steps.verdict.outputs.all_gates != 'true'
+        run: exit 1
+
+  commit-generated:
+    # Separate job with the only write permission: it never runs engine or app code.
+    needs: [engine-tests, app-candidate]
+    if: needs.engine-tests.result == 'success' && needs.app-candidate.outputs.all_gates == 'true' && github.ref == 'refs/heads/claude/b140-eldrazi-lands-20261028'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: generated
+      - name: Commit the tested jars, card data, SDK index and manifest to this branch only
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "${{ github.sha }}" || { echo "::warning::branch moved since this run started; not committing"; exit 0; }
+          tar -xf generated.tar && rm generated.tar
+          git add android/app/libs/argentum-*.jar android/app/src/main/assets/argentum/custom-cards.jsonl \
+            android/app/src/main/assets/argentum/custom-cards.index.tsv docs/agents/generated/sdk-api.json \
+            docs/agents/generated/sdk-api.md engine-upgrade/build140/runtime-manifest.json
+          if git diff --cached --quiet; then echo "::notice title=commit::generated files already match; nothing to commit"; exit 0; fi
+          git diff --cached --stat | tail -12
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "B140: tested engine jars + Eldrazi lands data (run ${{ github.run_id }})" \
+            -m "Generated by .github/workflows/b140-eldrazi-lands.yml after every gate passed on ${{ github.sha }}. Provenance: engine-upgrade/build140/runtime-manifest.json."
+          git push origin HEAD:${{ github.ref_name }}
+          echo "::notice title=commit::committed $(git rev-parse HEAD)"
