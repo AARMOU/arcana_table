@@ -17,8 +17,11 @@ const checkName = x => norm(x).split(/\s*\/\s*/).pop();
 
 // Never construct proof from a Copilot PR body or untrusted comments. A future
 // independent runner must authenticate provenance and the exact test execution first.
-function validIndependentProof(proof, sha, issue) {
-  return proof?.source === 'independent-oracle-runner' &&
+function validIndependentProof(proof, sha, issue, baseSha) {
+  return HEX.test(str(baseSha)) && proof?.integrationBaseSha === baseSha &&
+    HEX.test(str(proof?.testHeadSha)) && proof?.testRunHeadSha === proof?.testHeadSha &&
+    proof?.cardImplementationAncestorVerified === true && proof?.testOnlyDeltaVerified === true &&
+    proof?.source === 'independent-oracle-runner' &&
     proof?.provenanceVerified === true &&
     proof?.oracleReviewed === true &&
     proof?.headSha === sha && proof?.issue === issue &&
@@ -57,7 +60,7 @@ function assess({pr, unit, checks = [], proof = null}) {
     return outcome('checks-running','required-check-not-finished',summary);
   if(CHECK_NAMES.some(name=>byName.get(name).conclusion!=='success'))
     return outcome('checks-failed','required-check-not-successful',summary);
-  if(!validIndependentProof(proof,sha,issue))
+  if(!validIndependentProof(proof,sha,issue,pr?.base?.sha))
     return outcome('independent-proof-required','green-ci-is-not-oracle-certification',summary);
   return outcome('certified-candidate','independent-exact-head-rules-proof-verified',summary);
 }
