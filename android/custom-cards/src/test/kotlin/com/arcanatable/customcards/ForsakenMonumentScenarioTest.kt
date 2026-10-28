@@ -279,35 +279,37 @@ class ForsakenMonumentScenarioTest {
         assertEquals(2 to 2, d.stats(permanent!!))
     }
 
-    @Test fun twoMonumentsStackAnthemAndIndependentCastLifeTriggers() {
+    @Test fun opposingMonumentsIndependentlyBuffTheirOwnCreaturesAndCastTriggers() {
         val d = setup()
         d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
-        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        d.putPermanentOnBattlefield(d.player2, "Forsaken Monument")
         val mine = d.putCreatureOnBattlefield(d.player1, "Monument Colorless Probe")
         val theirs = d.putCreatureOnBattlefield(d.player2, "Monument Colorless Probe")
-        assertEquals("two independent +2/+2 static effects stack", 7 to 7, d.stats(mine))
-        assertEquals("neither anthem buffs the opponent", 3 to 3, d.stats(theirs))
+        assertEquals("my Monument buffs only my colorless creature", 5 to 5, d.stats(mine))
+        assertEquals("opponent's Monument buffs only their colorless creature", 5 to 5, d.stats(theirs))
 
-        val before = d.getLifeTotal(d.player1)
+        val myLife = d.getLifeTotal(d.player1)
+        val theirLife = d.getLifeTotal(d.player2)
         val ring = d.putCardInHand(d.player1, "Sol Ring")
         d.giveColorlessMana(d.player1, 1)
         assertNull(d.castSpell(d.player1, ring).error)
         d.resolveStack()
-        assertEquals("each Monument creates its own +2-life cast trigger", before + 4, d.getLifeTotal(d.player1))
+        assertEquals("my colorless cast triggers only my Monument", myLife + 2, d.getLifeTotal(d.player1))
+        assertEquals("opponent's Monument must not trigger from my cast", theirLife, d.getLifeTotal(d.player2))
     }
 
-    @Test fun twoMonumentsGiveSeparateManaBonusesAndRemovingOneKeepsOnlyOne() {
+    @Test fun opposingMonumentCannotKeepMyManaBonusAfterMineLeaves() {
         val d = setup()
-        val firstMonument = d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
-        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
-        val firstWastes = d.putLandOnBattlefield(d.player1, "Wastes")
-        d.tapForMana(d.player1, firstWastes)
-        assertEquals("one Wastes tap yields its own {C} and one bonus from each Monument", 3, d.manaPool(d.player1).colorless)
+        val mine = d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        d.putPermanentOnBattlefield(d.player2, "Forsaken Monument")
+        val first = d.putLandOnBattlefield(d.player1, "Wastes")
+        d.tapForMana(d.player1, first)
+        assertEquals("my own Monument adds exactly one bonus {C}", 2, d.manaPool(d.player1).colorless)
 
-        d.moveToGraveyard(firstMonument)
-        val secondWastes = d.putLandOnBattlefield(d.player1, "Wastes")
-        d.tapForMana(d.player1, secondWastes)
-        assertEquals("remaining Monument alone adds one additional {C}", 5, d.manaPool(d.player1).colorless)
+        d.moveToGraveyard(mine)
+        val second = d.putLandOnBattlefield(d.player1, "Wastes")
+        d.tapForMana(d.player1, second)
+        assertEquals("opponent's surviving Monument cannot add mana to my pool", 3, d.manaPool(d.player1).colorless)
     }
 
     @Test fun coloredSpellsGainNoLife() {
