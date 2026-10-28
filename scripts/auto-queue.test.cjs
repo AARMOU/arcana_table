@@ -167,7 +167,7 @@ test('Copilot PR wakeups are restricted to trusted main code and the configured 
   const fs = require('node:fs');
   const path = require('node:path');
   const workflow = fs.readFileSync(path.join(__dirname, '../.github/workflows/arcana-queue-feeder.yml'), 'utf8');
-  assert.match(workflow, /pull_request_target:\\s*\\n\\s+types: \\[opened, synchronize, ready_for_review\\]/);
+  assert.ok(workflow.includes('  pull_request_target:\n    types: [opened, synchronize, ready_for_review]'));
   // These checks must be present on BOTH read-only classification and write-enabled publishing.
   for (const gate of [
     "github.event_name != 'pull_request_target' && github.ref == 'refs/heads/main'",
@@ -179,8 +179,8 @@ test('Copilot PR wakeups are restricted to trusted main code and the configured 
   ]) assert.equal(workflow.split(gate).length - 1, 2, 'both jobs must check: ' + gate);
   assert.equal(workflow.split("ref: ${{ github.event_name == 'pull_request_target' && 'main' || github.workflow_sha }}").length - 1, 2,
     'both checkout steps must use trusted main rather than the PR head');
-  assert.match(workflow, /ARCANA_AUTOMATION_READY==='true' && process.env.ARCANA_DISPATCH_MODE==='normal'/,
+  assert.ok(workflow.includes("ARCANA_AUTOMATION_READY==='true' && process.env.ARCANA_DISPATCH_MODE==='normal'"),
     'queue creation remains opt-in to normal readiness');
-  assert.match(workflow, /createWorkflowDispatch\\(\\{\\.\\.\\.context\\.repo,workflow_id:'arcana-card-dispatcher\\.yml'/,
+  assert.ok(workflow.includes("createWorkflowDispatch({...context.repo,workflow_id:'arcana-card-dispatcher.yml'"),
     'new work must still go through the guarded dispatcher, not a browser or Copilot direct call');
 });
