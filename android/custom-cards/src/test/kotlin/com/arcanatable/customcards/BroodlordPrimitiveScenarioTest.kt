@@ -103,4 +103,59 @@ class BroodlordPrimitiveScenarioTest {
         assertEquals(2, d.projected.getPower(opponentBear))
         assertEquals(5, d.projected.getPower(broodlord))
     }
+
+    @Test
+    fun xTwoCanSplitCountersAcrossTwoAnnouncedFriendlyTargets() {
+        val d = customScenario(candidate, "Grizzly Bears")
+        val p = d.player1
+        val first = d.putCreatureOnBattlefield(p, "Grizzly Bears")
+        val second = d.putCreatureOnBattlefield(p, "Grizzly Bears")
+        val broodlord = d.putCardInHand(p, "Broodlord Review Candidate")
+        d.giveMana(p, Color.GREEN)
+        d.giveColorlessMana(p, 5)
+        assertNull(d.castXSpell(p, broodlord, 2).error)
+
+        var choseBoth = false
+        var distributed = false
+        for (step in 0 until 40) {
+            val decision = d.state.pendingDecision
+            when (decision) {
+                is com.wingedsheep.engine.core.ChooseTargetsDecision -> {
+                    val legal = decision.legalTargets.values.flatten()
+                    assertTrue("first creature must be legal", first in legal)
+                    assertTrue("second creature must be legal", second in legal)
+                    assertFalse("source cannot target itself", broodlord in legal)
+                    assertNull(d.submitTargetSelection(p, listOf(first, second)).error)
+                    choseBoth = true
+                }
+                is com.wingedsheep.engine.core.DistributeDecision -> {
+                    assertEquals(2, decision.totalAmount)
+                    assertEquals(setOf(first, second), decision.targets.toSet())
+                    assertNull(
+                        d.submitDecision(
+                            p,
+                            com.wingedsheep.engine.core.DistributionResponse(
+                                decision.id,
+                                mapOf(first to 1, second to 1),
+                            ),
+                        ).error
+                    )
+                    distributed = true
+                }
+                null -> {
+                    if (d.state.stack.isEmpty()) break
+                    d.bothPass()
+                }
+                else -> d.autoResolveDecision()
+            }
+        }
+        assertTrue("ETB must request target selection", choseBoth)
+        assertTrue("ETB must request an explicit allocation", distributed)
+        assertNull("stack must resolve", d.state.pendingDecision)
+        assertTrue("stack must be empty", d.state.stack.isEmpty())
+        assertEquals(5, d.projected.getPower(broodlord))
+        assertEquals(3, d.projected.getPower(first))
+        assertEquals(3, d.projected.getPower(second))
+    }
+
 }
