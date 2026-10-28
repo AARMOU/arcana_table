@@ -133,7 +133,7 @@ export default {
   async fetch(request, env, ctx, fetchImpl = fetch) {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
-    if (url.pathname === "/health") return json({ ok: true, service: "arcana-review", protocol: 1 });
+    if (url.pathname === "/health") return json({ ok: true, service: "arcana-review", protocol: 1 }, 200, origin);
     if (!env.GITHUB_OAUTH_CLIENT_ID || !env.GITHUB_OAUTH_CLIENT_SECRET || !env.SESSION_SECRET || String(env.SESSION_SECRET).length < 32)
       return json({ error: "not-configured" }, 503, origin);
 
