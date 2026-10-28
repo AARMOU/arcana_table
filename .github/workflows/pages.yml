@@ -30,10 +30,23 @@ jobs:
     steps:
       - name: Check out the site
         uses: actions/checkout@v4
+      - name: Check out integration deck data (not executable code)
+        uses: actions/checkout@v4
+        with:
+          ref: gpt/arcana-integration-next
+          path: integration-source
+          persist-credentials: false
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Validate control dashboard
-        run: node --test control/dashboard.test.cjs
+        run: node --test control/dashboard.test.cjs control/card-queue.test.cjs
+      - name: Generate deck scanner JSON from reviewed tool and current integration data
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git -C integration-source rev-parse HEAD)"
+          mkdir -p _site/control
+          node tools/deck-gap-audit.cjs --root integration-source --source-ref "gpt/arcana-integration-next@$SOURCE_SHA" --json _site/control/card-gaps.json --markdown /tmp/arcana-card-gaps.md
       - name: Stage the landing page
         run: |
           mkdir -p _site
@@ -43,6 +56,13 @@ jobs:
           cp -R assets _site/assets
           mkdir -p _site/control
           cp control/index.html _site/control/index.html
+          cp control/cards.html _site/control/cards.html
+          cp control/card-queue.js _site/control/card-queue.js
+          cp control/credits.html _site/control/credits.html
+          cp control/credit-budget.js _site/control/credit-budget.js
+          cp control/manifest.webmanifest _site/control/manifest.webmanifest
+          cp control/sw.js _site/control/sw.js
+          cp -R control/icons _site/control/icons
       - name: Upload site files
         uses: actions/upload-pages-artifact@v3
         with:

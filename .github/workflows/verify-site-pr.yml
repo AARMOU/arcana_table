@@ -8,6 +8,8 @@ on:
       - "closed-testing.html"
       - "privacy.html"
       - "assets/**"
+      - "control/**"
+      - ".github/workflows/pages.yml"
       - "README.md"
       - "tools/verify_site.test.cjs"
       - ".github/workflows/verify-site-pr.yml"
@@ -25,4 +27,4 @@ jobs:
       - name: Check page copy, paths and release limitations
         run: node --test tools/verify_site.test.cjs
       - name: Check dashboard regression
-        run: node --test control/dashboard.test.cjs
+        run: node --test control/dashboard.test.cjs control/card-queue.test.cjs

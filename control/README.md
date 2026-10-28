@@ -30,3 +30,26 @@ A separate local browser simulation was executed with mocked GitHub responses at
 ## Publishing
 
 This folder is only exposed through the existing GitHub Pages site after the website workflow change is merged and GitHub Pages deployment succeeds. Proposed URL: `https://aarmou.github.io/arcana_table/control/` — **do not describe it as live until deployed and checked.** No changes to Android gameplay, billing settings, or paid workers are included.
+## Install as an Android app (PWA)
+
+After merging and deploying the PWA files, open `https://aarmou.github.io/arcana_table/control/` in Chrome on Android. Tap **⋮ → Install app** (or **Add to Home screen** when install promotion is unavailable). The launcher entry is **Arcana Control**, separate from the Arcana Table game. It uses its own standalone window and receives website updates without APK rebuilds.
+
+The service worker caches only the dashboard shell and install assets for offline launch. **GitHub data, worker state and billing/status comments are never cached by the worker**; they require a network connection and should remain unknown or show errors if unavailable. It does not grant permission to run workers, alter billing, merge PRs, or change game releases. PWA installation is not a Play Store / signed Android APK release.
+
+PWA tests run alongside existing dashboard checks using `node --test control/dashboard.test.cjs`. Deployment is handled by the existing Pages workflow. Do not claim installability until the merged deployment is verified on an Android browser.
+
+## Card Queue: select and request cards
+
+The **Card Queue** screen is reachable from Arcana Control's desktop and Android PWA navigation or `/control/cards.html`. The existing `tools/deck-gap-audit.cjs` produces a public read-only `card-gaps.json` on site deployment, reading shipped personal Commander decks, six official precon manifests and both card indexes from the current `gpt/arcana-integration-next` source head. A source SHA and scan timestamp appear in the UI. The scanner reports *index presence*, not playable rules certification. The picker filters by deck, coverage and name; selects up to 8 cards per request; allows manual names; and retains only the draft selections in browser local storage. Users can view recently open card work issues.
+
+**Submission remains owner-controlled:** the button opens a GitHub new-issue form with a prefilled `[Card Request]` title and selected cards. A signed-in owner submits it on GitHub. This is distinct from an `[Arcana Queue]` work unit and is not automatic worker dispatch, credit spend or authorization-label application. A later engineering triage must check open PR ownership, Oracle behavior, engine blockers and executable regressions before creating any dispatchable unit.
+
+The card scanner JSON and public GitHub issue feeds are not service-worker cached; if offline, the installed app displays its shell and lets the owner keep a draft or add manual entries, but cannot claim current coverage.
+
+## Credit Budget: account-owner adjustment after a purchase
+
+The **Credit Budget** screen is reachable at `/control/credits.html`. It locally calculates the updated `ARCANA_AI_CREDIT_BUDGET` amount from confirmed *included* monthly AI credits plus any extra purchased credits confirmed by GitHub to be usable in that cycle. The new **total**, not the purchase delta, must be entered in the authenticated [GitHub Actions repository variables](https://github.com/AARMOU/arcana_table/settings/variables/actions). The page can copy the calculated value, and links to GitHub billing for confirmation and the Billing Watch for verification.
+
+This page **does not** call the GitHub write API, handle credentials, purchase credits, read personal billing, change dispatcher readiness, or launch agents. Exact quantities remain in the device's form and are not published in the public website, issue comments, or browser storage. The existing private, authenticated billing feed and capacity/reserve safeguards stay authoritative. Premium requests, GitHub Actions minutes and ChatGPT usage are separate units.
+
+Tests: `node --test control/dashboard.test.cjs control/card-queue.test.cjs`. Merging and deploying this PR does not change the Android game APK or release configuration.

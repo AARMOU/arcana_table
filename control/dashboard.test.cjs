@@ -15,3 +15,36 @@ test('public dashboard links limited to this repo',()=>{assert.ok(script.include
 test('billing and dispatcher status come only from github-actions bot status comments on #78',()=>{assert.ok(script.includes("'/issues/78/comments?per_page=100&page=1'"));assert.ok(script.includes("c?.user?.login==='github-actions[bot]'&&c?.user?.type==='Bot'"));assert.ok(script.includes("<!-- arcana-control-status-v1:"));});
 test('status view shows freshness, blockers, liabilities and worker states',()=>{for(const id of ['creditsFresh','readyFresh','blockerAction','liabValue','wRunning','wPending','wQueued','wDone','wBlocked','workerList'])assert.match(html,new RegExp('id="'+id+'"'),id);for(const s of ['Last successful billing check','premium requests, Actions minutes and ChatGPT usage are separate','never substituted'])assert.ok(script.includes(s),s);});
 test('status parser rejects malformed or foreign payloads',()=>{const fn=new vm.Script('('+script.match(/function parseStatus\(body\)\{[\s\S]*?return null;\}\}/)[0]+')');const ctx={STATUS_MARKER:'<!-- arcana-control-status-v1:'};vm.createContext(ctx);const parse=fn.runInContext(ctx);const mk=(k,j)=>'<!-- arcana-control-status-v1:'+k+' -->\nx\n```json\n'+j+'\n```';assert.equal(parse(mk('billing','{"kind":"billing","ok":true}')).ok,true);assert.equal(parse(mk('billing','{"kind":"other"}')),null);assert.equal(parse(mk('billing','not json')),null);assert.equal(parse('hello'),null);});
+
+test('PWA metadata and manifest are scoped to the control dashboard',()=>{
+  const manifest=JSON.parse(fs.readFileSync(path.join(__dirname,'manifest.webmanifest'),'utf8'));
+  assert.equal(manifest.id,'/arcana_table/control/');
+  assert.equal(manifest.scope,'./');
+  assert.equal(manifest.start_url,'./');
+  assert.equal(manifest.display,'standalone');
+  assert.match(html,/rel="manifest" href="\.\/manifest\.webmanifest"/);
+  assert.match(html,/serviceWorker\.register\('\.\/sw\.js'/);
+  for(const size of [192,512]){
+    const icon=manifest.icons.find(icon=>icon.sizes===size+'x'+size);
+    assert.ok(icon,'required PNG size '+size);
+    assert.match(icon.src,/^\.\/icons\/icon-(192|512)\.png$/);
+    const bytes=fs.readFileSync(path.join(__dirname,icon.src));
+    assert.equal(bytes.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+    assert.equal(bytes.readUInt32BE(16),size);
+    assert.equal(bytes.readUInt32BE(20),size);
+  }
+});
+test('service worker does not cache API or third-party data',()=>{
+  const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
+  assert.doesNotThrow(()=>new vm.Script(sw));
+  assert.ok(sw.includes("url.origin!==scope.origin"));
+  assert.ok(sw.includes("url.pathname.startsWith(scope.pathname)"));
+  assert.ok(sw.includes("request.method!=='GET'"));
+  assert.ok(sw.includes("shellUrls.has(url.href)"));
+  assert.ok(!sw.includes("'./card-gaps.json'"));
+  assert.ok(!sw.includes('api.github.com'));
+});
+test('Pages publishes the install manifest, worker and icons',()=>{
+  const workflow=fs.readFileSync(path.join(__dirname,'../.github/workflows/pages.yml'),'utf8');
+  for(const asset of ['manifest.webmanifest','sw.js','icons'])assert.ok(workflow.includes('control/'+asset),asset);
+});

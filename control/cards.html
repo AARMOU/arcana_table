@@ -1,0 +1,51 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#080f18">
+<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icons/icon-192.png" type="image/png">
+<meta name="description" content="Browse Arcana card gaps and submit selected cards for engineering triage."><title>Card Queue — Arcana Control</title>
+<style>
+:root{color-scheme:dark;--bg:#080f18;--panel:#111c29;--line:#2c4352;--ink:#f0f6f9;--muted:#92a8b9;--teal:#7ce8c7}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,Roboto,sans-serif;padding-bottom:105px}
+a{color:var(--teal)}button,input,select{font:inherit}button{cursor:pointer}
+:focus-visible{outline:2px solid var(--teal);outline-offset:3px}
+main{max-width:1040px;margin:auto;padding:16px}header{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);padding:0 0 14px}
+.brand{font-size:13px;letter-spacing:.1em;font-weight:900;color:var(--teal)}
+h1{font-size:clamp(30px,5vw,42px);line-height:1.2;letter-spacing:-.04em;margin:24px 0 4px}h2{font-size:18px;margin:0 0 10px}
+.muted{font-size:12px;color:var(--muted)}.panel{border:1px solid var(--line);border-radius:17px;padding:17px;background:var(--panel);margin:13px 0}
+.note{background:#142b31;border-color:#35685f;font-size:13px}.note b{color:var(--teal)}
+.filters{display:grid;grid-template-columns:2fr 1.5fr 1.4fr;gap:9px}
+.filters label{display:block;font-size:11px;color:var(--muted);font-weight:800;margin-bottom:4px}
+input[type=search],input[type=text],select{width:100%;background:#0b1824;border:1px solid #385264;color:var(--ink);border-radius:10px;padding:10px;min-height:45px}
+.entries{display:grid;gap:7px;max-height:570px;overflow:auto}
+.entry{background:#172938;border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;gap:10px;cursor:pointer;align-items:flex-start}
+.entry:has(input:checked){border-color:#65ceb5;background:#20403f}.entry input{accent-color:var(--teal);transform:scale(1.3);margin-top:6px}
+.name{display:block;font-weight:800;overflow-wrap:anywhere}.state{display:block;color:#f6c878;font-size:11px;font-weight:800}.decks{display:block;color:var(--muted);font-size:11px}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row input{flex:1;min-width:180px}
+.btn{border:1px solid #408372;border-radius:10px;background:#1b3f39;color:var(--teal);font-size:13px;font-weight:800;padding:11px 15px;text-decoration:none;display:inline-block}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}.tag{background:#20463e;color:var(--teal);font-size:11px;border-radius:10px;padding:7px 9px;max-width:100%;overflow-wrap:anywhere}
+.issues a{display:block;border-bottom:1px solid var(--line);padding:9px 0;text-decoration:none;font-size:13px}.issues a:last-child{border-bottom:0}
+.footer{position:fixed;bottom:0;left:0;right:0;background:#0b1925f5;border-top:1px solid var(--line);padding:12px 16px calc(13px + env(safe-area-inset-bottom))}
+.footer-inner{max-width:1040px;margin:auto;display:flex;justify-content:space-between;align-items:center;gap:12px}
+@media(max-width:700px){.filters{grid-template-columns:1fr}.panel{padding:13px}main{padding:14px}}
+</style></head><body>
+<main><header><span class="brand">⬡ ARCANA CONTROL</span><a href="./" class="btn">← Dashboard</a></header>
+<h1>Card Queue<span style="color:var(--teal)">.</span></h1>
+<p class="muted">Find cards in your Commander decks, select them, and prepare a tracked card request.</p>
+<section class="panel note"><b>A request is not a paid assignment.</b> You must review and submit it through GitHub. Rules validation, existing work, and engine blockers are checked before a separate Copilot assignment can be authorized.</section>
+<section class="panel"><h2>Browse cards</h2>
+<div class="filters"><div><label for="search">Search name</label><input id="search" type="search" placeholder="Card name…"></div>
+<div><label for="deck">Deck</label><select id="deck"><option value="">All scanned decks</option></select></div>
+<div><label for="coverage">Coverage</label><select id="coverage"><option value="missing">Not indexed</option><option value="face-name-review">Double-face review</option><option value="all">All cards</option></select></div></div>
+<p class="muted" id="source" role="status">Loading scanner…</p><p class="muted" id="count"></p>
+<div id="entries" class="entries" aria-label="Cards to select"></div>
+<p class="muted">Indexed means the name appears in an index, not that its Oracle behavior is playable.</p></section>
+<section class="panel"><h2>Add another card</h2><p class="muted">Manual entries are unverified, not automatically classified as missing.</p>
+<form id="add" class="row"><input id="manual" type="text" maxlength="150" placeholder="Exact card name" aria-label="Card name" required><button type="submit" class="btn">Add to selection</button></form>
+<p class="muted" id="notice" role="status"></p></section>
+<section class="panel"><h2>Selected cards</h2><div id="selected" class="tags"></div><button class="btn" id="clear" type="button">Clear draft</button></section>
+<section class="panel"><h2>Open card requests</h2><div id="issues" class="issues"><span class="muted">Loading GitHub issues…</span></div>
+<p class="muted"><a href="https://github.com/AARMOU/arcana_table/issues/321" target="_blank" rel="noopener noreferrer">View scanner tracker #321</a></p></section>
+</main>
+<div class="footer"><div class="footer-inner"><div><strong id="picked">0 selected</strong><div class="muted">Maximum 8 per request</div></div><button type="button" id="request" class="btn" disabled>Review GitHub request</button></div></div>
+<script src="./card-queue.js" defer></script><script>if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{}));</script>
+</body></html>
