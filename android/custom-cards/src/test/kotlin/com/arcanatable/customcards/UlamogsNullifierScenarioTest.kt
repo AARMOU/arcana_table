@@ -247,4 +247,42 @@ class UlamogsNullifierScenarioTest {
         assertTrue("Ineligible exile must not be processed under Rest in Peace", reexiled.isEmpty())
     }
 
+    /**
+     * In multiplayer, a replacement effect must not collapse separately owned
+     * process selections into one shared exile transaction. Each selected card
+     * changes exile objects under Rest in Peace; unselected/own cards do not.
+     */
+    @Test fun fourPlayerRestInPeaceProcessesTwoDifferentOpponentsAsNewExileObjects() {
+        val d = setup()
+        val seats = d.initMultiplayer(
+            decks = List(4) { com.wingedsheep.sdk.model.Deck.of("Plains" to 40) },
+        )
+        d.passPriorityUntil(com.wingedsheep.sdk.core.Step.PRECOMBAT_MAIN)
+        d.putPermanentOnBattlefield(seats[0], "Rest in Peace")
+        d.putCardInExile(seats[0], "Island")
+        d.putCardInExile(seats[1], "Sol Ring")
+        d.putCardInExile(seats[2], "Grizzly Bears")
+        d.putCardInExile(seats[3], "Island")
+
+        d.respondToOwnBears(Choices(yes = true, pick = listOf("Sol Ring", "Grizzly Bears")))
+
+        assertTrue("Both selected opponent-owned cards must pay the processor cost",
+            d.permanentsNamed(seats[0], "Grizzly Bears").isEmpty())
+        assertTrue("Rest in Peace must exile the countered target",
+            d.getExileCardNames(seats[0]).contains("Grizzly Bears"))
+        assertEquals(listOf("Sol Ring"), d.getExileCardNames(seats[1]))
+        assertEquals(listOf("Grizzly Bears"), d.getExileCardNames(seats[2]))
+        assertEquals(listOf("Island"), d.getExileCardNames(seats[3]))
+        assertTrue(d.getGraveyardCardNames(seats[1]).isEmpty())
+        assertTrue(d.getGraveyardCardNames(seats[2]).isEmpty())
+        val transitions = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
+            .filter { it.fromZone == com.wingedsheep.sdk.core.Zone.EXILE &&
+                it.toZone == com.wingedsheep.sdk.core.Zone.EXILE }
+            .map { it.ownerId to it.entityName }
+        assertEquals("Each selected opponent must have exactly one replacement transition",
+            listOf(seats[1] to "Sol Ring", seats[2] to "Grizzly Bears").toSet(),
+            transitions.toSet())
+        assertEquals("No duplicate processing transitions", 2, transitions.size)
+    }
+
 }
