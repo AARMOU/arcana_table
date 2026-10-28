@@ -92,7 +92,7 @@ function replaceWithSuggestion(oldName, suggested){
  resetVerification();selected();draw();
 }
 function choose(item,on){
- if(checking)return false;
+ if(checking){draw();return false;}
  const k=key(item.name);
  if(!on){chosen.delete(k);resetVerification();selected();draw();return true;}
  if(!chosen.has(k)&&chosen.size>=MAX){text('notice','Limit: 8 cards per request. Submit this batch before selecting more.');draw();return false;}
@@ -226,7 +226,7 @@ async function verifySelected(){
  checking=true;selected();
  for(const c of [...chosen.values()]){
   const identity=await Preflight.verifyPrintedCard(fetch,c.name);
-  if(token!==revision)return;
+  if(token!==revision){checking=false;selected();return;}
   const capability=identity.ok?Preflight.assessCard(identity.name,eligibility):{ok:false,reason:identity.reason};
   verified.set(key(c.name),{ok:identity.ok&&capability.ok,
     reason:identity.ok?capability.reason:identity.reason,
