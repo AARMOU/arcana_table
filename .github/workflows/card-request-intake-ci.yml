@@ -45,9 +45,12 @@ jobs:
           echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
           (yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses > /dev/null) || true
           "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" 'platforms;android-36' 'build-tools;36.0.0'
-      - name: Compile importer UI and run focused Android test
+      - name: Compile importer UI and test card request plus Deck Builder onboarding
         working-directory: android
         run: |
           # The hosted runner sets a deprecated path which disagrees with our pinned SDK.
           unset ANDROID_SDK_ROOT
-          ./gradlew :app:testDebugUnitTest --tests com.arcanatable.CardRequestsTest --no-daemon --stacktrace
+          ./gradlew :app:testDebugUnitTest \
+            --tests com.arcanatable.CardRequestsTest \
+            --tests com.arcanatable.ui.DeckBuilderUiTest \
+            --no-daemon --stacktrace
