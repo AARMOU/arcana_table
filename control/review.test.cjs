@@ -52,6 +52,12 @@ test('no GitHub token, no raw HTML, one write endpoint, and it is the review Wor
   assert.match(src, /never a merge, build, signing or release|never merges, builds, signs or releases/);
 });
 
+test('owner sign-in button is actually hidden by dashboard CSS after authentication', () => {
+  const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+  assert.match(html, /\.btn\[hidden\]\s*\{\s*display\s*:\s*none\s*!important\s*\}/);
+  assert.match(src, /signIn\.hidden = ownerReady;/);
+});
+
 test('dashboard loads it, the shell caches it and Pages publishes it', () => {
   const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   assert.ok(html.includes('<script src="./review.js" defer></script>'));
