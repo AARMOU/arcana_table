@@ -78,6 +78,11 @@ jobs:
               "Eldrazi Incursion": "43d3cf6a753c82d38992d35d3dbe9b09d3caaec4f8e0369065aaca4a5559849f",
               "Eldrazi Unbound": "f4f98c4f0e2c22f89f8fa8bf92e65847cb94cb8739ad867bc061759bf70ccdcf",
           }, "Original precon manifest substituted or changed"
+          monument = next((r for r in report["rows"] if r["name"] == "Forsaken Monument"), None)
+          if monument:
+              assert "CLAUDE SOURCE #171 / GPT VALIDATION #180" in monument["engineeringLane"], "Existing Monument implementation owner lost"
+              assert "Copilot #151 HOLD" in monument["engineeringLane"], "Unapproved duplicate Monument worker risk"
+              assert "NO duplicate paid dispatch" in monument["mandatoryReview"], "Existing Monument claim must block paid pickup"
           displacer = next((r for r in report["rows"] if r["name"] == "Eldrazi Displacer"), None)
           if displacer:
               assert displacer["engineeringLane"].startswith("GPT #154 / existing draft #163"), "Duplicate Displacer worker risk"
