@@ -1,7 +1,8 @@
 name: Arcana Queue Feeder
-# Read-only suggestions for the Copilot queue (scripts/queue-feeder.cjs). Never creates queue issues,
-# labels, assignments or paid work: it only refreshes its own status comment on #78, with prefilled
-# "new issue" links the owner reviews and submits.
+# Read-only Cardkit classification runs without secrets. Trusted-main publish may
+# open ONE GitHub Actions bot queue issue in enabled normal mode, preferring
+# owner-submitted [Card Request] priorities that are already SUPPORTED / copilot.
+# Only the separate guarded dispatcher can authorize a paid Copilot assignment.
 on:
   schedule:
     - cron: '*/15 * * * *'
