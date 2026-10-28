@@ -59,7 +59,11 @@ function chooseAutoQueue(payload, openIssues = []) {
   if (!payload?.ok || !/^[a-f0-9]{40}$/.test(String(payload.baseSha || '')) ||
       !/^[A-Za-z0-9._/-]+$/.test(String(payload.base || ''))) return { reason: 'invalid-cardkit-result' };
   const queued = new Set(F.collectNames(openIssues, 1000).map(F.normName));
+  // An outsider cannot park a fake "ready" issue and indefinitely block the feed.
   const pending = openIssues.find(i => !i.pull_request && String(i.title || '').startsWith('[Arcana Queue]') &&
+    (A.TRUSTED_ASSOCIATIONS.includes(i.author_association) ||
+      (i.user?.login === 'github-actions[bot]' && i.user?.type === 'Bot' &&
+        String(i.body || '').startsWith(A.AUTO_QUEUE_MARKER + '\n'))) &&
     !(i.assignees || []).some(a => ['copilot', 'copilot-swe-agent[bot]'].includes(String(a.login || '').toLowerCase())) &&
     A.unitActionable(i.body || '', payload.base).ok);
   if (pending) return { pendingIssue: pending.number, reason: 'eligible-queue-item-already-waiting' };
