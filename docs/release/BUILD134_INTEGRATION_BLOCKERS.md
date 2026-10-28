@@ -1,6 +1,6 @@
 # Build 134 isolated integration: exact-head blocker ledger (2026-10-28)
 
-**Scope:** draft PR #346, branch `gpt/build134-integrated-source-20261028`, inspected source head `bbaf7ca8978ff750f6ac4eecf88264b77935d161`. This document records *failed* integration gates; it does not certify Build 134 or authorize a merge/build. First release remains two-player, premade-only, with deck import disabled. Frozen staged release: PR #254. Source-validation lineage: PR #260 and successful workflow #40678286737. Source integration: PR #346.
+**Scope:** draft PR #346, branch `gpt/build134-integrated-source-20261028`, inspected source head `bbaf7ca8978ff750f6ac4eecf88264b77935d161`. This document records *failed* integration gates; it does not certify Build 134 or authorize a merge/build. Owner-approved Build 134 target now enables four-player online (WAN) and deck importing. Feature flags and release tests alone do NOT certify WAN gameplay or import end-to-end; those require separate acceptance. Frozen staged release: PR #254. Source-validation lineage: PR #260 and successful workflow #40678286737. Source integration: PR #346.
 
 ## 1. Bundled engine JAR/API mismatch — Android Development CI
 
@@ -25,6 +25,10 @@ The `Cannot infer type` errors at Ulalek are downstream of missing symbols; do *
 
 ## 3. Release acceptance still outstanding
 
-The new `ReleaseVariantScopeTest.kt` has three permanent tests for release `BuildConfig` feature flags, persisted AI opponent count, and premade-only deck visibility without deleting saved data. Development CI invokes these with `:app:testReleaseUnitTest`, but the upstream custom-card compilation failure prevented execution on this head. A successful historical source-validation run does **not** substitute for integrated-source Android compilation, scenario tests, release-variant JUnit, tutorial tests, and packaging verification on the final exact head.
+The revised `ReleaseVariantScopeTest.kt` has three permanent tests for release `BuildConfig` feature flags (import/multiplayer enabled), persisted AI opponent count bounded to 1–3, and visibility of imported plus premade decks without deleting saved data. These checks do not demonstrate functioning four-player WAN sessions or successful imports. Development CI invokes these with `:app:testReleaseUnitTest`, but the upstream custom-card compilation failure prevented execution on this head. A successful historical source-validation run does **not** substitute for integrated-source Android compilation, scenario tests, release-variant JUnit, tutorial tests, and packaging verification on the final exact head.
 
 **No merge, APK/AAB, signing, Cloudflare deployment, paid Copilot worker, or release authorization follows from this ledger.**
+
+## 4. Owner-approved scope change / additional acceptance (2026-10-28)
+
+Issue #81 Claude handoffs #6473498185 and #6473653110 record owner authorization for four-player online (WAN) and deck importing in Build 134. ReleaseFeatures and the three release-variant unit tests were updated accordingly. This does not validate the underlying network transport, four-seat lobby/session synchronization, importer, or security/privacy. Require real end-to-end WAN four-player acceptance and import success/failure regression coverage before calling Build 134 releasable. Claude owns isolated engine candidate workflow #40719147474; do not modify its engine patch/JAR lane. The previously failing engine/Cardkit gates remain blockers until exact-head green evidence is obtained.
