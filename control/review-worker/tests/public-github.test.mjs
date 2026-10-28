@@ -87,5 +87,5 @@ test('API limits and invalid data return uncached errors with status clues', asy
 
 test('no legacy caches.default calls: they cannot be relied on for workers.dev', () => {
   const source = readFileSync(new URL('../src/public-github.mjs', import.meta.url), 'utf8');
-  assert.doesNotMatch(source, /globalThis\.caches\b|caches\.default|cache\.put\(/);
+  assert.doesNotMatch(source.replace(/^\/\/.*$/gm, ''), /globalThis\.caches\b|caches\.default|cache\.put\(/);
 });
