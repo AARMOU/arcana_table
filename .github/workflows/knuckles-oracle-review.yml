@@ -15,7 +15,7 @@ jobs:
       - name: Existing Cardkit unit regressions
         run: python3 -m unittest discover -s tools/cardkit/tests -v
       - name: Fetch exact Scryfall Oracle record (fail closed if unreachable)
-        run: tools/cardkit/cardkit oracle fetch --refresh "Knuckles the Echidna"
+        run: tools/cardkit/cardkit oracle fetch "Knuckles the Echidna" --refresh
       - name: Verify official SLD identity, Oracle wording, and classify without dispatch
         run: |
           mkdir -p knuckles-evidence
