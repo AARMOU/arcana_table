@@ -1,0 +1,71 @@
+name: Personal Commander deck coverage audit
+# Audit existing deck data; never dispatch a paid worker or implement cards.
+on:
+  pull_request:
+    paths:
+      - 'tools/deck-gap-audit.cjs'
+      - 'tools/tests/deck-gap-audit.test.cjs'
+      - '.github/workflows/personal-deck-gap-audit.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '19 7 * * *'
+permissions:
+  contents: read
+jobs:
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tools/tests/deck-gap-audit.test.cjs
+      - run: git diff --check
+  refresh-tracker:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      # Only execute reviewed default-branch scripts. Integration checkout supplies DATA ONLY.
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          path: code
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: gpt/arcana-integration-next
+          path: source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node code/tools/tests/deck-gap-audit.test.cjs
+      - name: Generate exact-head deck coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          SRC_SHA="$(git -C source rev-parse HEAD)"
+          node code/tools/deck-gap-audit.cjs --root source --source-ref "gpt/arcana-integration-next@$SRC_SHA" --json output/report.json --markdown output/report.md
+      - name: Refresh machine section of issue 321 (no labels or paid dispatch)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const start = '<!-- arcana-deck-gap-snapshot-start -->';
+            const end = '<!-- arcana-deck-gap-snapshot-end -->';
+            const report = fs.readFileSync('output/report.md','utf8');
+            const {owner, repo} = context.repo;
+            const issue_number = 321;
+            const {data: issue} = await github.rest.issues.get({owner, repo, issue_number});
+            const old = issue.body || '';
+            const a = old.indexOf(start), b = old.indexOf(end);
+            if (a < 0 || b < a) throw Error('Tracker markers missing or malformed; will not replace human notes.');
+            const updated = old.slice(0,a+start.length)+'\n\n'+report+'\n'+old.slice(b);
+            if (updated !== old) await github.rest.issues.update({owner,repo,issue_number,body:updated});
+            core.info('Personal deck coverage snapshot refreshed without changing authorization or labels.');
