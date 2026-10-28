@@ -1,0 +1,50 @@
+name: B140 Nullifier exact-head engine acceptance
+on:
+  push:
+    branches:
+      - gpt/b140-nullifier-processor-port-20261028
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: b140-nullifier-engine-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  nullifier-real-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Execute B140 registered Nullifier engine regressions
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.UlamogsNullifierScenarioTest'
+      - name: Require exactly five executed, no skipped or failing scenarios
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          report = Path('android/custom-cards/build/test-results/test/TEST-com.arcanatable.customcards.UlamogsNullifierScenarioTest.xml')
+          assert report.is_file(), f'Missing JUnit XML: {report}'
+          root = ET.parse(report).getroot()
+          stats = {key: int(root.get(key, '0')) for key in ('tests', 'failures', 'errors', 'skipped')}
+          print(stats)
+          assert stats == {'tests': 5, 'failures': 0, 'errors': 0, 'skipped': 0}, stats
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b140-nullifier-exact-head-junit
+          retention-days: 14
+          path: |
+            android/custom-cards/build/test-results/test/
+            android/custom-cards/build/reports/tests/test/
