@@ -182,5 +182,11 @@ test('feeder workflow never writes issues from the job that runs base-branch cod
   assert.doesNotMatch(suggest, /\$\{\{ secrets\.|createComment|addLabels|assignees/);
   const publish = y.slice(y.indexOf('  publish:'));
   assert.doesNotMatch(publish, /path: base|cardkit\.py/);
-  assert.doesNotMatch(y, /issues\.create\(|addAssignees|COPILOT_DISPATCH_TOKEN|ARCANA_AUTOMATION_READY/);
+  // The untrusted integration-base job remains read-only; only the pinned main
+  // publish job may create a queue unit and wake the guarded dispatcher.
+  assert.doesNotMatch(suggest, /issues\.create\(|addAssignees|COPILOT_DISPATCH_TOKEN|ARCANA_AUTOMATION_READY/);
+  assert.doesNotMatch(publish, /COPILOT_DISPATCH_TOKEN|agent_assignment|addAssignees/);
+  assert.match(publish, /createNextAutoQueue/);
+  assert.match(publish, /createWorkflowDispatch/);
+  assert.match(publish, /ARCANA_AUTOMATION_READY/);
 });

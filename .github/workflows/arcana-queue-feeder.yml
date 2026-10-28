@@ -4,7 +4,11 @@ name: Arcana Queue Feeder
 # "new issue" links the owner reviews and submits.
 on:
   schedule:
-    - cron: '47 13 * * *'
+    - cron: '*/15 * * * *'
+  # Wake on Copilot's completion if GitHub emits a workflow_run for its dynamic workflow.
+  workflow_run:
+    workflows: ['Running Copilot cloud agent']
+    types: [completed]
   workflow_dispatch:
     inputs:
       max:
@@ -92,6 +96,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      actions: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -104,15 +109,21 @@ jobs:
       - uses: actions/github-script@v7
         env:
           ARCANA_INTEGRATION_BASE: ${{ vars.ARCANA_INTEGRATION_BASE }}
+          ARCANA_AUTOMATION_READY: ${{ vars.ARCANA_AUTOMATION_READY }}
+          ARCANA_DISPATCH_MODE: ${{ vars.ARCANA_DISPATCH_MODE }}
         with:
           script: |
             const Q=require('./scripts/queue-feeder.cjs');const S=require('./scripts/control-status.cjs');
             let r=null;try{r=JSON.parse(require('fs').readFileSync('feeder-result.json','utf8'));}catch(e){core.warning('Feeder result unavailable: '+e.message);}
             const result=r||{ok:false,reason:'feeder job produced no result (see the suggest job)'};
             let payload=Q.queuePayload({result,units:r?.units||[],base:process.env.ARCANA_INTEGRATION_BASE,baseSha:r?.baseSha,runId:context.runId});
+            const enabled=process.env.ARCANA_AUTOMATION_READY==='true' && process.env.ARCANA_DISPATCH_MODE==='normal';
+            const auto=await Q.createNextAutoQueue({github,...context.repo,payload,runId:context.runId,enabled});
+            payload.autoQueue=auto;
             // Stay well under GitHub's 65,536-character comment limit.
             while(S.formatStatus('queue',payload,Q.queueSummary(payload)).length>60000&&payload.suggestions.length)payload={...payload,suggestions:payload.suggestions.slice(0,-1)};
             const published=await S.publishStatus({github,...context.repo,kind:'queue',payload,summary:Q.queueSummary(payload)});
             core.info('Status comment: '+published);
             await core.summary.addHeading('Queue feeder').addRaw(Q.queueSummary(payload).join('\n')).write();
-            if(!r||published.startsWith('failed'))core.setFailed('Queue suggestions not published from verified feeder result ('+published+').');
+            if(!r||published.startsWith('failed')){core.setFailed('Queue status not published ('+published+').');return;}
+            if(auto.created||auto.pending)await github.rest.actions.createWorkflowDispatch({...context.repo,workflow_id:'arcana-card-dispatcher.yml',ref:'main',inputs:{dry_run:'false'}});

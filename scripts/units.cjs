@@ -93,7 +93,13 @@ async function loadUnits({ github, owner, repo, now = Date.now(), approvers, lag
     const labels = (issue.labels || []).map(l => l.name || l);
     const raw = { number: issue.number, title: issue.title, body: issue.body || '', labels,
       assignedToCopilot: (issue.assignees || []).some(isCopilot), ledger: parseLedger(comments), sessions,
-      authorAssociation: issue.author_association, commenters: commentersOf(comments) };
+      authorAssociation: issue.author_association, authorLogin: issue.user?.login,
+      authorType: issue.user?.type, commenters: commentersOf(comments) };
+    if (raw.authorLogin === 'github-actions[bot]' && raw.authorType === 'Bot') {
+      // Comment and assignment timestamps do not constitute body edits.
+      const writtenAt = await contentWrittenAt(github, owner, repo, issue.number);
+      raw.autoQueueUnedited = Number.isFinite(writtenAt) && writtenAt === Date.parse(issue.created_at);
+    }
     raw.feasibilityOverride = overrideOf(events.get(issue.number), labels);
     const oneShot = labels.includes(ONE_SHOT_LABEL);
     if (oneShot) raw.approval = approvalOf(events.get(issue.number), await contentWrittenAt(github, owner, repo, issue.number));

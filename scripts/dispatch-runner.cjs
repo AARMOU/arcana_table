@@ -12,7 +12,13 @@ const F = require('./feasibility.cjs');
 async function revalidate({ github, owner, repo, n, fresh, needApproval, approvers, base }) {
   try {
     const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: n, per_page: 100 });
-    const raw = { authorAssociation: fresh.author_association, commenters: commentersOf(comments) };
+    const raw = { authorAssociation: fresh.author_association, authorLogin: fresh.user?.login,
+      authorType: fresh.user?.type, title: fresh.title, body: fresh.body,
+      commenters: commentersOf(comments) };
+    if (raw.authorLogin === 'github-actions[bot]' && raw.authorType === 'Bot') {
+      const writtenAt = await contentWrittenAt(github, owner, repo, n);
+      raw.autoQueueUnedited = Number.isFinite(writtenAt) && writtenAt === Date.parse(fresh.created_at);
+    }
     if (needApproval) {
       const events = await github.paginate(github.rest.issues.listEventsForTimeline, { owner, repo, issue_number: n, per_page: 100 });
       raw.approval = approvalOf(events, await contentWrittenAt(github, owner, repo, n));
