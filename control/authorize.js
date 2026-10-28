@@ -102,7 +102,16 @@ function render(container, units, checkedAt) {
       // Signed-out visitors may see public status, but cannot authorize without login.
       const response = await fetch(API + '/v1/public/github?path=' +
         encodeURIComponent('/issues/' + unit.n), { cache: 'no-store' });
-      const info = response.ok ? await response.json() : null;
+      let info = response.ok ? await response.json() : null;
+      // The public Worker may serve a 15-minute-old issue after authorization.
+      // Recheck an apparently unapproved candidate at GitHub before offering a button.
+      if (info?.state === 'open' && verdict.ok &&
+          !(info.labels || []).some(l => l.name === 'arcana:authorize-once')) {
+        const direct = await fetch('https://api.github.com/repos/AARMOU/arcana_table/issues/' +
+          unit.n, { cache: 'no-store', headers: { Accept: 'application/vnd.github+json' } }).catch(() => null);
+        if (!direct?.ok) throw Error('Fresh issue state unavailable');
+        info = await direct.json();
+      }
       if (!info || info.number !== unit.n || !String(info.title || '').startsWith('[Arcana Queue]'))
         throw Error('No verified queue issue');
       if (info.state !== 'open') {
@@ -123,7 +132,8 @@ function render(container, units, checkedAt) {
         message.textContent = verdict.reason + age;
       } else {
         button.disabled = false;
-        message.textContent = 'Eligible queue unit · sign in to authorize' + age;
+        button.textContent = 'Sign in to authorize';
+        message.textContent = 'Eligible queue unit · GitHub sign-in required' + age;
       }
     })().catch(() => {
       button.disabled = true;
