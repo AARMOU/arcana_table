@@ -77,3 +77,15 @@ On the opening **Overview** screen, the **Current Copilot assignment** card show
 For that issue, the public browser makes read-only GitHub GET requests to the issue, its timeline, and a Copilot-authored cross-referenced PR (if one exists). For a verified PR it checks **only that PR branch** for a GitHub Actions `Running Copilot cloud agent` run. An agent workflow that finished successfully means the **agent run** finished; it does **not** mean the card is playable, merged or validated. PR titles remain visible so blocker/scaffold PRs are not confused with card completion. Unknown or stale data remains explicitly labeled; no GitHub write capability, billing amount, private token, or worker trigger was added.
 
 This panel refreshes on manual dashboard **Refresh**, as permitted by the public API rate limit, rather than assuming a continuous live connection. Its read-only status is based on the currently published dispatcher report and may lag an assignment until the next dispatcher snapshot.
+
+## Request-weighted queue priority
+
+The trusted queue feeder reads the opt-in per-card aggregate counts already published
+to issue #321 and combines them with separate, owner-authored GitHub card requests.
+Higher **recorded request counts** rank first, including repeat requests from
+different submissions; retries using the same idempotency ID do not add votes.
+Only verified `SUPPORTED / copilot`, unclaimed names can be ranked for
+automatic paid dispatch. Ties favor the oldest owner request, then Cardkit's
+original order. The Card Queue's read-only status shows the top demand rankings.
+This is **not a unique-person vote count** and does not weaken any engine,
+credit, reserve, worker-capacity, CI, or release gate.
