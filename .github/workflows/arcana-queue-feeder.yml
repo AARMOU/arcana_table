@@ -113,6 +113,9 @@ jobs:
             let r=null;try{r=JSON.parse(require('fs').readFileSync('feeder-result.json','utf8'));}catch(e){core.warning('Feeder result unavailable: '+e.message);}
             const result=r||{ok:false,reason:'feeder job produced no result (see the suggest job)'};
             let payload=Q.queuePayload({result,units:r?.units||[],base:process.env.ARCANA_INTEGRATION_BASE,baseSha:r?.baseSha,runId:context.runId});
+            const enabled=process.env.ARCANA_AUTOMATION_READY==='true' && process.env.ARCANA_DISPATCH_MODE==='normal';
+            const auto=await Q.createNextAutoQueue({github,...context.repo,payload,runId:context.runId,enabled});
+            payload.autoQueue=auto;
             // Stay well under GitHub's 65,536-character comment limit.
             while(S.formatStatus('queue',payload,Q.queueSummary(payload)).length>60000&&payload.suggestions.length)payload={...payload,suggestions:payload.suggestions.slice(0,-1)};
             const published=await S.publishStatus({github,...context.repo,kind:'queue',payload,summary:Q.queueSummary(payload)});
