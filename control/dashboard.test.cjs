@@ -162,3 +162,12 @@ test('signed-out approval checks GitHub live before showing a button',()=>{
   assert.ok(auth.includes("if (!direct?.ok) throw Error('Fresh issue state unavailable')"));
   assert.ok(auth.includes("button.textContent = 'Sign in to authorize'"));
 });
+
+test('installed PWA refreshes when an updated service worker activates',()=>{
+  assert.ok(html.includes("updateViaCache: 'none'"));
+  assert.ok(html.includes("registration.update()"));
+  assert.ok(html.includes("addEventListener('controllerchange'"));
+  assert.ok(html.includes('if (reloading) return'));
+  assert.ok(html.includes('location.reload()'));
+  assert.ok(sw.includes("arcana-control-shell-v11"));
+});
