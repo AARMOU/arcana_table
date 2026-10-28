@@ -19,7 +19,7 @@ jobs:
           endpoint='https://arcana-card-requests.arcanamtg.workers.dev'
           health_file="$RUNNER_TEMP/card-request-health.json"
           status=$(curl --silent --show-error --retry 2 --max-time 15 \
-            --proto '=https' --location-trusted \
+            --proto '=https' \
             -o "$health_file" -w '%{http_code}' "$endpoint/health")
           test "$status" = "200" || { echo "::error::Worker /health returned HTTP $status"; exit 1; }
           python3 - "$health_file" <<'PY'
