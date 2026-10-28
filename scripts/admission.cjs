@@ -5,6 +5,7 @@
 const { decideBudget } = require('./usage-budget-policy.cjs');
 
 const LEDGER = '<!-- arcana-wu-ledger-v1 -->';
+const AUTO_QUEUE_MARKER = '<!-- arcana-auto-queue-v1 -->';
 const ONE_SHOT_LABEL = 'arcana:authorize-once';
 const HALTED_LABEL = 'wu:halted';
 const RESOLVE_LABEL = 'wu:resolve-interrupted';
@@ -233,7 +234,12 @@ const trustedCommenter = c => TRUSTED_ASSOCIATIONS.includes(c?.association) ||
 // named approver gave it.
 function provenance(raw = {}, { needApproval = false, approvers } = {}) {
   const reasons = [];
-  if (!TRUSTED_ASSOCIATIONS.includes(raw.authorAssociation)) reasons.push('author-untrusted');
+  // Bot-created queue units are trusted ONLY when emitted unedited by the main feeder;
+  // other bot or public issue submissions cannot authorize paid work.
+  const trustedAutoQueue = raw.authorLogin === 'github-actions[bot]' && raw.authorType === 'Bot' &&
+    String(raw.title || '').startsWith('[Arcana Queue]') &&
+    String(raw.body || '').startsWith(AUTO_QUEUE_MARKER + '\n') && raw.autoQueueUnedited === true;
+  if (!TRUSTED_ASSOCIATIONS.includes(raw.authorAssociation) && !trustedAutoQueue) reasons.push('author-untrusted');
   if (!Array.isArray(raw.commenters)) reasons.push('comments-unavailable');
   else if (raw.commenters.some(c => !trustedCommenter(c))) reasons.push('untrusted-comments');
   if (needApproval) {
@@ -317,7 +323,7 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
     : { allowed: true, reason: 'admitted', budget };
 }
 
-module.exports = { LEDGER, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
+module.exports = { LEDGER, AUTO_QUEUE_MARKER, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
   SESSION_STALE_MS, DEFAULT_BILLING_LAG_HOURS,
   readiness, formatLedger, parseLedger, deriveUnit, unitActionable, budgetWithReservations, admit, isBot,
   provenance, trustedCommenter, TRUSTED_ASSOCIATIONS };
