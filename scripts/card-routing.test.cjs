@@ -1,0 +1,225 @@
+'use strict';
+// Owner card requests: classify every requested card (not only the six precons), route cards Copilot
+// cannot take yet to GPT as "[Card Work]" issues, and hand them back to the Copilot queue once
+// Cardkit says they are ready. Also: stuck queue issues and repeat paid retries.
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const Q = require('./queue-feeder.cjs');
+const F = require('./feasibility.cjs');
+const A = require('./admission.cjs');
+
+const BASE = 'gpt/arcana-integration-next';
+const SHA = '9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f';
+const OWNER = { author_association: 'OWNER', user: { login: 'AARMOU', type: 'User' } };
+const BOT = { login: 'github-actions[bot]', type: 'Bot' };
+const request = (number, names, extra = {}) => ({ number, ...OWNER, title: '[Card Request] ' + names.join(', '),
+  created_at: '2026-10-28T14:00:00Z', body: '## Cards requested\n' + names.map(n => '- ' + n + ' — Manually entered').join('\n') + '\n', ...extra });
+const gaps = (cards, { verified = true, claimed = {} } = {}) => ({
+  dispatch: { claimsVerified: verified, dispatchable: verified, claimed,
+    copilot: cards.filter(c => c.readiness === 'SUPPORTED' && c.route === 'copilot' && !claimed[c.name]).map(c => c.name) },
+  cards });
+const card = (name, readiness, route = null, extra = {}) => ({ name, readiness, route, reasons: ['reason for ' + name], ...extra });
+const PRECONS = gaps([card('Celestine, the Living Saint', 'SUPPORTED', 'copilot')]);
+const unitBody = name => ['## Cards', '- ' + name, '', '## Acceptance', '- ' + name + ': exact behavior',
+  '- Exact current Oracle behavior (cost, types, every ability, targeting and timing), checked against authoritative card records',
+  '- Executable regression scenarios for positive and negative behavior, registration and deterministic asset export',
+  'Base: ' + BASE, ''].join('\n');
+
+test('requested deck lists only owner-selected names, one per line, for a second Cardkit run', () => {
+  const outsider = { ...request(9, ['Sol Ring']), author_association: 'NONE', user: { login: 'x', type: 'User' } };
+  assert.equal(Q.requestedDeck([request(1, ['Broodlord', 'Ulalek, Fused Atrocity']), outsider]),
+    '1 Broodlord\n1 Ulalek, Fused Atrocity\n');
+  assert.equal(Q.requestedDeck([]), '');
+});
+
+test('a requested card outside the six precons becomes Copilot-eligible when Cardkit supports it', () => {
+  const issues = [request(10, ['Darksteel Monolith'])];
+  const before = Q.candidates({ gaps: PRECONS, openIssues: issues });
+  assert.deepEqual(before.requested, []);
+  assert.equal(before.blockedRequests[0].outcome, 'unclassified');
+  const r = Q.candidates({ gaps: PRECONS, requestedGaps: gaps([card('Darksteel Monolith', 'SUPPORTED', 'copilot')]), openIssues: issues });
+  assert.deepEqual(r.requested, [{ name: 'Darksteel Monolith', issue: 10 }]);
+  assert.equal(r.names[0], 'Darksteel Monolith');
+  assert.ok(r.eligibleNames.includes('Darksteel Monolith'));
+  assert.deepEqual(r.resolvedRequests, ['Darksteel Monolith']);
+});
+
+test('unverified requested classification adds nothing: no eligibility and no GPT work', () => {
+  const r = Q.candidates({ gaps: PRECONS, openIssues: [request(11, ['Darksteel Monolith', 'Broodlord'])],
+    requestedGaps: gaps([card('Darksteel Monolith', 'SUPPORTED', 'copilot'), card('Broodlord', 'NEEDS_REVIEW', 'gpt')], { verified: false }) });
+  assert.deepEqual(r.requested, []);
+  assert.deepEqual(r.workRequests, []);
+  assert.equal(r.requestedClassified, false);
+  assert.ok(r.blockedRequests.every(b => b.outcome === 'unclassified'));
+});
+
+test('each blocked request gets a precise outcome; only engine and review cards go to GPT', () => {
+  const issues = [request(12, ['Sol Ring', 'Abstruse Archaic', 'Ulalek, Fused Atrocity', 'Broodlord', 'Eldrazi Temple'])];
+  const requested = gaps([
+    card('Sol Ring', 'IMPLEMENTED_AND_TESTED'),
+    card('Abstruse Archaic', 'SUPPORTED', 'copilot'),
+    card('Ulalek, Fused Atrocity', 'NEEDS_REVIEW', 'claude', { reviewHint: 'possible-engine-gap' }),
+    card('Broodlord', 'NEEDS_REVIEW', 'gpt'),
+    card('Eldrazi Temple', 'ENGINE_BLOCKED', 'claude'),
+  ], { claimed: { 'Abstruse Archaic': 'PR #344 (copilot/x)' } });
+  const r = Q.candidates({ gaps: PRECONS, requestedGaps: requested, openIssues: issues });
+  const by = Object.fromEntries(r.blockedRequests.map(b => [b.name, b]));
+  assert.equal(by['Sol Ring'].outcome, 'implemented');
+  assert.equal(by['Abstruse Archaic'].outcome, 'claimed');
+  assert.match(by['Abstruse Archaic'].reason, /PR #344/);
+  assert.equal(by['Ulalek, Fused Atrocity'].outcome, 'engine-work');
+  assert.equal(by['Broodlord'].outcome, 'needs-review');
+  assert.equal(by['Eldrazi Temple'].outcome, 'engine-work');
+  assert.deepEqual(r.workRequests.map(w => w.name).sort(), ['Broodlord', 'Eldrazi Temple', 'Ulalek, Fused Atrocity']);
+  assert.deepEqual(r.resolvedRequests.sort(), ['Abstruse Archaic', 'Sol Ring']);
+  // None of them becomes a Copilot unit.
+  assert.deepEqual(r.names, ['Celestine, the Living Saint']);
+  const p = Q.queuePayload({ result: r, units: [], base: BASE, baseSha: SHA });
+  assert.equal(p.workRequests.length, 3);
+  assert.equal(p.requestedClassified, true);
+  assert.match(Q.queueSummary(p).join('\n'), /Broodlord \(#12, needs-review\)/);
+});
+
+test('a waiting queue issue Copilot cannot take no longer freezes the automatic queue', () => {
+  const stuckIssue = { number: 300, ...OWNER, title: '[Arcana Queue] Abstruse Archaic', body: unitBody('Abstruse Archaic'), assignees: [] };
+  const r = Q.candidates({ gaps: PRECONS, openIssues: [stuckIssue],
+    requestedGaps: null });
+  assert.deepEqual(r.notReady, []); // unknown is not "not ready": stays conservative
+  const claimedPrecons = gaps([card('Celestine, the Living Saint', 'SUPPORTED', 'copilot'), card('Abstruse Archaic', 'SUPPORTED', 'copilot')],
+    { claimed: { 'Abstruse Archaic': 'PR #344 (copilot/x)' } });
+  const r2 = Q.candidates({ gaps: claimedPrecons, openIssues: [stuckIssue] });
+  assert.deepEqual(r2.notReady, ['Abstruse Archaic']);
+  const p = Q.queuePayload({ result: r2, units: [{ name: 'Celestine, the Living Saint', body: unitBody('Celestine, the Living Saint') }], base: BASE, baseSha: SHA });
+  const pick = Q.chooseAutoQueue(p, [stuckIssue]);
+  assert.equal(pick.suggestion.name, 'Celestine, the Living Saint');
+  assert.deepEqual(pick.stuck, [{ issue: 300, cards: ['Abstruse Archaic'] }]);
+  // A waiting issue for a card that is still ready keeps the old behaviour (wake the dispatcher).
+  const fine = { ...stuckIssue, number: 301, title: '[Arcana Queue] Celestine', body: unitBody('Celestine, the Living Saint') };
+  assert.equal(Q.chooseAutoQueue(p, [stuckIssue, fine]).pendingIssue, 301);
+});
+
+test('a card whose earlier trusted queue issue closed without landing is held, not paid for again', () => {
+  const r = Q.candidates({ gaps: PRECONS, openIssues: [] });
+  const p = Q.queuePayload({ result: r, units: [{ name: 'Celestine, the Living Saint', body: unitBody('Celestine, the Living Saint') }], base: BASE, baseSha: SHA });
+  const closedBot = { number: 340, user: BOT, author_association: 'NONE', state: 'closed',
+    title: '[Arcana Queue] Celestine, the Living Saint — Cardkit SUPPORTED, unclaimed', body: A.AUTO_QUEUE_MARKER + '\n' + unitBody('Celestine, the Living Saint') };
+  const held = Q.chooseAutoQueue(p, [], [closedBot]);
+  assert.equal(held.suggestion, undefined);
+  assert.deepEqual(held.held, [{ name: 'Celestine, the Living Saint', issue: 340 }]);
+  // An outsider's closed lookalike cannot block a card.
+  const outsider = { ...closedBot, user: { login: 'x', type: 'User' }, body: unitBody('Celestine, the Living Saint') };
+  assert.equal(Q.chooseAutoQueue(p, [], [outsider]).suggestion.name, 'Celestine, the Living Saint');
+});
+
+const workPayload = (requests, resolved = []) => ({ ok: true, requestedClassified: true, base: BASE, baseSha: SHA,
+  workRequests: requests, resolvedRequests: resolved });
+const ULALEK = { name: 'Ulalek, Fused Atrocity', issue: 12, outcome: 'engine-work', readiness: 'NEEDS_REVIEW', route: 'claude',
+  hint: 'possible-engine-gap', cardkitReasons: ['1 line(s) without a close implemented match (best 0.58)'] };
+const KNUCKLES = { name: 'Knuckles the Echidna', issue: 350, outcome: 'needs-review', readiness: 'NEEDS_REVIEW', route: 'gpt',
+  cardkitReasons: ['no cached Oracle record: run `tools/cardkit/cardkit oracle fetch` (needs Scryfall access)'] };
+const workIssue = (number, r, state = 'open', user = BOT) => ({ number, state, user, title: Q.cardWorkTitle(r),
+  body: Q.cardWorkBody(r, { runId: 1, baseSha: SHA, base: BASE }) });
+
+test('one card-work issue per blocked card, ever; never for unclassified runs', () => {
+  assert.equal(Q.planCardWork({ ...workPayload([ULALEK]), requestedClassified: false }).create, null);
+  assert.equal(Q.planCardWork(workPayload([ULALEK])).create.name, ULALEK.name);
+  // Existing open or closed bot issue for the card: nothing new.
+  assert.equal(Q.planCardWork(workPayload([ULALEK]), [workIssue(400, ULALEK)]).create, null);
+  assert.equal(Q.planCardWork(workPayload([ULALEK]), [workIssue(400, ULALEK, 'closed')]).create, null);
+  // A human-made lookalike does not count as the bot issue and cannot suppress routing.
+  assert.equal(Q.planCardWork(workPayload([ULALEK]), [workIssue(401, ULALEK, 'open', { login: 'someone', type: 'User' })]).create.name, ULALEK.name);
+  // Next blocked card is picked once the first has an issue.
+  assert.equal(Q.planCardWork(workPayload([ULALEK, KNUCKLES]), [workIssue(400, ULALEK)]).create.name, KNUCKLES.name);
+});
+
+test('open card work is capped so a flood of requests cannot flood GPT', () => {
+  const many = Array.from({ length: 10 }, (_, k) => workIssue(500 + k, { ...KNUCKLES, name: 'Card ' + k }));
+  const plan = Q.planCardWork(workPayload([ULALEK]), many);
+  assert.equal(plan.create, null);
+  assert.equal(plan.reason, 'card-work-limit-reached');
+});
+
+test('card work is closed and handed back once Cardkit says the card is ready', () => {
+  const plan = Q.planCardWork(workPayload([], [ULALEK.name]), [workIssue(400, ULALEK), workIssue(401, KNUCKLES, 'closed')]);
+  assert.deepEqual(plan.close, [{ issue: 400, name: ULALEK.name }]);
+});
+
+test('card-work body routes to GPT with real-engine rules, and never looks like a Copilot unit', () => {
+  const body = Q.cardWorkBody(KNUCKLES, { runId: 9, baseSha: SHA, base: BASE });
+  assert.ok(body.startsWith(Q.CARD_WORK_MARKER + '\n'));
+  assert.match(body, /oracle fetch/);
+  assert.match(body, /owner-request:#350/);
+  assert.match(body, /No Copilot assignment/);
+  assert.ok(!/@[A-Za-z0-9]/.test(body), 'no mentions');
+  const engine = Q.cardWorkBody(ULALEK, { runId: 9, baseSha: SHA, base: BASE });
+  assert.match(engine, /never as app-side workarounds/);
+  // Not a queue unit: the dispatcher and feasibility gate never see it, nor the owner-priority parser.
+  const issue = workIssue(400, ULALEK);
+  assert.deepEqual(F.collectNames([issue]), []);
+  assert.equal(A.unitActionable(issue.body, BASE).ok, false);
+  assert.deepEqual(Q.ownerSelections([{ ...issue, ...OWNER }]), []);
+});
+
+test('syncCardWork closes resolved work, opens one new issue, and is inert when disabled', async () => {
+  const calls = [];
+  const github = {
+    paginate: async (fn, args) => { calls.push(['list', args]); return [workIssue(400, KNUCKLES)]; },
+    rest: { issues: {
+      listForRepo: () => {},
+      createComment: async a => { calls.push(['comment', a]); },
+      update: async a => { calls.push(['update', a]); },
+      create: async a => { calls.push(['create', a]); return { data: { number: 410 } }; },
+    } },
+  };
+  const off = await Q.syncCardWork({ github, owner: 'AARMOU', repo: 'arcana_table', payload: workPayload([ULALEK]), runId: 5, enabled: false });
+  assert.equal(off.reason, 'normal-auto-dispatch-not-enabled');
+  assert.equal(calls.length, 0);
+  const out = await Q.syncCardWork({ github, owner: 'AARMOU', repo: 'arcana_table', payload: workPayload([ULALEK], [KNUCKLES.name]), runId: 5, enabled: true });
+  assert.deepEqual(out.closed, [{ issue: 400, name: KNUCKLES.name }]);
+  assert.deepEqual(out.created, { issue: 410, name: ULALEK.name, outcome: 'engine-work' });
+  assert.equal(calls[0][1].creator, 'github-actions[bot]');
+  assert.equal(calls[0][1].state, 'all');
+  const update = calls.find(c => c[0] === 'update')[1];
+  assert.deepEqual([update.issue_number, update.state], [400, 'closed']);
+  const created = calls.find(c => c[0] === 'create')[1];
+  assert.equal(created.title, '[Card Work] Ulalek, Fused Atrocity — needs engine work');
+  assert.equal(created.assignees, undefined);
+  assert.equal(created.labels, undefined);
+});
+
+test('control site is redeployed only when the integration base actually moved', () => {
+  const p = { ok: true, baseSha: SHA };
+  assert.equal(Q.needsSiteRefresh({ baseSha: 'a'.repeat(40) }, p), true);
+  assert.equal(Q.needsSiteRefresh({ baseSha: SHA }, p), false);
+  assert.equal(Q.needsSiteRefresh(null, p), false);
+  assert.equal(Q.needsSiteRefresh({ baseSha: 'a'.repeat(40) }, { ok: false, baseSha: SHA }), false);
+});
+
+test('outcome mapping never invents readiness', () => {
+  assert.equal(Q.outcomeOf(undefined), 'unclassified');
+  assert.equal(Q.outcomeOf({ readiness: 'SUPPORTED', route: 'gpt' }), 'unclassified');
+  assert.equal(Q.outcomeOf({ readiness: 'IMPLEMENTED_AND_TESTED', claimedBy: 'PR #1' }), 'implemented');
+});
+
+test('feeder workflow classifies owner requests in the no-secret job and routes in the trusted publish job', () => {
+  const fs = require('node:fs');
+  const y = fs.readFileSync('.github/workflows/arcana-queue-feeder.yml', 'utf8');
+  const suggest = y.slice(y.indexOf('  suggest:'), y.indexOf('  publish:'));
+  const publish = y.slice(y.indexOf('  publish:'));
+  assert.match(suggest, /requestedDeck\(openIssues\)/);
+  assert.match(suggest, /gaps --claims-from-github --deck \.\.\/requested\.txt/);
+  assert.match(suggest, /requestedGaps,openIssues,max\}\)/);
+  assert.ok(!/\$\{\{\s*secrets\./.test(suggest), 'suggest job stays secret-free');
+  assert.match(publish, /Q\.syncCardWork\(/);
+  assert.match(publish, /workflow_id:'pages\.yml'/);
+  assert.match(publish, /needsSiteRefresh\(previous,payload\)/);
+});
+
+test('control site lets the owner file blocked cards, shows routing, and still never dispatches', () => {
+  const fs = require('node:fs');
+  const js = fs.readFileSync('control/card-queue.js', 'utf8');
+  assert.match(js, /function allVerified\(\)\{\n return !checking && chosen\.size>0 &&/);
+  assert.match(js, /routed to GPT/);
+  assert.match(js, /Preflight\.assessCard\(identity\.name,eligibility\)/);
+  assert.ok(!/POST|PUT|PATCH|DELETE|createWorkflowDispatch|issues\.create/.test(js));
+});

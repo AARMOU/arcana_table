@@ -38,7 +38,7 @@ input[type=search],input[type=text],select{width:100%;background:#0b1824;border:
 <main><header><span class="brand">⬡ ARCANA CONTROL</span><a href="./" class="btn">← Dashboard</a></header>
 <h1>Card Queue<span style="color:var(--teal)">.</span></h1>
 <p class="muted">Choose cards, verify exact printed names and Cardkit eligibility in this app, then submit an owner-reviewed request. No paid Copilot work starts from this screen.</p>
-<section class="panel note"><b>Copilot hard gate.</b> Review and submit your selected cards on GitHub. The queue feeder prioritizes owner-selected requests only when Cardkit verifies SUPPORTED / copilot on the current integration base. Unsupported, unknown, already claimed or engine-blocked cards are not assigned to Copilot. No selection bypasses the normal credit reserve, capacity or CI checks.</section>
+<section class="panel note"><b>Copilot hard gate.</b> Review and submit your selected cards on GitHub. The queue feeder sends a card to Copilot only when Cardkit verifies SUPPORTED / copilot on the current integration base. Cards that need engine or rules work are routed to GPT instead (no Copilot credits) and return to the Copilot queue once Cardkit marks them ready. Already implemented or claimed cards are reported, not re-done. No selection bypasses the normal credit reserve, capacity or CI checks.</section>
 <section class="panel" aria-label="Card browser sources">
 <h2>Where do these cards come from?</h2>
 <div class="tabs" role="group" aria-label="Card source">
@@ -66,7 +66,7 @@ input[type=search],input[type=text],select{width:100%;background:#0b1824;border:
 <form id="add" class="row"><input id="manual" type="text" maxlength="150" placeholder="Exact card name" aria-label="Card name" required><button type="submit" class="btn">Add to selection</button></form>
 <p class="muted" id="notice" role="status"></p></section>
 <section class="panel"><h2>Verify before submitting</h2>
-<p class="muted">Exact Magic card names are checked live using Scryfall. Cardkit eligibility is checked against the complete, fresh, same-source, read-only queue-feeder allowlist. If the name is abbreviated, confirm the suggested printed name; unsupported, claimed, unknown and stale results cannot be submitted through this Copilot-priority route. Selected names are sent to Scryfall for verification.</p>
+<p class="muted">Exact Magic card names are checked live using Scryfall. Copilot readiness is shown from the latest complete, fresh, same-source queue-feeder allowlist, for information only. If the name is abbreviated, confirm the suggested printed name. Cards Copilot cannot take yet can still be requested; they are routed to GPT. Selected names are sent to Scryfall for verification.</p>
 <p id="verificationStatus" class="muted" role="status">Select cards to verify.</p>
 <h2>Selected cards</h2><div id="selected" class="entries"></div>
 <div class="row" style="margin-top:12px"><button class="btn" id="verifyCards" type="button" disabled>Verify selected cards</button><button class="btn" id="clear" type="button">Clear draft</button></div></section>
