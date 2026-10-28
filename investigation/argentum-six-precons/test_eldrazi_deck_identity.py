@@ -1,0 +1,309 @@
+#!/usr/bin/env python3
+"""Regression tests for the exact-original Eldrazi precon identity gate (#150)."""
+from __future__ import annotations
+
+import importlib.util
+import pathlib
+import tempfile
+import unittest
+
+SCRIPT = pathlib.Path(__file__).with_name("eldrazi-incursion-cardkit-triage.py")
+spec = importlib.util.spec_from_file_location("eldrazi_incursion_cardkit_triage", SCRIPT)
+assert spec and spec.loader
+audit = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(audit)
+
+
+class OriginalDeckIdentityTest(unittest.TestCase):
+    def setUp(self):
+        self.cards = [
+            {"name": "Eldrazi Temple", "quantity": 1},
+            {"name": "Wastes", "quantity": 12},
+            {"name": "Ugin, the Ineffable", "quantity": 1},
+        ]
+
+    def test_same_exact_cards_in_different_manifest_order_have_same_digest(self):
+        self.assertEqual(
+            audit.original_deck_digest(self.cards),
+            audit.original_deck_digest(list(reversed(self.cards))),
+        )
+
+    def test_substituting_one_card_changes_original_identity(self):
+        replaced = [dict(c) for c in self.cards]
+        replaced[0]["name"] = "Temple of the False God"
+        self.assertNotEqual(
+            audit.original_deck_digest(self.cards),
+            audit.original_deck_digest(replaced),
+        )
+
+    def test_changing_quantity_changes_original_identity(self):
+        altered = [dict(c) for c in self.cards]
+        altered[1]["quantity"] = 11
+        self.assertNotEqual(
+            audit.original_deck_digest(self.cards),
+            audit.original_deck_digest(altered),
+        )
+
+    def test_split_wastes_rows_preserve_exact_card_quantities(self):
+        split = [dict(c) for c in self.cards]
+        split[1]["quantity"] = 8
+        split.append({"name": "Wastes", "quantity": 4})
+        self.assertEqual(
+            audit.original_deck_digest(self.cards),
+            audit.original_deck_digest(split),
+        )
+
+    def test_extra_duplicate_copy_changes_identity(self):
+        with_extra = self.cards + [{"name": "Wastes", "quantity": 1}]
+        self.assertNotEqual(
+            audit.original_deck_digest(self.cards),
+            audit.original_deck_digest(with_extra),
+        )
+
+    def test_zero_or_non_integer_quantity_is_rejected(self):
+        for bad in (0, -1, 1.0, True):
+            with self.subTest(bad=bad):
+                with self.assertRaisesRegex(ValueError, "quantity"):
+                    audit.original_deck_digest([{"name": "Wastes", "quantity": bad}])
+
+    def test_empty_or_whitespace_name_is_rejected(self):
+        for bad in ("", " Wastes", "Wastes "):
+            with self.subTest(bad=bad):
+                with self.assertRaisesRegex(ValueError, "name"):
+                    audit.original_deck_digest([{"name": bad, "quantity": 1}])
+
+    def test_missing_or_modified_official_deck_fails_closed(self):
+        valid = {"Eldrazi Incursion": {"cards": self.cards}}
+        expected = {"Eldrazi Incursion": audit.original_deck_digest(self.cards)}
+        self.assertEqual(audit.verify_original_decks(valid, expected), expected)
+        with self.assertRaisesRegex(ValueError, "Missing"):
+            audit.verify_original_decks({}, expected)
+        changed = {"Eldrazi Incursion": {"cards": self.cards[:-1]}}
+        with self.assertRaisesRegex(ValueError, "identity"):
+            audit.verify_original_decks(changed, expected)
+
+
+    def test_distinct_original_manifest_decks_are_retained(self):
+        incursion = {"name": "Eldrazi Incursion", "cards": self.cards}
+        unbound = {"name": "Eldrazi Unbound", "cards": [{"name": "Wastes", "quantity": 15}]}
+        decks = audit.unique_manifest_decks({"decks": [incursion, unbound]})
+        self.assertEqual(set(decks), {"Eldrazi Incursion", "Eldrazi Unbound"})
+        self.assertIs(decks["Eldrazi Incursion"], incursion)
+
+    def test_duplicate_original_deck_entry_is_rejected_even_if_last_copy_is_valid(self):
+        original = {"name": "Eldrazi Incursion", "cards": self.cards}
+        replaced = {"name": "Eldrazi Incursion", "cards": self.cards[:-1]}
+        for entries in ([replaced, original], [original, replaced], [original, original]):
+            with self.subTest(entries=entries):
+                with self.assertRaisesRegex(ValueError, "Duplicate deck name"):
+                    audit.unique_manifest_decks({"decks": entries})
+
+    def test_malformed_manifest_deck_entries_are_rejected(self):
+        for manifest in ({}, {"decks": None}, {"decks": [None]},
+                         {"decks": [{"name": "", "cards": []}]},
+                         {"decks": [{"name": "Eldrazi Incursion", "cards": None}]}):
+            with self.subTest(manifest=manifest):
+                with self.assertRaisesRegex(ValueError, "Invalid"):
+                    audit.unique_manifest_decks(manifest)
+
+
+class ShippedCustomExportIntegrityTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        root = pathlib.Path(self.tmp.name)
+        self.index = root / "custom-cards.index.tsv"
+        self.jsonl = root / "custom-cards.jsonl"
+
+    def write(self, index: str, jsonl: str):
+        self.index.write_text(index)
+        self.jsonl.write_text(jsonl)
+
+    def test_matching_custom_index_and_jsonl_is_accepted(self):
+        self.write('Eldrazi Temple\tcard\nUgin, the Ineffable\tcard\n',
+                   '{"name":"Eldrazi Temple"}\n{"name":"Ugin, the Ineffable"}\n')
+        entries = audit.read_index_entries(self.index)
+        self.assertEqual(audit.verify_custom_export(entries, self.jsonl), 2)
+
+    def test_ghost_index_entry_is_rejected(self):
+        self.write('Eldrazi Temple\tcard\nUgin, the Ineffable\tcard\n',
+                   '{"name":"Eldrazi Temple"}\n')
+        with self.assertRaisesRegex(ValueError, "index-only"):
+            audit.verify_custom_export(audit.read_index_entries(self.index), self.jsonl)
+
+    def test_unindexed_export_is_rejected(self):
+        self.write('Eldrazi Temple\tcard\n',
+                   '{"name":"Eldrazi Temple"}\n{"name":"Ugin, the Ineffable"}\n')
+        with self.assertRaisesRegex(ValueError, "export-only"):
+            audit.verify_custom_export(audit.read_index_entries(self.index), self.jsonl)
+
+    def test_duplicate_index_and_duplicate_export_are_rejected(self):
+        self.write('Eldrazi Temple\tcard\nEldrazi Temple\tcard\n',
+                   '{"name":"Eldrazi Temple"}\n')
+        with self.assertRaisesRegex(ValueError, "duplicate index"):
+            audit.read_index_entries(self.index)
+        self.write('Eldrazi Temple\tcard\n',
+                   '{"name":"Eldrazi Temple"}\n{"name":"Eldrazi Temple"}\n')
+        with self.assertRaisesRegex(ValueError, "duplicate exported"):
+            audit.verify_custom_export(audit.read_index_entries(self.index), self.jsonl)
+
+    def test_malformed_index_and_jsonl_fail_closed(self):
+        self.write('Eldrazi Temple\tunknown\n', '{"name":"Eldrazi Temple"}\n')
+        with self.assertRaisesRegex(ValueError, "invalid card index"):
+            audit.read_index_entries(self.index)
+        self.write('Eldrazi Temple\tcard\n', '{"name":\n')
+        with self.assertRaisesRegex(ValueError, "invalid JSON"):
+            audit.verify_custom_export(audit.read_index_entries(self.index), self.jsonl)
+
+    def test_basic_lands_count_as_cards_but_tokens_do_not(self):
+        self.write('Wastes\tbasic\nEldrazi Spawn\ttoken\n',
+                   '{"name":"Wastes"}\n{"name":"Eldrazi Spawn"}\n')
+        entries = audit.read_index_entries(self.index)
+        self.assertEqual(audit.verify_custom_export(entries, self.jsonl), 2)
+        self.assertEqual({name for name, kind in entries.items()
+                          if kind in {"card", "basic"}}, {"Wastes"})
+
+    def test_all_cards_index_accepts_matching_card_basic_and_token_exports(self):
+        self.write('Eldrazi Temple\tcard\nWastes\tbasic\nEldrazi Spawn\ttoken\n',
+                   '{"name":"Eldrazi Temple"}\n{"name":"Wastes"}\n{"name":"Eldrazi Spawn"}\n')
+        entries = audit.read_index_entries(self.index)
+        self.assertEqual(audit.verify_custom_export(entries, self.jsonl), 3)
+        self.assertEqual({n for n, kind in entries.items() if kind != "token"},
+                         {"Eldrazi Temple", "Wastes"})
+
+    def test_all_cards_index_rejects_phantom_coverage_and_unindexed_exports(self):
+        self.write('Eldrazi Temple\tcard\nUgin, the Ineffable\tcard\n',
+                   '{"name":"Eldrazi Temple"}\n')
+        with self.assertRaisesRegex(ValueError, "index-only"):
+            audit.verify_custom_export(audit.read_index_entries(self.index), self.jsonl)
+        self.write('Eldrazi Temple\tcard\n',
+                   '{"name":"Eldrazi Temple"}\n{"name":"Ugin, the Ineffable"}\n')
+        with self.assertRaisesRegex(ValueError, "export-only"):
+            audit.verify_custom_export(audit.read_index_entries(self.index), self.jsonl)
+
+    def test_token_kind_is_not_a_card(self):
+        self.write('Eldrazi Spawn\ttoken\nEldrazi Temple\tcard\n',
+                   '{"name":"Eldrazi Spawn"}\n{"name":"Eldrazi Temple"}\n')
+        entries = audit.read_index_entries(self.index)
+        self.assertEqual(audit.verify_custom_export(entries, self.jsonl), 2)
+        self.assertEqual({name for name, kind in entries.items() if kind == "card"},
+                         {"Eldrazi Temple"})
+
+
+
+
+class CrossLibraryKindIntegrityTest(unittest.TestCase):
+    def test_matching_shared_card_and_token_kinds_are_accepted(self):
+        upstream = {"Eldrazi Temple": "card", "Wastes": "basic", "Spawn": "token"}
+        custom = {"Eldrazi Temple": "card", "Spawn": "token", "Other": "card"}
+        self.assertEqual(
+            audit.verify_shared_index_kinds([upstream, custom]),
+            {"Eldrazi Temple": "card", "Spawn": "token"},
+        )
+
+    def test_token_card_conflict_fails_in_either_direction(self):
+        for left, right in (("token", "card"), ("card", "token"),
+                            ("basic", "card"), ("card", "basic")):
+            with self.subTest(left=left, right=right):
+                with self.assertRaisesRegex(ValueError, "Conflicting shipped index kinds"):
+                    audit.verify_shared_index_kinds([{"Eldrazi Temple": left},
+                                                     {"Eldrazi Temple": right}])
+
+    def test_missing_or_extra_index_source_fails_closed(self):
+        for sources in ([], [{}], [{}, {}, {}]):
+            with self.subTest(sources=sources):
+                with self.assertRaisesRegex(ValueError, "exactly two"):
+                    audit.verify_shared_index_kinds(sources)
+
+
+
+class CardkitClassificationIntegrityTest(unittest.TestCase):
+    def setUp(self):
+        self.names = ["Eldrazi Temple", "Ugin, the Ineffable"]
+        self.rows = [
+            {"name": "Eldrazi Temple", "readiness": "SUPPORTED", "route": "copilot"},
+            {"name": "Ugin, the Ineffable", "readiness": "ENGINE_BLOCKED", "route": "claude"},
+        ]
+
+    def test_complete_classification_accepts_any_result_order(self):
+        actual = audit.require_exact_cardkit_classifications(self.names, list(reversed(self.rows)))
+        self.assertEqual(set(actual), set(self.names))
+        self.assertEqual(actual["Eldrazi Temple"]["readiness"], "SUPPORTED")
+
+    def test_duplicate_cardkit_result_rejected_instead_of_last_row_wins(self):
+        duplicate = self.rows + [{"name": "Eldrazi Temple", "readiness": "SUPPORTED", "route": "copilot"}]
+        with self.assertRaisesRegex(ValueError, "Duplicate Cardkit classification"):
+            audit.require_exact_cardkit_classifications(self.names, duplicate)
+
+    def test_missing_or_unrequested_classification_rejected(self):
+        for rows in (self.rows[:1], self.rows + [{"name": "Extra Card", "readiness": "SUPPORTED", "route": "copilot"}]):
+            with self.subTest(rows=rows):
+                with self.assertRaisesRegex(ValueError, "classification mismatch"):
+                    audit.require_exact_cardkit_classifications(self.names, rows)
+
+    def test_invalid_result_shapes_or_readiness_rejected(self):
+        bad = (None, {}, [None], [{"name": "", "readiness": "SUPPORTED"}],
+               [{"name": "Eldrazi Temple", "readiness": ""}])
+        for rows in bad:
+            with self.subTest(rows=rows):
+                with self.assertRaisesRegex(ValueError, "Invalid Cardkit"):
+                    audit.require_exact_cardkit_classifications(self.names, rows)
+
+    def test_duplicate_requested_name_rejected(self):
+        with self.assertRaisesRegex(ValueError, "Duplicate requested"):
+            audit.require_exact_cardkit_classifications(self.names + self.names[:1], self.rows)
+
+    def test_unknown_readiness_never_becomes_eligible_work(self):
+        for bad in ("NEEDS_ENGINE", "READY", "BLOCKED", True, None):
+            with self.subTest(readiness=bad):
+                rows = [dict(self.rows[0], readiness=bad), self.rows[1]]
+                with self.assertRaisesRegex(ValueError, "Invalid Cardkit readiness"):
+                    audit.require_exact_cardkit_classifications(self.names, rows)
+
+    def test_worker_route_must_match_cardkit_readiness(self):
+        for readiness, route in (
+            ("SUPPORTED", "gpt"),
+            ("ENGINE_BLOCKED", "copilot"),
+            ("NEEDS_REVIEW", "copilot"),
+            ("IMPLEMENTED_AND_TESTED", "copilot"),
+            ("SUPPORTED", None),
+        ):
+            with self.subTest(readiness=readiness, route=route):
+                rows = [dict(self.rows[0], readiness=readiness, route=route), self.rows[1]]
+                with self.assertRaisesRegex(ValueError, "Invalid Cardkit route"):
+                    audit.require_exact_cardkit_classifications(self.names, rows)
+
+    def test_every_supported_cardkit_route_is_accepted_as_advisory_only(self):
+        for readiness, route in (
+            ("SUPPORTED", "copilot"),
+            ("NEEDS_REVIEW", "gpt"),
+            ("NEEDS_REVIEW", "claude"),
+            ("ENGINE_BLOCKED", "claude"),
+            ("IMPLEMENTED_AND_TESTED", None),
+        ):
+            with self.subTest(readiness=readiness, route=route):
+                rows = [dict(self.rows[0], readiness=readiness, route=route), self.rows[1]]
+                self.assertEqual(
+                    set(audit.require_exact_cardkit_classifications(self.names, rows)),
+                    set(self.names),
+                )
+
+
+class ExistingCardOwnerSafetyTest(unittest.TestCase):
+    def test_forsaken_source_is_claimed_and_paid_copilot_pickup_is_on_hold(self):
+        lane, review = audit.TRIAGE["Forsaken Monument"]
+        self.assertIn("CLAUDE SOURCE #171", lane)
+        self.assertIn("GPT VALIDATION #180", lane)
+        self.assertIn("Copilot #151 HOLD", lane)
+        self.assertIn("NO duplicate paid dispatch", review)
+        self.assertIn("deterministic export", review)
+
+    def test_displacer_existing_gpt_owner_remains_exclusive(self):
+        lane, review = audit.TRIAGE["Eldrazi Displacer"]
+        self.assertIn("GPT #154 / existing draft #163", lane)
+        self.assertIn("DO NOT dispatch a duplicate", review)
+
+
+
+if __name__ == "__main__":
+    unittest.main()
