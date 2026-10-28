@@ -130,7 +130,7 @@ function dispatcherAction(state, reason = '') {
     case 'denied':
       if (r.startsWith('feasibility: feasibility-unavailable') || r.startsWith('feasibility: feasibility-stale'))
         return 'Wait/inspect: the Cardkit feasibility job did not produce verdicts for this base SHA. Check the dispatcher run\'s feasibility job.';
-      if (r.startsWith('feasibility')) return 'This card is not Copilot-ready per Cardkit; do not assign it. Route engine gaps to GPT/Claude. A manual feasibility-reviewed exception is possible only for separately owner-created queue units, never automatic queue units.';
+      if (r.startsWith('feasibility')) return 'This card is not Copilot-ready per Cardkit; do not assign it. Route engine gaps to GPT/Claude. The arcana:feasibility-reviewed exception is available only for separately owner-created queue units, never automatic queue units.';
       if (r.startsWith('budget')) return 'Wait: billing headroom (including reserve and pending liabilities) does not allow new work. See billing.';
       if (r.startsWith('capacity')) return 'Wait for active units to finish. A unit stuck in pickup-timeout or session-stale can be released by the owner with the wu:halted label.';
       if (r.startsWith('untrusted-origin')) return 'Owner: the issue has content from untrusted accounts; edit/remove it or open a clean issue.';
