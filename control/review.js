@@ -16,7 +16,11 @@ const SHA = /^[0-9a-f]{40}$/;
 
 const sessionFromHash = hash => { const m = String(hash || '').match(/(?:^#|&)review-session=([^&]+)/); return m ? decodeURIComponent(m[1]) : null; };
 const canDecide = i => !!i && i.state !== 'integrated' && SHA.test(String(i.headSha || '')) && Number.isSafeInteger(i.pr);
-const canApprove = i => canDecide(i) && (i.state === 'awaiting-review' || i.state === 'certified');
+// Approval needs independent rules certification on this head, not just green checks. The Worker
+// enforces the same rule on the live head; this only disables the button and explains why.
+const canApprove = i => canDecide(i) && i.state === 'certified' && i.certification === 'certified';
+const approveBlocked = i => !canDecide(i) || canApprove(i) ? null
+  : 'Approval needs independent certification of this exact commit (' + (CERT[i.certification || 'not-run'] || i.certification) + '). You can still request a fix.';
 function decisionMessage(status, body) {
   if (status === 200 && body?.duplicate) return { ok: true, text: 'Already recorded for this commit.' };
   if (status === 200 || status === 207) return { ok: true, text: body?.state === 'approved'
@@ -24,11 +28,12 @@ function decisionMessage(status, body) {
     : 'Fix requested. Recorded on GitHub; the dispatcher will request a repair only if budget, reserve and capacity allow.' + (body?.warning ? ' (Repair queue not reached: ' + body.warning + ')' : '') };
   if (status === 401) return { ok: false, signIn: true, text: 'Please sign in again (owner only).' };
   if (status === 409 && body?.error === 'stale-commit') return { ok: false, stale: true, text: 'A newer commit arrived. Nothing was recorded. Refresh and review the new commit.' };
+  if (status === 422 && body?.error === 'not-certified') return { ok: false, text: 'Cannot approve: this exact commit has not passed independent certification (' + (body.certification || 'not-run') + '). You can still request a fix.' };
   if (status === 422 && body?.error === 'checks-not-green') return { ok: false, text: 'Cannot approve: checks are not all passing (' + (body.checks || []).join(', ') + '). You can still request a fix.' };
   if (status === 400 && body?.error === 'describe-the-fix') return { ok: false, text: 'Describe what needs fixing.' };
   return { ok: false, text: 'Not recorded (' + (body?.error || 'HTTP ' + status) + ').' };
 }
-const api = { REVIEW_API, LABELS, sessionFromHash, canDecide, canApprove, decisionMessage };
+const api = { REVIEW_API, LABELS, sessionFromHash, canDecide, canApprove, approveBlocked, decisionMessage };
 root.ArcanaReview = api;
 if (typeof module === 'object' && module.exports) { module.exports = api; return; }
 if (typeof document === 'undefined') return;
@@ -167,7 +172,7 @@ function openSheet(item) {
     if (serviceUp === false) msg.textContent = 'Review service unavailable. No card decision can be sent.';
     else if (authNotice) msg.textContent = authNotice;
     else if (!session) msg.textContent = 'Sign in with GitHub to approve or request a fix.';
-    else msg.textContent = 'Validating your owner session…';
+    else msg.textContent = ownerReady && serviceUp === true && approveBlocked(item) ? approveBlocked(item) : 'Validating your owner session…';
   };
   refreshSheet = refresh;
   async function send(decision) {

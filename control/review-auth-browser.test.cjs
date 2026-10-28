@@ -54,7 +54,7 @@ function browser({ hash='', localBlocked=false, sessionBlocked=false, authStatus
     addEventListener(name,fn){(listeners[name] ||= []).push(fn);},
   };
   vm.runInNewContext(src,sandbox,{filename:'review.js'});
-  const item={ pr:360, headSha:'a'.repeat(40), state:'awaiting-review',
+  const item={ pr:360, headSha:'a'.repeat(40), state:'certified', certification:'certified',
     card:'Test Card',checks:[],checkRuns:[],problems:[],abilities:[] };
   const host = new Element('div');
   const open = () => {

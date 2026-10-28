@@ -124,6 +124,12 @@ export async function decide(api, { pr, sha, decision, note }) {
     const runs = checks.body?.check_runs || [];
     const notGreen = runs.filter(r => r.status !== "completed" || !GREEN.has(r.conclusion)).map(r => r.name);
     if (!runs.length || notGreen.length) return [422, { error: "checks-not-green", checks: notGreen.slice(0, 10) }];
+    // Green checks are not rules certification. Require the independent certification check(s)
+    // (name contains "certif", same rule as scripts/review-inbox.cjs) on THIS exact head.
+    const cert = runs.filter(r => /certif/i.test(String(r.name || "")) && r.head_sha === sha);
+    const certification = !cert.length ? "not-run" : cert.some(r => r.status !== "completed") ? "running"
+      : cert.every(r => r.conclusion === "success") ? "certified" : "failed";
+    if (certification !== "certified") return [422, { error: "not-certified", certification }];
   }
   const body = [DECISION_MARKER, `sha:${sha}`, decision === "approve"
     ? "**Owner verified this card** (Arcana Control). Sign-off for integration review only: not a merge, build, signing or release approval."
