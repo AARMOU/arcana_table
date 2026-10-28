@@ -57,6 +57,7 @@ const store = {
   }
 };
 let serviceUp = null, data = null, listEl = null, onChange = null;
+let sheet;
 let authenticated = false, authNotice = '', validating = null;
 let refreshSheet = () => {};
 const redrawAuth = () => { if (sheet?.open) refreshSheet(); };
@@ -136,7 +137,6 @@ function render(container, payload, changed) {
   }
 }
 
-let sheet;
 function openSheet(item) {
   if (!sheet) { sheet = el('dialog'); sheet.style.cssText = 'max-width:640px;width:calc(100% - 32px);border:1px solid var(--line,#333);border-radius:14px;background:var(--panel,#111);color:var(--text,#eee);padding:16px'; document.body.append(sheet); }
   sheet.replaceChildren();
