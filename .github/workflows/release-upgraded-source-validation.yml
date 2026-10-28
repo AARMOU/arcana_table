@@ -5,7 +5,7 @@ name: Release source validation - upgraded Argentum and tutorial
 # Reproducible isolated integration candidate: no production branch is mutated.
 on:
   push:
-    branches: [gpt/release-upgraded-validation-20261025]
+    branches: [gpt/pr260-exact-source-validation-20261028]
     paths: ['.github/workflows/release-upgraded-source-validation.yml']
   workflow_dispatch:
 concurrency:
