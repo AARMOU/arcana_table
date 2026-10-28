@@ -160,3 +160,47 @@ test("reusing an id for different card names is rejected without changing totals
   assert.equal(store.values.get("records")["ratchet, field medic"],undefined);
  }finally{globalThis.fetch=previous;}
 });
+
+test("public intake forwards wire-format names to queue, publishes one card, and preserves idempotency", async () => {
+ const original=globalThis.fetch, writes=[];
+ globalThis.fetch=async (url, options) => {
+   writes.push({url,options});
+   return {ok:true,json:async()=>({id:32199})};
+ };
+ try {
+   const store=storage();
+   const queue=new CardRequestQueue({storage:store},{GITHUB_REQUESTS_TOKEN:"fake"});
+   const env={
+     RATE_SALT:"test-only-rate-salt",
+     GITHUB_REQUESTS_TOKEN:"fake",
+     REQUEST_QUEUE:{
+       idFromName:name => name,
+       get:() => ({fetch: request => queue.fetch(request)})
+     },
+   };
+   const makeRequest=()=>new Request("https://arcana-card-requests.example/v1/card-requests",{
+     method:"POST",
+     headers:{"content-type":"application/json","CF-Connecting-IP":"198.51.100.42"},
+     body:JSON.stringify({
+       requestId:"12345678-5678-4678-8678-123456789abc",
+       cardNames:["Goblin Welder"]
+     })
+   });
+   const first=await worker.fetch(makeRequest(),env);
+   const firstBody=await first.json();
+   assert.equal(first.status,200,JSON.stringify(firstBody));
+   assert.equal(firstBody.accepted,1);
+   assert.equal(firstBody.pending,false);
+   assert.equal(writes.length,1);
+   assert.match(writes[0].url,/\/issues\/321\/comments$/);
+   assert.match(writes[0].options.body,/Goblin Welder/);
+   assert.equal(store.values.get("records")["goblin welder"].count,1);
+   const repeat=await worker.fetch(makeRequest(),env);
+   const repeatBody=await repeat.json();
+   assert.equal(repeat.status,200);
+   assert.equal(repeatBody.duplicate,true);
+   assert.equal(repeatBody.pending,false);
+   assert.equal(writes.length,1,"repeat must not double-publish or increment");
+   assert.equal(store.values.get("records")["goblin welder"].count,1);
+ } finally {globalThis.fetch=original;}
+});

@@ -86,7 +86,9 @@ export default {
     const opaque = await requestKey(ip, env.RATE_SALT + ":" + new Date().toISOString().slice(0, 10));
     const internal = new Request("https://internal/submit", {
       method: "POST", headers: { "content-type": "application/json", "x-opaque-client": opaque },
-      body: JSON.stringify(parsed)
+      // Public validation returns {requestId, names:[{key,name}]}; the queue
+      // validates the wire-format {requestId, cardNames:[string]} independently.
+      body: JSON.stringify({ requestId: parsed.requestId, cardNames: parsed.names.map(({ name }) => name) })
     });
     return env.REQUEST_QUEUE.get(env.REQUEST_QUEUE.idFromName("global")).fetch(internal);
   },
