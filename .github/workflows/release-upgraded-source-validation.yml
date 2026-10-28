@@ -683,9 +683,56 @@ jobs:
           assert total_failures == total_errors == 0, (total_failures, total_errors)
           print('PASS: all required Eldrazi scenarios executed, AI mirror ended, and app tests green')
           PY
+      # Disposable release-variant regression: verify the actual compiled BuildConfig,
+      # not merely a helper invoked with debug=false from a debug test.
+      - name: Stage strict two-player and premade-only Build 134 release regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > android/app/src/test/java/com/arcanatable/Build134ReleaseScopeTest.kt <<'KOTLIN'
+          package com.arcanatable
+
+          import org.junit.Assert.assertEquals
+          import org.junit.Assert.assertFalse
+          import org.junit.Test
+
+          class Build134ReleaseScopeTest {
+              @Test fun releaseDisablesImportAndMultiplayerPreview() {
+                  assertFalse("This test must execute as a release variant", BuildConfig.DEBUG)
+                  assertFalse("Release must not expose deck importing", ReleaseFeatures.deckImportEnabled)
+                  assertFalse("Release must not expose four-player preview", ReleaseFeatures.multiplayerPreviewEnabled)
+              }
+
+              @Test fun releaseClampsPersistedThreeOpponentSettingToOne() {
+                  assertEquals(1, ReleaseFeatures.aiCount(3))
+              }
+
+              @Test fun releaseOnlyListsPremadeDecks() {
+                  val premade = DeckChoice("builtin:test", "Premade", null, true)
+                  val imported = DeckChoice("user:test", "Imported", null, false)
+                  assertEquals(listOf(premade), ReleaseFeatures.availableDecks(listOf(premade, imported)))
+              }
+          }
+          KOTLIN
       - name: Release must not expose debug test scenarios
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest' --tests 'com.arcanatable.LauncherBrandingTest' --tests 'com.arcanatable.TutorialPracticeScenariosTest' --tests 'com.arcanatable.TutorialPriorityHostTest'
+        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.Build134ReleaseScopeTest' --tests 'com.arcanatable.ReleaseFeaturesTest' --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest' --tests 'com.arcanatable.LauncherBrandingTest' --tests 'com.arcanatable.TutorialPracticeScenariosTest' --tests 'com.arcanatable.TutorialPriorityHostTest'
+      - name: Require release scope regression executed with no skips
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PYRELEASE'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          root = Path('android/app/build/test-results/testReleaseUnitTest')
+          for name, expected in [('Build134ReleaseScopeTest', 3), ('ReleaseFeaturesTest', 3)]:
+              files = list(root.glob('TEST-*' + name + '.xml'))
+              assert len(files) == 1, (name, 'missing or duplicate JUnit evidence', files)
+              suite = ET.parse(files[0]).getroot()
+              actual = {key:int(suite.get(key, 0)) for key in ('tests','failures','errors','skipped')}
+              assert actual == dict(tests=expected,failures=0,errors=0,skipped=0), (name, actual)
+              print('PASS: release', name, expected, 'tests, no skips')
+          PYRELEASE
       - name: Require tutorial tests actually executed on upgraded engine
         shell: bash
         run: |
