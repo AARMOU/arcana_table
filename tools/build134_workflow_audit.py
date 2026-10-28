@@ -155,6 +155,20 @@ def audit(release: str, preview: str) -> list[str]:
         if not trigger_block or trigger_block.group(1) != expected_triggers:
             problems.append('preview is no longer manual-only' if name == 'preview' else
                             'release: workflow triggers changed; review before activation')
+    # Shared validation steps must remain hard gates. Comparing the two
+    # workflows is insufficient: an identical 'if: false' or
+    # 'continue-on-error: true' in both could silently waive a test.
+    # The Android failure annotation is deliberately always-on for diagnosis,
+    # but it does not replace any mandatory validation step.
+    annotation = 'Annotate Android unit-test failures (diagnostic, read-only)'
+    for label, shared in [('release', release_steps), ('preview', common)]:
+        for step_name, step_body in shared[:required_gate_count]:
+            conditions = re.findall(r'(?m)^        if: ([^\n]+)$', step_body)
+            expected = ['always()'] if step_name == annotation else []
+            if conditions != expected:
+                problems.append(f'{label}: unreviewed required-gate condition: {step_name}')
+            if re.search(r'(?m)^        continue-on-error\s*:', step_body):
+                problems.append(f'{label}: required gate may ignore failure: {step_name}')
     if len(extras) == 3:
         build, verify, upload = (body for _, body in extras)
         # Preview-only steps have no release counterpart. Check their
