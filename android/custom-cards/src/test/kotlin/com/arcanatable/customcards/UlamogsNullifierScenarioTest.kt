@@ -9,7 +9,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class UlamogsNullifierScenarioTest {
-    private fun setup() = customScenario(UlamogsNullifier, "Grizzly Bears", "Sol Ring")
+    private fun setup() = customScenario(UlamogsNullifier, "Grizzly Bears", "Sol Ring", "Island")
 
     /** I cast Bears, then flash in Nullifier holding priority; its ETB targets the Bears spell. */
     private fun GameTestDriver.respondToOwnBears(c: Choices): EntityId {
@@ -64,4 +64,22 @@ class UlamogsNullifierScenarioTest {
         assertEquals(1, d.permanentsNamed(d.player1, "Ulamog's Nullifier").size)
         assertEquals(2, d.getExileCardNames(d.player2).size)
     }
+    @Test fun processingTwoOfThreeExiledCardsLeavesTheThirdExiled() {
+        val d = setup()
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Grizzly Bears")
+        d.putCardInExile(d.player2, "Island")
+
+        d.respondToOwnBears(Choices(yes = true, pick = listOf("Sol Ring", "Grizzly Bears")))
+
+        assertTrue("The spell must be countered after exactly two moves",
+            d.permanentsNamed(d.player1, "Grizzly Bears").isEmpty())
+        assertEquals("Only the unselected card remains exiled",
+            listOf("Island"), d.getExileCardNames(d.player2))
+        assertEquals("The selected cards reach their owner's graveyard",
+            listOf("Grizzly Bears", "Sol Ring"), d.getGraveyardCardNames(d.player2).sorted())
+        assertFalse("Unselected exile must not move",
+            d.getGraveyardCardNames(d.player2).contains("Island"))
+    }
+
 }
