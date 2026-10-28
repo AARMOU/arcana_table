@@ -2546,13 +2546,19 @@
    ]
   },
   "Effects.Sacrifice": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Ulamog's Crusher",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsCrusher.kt",
      "lines": 27,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsCrusherScenarioTest.kt"
+    },
+    {
+     "card": "Lokhust Heavy Destroyer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/LokhustHeavyDestroyer.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LokhustHeavyDestroyerScenarioTest.kt"
     },
     {
      "card": "Eldrazi Monument",
@@ -2983,7 +2989,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3887,7 +3893,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 40,
+   "count": 41,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -4294,7 +4300,7 @@
    ]
   },
   "keywords()": {
-   "count": 78,
+   "count": 79,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4539,7 +4545,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -4580,7 +4586,7 @@
    ]
   },
   "unearth()": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -4613,10 +4619,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ChronomancerScenarioTest.kt"
     },
     {
-     "card": "Royal Warden",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RoyalWarden.kt",
-     "lines": 39,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RoyalWardenScenarioTest.kt"
+     "card": "Lokhust Heavy Destroyer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/LokhustHeavyDestroyer.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LokhustHeavyDestroyerScenarioTest.kt"
     }
    ]
   }
@@ -6003,7 +6009,7 @@
    ]
   },
   "EffectTarget.PlayerRef": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -6347,7 +6353,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 95,
+   "count": 96,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -6690,7 +6696,7 @@
    ]
   },
   "Player.Each": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Sautekh Immortal",
@@ -6703,6 +6709,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DeployToTheFront.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DeployToTheFrontScenarioTest.kt"
+    },
+    {
+     "card": "Lokhust Heavy Destroyer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/LokhustHeavyDestroyer.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LokhustHeavyDestroyerScenarioTest.kt"
     },
     {
      "card": "Rampaging Ferocidon",
