@@ -82,10 +82,16 @@ test('one trusted bot issue is created with immutable provenance and exact unit 
     authorType: 'Bot', body, title, autoQueueUnedited: true, commenters: [] }).ok, true);
 });
 test('existing complete unassigned issue is woken without opening another issue', async () => {
-  const existing = [{ number: 99, title: '[Arcana Queue] Another Card', body: BODY, assignees: [] }];
+  const existing = [{ number: 99, title: '[Arcana Queue] Another Card', body: BODY, assignees: [], author_association: 'OWNER' }];
   const { result, calls } = await run({ open: existing });
   assert.deepEqual([result.created, result.pending, result.issue], [undefined, true, 99]);
   assert.equal(calls.some(([kind]) => kind === 'create'), false);
+});
+test('untrusted public ready-looking issues cannot monopolize the pending queue slot', () => {
+  const p = payload();
+  const outsider = [{ number: 99, title: '[Arcana Queue] Fake Card', body: BODY, assignees: [], author_association: 'NONE',
+    user: { login: 'stranger', type: 'User' } }];
+  assert.equal(Q.chooseAutoQueue(p, outsider).suggestion.name, CARD);
 });
 test('bot provenance rejects missing marker, wrong issuer, edits and untrusted comments', () => {
   const base = { authorAssociation: 'NONE', authorLogin: 'github-actions[bot]', authorType: 'Bot',
