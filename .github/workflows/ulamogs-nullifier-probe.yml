@@ -1,0 +1,50 @@
+name: Ulamog's Nullifier real-engine probe
+on:
+  push:
+    branches:
+      - gpt/ulamogs-nullifier-processor-20261028
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ulamogs-nullifier-probe-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  processor-engine-scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Run focused real Argentum engine scenarios
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.UlamogsNullifierScenarioTest'
+      - name: Require all five test cases actually execute
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          report=Path('android/custom-cards/build/test-results/test/TEST-com.arcanatable.customcards.UlamogsNullifierScenarioTest.xml')
+          assert report.exists(), f'JUnit not produced: {report}'
+          root=ET.parse(report).getroot()
+          stats={k:int(root.get(k, 0)) for k in ('tests','failures','errors','skipped')}
+          print(stats)
+          assert stats==dict(tests=5, failures=0, errors=0, skipped=0), f'Nullifier engine probe not green: {stats}'
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nullifier-exact-head-junit
+          retention-days: 14
+          path: |
+            android/custom-cards/build/test-results/test/
+            android/custom-cards/build/reports/tests/test/
