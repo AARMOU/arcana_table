@@ -13,6 +13,8 @@
 //      to repair. Nothing here starts a paid worker, and the review never mentions @copilot.
 // Approval is card sign-off for integration review only: no merge, build, signing or release.
 
+import { publicGithub } from './public-github.mjs';
+
 const REPO = "AARMOU/arcana_table";
 const OWNER = "aarmou";
 const API = "https://api.github.com/repos/" + REPO;
@@ -134,6 +136,7 @@ export default {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
     if (url.pathname === "/health") return json({ ok: true, service: "arcana-review", protocol: 1 }, 200, origin);
+    if (url.pathname === "/v1/public/github") return publicGithub(request, { fetchImpl });
     if (!env.GITHUB_OAUTH_CLIENT_ID || !env.GITHUB_OAUTH_CLIENT_SECRET || !env.SESSION_SECRET || String(env.SESSION_SECRET).length < 32)
       return json({ error: "not-configured" }, 503, origin);
 
