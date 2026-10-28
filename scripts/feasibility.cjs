@@ -74,6 +74,10 @@ function overrideOf(events, labels) {
 // { ok, reason, cards:[{name, readiness, route, hint}] }. Unknown or missing data is "not ok".
 function assess({ body, override = null, approvers = [], verdicts, baseSha }) {
   const allowed = (approvers || []).map(a => String(a).toLowerCase());
+  // Automatically queued issues never bypass Cardkit, even with an owner-added
+  // feasibility override. Manual/legacy units retain their explicit override.
+  if (override && String(body || '').startsWith('<!-- arcana-auto-queue-v1 -->\n'))
+    return { ok: false, reason: 'automatic queue: Cardkit feasibility override prohibited', cards: [] };
   if (override) {
     if (override.actor && allowed.includes(String(override.actor).toLowerCase()))
       return { ok: true, reason: 'owner-reviewed by ' + override.actor, cards: [] };

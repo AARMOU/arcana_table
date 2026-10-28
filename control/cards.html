@@ -37,8 +37,8 @@ input[type=search],input[type=text],select{width:100%;background:#0b1824;border:
 </style></head><body>
 <main><header><span class="brand">⬡ ARCANA CONTROL</span><a href="./" class="btn">← Dashboard</a></header>
 <h1>Card Queue<span style="color:var(--teal)">.</span></h1>
-<p class="muted">Find cards in your Commander decks, select them, and prepare a tracked card request.</p>
-<section class="panel note"><b>A request is not a paid assignment.</b> You must review and submit it through GitHub. Rules validation, existing work, and engine blockers are checked before a separate Copilot assignment can be authorized.</section>
+<p class="muted">Choose which cards you want developed next. Your selection gets first consideration, but never bypasses engine-feasibility, CI, capacity or billing gates.</p>
+<section class="panel note"><b>Copilot hard gate.</b> Review and submit your selected cards on GitHub. The queue feeder prioritizes owner-selected requests only when Cardkit verifies SUPPORTED / copilot on the current integration base. Unsupported, unknown, already claimed or engine-blocked cards are not assigned to Copilot. No selection bypasses the normal credit reserve, capacity or CI checks.</section>
 <section class="panel" aria-label="Card browser sources">
 <h2>Where do these cards come from?</h2>
 <div class="tabs" role="group" aria-label="Card source">
@@ -66,9 +66,10 @@ input[type=search],input[type=text],select{width:100%;background:#0b1824;border:
 <form id="add" class="row"><input id="manual" type="text" maxlength="150" placeholder="Exact card name" aria-label="Card name" required><button type="submit" class="btn">Add to selection</button></form>
 <p class="muted" id="notice" role="status"></p></section>
 <section class="panel"><h2>Selected cards</h2><div id="selected" class="tags"></div><button class="btn" id="clear" type="button">Clear draft</button></section>
+<section class="panel"><h2>Priority selection status</h2><p class="muted">Read-only status from the most recent queue feeder. An unverified or stale status never authorizes work.</p><div id="priorityStatus" class="issues" role="status"><span class="muted">Loading latest Cardkit queue status…</span></div></section>
 <section class="panel"><h2>Open card requests</h2><div id="issues" class="issues"><span class="muted">Loading GitHub issues…</span></div>
 <p class="muted"><a href="https://github.com/AARMOU/arcana_table/issues/321" target="_blank" rel="noopener noreferrer">View scanner tracker #321</a></p></section>
 </main>
-<div class="footer"><div class="footer-inner"><div><strong id="picked">0 selected</strong><div class="muted">Maximum 8 per request</div></div><button type="button" id="request" class="btn" disabled>Review GitHub request</button></div></div>
+<div class="footer"><div class="footer-inner"><div><strong id="picked">0 selected</strong><div class="muted">Maximum 8 per request</div></div><button type="button" id="request" class="btn" disabled>Review priority request</button></div></div>
 <script src="./card-queue.js" defer></script><script>if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{}));</script>
 </body></html>

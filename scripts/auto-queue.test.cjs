@@ -110,3 +110,55 @@ test('bot provenance rejects missing marker, wrong issuer, edits and untrusted c
 test('unexpected token issuer halts, never silently assumes issue provenance', async () => {
   await assert.rejects(() => run({ issuer: { login: 'other-app[bot]', type: 'Bot' } }), /issuer-not-github-actions/);
 });
+
+test('owner-selected supported card is prioritized over automatic suggestions', () => {
+  const requested = { number: 501, title: '[Card Request] ' + CARD + ', Ulalek, Fused Atrocity',
+    author_association: 'OWNER', user: { login: 'AARMOU', type: 'User' },
+    created_at: '2026-10-28T14:20:00Z',
+    body: '## Cards requested\n- ' + CARD + ' — Not indexed — Personal: Rocco\n- Ulalek, Fused Atrocity — Not indexed\n\n## Source and triage' };
+  const gaps = { dispatch: { claimsVerified: true, dispatchable: true, copilot: ['Celestine, the Living Saint', CARD] } };
+  const r = Q.candidates({ gaps, openIssues: [requested], max: 2 });
+  assert.deepEqual(r.names, [CARD, 'Celestine, the Living Saint']);
+  assert.deepEqual(r.requested, [{ name: CARD, issue: 501 }]);
+  assert.deepEqual(r.blockedRequests.map(x => x.name), ['Ulalek, Fused Atrocity']);
+  const generated = Q.queuePayload({ result: r, units: [{ name: CARD, body: BODY }], base: BASE, baseSha: SHA });
+  assert.equal(generated.suggestions[0].requestedIssue, 501);
+  assert.match(Q.queueSummary(generated).join('\n'), /NO assignment/);
+  assert.equal(generated.suggestions[0].ready, true);
+});
+
+test('unsupported selections are never sent to Cardkit unit generation or queued', () => {
+  const request = { number: 502, title: '[Card Request] Impossible Engine Card',
+    author_association: 'OWNER', user: { login: 'AARMOU', type: 'User' },
+    body: '## Cards requested\n- Impossible Engine Card — Manually entered\n\n## Source and triage' };
+  const gaps = { dispatch: { claimsVerified: true, dispatchable: true, copilot: [] } };
+  const r = Q.candidates({ gaps, openIssues: [request], max: 3 });
+  assert.deepEqual(r.names, []);
+  assert.equal(r.blockedRequests[0].issue, 502);
+  assert.equal(Q.chooseAutoQueue(Q.queuePayload({ result: r, units: [], base: BASE, baseSha: SHA }), [request]).suggestion, undefined);
+});
+
+test('outsider requests and unrelated owner issue sections cannot affect priority', () => {
+  const outsider = { number: 503, title: '[Card Request] ' + CARD,
+    author_association: 'NONE', user: { login: 'outsider', type: 'User' },
+    body: '## Cards requested\n- ' + CARD + '\n' };
+  const badBody = { number: 504, title: '[Card Request] ' + CARD,
+    author_association: 'OWNER', user: { login: 'AARMOU', type: 'User' },
+    body: '## Other section\n- ' + CARD + '\n' };
+  assert.deepEqual(Q.ownerSelections([outsider, badBody]), []);
+  const gaps = { dispatch: { claimsVerified: true, dispatchable: true, copilot: ['Celestine, the Living Saint', CARD] } };
+  assert.deepEqual(Q.candidates({ gaps, openIssues: [outsider, badBody] }).names,
+    ['Celestine, the Living Saint', CARD]);
+});
+
+test('owner selections never fake an actionable queue unit or suppress eligibility', () => {
+  const request = { number: 505, title: '[Card Request] ' + CARD,
+    author_association: 'OWNER', user: { login: 'AARMOU', type: 'User' },
+    body: '## Cards requested\n- ' + CARD + ' — Not indexed\n' };
+  const gaps = { dispatch: { claimsVerified: true, dispatchable: true, copilot: [CARD] } };
+  const r = Q.candidates({ gaps, openIssues: [request] });
+  assert.deepEqual(r.names, [CARD]);
+  assert.equal(r.alreadyQueued.length, 0);
+  const p = Q.queuePayload({ result: r, units: [{ name: CARD, body: BODY }], base: BASE, baseSha: SHA });
+  assert.equal(Q.chooseAutoQueue(p, [request]).suggestion.name, CARD);
+});
