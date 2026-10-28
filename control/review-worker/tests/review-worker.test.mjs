@@ -135,6 +135,21 @@ test("sign-in: owner only, signed state, allow-listed return, session never cont
   assert.equal(forged.status, 400);
 });
 
+test("health responds with CORS only for the Arcana Control origin", async () => {
+  const allowed = await worker.fetch(new Request(W + "/health", { headers: { Origin: PWA } }), ENV);
+  assert.equal(allowed.status, 200);
+  assert.deepEqual(await allowed.json(), { ok: true, service: "arcana-review", protocol: 1 });
+  assert.equal(allowed.headers.get("Access-Control-Allow-Origin"), PWA);
+  assert.equal(allowed.headers.get("Vary"), "Origin");
+
+  const denied = await worker.fetch(new Request(W + "/health", { headers: { Origin: "https://evil.example" } }), ENV);
+  assert.equal(denied.status, 200);
+  assert.equal(denied.headers.get("Access-Control-Allow-Origin"), null);
+
+  const noOrigin = await worker.fetch(new Request(W + "/health"), ENV);
+  assert.equal(noOrigin.headers.get("Access-Control-Allow-Origin"), null);
+});
+
 test("unconfigured Worker refuses everything but health", async () => {
   assert.equal((await worker.fetch(new Request(W + "/health"), {})).status, 200);
   assert.equal((await worker.fetch(new Request(W + "/v1/decision", { method: "POST" }), {})).status, 503);
