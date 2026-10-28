@@ -1,0 +1,6 @@
+# Arcana Control card-review Worker. Separate from the card-request and multiplayer Workers.
+# Secrets (wrangler secret put): GITHUB_OAUTH_CLIENT_SECRET, SESSION_SECRET (>= 32 random chars).
+# Var: GITHUB_OAUTH_CLIENT_ID (public). The OAuth app's callback URL is https://<worker host>/auth/callback.
+name = "arcana-review"
+main = "src/index.mjs"
+compatibility_date = "2026-10-01"
