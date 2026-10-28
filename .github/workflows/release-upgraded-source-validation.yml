@@ -819,7 +819,7 @@ jobs:
             ':(exclude)android/app/libs/*.jar' > "$patch"
           test -s "$patch"
           test "$(wc -c < "$patch")" -lt 25000000
-          if grep -q '^diff --git a/android/app/libs/.*\\.jar ' "$patch"; then
+          if grep -qE '^diff --git a/android/app/libs/[^ ]+[.]jar ' "$patch"; then
             echo "::error::Generated JAR included in source-only review patch"
             exit 1
           fi
