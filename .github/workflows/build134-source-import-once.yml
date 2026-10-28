@@ -1,0 +1,84 @@
+name: Build 134 isolated source integration (one shot)
+# This workflow only creates a reviewable source commit on a dedicated branch.
+# It does not compile packages, publish binaries, merge or deploy.
+on:
+  push:
+    branches: [gpt/build134-source-import-runner-20261028]
+    paths: [.github/workflows/build134-source-import-once.yml]
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: build134-source-import-once
+  cancel-in-progress: false
+jobs:
+  import-reviewed-patch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout immutable validated source base
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: 77bccdcc0b7445b8888984c5ed194fbfb80f99ee
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Download immutable CI source evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: argentum-eldrazi-source-compatibility
+          repository: AARMOU/arcana_table
+          run-id: 40678286737
+          github-token: ${{ github.token }}
+          path: /tmp/build134-source-evidence
+      - name: Verify artifact, apply source patch and push isolated branch
+        shell: bash
+        env:
+          TARGET_BRANCH: gpt/build134-integrated-source-20261028
+          BASE_SHA: 77bccdcc0b7445b8888984c5ed194fbfb80f99ee
+          REVIEW_HELPER_SHA: 794c49ef6d4eec3825eb6750440c4d49044902cc
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$BASE_SHA"
+          test -z "$(git status --porcelain)"
+          patch=/tmp/build134-source-evidence/combined-evidence/build134-integrated-source.patch
+          manifest=/tmp/build134-source-evidence/combined-evidence/build134-source-review-manifest.txt
+          test -s "$patch" && test -s "$manifest"
+          grep -Fx "workflow_source_sha=$BASE_SHA" "$manifest"
+          grep -Fx 'patch_sha256=071220efb31c70a28ac626dffc52e5e2ac1268ba3a84e2da48406167049a7740' "$manifest"
+          grep -Fx 'patch_bytes=5046009' "$manifest"
+          git fetch --no-tags origin "$REVIEW_HELPER_SHA"
+          test "$(git rev-parse FETCH_HEAD)" = "$REVIEW_HELPER_SHA"
+          git show "$REVIEW_HELPER_SHA:tools/release/apply_build134_review_patch.py" > /tmp/apply_build134_review_patch.py
+          python3 /tmp/apply_build134_review_patch.py "$patch" --repo "$PWD" --apply
+          git add -A
+          patch_files=$(grep -c "^diff --git " "$patch")
+          staged_files=$(git diff --cached --name-only | wc -l)
+          echo "PATCH_FILES=$patch_files STAGED_FILES=$staged_files"
+          # The exported source-only patch has 196 actual Git diff headers;
+          # earlier 272-file inventory includes changes not exported as this patch.
+          test "$patch_files" -eq 196
+          test "$staged_files" -eq "$patch_files"
+          if git diff --cached --name-only | grep -E '^android/app/libs/.*[.]jar$|Build134ReleaseScopeTest[.]kt$'; then
+            echo '::error::Disallowed generated JAR or ephemeral test fixture in staged source'
+            exit 1
+          fi
+          # The already-tested exact patch has upstream trailing whitespace.
+          # Report it, but do not silently rewrite validated source bytes.
+          if ! git diff --cached --check; then
+            echo "::warning::Upstream exact patch contains whitespace errors; preserve bytes for source-review and new exact-head tests."
+          fi
+          # Git rerere/preimage is a historical conflict fixture by design.
+          # Reject live-source conflict markers, not archived resolution inputs.
+          test -z "$(git ls-files -u)"
+          if git diff --cached --unified=0 -- . ':(exclude)engine-upgrade/rerere/**' | grep -E "^\\+(<<<<<<< |=======|>>>>>>> )"; then
+            echo "::error::Conflict markers introduced by integration patch"
+            exit 1
+          fi
+          git config user.name 'arcana-source-integration'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'build134: stage exact verified combined source patch for review'
+          git fetch --no-tags origin "refs/heads/$TARGET_BRANCH"
+          test "$(git rev-parse FETCH_HEAD)" = "$BASE_SHA"
+          git push origin "HEAD:refs/heads/$TARGET_BRANCH"
+          echo "ISOLATED_INTEGRATION_HEAD=$(git rev-parse HEAD)"
+          echo 'Source-only commit; runtime JAR rebuild and exact-head CI are still required.'
