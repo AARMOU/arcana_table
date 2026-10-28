@@ -4,7 +4,7 @@
 // credential in the PWA:
 //   1. Sign-in: GitHub OAuth web flow run by this Worker. Only the repository owner's account is accepted.
 //   2. The owner's OAuth access token never reaches the browser. The PWA receives an AES-GCM encrypted,
-//      expiring session blob that only this Worker can open and that only works for /v1/decision.
+//      expiring session blob that only this Worker can open for /v1/decision and /v1/authorize.
 //   3. A decision is recorded as a real GitHub PR review BY THE OWNER, pinned to the exact reviewed commit
 //      (commit_id). A newer head is refused (409), a repeated decision is idempotent, and Approve is refused
 //      while checks are failing or still running.
@@ -12,6 +12,7 @@
 //      the existing repair admission (readiness, 10% reserve, capacity, ceilings), whether Copilot is asked
 //      to repair. Nothing here starts a paid worker, and the review never mentions @copilot.
 // Approval is card sign-off for integration review only: no merge, build, signing or release.
+// Owner work authorization separately uses /v1/authorization + /v1/authorize and never certifies rules.
 
 import { publicGithub } from './public-github.mjs';
 import { authorizationInfo, authorizeUnit } from './authorize.mjs';

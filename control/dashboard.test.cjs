@@ -6,7 +6,7 @@ const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
 const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
 test('self-contained dashboard exists',()=>{assert.ok(html.startsWith('<!doctype html>'));assert.ok(html.includes('<title>Arcana Control'));assert.ok(script);
-  // Only the same-origin review module may load (Phase 2 approvals); the inline dashboard script stays read-only.
+  // Only approved same-origin review and owner authorization modules may load; the inline dashboard script stays read-only.
   assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"','<script src="./authorize.js"']);});
 test('owner authorization has a visible queue panel and guarded client module',()=>{assert.match(html,/id="authorizationList"/);assert.match(html,/authorize\.js/);assert.ok(html.includes('I agree. Do it'));});
 test('inline JavaScript parses',()=>{assert.doesNotThrow(()=>new vm.Script(script));});
