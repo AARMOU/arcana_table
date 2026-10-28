@@ -200,6 +200,7 @@
           return {label:'Agent finished',tag:'green',detail:'Copilot finished its agent run. The PR needs review; this does not certify the card.'};
         if(run && run.status==='completed' && run.conclusion!=='success')
           return {label:'Run '+(run.conclusion||'ended'),tag:'red',detail:'Copilot agent run did not finish successfully. Inspect the run and PR.'};
+        if(pr?.state==='closed')return {label:'PR closed',tag:'gray',detail:'Copilot PR is closed. Check GitHub for the disposition; closed does not mean card support.'};
         if(pr)return {label:'PR opened',tag:'blue',detail:'Copilot opened a PR. Agent completion is not verified from this feed.'};
         if(kind==='recent')return {label:'Recently finished',tag:'gray',detail:'Last dispatcher snapshot reports a recent Copilot session; no PR link verified.'};
         if(kind==='active')return {label:'Assigned / active',tag:'amber',detail:'Dispatcher reports an active unit; actual agent execution is not yet verified.'};
@@ -213,15 +214,17 @@
         if(ok){a.href=safelyLink(url);a.textContent=label;}
       }
       function showAssignment(candidate,issue,pr,run,checkedAt,warning){
-        const stage=candidate?copilotStage(pr,run,candidate.kind):{label:'No active assignment',tag:'gray',detail:'No currently assigned or recently finished Copilot card in the latest dispatcher snapshot.'};
+        const stage=candidate?copilotStage(pr,run,candidate.kind):checkedAt?
+          {label:'No active assignment',tag:'gray',detail:'No currently assigned or recently finished Copilot card in the latest dispatcher snapshot.'}:
+          {label:'Status unavailable',tag:'gray',detail:'Dispatcher data unavailable; active Copilot work cannot be verified.'};
         text('assignmentStage',stage.label);
         $('assignmentStage').className='tag '+stage.tag;
-        text('assignmentCard',candidate?(issue?.title||'Card request #'+candidate.number):'No current card reported');
+        text('assignmentCard',candidate?(issue?.title||'Card request #'+candidate.number):checkedAt?'No current card reported':'Assignment status unavailable');
         text('assignmentDetail',(pr?'PR #'+pr.number+' · '+pr.title+'. ':'')+stage.detail+(warning?' · Some GitHub details unavailable.':''));
         showAssignmentLink('assignmentIssue',candidate?ROOT+'/issues/'+candidate.number:null,'Issue #'+(candidate?.number||''));
         showAssignmentLink('assignmentPr',pr?.html_url,pr?'PR #'+pr.number:'');
         showAssignmentLink('assignmentAgentRun',run?.html_url,'Agent run');
-        text('assignmentFresh',(candidate?.kind==='recent'?'Most recent unit · ':'Latest dispatcher snapshot · ')+(checkedAt?timeAgo(checkedAt):'time unknown')+(checkedAt&&ageHours(checkedAt)>6?' · status may be stale':''));
+        text('assignmentFresh',checkedAt?(candidate?.kind==='recent'?'Most recent unit · ':'Latest dispatcher snapshot · ')+timeAgo(checkedAt)+(ageHours(checkedAt)>6?' · status may be stale':''):'No verified dispatcher timestamp');
       }
       async function fetchCopilotAssignment(d){
         const request=++assignmentRequest;
