@@ -189,7 +189,7 @@ export default {
       });
       if (request.method !== "GET") return json({ error: "use-get" }, 405, origin);
       if (origin !== PWA_ORIGIN) return json({ error: "origin-not-allowed" }, 403, origin);
-      const session = await openSession(env.SESSION_SECRET, (request.headers.get("Authorization") || "").replace(/^Bearer\\s+/i, ""));
+      const session = await openSession(env.SESSION_SECRET, (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""));
       if (!session) return json({ error: "sign-in-required" }, 401, origin);
       return json({ ok: true, login: session.login, expiresAt: session.exp }, 200, origin);
     }
