@@ -2,6 +2,7 @@
 // Loads work units from GitHub for admission control. All I/O lives here so that
 // admission.cjs stays pure. One unit = one queue (or Copilot-assigned) issue plus its PRs.
 const { parseLedger, deriveUnit, provenance, ONE_SHOT_LABEL, LEDGER, isBot } = require('./admission.cjs');
+const { overrideOf } = require('./feasibility.cjs');
 
 // writtenAt = created or last edited, whichever is later. Only the dispatcher's own ledger records
 // (github-actions[bot] + ledger marker) are exempt from the after-approval rule.
@@ -93,6 +94,7 @@ async function loadUnits({ github, owner, repo, now = Date.now(), approvers, lag
     const raw = { number: issue.number, title: issue.title, body: issue.body || '', labels,
       assignedToCopilot: (issue.assignees || []).some(isCopilot), ledger: parseLedger(comments), sessions,
       authorAssociation: issue.author_association, commenters: commentersOf(comments) };
+    raw.feasibilityOverride = overrideOf(events.get(issue.number), labels);
     const oneShot = labels.includes(ONE_SHOT_LABEL);
     if (oneShot) raw.approval = approvalOf(events.get(issue.number), await contentWrittenAt(github, owner, repo, issue.number));
     units.push({ raw, derived: { ...deriveUnit(raw, now, lagMs === undefined ? undefined : { lagMs }), ambiguousLink: ambiguous.has(issue.number),

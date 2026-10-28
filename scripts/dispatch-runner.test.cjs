@@ -39,7 +39,9 @@ function fake({ issues = [queue(68, [A.ONE_SHOT_LABEL])], ledger = {}, ci = true
   return { github, writes };
 }
 const ctx = { repo: { owner: 'AARMOU', repo: 'arcana_table' }, runId: 555 };
-const env = x => ({ ARCANA_AUTOMATION_READY: 'true', ARCANA_DISPATCH_MODE: 'authorize-once', ARCANA_REPAIR_MODE: 'off', ARCANA_INTEGRATION_BASE: BASE, COPILOT_DISPATCH_TOKEN: 't', ...x });
+const env = x => ({ ARCANA_AUTOMATION_READY: 'true', ARCANA_DISPATCH_MODE: 'authorize-once', ARCANA_REPAIR_MODE: 'off', ARCANA_INTEGRATION_BASE: BASE, COPILOT_DISPATCH_TOKEN: 't',
+  // Cardkit verdict for the test card on BASE_SHA (feasibility gate).
+  ARCANA_FEASIBILITY: JSON.stringify({ schema: 1, baseSha: 'c'.repeat(40), cards: { 'eldrazi monument': { name: 'Eldrazi Monument', readiness: 'SUPPORTED', route: 'copilot' } } }), ...x });
 const readBudget = async () => ({ snapshot: { used: 300, allowance: 1500, measuredAt: new Date().toISOString() } });
 const fetchOk = calls => async (url, init) => { calls.push([url, JSON.parse(init.body)]); return { ok: true, json: async () => ({ assignees: [{ login: 'Copilot' }] }) }; };
 const run = (f, e, extra = {}) => runDispatch({ github: f.github, context: ctx, core: core(), env: env(e), readBudget, ...extra });

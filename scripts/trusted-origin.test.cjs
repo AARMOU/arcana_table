@@ -47,7 +47,8 @@ function fake({ issues, events = () => [labeled(10)], edited = () => null, comme
 const core = { info() {}, warning() {}, setFailed() {}, summary: { addHeading() { return this; }, addCodeBlock() { return this; }, async write() {} } };
 const readBudget = async () => ({ snapshot: { used: 100, allowance: 1500, measuredAt: new Date().toISOString() } });
 const dispatch = (f, mode, extraEnv = {}, coreImpl = core) => runDispatch({ github: f.github, context: { repo: { owner: 'AARMOU', repo: 'arcana_table' }, runId: 7 }, core: coreImpl,
-  env: { ARCANA_AUTOMATION_READY: 'true', ARCANA_DISPATCH_MODE: mode, ARCANA_INTEGRATION_BASE: BASE, COPILOT_DISPATCH_TOKEN: 't', ...extraEnv },
+  env: { ARCANA_AUTOMATION_READY: 'true', ARCANA_DISPATCH_MODE: mode, ARCANA_INTEGRATION_BASE: BASE, COPILOT_DISPATCH_TOKEN: 't',
+    ARCANA_FEASIBILITY: JSON.stringify({ schema: 1, baseSha: 'c'.repeat(40), cards: { 'eldrazi monument': { name: 'Eldrazi Monument', readiness: 'SUPPORTED', route: 'copilot' } } }), ...extraEnv },
   readBudget, fetchImpl: f.fetchImpl });
 
 test('provenance: author must be owner, member or collaborator', () => {

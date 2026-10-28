@@ -1,0 +1,110 @@
+name: Arcana Queue Feeder
+# Read-only suggestions for the Copilot queue (scripts/queue-feeder.cjs). Never creates queue issues,
+# labels, assignments or paid work: it only refreshes its own status comment on #78, with prefilled
+# "new issue" links the owner reviews and submits.
+on:
+  schedule:
+    - cron: '47 13 * * *'
+  workflow_dispatch:
+    inputs:
+      max:
+        description: 'How many suggestions (1-5)'
+        type: number
+        default: 3
+permissions:
+  contents: read
+concurrency:
+  group: arcana-queue-feeder
+  cancel-in-progress: false
+jobs:
+  suggest:
+    # Integration-base Cardkit runs here with a read-only token and no repository secrets.
+    if: ${{ github.ref == 'refs/heads/main' && vars.ARCANA_INTEGRATION_BASE != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    outputs:
+      result: ${{ steps.pick.outputs.result }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: ctl
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ vars.ARCANA_INTEGRATION_BASE }}
+          path: base
+          persist-credentials: false
+      - name: Cardkit coverage with verified open-PR claims
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git -C base rev-parse HEAD > base-sha.txt
+          (cd base && python3 -I tools/cardkit/cardkit.py gaps --claims-from-github --json-output ../gaps.json > /dev/null)
+      - name: Pick unqueued Copilot-ready cards (trusted main code)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs=require('fs');const {candidates}=require('./ctl/scripts/queue-feeder.cjs');
+            const max=Math.min(5,Math.max(1,Number(context.payload.inputs?.max||3)||3));
+            const openIssues=await github.paginate(github.rest.issues.listForRepo,{...context.repo,state:'open',per_page:100});
+            const r=candidates({gaps:JSON.parse(fs.readFileSync('gaps.json','utf8')),openIssues,max});
+            fs.writeFileSync('pick.json',JSON.stringify(r));fs.writeFileSync('names.txt',r.names.join('\n')+(r.names.length?'\n':''));
+            core.info(JSON.stringify(r));
+      - name: Generate queue bodies (cardkit unit, fails closed per card)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          mkdir -p units
+          i=0
+          while IFS= read -r name; do
+            [ -n "$name" ] || continue
+            i=$((i+1))
+            printf '%s' "$name" > "units/$i.name"
+            (cd base && python3 -I tools/cardkit/cardkit.py unit -- "$name") > "units/$i.body" 2> "units/$i.err" || rm -f "units/$i.body"
+          done < names.txt
+      - id: pick
+        name: Assemble suggestions (trusted main code)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs=require('fs');const r=JSON.parse(fs.readFileSync('pick.json','utf8'));
+            const units=fs.readdirSync('units').filter(f=>f.endsWith('.name')).sort((a,b)=>parseInt(a)-parseInt(b)).map(f=>{
+              const k=f.slice(0,-5),body=fs.existsSync('units/'+k+'.body')?fs.readFileSync('units/'+k+'.body','utf8'):null;
+              return {name:fs.readFileSync('units/'+f,'utf8'),body,error:body?null:(fs.readFileSync('units/'+k+'.err','utf8').split('\n')[0]||'refused')};});
+            core.setOutput('result',JSON.stringify({...r,units,baseSha:fs.readFileSync('base-sha.txt','utf8').trim()}));
+  publish:
+    needs: suggest
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        env:
+          FEEDER_RESULT: ${{ needs.suggest.outputs.result }}
+          ARCANA_INTEGRATION_BASE: ${{ vars.ARCANA_INTEGRATION_BASE }}
+        with:
+          script: |
+            const Q=require('./scripts/queue-feeder.cjs');const S=require('./scripts/control-status.cjs');
+            let r=null;try{r=JSON.parse(process.env.FEEDER_RESULT||'null');}catch{}
+            const result=r||{ok:false,reason:'feeder job produced no result (see the suggest job)'};
+            let payload=Q.queuePayload({result,units:r?.units||[],base:process.env.ARCANA_INTEGRATION_BASE,baseSha:r?.baseSha,runId:context.runId});
+            // Stay well under GitHub's 65,536-character comment limit.
+            while(S.formatStatus('queue',payload,Q.queueSummary(payload)).length>60000&&payload.suggestions.length)payload={...payload,suggestions:payload.suggestions.slice(0,-1)};
+            const published=await S.publishStatus({github,...context.repo,kind:'queue',payload,summary:Q.queueSummary(payload)});
+            core.info('Status comment: '+published);
+            await core.summary.addHeading('Queue feeder').addRaw(Q.queueSummary(payload).join('\n')).write();
+            if(published.startsWith('failed'))core.setFailed('Could not publish queue suggestions ('+published+').');

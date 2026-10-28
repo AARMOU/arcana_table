@@ -25,10 +25,69 @@ concurrency:
   group: arcana-copilot-control
   cancel-in-progress: false
 jobs:
-  dispatch:
+  # Engine feasibility: Cardkit from the integration base, run with NO secrets and read-only access.
+  # Its verdicts only narrow what the dispatch job may assign (scripts/feasibility.cjs); missing or
+  # stale verdicts fail closed there.
+  feasibility:
     if: >-
       ${{ github.ref == 'refs/heads/main' && (github.event_name != 'issues' ||
-      contains(fromJSON('["arcana:authorize-once","wu:resolve-interrupted","wu:halted"]'), github.event.label.name)) }}
+      contains(fromJSON('["arcana:authorize-once","wu:resolve-interrupted","wu:halted","arcana:feasibility-reviewed"]'), github.event.label.name)) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      issues: read
+    outputs:
+      verdicts: ${{ steps.verdicts.outputs.verdicts }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          path: ctl
+          persist-credentials: false
+      - name: List card names in open queue issues (trusted main code)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {collectNames}=require('./ctl/scripts/feasibility.cjs');
+            const issues=await github.paginate(github.rest.issues.listForRepo,{...context.repo,state:'open',per_page:100});
+            const names=collectNames(issues);
+            require('fs').writeFileSync('names.txt',names.join('\n')+(names.length?'\n':''));
+            core.info('Cards to classify: '+names.length);
+      - name: Check out integration base
+        if: ${{ vars.ARCANA_INTEGRATION_BASE != '' }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ vars.ARCANA_INTEGRATION_BASE }}
+          path: base
+          persist-credentials: false
+      - name: Classify with Cardkit (base code, no secrets, no token)
+        if: ${{ vars.ARCANA_INTEGRATION_BASE != '' }}
+        run: |
+          set -euo pipefail
+          git -C base rev-parse HEAD > base-sha.txt
+          mapfile -t names < names.txt
+          if [ "${#names[@]}" -eq 0 ]; then echo '[]' > classified.json; exit 0; fi
+          (cd base && python3 -I tools/cardkit/cardkit.py classify --json -- "${names[@]}") > classified.json
+      - id: verdicts
+        name: Build verdicts (trusted main code)
+        if: ${{ vars.ARCANA_INTEGRATION_BASE != '' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs=require('fs');const {buildVerdicts}=require('./ctl/scripts/feasibility.cjs');
+            let v=null;
+            try{v=buildVerdicts({baseSha:fs.readFileSync('base-sha.txt','utf8').trim(),classified:JSON.parse(fs.readFileSync('classified.json','utf8'))});}catch(e){core.warning('Cardkit output unreadable: '+e.message);}
+            if(!v){core.warning('No feasibility verdicts: dispatch will refuse new assignments.');return;}
+            core.setOutput('verdicts',JSON.stringify(v));
+            const summary=Object.values(v.cards).map(c=>c.name+': '+c.readiness+(c.route?' / '+c.route:'')).join('\n');
+            await core.summary.addHeading('Cardkit feasibility @ '+v.baseSha.slice(0,7)).addCodeBlock(summary||'(no queue cards)').write();
+  dispatch:
+    needs: feasibility
+    # Runs even if the feasibility job failed: the gate then fails closed with a stated reason.
+    if: >-
+      ${{ !cancelled() && github.ref == 'refs/heads/main' && (github.event_name != 'issues' ||
+      contains(fromJSON('["arcana:authorize-once","wu:resolve-interrupted","wu:halted","arcana:feasibility-reviewed"]'), github.event.label.name)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -55,6 +114,7 @@ jobs:
           ARCANA_PREMIUM_REQUEST_BUDGET: ${{ vars.ARCANA_PREMIUM_REQUEST_BUDGET }}
           # Used only for the Copilot assignment call; all reads and ledger writes use GITHUB_TOKEN.
           COPILOT_DISPATCH_TOKEN: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
+          ARCANA_FEASIBILITY: ${{ needs.feasibility.outputs.verdicts }}
         with:
           script: |
             const {dispatcher}=require('./scripts/control-workflows.cjs');
