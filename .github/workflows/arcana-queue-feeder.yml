@@ -5,6 +5,10 @@ name: Arcana Queue Feeder
 on:
   schedule:
     - cron: '*/15 * * *'
+  # Best-effort completion wakeup. The schedule handles missed dynamic agent events.
+  workflow_run:
+    workflows: ['Running Copilot cloud agent']
+    types: [completed]
   workflow_dispatch:
     inputs:
       max:
