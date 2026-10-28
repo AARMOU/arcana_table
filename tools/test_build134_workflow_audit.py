@@ -300,6 +300,41 @@ class WorkflowAuditTest(unittest.TestCase):
         problems = audit(widen(a), widen(b))
         self.assertTrue(any('unreviewed job-level controls' in x for x in problems), problems)
 
+    def test_identical_required_gate_skip_rejected(self):
+        a, b = fixture()
+        def weaken(source):
+            return source.replace('      - name: gate 12\n',
+                                  '      - name: gate 12\n        if: false\n')
+        problems = audit(weaken(a), weaken(b))
+        self.assertTrue(any('required-gate condition' in x for x in problems), problems)
+
+    def test_identical_required_gate_continue_on_error_rejected(self):
+        a, b = fixture()
+        def weaken(source):
+            return source.replace('      - name: gate 12\n',
+                                  '      - name: gate 12\n        continue-on-error: true\n')
+        problems = audit(weaken(a), weaken(b))
+        self.assertTrue(any('required gate may ignore failure' in x for x in problems), problems)
+
+    def test_reviewed_always_on_failure_annotation_allowed(self):
+        a, b = fixture()
+        def annotate(source):
+            return source.replace(
+                '      - name: gate 10\n',
+                '      - name: Annotate Android unit-test failures (diagnostic, read-only)\n'
+                '        if: always()\n')
+        self.assertEqual(audit(annotate(a), annotate(b)), [])
+
+    def test_identical_annotation_condition_drift_rejected(self):
+        a, b = fixture()
+        def weaken(source):
+            return source.replace(
+                '      - name: gate 10\n',
+                '      - name: Annotate Android unit-test failures (diagnostic, read-only)\n'
+                '        if: false\n')
+        problems = audit(weaken(a), weaken(b))
+        self.assertTrue(any('required-gate condition' in x for x in problems), problems)
+
     def test_git_blob_hash(self):
         self.assertEqual(git_blob_sha(b'hello\n'), 'ce013625030ba8dba906f756967f9e9ca394464a')
 
