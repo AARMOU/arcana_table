@@ -169,7 +169,7 @@ def verify_custom_export(entries: dict[str, str], jsonl_path: Path) -> int:
 # exact Oracle, a real engine scenario, registry/export and CI.
 TRIAGE = {
     "Ulalek, Fused Atrocity": ("GPT #132 / draft #156", "candidate tested on isolated runtime; not on shared development"),
-    "Forsaken Monument": ("Copilot CANDIDATE #151", "cross-deck; NO authorization; test mana tap replacement and anthem"),
+    "Forsaken Monument": ("CLAUDE SOURCE #171 / GPT VALIDATION #180; Copilot #151 HOLD", "existing unintegrated source and nine scenarios; NO duplicate paid dispatch; verify deterministic export, opponent mana, anthem and cross-deck acceptance"),
     "Eldrazi Temple": ("GPT #152 / draft #158", "colorless-Eldrazi ability-source restriction needs source-built engine primitive"),
     "Ugin, the Ineffable": ("GPT #153", "unique token-to-face-down-exile link survives Ugin departure"),
     "Eldrazi Displacer": ("GPT #154 / existing draft #163", "13 real-engine scenarios green on isolated head; DO NOT dispatch a duplicate Copilot worker; upgraded integration pending"),
