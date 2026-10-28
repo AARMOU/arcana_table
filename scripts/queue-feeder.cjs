@@ -7,13 +7,17 @@ const F = require('./feasibility.cjs');
 
 const REPO_URL = 'https://github.com/AARMOU/arcana_table';
 const MAX_URL = 7500;
+const trustedIssue = i => !i.pull_request && (A.TRUSTED_ASSOCIATIONS.includes(i.author_association) ||
+  (i.user?.login === 'github-actions[bot]' && i.user?.type === 'Bot' &&
+    String(i.body || '').startsWith(A.AUTO_QUEUE_MARKER + '\n')));
 
 // gaps: Cardkit `gaps --claims-from-github` JSON. openIssues: open issues (REST shape).
 function candidates({ gaps, openIssues = [], max = 5 }) {
   if (!gaps || !gaps.dispatch || gaps.dispatch.claimsVerified !== true || gaps.dispatch.dispatchable !== true)
     return { ok: false, reason: 'Cardkit could not verify open-PR claims; no suggestions (fail closed).', names: [], alreadyQueued: [] };
-  const queued = new Set(F.collectNames(openIssues, 1000).map(F.normName));
-  const titles = openIssues.filter(i => !i.pull_request).map(i => F.normName(i.title));
+  const safeIssues = openIssues.filter(trustedIssue);
+  const queued = new Set(F.collectNames(safeIssues, 1000).map(F.normName));
+  const titles = safeIssues.map(i => F.normName(i.title));
   const copilot = Array.isArray(gaps.dispatch.copilot) ? gaps.dispatch.copilot.filter(n => typeof n === 'string') : [];
   const alreadyQueued = copilot.filter(n => queued.has(F.normName(n)) || titles.some(t => t.includes(F.normName(n))));
   const names = copilot.filter(n => !alreadyQueued.includes(n)).slice(0, max);
@@ -58,18 +62,16 @@ function queueSummary(p) {
 function chooseAutoQueue(payload, openIssues = []) {
   if (!payload?.ok || !/^[a-f0-9]{40}$/.test(String(payload.baseSha || '')) ||
       !/^[A-Za-z0-9._/-]+$/.test(String(payload.base || ''))) return { reason: 'invalid-cardkit-result' };
-  const queued = new Set(F.collectNames(openIssues, 1000).map(F.normName));
+  const safeIssues = openIssues.filter(trustedIssue);
+  const queued = new Set(F.collectNames(safeIssues, 1000).map(F.normName));
   // An outsider cannot park a fake "ready" issue and indefinitely block the feed.
-  const pending = openIssues.find(i => !i.pull_request && String(i.title || '').startsWith('[Arcana Queue]') &&
-    (A.TRUSTED_ASSOCIATIONS.includes(i.author_association) ||
-      (i.user?.login === 'github-actions[bot]' && i.user?.type === 'Bot' &&
-        String(i.body || '').startsWith(A.AUTO_QUEUE_MARKER + '\n'))) &&
+  const pending = safeIssues.find(i => String(i.title || '').startsWith('[Arcana Queue]') &&
     !(i.assignees || []).some(a => ['copilot', 'copilot-swe-agent[bot]'].includes(String(a.login || '').toLowerCase())) &&
     A.unitActionable(i.body || '', payload.base).ok);
   if (pending) return { pendingIssue: pending.number, reason: 'eligible-queue-item-already-waiting' };
   const s = (payload.suggestions || []).find(x => x.ready && x.body &&
     A.unitActionable(x.body, payload.base).ok && !queued.has(F.normName(x.name)) &&
-    !openIssues.some(i => !i.pull_request && String(i.title || '') === x.title));
+    !safeIssues.some(i => String(i.title || '') === x.title));
   return s ? { suggestion: s } : { reason: 'no-unclaimed-ready-card' };
 }
 
