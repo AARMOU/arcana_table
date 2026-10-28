@@ -10,6 +10,11 @@ on:
   workflow_run:
     workflows: ['Running Copilot cloud agent']
     types: [completed]
+  # Copilot PR activity wakes the feeder promptly when scheduled workflows are delayed.
+  # Run only trusted main code, and only for Copilot PRs targeting our integration base.
+  # Never check out or execute the PR head in a workflow with write permissions.
+  pull_request_target:
+    types: [opened, synchronize, ready_for_review]
   workflow_dispatch:
     inputs:
       max:
@@ -24,7 +29,14 @@ concurrency:
 jobs:
   suggest:
     # Integration-base Cardkit runs here with a read-only token and no repository secrets.
-    if: ${{ github.ref == 'refs/heads/main' && vars.ARCANA_INTEGRATION_BASE != '' }}
+    if: >-
+      ${{ vars.ARCANA_INTEGRATION_BASE != '' &&
+      (github.event_name != 'pull_request_target' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request_target' &&
+      github.event.pull_request.user.login == 'Copilot' &&
+      github.event.pull_request.base.ref == vars.ARCANA_INTEGRATION_BASE &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.repo.fork == false)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -34,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.workflow_sha }}
+          ref: ${{ github.event_name == 'pull_request_target' && 'main' || github.workflow_sha }}
           path: ctl
           persist-credentials: false
       - uses: actions/checkout@v4
@@ -115,7 +127,14 @@ jobs:
           retention-days: 1
   publish:
     needs: suggest
-    if: ${{ !cancelled() && github.ref == 'refs/heads/main' }}
+    if: >-
+      ${{ !cancelled() && vars.ARCANA_INTEGRATION_BASE != '' &&
+      (github.event_name != 'pull_request_target' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'pull_request_target' &&
+      github.event.pull_request.user.login == 'Copilot' &&
+      github.event.pull_request.base.ref == vars.ARCANA_INTEGRATION_BASE &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.head.repo.fork == false)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -127,7 +146,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.workflow_sha }}
+          ref: ${{ github.event_name == 'pull_request_target' && 'main' || github.workflow_sha }}
           persist-credentials: false
       - name: Download feeder result
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
