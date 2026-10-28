@@ -59,7 +59,7 @@ jobs:
       # tests need the debug-only ui-test-manifest and can't launch there.
       - name: Check release build has no debug test scenarios
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest' --tests 'com.arcanatable.LauncherBrandingTest'
+        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest --tests 'com.arcanatable.ReleaseHasNoTestScenariosTest' --tests 'com.arcanatable.LauncherBrandingTest' --tests 'com.arcanatable.ReleaseVariantScopeTest'
       - name: Check exported index consistency
         run: |
           python3 - <<'PY'
