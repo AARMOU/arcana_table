@@ -130,3 +130,14 @@ test('priority inbox shows trusted owner and public demand separately, without a
  assert.ok(script.includes('Not Copilot-ready'));
  assert.ok(!/\b(?:POST|PUT|PATCH|DELETE)\b/.test(script));
 });
+
+test('one-tap authorization reconciles live owner state on refresh and fails closed on lookup errors',()=>{
+ const auth=read('authorize.js');
+ assert.ok(auth.includes("call('/v1/authorization?issue=' + unit.n, token, 'GET')"));
+ assert.ok(auth.includes("if (info.authorized)"));
+ assert.ok(auth.includes("if (info.claimed)"));
+ assert.ok(auth.includes("button.disabled = true;"));
+ assert.ok(auth.includes('Live authorization status unavailable'));
+ assert.ok(auth.includes('worker slot occupied'));
+ assert.ok(!auth.includes("button.disabled = false; message.textContent = 'Issue details unavailable"));
+});
