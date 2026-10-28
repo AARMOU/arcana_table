@@ -281,7 +281,8 @@ data class ArgentumTableSnapshot(
                         isCommander = card.optBoolean("isCommander"),
                         combatRole = when { card.optBoolean("isAttacking") -> "ATTACKING"; card.optBoolean("isBlocking") -> "BLOCKING"; else -> null },
                         damage = card.optInt("damage", 0),
-                        summoningSick = card.optBoolean("hasSummoningSickness") && typeLine.contains("Creature", ignoreCase = true)
+                        summoningSick = card.optBoolean("hasSummoningSickness") && typeLine.contains("Creature", ignoreCase = true),
+                        attachedTo = card.optString("attachedTo").takeUnless { it.isBlank() || it == "null" }?.let(::cardId),
                     )
                 }
             }
