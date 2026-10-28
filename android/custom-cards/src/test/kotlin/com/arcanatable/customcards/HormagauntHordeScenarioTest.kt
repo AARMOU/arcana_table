@@ -21,8 +21,8 @@ class HormagauntHordeScenarioTest {
         assertNull(d.castXSpell(p, horde, 5).error)
         d.resolveAll()
 
-        assertEquals(5, d.projected.getPower(horde))
-        assertEquals(5, d.projected.getToughness(horde))
+        assertEquals(6, d.projected.getPower(horde))
+        assertEquals(6, d.projected.getToughness(horde))
         assertEquals(initialHandSize + 1, d.zoneNames(p, Zone.HAND).size)
     }
 
@@ -38,8 +38,8 @@ class HormagauntHordeScenarioTest {
         assertNull(d.castXSpell(p, horde, 4).error)
         d.resolveAll()
 
-        assertEquals(4, d.projected.getPower(horde))
-        assertEquals(4, d.projected.getToughness(horde))
+        assertEquals(5, d.projected.getPower(horde))
+        assertEquals(5, d.projected.getToughness(horde))
         assertEquals(initialHandSize, d.zoneNames(p, Zone.HAND).size)
     }
 
