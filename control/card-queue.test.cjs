@@ -120,3 +120,10 @@ test('Scryfall exact card is accepted, abbreviated fuzzy only suggests owner-con
  assert.equal((await Preflight.verifyPrintedCard(async()=>{throw Error('offline')},'Broodlord')).ok,false);
  assert.equal((await Preflight.verifyPrintedCard(async()=>({ok:false,status:429}),'Broodlord')).ok,false);
 });
+
+test('priority panel displays ranked verified demand counts from the read-only feeder',()=>{
+ assert.ok(script.includes("Array.isArray(data.demand)"));
+ assert.ok(script.includes("Most requested Copilot-ready cards"));
+ assert.ok(script.includes("recorded request"));
+ assert.ok(!/\\b(?:POST|PUT|PATCH|DELETE)\\b/.test(script));
+});
