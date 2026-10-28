@@ -200,4 +200,51 @@ class UlamogsNullifierScenarioTest {
         assertTrue("Rest in Peace also redirects the countered spell",
             d.getExileCardNames(d.player1).contains("Grizzly Bears"))
     }
+    /**
+     * Negative replacement fixture: declining the optional processor cost must
+     * neither counter the targeted spell nor generate EXILE-to-EXILE moves.
+     */
+    @Test fun restInPeaceDeclineDoesNotProcessCardsOrCounter() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Rest in Peace")
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Island")
+
+        d.respondToOwnBears(Choices(yes = false))
+
+        assertEquals("Declining the optional processing lets the targeted spell resolve",
+            1, d.permanentsNamed(d.player1, "Grizzly Bears").size)
+        assertEquals(listOf("Island", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
+        assertTrue("Declining must not move either exiled card",
+            d.getGraveyardCardNames(d.player2).isEmpty())
+        val reexiled = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
+            .filter { it.ownerId == d.player2 &&
+                it.fromZone == com.wingedsheep.sdk.core.Zone.EXILE &&
+                it.toZone == com.wingedsheep.sdk.core.Zone.EXILE }
+        assertTrue("Declining cannot produce a replacement zone-change event", reexiled.isEmpty())
+    }
+
+    /**
+     * Replacement effects must not turn our own exiled cards into eligible
+     * processing material. One opponent-owned exile is still insufficient.
+     */
+    @Test fun restInPeaceDoesNotAllowProcessingOwnExiledCards() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Rest in Peace")
+        d.putCardInExile(d.player1, "Sol Ring")
+        d.putCardInExile(d.player1, "Island")
+        d.putCardInExile(d.player2, "Grizzly Bears")
+
+        d.respondToOwnBears(Choices(yes = true))
+
+        assertEquals("A single opponent-owned exile cannot pay the two-card processing cost",
+            1, d.permanentsNamed(d.player1, "Grizzly Bears").size)
+        assertEquals(listOf("Island", "Sol Ring"), d.getExileCardNames(d.player1).sorted())
+        assertEquals(listOf("Grizzly Bears"), d.getExileCardNames(d.player2))
+        val reexiled = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
+            .filter { it.fromZone == com.wingedsheep.sdk.core.Zone.EXILE &&
+                it.toZone == com.wingedsheep.sdk.core.Zone.EXILE }
+        assertTrue("Ineligible exile must not be processed under Rest in Peace", reexiled.isEmpty())
+    }
+
 }
