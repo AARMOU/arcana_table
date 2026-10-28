@@ -115,4 +115,4 @@ jobs:
             const published=await S.publishStatus({github,...context.repo,kind:'queue',payload,summary:Q.queueSummary(payload)});
             core.info('Status comment: '+published);
             await core.summary.addHeading('Queue feeder').addRaw(Q.queueSummary(payload).join('\n')).write();
-            if(published.startsWith('failed'))core.setFailed('Could not publish queue suggestions ('+published+').');
+            if(!r||published.startsWith('failed'))core.setFailed('Queue suggestions not published from verified feeder result ('+published+').');
