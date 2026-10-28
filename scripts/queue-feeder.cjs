@@ -48,7 +48,8 @@ function queueSummary(p) {
     (p.alreadyQueued.length ? `; already queued: ${p.alreadyQueued.join(', ')}` : '') + '.',
   ...ready.map(s => `${s.name}: ${s.newIssueUrl ? '[open prefilled queue issue](' + s.newIssueUrl + ')' : 'body in JSON below'}`),
   ...(p.autoQueue?.created ? ['Auto-queued #' + p.autoQueue.issue + ' (' + p.autoQueue.name + '); guarded dispatcher requested.'] :
-    ['Auto-queue: ' + (p.autoQueue?.reason || 'not attempted') + '.'])];
+    ['Auto-queue: ' + (p.autoQueue?.reason || 'not attempted') +
+      (p.autoQueue?.pending ? ' (#' + p.autoQueue.issue + ' queued; guarded dispatcher requested)' : '') + '.'])];
 }
 
 
@@ -58,10 +59,10 @@ function chooseAutoQueue(payload, openIssues = []) {
   if (!payload?.ok || !/^[a-f0-9]{40}$/.test(String(payload.baseSha || '')) ||
       !/^[A-Za-z0-9._/-]+$/.test(String(payload.base || ''))) return { reason: 'invalid-cardkit-result' };
   const queued = new Set(F.collectNames(openIssues, 1000).map(F.normName));
-  const pending = openIssues.some(i => !i.pull_request && String(i.title || '').startsWith('[Arcana Queue]') &&
+  const pending = openIssues.find(i => !i.pull_request && String(i.title || '').startsWith('[Arcana Queue]') &&
     !(i.assignees || []).some(a => ['copilot', 'copilot-swe-agent[bot]'].includes(String(a.login || '').toLowerCase())) &&
     A.unitActionable(i.body || '', payload.base).ok);
-  if (pending) return { reason: 'eligible-queue-item-already-waiting' };
+  if (pending) return { pendingIssue: pending.number, reason: 'eligible-queue-item-already-waiting' };
   const s = (payload.suggestions || []).find(x => x.ready && x.body &&
     A.unitActionable(x.body, payload.base).ok && !queued.has(F.normName(x.name)) &&
     !openIssues.some(i => !i.pull_request && String(i.title || '') === x.title));
@@ -78,7 +79,7 @@ async function createNextAutoQueue({ github, owner, repo, payload, runId, enable
   if (head !== payload.baseSha) return { reason: 'integration-base-moved' };
   const open = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
   const pick = chooseAutoQueue(payload, open);
-  if (!pick.suggestion) return { reason: pick.reason };
+  if (!pick.suggestion) return { reason: pick.reason, ...(pick.pendingIssue ? { pending: true, issue: pick.pendingIssue } : {}) };
   const s = pick.suggestion;
   const body = [A.AUTO_QUEUE_MARKER,
     '<!-- source: trusted-main-queue-feeder; run:' + runId + '; base-sha:' + payload.baseSha + ' -->',
