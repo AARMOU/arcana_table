@@ -188,6 +188,15 @@ class UlamogsNullifierScenarioTest {
             listOf("Island", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
         assertTrue("Neither processed card may enter the opponent's graveyard",
             d.getGraveyardCardNames(d.player2).isEmpty())
+        // CR 400.7: replacement into the same exile zone is still a fresh
+        // zone-change event, not a no-op on the old exiled objects.
+        val processed = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
+            .filter { it.ownerId == d.player2 &&
+                it.fromZone == com.wingedsheep.sdk.core.Zone.EXILE &&
+                it.toZone == com.wingedsheep.sdk.core.Zone.EXILE }
+            .map { it.entityName }.sorted()
+        assertEquals("Both processed cards must leave and re-enter exile as new objects",
+            listOf("Island", "Sol Ring"), processed)
         assertTrue("Rest in Peace also redirects the countered spell",
             d.getExileCardNames(d.player1).contains("Grizzly Bears"))
     }
