@@ -108,7 +108,7 @@ private suspend fun TableController.acceptWifiGuest(
     onlineRoomCode = null
     wifiRole = if (server is ArgentumCloudHost) "online-host" else "host"
     val you = setup.you.copy(name = friendlyName(setup.you.commander))
-    argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, you, seat, emit = emit).also { it.quietOpponentTurns = quietOpponentTurns } }
+    argentumSocket.localHostFactory = { emit -> com.arcanatable.engine.LocalArgentumHost(registry, you, seat, emit = emit).also { it.quietOpponentTurns = quietOpponentTurns; it.respondToOwnStack = respondToOwnStack } }
     argentumOffline = true
     argentumDeckForLobby = null
     argentumCommanderForLobby = null

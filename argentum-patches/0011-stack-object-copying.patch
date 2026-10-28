@@ -1,0 +1,1453 @@
+diff --git a/docs/card-sdk-language-reference.md b/docs/card-sdk-language-reference.md
+index b16546693c..5cf7e54e13 100644
+--- a/docs/card-sdk-language-reference.md
++++ b/docs/card-sdk-language-reference.md
+@@ -3376,7 +3376,7 @@ wrappers: Word of Command composes it inside `WithManaAbilitySources` and
+   groups, final-set-dependent target planning, or multiple object visits of one entity in separate
+   slots (LEA G60); these boundaries block printed Fork. No new effect vocabulary is introduced.
+ 
+-- `CopyEachTargetSpellEffect()` (facade `Effects.CopyEachTargetSpell(keywordsForCopy, removeLegendary)`) — copy **every** spell targeted by this effect (one copy per `ChosenTarget.Spell` in context), pausing per copy that has targets so the controller may choose new targets (CR 707.10). Pair with an unlimited spell target requirement — `TargetObject(filter = TargetFilter.InstantOrSorcerySpellOnStack, unlimited = true)`. Used by Display of Power ("Copy any number of target instant and/or sorcery spells."). Spells flagged `cantBeCopied` are skipped.
++- `CopyStackObjectsEffect()` (facade `Effects.CopyEachTargetSpell(keywordsForCopy, removeLegendary)`) — copy **every** spell targeted by this effect (one copy per `ChosenTarget.Spell` in context), pausing per copy that has targets so the controller may choose new targets (CR 707.10). Pair with an unlimited spell target requirement — `TargetObject(filter = TargetFilter.InstantOrSorcerySpellOnStack, unlimited = true)`. Used by Display of Power ("Copy any number of target instant and/or sorcery spells."). Spells flagged `cantBeCopied` are skipped.
+ - `CopyForEachOtherPossibleTargetEffect(target = EffectTarget.TriggeringEntity, candidates, copier = Player.You)` (facade `Effects.CopyForEachOtherPossibleTarget(candidates, target, copier)`) — copy a spell **or an activated/triggered ability** once **for each other object it could target**, auto-assigning every copy a distinct one of those objects (CR 707.10d). The Zada family: **Mirrorwing Dragon**, **Agrus Kos, Eternal Soldier**, Zada, Hedron Grinder. This is the 707.10d shape, **not** 707.10c — no decision is made, so contrast `CopyTargetSpellEffect(copies = …)`, which makes N copies and pauses to let the controller *choose* new targets for each. The engine dispatches on what `target` resolves to: a spell on the stack, or an ability (`EffectTarget.TargetingSource` for Agrus Kos's "copy that ability" in a becomes-the-target trigger). The candidate set is every object matching `candidates` that is a legal target for **every** instance of the word "target" on the original (the per-requirement legal-target sets are intersected, so hexproof/shroud/protection and per-requirement filters are honored — "any creature that couldn't be targeted … is just ignored"), minus the objects the original already targets (the "each **other** …" of the card text). Each copy fills *all* of the original's target slots with its one object; a modal spell or triggered ability keeps its chosen modes with its per-mode targets rewritten the same way (700.2g — "a different mode cannot be chosen"). `candidates` reads "this" as the **ability's source** (not the copied object), so `Creature.sourceItself()` is "the copy targets [this creature]" — **Ivy, Gleeful Spellthief** gets one copy aimed at herself when she is a legal target, none otherwise. **`copier` controls every copy and is the player `candidates` and each candidate's legality are read relative to** — so `GameObjectFilter.Creature.youControl()` reads "creature the copier controls". "You copy" is the default `Player.You` (Zada; Agrus Kos, whose controller gets the copies "no matter which player controlled the original ability"); Mirrorwing's "**that player** copies … each other creature **they** control" on a trigger watching every seat is `copier = Player.TriggeringPlayer`, the caster — cast Murder on an opponent's Mirrorwing Dragon and *your* creatures each get a Murder. Copies aren't cast or activated, so cast/activate triggers (including the Dragon's own) don't refire; an object flagged `cantBeCopied` yields no copies. Pair with `Triggers.anyPlayer.casts(InstantOrSorcery, requires = setOf(SpellCastPredicate.TargetsOnlySource))` or `Triggers.self.becomesTarget(abilitiesOnly = true, targetsOnlyIt = true)`.
+ - `CopyTargetTriggeredAbilityEffect(target)` — copy a triggered ability on the stack. `target` is
+   usually `ContextTarget(0)`; `EffectTarget.TargetingSource` copies the ability that just targeted
+@@ -18344,3 +18344,17 @@ controller with `storePlayer()` and compares each ranked bidder using
+ `Conditions.PlayerIs(Player.You, originalController.asPlayers)`, so a later control change does
+ not change which player earns the counters. `ChooseNumberThen` remains the public, single
+ chooser combinator, and `SelectFromCollection` remains ordinary collection selection.
++
++### Controlled stack copies
++
++`Effects.CopyControlledStackObjects(kinds, player = Player.You)` snapshots the selected player's
++spells and/or activated/triggered abilities currently on the shared stack. `StackObjectKind` selects
++which kinds are included; no mana abilities enter the stack. The resolving object is excluded while
++other pending instances of its ability remain eligible. A batch is ordered by its controller, then
++copies use the ordinary copy/retarget continuations, preserving modes, X and cost-linked values.
++Ulalek composes a spells-only batch followed by an activated/triggered-abilities batch inside
++`Effects.MayPay(ManaCost.parse("{C}{C}"), then = ...)`.
++
++`CopyStackObjectsEffect` replaces the former Kotlin name `CopyEachTargetSpellEffect`, retaining the
++`CopyEachTargetSpell` serialization name and chosen-targets default for existing exported card data.
++`Effects.CopyEachTargetSpell()` remains the facade for that default.
+diff --git a/docs/sdk-index.md b/docs/sdk-index.md
+index c067fe9e32..a9eb0600a0 100644
+--- a/docs/sdk-index.md
++++ b/docs/sdk-index.md
+@@ -777,9 +777,9 @@ Families:
+ - `CopyCardIntoCollectionEffect(source: EffectTarget, storeAs: String)` — Copy a single card referenced by source and store the copy's entity id in the pipeline collection storeAs.
+ - `CopyCollectionIntoCollectionEffect(from: String, storeAs: String)` — Copy **every** card in the pipeline collection from and store all the copies' entity ids in the collection storeAs.
+ - `CopyEachSpellCastEffect(copies: Int, spellFilter: GameObjectFilter)` — Until end of turn, whenever you cast a spell matching spellFilter, copy it.
+-- `CopyEachTargetSpellEffect(keywordsForCopy: List<String>, removeLegendary: Boolean)` — Copy each spell targeted by this effect (CR 707.10).
+ - `CopyForEachOtherPossibleTargetEffect(target: EffectTarget, candidates: GameObjectFilter, copier: Player)` — Copy a spell or ability once **for each other object it could target** (CR 707.10d), auto-assigning every copy a distinct one of those objects as its target.
+ - `CopyNextSpellCastEffect(copies: Int, spellFilter: GameObjectFilter)` — When you next cast a spell matching spellFilter this turn, copy that spell.
++- `CopyStackObjectsEffect(source: StackCopySource, player: Player, kinds: Set<StackObjectKind>, keywordsForCopy: List<String>, removeLegendary: Boolean)` — Copy a snapshot of chosen or controlled stack objects, with independently retargetable copies.
+ - `CopyTargetSpellEffect(target: EffectTarget, keywordsForCopy: List<String>, removeLegendary: Boolean, addedTokenKeywords: Set<Keyword>, sacrificeTokenAtStep: Step?, sacrificeTokenOnlyOnControllersTurn: Boolean, copies: DynamicAmount, exceptions: CopyExceptions, tokenStartingLoyalty: DynamicAmount?)`
+ - `CopyTargetSpellOrAbilityEffect(target: EffectTarget, copies: DynamicAmount)` — Copy target spell **or** ability on the stack, dispatching at resolution on the chosen object's kind: an instant/sorcery spell copies via the spell-copy path; an activated or triggered ability copi…
+ - `CopyTargetTriggeredAbilityEffect(target: EffectTarget)` — Copy target triggered ability on the stack.
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
+index d64ef16573..7279cf666f 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/Effects.kt
+@@ -5423,10 +5423,19 @@ object Effects {
+         keywordsForCopy: List<com.wingedsheep.sdk.core.Keyword> = emptyList(),
+         removeLegendary: Boolean = false
+     ): Effect =
+-        com.wingedsheep.sdk.scripting.effects.CopyEachTargetSpellEffect(
+-            keywordsForCopy.map { it.name }, removeLegendary
++        com.wingedsheep.sdk.scripting.effects.CopyStackObjectsEffect(
++            keywordsForCopy = keywordsForCopy.map { it.name }, removeLegendary = removeLegendary
+         )
+ 
++    /** Copy a snapshot of stack objects controlled by [player], in their controller's chosen order. */
++    fun CopyControlledStackObjects(
++        kinds: Set<com.wingedsheep.sdk.scripting.effects.StackObjectKind>,
++        player: Player = Player.You
++    ): Effect = com.wingedsheep.sdk.scripting.effects.CopyStackObjectsEffect(
++        source = com.wingedsheep.sdk.scripting.effects.StackCopySource.Controlled,
++        player = player, kinds = kinds
++    )
++
+     /**
+      * Copy [target] — a spell or an ability on the stack — once for each **other** object matching
+      * [candidates] that it could target, giving each copy a distinct one of those objects as its
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/StackEffects.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/StackEffects.kt
+index cd1ebdc293..1d038b4894 100644
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/StackEffects.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/effects/StackEffects.kt
+@@ -1045,28 +1045,42 @@ data class CopyForEachOtherPossibleTargetEffect(
+         copy(candidates = candidates.applyTextReplacement(replacer))
+ }
+ 
++/** How a batch copy instruction identifies its source objects. */
++@Serializable
++enum class StackCopySource { ChosenTargets, Controlled }
++
++/** Stack objects only: mana abilities never enter this collection. */
++@Serializable
++enum class StackObjectKind { Spell, ActivatedAbility, TriggeredAbility }
++
+ /**
+- * Copy each spell targeted by this effect (CR 707.10). One copy is created per
+- * targeted spell on the stack; for each copy the controller may choose new targets.
+- *
+- * Models "Copy any number of target instant and/or sorcery spells. You may choose new
+- * targets for the copies." (Display of Power). Unlike [CopyTargetSpellEffect], which
+- * copies a single referenced target, this reads **every** spell target chosen for the
+- * spell/ability (all [com.wingedsheep.sdk.scripting.targets.ChosenTarget.Spell] entries in
+- * the resolution context) and copies them in turn, pausing per copy that has targets so
+- * the controller can retarget it.
+- *
+- * Spells flagged "can't be copied" are skipped (no copy is created for them).
++ * Copy a snapshot of chosen or controlled stack objects, with independently retargetable copies.
++ * [source] selects chosen spell targets (Display of Power) or a player's controlled objects.
++ * [kinds] selects spells and/or activated/triggered abilities (Ulalek's two sequential groups).
++ * The resolving object is excluded; other pending instances of that same ability are eligible.
++ * The controller orders each batch. Copies retain modes, X, cost-linked choices and source identity.
++ *
++ * This widens the former CopyEachTargetSpellEffect rather than adding a parallel batch copier.
++ * [CopyTargetSpellEffect] and [CopyTargetSpellOrAbilityEffect] supply the individual copy operations;
++ * neither alone selects or orders a non-targeted snapshot. Mana abilities never use the stack.
+  */
++@OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+ @SerialName("CopyEachTargetSpell")
+ @Serializable
+-data class CopyEachTargetSpellEffect(
++data class CopyStackObjectsEffect(
++    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
++    val source: StackCopySource = StackCopySource.ChosenTargets,
++    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
++    val player: Player = Player.You,
++    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
++    val kinds: Set<StackObjectKind> = setOf(StackObjectKind.Spell),
+     /** Keywords (by enum name) granted to each copy while it remains a spell on the stack. */
+     val keywordsForCopy: List<String> = emptyList(),
+     /** When true, the Legendary supertype is stripped from each resulting copy (CR 707.10f). */
+     val removeLegendary: Boolean = false
+ ) : Effect {
+-    override val description: String = "Copy each target spell"
++    override val description: String = if (source == StackCopySource.ChosenTargets)
++        "Copy each target spell" else "Copy the selected spells or abilities ${player.description} control"
+ }
+ 
+ /**
+diff --git a/mtg-sdk/src/test/kotlin/com/wingedsheep/sdk/scripting/StackObjectCopySdkTest.kt b/mtg-sdk/src/test/kotlin/com/wingedsheep/sdk/scripting/StackObjectCopySdkTest.kt
+new file mode 100644
+index 0000000000..6e28f051f3
+--- /dev/null
++++ b/mtg-sdk/src/test/kotlin/com/wingedsheep/sdk/scripting/StackObjectCopySdkTest.kt
+@@ -0,0 +1,21 @@
++package com.wingedsheep.sdk.scripting
++
++import com.wingedsheep.sdk.dsl.Effects
++import com.wingedsheep.sdk.scripting.effects.*
++import com.wingedsheep.sdk.scripting.references.Player
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.shouldBe
++import kotlinx.serialization.json.Json
++
++class StackObjectCopySdkTest : FunSpec({
++    test("existing targeted-copy JSON still decodes and uses the same wire name") {
++        val original = Json.decodeFromString(Effect.serializer(), """{"type":"CopyEachTargetSpell"}""")
++        original shouldBe CopyStackObjectsEffect()
++        Json.encodeToString(Effect.serializer(), original).contains("CopyEachTargetSpell") shouldBe true
++    }
++    test("controlled stack copies round-trip with player and ability kinds") {
++        val effect = Effects.CopyControlledStackObjects(
++            setOf(StackObjectKind.ActivatedAbility, StackObjectKind.TriggeredAbility), Player.TargetOpponent)
++        Json.decodeFromString(Effect.serializer(), Json.encodeToString(Effect.serializer(), effect)) shouldBe effect
++    }
++})
+diff --git a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+index 2eea22ccd6..8a52d5259f 100644
+--- a/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
++++ b/mtg-sdk/src/test/resources/sdk-surface-baseline.txt
+@@ -608,9 +608,9 @@ ConvertCountersToTokensEffect — Effect
+ CopyCardIntoCollectionEffect — Effect
+ CopyCollectionIntoCollectionEffect — Effect
+ CopyEachSpellCastEffect — Effect
+-CopyEachTargetSpellEffect — Effect
+ CopyForEachOtherPossibleTargetEffect — Effect
+ CopyNextSpellCastEffect — Effect
++CopyStackObjectsEffect — Effect
+ CopyTargetSpellEffect — Effect
+ CopyTargetSpellOrAbilityEffect — Effect
+ CopyTargetTriggeredAbilityEffect — Effect
+diff --git a/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/ltr/cards/DisplayOfPower.kt b/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/ltr/cards/DisplayOfPower.kt
+index f749f7279b..d03a7da00f 100644
+--- a/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/ltr/cards/DisplayOfPower.kt
++++ b/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/ltr/cards/DisplayOfPower.kt
+@@ -14,7 +14,7 @@ import com.wingedsheep.sdk.scripting.filters.unified.TargetFilter
+  * Copy any number of target instant and/or sorcery spells. You may choose new targets
+  * for the copies.
+  *
+- * Uses [com.wingedsheep.sdk.scripting.effects.CopyEachTargetSpellEffect] (CR 707.10): one
++ * Uses [com.wingedsheep.sdk.scripting.effects.CopyStackObjectsEffect] (CR 707.10): one
+  * copy is made per targeted spell, with optional retargeting per copy. The "can't be
+  * copied" clause maps to the card-level `cantBeCopied` flag (CR 707.10 — no copy results
+  * if a copy effect names this spell).
+diff --git a/mtg-sets/2023/tests/src/test/kotlin/com/wingedsheep/engine/scenarios/DisplayOfPowerScenarioTest.kt b/mtg-sets/2023/tests/src/test/kotlin/com/wingedsheep/engine/scenarios/DisplayOfPowerScenarioTest.kt
+index 12593a31f1..fe028de3e1 100644
+--- a/mtg-sets/2023/tests/src/test/kotlin/com/wingedsheep/engine/scenarios/DisplayOfPowerScenarioTest.kt
++++ b/mtg-sets/2023/tests/src/test/kotlin/com/wingedsheep/engine/scenarios/DisplayOfPowerScenarioTest.kt
+@@ -1,5 +1,8 @@
+ package com.wingedsheep.engine.scenarios
+ 
++import com.wingedsheep.engine.core.OrderObjectsDecision
++import com.wingedsheep.engine.core.OrderedResponse
++import com.wingedsheep.engine.core.SubmitDecision
+ import com.wingedsheep.engine.core.CastSpell
+ import com.wingedsheep.engine.state.components.identity.CantBeCopiedComponent
+ import com.wingedsheep.engine.state.components.identity.CardComponent
+@@ -15,7 +18,7 @@ import io.kotest.matchers.shouldBe
+  * Display of Power — "This spell can't be copied. Copy any number of target instant and/or
+  * sorcery spells. You may choose new targets for the copies." (CR 707.10).
+  *
+- * Exercises the CopyEachTargetSpellEffect + the cantBeCopied flag.
++ * Exercises the CopyStackObjectsEffect + the cantBeCopied flag.
+  */
+ class DisplayOfPowerScenarioTest : ScenarioTestBase() {
+ 
+@@ -109,8 +112,11 @@ class DisplayOfPowerScenarioTest : ScenarioTestBase() {
+             var guard = 0
+             while (game.state.stack.isNotEmpty() && guard++ < 20) {
+                 game.resolveStack()
+-                if (game.hasPendingDecision()) {
+-                    game.selectTargets(listOf(player2Id))
++                when (val decision = game.state.pendingDecision) {
++                    is OrderObjectsDecision -> game.execute(SubmitDecision(player1Id,
++                        OrderedResponse(decision.id, decision.objects))).error shouldBe null
++                    null -> Unit
++                    else -> game.selectTargets(listOf(player2Id)).error shouldBe null
+                 }
+             }
+ 
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/CardSpecificContinuations.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/CardSpecificContinuations.kt
+index a9d596be8d..6f4b632eec 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/CardSpecificContinuations.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/CardSpecificContinuations.kt
+@@ -436,25 +436,12 @@ data class StormCopyTargetContinuation(
+     val objectReferences: com.wingedsheep.engine.handlers.ObjectReferenceEnvironment = com.wingedsheep.engine.handlers.ObjectReferenceEnvironment(),
+ ) : AnswerContinuation
+ 
+-/**
+- * Resume copying a list of targeted spells one at a time (CR 707.10).
+- *
+- * Used by [com.wingedsheep.sdk.scripting.effects.CopyEachTargetSpellEffect] (Display of
+- * Power). [remainingSpellIds] holds every spell still to be copied, head first; the head
+- * is the spell whose copy's targets are being chosen by the paused decision. On resume the
+- * head is copied with the selected targets, then the tail is processed.
+- *
+- * @property remainingSpellIds Spells still to copy (head = the one being retargeted now)
+- * @property controllerId Player who controls the copies and picks targets
+- * @property targetRequirements Target requirements of the head spell (for the copy)
+- */
++/** Frozen batch of originals awaiting their controller's copy-order choice. */
+ @Serializable
+-data class CopyEachSpellContinuation(
+-    val remainingSpellIds: List<EntityId>,
+-    val controllerId: EntityId,
+-    val targetRequirements: List<TargetRequirement>,
+-    val keywordsForCopy: Set<String> = emptySet(),
+-    val removeLegendary: Boolean = false
++data class CopyStackObjectsOrderContinuation(
++    val objects: List<EntityId>,
++    val effect: com.wingedsheep.sdk.scripting.effects.CopyStackObjectsEffect,
++    val effectContext: com.wingedsheep.engine.handlers.EffectContext
+ ) : AnswerContinuation
+ 
+ /**
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/GameEvent.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/GameEvent.kt
+index e7a6780c6f..7f1c508b7d 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/GameEvent.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/GameEvent.kt
+@@ -919,9 +919,20 @@ data class AbilityActivatedEvent(
+ ) : GameEvent
+ 
+ /**
+- * An ability triggered.
++ * An activated or triggered ability was copied without being activated or triggering again.
+  */
+ @Serializable
++@SerialName("AbilityCopiedEvent")
++data class AbilityCopiedEvent(
++    val sourceId: EntityId,
++    val sourceName: String,
++    val controllerId: EntityId,
++    val abilityEntityId: EntityId,
++    val description: String
++) : GameEvent
++
++/** An ability actually triggered; making a copy emits AbilityCopiedEvent instead. */
++@Serializable
+ @SerialName("AbilityTriggeredEvent")
+ data class AbilityTriggeredEvent(
+     val sourceId: EntityId,
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
+index 736b345d53..5e48194a47 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/core/Serialization.kt
+@@ -72,7 +72,8 @@ val engineSerializersModule = SerializersModule {
+         subclass(DamagePreventionShieldCreatedEvent::class)
+         subclass(BlockerDeclarationPolicyChangedEvent::class)
+         subclass(PlayerActionPermissionsChangedEvent::class)
+         subclass(AbilityTriggeredEvent::class)
++        subclass(AbilityCopiedEvent::class)
+         subclass(ResolvedEvent::class)
+         subclass(SpellCounteredEvent::class)
+         subclass(SpellFizzledEvent::class)
+@@ -484,7 +484,7 @@ val engineSerializersModule = SerializersModule {
+         subclass(CopyActivatedAbilityTargetContinuation::class)
+         subclass(CopyAbilityTargetContinuation::class)
+         subclass(StormCopyTargetContinuation::class)
+-        subclass(CopyEachSpellContinuation::class)
++        subclass(CopyStackObjectsOrderContinuation::class)
+         subclass(StormCopyModalTargetContinuation::class)
+         subclass(ChangeSpellTargetContinuation::class)
+         subclass(LegendRuleContinuation::class)
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerIndex.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerIndex.kt
+index 893aa8d33f..eab7f9c992 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerIndex.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerIndex.kt
+@@ -479,2 +479,3 @@ class TriggerIndex(
+             is com.wingedsheep.engine.core.TurnSkippedEvent,
++            is com.wingedsheep.engine.core.AbilityCopiedEvent,
+             is com.wingedsheep.engine.core.AbilityAutoAnsweredEvent,
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/ContinuationHandler.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/ContinuationHandler.kt
+index f8129fcfd2..a5b11f3644 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/ContinuationHandler.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/ContinuationHandler.kt
+@@ -115,6 +115,11 @@ class ContinuationHandler(
+             )
+         }
+ 
++        val order = suspension.answer as? CopyStackObjectsOrderContinuation
++        if (order != null && (response !is OrderedResponse ||
++            response.orderedObjects.size != order.objects.size || response.orderedObjects.toSet() != order.objects.toSet()))
++            return ExecutionResult.error(state, "Order each copied object exactly once")
++
+         if (response is TargetsResponse) {
+             val error = com.wingedsheep.engine.handlers.effects.stack.SpellCopyTargets.validate(
+                 state, services.targetFinder, suspension.answer, response)
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/MiscContinuationResumer.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/MiscContinuationResumer.kt
+index 1a2476a80d..c62c00fa33 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/MiscContinuationResumer.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/MiscContinuationResumer.kt
+@@ -47,6 +47,6 @@ class MiscContinuationResumer(
+         resumer(FlipOntoBattlefieldContinuation::class, ::resumeFlipOntoBattlefield),
+         resumer(StormCopyTargetContinuation::class, ::resumeStormCopyTarget),
+         resumer(StormCopyModalTargetContinuation::class, ::resumeStormCopyModalTarget),
+-        resumer(CopyEachSpellContinuation::class, ::resumeCopyEachSpell),
++        resumer(CopyStackObjectsOrderContinuation::class, ::resumeCopyStackObjectsOrder),
+         resumer(CopyTriggeredAbilityTargetContinuation::class, ::resumeCopyTriggeredAbilityTarget),
+         resumer(CopyActivatedAbilityTargetContinuation::class, ::resumeCopyActivatedAbilityTarget),
+@@ -154,11 +154,9 @@ class MiscContinuationResumer(
+             return ExecutionResult.error(state, "Expected target selection response for ability copy")
+         }
+ 
+-        val selectedTargets = response.selectedTargets.entries
+-            .sortedBy { it.key }
+-            .flatMap { (_, targetIds) ->
+-                targetIds.map { entityId -> entityIdToChosenTarget(state, entityId) }
+-            }
++        val selection = com.wingedsheep.engine.handlers.effects.stack.SpellCopyTargets.selection(
++            state, continuation.abilityEntityId, response)
++        val selectedTargets = selection.targets
+ 
+         // Push the copy whose targets were just chosen.
+         val push = com.wingedsheep.engine.handlers.effects.stack.CopyTargetSpellOrAbilityExecutor
+@@ -167,7 +165,8 @@ class MiscContinuationResumer(
+                 abilityEntityId = continuation.abilityEntityId,
+                 controllerId = continuation.controllerId,
+                 targets = selectedTargets,
+-                targetRequirements = continuation.targetRequirements
++                targetRequirements = continuation.targetRequirements,
++                retainedTargetIndices = selection.retained
+             )
+         if (push.outcome !is Outcome.Done) return push
+ 
+@@ -601,53 +600,19 @@ class MiscContinuationResumer(
+         return checkForMore(result.stateWithOutputsHandedOn(), flipEvents + result.events)
+     }
+ 
+-    private fun resumeCopyEachSpell(
++    private fun resumeCopyStackObjectsOrder(
+         state: GameState,
+-        continuation: CopyEachSpellContinuation,
++        continuation: CopyStackObjectsOrderContinuation,
+         response: DecisionResponse,
+         checkForMore: CheckForMore
+     ): ExecutionResult {
+-        if (response !is TargetsResponse) {
+-            return ExecutionResult.error(state, "Expected target selection response for spell copy")
+-        }
+-
+-        val selectedTargets = response.selectedTargets.entries
+-            .sortedBy { it.key }
+-            .flatMap { (_, targetIds) ->
+-                targetIds.map { entityId -> entityIdToChosenTarget(state, entityId) }
+-            }
+-
+-        // Copy the head spell (the one just retargeted) with its new targets.
+-        val headSpellId = continuation.remainingSpellIds.first()
+-        val copyResult = services.stackResolver.putSpellCopy(
+-            state = state,
+-            sourceSpellId = headSpellId,
+-            targets = selectedTargets,
+-            targetRequirements = continuation.targetRequirements,
+-            controllerId = continuation.controllerId
+-        )
+-        if (copyResult.outcome !is Outcome.Done) return copyResult
+-        val mutated = com.wingedsheep.engine.handlers.effects.stack.StormCopyEffectExecutor
+-            .applyCopyMutations(
+-                copyResult.newState, copyResult.events,
+-                continuation.keywordsForCopy, continuation.removeLegendary
+-            )
+-
+-        // Process the remaining spells in the queue.
+-        val result = com.wingedsheep.engine.handlers.effects.stack.CopyEachTargetSpellExecutor
+-            .driveCopyEachSpell(
+-                state = mutated,
+-                targetFinder = services.targetFinder,
+-                controllerId = continuation.controllerId,
+-                remainingSpellIds = continuation.remainingSpellIds.drop(1),
+-                keywordsForCopy = continuation.keywordsForCopy,
+-                removeLegendary = continuation.removeLegendary,
+-                priorEvents = copyResult.events
+-            )
+-        // Propagate a further pause (another copy needs retargeting) or an error as-is;
+-        // otherwise let the engine continue resolving the stack.
+-        if (result.outcome is Outcome.Paused || result.error != null) return result
+-        return checkForMore(result.newState, result.events)
++        if (response !is OrderedResponse || response.orderedObjects.size != continuation.objects.size ||
++            response.orderedObjects.toSet() != continuation.objects.toSet())
++            return ExecutionResult.error(state, "Expected each copied object exactly once")
++        val result = com.wingedsheep.engine.handlers.effects.stack.CopyStackObjectsExecutor.copyInOrder(
++            state, response.orderedObjects.reversed(), continuation.effect,
++            continuation.effectContext, services.effectExecutorRegistry::execute).toExecutionResult()
++        return if (result.outcome is Outcome.Done) checkForMore(result.state, result.events) else result
+     }
+ 
+     private fun resumeStormCopyTarget(
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ObjectReferencePropagation.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ObjectReferencePropagation.kt
+index 4b9ad564e0..f2801c931f 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ObjectReferencePropagation.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/continuations/ObjectReferencePropagation.kt
+@@ -99,6 +99,7 @@ internal fun AnswerContinuation.objectReferences(): ObjectReferenceEnvironment?
+     is ChooseActionContinuation -> objectReferences
+     is TriggeredAbilityContinuation -> objectReferences
+     is TriggerDamageDistributionContinuation -> objectReferences
++    is CopyStackObjectsOrderContinuation -> effectContext.objectReferences
+     is MayAbilityContinuation -> effectContext.objectReferences
+     is GatedEffectContinuation -> effectContext.objectReferences
+     is MayRevealCardFromHandContinuation -> effectContext.objectReferences
+@@ -220,6 +221,7 @@ internal fun AnswerContinuation.withObjectReferences(refs: ObjectReferenceEnviro
+     is ChooseActionContinuation -> copy(objectReferences = refs)
+     is TriggeredAbilityContinuation -> copy(objectReferences = refs)
+     is TriggerDamageDistributionContinuation -> copy(objectReferences = refs)
++    is CopyStackObjectsOrderContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+     is MayAbilityContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+     is GatedEffectContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+     is MayRevealCardFromHandContinuation -> copy(effectContext = effectContext.copy(objectReferences = refs))
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt
+index 812935c27b..bc01b26c55 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/EffectExecutorRegistry.kt
+@@ -78,5 +78,5 @@ class EffectExecutorRegistry(
+         registerModule(
+             LibraryExecutors(::recurse, zones, cardRegistry, castSpellHandler, playLandHandler, targetFinder, legalActionEnumerator)
+         )
+-        registerModule(StackExecutors(zones, amountEvaluator, cardRegistry, spellCounterer, targetFinder = targetFinder))
++        registerModule(StackExecutors(zones, amountEvaluator, cardRegistry, spellCounterer, targetFinder = targetFinder, effectExecutor = ::recurse))
+         registerModule(InformationExecutors(cardRegistry))
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyEachTargetSpellExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyEachTargetSpellExecutor.kt
+deleted file mode 100644
+index 502fcf5dc7..0000000000
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyEachTargetSpellExecutor.kt
++++ /dev/null
+@@ -1,164 +0,0 @@
+-package com.wingedsheep.engine.handlers.effects.stack
+-
+-import com.wingedsheep.engine.core.*
+-import com.wingedsheep.engine.handlers.EffectContext
+-import com.wingedsheep.engine.handlers.TargetFinder
+-import com.wingedsheep.engine.handlers.effects.EffectExecutor
+-import com.wingedsheep.engine.mechanics.stack.StackPlacement
+-import com.wingedsheep.engine.state.GameState
+-import com.wingedsheep.engine.state.components.identity.CantBeCopiedComponent
+-import com.wingedsheep.engine.state.components.identity.CardComponent
+-import com.wingedsheep.engine.state.components.stack.ChosenTarget
+-import com.wingedsheep.engine.state.components.stack.TargetsComponent
+-import com.wingedsheep.sdk.model.EntityId
+-import com.wingedsheep.sdk.scripting.effects.CopyEachTargetSpellEffect
+-import kotlin.reflect.KClass
+-
+-/**
+- * Executor for [CopyEachTargetSpellEffect] (CR 707.10).
+- *
+- * Reads every spell target chosen for this spell/ability (all
+- * [ChosenTarget.Spell] entries in the resolution context) and creates one copy of each.
+- * For each copied spell that has its own targets, pauses with a [ChooseTargetsDecision]
+- * so the controller may pick new targets for that copy; copies whose source has no
+- * (flat) targets — including modal spells, whose copies inherit their chosen modes and
+- * targets verbatim — are created immediately. Spells flagged "can't be copied" are
+- * skipped.
+- *
+- * Models "Copy any number of target instant and/or sorcery spells. You may choose new
+- * targets for the copies." (Display of Power).
+- */
+-class CopyEachTargetSpellExecutor(
+-    private val targetFinder: TargetFinder
+-) : EffectExecutor<CopyEachTargetSpellEffect> {
+-
+-    override val effectType: KClass<CopyEachTargetSpellEffect> = CopyEachTargetSpellEffect::class
+-
+-    override fun execute(
+-        state: GameState,
+-        effect: CopyEachTargetSpellEffect,
+-        context: EffectContext
+-    ): EffectResult {
+-        // The spells to copy are every Spell target chosen for this effect.
+-        val spellIds = context.targets
+-            .filterIsInstance<ChosenTarget.Spell>()
+-            .map { it.spellEntityId }
+-            .distinct()
+-
+-        return EffectResult.from(
+-            driveCopyEachSpell(
+-                state = state,
+-                targetFinder = targetFinder,
+-                controllerId = context.controllerId,
+-                remainingSpellIds = spellIds,
+-                keywordsForCopy = effect.keywordsForCopy.toSet(),
+-                removeLegendary = effect.removeLegendary,
+-                priorEvents = emptyList()
+-            )
+-        )
+-    }
+-
+-    companion object {
+-        /**
+-         * Process the queue of spells to copy, one at a time. Creates copies that need
+-         * no retargeting immediately; pauses (pushing a [CopyEachSpellContinuation] with
+-         * the still-unprocessed queue, head first) when the current copy can be retargeted.
+-         */
+-        fun driveCopyEachSpell(
+-            state: GameState,
+-            targetFinder: TargetFinder,
+-            controllerId: EntityId,
+-            remainingSpellIds: List<EntityId>,
+-            keywordsForCopy: Set<String>,
+-            removeLegendary: Boolean,
+-            priorEvents: List<GameEvent>
+-        ): ExecutionResult {
+-            var currentState = state
+-            val allEvents = priorEvents.toMutableList()
+-            var queue = remainingSpellIds
+-
+-            while (queue.isNotEmpty()) {
+-                val spellId = queue.first()
+-                val rest = queue.drop(1)
+-                val container = currentState.getEntity(spellId)
+-
+-                // Source already left the stack, or can't be copied — skip it.
+-                if (container == null || container.has<CantBeCopiedComponent>()) {
+-                    queue = rest
+-                    continue
+-                }
+-
+-                val cardComponent = container.get<CardComponent>()
+-                val targetReqs = container.get<TargetsComponent>()?.targetRequirements ?: emptyList()
+-
+-                // No flat targets (untargeted or modal spell): copy verbatim now.
+-                if (targetReqs.isEmpty()) {
+-                    val copyResult = StackPlacement.putSpellCopy(
+-                        state = currentState,
+-                        sourceSpellId = spellId,
+-                        controllerId = controllerId
+-                    )
+-                    if (copyResult.outcome !is Outcome.Done) return copyResult
+-                    currentState = StormCopyEffectExecutor.applyCopyMutations(
+-                        copyResult.newState, copyResult.events, keywordsForCopy, removeLegendary
+-                    )
+-                    allEvents.addAll(copyResult.events)
+-                    queue = rest
+-                    continue
+-                }
+-
+-                // Targeted spell — offer new targets for the copy.
+-                val legalTargetsMap = mutableMapOf<Int, List<EntityId>>()
+-                for ((index, requirement) in targetReqs.withIndex()) {
+-                    legalTargetsMap[index] = targetFinder.findLegalTargets(
+-                        currentState, requirement, controllerId, spellId
+-                    )
+-                }
+-
+-                // 707.10c: no legal replacement — copy inherits the source's (now-illegal)
+-                // targets and fizzles on resolution per 608.2b / 112.3b.
+-                if (legalTargetsMap.any { (_, t) -> t.isEmpty() }) {
+-                    val copyResult = StackPlacement.putSpellCopy(
+-                        state = currentState,
+-                        sourceSpellId = spellId,
+-                        controllerId = controllerId
+-                    )
+-                    if (copyResult.outcome !is Outcome.Done) return copyResult
+-                    currentState = StormCopyEffectExecutor.applyCopyMutations(
+-                        copyResult.newState, copyResult.events, keywordsForCopy, removeLegendary
+-                    )
+-                    allEvents.addAll(copyResult.events)
+-                    queue = rest
+-                    continue
+-                }
+-
+-                val spellName = cardComponent?.name ?: "spell"
+-                val continuation = CopyEachSpellContinuation(
+-                    remainingSpellIds = queue,
+-                    controllerId = controllerId,
+-                    targetRequirements = targetReqs,
+-                    keywordsForCopy = keywordsForCopy,
+-                    removeLegendary = removeLegendary
+-                )
+-                val decision = { decisionId: String -> ChooseTargetsDecision(
+-                    id = decisionId,
+-                    playerId = controllerId,
+-                    prompt = "Choose new targets for copy of $spellName",
+-                    context = DecisionContext(
+-                        phase = DecisionPhase.CASTING,
+-                        sourceName = spellName,
+-                        effectHint = "Copy of $spellName"
+-                    ),
+-                    targetRequirements = targetReqs.mapIndexed { index, req ->
+-                        TargetRequirementInfo(index = index, description = req.description)
+-                    },
+-                    legalTargets = legalTargetsMap
+-                ) }
+-
+-                return currentState.suspendForDecision(decision, continuation, allEvents)
+-            }
+-
+-            return ExecutionResult.success(currentState, allEvents)
+-        }
+-    }
+-}
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyStackObjectsExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyStackObjectsExecutor.kt
+new file mode 100644
+index 0000000000..326e58c0c4
+--- /dev/null
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyStackObjectsExecutor.kt
+@@ -0,0 +1,81 @@
++package com.wingedsheep.engine.handlers.effects.stack
++
++import com.wingedsheep.engine.core.*
++import com.wingedsheep.engine.handlers.EffectContext
++import com.wingedsheep.engine.handlers.effects.EffectExecutor
++import com.wingedsheep.engine.handlers.effects.TargetResolutionUtils
++import com.wingedsheep.engine.state.GameState
++import com.wingedsheep.engine.state.isResolving
++import com.wingedsheep.engine.state.components.identity.CantBeCopiedComponent
++import com.wingedsheep.engine.state.components.identity.CardComponent
++import com.wingedsheep.engine.state.components.stack.*
++import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.effects.*
++import com.wingedsheep.sdk.scripting.targets.EffectTarget
++import kotlin.reflect.KClass
++
++/** A batch is frozen before creating any copies; newly made copies cannot copy themselves. */
++class CopyStackObjectsExecutor(
++    private val executeEffect: (GameState, Effect, EffectContext) -> EffectResult
++) : EffectExecutor<CopyStackObjectsEffect> {
++    override val effectType: KClass<CopyStackObjectsEffect> = CopyStackObjectsEffect::class
++
++    override fun execute(state: GameState, effect: CopyStackObjectsEffect, context: EffectContext): EffectResult {
++        val controller = TargetResolutionUtils.resolvePlayerRef(effect.player, context, state)
++        val candidates = if (effect.source == StackCopySource.ChosenTargets)
++            context.targets.filterIsInstance<ChosenTarget.Spell>().map { it.spellEntityId }.distinct()
++        else state.stack.filter { id ->
++            val entity = state.getEntity(id)
++            val owner = entity?.get<SpellOnStackComponent>()?.casterId
++                ?: entity?.get<TriggeredAbilityOnStackComponent>()?.controllerId
++                ?: entity?.get<ActivatedAbilityOnStackComponent>()?.controllerId
++            owner == controller
++        }
++        val objects = candidates.filter { id ->
++            val e = state.getEntity(id) ?: return@filter false
++            val kind = when {
++                e.has<SpellOnStackComponent>() -> StackObjectKind.Spell
++                e.has<ActivatedAbilityOnStackComponent>() -> StackObjectKind.ActivatedAbility
++                e.has<TriggeredAbilityOnStackComponent>() -> StackObjectKind.TriggeredAbility
++                else -> return@filter false
++            }
++            kind in effect.kinds && !e.has<CantBeCopiedComponent>() &&
++                state.objectRef(id)?.let { !state.isResolving(it) } != false
++        }
++        if (objects.size < 2) return copyInOrder(state, objects, effect, context, executeEffect)
++        val info = objects.associateWith { id ->
++            val e = state.getEntity(id)!!
++            val abilityName = e.get<TriggeredAbilityOnStackComponent>()?.sourceName
++                ?: e.get<ActivatedAbilityOnStackComponent>()?.sourceName
++            val card = e.get<CardComponent>() ?: e.get<TriggeredAbilityOnStackComponent>()?.sourceId?.let {
++                state.getEntity(it)?.get<CardComponent>()
++            } ?: e.get<ActivatedAbilityOnStackComponent>()?.sourceId?.let { state.getEntity(it)?.get<CardComponent>() }
++            SearchCardInfo(name = e.get<CardComponent>()?.name ?: "$abilityName's ability",
++                manaCost = card?.manaCost?.toString() ?: "", typeLine = if (abilityName == null)
++                    card?.typeLine?.toString() ?: "Spell" else "Ability", imageUri = card?.imageUri)
++        }
++        return EffectResult.from(state.suspendForDecision({ id -> OrderObjectsDecision(
++            id = id, playerId = context.controllerId,
++            prompt = "Choose the stack order for the copies",
++            context = DecisionContext(phase = DecisionPhase.RESOLUTION),
++            objects = objects, cardInfo = info,
++            orderingTitle = "Order copies", firstLabel = "Resolves first", lastLabel = "Resolves last"
++        ) }, CopyStackObjectsOrderContinuation(objects, effect, context), emptyList()))
++    }
++
++    companion object {
++        /** [objects] is bottom-to-top: each ordinary copy is placed above the preceding one. */
++        fun copyInOrder(state: GameState, objects: List<EntityId>, effect: CopyStackObjectsEffect,
++                        context: EffectContext,
++                        executeEffect: (GameState, Effect, EffectContext) -> EffectResult): EffectResult {
++            val effects = objects.map { id ->
++                if (state.getEntity(id)?.has<SpellOnStackComponent>() == true)
++                    CopyTargetSpellEffect(EffectTarget.SpecificEntity(id),
++                        keywordsForCopy = effect.keywordsForCopy, removeLegendary = effect.removeLegendary)
++                else CopyTargetSpellOrAbilityEffect(EffectTarget.SpecificEntity(id))
++            }
++            return if (effects.isEmpty()) EffectResult.success(state)
++            else executeEffect(state, CompositeEffect(effects), context)
++        }
++    }
++}
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetSpellOrAbilityExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetSpellOrAbilityExecutor.kt
+index 85f6ddf0af..dc01923641 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetSpellOrAbilityExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetSpellOrAbilityExecutor.kt
+@@ -127,6 +127,7 @@ class CopyTargetSpellOrAbilityExecutor(
+             while (copiesLeft > 0) {
+                 val container = currentState.getEntity(abilityEntityId)
+                     ?: return ExecutionResult.success(currentState, allEvents) // source gone — stop
++                if (container.has<CantBeCopiedComponent>()) return ExecutionResult.success(currentState, allEvents)
+                 val targetRequirements = container.get<TargetsComponent>()?.targetRequirements
+                     ?: emptyList()
+ 
+@@ -143,15 +144,15 @@ class CopyTargetSpellOrAbilityExecutor(
+ 
+                 // Legal targets are found from the *copier's* perspective (its source), matching
+                 // how new targets for a copy are validated — not from the copied ability's entity.
+-                val legalTargetsMap = legalTargetsFor(
+-                    currentState, targetFinder, targetRequirements, controllerId, copierSourceId
+-                )
++                val prompt = SpellCopyTargets.prompt(currentState, targetFinder, abilityEntityId,
++                    controllerId, targetRequirements, com.wingedsheep.sdk.scripting.effects.CopyExceptions.None)
++                val legalTargetsMap = prompt.legal
+ 
+                 // CR 707.10c: no legal replacement for some requirement — the copy is still made,
+                 // inheriting the source's targets (which may be illegal, so it's removed on
+                 // resolution per CR 608.2b). The board doesn't change between copies, so this holds
+                 // for every remaining copy.
+-                if (legalTargetsMap.any { (_, targets) -> targets.isEmpty() }) {
++                if (legalTargetsMap.values.all { it.isEmpty() }) {
+                     val inherited = container.get<TargetsComponent>()?.targets ?: emptyList()
+                     val push = cloneAndPush(
+                         currentState, abilityEntityId, controllerId,
+@@ -179,9 +180,7 @@ class CopyTargetSpellOrAbilityExecutor(
+                         sourceName = sourceName,
+                         effectHint = "Copy of $sourceName's ability"
+                     ),
+-                    targetRequirements = targetRequirements.mapIndexed { index, req ->
+-                        TargetRequirementInfo(index = index, description = req.description)
+-                    },
++                    targetRequirements = prompt.requirements,
+                     legalTargets = legalTargetsMap
+                 ) }
+                 val continuation = CopyAbilityTargetContinuation(
+@@ -208,43 +207,65 @@ class CopyTargetSpellOrAbilityExecutor(
+             abilityEntityId: EntityId,
+             controllerId: EntityId,
+             targets: List<ChosenTarget> = emptyList(),
+-            targetRequirements: List<TargetRequirement> = emptyList()
++            targetRequirements: List<TargetRequirement> = emptyList(),
++            retainedTargetIndices: Set<Int>? = null
+         ): ExecutionResult {
+             val container = state.getEntity(abilityEntityId)
+                 ?: return ExecutionResult.error(state, "Ability to copy no longer on stack")
++            if (container.has<CantBeCopiedComponent>()) return ExecutionResult.success(state)
+ 
+-            container.get<TriggeredAbilityOnStackComponent>()?.let { triggered ->
+-                val copy = CopyTargetTriggeredAbilityExecutor.cloneAbility(triggered, controllerId)
+-                return StackPlacement.putTriggeredAbility(state, copy, targets, targetRequirements)
++            val originalTargets = container.get<TargetsComponent>()?.targets.orEmpty()
++            val effectiveTargets = if (targets.isEmpty()) originalTargets else targets
++            val effectiveRequirements = if (targetRequirements.isEmpty())
++                container.get<TargetsComponent>()?.targetRequirements.orEmpty() else targetRequirements
++            fun modeTargets(modes: List<List<ChosenTarget>>): List<List<ChosenTarget>> {
++                var offset = effectiveTargets.size - modes.sumOf { it.size }
++                return modes.map { old -> effectiveTargets.drop(offset).take(old.size).also { offset += old.size } }
+             }
+-
+-            val activated = container.get<ActivatedAbilityOnStackComponent>()
+-                ?: return ExecutionResult.error(state, "Target entity is not an ability on the stack")
+-            // CR 707.10: the copy inherits cast-time values and is controlled by the copier. It
+-            // isn't "activated", so suppress the AbilityActivatedEvent (it would re-fire "whenever
+-            // you activate an ability" triggers off the copy).
+-            var offset = targets.size - activated.modeTargetsOrdered.sumOf { it.size }
+-            val copiedModeTargets = activated.modeTargetsOrdered.map { old ->
+-                targets.drop(offset).take(old.size).also { offset += old.size }
++            fun remapDistribution(old: Map<EntityId, Int>?): Map<EntityId, Int>? = old?.let {
++                if (targets.isEmpty()) it else buildMap {
++                    originalTargets.zip(effectiveTargets).forEach { (from, to) ->
++                        with(SpellCopyTargets) { old[from.entityId()]?.let { amount ->
++                            put(to.entityId(), (get(to.entityId()) ?: 0) + amount)
++                        } }
++                    }
++                }
+             }
+-            val copy = activated.copy(controllerId = controllerId, modeTargetsOrdered = copiedModeTargets)
+-            return StackPlacement.putActivatedAbility(
+-                state, copy, targets, targetRequirements, emitActivationEvent = false
+-            )
+-        }
+-
+-        private fun legalTargetsFor(
+-            state: GameState,
+-            targetFinder: TargetFinder,
+-            targetRequirements: List<TargetRequirement>,
+-            controllerId: EntityId,
+-            sourceId: EntityId?
+-        ): Map<Int, List<EntityId>> {
+-            val map = mutableMapOf<Int, List<EntityId>>()
+-            for ((index, requirement) in targetRequirements.withIndex()) {
+-                map[index] = targetFinder.findLegalTargets(state, requirement, controllerId, sourceId)
++            val result: ExecutionResult
++            val sourceId: EntityId
++            val sourceName: String
++            val description: String
++            val triggered = container.get<TriggeredAbilityOnStackComponent>()
++            if (triggered != null) {
++                val copy = CopyTargetTriggeredAbilityExecutor.cloneAbility(triggered, controllerId).copy(
++                    modeTargetsOrdered = modeTargets(triggered.modeTargetsOrdered),
++                    damageDistribution = remapDistribution(triggered.damageDistribution),
++                    modeDamageDistribution = triggered.modeDamageDistribution.mapValues { (_, old) -> remapDistribution(old).orEmpty() }
++                )
++                sourceId = copy.sourceId; sourceName = copy.sourceName; description = copy.description
++                result = StackPlacement.putTriggeredAbility(state, copy, effectiveTargets, effectiveRequirements, emitTriggerEvent = false)
++            } else {
++                val activated = container.get<ActivatedAbilityOnStackComponent>()
++                    ?: return ExecutionResult.error(state, "Target entity is not an ability on the stack")
++                val copy = activated.copy(controllerId = controllerId,
++                    modeTargetsOrdered = modeTargets(activated.modeTargetsOrdered),
++                    damageDistribution = remapDistribution(activated.damageDistribution))
++                sourceId = copy.sourceId; sourceName = copy.sourceName; description = "Copy of $sourceName's ability"
++                result = StackPlacement.putActivatedAbility(state, copy, effectiveTargets, effectiveRequirements, emitActivationEvent = false)
+             }
+-            return map
++            val copyId = result.state.stack.lastOrNull() ?: return result
++            if (copyId in state.stack) return result
++            val announced = result.copy(events = result.events + AbilityCopiedEvent(
++                sourceId, sourceName, controllerId, copyId, description))
++            val original = container.get<TargetsComponent>() ?: return announced
++            val copyTargets = result.state.getEntity(copyId)?.get<TargetsComponent>() ?: return announced
++            val kept = original.targets.indices.filter { i ->
++                (retainedTargetIndices == null || i in retainedTargetIndices) && original.targets[i] == copyTargets.targets.getOrNull(i)
++            }.mapTo(mutableSetOf()) { with(SpellCopyTargets) { original.targets[it].entityId() } }
++            return announced.copy(state = announced.state.updateEntity(copyId) { it.with(copyTargets.copy(
++                targetEntryStamps = copyTargets.targetEntryStamps.filterKeys { it !in kept } + original.targetEntryStamps.filterKeys { it in kept },
++                targetObjectRefs = copyTargets.targetObjectRefs.filterKeys { it !in kept } + original.targetObjectRefs.filterKeys { it in kept }
++            )) })
+         }
+ 
+         private fun sourceNameOf(container: ComponentContainer): String =
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetTriggeredAbilityExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetTriggeredAbilityExecutor.kt
+index 44252c0694..e585e5de83 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetTriggeredAbilityExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/CopyTargetTriggeredAbilityExecutor.kt
+@@ -48,70 +48,10 @@ class CopyTargetTriggeredAbilityExecutor(
+         val sourceAbility = container.get<TriggeredAbilityOnStackComponent>()
+             ?: return EffectResult.error(state, "Target entity is not a triggered ability on stack")
+ 
+-        val targetsComponent = container.get<TargetsComponent>()
+-        val targetRequirements = targetsComponent?.targetRequirements ?: emptyList()
+-
+-        // No targets — clone directly and push
+-        if (targetRequirements.isEmpty()) {
+-            val copy = cloneAbility(sourceAbility, context.controllerId)
+-            return EffectResult.from(StackPlacement.putTriggeredAbility(state, copy))
+-        }
+-
+-        // Targets exist — prompt the copy controller to choose new targets.
+-        return promptForCopyTargets(state, context, abilityEntityId, targetRequirements)
+-    }
+-
+-    private fun promptForCopyTargets(
+-        state: GameState,
+-        context: EffectContext,
+-        abilityEntityId: EntityId,
+-        targetRequirements: List<com.wingedsheep.sdk.scripting.targets.TargetRequirement>
+-    ): EffectResult {
+-        // A slot that reads an earlier target ("target land that player controls") is offered per
+-        // earlier pick, as when the original was put on the stack.
+-        val prefixTables = if (DependentTargetSelection.isRequired(targetRequirements)) {
+-            DependentTargetSelection.prefixTables(state, targetRequirements,
+-                PredicateContext(controllerId = context.controllerId, sourceId = context.sourceId), targetFinder)
+-        } else null
+-        val legalTargetsMap = mutableMapOf<Int, List<EntityId>>()
+-        for ((index, requirement) in targetRequirements.withIndex()) {
+-            legalTargetsMap[index] = prefixTables?.get(index)?.values?.flatten()?.distinct()
+-                ?: targetFinder.findLegalTargets(state, requirement, context.controllerId, context.sourceId)
+-        }
+-
+-        // If no legal targets for any requirement, skip copy (no-op).
+-        if (legalTargetsMap.any { (_, targets) -> targets.isEmpty() }) {
+-            return EffectResult.success(state)
+-        }
+-
+-        val sourceName = state.getEntity(abilityEntityId)
+-            ?.get<TriggeredAbilityOnStackComponent>()?.sourceName ?: "ability"
+-
+-        val continuation = CopyTriggeredAbilityTargetContinuation(
+-            abilityEntityId = abilityEntityId,
+-            controllerId = context.controllerId,
+-            targetRequirements = targetRequirements
+-        )
+-
+-        val targetReqInfos = targetRequirements.mapIndexed { index, req ->
+-            TargetRequirementInfo(index = index, description = req.description,
+-                legalTargetsByPrefix = prefixTables?.get(index)?.takeIf { index > 0 })
+-        }
+-
+-        val decision = { decisionId: String -> ChooseTargetsDecision(
+-            id = decisionId,
+-            playerId = context.controllerId,
+-            prompt = "Choose new targets for copy of $sourceName's ability",
+-            context = DecisionContext(
+-                phase = DecisionPhase.CASTING,
+-                sourceName = sourceName,
+-                effectHint = "Copy of triggered ability"
+-            ),
+-            targetRequirements = targetReqInfos,
+-            legalTargets = legalTargetsMap
+-        ) }
+-
+-        return EffectResult.from(state.suspendForDecision(decision, continuation, emptyList()))
++        return EffectResult.from(CopyTargetSpellOrAbilityExecutor.driveAbilityCopies(
++            state, targetFinder, abilityEntityId, context.controllerId, context.sourceId,
++            remainingCopies = 1, totalCopies = 1, priorEvents = emptyList()
++        ))
+     }
+ 
+     companion object {
+@@ -128,6 +68,9 @@ class CopyTargetTriggeredAbilityExecutor(
+             return source.copy(
+                 controllerId = copyController,
+                 stateTriggerAbilityId = null,
++                // A leading "you may" is a resolution choice, even when the original's UI
++                // answered it early while targeting. The copy must make its own choice.
++                consentAnsweredAtTargeting = false,
+                 description = "Copy of ${source.description}"
+             )
+         }
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/SpellCopyTargets.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/SpellCopyTargets.kt
+index b41d899272..9e500a1490 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/SpellCopyTargets.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/SpellCopyTargets.kt
+@@ -31,5 +31,9 @@
+-    fun originals(state: GameState, sourceId: EntityId, ordinal: Int? = null): List<ChosenTarget> =
+-        if (ordinal == null) state.spellOrLastKnown(sourceId)?.get<TargetsComponent>()?.targets.orEmpty()
+-        else state.spellOrLastKnown(sourceId)?.get<SpellOnStackComponent>()?.modeTargetsOrdered?.getOrNull(ordinal).orEmpty()
++    fun originals(state: GameState, sourceId: EntityId, ordinal: Int? = null): List<ChosenTarget> {
++        val source = state.getEntity(sourceId)?.takeIf {
++            it.has<ActivatedAbilityOnStackComponent>() || it.has<TriggeredAbilityOnStackComponent>()
++        } ?: state.spellOrLastKnown(sourceId)
++        return if (ordinal == null) source?.get<TargetsComponent>()?.targets.orEmpty()
++        else source?.get<SpellOnStackComponent>()?.modeTargetsOrdered?.getOrNull(ordinal).orEmpty()
++    }
+-
++
+     fun selection(state: GameState, sourceId: EntityId, response: TargetsResponse, ordinal: Int? = null): Selection {
+@@ -54,4 +58,9 @@ internal object SpellCopyTargets {
+-        val distribution = state.spellOrLastKnown(sourceId)?.get<SpellOnStackComponent>()?.damageDistribution.orEmpty()
++        val entity = state.getEntity(sourceId)?.takeIf {
++            it.has<ActivatedAbilityOnStackComponent>() || it.has<TriggeredAbilityOnStackComponent>()
++        } ?: state.spellOrLastKnown(sourceId)
++        val distribution = (entity?.get<SpellOnStackComponent>()?.damageDistribution
++            ?: entity?.get<ActivatedAbilityOnStackComponent>()?.damageDistribution
++            ?: entity?.get<TriggeredAbilityOnStackComponent>()?.damageDistribution).orEmpty()
+         val infos = mutableListOf<TargetRequirementInfo>()
+         val legal = mutableMapOf<Int, List<EntityId>>()
+         var slot = 0
+@@ -61,7 +70,9 @@ internal object SpellCopyTargets {
+                 infos += TargetRequirementInfo(index = slot, minTargets = 0, maxTargets = 1,
+                     description = "${req.description} — target ${slot + 1}" +
+                         (amount?.let { ": $it to this target" } ?: ""), emptyChoiceLabel = "Keep original target",
+-                    legalTargetsByPrefix = tables?.get(index)?.takeIf { index > 0 },
++                    legalTargetsByPrefix = tables?.get(index)?.filterKeys {
++                        it.isNotEmpty() || state.getEntity(sourceId)?.get<SpellOnStackComponent>() != null
++                    }?.takeIf { index > 0 },
+                     prefixLength = index.takeIf { tables != null && index > 0 })
+                 legal[slot] = byRequirement[index].orEmpty()
+                 slot++
+@@ -105,12 +116,13 @@ internal object SpellCopyTargets {
+ 
+     /** The prospective copy, on a scratch state, so legality reads its colors and controller. */
+     private class Preview(val state: GameState, val copyId: EntityId, val card: CardComponent,
+-                          val controllerId: EntityId, val xValue: Int?) {
++                          val controllerId: EntityId, val xValue: Int?,
++                          val sourceType: TargetingSourceType = TargetingSourceType.SPELL) {
+         val subtypes: Set<String> = card.typeLine.subtypes.mapTo(mutableSetOf()) { it.value }
+ 
+         fun legal(finder: TargetFinder, requirement: TargetRequirement, prefix: List<ChosenTarget> = emptyList(),
+                   named: Map<String, ChosenTarget> = emptyMap()): List<EntityId> =
+-            finder.findLegalTargets(state, requirement, controllerId, copyId, targetingSourceType = TargetingSourceType.SPELL,
++            finder.findLegalTargets(state, requirement, controllerId, copyId, targetingSourceType = sourceType,
+                 pipelineContext = if (prefix.isEmpty()) null else PredicateContext(controllerId = controllerId,
+                     sourceId = copyId, xValue = xValue, targets = prefix, namedTargets = named),
+             ).filter { candidate ->
+@@ -124,7 +136,7 @@ internal object SpellCopyTargets {
+                     sourceId = copyId,
+                     xValue = xValue,
+                     allTargets = prefix,
+-                    targetingSourceType = TargetingSourceType.SPELL,
++                    targetingSourceType = sourceType,
+                     namedTargets = named,
+                 ) == null
+             }
+@@ -132,12 +144,32 @@ internal object SpellCopyTargets {
+ 
+     private fun preview(state: GameState, sourceId: EntityId, controllerId: EntityId, exceptions: CopyExceptions): Preview? {
+-        val source = state.spellOrLastKnown(sourceId) ?: return null
++        val source = state.getEntity(sourceId)?.takeIf {
++            it.has<ActivatedAbilityOnStackComponent>() || it.has<TriggeredAbilityOnStackComponent>()
++        } ?: state.spellOrLastKnown(sourceId) ?: return null
+-        val card = source.get<CardComponent>() ?: return null
+-        val spell = source.get<SpellOnStackComponent>() ?: return null
+-        val (copyId, scratch) = state.newEntity()
+-        val copied = CopyExceptionApplier.apply(card, exceptions).copy(ownerId = controllerId)
+-        return Preview(scratch.withEntity(copyId, ComponentContainer.of(copied, spell.copy(casterId = controllerId))),
+-            copyId, copied, controllerId, spell.xValue)
++        val spell = source.get<SpellOnStackComponent>()
++        if (spell != null) {
++            val card = source.get<CardComponent>() ?: return null
++            val (copyId, scratch) = state.newEntity()
++            val copied = CopyExceptionApplier.apply(card, exceptions).copy(ownerId = controllerId)
++            return Preview(scratch.withEntity(copyId, ComponentContainer.of(copied, spell.copy(casterId = controllerId))),
++                copyId, copied, controllerId, spell.xValue)
++        }
++        val activated = source.get<ActivatedAbilityOnStackComponent>()
++        val triggered = source.get<TriggeredAbilityOnStackComponent>()
++        val abilitySourceId = activated?.sourceId ?: triggered?.sourceId ?: return null
++        val snapshot = activated?.lastKnownSourceSnapshot ?: triggered?.lastKnownSourceSnapshot
++        val live = state.getEntity(abilitySourceId)
++        val card = snapshot?.copiableCard ?: live?.get<CardComponent>() ?: return null
++        val projectedColors = state.projectedState.getColors(abilitySourceId)
++        val colors = snapshot?.colors ?: if (abilitySourceId in state.getBattlefield()) projectedColors
++            else card.colors.map { it.name }.toSet()
++        val effectiveCard = card.copy(colors = colors.mapNotNull { name ->
++            com.wingedsheep.sdk.core.Color.entries.find { it.name == name }
++        }.toSet())
++        val scratch = if (live == null) state.withEntity(abilitySourceId, ComponentContainer.of(effectiveCard)) else state
++        return Preview(scratch, abilitySourceId, effectiveCard, controllerId,
++            activated?.xValue ?: triggered?.xValue,
++            if (activated != null) TargetingSourceType.ACTIVATED_ABILITY else TargetingSourceType.TRIGGERED_ABILITY)
+     }
+ 
+     fun validate(state: GameState, finder: TargetFinder, answer: AnswerContinuation, response: TargetsResponse): String? {
+@@ -156,15 +180,19 @@ internal object SpellCopyTargets {
+                 requirements = answer.modeTargetRequirements[answer.chosenModes[answer.currentOrdinal]].orEmpty()
+                 exceptions = answer.exceptions; ordinal = answer.currentOrdinal
+             }
++            is CopyAbilityTargetContinuation -> {
++                sourceId = answer.abilityEntityId; controller = answer.controllerId
++                requirements = answer.targetRequirements; exceptions = CopyExceptions.None; ordinal = null
++            }
+             else -> return null
+         }
+         val selection = selection(state, sourceId, response, ordinal)
+         if (selection.retained.size == selection.targets.size) return null
+-        val preview = preview(state, sourceId, controller, exceptions) ?: return "Source spell missing"
++        val preview = preview(state, sourceId, controller, exceptions) ?: return "Source spell or ability missing"
+         val aligned = alignedRequirements(requirements, selection.targets.size)
+         return finder.validator.validateTargets(preview.state, selection.targets, aligned, controller,
+             preview.card.colors, preview.subtypes, preview.copyId, preview.xValue,
+-            TargetingSourceType.SPELL, retainedTargetIndices = selection.retained)
++            preview.sourceType, retainedTargetIndices = selection.retained)
+             ?: unseatedKeptTarget(preview, finder, aligned, originals(state, sourceId, ordinal), selection)
+     }
+ 
+@@ -190,7 +218,7 @@ internal object SpellCopyTargets {
+             state = preview.state, target = original, requirement = requirement,
+             casterId = preview.controllerId, sourceColors = preview.card.colors, sourceSubtypes = preview.subtypes,
+             sourceId = preview.copyId, xValue = preview.xValue, allTargets = among,
+-            targetingSourceType = TargetingSourceType.SPELL,
++            targetingSourceType = preview.sourceType,
+             namedTargets = EffectContext.buildNamedTargets(aligned, among),
+         ) == null
+         return legal(originals) && !legal(bindings)
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/StackExecutors.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/StackExecutors.kt
+index 72edcba38d..874f812707 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/StackExecutors.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/stack/StackExecutors.kt
+@@ -16,7 +16,8 @@ class StackExecutors(
+     private val amountEvaluator: DynamicAmountEvaluator,
+     private val cardRegistry: CardRegistry,
+     private val counterer: SpellCounterer,
+-    private val targetFinder: TargetFinder
++    private val targetFinder: TargetFinder,
++    private val effectExecutor: (com.wingedsheep.engine.state.GameState, com.wingedsheep.sdk.scripting.effects.Effect, com.wingedsheep.engine.handlers.EffectContext) -> com.wingedsheep.engine.core.EffectResult
+ ) : ExecutorModule {
+     override fun executors(): List<EffectExecutor<*>> = listOf(
+         CounterEffectExecutor(amountEvaluator, cardRegistry, counterer),
+@@ -28,7 +29,7 @@ class StackExecutors(
+         ChangeTargetExecutor(targetFinder = targetFinder, predicateEvaluator = zones.predicateEvaluator),
+         StormCopyEffectExecutor(targetFinder = targetFinder),
+         CopyTargetSpellExecutor(dynamicAmountEvaluator = amountEvaluator, targetFinder = targetFinder),
+-        CopyEachTargetSpellExecutor(targetFinder = targetFinder),
++        CopyStackObjectsExecutor(effectExecutor),
+         CopyForEachOtherPossibleTargetExecutor(targetFinder = targetFinder, predicateEvaluator = zones.predicateEvaluator),
+         CopyTargetTriggeredAbilityExecutor(targetFinder = targetFinder),
+         CopyTargetSpellOrAbilityExecutor(dynamicAmountEvaluator = amountEvaluator, targetFinder = targetFinder),
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt
+index 9dafe60071..6efe9da343 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/mechanics/stack/StackPlacement.kt
+@@ -35,7 +35,8 @@ internal object StackPlacement {
+          * Firebender Ascension's "attacking causes a triggered ability of that creature to trigger"
+          * meta-trigger can key on it.
+          */
+-        causedByAttack: Boolean = false
++        causedByAttack: Boolean = false,
++        emitTriggerEvent: Boolean = true
+     ): ExecutionResult {
+         // Create a new entity for the ability on the stack
+         val (abilityId, stateWithId) = state.newEntity()
+@@ -54,16 +55,15 @@ internal object StackPlacement {
+         // for it announced exactly which card had just refused to be targeted.
+         val sourceDisplayName = nameVisibleToAll(state, ability.sourceId, ability.sourceName)
+ 
+-        val events = mutableListOf<GameEvent>(
+-            AbilityTriggeredEvent(
++        val events = mutableListOf<GameEvent>()
++        if (emitTriggerEvent) events.add(AbilityTriggeredEvent(
+                 ability.sourceId,
+                 sourceDisplayName,
+                 ability.controllerId,
+                 ability.description,
+                 abilityEntityId = abilityId,
+                 causedByAttack = causedByAttack
+-            )
+-        )
++            ))
+ 
+         if (CrimeDetector.isCrime(newState, ability.controllerId, targets)) {
+             events.add(CommitCrimeEvent(ability.controllerId, abilityId, sourceDisplayName))
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/ClientEvent.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/ClientEvent.kt
+index aa75c15509..88bda52f9d 100644
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/ClientEvent.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/ClientEvent.kt
+@@ -1326,6 +1326,12 @@ object ClientEventTransformer {
+                 spellName = event.cardName
+             )
+ 
++            is AbilityCopiedEvent -> ClientEvent.AbilityTriggered(
++                sourceId = event.sourceId, sourceName = event.sourceName,
++                abilityDescription = event.description, controllerId = event.controllerId,
++                isYours = event.controllerId == viewingPlayerId
++            )
++
+             is AbilityTriggeredEvent -> ClientEvent.AbilityTriggered(
+                 sourceId = event.sourceId,
+                 sourceName = event.sourceName,
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/SpellCopyRetargetingTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/SpellCopyRetargetingTest.kt
+index f2cf7c91c5..6dfdfc2f87 100644
+--- a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/SpellCopyRetargetingTest.kt
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/SpellCopyRetargetingTest.kt
+@@ -201,9 +201,7 @@ class SpellCopyRetargetingTest : FunSpec({
+         val oldStamp = d.state.getEntity(source)!!.get<TargetsComponent>()!!.targetEntryStamps.getValue(a)
+         d.replaceState(d.state.updateEntity(a) { it.with(
+             com.wingedsheep.engine.state.components.battlefield.BattlefieldEntryTimestampComponent(oldStamp + 100)) })
+-        val result = com.wingedsheep.engine.handlers.effects.stack.CopyEachTargetSpellExecutor(
+-            TargetFinder(PredicateEvaluator(cardRegistry = d.cardRegistry))
+-        ).execute(d.state, CopyEachTargetSpellEffect(),
++        val result = EngineServices(d.cardRegistry).effectExecutorRegistry.execute(d.state, CopyStackObjectsEffect(),
+             EffectContext(sourceId = null, controllerId = d.player2, targets = listOf(ChosenTarget.Spell(source))))
+         result.error shouldBe null
+         d.replaceState(result.state)
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/StackObjectCopyEngineTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/StackObjectCopyEngineTest.kt
+new file mode 100644
+index 0000000000..c0f8a2cb90
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/StackObjectCopyEngineTest.kt
+@@ -0,0 +1,276 @@
++package com.wingedsheep.engine.scenarios
++
++import com.wingedsheep.engine.core.*
++import com.wingedsheep.engine.handlers.EffectContext
++import com.wingedsheep.engine.mechanics.stack.StackPlacement
++import com.wingedsheep.engine.state.GameState
++import com.wingedsheep.engine.state.beginResolutionControl
++import com.wingedsheep.engine.state.components.battlefield.BattlefieldEntryTimestampComponent
++import com.wingedsheep.engine.state.components.identity.*
++import com.wingedsheep.engine.state.components.stack.*
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.engine.support.TestCards
++import com.wingedsheep.sdk.core.*
++import com.wingedsheep.sdk.dsl.*
++import com.wingedsheep.sdk.model.Deck
++import com.wingedsheep.sdk.model.EntityId
++import com.wingedsheep.sdk.scripting.KeywordAbility
++import com.wingedsheep.sdk.scripting.ProtectionScope
++import com.wingedsheep.sdk.scripting.effects.*
++import com.wingedsheep.sdk.scripting.filters.unified.TargetFilter
++import com.wingedsheep.sdk.scripting.targets.EffectTarget
++import com.wingedsheep.sdk.scripting.targets.TargetRequirement
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.shouldBe
++import kotlinx.serialization.json.Json
++
++/** Engine fixtures isolate Ulalek's stack operation; they are not shipped card substitutes. */
++class StackObjectCopyEngineTest : FunSpec({
++    val life = card("Stack Copy Test Life") {
++        manaCost = "{1}"; typeLine = "Instant"
++        spell { effect = Effects.GainLife(1) }
++    }
++    val body = card("Stack Copy Test Body") {
++        manaCost = "{1}"; typeLine = "Creature — Eldrazi"; power = 2; toughness = 3
++    }
++    val redSource = card("Stack Copy Test Red Source") {
++        manaCost = "{R}"; typeLine = "Creature — Wizard"; power = 2; toughness = 3
++    }
++    val blueCopier = card("Stack Copy Test Blue Copier") {
++        manaCost = "{U}"; typeLine = "Creature — Wizard"; power = 2; toughness = 3
++    }
++    val guards = listOf(Color.RED, Color.BLUE).map { color -> card("Stack Copy ${color.name} Guard") {
++        manaCost = "{W}"; typeLine = "Creature — Soldier"; power = 2; toughness = 4
++        keywordAbility(KeywordAbility.Protection(ProtectionScope.Color(color)))
++    } }
++    val batch = CompositeEffect(listOf(
++        Effects.CopyControlledStackObjects(setOf(StackObjectKind.Spell)),
++        Effects.CopyControlledStackObjects(setOf(StackObjectKind.ActivatedAbility, StackObjectKind.TriggeredAbility))
++    ))
++    fun setup() = GameTestDriver().apply {
++        registerCards(TestCards.all + listOf(life, body, redSource, blueCopier) + guards)
++        initMirrorMatch(Deck.of("Island" to 40), startingPlayer = 0)
++        passPriorityUntil(Step.PRECOMBAT_MAIN)
++    }
++    fun cast(d: GameTestDriver, name: String = life.name): EntityId {
++        val id = d.putCardInHand(d.player1, name)
++        d.giveColorlessMana(d.player1, 1)
++        d.castSpell(d.player1, id).error shouldBe null
++        return id
++    }
++    fun triggered(d: GameTestDriver, source: EntityId, player: EntityId = d.player1,
++                  effect: Effect = Effects.GainLife(2), targets: List<ChosenTarget> = emptyList(),
++                  requirements: List<TargetRequirement> = emptyList()): EntityId {
++        val result = StackPlacement.putTriggeredAbility(d.state, TriggeredAbilityOnStackComponent(
++            source, "Test Source", player, effect, effect.description), targets, requirements)
++        d.replaceState(result.state)
++        return d.state.stack.last()
++    }
++    fun activated(d: GameTestDriver, source: EntityId, player: EntityId = d.player1): EntityId {
++        val result = StackPlacement.putActivatedAbility(d.state, ActivatedAbilityOnStackComponent(
++            source, "Test Source", player, Effects.GainLife(3), xValue = 7))
++        d.replaceState(result.state)
++        return d.state.stack.last()
++    }
++    fun execute(d: GameTestDriver, effect: Effect = batch, source: EntityId? = null): EffectResult {
++        val result = d.services.effectExecutorRegistry.execute(d.state, effect,
++            EffectContext(sourceId = source, controllerId = d.player1))
++        result.error shouldBe null
++        d.replaceState(result.state)
++        return result
++    }
++    fun order(d: GameTestDriver, firstToResolve: List<EntityId>) {
++        d.submitDecision(d.player1, OrderedResponse(d.pendingDecision!!.id, firstToResolve)).error shouldBe null
++    }
++    fun roundTrip(d: GameTestDriver) {
++        val json = Json { serializersModule = engineSerializersModule; allowStructuredMapKeys = true; encodeDefaults = true }
++        d.replaceState(json.decodeFromString(GameState.serializer(), json.encodeToString(GameState.serializer(), d.state)))
++    }
++
++    test("spells are copied before abilities, and each group may be freely ordered") {
++        val d = setup()
++        val source = d.putPermanentOnBattlefield(d.player1, redSource.name)
++        val spell = cast(d)
++        val a = triggered(d, source)
++        val b = activated(d, source)
++        val originalStack = d.state.stack
++        execute(d)
++        d.pendingDecision!!::class shouldBe OrderObjectsDecision::class
++        order(d, listOf(a, b))
++        val added = d.state.stack.drop(originalStack.size)
++        added.size shouldBe 3
++        d.state.getEntity(added[0])!!.has<SpellOnStackComponent>() shouldBe true
++        d.state.getEntity(added[1])!!.get<ActivatedAbilityOnStackComponent>()!!.xValue shouldBe 7
++        d.state.getEntity(added[2])!!.get<TriggeredAbilityOnStackComponent>()!!.sourceId shouldBe source
++        d.state.stack.take(originalStack.size) shouldBe originalStack
++        d.state.getEntity(added[0])!!.get<CopyOfComponent>()!!.originalCardDefinitionId shouldBe
++            d.state.getEntity(spell)!!.get<CardComponent>()!!.cardDefinitionId
++    }
++    test("a frozen batch includes existing spell copies exactly once and supports order save and resume") {
++        val d = setup()
++        val spell = cast(d)
++        val existing = StackPlacement.putSpellCopy(d.state, spell, controllerId = d.player1)
++        d.replaceState(existing.state)
++        val existingId = d.state.stack.last()
++        val before = d.state.stack.size
++        execute(d, Effects.CopyControlledStackObjects(setOf(StackObjectKind.Spell)))
++        roundTrip(d)
++        order(d, listOf(spell, existingId))
++        d.state.stack.size shouldBe before + 2
++        d.pendingDecision shouldBe null
++    }
++    test("opponents' stack objects and the currently resolving ability are excluded") {
++        val d = setup()
++        val source = d.putPermanentOnBattlefield(d.player1, redSource.name)
++        val own = triggered(d, source)
++        val opponent = triggered(d, source, d.player2)
++        val resolving = triggered(d, source, effect = batch)
++        val begun = d.state.beginResolutionControl(resolving)
++        d.replaceState(begun.state)
++        val result = execute(d, Effects.CopyControlledStackObjects(setOf(StackObjectKind.TriggeredAbility)))
++        result.events.filterIsInstance<AbilityCopiedEvent>().size shouldBe 1
++        d.state.stack.containsAll(listOf(own, opponent, resolving)) shouldBe true
++        d.state.stack.size shouldBe 4
++    }
++    test("other pending batch-copy triggers can be copied without copying the resolving one") {
++        val d = setup()
++        val source = d.putPermanentOnBattlefield(d.player1, blueCopier.name)
++        val first = triggered(d, source, effect = batch)
++        val top = triggered(d, source, effect = batch)
++        d.replaceState(d.state.beginResolutionControl(top).state)
++        execute(d, Effects.CopyControlledStackObjects(setOf(StackObjectKind.TriggeredAbility)))
++        d.state.stack.size shouldBe 3
++        d.state.getEntity(d.state.stack.last())!!.get<TriggeredAbilityOnStackComponent>()!!.effect shouldBe
++            d.state.getEntity(first)!!.get<TriggeredAbilityOnStackComponent>()!!.effect
++    }
++    test("empty stacks and uncopyable objects create no copies") {
++        val d = setup()
++        execute(d).events.filterIsInstance<SpellCopiedEvent>().size shouldBe 0
++        val spell = cast(d)
++        d.replaceState(d.state.updateEntity(spell) { it.with(CantBeCopiedComponent) })
++        execute(d).events.filterIsInstance<SpellCopiedEvent>().size shouldBe 0
++        d.state.stack shouldBe listOf(spell)
++    }
++    test("ability copies emit copy events without triggering or activating again") {
++        val d = setup()
++        val source = d.putPermanentOnBattlefield(d.player1, redSource.name)
++        triggered(d, source)
++        val result = execute(d, Effects.CopyControlledStackObjects(setOf(StackObjectKind.TriggeredAbility)))
++        result.events.filterIsInstance<AbilityTriggeredEvent>().size shouldBe 0
++        result.events.filterIsInstance<AbilityActivatedEvent>().size shouldBe 0
++        result.events.filterIsInstance<AbilityCopiedEvent>().size shouldBe 1
++    }
++    test("an ability's new targets use its original source's color, not the copier's color") {
++        val d = setup()
++        val source = d.putPermanentOnBattlefield(d.player1, redSource.name)
++        val copier = d.putPermanentOnBattlefield(d.player1, blueCopier.name)
++        val old = d.putPermanentOnBattlefield(d.player1, "Grizzly Bears")
++        val redGuard = d.putPermanentOnBattlefield(d.player1, guards[0].name)
++        val blueGuard = d.putPermanentOnBattlefield(d.player1, guards[1].name)
++        triggered(d, source, effect = Effects.DealDamage(1, EffectTarget.ContextTarget(0)),
++            targets = listOf(ChosenTarget.Permanent(old)), requirements = listOf(com.wingedsheep.sdk.scripting.targets.TargetObject(filter = TargetFilter.Creature)))
++        execute(d, Effects.CopyControlledStackObjects(setOf(StackObjectKind.TriggeredAbility)), copier)
++        val decision = d.pendingDecision as ChooseTargetsDecision
++        (redGuard in decision.legalTargets.getValue(0)) shouldBe false
++        (blueGuard in decision.legalTargets.getValue(0)) shouldBe true
++        val before = d.state
++        (d.submitTargetSelection(d.player1, listOf(redGuard)).error != null) shouldBe true
++        d.state shouldBe before
++        roundTrip(d)
++        d.submitTargetSelection(d.player1, listOf(blueGuard)).error shouldBe null
++        d.state.getEntity(d.state.stack.last())!!.get<TargetsComponent>()!!.targets shouldBe listOf(ChosenTarget.Permanent(blueGuard))
++    }
++    test("keeping an ability target retains its old battlefield visit, while explicit reselection captures the new visit") {
++        for (keep in listOf(true, false)) {
++            val d = setup()
++            val source = d.putPermanentOnBattlefield(d.player1, redSource.name)
++            val old = d.putPermanentOnBattlefield(d.player1, "Grizzly Bears")
++            val original = triggered(d, source, effect = Effects.DealDamage(1, EffectTarget.ContextTarget(0)),
++                targets = listOf(ChosenTarget.Permanent(old)), requirements = listOf(com.wingedsheep.sdk.scripting.targets.TargetObject(filter = TargetFilter.Creature)))
++            val stamp = d.state.getEntity(original)!!.get<TargetsComponent>()!!.targetEntryStamps.getValue(old)
++            d.replaceState(d.state.updateEntity(old) { it.with(BattlefieldEntryTimestampComponent(stamp + 100)) })
++            execute(d, Effects.CopyControlledStackObjects(setOf(StackObjectKind.TriggeredAbility)))
++            d.submitTargetSelection(d.player1, if (keep) emptyList() else listOf(old)).error shouldBe null
++            d.state.getEntity(d.state.stack.last())!!.get<TargetsComponent>()!!.targetEntryStamps[old] shouldBe
++                if (keep) stamp else stamp + 100
++        }
++    }
++    test("targetless permanent spell copies resolve into token permanents") {
++        val d = setup()
++        cast(d, body.name)
++        execute(d, Effects.CopyControlledStackObjects(setOf(StackObjectKind.Spell)))
++        d.bothPass().error shouldBe null
++        val token = d.findPermanent(d.player1, body.name)!!
++        d.state.getEntity(token)!!.has<TokenComponent>() shouldBe true
++    }
++    test("optional colorless payment may be declined and colored mana cannot substitute for it") {
++        for (coloredOnly in listOf(true, false)) {
++            val d = setup()
++            val spell = cast(d)
++            if (coloredOnly) d.giveMana(d.player1, Color.BLUE, 2) else d.giveColorlessMana(d.player1, 2)
++            execute(d, Effects.MayPay(ManaCost.parse("{C}{C}"), then = batch))
++            if (coloredOnly) d.pendingDecision shouldBe null
++            else {
++                d.pendingDecision!!::class shouldBe YesNoDecision::class
++                d.submitYesNo(d.player1, false).error shouldBe null
++            }
++            d.state.stack shouldBe listOf(spell)
++        }
++    }
++    test("paying the optional cost consumes two colorless mana and copies the spell") {
++        val d = setup()
++        cast(d)
++        d.giveColorlessMana(d.player1, 2)
++        execute(d, Effects.MayPay(ManaCost.parse("{C}{C}"), then = batch))
++        d.submitYesNo(d.player1, true).error shouldBe null
++        if (d.pendingDecision is SelectManaSourcesDecision)
++            d.submitManaAutoPayOrDecline(d.player1, true).error shouldBe null
++        d.pendingDecision shouldBe null
++        d.state.stack.size shouldBe 2
++        d.state.getEntity(d.player1)!!.get<com.wingedsheep.engine.state.components.player.ManaPoolComponent>()!!.colorless shouldBe 0
++    }
++    test("a departed ability source keeps its last known color when choosing new targets") {
++        val d = setup()
++        val source = d.putPermanentOnBattlefield(d.player1, redSource.name)
++        val old = d.putPermanentOnBattlefield(d.player1, "Grizzly Bears")
++        val redGuard = d.putPermanentOnBattlefield(d.player1, guards[0].name)
++        val blueGuard = d.putPermanentOnBattlefield(d.player1, guards[1].name)
++        val ability = triggered(d, source, effect = Effects.DealDamage(1, EffectTarget.ContextTarget(0)),
++            targets = listOf(ChosenTarget.Permanent(old)),
++            requirements = listOf(com.wingedsheep.sdk.scripting.targets.TargetObject(filter = TargetFilter.Creature)))
++        val sourceCard = d.state.getEntity(source)!!.get<CardComponent>()!!
++        d.replaceState(d.state.updateEntity(ability) { entity ->
++            entity.with(entity.get<TriggeredAbilityOnStackComponent>()!!.copy(lastKnownSourceSnapshot =
++                EntitySnapshot(source, colors = setOf("RED"), copiableCard = sourceCard)))
++        }.removeEntity(source))
++        execute(d, Effects.CopyControlledStackObjects(setOf(StackObjectKind.TriggeredAbility)))
++        val decision = d.pendingDecision as ChooseTargetsDecision
++        (redGuard in decision.legalTargets.getValue(0)) shouldBe false
++        (blueGuard in decision.legalTargets.getValue(0)) shouldBe true
++    }
++    test("a copied optional trigger does not inherit a resolution consent choice") {
++        val d = setup()
++        val source = d.putPermanentOnBattlefield(d.player1, redSource.name)
++        val original = triggered(d, source, effect = Effects.May(Effects.GainLife(2)))
++        d.replaceState(d.state.updateEntity(original) { entity ->
++            entity.with(entity.get<TriggeredAbilityOnStackComponent>()!!.copy(consentAnsweredAtTargeting = true))
++        })
++        execute(d, Effects.CopyControlledStackObjects(setOf(StackObjectKind.TriggeredAbility)))
++        val copy = d.state.getEntity(d.state.stack.last())!!.get<TriggeredAbilityOnStackComponent>()!!
++        copy.consentAnsweredAtTargeting shouldBe false
++        d.bothPass().error shouldBe null
++        d.pendingDecision!!::class shouldBe YesNoDecision::class
++        d.submitYesNo(d.player1, false).error shouldBe null
++    }
++    test("ordering answers cannot omit, duplicate, or invent objects") {
++        val d = setup()
++        val first = cast(d)
++        val second = cast(d)
++        execute(d, Effects.CopyControlledStackObjects(setOf(StackObjectKind.Spell)))
++        val before = d.state
++        (d.submitDecision(d.player1, OrderedResponse(d.pendingDecision!!.id, listOf(first, first))).error != null) shouldBe true
++        d.state shouldBe before
++        order(d, listOf(first, second))
++        d.state.stack.size shouldBe 4
++    }
++})

@@ -78,6 +78,7 @@ data class AppPreconDeck(val id: String, val name: String, val commander: String
  * Home: your deck at the top, one PLAY button, small footer. PLAY opens [PlaySheet] (offline vs AI
  * or online with Argentum). Approved design, Build 97.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ArcanaHomeScreen(
     wide: Boolean,
@@ -101,6 +102,7 @@ fun ArcanaHomeScreen(
     onSettings: () -> Unit,
     onReturnToTable: () -> Unit,
 ) {
+    var scenarioPickerOpen by remember { mutableStateOf(false) }
     Column(
         Modifier.fillMaxSize().background(Ink).windowInsetsPadding(WindowInsets.safeDrawing)
             .verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 14.dp),
@@ -108,8 +110,12 @@ fun ArcanaHomeScreen(
     ) {
         Column(Modifier.widthIn(max = if (LocalConfiguration.current.screenHeightDp < 520) 820.dp else if (wide) 560.dp else 460.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("ARCANA TABLE", color = SoftWhite, fontSize = 20.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp, modifier = Modifier.weight(1f))
-                IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).clip(CircleShape).border(1.dp, PanelLight, CircleShape)) {
+                Text(if (testScenarios.isNotEmpty()) "ARCANA QA · B${BuildConfig.VERSION_CODE}" else "ARCANA TABLE", color = SoftWhite, fontSize = if (testScenarios.isNotEmpty()) 17.sp else 20.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp, modifier = Modifier.weight(1f))
+                if (testScenarios.isNotEmpty() && !argentumActive) OutlinedButton(
+                    onClick = { scenarioPickerOpen = true },
+                    modifier = Modifier.heightIn(min = 48.dp).testTag("test-scenarios-entry")
+                ) { Text("TESTS (${testScenarios.size})", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black) }
+                IconButton(onClick = onSettings, modifier = Modifier.size(48.dp).tutorialTarget("home-settings").clip(CircleShape).border(1.dp, PanelLight, CircleShape)) {
                     Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = SoftWhite)
                 }
             }
@@ -146,7 +152,7 @@ fun ArcanaHomeScreen(
             val deckPanel: @Composable (Modifier) -> Unit = { mod ->
                 Column(mod) {
                     Text("YOUR DECK", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.padding(bottom = 6.dp))
-                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).border(1.dp, PanelLight, RoundedCornerShape(20.dp)).background(Panel).testTag("home-deck")) {
+                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).border(1.dp, PanelLight, RoundedCornerShape(20.dp)).background(Panel).testTag("home-deck").tutorialTarget("home-deck")) {
                         Box(Modifier.fillMaxWidth().height(if (short) (if (BuildConfig.DEBUG) 70.dp else 120.dp) else if (wide) (if (BuildConfig.DEBUG) 175.dp else 280.dp) else (if (BuildConfig.DEBUG) 120.dp else 230.dp)).background(Color(0xFF22302C))) {
                             if (commanderArt != null) CardArt(commanderArt, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, fallbackName = deck?.commander)
                             Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Color(0xB3101615)).padding(horizontal = 16.dp, vertical = 10.dp)) {
@@ -155,7 +161,7 @@ fun ArcanaHomeScreen(
                             }
                         }
                         Row(Modifier.fillMaxWidth().padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            OutlinedButton(onClick = onChangeDeck, enabled = !argentumActive, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("Change deck", color = SoftWhite, fontWeight = FontWeight.Bold) }
+                            OutlinedButton(onClick = onChangeDeck, enabled = !argentumActive, modifier = Modifier.weight(1f).heightIn(min = 48.dp).tutorialTarget("home-change-deck")) { Text("Change deck", color = SoftWhite, fontWeight = FontWeight.Bold) }
                             // Import is parked for now (plumbing kept in onImport): greyed, tap says so.
                             val homeContext = androidx.compose.ui.platform.LocalContext.current
                             OutlinedButton(
@@ -174,7 +180,7 @@ fun ArcanaHomeScreen(
                 ) { Text("RETURN TO TABLE", fontSize = 18.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp) }
                 else Button(
                     onClick = onPlay, enabled = !working && !resumeAvailable && !offlineResumeAvailable,
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp).testTag("home-play"),
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 68.dp).testTag("home-play").tutorialTarget("home-play"),
                     colors = ButtonDefaults.buttonColors(containerColor = Mint, contentColor = Ink),
                 ) { Text(if (working) (workingLabel ?: "PREPARING…") else "PLAY", fontSize = if (working) 15.sp else 22.sp, fontWeight = FontWeight.Black, letterSpacing = 2.sp) }
             }
@@ -186,27 +192,34 @@ fun ArcanaHomeScreen(
                 playButton()
             }
             Spacer(Modifier.height(8.dp))
-            // Below PLAY, so the debug card never pushes it off a short or narrow screen.
-            if (testScenarios.isNotEmpty() && !argentumActive) Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Panel)
-                    .padding(14.dp).testTag("test-scenarios-card")
-            ) {
-                Text("TEST SCENARIOS · DEBUG BUILD", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
-                Text("Start an offline game vs the AI from a ready board. The engine plays it normally from there.",
-                    color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
-                testScenarios.forEach { scenario ->
-                    OutlinedButton(onClick = { onTestScenario(scenario) }, enabled = !working,
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 48.dp).testTag("test-scenario-${scenario.id}")) {
-                        Column(Modifier.fillMaxWidth()) {
-                            Text(scenario.title, color = SoftWhite, fontWeight = FontWeight.Bold)
-                            Text(scenario.description, color = Muted, fontSize = 11.sp)
-                        }
-                    }
-                }
-            }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.weight(1f))
                 Text("Build ${BuildConfig.VERSION_CODE} · Based on Build ${BuildConfig.BASE_BUILD}", color = Muted, fontSize = 12.sp)
+            }
+        }
+    }
+    if (scenarioPickerOpen && testScenarios.isNotEmpty()) ModalBottomSheet(
+        onDismissRequest = { scenarioPickerOpen = false },
+        containerColor = Panel,
+    ) {
+        Column(
+            Modifier.fillMaxWidth().verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp).padding(bottom = 28.dp).testTag("test-scenarios-picker"),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("TEST SCENARIOS · DEBUG ONLY", color = CounterGold, fontSize = 16.sp, fontWeight = FontWeight.Black)
+            Text("Choose a ready-made offline game against the AI.", color = Muted, fontSize = 13.sp)
+            testScenarios.forEach { scenario ->
+                OutlinedButton(
+                    onClick = { scenarioPickerOpen = false; onTestScenario(scenario) },
+                    enabled = !working && !argentumActive,
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("test-scenario-${scenario.id}"),
+                ) {
+                    Column(Modifier.fillMaxWidth()) {
+                        Text(scenario.title, color = SoftWhite, fontWeight = FontWeight.Bold)
+                        Text(scenario.description, color = Muted, fontSize = 11.sp)
+                    }
+                }
             }
         }
     }
@@ -215,7 +228,7 @@ fun ArcanaHomeScreen(
 /** After PLAY: offline vs AI (with the AI's deck) or online with Argentum. */
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun PlaySheet(
+internal fun PlaySheet(
     deckName: String?,
     aiDecks: List<DeckChoice>,
     aiDeckId: String?,
@@ -231,6 +244,7 @@ fun PlaySheet(
     onWifiJoin: () -> Unit = {},
     onOnlineHost: () -> Unit = {},
     onOnlineJoin: () -> Unit = {},
+    tutorialStep: ArcanaLessonStep? = null, onTutorialNext: () -> Unit = {}, onTutorialExit: () -> Unit = {},
 ) {
     var online by remember { mutableStateOf(false) }
     // Play with a friend: null = not chosen; 1 host on Wi-Fi, 2 join on Wi-Fi, 3 host online, 4 join online.
@@ -239,14 +253,24 @@ fun PlaySheet(
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("How do you want to play?", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
+            tutorialStep?.let { step ->
+                TutorialInlineCue(step.title, step.body + "  " + step.hint)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
+                    if (step.actionKind == "next") TextButton(onClick = onTutorialNext) { Text("NEXT", color = Mint) }
+                }
+            }
             Text(deckName?.let { "Your deck: $it" } ?: "No deck yet: offline uses a quick Portal duel.", color = Muted, fontSize = 14.sp)
             PlayOption("Offline vs AI", "Runs on your phone. No internet needed.", selected = !online && friendMode == null, onClick = { online = false; friendMode = null }, tag = "play-offline-option") {
                 Text("PLAYERS", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     DeckChip("2 · you vs AI", aiCount == 1) { onAiCount(1) }
-                    DeckChip("3 players", aiCount == 2) { onAiCount(2) }
-                    DeckChip("4 players", aiCount == 3) { onAiCount(3) }
+                    if (ReleaseFeatures.multiplayerPreviewEnabled) {
+                        DeckChip("3 players", aiCount == 2) { onAiCount(2) }
+                        DeckChip("4 players", aiCount == 3) { onAiCount(3) }
+                    }
                 }
+                if (!ReleaseFeatures.multiplayerPreviewEnabled) Text("Four-player support coming soon.", color = Muted, fontSize = 12.sp)
                 Text(if (aiCount > 1) "FIRST AI'S DECK (the others are random)" else "AI'S DECK", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp)
                 val shown = if (showAllDecks) aiDecks else aiDecks.filter { !it.builtIn || it.id in setOf("tokens_win", "artificer_v4", "ayula_bears", "sliver_overlord", "hazel_squirrels", "mabel_heir", "velociraptor_beefcake") || it.id == aiDeckId }
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -303,19 +327,26 @@ private fun DeckChip(label: String, selected: Boolean, onClick: () -> Unit) {
 /** Pick from precons, Arcana decks, Argentum EDHREC decks, and then your other decks. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit) {
+internal fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit, onDeckBuilder: (() -> Unit)? = null, tutorialStep: ArcanaLessonStep? = null, onTutorialNext: () -> Unit = {}, onTutorialExit: () -> Unit = {}) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text("Choose your deck", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
+            tutorialStep?.let { step ->
+                TutorialInlineCue(step.title, step.body + "  " + step.hint)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                    TextButton(onClick = onTutorialExit) { Text("EXIT LESSON", color = Muted) }
+                    if (step.actionKind == "next") TextButton(onClick = onTutorialNext) { Text("NEXT", color = Mint) }
+                }
+            }
             listOf(
                 DeckChoiceCategory.PRECON to "WOTC PRECONS",
                 DeckChoiceCategory.ARCANA to "ARCANA",
                 DeckChoiceCategory.ARGENTUM to "ARGENTUM PREMADE DECKS",
                 DeckChoiceCategory.OTHER to "YOUR OTHER DECKS"
-            ).forEach { (category, heading) ->
+            ).filter { ReleaseFeatures.deckImportEnabled || it.first != DeckChoiceCategory.OTHER }.forEach { (category, heading) ->
                 val list = decks.filter { it.category == category }
                 Text(heading, color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.padding(top = 16.dp, bottom = 6.dp))
-                if (list.isEmpty()) Text("None yet. Import a deck and it lands here.", color = Muted, fontSize = 13.sp)
+                if (list.isEmpty()) Text(if (ReleaseFeatures.deckImportEnabled) "None yet. Import a deck and it lands here." else "No decks in this group.", color = Muted, fontSize = 13.sp)
                 list.forEach { d ->
                     Row(
                         Modifier.fillMaxWidth().padding(vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(if (d.id == activeId) PanelLight else Panel)
@@ -330,7 +361,15 @@ fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckCho
                     }
                 }
             }
-            OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth().padding(top = 16.dp).heightIn(min = 52.dp)) { Text("Import a new deck", color = SoftWhite, fontWeight = FontWeight.Bold) }
+            if (ReleaseFeatures.deckImportEnabled) {
+                OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth().padding(top = 16.dp).heightIn(min = 52.dp)) { Text("Import a new deck", color = SoftWhite, fontWeight = FontWeight.Bold) }
+            } else Text("Deck importing coming soon.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 16.dp))
+            // Developer builds only (DeckBuilderFlag): search the library and build or edit decks.
+            onDeckBuilder?.let { open ->
+                OutlinedButton(onClick = open, modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 52.dp).testTag("open-deck-builder")) {
+                    Text("Deck builder · developer preview", color = Mint, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }

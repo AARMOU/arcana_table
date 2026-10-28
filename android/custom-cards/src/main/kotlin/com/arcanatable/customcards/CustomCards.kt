@@ -23,6 +23,9 @@ object CustomCards {
     private const val POOL = "Card pool 10/26"
 
     val entries: List<Entry> = listOf(
+        Entry(EldraziTemple, "M3C", "Six WotC precons"),
+        Entry(CorruptedCrossroads, "M3C", "Six WotC precons"),
+        Entry(AzlaskTheSwellingScourge, "M3C", "Six WotC precons"),
         // Tokens Win 9/26 (Rocco, Cabaretti Caterer)
         Entry(AncientCopperDragon, "CLB", TOKENS_WIN),
         Entry(DisplacedDinosaurs, "WHO", TOKENS_WIN),
@@ -262,10 +265,31 @@ object CustomCards {
         Entry(GoliathTruck, "40K", "Six WotC precons"),
         Entry(EldraziConscription, "M3C", "Six WotC precons"),
         // Eldrazi Incursion.
+        Entry(EldraziDisplacer, "OGW", "Eldrazi Incursion"),
+        Entry(EldritchImmunity, "M3C", "Eldrazi Incursion"),
         Entry(EldraziMonument, "M3C", "Eldrazi Incursion"),
         Entry(OblivionSower, "M3C", "Eldrazi Incursion"),
         Entry(SireOfStagnation, "BFZ", "Eldrazi Incursion"),
         Entry(SufferThePast, "ROE", "Eldrazi Incursion"),
+        Entry(ForsakenMonument, "CMM", "Eldrazi Incursion"),
+        Entry(EldraziConfluence, "M3C", "Eldrazi Incursion"),
+        Entry(SelectiveObliteration, "M3C", "Eldrazi Incursion"),
+        Entry(KozileksReturn, "OGW", "Eldrazi Incursion"),
+        Entry(InversionBehemoth, "M3C", "Eldrazi Incursion"),
+        Entry(SpawnbedProtector, "M3C", "Eldrazi Incursion"),
+        Entry(UginTheIneffable, "CMM", "Eldrazi Incursion"),
+        Entry(ChitteringDispatcher, "M3C", "Eldrazi Incursion"),
+        Entry(RishkarsExpertise, "LCC", "Eldrazi Incursion"),
+        Entry(VileRedeemer, "OGW", "Eldrazi Incursion"),
+        Entry(BismuthMindrender, "M3C", "Eldrazi Incursion"),
+        Entry(UlamogsNullifier, "BFZ", "Eldrazi Incursion"),
+        Entry(MorophonTheBoundless, "CMM", "Eldrazi Incursion"),
+        // Needs the colorless-hybrid and stack-copy engine patches (engine-upgrade/ulalek).
+        Entry(UlalekFusedAtrocity, "M3C", "Eldrazi Incursion"),
+        // Eldrazi Unbound. Needs the granted-cascade engine patch (engine-upgrade/ulalek).
+        Entry(ZhulodokVoidGorger, "CMM", "Eldrazi Unbound"),
+        // The Ruinous Powers. Needs engine patches 0008 + 0009 (engine-upgrade/ulalek).
+        Entry(AbaddonTheDespoiler, "40K", "The Ruinous Powers"),
     )
 
     private val COMMANDER_LEGAL = setOf(DeckFormat.COMMANDER, DeckFormat.LEGACY, DeckFormat.VINTAGE)

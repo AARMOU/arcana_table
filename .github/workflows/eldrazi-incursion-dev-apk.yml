@@ -1,0 +1,101 @@
+name: Eldrazi Incursion Fold developer APK
+# Owner-requested developer APK for the 90/100 Eldrazi Incursion candidate (#171, #81).
+# Uses the COMMITTED runtime jars (same ones Development CI validated); verifies them against
+# engine-upgrade/ulalek/runtime-manifest.json, re-runs the gates, then builds a debug-signed APK
+# that installs beside other Arcana builds. Never signs for release, publishes or replaces jars.
+on:
+  push:
+    branches: [claude/eldrazi-incursion-tonight-20261024]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: eldrazi-dev-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      PKG: com.arcanatable.eldrazi
+      LABEL: Arcana Eldrazi DEV
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+
+      - name: Committed runtime jars match the recorded Ulalek runtime manifest
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, sys
+          from pathlib import Path
+          m = json.loads(Path("engine-upgrade/ulalek/runtime-manifest.json").read_text())
+          bad = [n for n, h in m["jars"].items()
+                 if hashlib.sha256(Path("android/app/libs", n).read_bytes()).hexdigest() != h]
+          print("jar mismatch:", bad) if bad else print("all runtime jars match manifest")
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: Eldrazi Incursion gate (>= 90/100 original slots indexed)
+        run: |
+          python3 investigation/argentum-six-precons/coverage-audit.py | tee coverage.txt
+          python3 - <<'PY'
+          import re, sys
+          line = next(l for l in open("coverage.txt") if l.startswith("Eldrazi Incursion:"))
+          n = int(re.search(r"(\d+)/100", line).group(1))
+          print("Eldrazi Incursion supported:", n)
+          sys.exit(0 if n >= 90 else 1)
+          PY
+
+      - name: Committed custom-card data matches a fresh export
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          git diff --exit-code -- app/src/main/assets/argentum/custom-cards.jsonl app/src/main/assets/argentum/custom-cards.index.tsv
+
+      - name: Custom-card scenarios and Android unit tests
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 -Parcana.debugApplicationIdSuffix=.eldrazi "-Parcana.debugLabel=$LABEL" :app:assembleDebug
+
+      - name: Verify APK contents and provenance
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          APK=dist/ArcanaTable-EldraziIncursion-DEV-debug.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk "$APK"
+          BT="$ANDROID_HOME/build-tools/36.0.0"
+          "$BT/aapt" dump badging "$APK" > dist/package-info.txt
+          grep -F "package: name='$PKG'" dist/package-info.txt
+          grep -F "application-label:'$LABEL'" dist/package-info.txt
+          "$BT/apksigner" verify --print-certs "$APK" > dist/signing-info.txt
+          unzip -l "$APK" > dist/apk-listing.txt
+          grep -F "assets/precons/eldrazi_incursion.txt" dist/apk-listing.txt
+          grep -F "assets/argentum/custom-cards.jsonl" dist/apk-listing.txt
+          unzip -p "$APK" assets/argentum/custom-cards.index.tsv > dist/custom-cards.index.tsv
+          for c in "Ulalek, Fused Atrocity" "Eldrazi Displacer" "Eldritch Immunity" "Forsaken Monument" "Ugin, the Ineffable"; do
+            grep -qF "$c" dist/custom-cards.index.tsv || { echo "missing in APK: $c"; exit 1; }
+          done
+          unzip -p "$APK" assets/precons/eldrazi_incursion.txt | cmp - android/app/src/main/assets/precons/eldrazi_incursion.txt
+          cp coverage.txt dist/
+          printf 'branch=%s\ncommit=%s\npackage=%s\nlabel=%s\nsigning=Android debug key\n' \
+            "$GITHUB_REF_NAME" "$GITHUB_SHA" "$PKG" "$LABEL" > dist/provenance.txt
+          sha256sum "$APK" android/app/libs/argentum-*.jar > dist/SHA256SUMS.txt
+          cat dist/provenance.txt dist/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArcanaTable-EldraziIncursion-DEV
+          retention-days: 30
+          if-no-files-found: error
+          path: dist/
