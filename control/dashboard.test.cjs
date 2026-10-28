@@ -148,3 +148,7 @@ test('closed issues are never shown as candidates and verdict age is shown',()=>
   assert.ok(src.includes('function render(container, units, checkedAt)'));
   assert.ok(html.includes("window.ArcanaAuthorize.render($('authorizationList'),w.list||[],d.checkedAt);"));
 });
+test('a stale-served feed is re-asked once (no polling) before being reported stale',()=>{
+  assert.ok(html.includes("if(res.ok&&isStaleFeed(res)){await new Promise(r=>setTimeout(r,2000));const again=await fetch(PUBLIC_GITHUB+encodeURIComponent(path),{cache:'no-cache'})"));
+  assert.equal((html.match(/isStaleFeed\(res\)/g)||[]).length,1,'single retry only');
+});
