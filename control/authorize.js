@@ -9,6 +9,16 @@ const KEY = 'arcana-review-session-v1';
 const LOGIN = API + '/auth/login?return=' + encodeURIComponent('https://aarmou.github.io/arcana_table/control/');
 const issueUrl = n => 'https://github.com/AARMOU/arcana_table/issues/' + n;
 const safeNumber = n => Number.isSafeInteger(n) && n > 0 && n < 10000000;
+// Display-only preflight mirrors the Worker's actionable-unit shape; the Worker remains authoritative.
+function actionable(info) {
+  const body = String(info?.body || '');
+  const trusted = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(info?.author_association) ||
+    (info?.user?.login === 'github-actions[bot]' && info?.user?.type === 'Bot' && body.startsWith('<!-- arcana-auto-queue-v1 -->\n'));
+  return info?.state === 'open' && !info?.pull_request && trusted &&
+    /^Base: [A-Za-z0-9._/-]+$/m.test(body) && /## Cards\b/.test(body) &&
+    /## Acceptance\b/.test(body) && body.includes('Exact current Oracle behavior') &&
+    body.includes('Executable regression scenarios');
+}
 function session() {
   for (const name of ['localStorage', 'sessionStorage']) {
     try { const v = root[name]?.getItem(KEY); if (v) return v; } catch {}
@@ -64,9 +74,17 @@ function render(container, units) {
         if ((info.labels || []).some(l => l.name === 'arcana:authorize-once')) {
           button.disabled = true; button.textContent = 'Authorized';
           message.textContent = 'Authorized — waiting for safe dispatcher pickup.';
+        } else if (!actionable(info)) {
+          button.disabled = true;
+          button.textContent = 'Not eligible';
+          message.textContent = 'Legacy or incomplete work unit. Needs a verified queue-unit conversion before authorization.';
+        } else if ((info.assignees || []).some(a => ['copilot', 'copilot-swe-agent[bot]'].includes(String(a.login || '').toLowerCase()))) {
+          button.disabled = true;
+          button.textContent = 'Already assigned';
+          message.textContent = 'Copilot already has this work.';
         } else {
           button.disabled = false;
-          message.textContent = 'Not authorized · owner-only permission for this specific card';
+          message.textContent = 'Eligible queue unit · owner authorization required';
         }
       }).catch(() => { message.textContent = 'Issue details unavailable — authorization disabled for safety.'; });
 
