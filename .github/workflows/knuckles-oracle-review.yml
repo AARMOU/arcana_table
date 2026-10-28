@@ -1,0 +1,60 @@
+name: Knuckles SLD Oracle evidence (read-only)
+# #369: independent canonical-card and Cardkit triage, never dispatches, builds, or registers.
+on:
+  push:
+    branches:
+      - gpt/knuckles-oracle-review-20261028
+permissions:
+  contents: read
+jobs:
+  oracle-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Existing Cardkit unit regressions
+        run: python3 -m unittest discover -s tools/cardkit/tests -v
+      - name: Fetch exact Scryfall Oracle record (fail closed if unreachable)
+        run: tools/cardkit/cardkit oracle fetch --refresh "Knuckles the Echidna"
+      - name: Verify official SLD identity, Oracle wording, and classify without dispatch
+        run: |
+          mkdir -p knuckles-evidence
+          PYTHONPATH=tools/cardkit python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from cardkit_lib import oracle, readiness
+          name = "Knuckles the Echidna"
+          card = oracle.cached(name)
+          assert card is not None, "Missing authoritative Scryfall record: refuse review"
+          assert card.get("name") == name, "Name does not match exact owner request"
+          assert card.get("set", "").lower() == "sld"
+          assert str(card.get("collector_number")) == "2082"
+          assert card.get("mana_cost") == "{2}{R}{R}"
+          assert card.get("type_line") == "Legendary Creature — Echidna Warrior"
+          assert (str(card.get("power")), str(card.get("toughness"))) == ("2", "4")
+          assert {"Double strike", "Trample", "Haste"} <= set(card.get("keywords", []))
+          expected = [
+              "Double strike, trample, haste",
+              "Whenever one or more creatures you control deal combat damage to a player, create a Treasure token.",
+              "Treasure Hunter — At the beginning of your upkeep, if you control thirty or more artifacts, you win the game.",
+          ]
+          lines = [line.strip() for line in card.get("oracle_text", "").splitlines() if line.strip()]
+          assert lines == expected, f"Oracle wording changed; review manually: {lines!r}"
+          verdict = readiness.classify(name)
+          assert verdict["name"] == name
+          assert verdict["readiness"] in {"SUPPORTED", "NEEDS_REVIEW", "ENGINE_BLOCKED", "IMPLEMENTED_AND_TESTED"}
+          # The classifier's verdict is advisory only. Do NOT convert it to a queue unit or authorize a worker.
+          out = Path("knuckles-evidence")
+          (out / "oracle.json").write_text(json.dumps(card, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+          (out / "cardkit.json").write_text(json.dumps(verdict, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+          print("Verified exact SLD #2082 identity and all three Oracle rules lines")
+          print(f"Cardkit: {verdict['readiness']} (route: {verdict.get('route')}) — advisory only")
+          PY
+      - name: Publish evidence artifact, not an APK or source change
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: knuckles-oracle-review
+          retention-days: 14
+          path: knuckles-evidence/
+          if-no-files-found: ignore
