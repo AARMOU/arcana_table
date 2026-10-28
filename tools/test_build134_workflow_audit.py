@@ -11,7 +11,9 @@ def fixture():
     common[0] = '      - name: Verify original logo and tutorial assets inside unsigned release package\n' + RELEASE_SCOPE + '\n'
     preview_common = common.copy()
     preview_common[0] = preview_common[0].replace(RELEASE_SCOPE, PREVIEW_SCOPE)
-    prefix = 'on:\n  workflow_dispatch:\npermissions:\n  contents: read\n  actions: read\njobs:\n  compatibility:\n    steps:\n'
+    prefix = ('on:\n  workflow_dispatch:\npermissions:\n  contents: read\n  actions: read\n'
+              'jobs:\n  compatibility:\n    runs-on: ubuntu-24.04\n'
+              '    timeout-minutes: 120\n    steps:\n')
     extras = [
         '      - name: Build installable combined test APK\n'
         '        run: |\n'
@@ -102,6 +104,36 @@ class WorkflowAuditTest(unittest.TestCase):
         a, b = fixture()
         self.assertTrue(any('job configuration' in x for x in audit(
             a, b.replace('  compatibility:\n', '  compatibility:\n    runs-on: self-hosted\n'))))
+
+    def test_identical_self_hosted_runner_rejected(self):
+        a, b = fixture()
+        def mutate(source):
+            return source.replace('runs-on: ubuntu-24.04', 'runs-on: self-hosted')
+        problems = audit(mutate(a), mutate(b))
+        self.assertTrue(any('reviewed baseline' in x for x in problems), problems)
+
+    def test_identical_timeout_expansion_rejected(self):
+        a, b = fixture()
+        def mutate(source):
+            return source.replace('timeout-minutes: 120', 'timeout-minutes: 600')
+        problems = audit(mutate(a), mutate(b))
+        self.assertTrue(any('reviewed baseline' in x for x in problems), problems)
+
+    def test_identical_privileged_container_rejected(self):
+        a, b = fixture()
+        def mutate(source):
+            return source.replace('    timeout-minutes: 120\n',
+                                  '    timeout-minutes: 120\n    container: privileged-image\n')
+        problems = audit(mutate(a), mutate(b))
+        self.assertTrue(any('reviewed baseline' in x for x in problems), problems)
+
+    def test_identical_matrix_strategy_rejected(self):
+        a, b = fixture()
+        def mutate(source):
+            return source.replace('    timeout-minutes: 120\n',
+                                  '    timeout-minutes: 120\n    strategy:\n      matrix:\n        os: [ubuntu-24.04, self-hosted]\n')
+        problems = audit(mutate(a), mutate(b))
+        self.assertTrue(any('reviewed baseline' in x for x in problems), problems)
 
     def test_packaging_steps_cannot_be_interleaved(self):
         a, b = fixture()

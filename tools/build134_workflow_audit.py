@@ -94,6 +94,14 @@ def audit(release: str, preview: str) -> list[str]:
 
     if job_config(release) is None or job_config(release) != job_config(preview):
         problems.append('release/preview job configuration differs')
+    # Cross-workflow equality cannot catch identical runner/container/matrix
+    # changes. Only the reviewed job-level execution settings are allowed.
+    reviewed_job = ('  compatibility:\n'
+                    '    runs-on: ubuntu-24.04\n'
+                    '    timeout-minutes: 120\n')
+    for name, source in [('release', release), ('preview', preview)]:
+        if job_config(source) != reviewed_job:
+            problems.append(f'{name}: compatibility runner/timeout/job settings differ from reviewed baseline')
     for name, source in [('release', release), ('preview', preview)]:
         # An extra reusable-workflow job with no steps can execute outside
         # the reviewed compatibility job. Identical additions to both files
