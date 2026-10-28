@@ -1,0 +1,36 @@
+name: Card Request Intake CI
+on:
+  pull_request:
+    paths:
+      - 'android/card-request-worker/**'
+      - 'android/app/src/main/java/com/arcanatable/CardRequests.kt'
+      - 'android/app/src/main/java/com/arcanatable/TableOverlaysB.kt'
+      - 'android/app/src/test/java/com/arcanatable/CardRequestsTest.kt'
+      - 'android/app/build.gradle.kts'
+      - '.github/workflows/card-request-intake-ci.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  worker-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run name validation, dedupe and retry tests without credentials
+        run: node --test android/card-request-worker/tests/card-requests.test.mjs
+      - run: git diff --check
+  android-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - name: Compile importer UI and run focused Android test
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --tests com.arcanatable.CardRequestsTest --no-daemon --stacktrace
