@@ -54,6 +54,12 @@ This page **does not** call the GitHub write API, handle credentials, purchase c
 
 Tests: `node --test control/dashboard.test.cjs control/card-queue.test.cjs`. Merging and deploying this PR does not change the Android game APK or release configuration.
 
+## Mandatory pre-submission checks (Arcana Control)
+
+The Card Queue picker now performs **two read-only checks before enabling Review verified request**: Scryfall exact-name lookup for each selected Magic card (with owner-confirmed canonical suggestions for non-exact entries), and the complete unclaimed Cardkit `SUPPORTED / copilot` allowlist posted by the trusted queue feeder on #78. The feeder status must be published by `github-actions[bot]`, complete, at most six hours old, and match the same exact 40-character integration-head SHA as the deck/library scanner. Any network error, stale/incomplete snapshot, mismatched SHA, invalid/ambiguous name, unknown/blocked/claimed card, or unconfirmed suggestion **blocks the GitHub request button**. All selected card names are sent to Scryfall for verification; there are no tokens, decklists, identities or credentials in those requests.
+
+Cards that require GPT/Claude engine implementation are not sent to Copilot; they may be discussed separately in #321 / #81. The in-browser check is not a security boundary: the existing dispatcher still independently validates Cardkit at its current head, issues, provenance, CI, fresh billing and the 10% reserve. A preliminary `SUPPORTED` result does not certify gameplay correctness or guarantee Copilot success. No static allowlist or browser state is ever allowed to authorize paid work. If the queue feeder has not yet published `eligibleNames`, the UI fails closed until the new status is available.
+
 ## Dual card sources (Deck Needs and Argentum Library)
 
 **Deck Needs** still uses the existing `tools/deck-gap-audit.cjs` report and the current 19 deck manifests. It shows unique scanned deck card names (the former 1,196 figure), unique missing index names, and front-face-only/DFA name-review candidates **separately**. An indexed deck card is not guaranteed playable; "not indexed" means missing from the two current index files, not proof the engine has no equivalent.
