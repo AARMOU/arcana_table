@@ -9,6 +9,8 @@ on:
       - "privacy.html"
       - "assets/**"
       - "control/**"
+      - "tools/argentum-catalog.cjs"
+      - "tools/tests/argentum-catalog.test.cjs"
       - ".github/workflows/pages.yml"
       - "README.md"
       - "tools/verify_site.test.cjs"
@@ -27,4 +29,19 @@ jobs:
       - name: Check page copy, paths and release limitations
         run: node --test tools/verify_site.test.cjs
       - name: Check dashboard regression
-        run: node --test control/dashboard.test.cjs control/card-queue.test.cjs
+        run: node --test control/dashboard.test.cjs control/card-queue.test.cjs tools/tests/argentum-catalog.test.cjs
+      - name: Check out integration deck/index data (data only)
+        uses: actions/checkout@v4
+        with:
+          ref: gpt/arcana-integration-next
+          path: integration-source
+          persist-credentials: false
+      - name: Verify current integrated catalog and deck scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          SOURCE_SHA="$(git -C integration-source rev-parse HEAD)"
+          mkdir -p /tmp/arcana-site-check
+          node tools/deck-gap-audit.cjs --root integration-source --source-ref "gpt/arcana-integration-next@$SOURCE_SHA" --json /tmp/arcana-site-check/gaps.json --markdown /tmp/arcana-site-check/gaps.md
+          node tools/argentum-catalog.cjs --root integration-source --source-ref "gpt/arcana-integration-next@$SOURCE_SHA" --json /tmp/arcana-site-check/catalog.json
+          node -e 'const f=require("fs"),d=JSON.parse(f.readFileSync("/tmp/arcana-site-check/gaps.json")),c=JSON.parse(f.readFileSync("/tmp/arcana-site-check/catalog.json"));if(d.sourceRef!==c.sourceRef||!c.cards.length||d.decks.length<1||c.cards.some(x=>x.kind==="token"))process.exit(1);console.log("Verified",d.decks.length,"scanned decks and",c.cards.length,"indexed non-token names at",c.sourceRef);'

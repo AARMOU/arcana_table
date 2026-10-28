@@ -53,3 +53,13 @@ The **Credit Budget** screen is reachable at `/control/credits.html`. It locally
 This page **does not** call the GitHub write API, handle credentials, purchase credits, read personal billing, change dispatcher readiness, or launch agents. Exact quantities remain in the device's form and are not published in the public website, issue comments, or browser storage. The existing private, authenticated billing feed and capacity/reserve safeguards stay authoritative. Premium requests, GitHub Actions minutes and ChatGPT usage are separate units.
 
 Tests: `node --test control/dashboard.test.cjs control/card-queue.test.cjs`. Merging and deploying this PR does not change the Android game APK or release configuration.
+
+## Dual card sources (Deck Needs and Argentum Library)
+
+**Deck Needs** still uses the existing `tools/deck-gap-audit.cjs` report and the current 19 deck manifests. It shows unique scanned deck card names (the former 1,196 figure), unique missing index names, and front-face-only/DFA name-review candidates **separately**. An indexed deck card is not guaranteed playable; "not indexed" means missing from the two current index files, not proof the engine has no equivalent.
+
+**Argentum Library** uses the *same integration-branch exact HEAD* via a new **read-only catalog exporter**, `tools/argentum-catalog.cjs`. It deduplicates names from `all-cards.index.tsv` and `custom-cards.index.tsv`, excludes token-only names by default and lists indexed card/basic names **even when none of the scanned decks contains them**. The library page supports searching, indexed names outside the scanned decks, and incremental 100-row pagination without creating thousands of DOM elements. It **cannot** infer that every indexed card has executable, tested Oracle rules. Selecting names from either view creates the same owner-reviewed GitHub request, never a paid worker assignment.
+
+The Pages workflow builds `card-gaps.json` and `argentum-catalog.json` from the same integration-branch checkout and source SHA; neither JSON file is cached by the service worker. New integration changes require a new Pages deployment (manual site workflow dispatch is available). No importer, card implementation, Android game APK, billing or dispatcher behavior changes.
+
+Tests: `node --test control/dashboard.test.cjs control/card-queue.test.cjs tools/tests/argentum-catalog.test.cjs`.
