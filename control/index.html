@@ -161,10 +161,14 @@
       if(['overview','work','safety'].includes(location.hash.slice(1)))changeView(location.hash.slice(1));
       window.addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(['overview','work','safety'].includes(v))changeView(v)});
       let staleFeeds=0,cachedFeeds=0,sourceTimes=[],staleSources=[];
+      // A feed served stale (edge stale-while-revalidate, or a copy checked over 15 min ago) has already
+      // started a background refresh at the edge. Ask once more, shortly after, before calling it stale.
+      const isStaleFeed=r=>{const st=r.headers.get('x-arcana-feed'),cf=(r.headers.get('cf-cache-status')||'').toUpperCase(),src=Date.parse(r.headers.get('x-arcana-checked-at')||'');return st==='stale'||cf==='STALE'||cf==='UPDATING'||(Number.isFinite(src)&&Date.now()-src>15*60*1000);};
       async function api(path) {
         // Let the browser and native Cloudflare Workers cache honor the published 15-minute TTL.
         // cache:'no-store' bypassed caching and repeatedly exhausted public GitHub API limits.
-        const res=await fetch(PUBLIC_GITHUB+encodeURIComponent(path));
+        let res=await fetch(PUBLIC_GITHUB+encodeURIComponent(path));
+        if(res.ok&&isStaleFeed(res)){await new Promise(r=>setTimeout(r,2000));const again=await fetch(PUBLIC_GITHUB+encodeURIComponent(path),{cache:'no-cache'}).catch(()=>null);if(again?.ok)res=again;}
         if(!res.ok){
           const body=await res.json().catch(()=>({}));
           throw Error('GitHub feed HTTP '+res.status+(body?.error?' ('+body.error+')':''));
