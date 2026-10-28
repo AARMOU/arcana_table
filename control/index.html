@@ -160,7 +160,7 @@
       document.querySelectorAll('[data-view-link]').forEach(node=>node.addEventListener('click',ev=>{ev.preventDefault();changeView(node.dataset.viewLink)}));
       if(['overview','work','safety'].includes(location.hash.slice(1)))changeView(location.hash.slice(1));
       window.addEventListener('hashchange',()=>{const v=location.hash.slice(1);if(['overview','work','safety'].includes(v))changeView(v)});
-      let staleFeeds=0,cachedFeeds=0,sourceTimes=[];
+      let staleFeeds=0,cachedFeeds=0,sourceTimes=[],staleSources=[];
       async function api(path) {
         // Let the browser and native Cloudflare Workers cache honor the published 15-minute TTL.
         // cache:'no-store' bypassed caching and repeatedly exhausted public GitHub API limits.
@@ -173,7 +173,7 @@
         const cf=(res.headers.get('cf-cache-status')||'').toUpperCase();
         const source=Date.parse(res.headers.get('x-arcana-checked-at')||'');
         if(Number.isFinite(source))sourceTimes.push(source);
-        if(state==='stale'||cf==='STALE'||cf==='UPDATING'||(Number.isFinite(source)&&Date.now()-source>15*60*1000))staleFeeds++;
+        if(state==='stale'||cf==='STALE'||cf==='UPDATING'||(Number.isFinite(source)&&Date.now()-source>15*60*1000)){staleFeeds++;staleSources.push(path+' ('+(state||cf||'old timestamp')+(Number.isFinite(source)?', checked '+new Date(source).toLocaleString():'')+')');}
         else if(state==='cached'||cf==='HIT')cachedFeeds++;
         return {data:await res.json(),link:res.headers.get('link')||''};
       }
@@ -302,12 +302,12 @@
           addRow(list,'#'+i.pr+' '+String(i.card||'Card').slice(0,120),(checks||'no checks yet')+' · head '+String(i.headSha||'').slice(0,7)+' · '+timeAgo(r.checkedAt),href,REVIEW_STATES[i.state]||{klass:'neutral',tag:'gray',label:String(i.state||'unknown')});}}
       async function fetchControl(){try{const st=await fetchStatus();renderBilling(st);renderDispatcher(st);renderQueue(st);renderReview(st);fetchCopilotAssignment(st.dispatcher?.data||null);if(!st.billing&&!st.dispatcher)text('readyDetail','No status comments published yet on issue #78.');}catch(err){text('readyDetail','Status feed unavailable: '+err.message);fetchCopilotAssignment(null);}}
       let loading=false;
-      async function refresh(){if(loading)return;loading=true;staleFeeds=0;cachedFeeds=0;sourceTimes=[];$('refresh').disabled=true;$('refreshIcon').classList.add('spin');text('connectionText','Checking cached GitHub feeds…');$('connectionDot').className='pulse';const checks=await Promise.allSettled([api('/pulls?state=open&sort=updated&direction=desc&per_page=100'),api('/actions/runs?per_page=30'),fetchNotes(),fetchUpgrade(),fetchControl()]);let successful=0;const failures=[];checks.slice(0,3).forEach((result,i)=>{if(result.status==='fulfilled'){try{if(i===0)renderPRs(result.value.data);if(i===1)renderRuns(result.value.data);if(i===2)renderNotes(result.value);successful++;}catch(err){failures.push(err.message);}}else{failures.push(result.reason?.message||'Network request failed');}});if(checks[0].status==='rejected'){text('prCount','—');text('prSub','Unavailable');$('prList').replaceChildren(e('div','empty','Cannot fetch pull requests. Use the GitHub links to inspect directly.'));}if(checks[1].status==='rejected'){text('ciResult','Unknown');text('ciSub','Workflow feed unavailable');text('runningCount','—');$('runList').replaceChildren(e('div','empty','Cannot fetch workflow runs.'));}if(checks[2].status==='rejected')$('noteList').replaceChildren(e('div','empty','Cannot fetch coordination notes.'));
+      async function refresh(){if(loading)return;loading=true;staleFeeds=0;cachedFeeds=0;sourceTimes=[];staleSources=[];$('refresh').disabled=true;$('refreshIcon').classList.add('spin');text('connectionText','Checking cached GitHub feeds…');$('connectionDot').className='pulse';const checks=await Promise.allSettled([api('/pulls?state=open&sort=updated&direction=desc&per_page=100'),api('/actions/runs?per_page=30'),fetchNotes(),fetchUpgrade(),fetchControl()]);let successful=0;const failures=[];checks.slice(0,3).forEach((result,i)=>{if(result.status==='fulfilled'){try{if(i===0)renderPRs(result.value.data);if(i===1)renderRuns(result.value.data);if(i===2)renderNotes(result.value);successful++;}catch(err){failures.push(err.message);}}else{failures.push(result.reason?.message||'Network request failed');}});if(checks[0].status==='rejected'){text('prCount','—');text('prSub','Unavailable');$('prList').replaceChildren(e('div','empty','Cannot fetch pull requests. Use the GitHub links to inspect directly.'));}if(checks[1].status==='rejected'){text('ciResult','Unknown');text('ciSub','Workflow feed unavailable');text('runningCount','—');$('runList').replaceChildren(e('div','empty','Cannot fetch workflow runs.'));}if(checks[2].status==='rejected')$('noteList').replaceChildren(e('div','empty','Cannot fetch coordination notes.'));
         for(const result of checks.slice(3)){if(result.status==='rejected')failures.push(result.reason?.message||'Additional feed unavailable');else successful++;}
         $('connectionDot').className='pulse '+(successful===5&&!staleFeeds?'ok':'warn');
         text('connectionText',staleFeeds?'GitHub snapshot stale':successful===5?(cachedFeeds?'GitHub cached data':'GitHub data · '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})):successful?'Partial data · '+failures.length+' issue(s)':'GitHub feed unavailable');
         const sourceAt=sourceTimes.length?new Date(Math.min(...sourceTimes)).toLocaleString():null;
-        text('fetchedAt',successful?(sourceAt?'Source checked '+sourceAt:'Source time unavailable')+(staleFeeds?' · Display-only stale snapshot':'')+(failures.length?' · Some feeds unavailable':''):'Refresh later · '+(failures[0]||'Cached feed unavailable'));$('refresh').disabled=false;$('refreshIcon').classList.remove('spin');loading=false;}
+        text('fetchedAt',successful?(sourceAt?'Source checked '+sourceAt:'Source time unavailable')+(staleFeeds?' · Stale feeds: '+staleSources.join('; '):'')+(failures.length?' · Some feeds unavailable':''):'Refresh later · '+(failures[0]||'Cached feed unavailable'));$('refresh').disabled=false;$('refreshIcon').classList.remove('spin');loading=false;}
       $('refresh').addEventListener('click',refresh);
       refresh();
     })();
