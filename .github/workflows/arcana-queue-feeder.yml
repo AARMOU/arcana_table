@@ -121,4 +121,5 @@ jobs:
             const published=await S.publishStatus({github,...context.repo,kind:'queue',payload,summary:Q.queueSummary(payload)});
             core.info('Status comment: '+published);
             await core.summary.addHeading('Queue feeder').addRaw(Q.queueSummary(payload).join('\n')).write();
-            if(!r||published.startsWith('failed'))core.setFailed('Queue suggestions not published from verified feeder result ('+published+').');
+            if(!r||published.startsWith('failed')){core.setFailed('Queue status not published ('+published+').');return;}
+            if(auto.created||auto.pending)await github.rest.actions.createWorkflowDispatch({...context.repo,workflow_id:'arcana-card-dispatcher.yml',ref:'main',inputs:{dry_run:'false'}});
