@@ -247,6 +247,27 @@ class WorkflowAuditTest(unittest.TestCase):
         problems = audit(a, b)
         self.assertTrue(any('duplicate or missing root jobs' in x for x in problems), problems)
 
+    def test_identical_workflow_env_injection_rejected(self):
+        a, b = fixture()
+        def widen(source):
+            return source.replace('jobs:\n', 'env:\n  GRADLE_OPTS: -DskipTests=true\njobs:\n')
+        problems = audit(widen(a), widen(b))
+        self.assertTrue(any('workflow-level env/defaults' in x for x in problems), problems)
+
+    def test_identical_job_skip_condition_rejected(self):
+        a, b = fixture()
+        def widen(source):
+            return source.replace('  compatibility:\n', '  compatibility:\n    if: false\n')
+        problems = audit(widen(a), widen(b))
+        self.assertTrue(any('unreviewed job-level controls' in x for x in problems), problems)
+
+    def test_identical_job_environment_rejected(self):
+        a, b = fixture()
+        def widen(source):
+            return source.replace('  compatibility:\n', '  compatibility:\n    environment: production\n')
+        problems = audit(widen(a), widen(b))
+        self.assertTrue(any('unreviewed job-level controls' in x for x in problems), problems)
+
     def test_git_blob_hash(self):
         self.assertEqual(git_blob_sha(b'hello\n'), 'ce013625030ba8dba906f756967f9e9ca394464a')
 

@@ -115,6 +115,17 @@ def audit(release: str, preview: str) -> list[str]:
         # pass the cross-workflow job-configuration parity comparison.
         if re.search(r'(?m)^    permissions\s*:', job_config(source) or ''):
             problems.append(f'{name}: job-level permissions override is not reviewed')
+        # Matching changes in both workflows can still introduce unreviewed
+        # execution controls. Job-level conditions can silently skip all
+        # validation, while environment/defaults can alter command behavior.
+        job_controls = re.findall(
+            r'(?m)^    (env|defaults|if|continue-on-error|environment)\s*:',
+            job_config(source) or '',
+        )
+        if job_controls:
+            problems.append(f'{name}: unreviewed job-level controls {job_controls!r}')
+        if re.search(r'(?m)^(?:env|defaults)\s*:', header):
+            problems.append(f'{name}: unreviewed workflow-level env/defaults')
         # Reject duplicate root declarations: the first match can look safe
         # while GitHub/YAML interprets a later declaration differently.
         if len(re.findall(r'(?m)^permissions\s*:', header)) != 1:
