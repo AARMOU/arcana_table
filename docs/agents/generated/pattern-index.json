@@ -796,13 +796,19 @@
    ]
   },
   "DynamicAmounts.distinctEntitiesIn": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Suffer the Past",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SufferThePast.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SufferThePastScenarioTest.kt"
+    },
+    {
+     "card": "Malanthrope",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
+     "lines": 53,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
     }
    ]
   },
@@ -1157,13 +1163,19 @@
    ]
   },
   "Effects.AddDynamicCounters": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Death's Presence",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DeathsPresence.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DeathsPresenceScenarioTest.kt"
+    },
+    {
+     "card": "Malanthrope",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
+     "lines": 53,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
     },
     {
      "card": "Power Depot",
@@ -2405,7 +2417,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -2983,7 +2995,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3887,7 +3899,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 40,
+   "count": 41,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -4294,7 +4306,7 @@
    ]
   },
   "keywords()": {
-   "count": 78,
+   "count": 79,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4539,7 +4551,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -4938,7 +4950,7 @@
    ]
   },
   "CounterType.PLUS_ONE_PLUS_ONE": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Bone Sabres",
@@ -6044,7 +6056,7 @@
    ]
   },
   "EffectTarget.Self": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -6184,7 +6196,7 @@
    ]
   },
   "GameObjectFilter.Any": {
-   "count": 9,
+   "count": 10,
    "examples": [
     {
      "card": "Skittering Cicada",
@@ -6347,7 +6359,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 95,
+   "count": 96,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -6777,7 +6789,7 @@
    ]
   },
   "Player.TargetPlayer": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Suffer the Past",
@@ -6790,6 +6802,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/OblivionSower.kt",
      "lines": 48,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/OblivionSowerScenarioTest.kt"
+    },
+    {
+     "card": "Malanthrope",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
+     "lines": 53,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
     }
    ]
   },
@@ -7210,7 +7228,7 @@
    ]
   },
   "Targets.Player": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Necron Deathmark",
@@ -7235,11 +7253,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimarisEliminator.kt",
      "lines": 45,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimarisEliminatorScenarioTest.kt"
+    },
+    {
+     "card": "Malanthrope",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
+     "lines": 53,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
     }
    ]
   },
   "target(\u2026)": {
-   "count": 62,
+   "count": 63,
    "examples": [
     {
      "card": "Defile",

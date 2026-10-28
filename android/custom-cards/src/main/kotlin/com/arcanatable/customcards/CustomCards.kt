@@ -162,6 +162,7 @@ object CustomCards {
         Entry(TyranidInvasion, "40K", "Six WotC precons"),
         Entry(SanguinaryPriest, "40K", "Six WotC precons"),
         Entry(Venomthrope, "40K", "Six WotC precons"),
+        Entry(Malanthrope, "40K", "Six WotC precons"),
         Entry(TyranidPrime, "40K", "Six WotC precons"),
         Entry(SpaceMarineScout, "40K", "Six WotC precons"),
         Entry(Defile, "MH1", "Six WotC precons"),
