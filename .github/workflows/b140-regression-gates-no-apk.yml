@@ -1,0 +1,155 @@
+name: B140 exact-source full regression gates (NO APK)
+# Source-only audit of the last successful B140 Card Request TEST APK source.
+# This workflow never packages an APK/AAB, signs, deploys, merges, or dispatches workers.
+on:
+  push:
+    branches:
+      - gpt/b140-regression-gates-20261028
+    paths:
+      - .github/workflows/b140-regression-gates-no-apk.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: b140-regression-no-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  source-guard:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify exact B140 test-APK ancestry and workflow-only diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=49d0b8c02a4137ef23ee9bb04b2c2b5f0f9bb4eb
+          git merge-base --is-ancestor "$base" HEAD
+          git diff --name-only "$base" HEAD > /tmp/changed-paths
+          printf '.github/workflows/b140-regression-gates-no-apk.yml\n' > /tmp/expected-paths
+          diff -u /tmp/expected-paths /tmp/changed-paths
+          git diff --check "$base" HEAD
+          echo "PASS: exact B140 source $base plus one isolated CI workflow; NO APK"
+
+  cardkit:
+    needs: source-guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Run Cardkit unit and registration rules
+        run: |
+          python3 -m unittest discover -s tools/cardkit/tests -v
+          tools/cardkit/cardkit check
+      - name: Verify generated SDK and pattern indexes
+        run: |
+          tools/cardkit/cardkit sdk-index --check
+          tools/cardkit/cardkit patterns --check
+          tools/cardkit/cardkit docs-check
+      - name: Audit original six precon coverage
+        run: python3 investigation/argentum-six-precons/coverage-audit.py
+
+  custom-cards:
+    needs: source-guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export cards and execute all real-engine custom-card tests
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards :custom-cards:test
+      - name: Summarize actual custom-card JUnit XML
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          files=list(Path('android/custom-cards/build/test-results/test').glob('TEST-*.xml'))
+          if not files:
+              print('No custom-card XML generated (compile or setup failure).')
+          totals={k:0 for k in ('tests','failures','errors','skipped')}
+          for path in files:
+              root=ET.parse(path).getroot()
+              for key in totals: totals[key]+=int(root.get(key,'0'))
+          print('custom-cards:',len(files),'suites',totals)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b140-custom-card-junit-no-apk
+          retention-days: 14
+          if-no-files-found: warn
+          path: android/custom-cards/build/test-results/test/
+
+  android:
+    needs: source-guard
+    runs-on: ubuntu-24.04
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validate Android regex and launcher
+        run: |
+          python3 -m unittest discover -s tools/tests -p 'test_android_regex.py'
+          python3 tools/check_android_regex.py
+          python3 tools/verify_launcher_branding.py
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Run full Android debug unit suite
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+      - name: Run full Android release unit suite
+        working-directory: android
+        if: always()
+        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest
+      - name: Compile debug and release Kotlin (NO packaging)
+        working-directory: android
+        if: always()
+        run: ./gradlew --no-daemon --max-workers=2 :app:compileDebugKotlin :app:compileReleaseKotlin
+      - name: Summarize actual Android JUnit XML
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for variant in ('testDebugUnitTest','testReleaseUnitTest'):
+              files=list(Path('android/app/build/test-results').joinpath(variant).glob('TEST-*.xml'))
+              totals={k:0 for k in ('tests','failures','errors','skipped')}
+              for path in files:
+                  root=ET.parse(path).getroot()
+                  for key in totals: totals[key]+=int(root.get(key,'0'))
+              print(variant,len(files),'suites',totals)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b140-android-debug-release-junit-no-apk
+          retention-days: 14
+          if-no-files-found: warn
+          path: android/app/build/test-results/
