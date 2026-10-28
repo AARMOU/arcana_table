@@ -1,10 +1,7 @@
 'use strict';
-// Read-only Copilot queue feeder (issue #81, 2026-10-28).
-//
-// Suggests [Arcana Queue] units for cards Cardkit routes to Copilot (SUPPORTED) that no open PR claims
-// and no open queue issue already names. It never creates issues, labels, assignments or comments
-// other than its own status comment: the dispatcher only trusts queue issues written by the owner, so
-// each suggestion carries a prefilled "new issue" link the owner reviews and submits.
+// Cardkit-backed Copilot queue feeder (issue #81).
+// Produces suggestions; in owner's existing normal auto mode it may create ONE unedited
+// Actions-bot issue. Paid assignment is still exclusively the separate guarded dispatcher.
 const A = require('./admission.cjs');
 const F = require('./feasibility.cjs');
 
@@ -41,7 +38,7 @@ function queuePayload({ result, units = [], base, baseSha, now = new Date(), run
   return { checkedAt: now.toISOString(), runId: runId ? String(runId) : null, base: base || null, baseSha: baseSha || null,
     ok: !!result?.ok, reason: result?.reason || null, available: result?.available ?? null,
     alreadyQueued: result?.alreadyQueued || [], suggestions,
-    note: 'Suggestions only. Review, then open the prefilled issue as the owner; the dispatcher still applies every admission, billing, capacity and feasibility gate. Cardkit readiness is routing evidence, not a gameplay certification.' };
+    note: 'Cardkit routing is not gameplay certification. Normal auto mode may queue one card; the dispatcher independently enforces provenance, CI, capacity and billing before spending.' };
 }
 
 function queueSummary(p) {
@@ -50,7 +47,46 @@ function queueSummary(p) {
   return [`Queue feeder: ${ready.length} Copilot-ready card(s) suggested of ${p.available} SUPPORTED and unclaimed on ${String(p.baseSha || '').slice(0, 7)}` +
     (p.alreadyQueued.length ? `; already queued: ${p.alreadyQueued.join(', ')}` : '') + '.',
   ...ready.map(s => `${s.name}: ${s.newIssueUrl ? '[open prefilled queue issue](' + s.newIssueUrl + ')' : 'body in JSON below'}`),
-  'Opening an issue does not dispatch anything by itself; normal-mode dispatch then picks the lowest-numbered eligible unit.'];
+  ...(p.autoQueue?.created ? ['Auto-queued #' + p.autoQueue.issue + ' (' + p.autoQueue.name + '); guarded dispatcher requested.'] :
+    ['Auto-queue: ' + (p.autoQueue?.reason || 'not attempted') + '.'])];
 }
 
-module.exports = { candidates, newIssueUrl, queuePayload, queueSummary };
+
+// Queue at most one new issue per pass, and never when a complete unassigned
+// queue issue already awaits the normal dispatcher. No billable operation here.
+function chooseAutoQueue(payload, openIssues = []) {
+  if (!payload?.ok || !/^[a-f0-9]{40}$/.test(String(payload.baseSha || '')) ||
+      !/^[A-Za-z0-9._/-]+$/.test(String(payload.base || ''))) return { reason: 'invalid-cardkit-result' };
+  const queued = new Set(F.collectNames(openIssues, 1000).map(F.normName));
+  const pending = openIssues.some(i => !i.pull_request && String(i.title || '').startsWith('[Arcana Queue]') &&
+    !(i.assignees || []).some(a => ['copilot', 'copilot-swe-agent[bot]'].includes(String(a.login || '').toLowerCase())) &&
+    A.unitActionable(i.body || '', payload.base).ok);
+  if (pending) return { reason: 'eligible-queue-item-already-waiting' };
+  const s = (payload.suggestions || []).find(x => x.ready && x.body &&
+    A.unitActionable(x.body, payload.base).ok && !queued.has(F.normName(x.name)) &&
+    !openIssues.some(i => !i.pull_request && String(i.title || '') === x.title));
+  return s ? { suggestion: s } : { reason: 'no-unclaimed-ready-card' };
+}
+
+async function createNextAutoQueue({ github, owner, repo, payload, runId, enabled }) {
+  if (!enabled) return { reason: 'normal-auto-dispatch-not-enabled' };
+  if (!payload?.ok) return { reason: 'cardkit-suggestions-unavailable' };
+  if (!/^[0-9]+$/.test(String(runId))) return { reason: 'invalid-run-id' };
+  if (!/^[a-f0-9]{40}$/.test(String(payload.baseSha || '')) ||
+      !/^[A-Za-z0-9._/-]+$/.test(String(payload.base || ''))) return { reason: 'invalid-base-provenance' };
+  const head = (await github.rest.repos.getBranch({ owner, repo, branch: payload.base })).data.commit.sha;
+  if (head !== payload.baseSha) return { reason: 'integration-base-moved' };
+  const open = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
+  const pick = chooseAutoQueue(payload, open);
+  if (!pick.suggestion) return { reason: pick.reason };
+  const s = pick.suggestion;
+  const body = [A.AUTO_QUEUE_MARKER,
+    '<!-- source: trusted-main-queue-feeder; run:' + runId + '; base-sha:' + payload.baseSha + ' -->',
+    s.body.trim(), ''].join('\n');
+  const issue = (await github.rest.issues.create({ owner, repo, title: s.title, body })).data;
+  if (issue.user?.login !== 'github-actions[bot]' || issue.user?.type !== 'Bot')
+    throw Error('auto-queue-issuer-not-github-actions-bot; no dispatch');
+  return { created: true, issue: issue.number, name: s.name, url: issue.html_url };
+}
+
+module.exports = { candidates, newIssueUrl, queuePayload, queueSummary, chooseAutoQueue, createNextAutoQueue };
