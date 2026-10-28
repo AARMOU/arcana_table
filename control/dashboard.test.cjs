@@ -92,3 +92,4 @@ test('Copilot lifecycle distinguishes assignment, pickup, agent running and fini
   assert.match(stage(pr,{status:'completed',conclusion:'failure'},'confirmed').label,/Run failure/);
   assert.equal(stage(null,null,'recent').label,'Recently finished');
 });
+test('queue feeder suggestions render with repo-only new-issue links',()=>{assert.ok(script.includes("d.kind==='queue'"));assert.match(html,/id="queueList"/);assert.ok(script.includes("s.newIssueUrl.startsWith(ROOT+'/issues/new?')"));});

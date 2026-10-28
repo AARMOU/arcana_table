@@ -267,7 +267,7 @@ function dispatchGithub({ issues = [issue(70)], prs = [], comments = {} } = {}) 
 }
 const coreStub = () => ({ log: [], info() {}, warning() {}, setFailed() {}, summary: { addHeading() { return this; }, addCodeBlock() { return this; }, addRaw() { return this; }, async write() {} } });
 const wfEnv = (x = {}) => ({ ARCANA_AUTOMATION_READY: 'true', ARCANA_DISPATCH_MODE: 'normal', ARCANA_INTEGRATION_BASE: BASE,
-  COPILOT_DISPATCH_TOKEN: 't', ...x });
+  COPILOT_DISPATCH_TOKEN: 't', ARCANA_FEASIBILITY: JSON.stringify({ schema: 1, baseSha: 'c'.repeat(40), cards: { 'eldrazi monument': { name: 'Eldrazi Monument', readiness: 'SUPPORTED', route: 'copilot' } } }), ...x });
 const goodBudget = async () => ({ snapshot: { account: 'AARMOU', metric: 'ai_credits', period: '2026-10', used: 450, reportedUsed: 300, reserved: 150,
   allowance: 1500, measuredAt: new Date().toISOString() }, status: { level: 'normal' }, error: null });
 
@@ -330,7 +330,7 @@ test('label-event trigger is limited to control labels on main and keeps the rea
   const y = fs.readFileSync('.github/workflows/arcana-card-dispatcher.yml', 'utf8');
   assert.match(y, /issues:\n    types: \[labeled\]/);
   assert.match(y, /github\.ref == 'refs\/heads\/main'/);
-  assert.match(y, /\["arcana:authorize-once","wu:resolve-interrupted","wu:halted"\]/);
+  assert.match(y, /\["arcana:authorize-once","wu:resolve-interrupted","wu:halted","arcana:feasibility-reviewed"\]/);
   assert.match(y, /dry_run:/);
   assert.doesNotMatch(y, /ARCANA_AUTOMATION_READY: ['"]?true/);
   assert.match(y, /ARCANA_AUTOMATION_READY: \$\{\{ vars\.ARCANA_AUTOMATION_READY \}\}/);

@@ -4,6 +4,7 @@
 // only the Copilot assignment call uses the owner's dispatch token.
 const A = require('./admission.cjs');
 const { loadUnits, isCopilot, contentWrittenAt, approvalOf, commentersOf } = require('./units.cjs');
+const F = require('./feasibility.cjs');
 
 // Re-reads the issue right before the paid call so an edit, rename, new or edited comment, or a
 // body that no longer passes the readiness rules stops the assignment, even if it happened after
@@ -136,6 +137,10 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
     return done('ci-not-ready', { base, baseSha });
   }
 
+  // Engine feasibility (Cardkit on this exact base SHA). Missing or stale verdicts fail closed.
+  const verdicts = F.parseVerdicts(env.ARCANA_FEASIBILITY);
+  const feasible = u => F.assess({ body: u.raw.body, override: u.raw.feasibilityOverride, approvers, verdicts, baseSha });
+  report.feasibility = verdicts ? { baseSha: verdicts.baseSha, classified: Object.keys(verdicts.cards).length } : { unavailable: true };
   const labeled = data.units.filter(u => u.raw.labels.includes(A.ONE_SHOT_LABEL));
   let candidate;
   if (ready.dispatch === 'authorize-once') {
@@ -145,7 +150,7 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
     // Untrusted issues are never candidates, so they can't spend credits or hold up the queue.
     // Incomplete issues are skipped (and reported), so one unfinished issue can't block the whole queue.
     candidate = data.units.filter(u => u.derived.state === 'queued' && u.raw.title.startsWith('[Arcana Queue]') &&
-      !u.prs.length && u.derived.provenance?.ok && A.unitActionable(u.raw.body, base).ok)
+      !u.prs.length && u.derived.provenance?.ok && A.unitActionable(u.raw.body, base).ok && feasible(u).ok)
       .sort((a, b) => a.raw.number - b.raw.number)[0];
   }
   if (!candidate) {
@@ -155,12 +160,21 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
       u.derived.skip = !u.raw.title.startsWith('[Arcana Queue]') ? 'not-a-queue-issue'
         : u.prs.length ? 'has-open-pr ' + u.prs.map(p => '#' + p.number).join(',')
           : !u.derived.provenance?.ok ? 'untrusted-origin: ' + (u.derived.provenance?.reasons || []).join(',')
-            : !A.unitActionable(u.raw.body, base).ok ? 'not-actionable: ' + A.unitActionable(u.raw.body, base).missing.join(',') : 'not-labeled';
+            : !A.unitActionable(u.raw.body, base).ok ? 'not-actionable: ' + A.unitActionable(u.raw.body, base).missing.join(',')
+              : !feasible(u).ok ? 'feasibility: ' + feasible(u).reason : 'not-labeled';
     }
     return done('nothing-eligible');
   }
 
   const n = candidate.raw.number;
+  // authorize-once names its unit explicitly, so the gate denies instead of skipping.
+  const feas = feasible(candidate);
+  report.candidateFeasibility = { issue: n, ok: feas.ok, reason: feas.reason, cards: feas.cards.map(c => ({ name: c.name, readiness: c.readiness, route: c.route, hint: c.hint || null })) };
+  // An incomplete unit is denied by admission with its own, more specific reason.
+  if (!feas.ok && A.unitActionable(candidate.raw.body, base).ok) {
+    await core.summary.addHeading('Feasibility gate').addCodeBlock(JSON.stringify(report.candidateFeasibility)).write();
+    return done('denied', { issue: n, reason: 'feasibility: ' + feas.reason });
+  }
   // Non-spending preflight: dry-run proves the edit-history lookup works from Actions before any
   // one-shot relies on it (a failure there would refuse every one-shot unit).
   if (dry) {

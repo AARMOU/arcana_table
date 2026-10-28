@@ -16,23 +16,26 @@ const STATUS_ISSUE = 78;
 const MARKERS = {
   billing: '<!-- arcana-control-status-v1:billing -->',
   dispatcher: '<!-- arcana-control-status-v1:dispatcher -->',
+  queue: '<!-- arcana-control-status-v1:queue -->',
 };
 const MAX_UNITS_LISTED = 40;
 const isBot = c => c?.user?.type === 'Bot' && c?.user?.login === 'github-actions[bot]';
 const round = x => Number.isFinite(x) ? Math.round(x * 100) / 100 : null;
 
 // Strip anything that could notify people or break the fenced JSON block.
-function clean(value) {
-  if (typeof value === 'string') return value.replace(/@/g, '＠').replace(/`/g, "'").slice(0, 400);
-  if (Array.isArray(value)) return value.map(clean);
-  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, clean(v)]));
+// Queue suggestions carry full issue bodies and prefilled links, so they get a larger limit.
+function clean(value, max = 400) {
+  if (typeof value === 'string') return value.replace(/@/g, '＠').replace(/```/g, "'''").slice(0, max);
+  if (Array.isArray(value)) return value.map(v => clean(v, max));
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, clean(v, max)]));
   return value;
 }
 
 function formatStatus(kind, payload, summary = []) {
   if (!MARKERS[kind]) throw Error('invalid-status-kind');
-  const data = clean({ ...payload, kind, schema: 1 });
-  const lines = summary.map(l => '- ' + clean(String(l)));
+  const max = kind === 'queue' ? 8000 : 400;
+  const data = clean({ ...payload, kind, schema: 1 }, max);
+  const lines = summary.map(l => '- ' + clean(String(l), max));
   return [MARKERS[kind],
     `**Arcana Control status — ${kind}** (maintained automatically; edited in place; read by https://aarmou.github.io/arcana_table/control/)`,
     ...lines, '', '```json', JSON.stringify(data, null, 1), '```'].join('\n');
@@ -120,11 +123,14 @@ function dispatcherAction(state, reason = '') {
     case 'base-not-configured': return 'Owner: set ARCANA_INTEGRATION_BASE to the integration branch name.';
     case 'ci-not-ready': return 'Wait: the integration base head has no successful "Arcana Development CI" run yet.';
     case 'authorize-once-needs-exactly-one-label': return 'Owner: in authorize-once mode, add the arcana:authorize-once label to exactly one [Arcana Queue] issue.';
-    case 'nothing-eligible': return 'None: no queued, trusted [Arcana Queue] issue without an open PR. See skipped units.';
+    case 'nothing-eligible': return 'Queue empty: no queued, trusted, complete, Copilot-ready [Arcana Queue] issue without an open PR. See skipped units, and the Queue Feeder suggestions on #78 for cards ready to queue.';
     case 'label-removal-failed': return 'Owner: the one-shot label could not be removed; review the attempt in #81.';
     case 'dry-run': return 'None: dry run only. The admission decision is shown; nothing was assigned.';
     case 'attempted': return null;
     case 'denied':
+      if (r.startsWith('feasibility: feasibility-unavailable') || r.startsWith('feasibility: feasibility-stale'))
+        return 'Wait/inspect: the Cardkit feasibility job did not produce verdicts for this base SHA. Check the dispatcher run\'s feasibility job.';
+      if (r.startsWith('feasibility')) return 'Owner: this unit\'s cards are not Copilot-ready per Cardkit (engine gap or review needed). Route it to the engine lane, or, after reviewing it yourself, add the arcana:feasibility-reviewed label to dispatch anyway.';
       if (r.startsWith('budget')) return 'Wait: billing headroom (including reserve and pending liabilities) does not allow new work. See billing.';
       if (r.startsWith('capacity')) return 'Wait for active units to finish. A unit stuck in pickup-timeout or session-stale can be released by the owner with the wu:halted label.';
       if (r.startsWith('untrusted-origin')) return 'Owner: the issue has content from untrusted accounts; edit/remove it or open a clean issue.';
@@ -194,6 +200,7 @@ function dispatcherPayload({ result, report = {}, ready, now = new Date(), runId
     dispatchReady, workers: report.units ? summarizeUnits(report.units) : null,
     decision: publicDecision(report.decision), liabilities: publicLiabilities(report.decision?.budget?.liabilities),
     base: report.base || null, ciRuns: report.ciRuns || null,
+    feasibility: report.feasibility || null, candidateFeasibility: report.candidateFeasibility || null,
   };
 }
 
