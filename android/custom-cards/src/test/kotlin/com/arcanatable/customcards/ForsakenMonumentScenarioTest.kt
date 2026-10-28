@@ -213,6 +213,34 @@ class ForsakenMonumentScenarioTest {
         assertEquals("colored Eldrazi does not receive the anthem", 1 to 1, d.stats(permanent!!))
     }
 
+    @Test fun puttingAColorlessCreatureDirectlyOntoBattlefieldIsNotCasting() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val creature = d.putCreatureOnBattlefield(d.player1, "Monument Colorless Probe")
+        assertEquals("the colorless creature still receives Monument's anthem", 5 to 5, d.stats(creature))
+        d.resolveAll()
+        assertEquals("entering without being cast must not create a cast trigger", before, d.getLifeTotal(d.player1))
+    }
+
+    @Test fun eachSeparateColorlessCastGainsExactlyTwoLife() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+
+        val first = d.putCardInHand(d.player1, "Monument Colorless Probe")
+        d.giveColorlessMana(d.player1, 2)
+        assertNull(d.castSpell(d.player1, first).error)
+        d.resolveStack()
+        assertEquals("the first colorless spell generates one trigger", before + 2, d.getLifeTotal(d.player1))
+
+        val second = d.putCardInHand(d.player1, "Sol Ring")
+        d.giveColorlessMana(d.player1, 1)
+        assertNull(d.castSpell(d.player1, second).error)
+        d.resolveStack()
+        assertEquals("the second colorless spell generates its own trigger", before + 4, d.getLifeTotal(d.player1))
+    }
+
     @Test fun coloredSpellsGainNoLife() {
         val d = setup()
         d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
