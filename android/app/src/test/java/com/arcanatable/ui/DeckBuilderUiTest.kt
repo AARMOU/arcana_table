@@ -1,6 +1,7 @@
 package com.arcanatable.ui
 
 import androidx.activity.ComponentActivity
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -46,7 +47,42 @@ class DeckBuilderUiTest {
 
     private val catalog by lazy { SupportedCardCatalog.load { File("src/main/assets", it).takeIf(File::exists)?.inputStream() } }
 
+    private fun markBuilderIntroSeen() {
+        rule.activity.getSharedPreferences("arcana_options", Context.MODE_PRIVATE)
+            .edit().putBoolean("deck_builder_intro_seen_v1", true).commit()
+    }
+
+    @Test @Config(sdk = [34], qualifiers = "w344dp-h882dp-port-xxhdpi")
+    fun firstOpenExplainsLibraryLimitationsAndDoesNotRepeat() {
+        val prefs = rule.activity.getSharedPreferences("arcana_options", Context.MODE_PRIVATE)
+        prefs.edit().remove("deck_builder_intro_seen_v1").commit()
+        var visible by mutableStateOf(true)
+        rule.setContent {
+            if (visible) DeckManagerDialog(
+                decks = emptyList(),
+                loadCatalog = { catalog },
+                onDecksChanged = {},
+                onPlay = {},
+                onDismiss = { visible = false },
+            )
+        }
+        rule.onNodeWithText("About the Deck Builder").assertExists()
+        rule.onNodeWithText("Arcana's card library is growing.", substring = true).assertExists()
+        rule.onNodeWithTag("deck-builder-intro-continue").performClick()
+        rule.waitForIdle()
+        assertTrue(prefs.getBoolean("deck_builder_intro_seen_v1", false))
+        rule.onNodeWithText("About the Deck Builder").assertDoesNotExist()
+
+        rule.runOnIdle { visible = false }
+        rule.waitForIdle()
+        rule.runOnIdle { visible = true }
+        rule.waitForIdle()
+        rule.onNodeWithText("About the Deck Builder").assertDoesNotExist()
+        rule.onNodeWithTag("deck-new").assertExists()
+    }
+
     private fun buildDeck(name: String, folded: Boolean) {
+        markBuilderIntroSeen()
         var decks by mutableStateOf(listOf<SavedDeck>())
         rule.setContent {
             DeckManagerDialog(decks = decks, loadCatalog = { catalog }, onDecksChanged = { decks = it }, onPlay = {}, onDismiss = {})
@@ -90,6 +126,7 @@ class DeckBuilderUiTest {
 
     /** Deck library tiles, search, delete with undo; then the FILTERS panel and the card grid. */
     @Test @Config(sdk = [34], qualifiers = "w344dp-h882dp-port-xxhdpi") fun libraryTilesAndFiltersPanel() {
+        markBuilderIntroSeen()
         var decks by mutableStateOf(listOf(
             SavedDeck("Goblins", "Commander\n1 Krenko, Mob Boss\nDeck\n1 Sol Ring\n", "Krenko, Mob Boss", updatedAt = System.currentTimeMillis(), tags = listOf("Casual")),
             SavedDeck("Lands", "Deck\n1 Forest\n", updatedAt = 1L),

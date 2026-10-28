@@ -140,6 +140,26 @@ import kotlinx.coroutines.CoroutineScope
 /** Overlays and dialogs drawn over the table (part 2: rooms, lobby, deck import, local-rules dialogs). */
 @Composable
 internal fun TableController.TableOverlaysB() {
+    var cardRequestOpen by remember { mutableStateOf(false) }
+    var cardRequestVisibleCount by remember { mutableIntStateOf(40) }
+    var cardRequestSelected by remember { mutableStateOf<Set<String>>(emptySet()) }
+    var cardRequestSending by remember { mutableStateOf(false) }
+    var cardRequestFeedback by remember { mutableStateOf<String?>(null) }
+    var cardRequestCompleted by remember { mutableStateOf(false) }
+    var cardRequestId by remember { mutableStateOf(java.util.UUID.randomUUID().toString()) }
+    val cardRequestNames = remember(importText, supportCatalog) {
+        if (importText.isBlank()) emptyList()
+        else supportCatalog?.check(parseDeckList(importText))?.unsupportedNames.orEmpty()
+    }
+    val openCardRequest: () -> Unit = {
+        cardRequestVisibleCount = 40
+        cardRequestSelected = cardRequestNames.take(10).toSet()
+        cardRequestId = java.util.UUID.randomUUID().toString()
+        cardRequestSending = false
+        cardRequestCompleted = false
+        cardRequestFeedback = null
+        cardRequestOpen = true
+    }
             Box(Modifier.fillMaxSize()) {
 
 
@@ -456,25 +476,18 @@ internal fun TableController.TableOverlaysB() {
                         Text("Paste a deck list or choose a .txt/.csv file. Import replaces this player's deck.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                         TextButton(onClick = { run { savedDecksOpen = true } }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp)) { Text("SAVED DECKS · ${savedDecks.size}", color = Mint) }
                         Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            OutlinedButton(onClick = { run { filePicker.launch(arrayOf("text/*", "application/*")) } }, enabled = !importing && !argentumDeckLoading, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("CHOOSE FILE", fontSize = 9.sp) }
-                            OutlinedButton(
+                            OutlinedButton(onClick = { run { filePicker.launch(arrayOf("text/*", "application/*")) } }, enabled = !importing, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("CHOOSE FILE", fontSize = 9.sp) }
+                            if (DeckBuilderFlag.enabled) OutlinedButton(
                                 onClick = { run {
-                                    argentumDeckLoading = true
-                                    importError = null
-                                    scope.launch {
-                                        try {
-                                            val decks = withContext(Dispatchers.IO) { ArgentumDeckApi(argentumOrigin).commanderExamples() }
-                                            argentumDeckOptions = decks
-                                            if (decks.isEmpty()) importError = "Argentum did not return any Commander examples that pass its current deck validator."
-                                            else argentumDeckPickerOpen = true
-                                        } catch (error: Exception) {
-                                            importError = error.message ?: "Could not load Argentum's premade decks. Check your connection and try again."
-                                        } finally { argentumDeckLoading = false }
+                                    if (!importing) {
+                                        deckBuilderReturnToImport = true
+                                        importOpen = false
+                                        deckBuilderOpen = true
                                     }
                                 } },
-                                enabled = !importing && !argentumDeckLoading,
-                                modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                            ) { Text(if (argentumDeckLoading) "LOADING…" else "ARGENTUM DECKS", fontSize = 9.sp, color = Mint) }
+                                enabled = !importing,
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("import-open-deck-builder")
+                            ) { Text("DECK BUILDER", fontSize = 9.sp, color = Mint) }
                         }
                         OutlinedTextField(
                             value = importText,
@@ -483,7 +496,7 @@ internal fun TableController.TableOverlaysB() {
                             placeholder = { Text("1 Sol Ring\n36 Island\n...") },
                             minLines = 5,
                             maxLines = 10,
-                            enabled = !importing && !argentumDeckLoading
+                            enabled = !importing
                         )
                         if (importText.isNotBlank()) {
                             val importedCardCount = remember(importText) { parseDeckList(importText).sumOf { it.count } }
@@ -496,6 +509,16 @@ internal fun TableController.TableOverlaysB() {
                                     "Not in Argentum: ${supportReport.unsupportedNames.take(8).joinToString()}${if (supportReport.unsupportedNames.size > 8) ", +${supportReport.unsupportedNames.size - 8} more" else ""}",
                                     color = CounterGold, fontSize = 10.sp, maxLines = 3, overflow = TextOverflow.Ellipsis
                                 )
+                                if (supportReport.unsupportedNames.isNotEmpty()) {
+                                    OutlinedButton(
+                                        onClick = openCardRequest,
+                                        enabled = !importing,
+                                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp).heightIn(min = 48.dp)
+                                    ) {
+                                        Text("REQUEST MISSING CARDS (" + supportReport.unsupportedNames.size + ")", fontSize = 11.sp, color = Mint)
+                                    }
+                                    Text("Optional. Review the names before submitting a public card request.", fontSize = 10.sp, color = Muted)
+                                }
                             } else Text(if (supportCatalogFailed) "Argentum library check unavailable in this build." else "Checking Argentum's card library…", color = Muted, fontSize = 10.sp)
                         }
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -507,7 +530,7 @@ internal fun TableController.TableOverlaysB() {
                         if (importing) Text("Matching card names and trying automatic fixes…", color = Mint, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                             TextButton(onClick = { run { if (!importing) cancelDeckImport() } }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
-                            Button(onClick = { run { importDeck(importText) } }, enabled = !importing && !argentumDeckLoading, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (importing || argentumDeckLoading) "LOADING" else "IMPORT") }
+                            Button(onClick = { run { importDeck(importText) } }, enabled = !importing, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (importing) "LOADING" else "IMPORT") }
                         }
                     }
                 }
@@ -515,36 +538,94 @@ internal fun TableController.TableOverlaysB() {
         }
     }
 
-    if (argentumDeckPickerOpen) Dialog(onDismissRequest = { argentumDeckPickerOpen = false }) {
-        Surface(
-            Modifier.fillMaxWidth(0.96f).heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.78f),
-            shape = RoundedCornerShape(18.dp), color = Panel
-        ) {
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("ARGENTUM COMMANDER DECKS", color = SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text("These lists come from Argentum and passed its live Commander deck validator.", color = Muted, fontSize = 12.sp)
-                argentumDeckOptions.forEach { deck ->
-                    Surface(
-                        Modifier.fillMaxWidth().clickable {
-                            importText = deck.asImportText()
-                            importError = null
-                            // The list is now in the import box above; no pop-up needed.
-                            argentumDeckPickerOpen = false
-                        },
-                        shape = RoundedCornerShape(12.dp), color = PanelLight, border = BorderStroke(1.dp, Muted.copy(alpha = 0.35f))
-                    ) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(deck.name, color = Mint, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text("Commander · ${deck.commander} · 100 cards", color = SoftWhite, fontSize = 11.sp)
-                            if (deck.description.isNotBlank()) Text(deck.description, color = Muted, fontSize = 11.sp)
-                            deck.note?.let { Text(it, color = Color(0xFFFFD271), fontSize = 10.sp) }
-                        }
+
+    // Requests never change the deck or start a paid card-implementation worker.
+    if (cardRequestOpen) AlertDialog(
+        onDismissRequest = { if (!cardRequestSending) cardRequestOpen = false },
+        title = { Text("Request missing cards") },
+        text = {
+            Column(
+                modifier = Modifier.heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.55f)
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text("Choose unsupported card names to share with Arcana's public request tracker. We never send your decklist, name, room, or device details.",
+                    color = Muted, fontSize = 12.sp)
+                if (cardRequestNames.size > 10) {
+                    Text("Select up to 10 names per request. You can request the others separately.",
+                        color = CounterGold, fontSize = 11.sp)
+                }
+                cardRequestNames.take(cardRequestVisibleCount).forEach { name ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(
+                            checked = name in cardRequestSelected,
+                            enabled = !cardRequestSending && !cardRequestCompleted,
+                            onCheckedChange = { checked ->
+                                cardRequestSelected = when {
+                                    checked && cardRequestSelected.size < 10 -> cardRequestSelected + name
+                                    !checked -> cardRequestSelected - name
+                                    else -> cardRequestSelected
+                                }
+                            }
+                        )
+                        Text(name, color = SoftWhite, fontSize = 12.sp, modifier = Modifier.weight(1f))
                     }
                 }
-                TextButton(onClick = { argentumDeckPickerOpen = false }, modifier = Modifier.align(Alignment.End).heightIn(min = 44.dp)) { Text("CLOSE", color = Muted) }
+                if (cardRequestNames.size > cardRequestVisibleCount) {
+                    TextButton(
+                        onClick = { cardRequestVisibleCount = (cardRequestVisibleCount + 40).coerceAtMost(cardRequestNames.size) },
+                        enabled = !cardRequestSending && !cardRequestCompleted
+                    ) { Text("SHOW MORE (${cardRequestNames.size - cardRequestVisibleCount} remaining)", color = Mint) }
+                }
+                if (!CardRequestApi.isConfigured) Text(
+                    "This build does not yet have a request service configured. No information has been sent.",
+                    color = CounterGold, fontSize = 11.sp
+                )
+                cardRequestFeedback?.let { Text(it, fontSize = 12.sp, color = if (cardRequestCompleted) Mint else CounterGold) }
+                if (cardRequestSending) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             }
-        }
-    }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (cardRequestCompleted) {
+                        cardRequestOpen = false
+                    } else {
+                        val stillMissing = supportCatalog?.check(parseDeckList(importText))?.unsupportedNames.orEmpty().toSet()
+                        val namesToSend = cardRequestSelected.filter { it in stillMissing }
+                        if (namesToSend.isEmpty()) {
+                            cardRequestFeedback = "All selected names are now indexed. Nothing was sent."
+                        } else {
+                            cardRequestSending = true
+                            cardRequestFeedback = null
+                            scope.launch {
+                                try {
+                                    val receipt = CardRequestApi.submit(namesToSend, cardRequestId)
+                                    cardRequestCompleted = true
+                                    cardRequestFeedback = if (receipt.pending)
+                                        "Request queued. GitHub tracker update is pending; no need to resubmit."
+                                    else "Submitted " + receipt.accepted + " card name(s) to Arcana's request tracker."
+                                } catch (error: Exception) {
+                                    cardRequestFeedback = error.message ?: "Submission failed. You can retry without losing your deck."
+                                } finally {
+                                    cardRequestSending = false
+                                }
+                            }
+                        }
+                    }
+                },
+                enabled = !cardRequestSending && (cardRequestCompleted ||
+                    (CardRequestApi.isConfigured && cardRequestSelected.isNotEmpty()))
+            ) { Text(if (cardRequestCompleted) "DONE" else if (cardRequestSending) "SENDING…" else "SEND REQUEST", color = Mint) }
+        },
+        dismissButton = { TextButton(
+            enabled = !cardRequestSending,
+            onClick = { cardRequestOpen = false }
+        ) { Text(if (cardRequestCompleted) "CLOSE" else "CANCEL") } },
+        containerColor = Panel,
+        titleContentColor = SoftWhite,
+        textContentColor = Muted
+    )
 
     if (savedDecksOpen) SavedDecksDialog(
         decks = savedDecks,
@@ -666,6 +747,7 @@ internal fun TableController.TableOverlaysB() {
                                 importReviewMessage = "Removed ${overflow.size} card(s) over the deck limit."
                             }
                         ) { Text("TRIM EXCESS", color = Mint) }
+                    if (cardRequestNames.isNotEmpty()) TextButton(onClick = openCardRequest, enabled = !importAutoFixInProgress) { Text("REQUEST MISSING CARDS", color = Mint) }
                     if (cardsNeedingReview.isNotEmpty()) TextButton(onClick = { if (!importAutoFixInProgress) { importReviewOpen = false; deckEditorOpen = true } }, enabled = !importAutoFixInProgress, modifier = Modifier.heightIn(min = 48.dp)) {
                         Text("OPEN EDITOR", color = Mint)
                     }
