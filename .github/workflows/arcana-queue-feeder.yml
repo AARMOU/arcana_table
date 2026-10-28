@@ -30,7 +30,7 @@ jobs:
   suggest:
     # Integration-base Cardkit runs here with a read-only token and no repository secrets.
     if: >-
-      ${{ vars.ARCANA_INTEGRATION_BASE != '' &&
+      ${{ vars.ARCANA_INTEGRATION_BASE != '' && (
       (github.event_name != 'pull_request_target' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'pull_request_target' &&
       github.event.pull_request.user.login == 'Copilot' &&
@@ -128,7 +128,7 @@ jobs:
   publish:
     needs: suggest
     if: >-
-      ${{ !cancelled() && vars.ARCANA_INTEGRATION_BASE != '' &&
+      ${{ !cancelled() && vars.ARCANA_INTEGRATION_BASE != '' && (
       (github.event_name != 'pull_request_target' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'pull_request_target' &&
       github.event.pull_request.user.login == 'Copilot' &&

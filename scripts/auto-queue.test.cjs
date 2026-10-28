@@ -184,3 +184,27 @@ test('Copilot PR wakeups are restricted to trusted main code and the configured 
   assert.ok(workflow.includes("createWorkflowDispatch({...context.repo,workflow_id:'arcana-card-dispatcher.yml'"),
     'new work must still go through the guarded dispatcher, not a browser or Copilot direct call');
 });
+
+
+test('feeder pull_request_target expressions are syntactically balanced and scoped to configured base on both jobs', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const workflow = fs.readFileSync(path.join(__dirname, '../.github/workflows/arcana-queue-feeder.yml'), 'utf8');
+  const blocks = [...workflow.matchAll(/^\s+if: >-\n([\s\S]*?)^\s+runs-on:/gm)]
+    .map(m => m[1]).filter(s => s.includes("github.event.pull_request.user.login"));
+  assert.equal(blocks.length, 2, 'classify and publish must each have the exact event predicate');
+  for (const block of blocks) {
+    const expr = block.slice(block.indexOf('$' + '{{')+3, block.indexOf('}}'));
+    assert.match(expr, /vars\.ARCANA_INTEGRATION_BASE != '' && \(\s*\(/,
+      'configured integration base must scope BOTH normal and Copilot PR events');
+    let depth = 0;
+    for (const ch of expr) {
+      if (ch === '(') depth++;
+      if (ch === ')') {
+        depth--;
+        assert.ok(depth >= 0, 'unexpected closing parenthesis in workflow guard');
+      }
+    }
+    assert.equal(depth, 0, 'unbalanced parentheses: GitHub rejects workflow before jobs start');
+  }
+});
