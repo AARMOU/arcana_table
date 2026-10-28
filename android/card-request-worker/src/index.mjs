@@ -151,7 +151,9 @@ export class CardRequestQueue {
     const seen = (await this.state.storage.get("seen")) || {};
     for (const [id, when] of Object.entries(seen))
       if (now - when > 48 * 3600_000) delete seen[id];
-    if (seen[parsed.requestId]) return respond({ ok: true, duplicate: true, tracker: TRACKER, accepted: 0 });
+    // Scope idempotency to the anonymous client, not the globally shared request ID.
+    const seenKey = client + ":" + parsed.requestId;
+    if (seen[seenKey]) return respond({ ok: true, duplicate: true, tracker: TRACKER, accepted: 0 });
     const day = new Date(now).toISOString().slice(0, 10);
     const rateKey = "rate:" + day + ":" + client;
     const globalKey = "rate-global:" + day;
@@ -169,7 +171,7 @@ export class CardRequestQueue {
       record.count++;
       records[key] = record;
     }
-    seen[parsed.requestId] = now;
+    seen[seenKey] = now;
     await this.state.storage.put("records", records);
     await this.state.storage.put("seen", seen);
     await this.state.storage.put(rateKey, rate + 1);

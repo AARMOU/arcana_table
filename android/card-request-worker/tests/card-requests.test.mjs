@@ -87,3 +87,26 @@ test("daily global intake limit also bounds many distinct clients", async () => 
   assert.equal(store.values.get("rate-global:"+day),60);
  } finally { globalThis.fetch = original; }
 });
+
+test("idempotency is per anonymous client, not global", async () => {
+ const previousFetch = globalThis.fetch, calls = [];
+ globalThis.fetch = async (url, opts) => {
+  calls.push({url, opts});
+  return {ok:true, json:async()=>({id:314})};
+ };
+ try {
+  const store = storage();
+  const queue = new CardRequestQueue({storage:store},{GITHUB_REQUESTS_TOKEN:"fake"});
+  const requestId = "12345678-1234-4234-8234-123456789abc";
+  const send = client => queue.fetch(new Request("https://internal/submit", {
+   method:"POST", headers:{"x-opaque-client":client},
+   body:JSON.stringify({requestId,cardNames:["Goblin Welder"]})
+  }));
+  const a = "c".repeat(64), b = "d".repeat(64);
+  assert.equal((await send(a)).status,200);
+  assert.equal((await send(b)).status,200);
+  assert.equal((await (await send(a)).json()).duplicate,true);
+  assert.equal(store.values.get("records")["goblin welder"].count,2);
+  assert.equal(calls.length,2);
+ } finally {globalThis.fetch=previousFetch;}
+});
