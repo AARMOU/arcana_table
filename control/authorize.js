@@ -82,7 +82,7 @@ function render(container, units, checkedAt) {
         const live = await call('/v1/authorization?issue=' + unit.n, token, 'GET');
         if (live.status !== 200 || !live.body?.ok) throw Error('Owner status unavailable');
         const info = live.body;
-        link.textContent = '#' + unit.n + ' · ' + String(info.title || '').replace(/^\\[Arcana Queue\\]\\s*/, '');
+        link.textContent = '#' + unit.n + ' · ' + String(info.title || '').replace(/^\[Arcana Queue\]\s*/, '');
         if (info.authorized) {
           button.disabled = true; button.textContent = 'Authorized';
           message.textContent = 'Authorization recorded — waiting for guarded dispatcher' +
@@ -110,7 +110,7 @@ function render(container, units, checkedAt) {
         if (!container.children.length) container.append(el('div', 'empty', 'No queued card units currently waiting.'));
         return;
       }
-      link.textContent = '#' + unit.n + ' · ' + info.title.replace(/^\\[Arcana Queue\\]\\s*/, '');
+      link.textContent = '#' + unit.n + ' · ' + info.title.replace(/^\[Arcana Queue\]\s*/, '');
       if ((info.labels || []).some(l => l.name === 'arcana:authorize-once')) {
         button.disabled = true; button.textContent = 'Authorized';
         message.textContent = 'Authorization recorded — waiting for guarded dispatcher.';
