@@ -98,18 +98,51 @@ async function resolveInterrupted({ github, owner, repo, unit, runId }) {
 // One selected owner authorization ALWAYS wins over the ordinary lowest-numbered normal
 // candidate. Without this, a dashboard tap on #379 in normal mode could dispatch #100.
 // Multiple labels fail closed. Feasibility/provenance/billing are checked AFTER selection.
+// The dispatcher's own reason a queued unit cannot be assigned, or null when it is eligible.
+// Published per unit to Arcana Control, which shows it instead of re-deriving eligibility.
+function skipReason(u, base, feasible, actionable = A.unitActionable) {
+  if (!u.raw.title.startsWith('[Arcana Queue]')) return 'not-a-queue-issue';
+  if (u.prs.length) return 'has-open-pr ' + u.prs.map(p => '#' + p.number).join(',');
+  if (!u.derived.provenance?.ok) return 'untrusted-origin: ' + (u.derived.provenance?.reasons || []).join(',');
+  const act = actionable(u.raw.body, base);
+  if (!act.ok) return 'not-actionable: ' + (act.missing || []).join(',');
+  const feas = feasible(u);
+  if (!feas.ok) return 'feasibility: ' + (feas.reason || 'not Copilot-ready');
+  return null;
+}
+
+// A refusal about the WORK ITSELF that no later run can fix (incomplete unit, Cardkit says not
+// Copilot-ready, already in an open PR). Only these clear a pending one-shot approval. Capacity,
+// budget, CI, lookups that were merely unavailable, and provenance/approval problems (a security
+// signal the owner must see) keep the existing deny-and-keep-label behavior.
+const TRANSIENT = /unavailable|feasibility-stale/;
+const permanentRefusal = reason => !!reason && /^(not-a-queue-issue|has-open-pr|not-actionable|feasibility)/.test(reason) &&
+  !TRANSIENT.test(reason);
+
 function selectCandidate(allUnits, mode, base, feasible, actionable = A.unitActionable) {
   const labeled = allUnits.filter(u => u.raw.labels.includes(A.ONE_SHOT_LABEL));
+  // An approval the dispatcher can never honor is cleared instead of pinning the queue forever.
+  // Nothing else is dispatched in the same run: the owner sees the reason first.
+  const impossible = u => {
+    if (u.derived.state !== 'queued') return null; // admission reports other states as before
+    const reason = skipReason(u, base, feasible, actionable);
+    return permanentRefusal(reason) ? reason : null;
+  };
   if (mode === 'authorize-once') {
-    return labeled.length === 1
-      ? { candidate: labeled[0], labeled, error: null }
-      : { candidate: null, labeled, error: 'authorize-once-needs-exactly-one-label' };
+    if (labeled.length !== 1) return { candidate: null, labeled, error: 'authorize-once-needs-exactly-one-label' };
+    const reason = impossible(labeled[0]);
+    return reason ? { candidate: null, labeled: [], clear: { unit: labeled[0], reason }, error: 'authorized-unit-not-eligible' }
+      : { candidate: labeled[0], labeled, error: null };
   }
   // Explicit priority is active in NORMAL mode. Dry-run continues to model ordinary
   // automatic eligibility without treating a pending owner label as a paid assignment.
   if (mode === 'normal') {
     if (labeled.length > 1) return { candidate: null, labeled, error: 'multiple-owner-authorizations' };
-    if (labeled.length === 1) return { candidate: labeled[0], labeled, error: null };
+    if (labeled.length === 1) {
+      const reason = impossible(labeled[0]);
+      return reason ? { candidate: null, labeled: [], clear: { unit: labeled[0], reason }, error: 'authorized-unit-not-eligible' }
+        : { candidate: labeled[0], labeled, error: null };
+    }
   }
   const candidate = allUnits.filter(u => u.derived.state === 'queued' && u.raw.title.startsWith('[Arcana Queue]') &&
     !u.prs.length && u.derived.provenance?.ok && actionable(u.raw.body, base).ok && feasible(u).ok)
@@ -169,21 +202,25 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   const verdicts = F.parseVerdicts(env.ARCANA_FEASIBILITY);
   const feasible = u => F.assess({ body: u.raw.body, override: u.raw.feasibilityOverride, approvers, verdicts, baseSha });
   report.feasibility = verdicts ? { baseSha: verdicts.baseSha, classified: Object.keys(verdicts.cards).length } : { unavailable: true };
+  // Every run publishes the dispatcher's own reason for each queued unit (null = eligible), so
+  // Arcana Control never has to re-derive eligibility. Pure: no extra API calls.
+  for (const u of data.units) if (u.derived.state === 'queued') {
+    u.derived.skip = skipReason(u, base, feasible);
+    u.derived.eligible = u.derived.skip === null;
+  }
   const selection = selectCandidate(data.units, ready.dispatch, base, feasible);
   const { candidate, labeled } = selection;
-  if (selection.error) return done(selection.error, { labeled: labeled.map(u => u.raw.number) });
-  if (!candidate) {
-    // Explain why every queued unit was passed over instead of staying silently blocked.
-    for (const u of data.units) {
-      if (u.derived.state !== 'queued') continue;
-      u.derived.skip = !u.raw.title.startsWith('[Arcana Queue]') ? 'not-a-queue-issue'
-        : u.prs.length ? 'has-open-pr ' + u.prs.map(p => '#' + p.number).join(',')
-          : !u.derived.provenance?.ok ? 'untrusted-origin: ' + (u.derived.provenance?.reasons || []).join(',')
-            : !A.unitActionable(u.raw.body, base).ok ? 'not-actionable: ' + A.unitActionable(u.raw.body, base).missing.join(',')
-              : !feasible(u).ok ? 'feasibility: ' + feasible(u).reason : 'not-labeled';
-    }
-    return done('nothing-eligible');
+  if (selection.clear) {
+    // The owner's approval names a unit no later run could assign. Withdraw it (the existing
+    // one-shot label) so it cannot pin the queue or block the next approval. Never spends.
+    const c = selection.clear;
+    report.clearedAuthorization = { issue: c.unit.raw.number, reason: c.reason };
+    try { await github.rest.issues.removeLabel({ owner, repo, issue_number: c.unit.raw.number, name: A.ONE_SHOT_LABEL }); }
+    catch { return done('authorization-clear-failed', { issue: c.unit.raw.number, reason: c.reason }); }
+    return done(selection.error, { issue: c.unit.raw.number, reason: 'approval withdrawn: ' + c.reason });
   }
+  if (selection.error) return done(selection.error, { labeled: labeled.map(u => u.raw.number) });
+  if (!candidate) return done('nothing-eligible');
 
   const n = candidate.raw.number;
   // authorize-once names its unit explicitly, so the gate denies instead of skipping.
@@ -243,4 +280,4 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   return done('attempted', { issue: n, result, ...(reason ? { reason } : {}) });
 }
 
-module.exports = { runDispatch, selectCandidate, assignCopilot, unitInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
+module.exports = { runDispatch, selectCandidate, skipReason, permanentRefusal, assignCopilot, unitInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };

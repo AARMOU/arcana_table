@@ -183,4 +183,7 @@ test('Copilot PR wakeups are restricted to trusted main code and the configured 
     'queue creation remains opt-in to normal readiness');
   assert.ok(workflow.includes("createWorkflowDispatch({...context.repo,workflow_id:'arcana-card-dispatcher.yml'"),
     'new work must still go through the guarded dispatcher, not a browser or Copilot direct call');
+  assert.ok(workflow.includes("if(auto.created||(auto.pending&&copilotWake))"),
+    'a waiting unit re-wakes the dispatcher only on Copilot activity, not every scheduled pass');
+  assert.ok(workflow.includes("const copilotWake=['workflow_run','pull_request_target'].includes(context.eventName);"));
 });

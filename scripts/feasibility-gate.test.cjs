@@ -130,9 +130,11 @@ test('authorize-once on an engine-gap unit is denied before billing or any ledge
   let billingReads = 0;
   const r = await W.dispatcher({ github: f.github, context: ctx(), core: core(), env: env({ ARCANA_DISPATCH_MODE: 'authorize-once' }),
     readBudget: async () => { billingReads++; return budget(); }, fetchImpl: async () => { throw Error('must not assign'); } });
-  assert.equal(r.result.state, 'denied'); assert.match(r.result.reason, /^feasibility: not Copilot-ready/);
-  assert.match(r.payload.action, /arcana:feasibility-reviewed/);
-  assert.ok(f.writes.every(w => w[1] === 78)); assert.ok(f.writes.every(w => w[0] !== 'removeLabel'), 'one-shot label not consumed');
+  // An approval Cardkit says can never be honored is withdrawn (label removed), never spent.
+  assert.equal(r.result.state, 'authorized-unit-not-eligible'); assert.match(r.result.reason, /^approval withdrawn: feasibility: not Copilot-ready/);
+  assert.match(r.payload.action, /approval was withdrawn/);
+  const onUnit = f.writes.filter(w => w[1] !== 78);
+  assert.deepEqual(onUnit.map(w => w[0]), ['removeLabel'], 'only the approval is withdrawn: no ledger write, no assignment');
   assert.equal(billingReads, 1, 'only the display read after the run');
 });
 
