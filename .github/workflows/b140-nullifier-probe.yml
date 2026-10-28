@@ -25,6 +25,8 @@ jobs:
         with:
           packages: platform-tools
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Verify generated Cardkit pattern index is current
+        run: tools/cardkit/cardkit patterns --check
       - name: Execute B140 registered Nullifier engine regressions
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.UlamogsNullifierScenarioTest'
