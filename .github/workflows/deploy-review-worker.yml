@@ -52,7 +52,7 @@ jobs:
           SESSION_SECRET: ${{ secrets.REVIEW_SESSION_SECRET }}
         run: |
           set -euo pipefail
-          npm install --no-save --no-audit --no-fund wrangler@4.40.0
+          npm install --no-save --no-audit --no-fund wrangler@4.69.0
           npx wrangler deploy --config control/review-worker/wrangler.toml --var "GITHUB_OAUTH_CLIENT_ID:$CLIENT_ID"
           printf '%s' "$CLIENT_SECRET" | npx wrangler secret put GITHUB_OAUTH_CLIENT_SECRET --config control/review-worker/wrangler.toml
           printf '%s' "$SESSION_SECRET" | npx wrangler secret put SESSION_SECRET --config control/review-worker/wrangler.toml
