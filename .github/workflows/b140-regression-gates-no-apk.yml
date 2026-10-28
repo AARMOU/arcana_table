@@ -1,5 +1,6 @@
 name: B140 exact-source full regression gates (NO APK)
-# Source-only audit of the last successful B140 Card Request TEST APK source.
+# Workflow-only branch, running full suites against the latest owner-confirmed B140 source.
+# Never equate the B140 test APK with a production release.
 # This workflow never packages an APK/AAB, signs, deploys, merges, or dispatches workers.
 on:
   push:
@@ -32,7 +33,10 @@ jobs:
           printf '.github/workflows/b140-regression-gates-no-apk.yml\n' > /tmp/expected-paths
           diff -u /tmp/expected-paths /tmp/changed-paths
           git diff --check "$base" HEAD
-          echo "PASS: exact B140 source $base plus one isolated CI workflow; NO APK"
+          target=310f7dd6a7f1829aa90955af02c2cd48fb8d1a61
+          actual="$(git ls-remote https://github.com/AARMOU/arcana_table.git refs/heads/gpt/b140-card-request-test-apk-20261028 | cut -f1)"
+          test "$actual" = "$target" || { echo "::error::B140 source moved or cannot be verified; do not test an obsolete source"; exit 1; }
+          echo "PASS: workflow-only diff from $base; verified B140 test source $target; NO APK"
 
   cardkit:
     needs: source-guard
@@ -41,6 +45,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: 310f7dd6a7f1829aa90955af02c2cd48fb8d1a61
           persist-credentials: false
       - uses: actions/setup-java@v4
         with:
@@ -65,6 +70,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: 310f7dd6a7f1829aa90955af02c2cd48fb8d1a61
           persist-credentials: false
       - uses: actions/setup-java@v4
         with:
@@ -90,6 +96,12 @@ jobs:
           for path in files:
               root=ET.parse(path).getroot()
               for key in totals: totals[key]+=int(root.get(key,'0'))
+              for case in root.findall('.//testcase'):
+                  for kind in ('failure', 'error'):
+                      problem=case.find(kind)
+                      if problem is not None:
+                          detail=(problem.get('message') or problem.text or '').strip().replace('\\n',' ')
+                          print(f"FAIL {case.get('classname')}.{case.get('name')} [{kind}]: {detail[:800]}")
           print('custom-cards:',len(files),'suites',totals)
           PY
       - uses: actions/upload-artifact@v4
@@ -107,6 +119,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: 310f7dd6a7f1829aa90955af02c2cd48fb8d1a61
           persist-credentials: false
       - name: Validate Android regex and launcher
         run: |
@@ -144,6 +157,12 @@ jobs:
               for path in files:
                   root=ET.parse(path).getroot()
                   for key in totals: totals[key]+=int(root.get(key,'0'))
+              for case in root.findall('.//testcase'):
+                  for kind in ('failure', 'error'):
+                      problem=case.find(kind)
+                      if problem is not None:
+                          detail=(problem.get('message') or problem.text or '').strip().replace('\\n',' ')
+                          print(f"FAIL {case.get('classname')}.{case.get('name')} [{kind}]: {detail[:800]}")
               print(variant,len(files),'suites',totals)
           PY
       - uses: actions/upload-artifact@v4
