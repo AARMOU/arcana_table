@@ -285,4 +285,36 @@ class UlamogsNullifierScenarioTest {
         assertEquals("No duplicate processing transitions", 2, transitions.size)
     }
 
+    /**
+     * Under Rest in Peace, choosing two of three cards owned by one opponent
+     * must process only the chosen objects. The third remains the original
+     * exiled object; the two chosen cards produce exactly two EXILE-to-EXILE
+     * zone changes despite all three card names still appearing in exile.
+     */
+    @Test fun restInPeaceProcessesExactlyTwoOfThreeAndLeavesThirdUnchanged() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Rest in Peace")
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Grizzly Bears")
+        d.putCardInExile(d.player2, "Island")
+
+        d.respondToOwnBears(Choices(yes = true, pick = listOf("Sol Ring", "Grizzly Bears")))
+
+        assertTrue("Processing two cards must counter the targeted spell",
+            d.permanentsNamed(d.player1, "Grizzly Bears").isEmpty())
+        assertEquals("All three names remain exiled under the replacement effect",
+            listOf("Grizzly Bears", "Island", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
+        assertTrue("Replacement effect prevents opponent graveyard moves",
+            d.getGraveyardCardNames(d.player2).isEmpty())
+        val reexiled = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
+            .filter { it.ownerId == d.player2 &&
+                it.fromZone == com.wingedsheep.sdk.core.Zone.EXILE &&
+                it.toZone == com.wingedsheep.sdk.core.Zone.EXILE }
+            .map { it.entityName }
+        assertEquals("Exactly the two selected cards must become new exile objects",
+            listOf("Grizzly Bears", "Sol Ring"), reexiled.sorted())
+        assertFalse("The unselected Island must not be processed",
+            reexiled.contains("Island"))
+    }
+
 }
