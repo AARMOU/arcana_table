@@ -54,7 +54,9 @@ jobs:
           patch_files=$(grep -c "^diff --git " "$patch")
           staged_files=$(git diff --cached --name-only | wc -l)
           echo "PATCH_FILES=$patch_files STAGED_FILES=$staged_files"
-          test "$patch_files" -eq 272
+          # The exported source-only patch has 196 actual Git diff headers;
+          # earlier 272-file inventory includes changes not exported as this patch.
+          test "$patch_files" -eq 196
           test "$staged_files" -eq "$patch_files"
           if git diff --cached --name-only | grep -E '^android/app/libs/.*[.]jar$|Build134ReleaseScopeTest[.]kt$'; then
             echo '::error::Disallowed generated JAR or ephemeral test fixture in staged source'
