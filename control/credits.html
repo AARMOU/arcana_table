@@ -1,0 +1,48 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#080f18">
+<link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icons/icon-192.png" type="image/png">
+<meta name="description" content="Privately calculate the Arcana dispatcher credit budget and open authenticated GitHub settings.">
+<title>Credit Budget — Arcana Control</title>
+<style>
+:root{color-scheme:dark;--bg:#080f18;--panel:#111c29;--line:#2c4352;--ink:#f0f6f9;--muted:#92a8b9;--teal:#7ce8c7}
+*{box-sizing:border-box}body{background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,Roboto,sans-serif;margin:0}
+main{max-width:750px;margin:auto;padding:18px}header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line);padding-bottom:14px}
+a{color:var(--teal)}button,input{font:inherit}button{cursor:pointer}
+:focus-visible{outline:2px solid var(--teal);outline-offset:3px}
+.brand{color:var(--teal);font-weight:850;font-size:13px;letter-spacing:.11em}
+h1{font-size:clamp(29px,5vw,42px);line-height:1.18;letter-spacing:-.04em;margin:22px 0 4px}h2{font-size:18px;margin:0 0 12px}
+.panel{background:var(--panel);border:1px solid var(--line);padding:18px;border-radius:17px;margin:14px 0}
+.note{background:#152e32;border-color:#34685e;font-size:13px}.note strong{color:var(--teal)}
+.muted{color:var(--muted);font-size:12px}.fields{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+label{color:var(--muted);font-size:12px;font-weight:750;display:block;margin-bottom:6px}
+input[type=number],input[readonly]{width:100%;background:#0b1924;color:var(--ink);border:1px solid #415965;border-radius:11px;padding:12px;min-height:46px;font-size:17px}
+output{font-size:35px;font-weight:850;color:var(--teal);display:block}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0}
+.btn{border:1px solid #408372;border-radius:10px;background:#1b3f39;color:var(--teal);font-size:13px;font-weight:800;padding:11px 15px;text-decoration:none;display:inline-block}
+.btn:disabled{opacity:.5;cursor:not-allowed}.steps{margin:0;padding-left:20px}.steps li{padding-bottom:10px}
+#message{min-height:20px}
+@media(max-width:560px){.fields{grid-template-columns:1fr}.panel{padding:14px}main{padding:14px}}
+</style></head><body>
+<main><header><span class="brand">⬡ ARCANA CONTROL</span><a href="./" class="btn">← Dashboard</a></header>
+<h1>Credit Budget<span style="color:var(--teal)">.</span></h1>
+<p class="muted">Plan a revised monthly Copilot AI-credit allowance after buying more credits.</p>
+<section class="panel note"><strong>Privacy and safety:</strong> This calculator runs on your device. It cannot purchase credits or directly change GitHub repository settings. The dispatcher continues to use the existing GitHub variable until you save it there. Updating the budget never turns on automation or authorizes a worker.</section>
+<section class="panel"><h2>Calculate new total</h2>
+<div class="fields"><div><label for="included">Current included monthly AI credits</label><input id="included" type="number" min="0" max="10000000" step="1" inputmode="numeric" placeholder="e.g. 1500"></div>
+<div><label for="extra">Additional credits purchased for this cycle</label><input id="extra" type="number" min="0" max="10000000" step="1" inputmode="numeric" placeholder="e.g. 500"></div></div>
+<p class="muted">Use confirmed credit quantities from GitHub billing; not dollars or legacy premium requests. If purchasing credits does not increase your monthly AI-credit allowance, do not raise the dispatcher budget.</p>
+<label for="total">New ARCANA_AI_CREDIT_BUDGET value</label><input id="total" readonly aria-live="polite" placeholder="Enter values above">
+<p class="muted" id="reserve"></p>
+<div class="actions"><button id="copy" class="btn" disabled type="button">Copy new budget</button><a class="btn" href="https://github.com/AARMOU/arcana_table/settings/variables/actions" target="_blank" rel="noopener noreferrer">Open GitHub variables</a></div>
+<p id="message" class="muted" role="status"></p></section>
+<section class="panel"><h2>Apply and verify</h2>
+<ol class="steps">
+<li>Confirm the purchase and amount in <a href="https://github.com/settings/billing" target="_blank" rel="noopener noreferrer">GitHub billing</a>.</li>
+<li>Copy the new total above and open <a href="https://github.com/AARMOU/arcana_table/settings/variables/actions" target="_blank" rel="noopener noreferrer">repository Actions variables</a>.</li>
+<li>Edit <code>ARCANA_AI_CREDIT_BUDGET</code>, paste the <strong>total</strong> (not just the amount purchased), and save.</li>
+<li>Run <a href="https://github.com/AARMOU/arcana_table/actions/workflows/arcana-copilot-billing-watch.yml" target="_blank" rel="noopener noreferrer">Arcana Copilot Billing Watch</a>. Confirm the refreshed status on the dashboard.</li>
+</ol>
+<p class="muted">The default reserve is 10% of the new budget unless <code>ARCANA_AI_CREDIT_RESERVE</code> is set. The billing feed remains authoritative for consumed credits and can lag. ChatGPT usage, GitHub Actions minutes, and premium requests use different units.</p></section>
+</main><script src="./credit-budget.js" defer></script>
+<script>if('serviceWorker' in navigator&&location.protocol==='https:')window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{}));</script>
+</body></html>
