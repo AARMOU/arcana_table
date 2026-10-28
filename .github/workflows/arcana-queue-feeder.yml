@@ -1,10 +1,15 @@
 name: Arcana Queue Feeder
-# Read-only suggestions for the Copilot queue (scripts/queue-feeder.cjs). Never creates queue issues,
-# labels, assignments or paid work: it only refreshes its own status comment on #78, with prefilled
-# "new issue" links the owner reviews and submits.
+# Trusted-main Cardkit search. In already-enabled normal automation mode, queue one
+# unclaimed supported card as github-actions[bot] and request the separate guarded dispatcher.
+# No secrets, bypasses, direct billable agent calls, or manual-card feeding are used here.
 on:
   schedule:
-    - cron: '47 13 * * *'
+    - cron: '*/15 * * *'
+  # Best-effort immediate handoff when GitHub's Copilot dynamic workflow completes.
+  # The schedule remains a fallback for dropped/unavailable completion events.
+  workflow_run:
+    workflows: ['Running Copilot cloud agent']
+    types: [completed]
   workflow_dispatch:
     inputs:
       max:
@@ -92,6 +97,7 @@ jobs:
     permissions:
       contents: read
       issues: write
+      actions: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -104,6 +110,8 @@ jobs:
       - uses: actions/github-script@v7
         env:
           ARCANA_INTEGRATION_BASE: ${{ vars.ARCANA_INTEGRATION_BASE }}
+          ARCANA_AUTOMATION_READY: ${{ vars.ARCANA_AUTOMATION_READY }}
+          ARCANA_DISPATCH_MODE: ${{ vars.ARCANA_DISPATCH_MODE }}
         with:
           script: |
             const Q=require('./scripts/queue-feeder.cjs');const S=require('./scripts/control-status.cjs');
@@ -112,7 +120,18 @@ jobs:
             let payload=Q.queuePayload({result,units:r?.units||[],base:process.env.ARCANA_INTEGRATION_BASE,baseSha:r?.baseSha,runId:context.runId});
             // Stay well under GitHub's 65,536-character comment limit.
             while(S.formatStatus('queue',payload,Q.queueSummary(payload)).length>60000&&payload.suggestions.length)payload={...payload,suggestions:payload.suggestions.slice(0,-1)};
+            // A failed verification can publish a diagnostic, but never creates an issue.
+            const enabled=process.env.ARCANA_AUTOMATION_READY==='true' && process.env.ARCANA_DISPATCH_MODE==='normal';
+            const auto=await Q.createNextAutoQueue({github,...context.repo,payload,runId:context.runId,enabled});
+            payload.autoQueue=auto;
             const published=await S.publishStatus({github,...context.repo,kind:'queue',payload,summary:Q.queueSummary(payload)});
             core.info('Status comment: '+published);
             await core.summary.addHeading('Queue feeder').addRaw(Q.queueSummary(payload).join('\n')).write();
-            if(!r||published.startsWith('failed'))core.setFailed('Queue suggestions not published from verified feeder result ('+published+').');
+            if(!r||published.startsWith('failed')){core.setFailed('Queue status not published ('+published+').');return;}
+            if(auto.created||auto.pending){
+              // A GitHub Actions token does not fire issues:opened hooks; workflow_dispatch
+              // does. All spending still goes through existing admission & fresh billing.
+              await github.rest.actions.createWorkflowDispatch({...context.repo,
+                workflow_id:'arcana-card-dispatcher.yml',ref:'main',inputs:{dry_run:'false'}});
+              core.info('Requested guarded dispatcher for queue issue #'+auto.issue);
+            }
