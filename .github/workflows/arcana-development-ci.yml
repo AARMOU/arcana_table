@@ -63,24 +63,6 @@ jobs:
       - name: Run custom-card scenario tests and Build 131 Android unit tests
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest
-      - name: TEMP report failing tests as annotations
-        if: always()
-        working-directory: android
-        run: |
-          python3 - <<'PY'
-          import glob, xml.etree.ElementTree as ET
-          bad=0; mine=[]
-          for f in glob.glob('**/build/test-results/**/*.xml', recursive=True):
-              r=ET.parse(f).getroot()
-              for tc in r.iter('testcase'):
-                  cls=tc.get('classname',''); name=tc.get('name','')
-                  fail=tc.find('failure') if tc.find('failure') is not None else tc.find('error')
-                  if 'AttachmentPile' in cls: mine.append(f"{name}={'FAIL' if fail is not None else 'pass'}")
-                  if fail is not None:
-                      bad+=1
-                      if bad<=25: print(f"::error::{cls}.{name}: {(fail.get('message') or '')[:200]}")
-          print(f"::notice::failing={bad} AttachmentPileTest: {' '.join(mine) or 'NOT RUN'}")
-          PY
       # Debug-only test scenarios (PR #110) must never ship: release compiles the empty
       # src/release stub. Only this test runs in the release variant, because the Compose UI
       # tests need the debug-only ui-test-manifest and can't launch there.
