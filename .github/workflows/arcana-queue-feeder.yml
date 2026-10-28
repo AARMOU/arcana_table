@@ -56,7 +56,10 @@ jobs:
             const fs=require('fs');const {candidates}=require('./ctl/scripts/queue-feeder.cjs');
             const max=Math.min(5,Math.max(1,Number(context.payload.inputs?.max||3)||3));
             const openIssues=await github.paginate(github.rest.issues.listForRepo,{...context.repo,state:'open',per_page:100});
-            const r=candidates({gaps:JSON.parse(fs.readFileSync('gaps.json','utf8')),openIssues,max});
+            // Read only: issue #321 is the existing opt-in aggregate demand tracker.
+            // If the trusted source is unavailable, the feeder fails closed before any queue creation.
+            const requestComments=await github.paginate(github.rest.issues.listComments,{...context.repo,issue_number:321,per_page:100});
+            const r=candidates({gaps:JSON.parse(fs.readFileSync('gaps.json','utf8')),openIssues,requestComments,max});
             fs.writeFileSync('pick.json',JSON.stringify(r));fs.writeFileSync('names.txt',r.names.join('\n')+(r.names.length?'\n':''));
             core.info(JSON.stringify(r));
       - name: Generate queue bodies (cardkit unit, fails closed per card)
