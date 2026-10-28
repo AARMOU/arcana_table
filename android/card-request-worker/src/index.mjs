@@ -147,7 +147,9 @@ export class CardRequestQueue {
     await this.state.storage.put("seen", seen);
     await this.state.storage.put(rateKey, rate + 1);
     const synced = await this.sync(10);
-    const pending = parsed.names.filter(({ key }) => records[key].syncedCount < records[key].count).length;
+    // sync() persists a fresh copy; the pre-sync map above is intentionally stale.
+    const published = (await this.state.storage.get("records")) || {};
+    const pending = parsed.names.filter(({ key }) => published[key]?.syncedCount < published[key]?.count).length;
     return respond({ ok: true, tracker: TRACKER, accepted: parsed.names.length,
       pending: pending > 0, synced, message: pending > 0 ? "Queued; public tracker synchronization pending" : "Added to tracker" },
       pending > 0 ? 202 : 200);
