@@ -30,7 +30,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
+      # Hosted runners provide Android cmdline-tools; avoid setup-android's retired 'tools' package.
+      - name: Prepare SDK 36
+        run: |
+          sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
       - name: Compile importer UI and run focused Android test
         working-directory: android
         run: ./gradlew :app:testDebugUnitTest --tests com.arcanatable.CardRequestsTest --no-daemon --stacktrace
