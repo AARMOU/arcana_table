@@ -39,7 +39,7 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Validate control dashboard
-        run: node --test control/dashboard.test.cjs control/card-queue.test.cjs
+        run: node --test control/dashboard.test.cjs control/card-queue.test.cjs tools/tests/argentum-catalog.test.cjs
       - name: Generate deck scanner JSON from reviewed tool and current integration data
         shell: bash
         run: |
@@ -47,6 +47,7 @@ jobs:
           SOURCE_SHA="$(git -C integration-source rev-parse HEAD)"
           mkdir -p _site/control
           node tools/deck-gap-audit.cjs --root integration-source --source-ref "gpt/arcana-integration-next@$SOURCE_SHA" --json _site/control/card-gaps.json --markdown /tmp/arcana-card-gaps.md
+          node tools/argentum-catalog.cjs --root integration-source --source-ref "gpt/arcana-integration-next@$SOURCE_SHA" --json _site/control/argentum-catalog.json
       - name: Stage the landing page
         run: |
           mkdir -p _site
