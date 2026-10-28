@@ -124,6 +124,27 @@ class ForsakenMonumentScenarioTest {
         assertEquals("only the real Wastes tap adds one extra {C}", 4, d.manaPool(d.player1).colorless)
     }
 
+    @Test fun rejectedUnaffordableColorlessCastDoesNotCreateMonumentTrigger() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val probe = d.putCardInHand(d.player1, "Monument Colorless Probe")
+
+        // A failed attempt to pay {2} is not a cast event and must be atomic:
+        // it must not spend the available {C} or create Monument's life trigger.
+        d.giveColorlessMana(d.player1, 1)
+        assertNotNull("unaffordable colorless spell must be rejected", d.castSpell(d.player1, probe).error)
+        assertEquals("rejected cast must not consume the mana", 1, d.manaPool(d.player1).colorless)
+        d.resolveAll()
+        assertEquals("rejected cast must not create a Monument trigger", before, d.getLifeTotal(d.player1))
+
+        // The same card can subsequently be legally cast with sufficient mana.
+        d.giveColorlessMana(d.player1, 1)
+        assertNull("the now-affordable cast must succeed", d.castSpell(d.player1, probe).error)
+        d.resolveStack()
+        assertEquals("exactly one successful cast triggers exactly two life", before + 2, d.getLifeTotal(d.player1))
+    }
+
     @Test fun withoutMonumentNoExtraMana() {
         val d = setup()
         val wastes = d.putLandOnBattlefield(d.player1, "Wastes")
