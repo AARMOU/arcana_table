@@ -5,6 +5,7 @@ const API = "https://api.github.com/repos/AARMOU/arcana_table";
 const MAX_BATCH = 10;
 const MAX_BODYSIZE = 4096;
 const MAX_DAILY_BATCHES = 3;
+const MAX_GLOBAL_DAILY_BATCHES = 60;
 const MAX_NAMES = 500;
 const respond = (data, status = 200) =>
   new Response(JSON.stringify(data), { status, headers: {
@@ -34,6 +35,28 @@ function parseBatch(json) {
   }
   return { requestId: json.requestId, names: [...names.values()] };
 }
+async function readLimitedBody(request, maxBytes) {
+  const headerLength = Number(request.headers.get("content-length") || 0);
+  if (headerLength > maxBytes) return null;
+  const reader = request.body?.getReader();
+  if (!reader) return "";
+  const chunks = [];
+  let length = 0;
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    length += value.byteLength;
+    if (length > maxBytes) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  const merged = new Uint8Array(length);
+  let offset = 0;
+  for (const chunk of chunks) { merged.set(chunk, offset); offset += chunk.byteLength; }
+  return new TextDecoder().decode(merged);
+}
 async function requestKey(ip, salt) {
   const bytes = new TextEncoder();
   const secret = await crypto.subtle.importKey("raw", bytes.encode(salt), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
@@ -51,15 +74,16 @@ export default {
       return respond({ error: "Card requests are not configured" }, 503);
     if (!(request.headers.get("content-type") || "").startsWith("application/json"))
       return respond({ error: "Expected JSON" }, 415);
-    const raw = await request.text();
-    if (raw.length > MAX_BODYSIZE) return respond({ error: "Batch too large" }, 413);
+    const raw = await readLimitedBody(request, MAX_BODYSIZE);
+    if (raw === null) return respond({ error: "Batch too large" }, 413);
     let json;
     try { json = JSON.parse(raw); } catch { return respond({ error: "Invalid JSON" }, 400); }
     const parsed = parseBatch(json);
     if (!parsed) return respond({ error: "Invalid card names or request ID (maximum 10 names)" }, 400);
     const ip = request.headers.get("CF-Connecting-IP");
     if (!ip) return respond({ error: "Request verification unavailable" }, 503);
-    const opaque = await requestKey(ip, env.RATE_SALT);
+    // Daily rotating HMAC prevents correlating a request source across dates.
+    const opaque = await requestKey(ip, env.RATE_SALT + ":" + new Date().toISOString().slice(0, 10));
     const internal = new Request("https://internal/submit", {
       method: "POST", headers: { "content-type": "application/json", "x-opaque-client": opaque },
       body: JSON.stringify(parsed)
@@ -130,8 +154,11 @@ export class CardRequestQueue {
     if (seen[parsed.requestId]) return respond({ ok: true, duplicate: true, tracker: TRACKER, accepted: 0 });
     const day = new Date(now).toISOString().slice(0, 10);
     const rateKey = "rate:" + day + ":" + client;
+    const globalKey = "rate-global:" + day;
     const rate = (await this.state.storage.get(rateKey)) || 0;
-    if (rate >= MAX_DAILY_BATCHES) return respond({ error: "Daily request limit reached" }, 429);
+    const globalRate = (await this.state.storage.get(globalKey)) || 0;
+    if (rate >= MAX_DAILY_BATCHES || globalRate >= MAX_GLOBAL_DAILY_BATCHES)
+      return respond({ error: "Daily request limit reached" }, 429);
     const records = (await this.state.storage.get("records")) || {};
     let newKeys = 0;
     for (const { key } of parsed.names) if (!records[key]) newKeys++;
@@ -146,6 +173,7 @@ export class CardRequestQueue {
     await this.state.storage.put("records", records);
     await this.state.storage.put("seen", seen);
     await this.state.storage.put(rateKey, rate + 1);
+    await this.state.storage.put(globalKey, globalRate + 1);
     const synced = await this.sync(10);
     // sync() persists a fresh copy; the pre-sync map above is intentionally stale.
     const published = (await this.state.storage.get("records")) || {};
