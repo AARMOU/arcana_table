@@ -1,0 +1,9 @@
+# Arcana card-request intake (not deployed)
+
+Isolated from the production multiplayer Cloudflare Worker. Owner approval is required before deployment. In Cloudflare, set **secrets** `GITHUB_REQUESTS_TOKEN` (fine-grained token with Issues:write restricted to `AARMOU/arcana_table`) and `RATE_SALT` (at least 32 random characters). Never ship either secret in the Android app or GitHub source.
+
+`wrangler deploy` provisions Durable Object `REQUEST_QUEUE`; requests are sent only after the user chooses the missing names and confirms in the existing importer. No entire deck, contact info or user token is sent; only canonical card names and a random idempotency key. IP addresses are HMAC-hashed in the edge worker and only the digest is passed to Durable Object for a three-submission-per-day cap. No analytics or raw IP storage. Public results appear as individual, deduplicated card comments on [#321](https://github.com/AARMOU/arcana_table/issues/321), with request counts but no player identity. The scheduled retry keeps requests recorded after temporary GitHub errors.
+
+**Development:** `node --test tests/card-requests.test.mjs`. Deploy is a separate explicit operation; no cloud worker, Android APK, or Play release is changed by this PR. After deployment, configure Android Gradle with `-ParcanaCardRequestUrl=https://<real deployed worker host>/v1/card-requests` for the intended build. Until then the button is explicitly unavailable; no fictional success message.
+
+**Limits:** Up to 10 unique names per submission; no more than three submissions per anonymous daily client hash; 500 unique names lifetime until moderation/reset. No paid Copilot/AI dispatch. To prevent spam and safeguard GitHub token use, set Cloudflare WAF/challenge/rate-limit rules on this Worker route in addition to in-DO limits before public deployment. Manual issue triage must separately verify names, existing ownership, and actual game rules.
