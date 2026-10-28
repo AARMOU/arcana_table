@@ -110,3 +110,53 @@ test("idempotency is per anonymous client, not global", async () => {
   assert.equal(calls.length,2);
  } finally {globalThis.fetch=previousFetch;}
 });
+
+test("retry stays pending during GitHub outage, then reports published without incrementing totals", async () => {
+ const originalFetch = globalThis.fetch;
+ let available = false, writes = 0;
+ globalThis.fetch = async () => {
+   writes++;
+   return available ? {ok:true, json: async()=>({id:91})} : {ok:false};
+ };
+ try {
+  const store=storage(), q=new CardRequestQueue({storage:store},{GITHUB_REQUESTS_TOKEN:"fake"});
+  const client="e".repeat(64), id="deadbeef-dead-4eef-8eef-123456789abc";
+  const send=()=>q.fetch(new Request("https://internal/submit", {
+   method:"POST",headers:{"x-opaque-client":client},
+   body:JSON.stringify({requestId:id,cardNames:["Goblin Welder"]})
+  }));
+  let res=await send(), body=await res.json();
+  assert.equal(res.status,202);assert.equal(body.pending,true);assert.equal(body.accepted,1);
+  res=await send();body=await res.json();
+  assert.equal(res.status,202);assert.equal(body.duplicate,true);
+  assert.equal(body.pending,true);assert.equal(body.accepted,1);
+  assert.equal(store.values.get("records")["goblin welder"].count,1);
+  assert.equal(writes,1,"duplicate should not publish or consume a request");
+  available=true;
+  const synced=await q.fetch(new Request("https://internal/sync",{method:"POST"}));
+  assert.equal((await synced.json()).synced,1);
+  res=await send();body=await res.json();
+  assert.equal(res.status,200);assert.equal(body.duplicate,true);
+  assert.equal(body.pending,false);assert.equal(body.accepted,1);
+  assert.equal(store.values.get("records")["goblin welder"].count,1);
+  assert.equal(writes,2);
+ } finally {globalThis.fetch=originalFetch;}
+});
+
+test("reusing an id for different card names is rejected without changing totals", async () => {
+ const previous=globalThis.fetch;
+ globalThis.fetch=async()=>({ok:true,json:async()=>({id:55})});
+ try {
+  const store=storage(),q=new CardRequestQueue({storage:store},{GITHUB_REQUESTS_TOKEN:"fake"});
+  const id="bbbbbbbb-ffff-4bbb-8bbb-123456789abc", client="f".repeat(64);
+  const send=cardNames=>q.fetch(new Request("https://internal/submit",{
+   method:"POST",headers:{"x-opaque-client":client},
+   body:JSON.stringify({requestId:id,cardNames})
+  }));
+  assert.equal((await send(["Goblin Welder"])).status,200);
+  const conflict=await send(["Ratchet, Field Medic"]);
+  assert.equal(conflict.status,409);
+  assert.equal(store.values.get("records")["goblin welder"].count,1);
+  assert.equal(store.values.get("records")["ratchet, field medic"],undefined);
+ }finally{globalThis.fetch=previous;}
+});

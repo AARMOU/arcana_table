@@ -149,11 +149,26 @@ export class CardRequestQueue {
     if (!parsed || !/^[a-f0-9]{64}$/.test(client || "")) return respond({ error: "Bad request" }, 400);
     const now = Date.now();
     const seen = (await this.state.storage.get("seen")) || {};
-    for (const [id, when] of Object.entries(seen))
-      if (now - when > 48 * 3600_000) delete seen[id];
-    // Scope idempotency to the anonymous client, not the globally shared request ID.
+    for (const [id, entry] of Object.entries(seen)) {
+      const when = typeof entry === "number" ? entry : entry?.at;
+      if (!Number.isFinite(when) || now - when > 48 * 3600_000) delete seen[id];
+    }
+    // Scope idempotency to each anonymous client. Keep the original batch's
+    // count snapshot so a retry cannot misreport a GitHub outage as published.
     const seenKey = client + ":" + parsed.requestId;
-    if (seen[seenKey]) return respond({ ok: true, duplicate: true, tracker: TRACKER, accepted: 0 });
+    const prior = seen[seenKey];
+    if (prior) {
+      const keys = parsed.names.map(({ key }) => key);
+      const original = Array.isArray(prior.items) ? prior.items.map(({ key }) => key) : [];
+      if (keys.length !== original.length ||
+          !keys.every(key => original.includes(key)))
+        return respond({ error: "Request ID already belongs to another batch" }, 409);
+      const records = (await this.state.storage.get("records")) || {};
+      const pending = prior.items.some(({ key, targetCount }) =>
+        (records[key]?.syncedCount ?? 0) < targetCount);
+      return respond({ ok: true, duplicate: true, tracker: TRACKER,
+        accepted: original.length, pending }, pending ? 202 : 200);
+    }
     const day = new Date(now).toISOString().slice(0, 10);
     const rateKey = "rate:" + day + ":" + client;
     const globalKey = "rate-global:" + day;
@@ -171,7 +186,8 @@ export class CardRequestQueue {
       record.count++;
       records[key] = record;
     }
-    seen[seenKey] = now;
+    seen[seenKey] = { at: now, items: parsed.names.map(({ key }) =>
+      ({ key, targetCount: records[key].count })) };
     await this.state.storage.put("records", records);
     await this.state.storage.put("seen", seen);
     await this.state.storage.put(rateKey, rate + 1);
