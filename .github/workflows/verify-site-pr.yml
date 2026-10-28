@@ -9,6 +9,8 @@ on:
       - "privacy.html"
       - "assets/**"
       - "control/**"
+      - "tools/argentum-catalog.cjs"
+      - "tools/tests/argentum-catalog.test.cjs"
       - ".github/workflows/pages.yml"
       - "README.md"
       - "tools/verify_site.test.cjs"
@@ -27,4 +29,4 @@ jobs:
       - name: Check page copy, paths and release limitations
         run: node --test tools/verify_site.test.cjs
       - name: Check dashboard regression
-        run: node --test control/dashboard.test.cjs control/card-queue.test.cjs
+        run: node --test control/dashboard.test.cjs control/card-queue.test.cjs tools/tests/argentum-catalog.test.cjs
