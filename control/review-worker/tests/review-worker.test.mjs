@@ -9,7 +9,8 @@ const PWA = "https://aarmou.github.io";
 const W = "https://arcana-review.example.workers.dev";
 
 // Minimal fake GitHub keeping state, recording every write.
-function fakeGitHub({ head = SHA, checks = [{ name: "toolkit", status: "completed", conclusion: "success" }], reviews = [],
+const CERTIFIED = { name: "independent-certification", status: "completed", conclusion: "success", head_sha: SHA };
+function fakeGitHub({ head = SHA, checks = [{ name: "toolkit", status: "completed", conclusion: "success" }, CERTIFIED], reviews = [],
   author = "Copilot", prState = "open", unitTitle = "[Arcana Queue] Celestine — Cardkit SUPPORTED, unclaimed", user = "AARMOU" } = {}) {
   const writes = [];
   const fetchImpl = async (url, init = {}) => {
@@ -186,4 +187,24 @@ test("unconfigured Worker refuses everything but health", async () => {
   assert.equal((await worker.fetch(new Request(W + "/health"), {})).status, 200);
   assert.equal((await worker.fetch(new Request(W + "/v1/decision", { method: "POST" }), {})).status, 503);
   assert.equal(cleanNote("hi @x <!-- y -->"), "hi ＠x  y");
+});
+
+test("approval requires independent certification of the exact head; fix requests stay available", async () => {
+  const toolkit = { name: "toolkit", status: "completed", conclusion: "success" };
+  const cases = [
+    [[toolkit], "not-run"],                                                             // green checks only (PR #344 case)
+    [[toolkit, { ...CERTIFIED, status: "in_progress", conclusion: null }], "running"],
+    [[toolkit, { ...CERTIFIED, conclusion: "failure" }], "failed"],
+    [[toolkit, { ...CERTIFIED, head_sha: "c".repeat(40) }], "not-run"],               // stale: certified an older commit
+  ];
+  for (const [checks, certification] of cases) {
+    const gh = fakeGitHub({ checks });
+    const r = await decision(gh, { pr: 360, sha: SHA, decision: "approve" });
+    assert.ok(r.status === 422 && ["not-certified", "checks-not-green"].includes(r.body.error), certification);
+    if (r.body.error === "not-certified") assert.equal(r.body.certification, certification);
+    assert.equal(gh.writes.length, 0, certification);
+    assert.equal((await decision(gh, { pr: 360, sha: SHA, decision: "request-fix", note: "needs rules check" })).status, 200, certification);
+  }
+  const ok = await decision(fakeGitHub({ checks: [toolkit, CERTIFIED] }), { pr: 360, sha: SHA, decision: "approve" });
+  assert.equal(ok.status, 200);
 });

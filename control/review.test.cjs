@@ -13,10 +13,17 @@ test('all seven status categories have owner-facing labels', () => {
     'Independently Certified', 'Integrated', 'Owner Approved'].sort());
 });
 
-test('only reviewable cards can be decided; approve needs green or certified', () => {
-  const item = s => ({ pr: 360, headSha: SHA, state: s });
-  assert.equal(R.canApprove(item('awaiting-review')), true);
-  assert.equal(R.canApprove(item('certified')), true);
+test('only reviewable cards can be decided; approve needs independent certification', () => {
+  const item = (s, certification) => ({ pr: 360, headSha: SHA, state: s, certification });
+  assert.equal(R.canApprove(item('certified', 'certified')), true);
+  assert.equal(R.approveBlocked(item('certified', 'certified')), null);
+  // Green checks without certification (e.g. PR #344): missing, running, failed all fail closed.
+  for (const c of [undefined, 'not-run', 'running', 'failed']) {
+    assert.equal(R.canApprove(item('awaiting-review', c)), false, String(c));
+    assert.match(R.approveBlocked(item('awaiting-review', c)), /independent certification[\s\S]*request a fix/, String(c));
+    assert.equal(R.canDecide(item('awaiting-review', c)), true, 'Request Fix stays available');
+  }
+  assert.match(R.decisionMessage(422, { error: 'not-certified', certification: 'running' }).text, /not passed independent certification \(running\)/);
   for (const s of ['checks-failed', 'checks-running', 'approved', 'changes-requested']) {
     assert.equal(R.canApprove(item(s)), false, s);
     assert.equal(R.canDecide(item(s)), true, s);
