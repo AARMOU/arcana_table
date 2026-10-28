@@ -43,21 +43,39 @@ jobs:
         with:
           packages: platform-tools
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-      - name: Execute real-engine fetch-shock JUnit only
+      # Independent executions probe the observed baseline failure that one
+      # successful focused run did not reproduce. Never retry away a red result.
+      - name: Reproduce ShockFetch across three fresh real-engine JUnit executions
         working-directory: android
-        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests com.arcanatable.ShockFetchTest
+        shell: bash
+        run: |
+          set -uo pipefail
+          failures=0
+          mkdir -p shockfetch-attempts
+          for attempt in 1 2 3; do
+            echo "::group::ShockFetch attempt $attempt/3"
+            ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests com.arcanatable.ShockFetchTest --rerun-tasks
+            status=$?
+            mkdir -p "shockfetch-attempts/attempt-$attempt"
+            cp app/build/test-results/testDebugUnitTest/TEST-*ShockFetchTest.xml "shockfetch-attempts/attempt-$attempt/" || true
+            printf '%s\\n' "$status" > "shockfetch-attempts/attempt-$attempt/exit-code.txt"
+            echo "::endgroup::"
+            if (( status != 0 )); then failures=$((failures + 1)); fi
+          done
+          echo "ShockFetch attempts failed: $failures/3"
+          test "$failures" -eq 0
       - name: Preserve exact JUnit failure and recent state/action trace
         if: always()
         run: |
           python3 - <<'PY'
           from pathlib import Path
           import xml.etree.ElementTree as ET
-          files=list(Path('android/app/build/test-results/testDebugUnitTest').glob('TEST-*ShockFetchTest.xml'))
+          files=sorted(Path('android/shockfetch-attempts').glob('attempt-*/TEST-*ShockFetchTest.xml'))
           if not files:
               print('No ShockFetch JUnit XML produced; inspect setup/compile logs.')
           for path in files:
               root=ET.parse(path).getroot()
-              print('ShockFetch JUnit:', {key:root.get(key) for key in ('tests','failures','errors','skipped')})
+              print('ShockFetch JUnit:', path.parent.name, {key:root.get(key) for key in ('tests','failures','errors','skipped')})
               for case in root.findall('.//testcase'):
                   for kind in ('failure','error'):
                       problem=case.find(kind)
@@ -70,4 +88,4 @@ jobs:
           name: b140-shockfetch-focused-junit-no-apk
           retention-days: 14
           if-no-files-found: warn
-          path: android/app/build/test-results/testDebugUnitTest/
+          path: android/shockfetch-attempts/
