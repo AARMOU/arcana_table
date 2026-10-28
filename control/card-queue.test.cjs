@@ -55,7 +55,7 @@ test('dual source browser labels indexed names as unverified and counts deck gap
  assert.ok(script.includes("status:'missing'")===false || script.includes("deckCards.filter(c=>c.status==='missing')"));
  assert.ok(script.includes('Not indexed'));
  assert.ok(script.includes('Indexed · rules unverified'));
- assert.ok(script.includes('Outside the 19 scanned decks'));
+ assert.ok(script.includes('Outside scanned decks'));
  assert.ok(workflow.includes('--json _site/control/argentum-catalog.json'));
  assert.ok(worker.includes('shellUrls.has(url.href)'));
  assert.ok(!worker.includes("'./argentum-catalog.json'"));
