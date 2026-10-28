@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { _test, CardRequestQueue } from "../src/index.mjs";
+import worker, { _test, CardRequestQueue } from "../src/index.mjs";
 test("canonical names, DFC dedupe and hostile GitHub markup", () => {
   assert.equal(_test.canonicalName("  Ratchet, Field Medic // Ratchet, Rescue Racer  "), "Ratchet, Field Medic // Ratchet, Rescue Racer");
   assert.equal(_test.canonicalName("@someone"), null);
@@ -58,4 +58,32 @@ test("GitHub outage queues cards for scheduled retry instead of claiming submitt
   const sync=await q.fetch(new Request("https://internal/sync",{method:"POST"}));
   assert.equal((await sync.json()).synced,1);
  }finally{globalThis.fetch=prevFetch;}
+});
+
+test("public endpoint stops overlarge streamed bodies before parsing or writing", async () => {
+ const tooLarge = "X".repeat(4097);
+ const response = await worker.fetch(new Request("https://example.workers.dev/v1/card-requests", {
+   method: "POST", headers: { "content-type": "application/json" }, body: tooLarge,
+ }), { RATE_SALT: "test", GITHUB_REQUESTS_TOKEN: "fake", REQUEST_QUEUE: {} });
+ assert.equal(response.status, 413);
+});
+test("daily global intake limit also bounds many distinct clients", async () => {
+ const original = globalThis.fetch;
+ globalThis.fetch = async () => ({ok: true, json: async () => ({id: 123})});
+ try {
+  const store = storage(), q = new CardRequestQueue({storage: store},{GITHUB_REQUESTS_TOKEN:"fake"});
+  let last;
+  for (let n = 1; n <= 61; n++) {
+    const client = n.toString(16).padStart(64, "0");
+    last = await q.fetch(new Request("https://internal/submit", {
+      method: "POST", headers: {"x-opaque-client": client}, body: JSON.stringify({
+       requestId: "11111111-2222-4333-8444-" + String(n).padStart(12,"0"),
+       cardNames:["Unique Request " + n]
+      })
+    }));
+  }
+  assert.equal(last.status,429);
+  const day = new Date().toISOString().slice(0,10);
+  assert.equal(store.values.get("rate-global:"+day),60);
+ } finally { globalThis.fetch = original; }
 });
