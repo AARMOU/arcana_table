@@ -35,7 +35,7 @@ test('authorizes only the selected verified issue; never calls Copilot, merge or
 });
 test('denies stale units, wrong targets, untrusted issues, incomplete acceptance, claimed card and conflicting pending approvals',async()=>{
   const cases=[
-    [mock(),{issue:170,expectedUpdatedAt:UPDATED},400],
+    [mock(),{issue:170,expectedUpdatedAt:UPDATED},404],
     [mock(),{issue:172,expectedUpdatedAt:'invalid'},400],
     [mock({state:'closed'}),{issue:172,expectedUpdatedAt:UPDATED},422],
     [mock({title:'[Card Request] Malanthrope'}),{issue:172,expectedUpdatedAt:UPDATED},422],

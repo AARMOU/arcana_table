@@ -100,9 +100,17 @@ async function resolveInterrupted({ github, owner, repo, unit, runId }) {
 // Multiple labels fail closed. Feasibility/provenance/billing are checked AFTER selection.
 function selectCandidate(allUnits, mode, base, feasible, actionable = A.unitActionable) {
   const labeled = allUnits.filter(u => u.raw.labels.includes(A.ONE_SHOT_LABEL));
-  if (labeled.length > 1) return { candidate: null, labeled, error: 'multiple-owner-authorizations' };
-  if (labeled.length === 1) return { candidate: labeled[0], labeled, error: null };
-  if (mode === 'authorize-once') return { candidate: null, labeled, error: 'authorize-once-needs-exactly-one-label' };
+  if (mode === 'authorize-once') {
+    return labeled.length === 1
+      ? { candidate: labeled[0], labeled, error: null }
+      : { candidate: null, labeled, error: 'authorize-once-needs-exactly-one-label' };
+  }
+  // Explicit priority is active in NORMAL mode. Dry-run continues to model ordinary
+  // automatic eligibility without treating a pending owner label as a paid assignment.
+  if (mode === 'normal') {
+    if (labeled.length > 1) return { candidate: null, labeled, error: 'multiple-owner-authorizations' };
+    if (labeled.length === 1) return { candidate: labeled[0], labeled, error: null };
+  }
   const candidate = allUnits.filter(u => u.derived.state === 'queued' && u.raw.title.startsWith('[Arcana Queue]') &&
     !u.prs.length && u.derived.provenance?.ok && actionable(u.raw.body, base).ok && feasible(u).ok)
     .sort((a, b) => a.raw.number - b.raw.number)[0];

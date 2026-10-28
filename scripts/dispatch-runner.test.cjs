@@ -159,9 +159,9 @@ test('a vague unit is denied before any write or assignment, in every mode', asy
   for (const mode of ['authorize-once', 'normal', 'dry-run']) {
     const f = fake({ issues: [queue(68, [A.ONE_SHOT_LABEL], 'Please do the next batch.')] }); const calls = [];
     const r = await run(f, { ARCANA_DISPATCH_MODE: mode }, { fetchImpl: fetchOk(calls) });
-    // Normal and dry-run selection skip incomplete units (so they can't block the queue); authorize-once
-    // names the unit explicitly and is denied by admission. Nothing is ever written or assigned.
-    if (mode !== 'authorize-once') assert.equal(r.state, 'nothing-eligible', mode);
+    // A specifically authorized normal-mode unit fails visibly instead of silently
+    // selecting another card. Dry-run continues to skip incomplete ordinary candidates.
+    if (mode === 'dry-run') assert.equal(r.state, 'nothing-eligible', mode);
     else { assert.equal(r.state, 'denied', mode); assert.match(r.reason, /unit-not-actionable/); }
     assert.equal(calls.length, 0); assert.equal(f.writes.length, 0);
   }
