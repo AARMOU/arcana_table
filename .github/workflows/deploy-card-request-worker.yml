@@ -1,0 +1,76 @@
+name: Deploy Arcana Card Request Worker (manual only)
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: "Exact reviewed B140 integration commit SHA containing the Worker"
+        type: string
+        required: true
+      confirmation:
+        description: "Type DEPLOY_CARD_REQUESTS to authorize production Cloudflare changes"
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: arcana-card-request-production-deploy
+  cancel-in-progress: false
+jobs:
+  deploy:
+    if: github.repository == 'AARMOU/arcana_table'
+    runs-on: ubuntu-24.04
+    environment: production
+    steps:
+      - name: Verify explicit deployment intent and secret setup
+        shell: bash
+        env:
+          APPROVAL: ${{ inputs.confirmation }}
+          SHA: ${{ inputs.source_sha }}
+          CF_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GH_REQUEST_TOKEN: ${{ secrets.CARD_REQUESTS_GITHUB_TOKEN }}
+          RATE_SALT: ${{ secrets.CARD_REQUEST_RATE_SALT }}
+        run: |
+          set -euo pipefail
+          test "$APPROVAL" = "DEPLOY_CARD_REQUESTS" || { echo 'Missing explicit confirmation'; exit 1; }
+          [[ "$SHA" =~ ^[0-9a-f]{40}$ ]] || { echo 'Require exact lower-case SHA'; exit 1; }
+          for value in "$CF_TOKEN" "$CF_ACCOUNT" "$GH_REQUEST_TOKEN" "$RATE_SALT"; do
+            test -n "$value" || { echo 'A required GitHub Actions secret is missing'; exit 1; }
+          done
+          test "${#RATE_SALT}" -ge 32 || { echo 'Rate-limit salt must be at least 32 characters'; exit 1; }
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Require code merged into the named B140 integration branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin '+refs/heads/gpt/b140-attachment-turbo-debug-20261027:refs/remotes/origin/gpt/b140-attachment-turbo-debug-20261027'
+          git merge-base --is-ancestor HEAD origin/gpt/b140-attachment-turbo-debug-20261027 || {
+            echo 'The requested commit is not yet integrated into the reviewed B140 branch'; exit 1;
+          }
+          test -f android/card-request-worker/src/index.mjs
+          test -f android/card-request-worker/wrangler.toml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify Worker tests before production
+        run: node --test android/card-request-worker/tests/card-requests.test.mjs
+      - name: Install pinned Wrangler
+        run: npm install --no-save --no-audit --no-fund wrangler@4.40.0
+      - name: Deploy isolated Worker and configure secrets
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          GH_REQUEST_TOKEN: ${{ secrets.CARD_REQUESTS_GITHUB_TOKEN }}
+          RATE_SALT: ${{ secrets.CARD_REQUEST_RATE_SALT }}
+        run: |
+          set -euo pipefail
+          # No production multiplayer Worker changes; separate arcana-card-requests Worker.
+          npx wrangler deploy --config android/card-request-worker/wrangler.toml
+          printf '%s' "$GH_REQUEST_TOKEN" | npx wrangler secret put GITHUB_REQUESTS_TOKEN --config android/card-request-worker/wrangler.toml
+          printf '%s' "$RATE_SALT" | npx wrangler secret put RATE_SALT --config android/card-request-worker/wrangler.toml
+          echo 'Card request Worker deployment completed; check its /health endpoint before enabling Android.'
