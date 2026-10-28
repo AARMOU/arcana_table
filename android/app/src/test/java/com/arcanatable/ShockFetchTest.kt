@@ -25,7 +25,6 @@ class ShockFetchTest {
         val host = LocalArgentumHost(registry, you, ai, paceMs = 0) { inbox.put(it) }
         host.receive(JSONObject().put("type", "connect"))
         host.receive(JSONObject().put("type", "createQuickGameLobby"))
-        fun send(action: JSONObject) = host.receive(JSONObject().put("type", "submitAction").put("action", action).put("interactionEpoch", "offline"))
         var stage = 0
         var lifeAfter = -1
         var untapped = false
@@ -34,6 +33,10 @@ class ShockFetchTest {
         // pinpoints the stalled step instead of only reporting the final stage.
         val trail = ArrayDeque<String>()
         fun note(entry: String) { trail.addLast(entry); while (trail.size > 40) trail.removeFirst() }
+        fun send(action: JSONObject) {
+            note("submit ${action.optString(\"type\")} ${action.toString().take(180)}")
+            host.receive(JSONObject().put("type", "submitAction").put("action", action).put("interactionEpoch", "offline"))
+        }
         var lastMsgType = "none"
         while (stage < 4 && guard++ < 300) {
             val msg = inbox.poll(60, TimeUnit.SECONDS) ?: run { note("TIMEOUT(60s) after $lastMsgType at stage=$stage"); null } ?: break
@@ -91,7 +94,10 @@ class ShockFetchTest {
         host.shutdown()
         println("[shock-fetch] stage=$stage life=$lifeAfter untapped=$untapped guard=$guard")
         trail.forEach { println("[shock-fetch] $it") }
-        assertEquals("reached shock prompt; stage=$stage life=$lifeAfter untapped=$untapped guard=$guard\n" + trail.takeLast(15).joinToString("\n"), 4, stage)
+        // Keep newest exchanges first and on one line: JUnit/Actions reports often
+        // show only the leading failure message, obscuring the original stall.
+        val recentTrace = trail.takeLast(8).asReversed().joinToString(" | ") { it.replace('\n', ' ') }
+        assertEquals("reached shock prompt; stage=$stage life=$lifeAfter untapped=$untapped guard=$guard last=$lastMsgType trace=$recentTrace", 4, stage)
         assertEquals("fetch/shock life accounting; stage=$stage life=$lifeAfter untapped=$untapped", 17, lifeAfter)
         assertTrue("Stomping Ground untapped after Yes; stage=$stage life=$lifeAfter untapped=$untapped", untapped)
         assertFalse(lifeAfter < 0)
