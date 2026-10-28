@@ -37,9 +37,11 @@ test('PWA metadata and manifest are scoped to the control dashboard',()=>{
 test('service worker does not cache API or third-party data',()=>{
   const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
   assert.doesNotThrow(()=>new vm.Script(sw));
-  assert.ok(sw.includes("url.origin !== self.location.origin"));
-  assert.ok(sw.includes("new URL(self.registration.scope).pathname"));
-  assert.ok(sw.includes("request.method !== 'GET'"));
+  assert.ok(sw.includes("url.origin!==scope.origin"));
+  assert.ok(sw.includes("url.pathname.startsWith(scope.pathname)"));
+  assert.ok(sw.includes("request.method!=='GET'"));
+  assert.ok(sw.includes("shellUrls.has(url.href)"));
+  assert.ok(!sw.includes("'./card-gaps.json'"));
   assert.ok(!sw.includes('api.github.com'));
 });
 test('Pages publishes the install manifest, worker and icons',()=>{
