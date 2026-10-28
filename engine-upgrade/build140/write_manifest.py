@@ -11,7 +11,8 @@ sha = lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
 patches = sorted((ROOT / "argentum-patches").glob("*.patch"))
 patches += [ROOT / "engine-upgrade/eldrazi-temple/patches/0001-colorless-eldrazi-source-mana.patch",
             ROOT / "engine-upgrade/eldrazi-combined/patches/0002-devoid-after-temple.patch",
-            ROOT / "engine-upgrade/build140/patches/0001-devoid-sdk-surface.patch"]
+            ROOT / "engine-upgrade/build140/patches/0001-devoid-sdk-surface.patch",
+            ROOT / "engine-upgrade/build140/patches/0002-temple-projected-source-subtypes.patch"]
 report = json.loads((ROOT / "engine-upgrade/patch-report.json").read_text())
 status = {p["patch"]: p["status"] for p in report["patches"]}
 manifest = {

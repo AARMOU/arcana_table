@@ -8,6 +8,7 @@
 #   + engine-upgrade/eldrazi-temple/patches/0001  (ColorlessSubtypeSpellsOrAbilitiesOnly)
 #   + engine-upgrade/eldrazi-combined/patches/0002 (DevoidSpellsOnly; applies after Temple)
 #   + engine-upgrade/build140/patches/0001 (DevoidSpellsOnly SDK baseline + sdk-index; no rules change)
+#   + engine-upgrade/build140/patches/0002 (Temple: battlefield ability sources use current subtypes)
 #   + the Temple and Corrupted Crossroads engine specs.
 # Fails on any patch that does not apply exactly. Writes engine-source.txt (provenance).
 set -euo pipefail
@@ -24,6 +25,8 @@ ELDRAZI=(
   engine-upgrade/eldrazi-combined/patches/0002-devoid-after-temple.patch
   # Engine bookkeeping 0002 omitted: DevoidSpellsOnly's SDK surface-baseline line and sdk-index entry.
   engine-upgrade/build140/patches/0001-devoid-sdk-surface.patch
+  # Temple 0001 read printed+projected subtypes for ability sources, so a former Eldrazi kept paying.
+  engine-upgrade/build140/patches/0002-temple-projected-source-subtypes.patch
 )
 for p in "${ELDRAZI[@]}"; do
   git -C argentum-engine apply --check "$ROOT/$p"
