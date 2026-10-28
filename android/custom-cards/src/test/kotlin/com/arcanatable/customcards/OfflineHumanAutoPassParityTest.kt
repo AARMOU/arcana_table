@@ -92,7 +92,7 @@ class OfflineHumanAutoPassParityTest {
             val p = d.player1
             d.putCreatureOnBattlefield(p, "Ulalek, Fused Atrocity")
             val first = d.putCardInHand(p, "Elder Deep-Fiend")
-            d.putCardInHand(p, "Elder Deep-Fiend") // response with flash, if affordable
+            val response = d.putCardInHand(p, "Elder Deep-Fiend") // response with flash, if affordable
             d.giveColorlessMana(p, available)
             assertNull("Initial Eldrazi cast must be legal", d.castSpell(p, first).error)
             assertEquals("Caster retains priority after casting", p, d.state.priorityPlayerId)
@@ -116,6 +116,26 @@ class OfflineHumanAutoPassParityTest {
             assertTrue("Default should pass without explicit own-stack stops", passes(emptySet()))
             assertEquals("Opt-in stop must follow real flash affordability (initial mana=$available)",
                 !expectStop, passes(com.wingedsheep.engine.legalactions.OwnStackStop.entries.toSet()))
+
+            // Prove the priority verdict matches an actual legal/illegal response,
+            // rather than only comparing two auto-pass heuristics. A failed
+            // response must not consume mana or disturb Ulalek's trigger.
+            val beforeResponse = d.manaPool(p).colorless
+            val stackBeforeResponse = d.state.stack.toList()
+            val responseError = d.castSpell(p, response).error
+            if (expectStop) {
+                assertNull("Affordable flash Eldrazi must actually cast in this window", responseError)
+                assertEquals("Second Elder Deep-Fiend costs eight colorless", beforeResponse - 8,
+                    d.manaPool(p).colorless)
+                assertTrue("Original Ulalek trigger must remain on the stack",
+                    d.state.stack.containsAll(stackBeforeResponse))
+            } else {
+                assertNotNull("Unaffordable flash Eldrazi must be rejected", responseError)
+                assertEquals("Rejected response must not consume any colorless mana",
+                    beforeResponse, d.manaPool(p).colorless)
+                assertEquals("Rejected response must not alter the stack",
+                    stackBeforeResponse, d.state.stack)
+            }
         }
     }
 
