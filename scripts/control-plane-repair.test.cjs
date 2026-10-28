@@ -189,18 +189,32 @@ function statusGithub(existing = []) {
 }
 const botC = (id, body) => ({ id, body, user: { login: 'github-actions[bot]', type: 'Bot' } });
 
-test('billing status: verified figures, freshness, reserve and exclusions; no mentions or secrets', async () => {
-  const r = await B.readBudget(env({ COPILOT_BILLING_READ_TOKEN: 'ghp_SECRET' }), { now: new Date(NOW), fetchImpl: okFetch(810) });
+test('public billing status has level and freshness only: no credit figures, allowance, percentages, mentions or secrets', async () => {
+  const r = await B.readBudget(env({ COPILOT_BILLING_READ_TOKEN: 'ghp_SECRET' }), { now: new Date(NOW), fetchImpl: okFetch(810.25) });
   const p = S.billingPayload(r, { now: new Date(NOW) });
   assert.equal(p.ok, true);
-  assert.deepEqual([p.current.reportedCredits, p.current.allowanceCredits, p.current.reserveCredits, p.current.effectiveCredits,
-    p.current.remainingVerifiedCredits, p.current.remainingAfterReserveCredits], [810, 1500, 150, 960, 690, 540]);
+  assert.deepEqual(p.current, { measuredAt: iso(NOW), period: '2026-10', metric: 'ai_credits', level: 'warn', band: '50-75%' });
   assert.equal(p.lastSuccessAt, iso(NOW));
+  assert.equal(p.privateFigures, 'https://github.com/settings/billing');
   assert.ok(p.excludes.includes('ChatGPT usage'));
   const body = S.formatStatus('billing', p, S.billingSummary(p));
   assert.ok(body.startsWith(S.MARKERS.billing));
-  assert.doesNotMatch(body, /SECRET|@AARMOU|Bearer/);
+  // Neither the reported usage (810.25), the allowance (1500), the reserve (150), the effective total (960.25),
+  // the remaining credits (689.75) nor a utilization percentage (54/64) appears anywhere.
+  assert.doesNotMatch(body, /810|1500|1,500|150\b|960|689|540|\b54%|\b64%|SECRET|@AARMOU|Bearer/);
   assert.deepEqual(S.parseStatus(body).current, p.current);
+});
+
+test('public dispatcher status and job summary omit usage ratio, totals and allowance', async () => {
+  const f = dispatchGithub(); const summaries = [];
+  const core = { ...coreStub(), summary: { addHeading() { return this; }, addCodeBlock(x) { summaries.push(x); return this; }, addRaw(x) { summaries.push(x); return this; }, async write() {} } };
+  const r = await W.dispatcher({ github: f.github, context: { repo: { owner: 'AARMOU', repo: 'arcana_table' }, runId: 9, eventName: 'workflow_dispatch',
+    payload: { inputs: { dry_run: 'true' } } }, core, env: wfEnv(), readBudget: goodBudget });
+  assert.equal(r.result.state, 'dry-run');
+  assert.deepEqual(r.payload.decision, { issue: 70, allowed: false, dryRun: true, wouldAllow: true, reason: 'dry-run', level: 'normal' });
+  assert.equal(r.payload.liabilities.fixedReserve, 'private (10% of allowance)');
+  const published = f.writes.map(w => w[2]).join('\n') + summaries.join('\n');
+  assert.doesNotMatch(published, /"ratio"|reportedCredits|"allowance|"total"|\b300\b|\b450\b|1500/);
 });
 
 test('failed billing check keeps the last successful reading for display and states the block', () => {

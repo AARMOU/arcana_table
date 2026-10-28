@@ -4,6 +4,12 @@
 // dashboard can show billing and dispatcher state without credentials. Status comments are
 // display-only: admission never reads them, so a stale or forged status can never authorize spend.
 // No @-mentions, tokens, response bodies or headers are ever written.
+// PRIVACY: the repository is public, so status comments and job summaries never contain credit
+// figures, the allowance, utilization percentages or anything derived from them (the reserve is 10%
+// of the allowance). Only the threshold level (already public via #78 alerts), freshness, reasons
+// and next steps are published. Exact figures stay in GitHub's private billing settings.
+const PRIVATE_BILLING_URL = 'https://github.com/settings/billing';
+const LEVEL_BANDS = { normal: 'below 50%', warn: '50-75%', slow: '75-90%', paused: '90% or more', unknown: 'unknown' };
 const { billingAction } = require('./billing-monitor.cjs');
 
 const STATUS_ISSUE = 78;
@@ -81,32 +87,25 @@ function billingPayload(result, { env = {}, previous = null, now = new Date(), s
     const last = previous?.lastSuccess || (previous?.ok ? previous.current : null) || null;
     return { ok: false, source, checkedAt, level: 'unknown', reason: result?.error || 'billing-unavailable',
       action: billingAction(result?.error || 'billing-unavailable', env),
-      blocksDispatch: true, lastSuccess: last, lastSuccessAt: last?.measuredAt || null, notes,
+      blocksDispatch: true, lastSuccess: last ? { measuredAt: last.measuredAt, period: last.period, metric: last.metric, level: last.level, band: last.band } : null,
+      lastSuccessAt: last?.measuredAt || null, notes, privateFigures: PRIVATE_BILLING_URL,
       unit: 'ai-credits', excludes: ['premium requests', 'GitHub Actions minutes', 'ChatGPT usage'] };
   }
-  const current = {
-    measuredAt: s.measuredAt, period: s.period, metric: s.metric, account: s.account,
-    reportedCredits: round(s.reportedUsed), reserveCredits: round(s.reserved),
-    effectiveCredits: round(s.used), allowanceCredits: s.allowance,
-    remainingVerifiedCredits: round(s.allowance - s.reportedUsed),
-    remainingAfterReserveCredits: round(s.allowance - s.used),
-    reportedUtilization: round(s.reportedUsed / s.allowance),
-    effectiveUtilization: round(s.used / s.allowance), level,
-  };
+  // Level and freshness only: no credit counts, allowance or percentages (see PRIVACY above).
+  const current = { measuredAt: s.measuredAt, period: s.period, metric: s.metric, level, band: LEVEL_BANDS[level] || 'unknown' };
   return { ok: true, source, checkedAt, level, reason: null,
     action: level === 'paused' ? 'Wait for the monthly reset or an owner budget decision; new paid work is paused at 90%.' : null,
     blocksDispatch: level === 'paused', current, lastSuccess: current, lastSuccessAt: s.measuredAt, notes,
     thresholds: { warn: 0.5, slow: 0.75, paused: 0.9, reserve: '10% of allowance unless ARCANA_AI_CREDIT_RESERVE is set' },
-    unit: 'ai-credits', excludes: ['premium requests', 'GitHub Actions minutes', 'ChatGPT usage'] };
+    privateFigures: PRIVATE_BILLING_URL, unit: 'ai-credits', excludes: ['premium requests', 'GitHub Actions minutes', 'ChatGPT usage'] };
 }
 
 function billingSummary(p) {
   if (!p.ok) return [`Billing: UNAVAILABLE (${p.reason}). New paid work is blocked.`, p.action ? 'Next step: ' + p.action : '',
     p.lastSuccessAt ? 'Last successful check: ' + p.lastSuccessAt : 'No successful check recorded yet.'].filter(Boolean);
   const c = p.current;
-  return [`Billing level: ${p.level} — ${c.reportedCredits} of ${c.allowanceCredits} AI credits reported (${Math.round(c.reportedUtilization * 100)}%), ` +
-    `${c.effectiveCredits} including the ${c.reserveCredits}-credit reserve (${Math.round(c.effectiveUtilization * 100)}%).`,
-  `Checked: ${c.measuredAt}.`];
+  return [`Billing level: ${p.level} (${c.band} of the allowance, reserve included). Exact figures are private: ${PRIVATE_BILLING_URL}`,
+    `Checked: ${c.measuredAt}.`];
 }
 
 // Owner-facing explanation for each dispatcher outcome.
@@ -152,6 +151,20 @@ function ciAction(state, result, report) {
   return `Owner: no Arcana Development CI run exists for ${base}@${sha} (pushes made with GITHUB_TOKEN do not start CI). ${manual[0].toUpperCase() + manual.slice(1)}.`;
 }
 
+// Admission decision without usage ratio or credit totals.
+function publicDecision(d) {
+  if (!d) return null;
+  return { issue: d.issue ?? null, allowed: !!d.allowed, dryRun: !!d.dryRun, wouldAllow: !!d.wouldAllow, reason: d.reason || null,
+    level: d.budget?.level || null };
+}
+// Estimated reservations are configuration x unit counts; the fixed reserve, totals, reported credits
+// and allowance would reveal private usage, so they are dropped.
+function publicLiabilities(l) {
+  if (!l) return null;
+  return { activeUnits: l.activeUnits, pendingRepairs: l.pendingRepairs, recentlyFinished: l.recentlyFinished, candidate: l.candidate,
+    fixedReserve: 'private (10% of allowance)' };
+}
+
 function summarizeUnits(units = []) {
   const counts = {};
   for (const u of units) counts[u.state] = (counts[u.state] || 0) + 1;
@@ -179,7 +192,7 @@ function dispatcherPayload({ result, report = {}, ready, now = new Date(), runId
       errors: ready.errors, billingLagHours: ready.billingLagMs !== undefined ? ready.billingLagMs / 3600000 : null } : null,
     state, reason, action: ciAction(state, result, report) || dispatcherAction(state, reason), issue: result?.issue || null, result: result?.result || null,
     dispatchReady, workers: report.units ? summarizeUnits(report.units) : null,
-    decision: report.decision || null, liabilities: report.decision?.budget?.liabilities || null,
+    decision: publicDecision(report.decision), liabilities: publicLiabilities(report.decision?.budget?.liabilities),
     base: report.base || null, ciRuns: report.ciRuns || null,
   };
 }
@@ -192,5 +205,5 @@ function dispatcherSummary(p) {
     `Checked: ${p.checkedAt}.`].filter(Boolean);
 }
 
-module.exports = { STATUS_ISSUE, MARKERS, formatStatus, parseStatus, publishStatus, previousStatus, billingPayload,
+module.exports = { STATUS_ISSUE, MARKERS, PRIVATE_BILLING_URL, publicDecision, publicLiabilities, formatStatus, parseStatus, publishStatus, previousStatus, billingPayload,
   billingSummary, dispatcherAction, dispatcherPayload, dispatcherSummary, summarizeUnits, clean };

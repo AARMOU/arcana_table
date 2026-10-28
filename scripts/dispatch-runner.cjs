@@ -175,7 +175,9 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
     actionable: A.unitActionable(candidate.raw.body, base) },
     units, labeledCount: labeled.length, ready, snapshot, now: Math.max(now, Date.now()) });
   report.decision = { issue: n, ...decision };
-  await core.summary.addHeading('Admission decision').addCodeBlock(JSON.stringify({ issue: n, ...decision })).write();
+  // Job summaries of a public repository are public: no usage ratio or credit totals.
+  await core.summary.addHeading('Admission decision').addCodeBlock(JSON.stringify({ issue: n, allowed: !!decision.allowed,
+    dryRun: !!decision.dryRun, wouldAllow: !!decision.wouldAllow, reason: decision.reason, level: decision.budget?.level || null })).write();
   if (!decision.allowed) return done(decision.dryRun ? 'dry-run' : 'denied', { issue: n, reason: decision.reason });
 
   const runId = String(context.runId);
