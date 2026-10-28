@@ -173,6 +173,27 @@ export default {
       return authRedirect(st.r + "#review-session=" + encodeURIComponent(session));
     }
 
+    // Read-only session confirmation: lets the PWA distinguish a valid owner session
+    // from a lost/expired OAuth callback without ever posting a review.
+    // Must remain no-store even when the public-feed Worker cache is enabled.
+    if (url.pathname === "/v1/session") {
+      if (request.method === "OPTIONS") return new Response(null, {
+        status: origin === PWA_ORIGIN ? 204 : 403,
+        headers: origin === PWA_ORIGIN ? {
+          "Access-Control-Allow-Origin": PWA_ORIGIN,
+          "Access-Control-Allow-Methods": "GET",
+          "Access-Control-Allow-Headers": "Authorization",
+          "Access-Control-Max-Age": "600", "Vary": "Origin",
+          "Cache-Control": "no-store",
+        } : { "Cache-Control": "no-store" }
+      });
+      if (request.method !== "GET") return json({ error: "use-get" }, 405, origin);
+      if (origin !== PWA_ORIGIN) return json({ error: "origin-not-allowed" }, 403, origin);
+      const session = await openSession(env.SESSION_SECRET, (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""));
+      if (!session) return json({ error: "sign-in-required" }, 401, origin);
+      return json({ ok: true, login: session.login, expiresAt: session.exp }, 200, origin);
+    }
+
     if (url.pathname === "/v1/decision") {
       if (request.method === "OPTIONS") return new Response(null, { status: origin === PWA_ORIGIN ? 204 : 403, headers: origin === PWA_ORIGIN ? {
         "Access-Control-Allow-Origin": PWA_ORIGIN, "Access-Control-Allow-Methods": "POST", "Access-Control-Allow-Headers": "Authorization, Content-Type",

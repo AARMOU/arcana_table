@@ -137,6 +137,36 @@ test("sign-in: owner only, signed state, allow-listed return, session never cont
   assert.equal(forged.status, 400);
 });
 
+test("GET owner session checks authentication without writing or exposing OAuth tokens", async () => {
+  const gh = fakeGitHub();
+  const encrypted = await sealSession(SECRET, { t: "gho_owner", login: "AARMOU",
+    exp: Math.floor(Date.now() / 1000) + 600 });
+  const probe = (token, origin = PWA) => worker.fetch(new Request(W + "/v1/session", {
+    headers: { Origin: origin, ...(token ? { Authorization: "Bearer " + token } : {}) }
+  }), ENV, {}, gh.fetchImpl);
+  const valid = await probe(encrypted);
+  assert.equal(valid.status, 200);
+  assert.equal(valid.headers.get("Cache-Control"), "no-store");
+  assert.equal(valid.headers.get("Access-Control-Allow-Origin"), PWA);
+  const body = await valid.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.login, "AARMOU");
+  assert.equal(typeof body.expiresAt, "number");
+  assert.ok(!JSON.stringify(body).includes("gho_owner"));
+  assert.equal((await probe(null)).status, 401);
+  assert.equal((await probe("invalid")).status, 401);
+  assert.equal((await probe(encrypted, "https://evil.example")).status, 403);
+  const preflight = await worker.fetch(new Request(W + "/v1/session", {
+    method: "OPTIONS", headers: { Origin: PWA, "Access-Control-Request-Method": "GET",
+      "Access-Control-Request-Headers": "authorization" }
+  }), ENV, {}, gh.fetchImpl);
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get("Access-Control-Allow-Headers"), "Authorization");
+  assert.equal(preflight.headers.get("Access-Control-Allow-Methods"), "GET");
+  assert.equal(preflight.headers.get("Cache-Control"), "no-store");
+  assert.equal(gh.writes.length, 0, "Authentication status is read only");
+});
+
 test("health responds with CORS only for the Arcana Control origin", async () => {
   const allowed = await worker.fetch(new Request(W + "/health", { headers: { Origin: PWA } }), ENV);
   assert.equal(allowed.status, 200);

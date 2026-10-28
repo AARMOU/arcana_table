@@ -34,12 +34,88 @@ if (typeof module === 'object' && module.exports) { module.exports = api; return
 if (typeof document === 'undefined') return;
 
 // ---- Browser wiring ------------------------------------------------------------------------------
-const store = { get() { try { return localStorage.getItem(KEY); } catch { return null; } },
-  set(v) { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch {} } };
-const incoming = sessionFromHash(location.hash);
-if (incoming) { store.set(incoming); try { history.replaceState(null, '', location.pathname + location.search); } catch {} }
+// On Android the installed PWA, Chrome, and in-app browsers can have different
+// storage contexts. Do not silently discard the OAuth return or a storage error.
+const stores = () => {
+  const available = [];
+  for (const name of ['localStorage', 'sessionStorage']) {
+    try { if (root[name]) available.push(root[name]); } catch {}
+  }
+  return available;
+};
+const store = {
+  get() {
+    for (const storage of stores()) { try { const value = storage.getItem(KEY); if (value) return value; } catch {} }
+    return null;
+  },
+  set(value) {
+    let saved = false;
+    for (const storage of stores()) {
+      try { if (value) storage.setItem(KEY, value); else storage.removeItem(KEY); saved = true; } catch {}
+    }
+    return saved;
+  }
+};
 let serviceUp = null, data = null, listEl = null, onChange = null;
-fetch(REVIEW_API + '/health', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).then(j => { serviceUp = !!j?.ok; }).catch(() => { serviceUp = false; });
+let sheet;
+let authenticated = false, authNotice = '', validating = null;
+let refreshSheet = () => {};
+const redrawAuth = () => { if (sheet?.open) refreshSheet(); };
+function acceptOAuthReturn() {
+  const incoming = sessionFromHash(location.hash);
+  if (!incoming) return false;
+  const saved = store.set(incoming);
+  // Never leave the encrypted owner session in the address bar or browser history.
+  try { history.replaceState(null, '', location.pathname + location.search); } catch {}
+  authenticated = false;
+  authNotice = saved
+    ? 'GitHub returned an owner session. Validating it…'
+    : 'Your browser blocked session storage. Open Arcana Control directly in Chrome and sign in there.';
+  redrawAuth();
+  if (saved) void validateOwnerSession(true);
+  return true;
+}
+async function validateOwnerSession(force = false) {
+  const value = store.get();
+  if (!value) { authenticated = false; redrawAuth(); return; }
+  if (validating) return validating;
+  if (authenticated && !force) return;
+  authenticated = false;
+  authNotice = 'Checking your GitHub owner session…';
+  redrawAuth();
+  validating = (async () => {
+    try {
+      const response = await fetch(REVIEW_API + '/v1/session', {
+        method: 'GET', cache: 'no-store', headers: { Authorization: 'Bearer ' + value }
+      });
+      if (response.status === 401) {
+        store.set(null);
+        authNotice = 'The owner session expired or could not be verified. Sign in again.';
+        return;
+      }
+      if (!response.ok) { authNotice = 'Owner session check unavailable (HTTP ' + response.status + ').'; return; }
+      const result = await response.json();
+      if (result?.ok && String(result.login || '').toLowerCase() === 'aarmou' && store.get() === value) {
+        authenticated = true;
+        authNotice = 'Signed in as GitHub owner. No card decision has been submitted.';
+      } else {
+        authNotice = 'Could not confirm the GitHub owner session. Sign in again.';
+      }
+    } catch {
+      authNotice = 'Unable to reach the owner sign-in check. No approval was submitted.';
+    } finally { validating = null; redrawAuth(); }
+  })();
+  return validating;
+}
+root.addEventListener('hashchange', () => { acceptOAuthReturn(); });
+root.addEventListener('pageshow', () => {
+  if (!acceptOAuthReturn()) void validateOwnerSession();
+});
+root.addEventListener('storage', e => { if (e.key === KEY) { authenticated = false; void validateOwnerSession(true); } });
+if (!acceptOAuthReturn()) void validateOwnerSession();
+fetch(REVIEW_API + '/health', { cache: 'no-store' })
+  .then(r => r.ok ? r.json() : null).then(j => { serviceUp = !!j?.ok; redrawAuth(); })
+  .catch(() => { serviceUp = false; redrawAuth(); });
 
 const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text !== undefined) n.textContent = text; return n; };
 const safeUrl = u => typeof u === 'string' && u.startsWith('https://github.com/AARMOU/arcana_table/') ? u : 'https://github.com/AARMOU/arcana_table/pulls';
@@ -61,11 +137,10 @@ function render(container, payload, changed) {
   }
 }
 
-let sheet;
 function openSheet(item) {
   if (!sheet) { sheet = el('dialog'); sheet.style.cssText = 'max-width:640px;width:calc(100% - 32px);border:1px solid var(--line,#333);border-radius:14px;background:var(--panel,#111);color:var(--text,#eee);padding:16px'; document.body.append(sheet); }
   sheet.replaceChildren();
-  const close = el('button', 'btn', 'Close'); close.type = 'button'; close.addEventListener('click', () => sheet.close());
+  const close = el('button', 'btn', 'Close'); close.type = 'button'; close.addEventListener('click', () => { sheet.close(); refreshSheet = () => {}; });
   const head = el('div'); head.style.cssText = 'display:flex;justify-content:space-between;gap:8px;align-items:start';
   head.append(el('h2', '', String(item.card || 'Card')), close);
   const status = el('p', '', (LABELS[item.state] || item.state) + ' · ' + CERT[item.certification || 'not-run']);
@@ -84,14 +159,19 @@ function openSheet(item) {
   const actions = el('div'); actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px';
   const refresh = () => {
     const session = store.get();
-    approve.disabled = !session || !canApprove(item) || serviceUp === false;
-    reject.disabled = !session || !canDecide(item) || serviceUp === false;
-    signIn.hidden = !!session || serviceUp === false;
-    if (serviceUp === false) msg.textContent = 'Approvals service is not deployed yet: ask Claude/the owner to finish setup (see #81).';
-    else if (!session) msg.textContent = 'Sign in once to approve or request fixes from here.';
+    const ownerReady = !!session && authenticated;
+    approve.disabled = !ownerReady || !canApprove(item) || serviceUp !== true;
+    reject.disabled = !ownerReady || !canDecide(item) || serviceUp !== true;
+    signIn.hidden = ownerReady;
+    signIn.disabled = serviceUp === false;
+    if (serviceUp === false) msg.textContent = 'Review service unavailable. No card decision can be sent.';
+    else if (authNotice) msg.textContent = authNotice;
+    else if (!session) msg.textContent = 'Sign in with GitHub to approve or request a fix.';
+    else msg.textContent = 'Validating your owner session…';
   };
+  refreshSheet = refresh;
   async function send(decision) {
-    const session = store.get(); if (!session) return refresh();
+    const session = store.get(); if (!session || !authenticated || serviceUp !== true) return refresh();
     approve.disabled = reject.disabled = true; msg.textContent = 'Recording…';
     let status = 0, body = null;
     try {
@@ -102,7 +182,7 @@ function openSheet(item) {
     } catch { status = 0; }
     const m = decisionMessage(status, body);
     msg.textContent = m.text;
-    if (m.signIn) store.set(null);
+    if (m.signIn) { store.set(null); authenticated = false; authNotice = m.text; }
     if (m.ok && body?.state) { item.state = body.state; item.problems = body.state === 'changes-requested' ? ['You requested a fix on this commit'] : [];
       if (data) { data.awaitingReview = data.items.filter(x => x.state === 'awaiting-review' || x.state === 'certified').length; render(listEl, data); onChange?.(data); } }
     refresh();
