@@ -25,7 +25,7 @@ android {
         require(cardRequestUrl.isEmpty() || (cardRequestUrl.startsWith("https://") && !cardRequestUrl.contains('"') && !cardRequestUrl.contains('\\'))) {
             "arcanaCardRequestUrl must be an HTTPS endpoint without quotes or backslashes"
         }
-        buildConfigField("String", "CARD_REQUEST_ENDPOINT", "\\\"$cardRequestUrl\\\"")
+        buildConfigField("String", "CARD_REQUEST_ENDPOINT", "\"$cardRequestUrl\"")
         buildConfigField("int", "BASE_BUILD", "120")
         buildConfigField("String", "BASE_SOURCE", "\"3e17b24\"")
         manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build $versionCode"
