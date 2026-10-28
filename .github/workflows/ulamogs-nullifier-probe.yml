@@ -28,7 +28,7 @@ jobs:
       - name: Run focused real Argentum engine scenarios
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.UlamogsNullifierScenarioTest'
-      - name: Require all three test cases actually execute
+      - name: Require all four test cases actually execute
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -38,7 +38,7 @@ jobs:
           root=ET.parse(report).getroot()
           stats={k:int(root.get(k, 0)) for k in ('tests','failures','errors','skipped')}
           print(stats)
-          assert stats==dict(tests=3, failures=0, errors=0, skipped=0), f'Nullifier engine probe not green: {stats}'
+          assert stats==dict(tests=4, failures=0, errors=0, skipped=0), f'Nullifier engine probe not green: {stats}'
           PY
       - uses: actions/upload-artifact@v4
         if: always()
