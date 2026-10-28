@@ -1,0 +1,18 @@
+name: Build 134 review patch helper tests
+on:
+  push:
+    branches:
+      - gpt/build134-review-patch-apply-20261028
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+      - name: Exercise exact-patch guardrails
+        run: python3 -m unittest discover -s tools/release/tests -p 'test_apply_build134_review_patch.py' -v
