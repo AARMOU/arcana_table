@@ -1,0 +1,166 @@
+name: Build 134 engine candidate (source build, CI-only runtime)
+# Claude lane for Build 134 blocker 1 (#81, #346). Rebuilds the four runtime jars from
+# wingedsheep/argentum-engine@61e71e5 + Arcana's mandatory patch series (0001-0008, 0011-0016)
+# + the two Eldrazi engine patches (Temple 0001, Devoid 0002), runs the engine suites with the
+# Eldrazi/Ulalek engine specs, then runs Arcana's custom-card and Android suites against the rebuilt
+# jars installed ONLY in this workspace. Never commits jars, builds or uploads an APK/AAB, signs,
+# deploys, or posts to issues. Every gate runs so one failure does not hide the next.
+on:
+  push:
+    branches: [claude/build134-engine-jars-20261028]
+    paths:
+      - .github/workflows/build134-engine-candidate.yml
+      - engine-upgrade/**
+      - argentum-patches/**
+      - android/**
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: build134-engine-candidate
+  cancel-in-progress: true
+
+env:
+  UPSTREAM: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+
+jobs:
+  engine-tests:
+    name: engine ${{ matrix.suite }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [sdk-rules-ai, set-scenarios]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: ${{ env.UPSTREAM }}
+          path: argentum-engine
+          persist-credentials: false
+      - name: Apply engine source (mandatory series, Ulalek stage, Eldrazi patches, engine specs)
+        run: bash engine-upgrade/build134/apply_engine.sh
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: SDK, rules engine (incl. Eldrazi/Ulalek specs) and AI suites
+        if: matrix.suite == 'sdk-rules-ai'
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:test :rules-engine:test :ai:test
+      - name: Every set's card scenario suite
+        if: matrix.suite == 'set-scenarios'
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sets:scenarioTest
+      - name: Count engine test results
+        if: always()
+        run: python3 engine-upgrade/build134/count_junit.py "engine ${{ matrix.suite }}" "argentum-engine/**/build/test-results/**/TEST-*.xml" | tee engine-summary.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: engine-${{ matrix.suite }}
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            engine-summary.txt
+            engine-source.txt
+            engine-upgrade/patch-report.json
+            engine-upgrade/ulalek/apply-report.json
+            argentum-engine/**/build/test-results/**/TEST-*.xml
+
+  app-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: ${{ env.UPSTREAM }}
+          path: argentum-engine
+          persist-credentials: false
+      - name: Apply engine source (same script as the engine job)
+        run: bash engine-upgrade/build134/apply_engine.sh
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Build the four Java 17 runtime jars and the card corpus
+        working-directory: argentum-engine
+        run: ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar :arcana-export:run
+      - name: Install candidate jars in this workspace only; record hashes and missing-symbol presence
+        run: python3 engine-upgrade/build134/install_candidate.py | tee candidate-summary.txt
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - id: custom_compile
+        name: "Gate 1: :custom-cards:compileKotlin (the Build 134 blocker)"
+        continue-on-error: true
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:compileKotlin
+      - id: export
+        name: "Gate 2: re-export custom cards; committed data must match exactly"
+        continue-on-error: true
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          git diff --stat -- app/src/main/assets/argentum/custom-cards.jsonl app/src/main/assets/argentum/custom-cards.index.tsv
+          git diff --exit-code -- app/src/main/assets/argentum/custom-cards.jsonl app/src/main/assets/argentum/custom-cards.index.tsv
+      - id: custom_tests
+        name: "Gate 3: custom-card scenarios (Abaddon, Crossroads, Temple, Ulalek and the rest)"
+        continue-on-error: true
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test
+      - id: app_debug
+        name: "Gate 4: Android debug unit tests"
+        continue-on-error: true
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+      - id: app_release
+        name: "Gate 5: Android release unit tests (incl. ReleaseVariantScopeTest; still encodes the old scope)"
+        continue-on-error: true
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest
+      - id: assemble
+        name: "Gate 6: compile the debug app on candidate jars (stays in CI, never uploaded)"
+        continue-on-error: true
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:assembleDebug
+      - name: Count app and custom-card results
+        if: always()
+        run: |
+          {
+            echo "gates: custom-compile=${{ steps.custom_compile.outcome }} export=${{ steps.export.outcome }} custom-tests=${{ steps.custom_tests.outcome }} app-debug=${{ steps.app_debug.outcome }} app-release=${{ steps.app_release.outcome }} assemble-debug=${{ steps.assemble.outcome }}"
+            python3 engine-upgrade/build134/count_junit.py custom-cards "android/custom-cards/build/test-results/**/TEST-*.xml"
+            python3 engine-upgrade/build134/count_junit.py precon-four "android/custom-cards/build/test-results/**/TEST-*.xml" "Abaddon|Crossroads|EldraziTemple|Ulalek"
+            python3 engine-upgrade/build134/count_junit.py app-debug "android/app/build/test-results/testDebugUnitTest/TEST-*.xml"
+            python3 engine-upgrade/build134/count_junit.py app-release "android/app/build/test-results/testReleaseUnitTest/TEST-*.xml"
+          } | tee -a candidate-summary.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: app-candidate
+          retention-days: 30
+          if-no-files-found: warn
+          path: |
+            candidate-summary.txt
+            engine-source.txt
+            android/custom-cards/build/test-results/
+            android/app/build/test-results/
+      - name: Fail if any gate failed (all gates already ran)
+        if: always()
+        run: |
+          for o in "${{ steps.custom_compile.outcome }}" "${{ steps.export.outcome }}" "${{ steps.custom_tests.outcome }}" "${{ steps.app_debug.outcome }}" "${{ steps.app_release.outcome }}" "${{ steps.assemble.outcome }}"; do
+            [ "$o" = success ] || { echo "::error::At least one Build 134 gate failed; see candidate-summary.txt"; exit 1; }
+          done
