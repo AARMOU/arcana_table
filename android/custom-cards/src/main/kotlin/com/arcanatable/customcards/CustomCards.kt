@@ -93,6 +93,7 @@ object CustomCards {
         Entry(SliverGravemother, "CMM", SLIVERS),
         // Other cards from the submitted collection. Unsupported mechanics remain listed in
         // android/docs/CUSTOM_CARDS_HANDOFF.md rather than being approximated silently.
+        Entry(AbstruseArchaic, "CMM", POOL),
         Entry(ConstrictingSliver, "CMM", POOL),
         Entry(AllosaurusShepherd, "2X2", POOL),
         Entry(BarretAvalancheLeader, "FIC", POOL),

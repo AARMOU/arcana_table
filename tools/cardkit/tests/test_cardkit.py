@@ -360,8 +360,22 @@ class GapsTests(unittest.TestCase):
         result = gaps.analyze(gaps.load_decks(), use_refs=False)
         audit = subprocess.run([sys.executable, str(repo.ROOT / "investigation/argentum-six-precons/coverage-audit.py")],
                                capture_output=True, text=True, check=True).stdout
+        manifest = json.loads((repo.ROOT / "investigation/argentum-six-precons/deck-manifest.json").read_text())
+        indexed_cards = {
+            repo.normalize_name(line.split("\t", 1)[0])
+            for path in manifest["baseline"]["cardIndexes"]
+            for line in (repo.ROOT / path).read_text().splitlines()
+            if line.strip()
+        }
         for d in result["decks"]:
-            self.assertIn(f"{d['name']}: {d['playableSlots']}/100 supported", audit)
+            custom_playable = sum(
+                card["slots"] for card in result["cards"]
+                if card["readiness"] == "IMPLEMENTED_AND_TESTED"
+                and card["source"].startswith("custom:")
+                and repo.normalize_name(card["name"]) not in indexed_cards
+                and d["name"] in card["decks"]
+            )
+            self.assertIn(f"{d['name']}: {d['playableSlots'] - custom_playable}/100 supported", audit)
         self.assertEqual(sum(result["totals"].values()), len(result["cards"]))
         self.assertEqual(set(result["dispatch"]), {"copilot", "claude", "gpt", "claimed", "claimsVerified", "dispatchable"})
 
