@@ -162,3 +162,24 @@ test('owner selections never fake an actionable queue unit or suppress eligibili
   const p = Q.queuePayload({ result: r, units: [{ name: CARD, body: BODY }], base: BASE, baseSha: SHA });
   assert.equal(Q.chooseAutoQueue(p, [request]).suggestion.name, CARD);
 });
+
+test('Copilot PR wakeups are restricted to trusted main code and the configured integration base', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const workflow = fs.readFileSync(path.join(__dirname, '../.github/workflows/arcana-queue-feeder.yml'), 'utf8');
+  assert.match(workflow, /pull_request_target:\\s*\\n\\s+types: \\[opened, synchronize, ready_for_review\\]/);
+  // These checks must be present on BOTH read-only classification and write-enabled publishing.
+  for (const gate of [
+    "github.event_name == 'pull_request_target'",
+    "github.event.pull_request.user.login == 'Copilot'",
+    'github.event.pull_request.base.ref == vars.ARCANA_INTEGRATION_BASE',
+    'github.event.pull_request.head.repo.full_name == github.repository',
+    'github.event.pull_request.head.repo.fork == false',
+  ]) assert.equal(workflow.split(gate).length - 1, 2, 'both jobs must check: ' + gate);
+  assert.equal(workflow.split("ref: ${{ github.event_name == 'pull_request_target' && 'main' || github.workflow_sha }}").length - 1, 2,
+    'both checkout steps must use trusted main rather than the PR head');
+  assert.match(workflow, /ARCANA_AUTOMATION_READY==='true' && process.env.ARCANA_DISPATCH_MODE==='normal'/,
+    'queue creation remains opt-in to normal readiness');
+  assert.match(workflow, /createWorkflowDispatch\\(\\{\\.\\.\\.context\\.repo,workflow_id:'arcana-card-dispatcher\\.yml'/,
+    'new work must still go through the guarded dispatcher, not a browser or Copilot direct call');
+});
