@@ -5,11 +5,7 @@ name: Arcana Queue Feeder
 on:
   schedule:
     - cron: '*/15 * * *'
-  # Best-effort immediate handoff when GitHub's Copilot dynamic workflow completes.
-  # The schedule remains a fallback for dropped/unavailable completion events.
-  workflow_run:
-    workflows: ['Running Copilot cloud agent']
-    types: [completed]
+  # Periodic pickup; GitHub's scheduler may delay individual executions.
   workflow_dispatch:
     inputs:
       max:
