@@ -2737,17 +2737,6 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RewindScenarioTest.kt"
     }
    ]
-  },
-  "Effects.discardHand": {
-   "count": 1,
-   "examples": [
-    {
-     "card": "Blood for the Blood God!",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BloodForTheBloodGod.kt",
-     "lines": 41,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BloodForTheBloodGodScenarioTest.kt"
-    }
-   ]
   }
  },
  "Keyword": {
@@ -5112,6 +5101,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CaptainJamesTKirk.kt",
      "lines": 61,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CaptainJamesTKirkScenarioTest.kt"
+    }
+   ]
+  },
+  "Patterns.Hand.discardHand": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Blood for the Blood God!",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BloodForTheBloodGod.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BloodForTheBloodGodScenarioTest.kt"
     }
    ]
   },
