@@ -3,6 +3,20 @@ const $=id=>document.getElementById(id),ISSUES='https://github.com/AARMOU/arcana
 const PAGE=100,OUTSIDE='__outside_decks__';
 let deckCards=[],libraryCards=[],deckSource='',librarySource='',view='decks',showCount=PAGE,deckReady=false,libraryReady=false;
 const chosen=new Map(),clean=s=>String(s||'').normalize('NFKC').trim().replace(/\s+/g,' ').slice(0,150),key=s=>clean(s).toLocaleLowerCase('en');
+const Preflight=globalThis.ArcanaCardPreflight;
+const verified=new Map();
+let feederData=null, eligibility={ok:false,reason:'Waiting for a complete Cardkit snapshot.'},checking=false,revision=0;
+function sourceRef(){return deckSource && deckSource.includes('@')?deckSource:librarySource;}
+function currentEligibility(){
+ if(deckSource && librarySource && deckSource.includes('@') && librarySource.includes('@') && deckSource!==librarySource)
+  return {ok:false,reason:'Deck and library sources disagree. Refresh the published app.'};
+ return Preflight.parseSnapshot(feederData,sourceRef());
+}
+function allVerified(){
+ const current=currentEligibility();
+ return !checking && current.ok && chosen.size>0 &&
+  [...chosen].every(([k])=>verified.get(k)?.ok);
+}
 const rank=s=>({missing:0,'face-name-review':1,indexed:2,manual:3})[s]??3;
 const status=s=>({missing:'Not indexed','face-name-review':'Double-face name review',indexed:'Indexed · rules unverified',manual:'Manually entered'})[s]||'Unverified';
 function elem(t,c,s){const n=document.createElement(t);if(c)n.className=c;if(s!==undefined)n.textContent=s;return n;}
@@ -46,16 +60,44 @@ function restore(){try{
 function selected(){
  $('selected').replaceChildren();
  if(!chosen.size)$('selected').append(elem('span','muted','Select some cards above.'));
- for(const c of chosen.values())$('selected').append(elem('span','tag',c.name));
+ for(const c of chosen.values()){
+  const wrapper=elem('div','entry');
+  const result=verified.get(key(c.name));
+  const textPart=elem('span','');
+  textPart.append(elem('span','name',c.name),elem('span','decks',
+    result ? (result.ok?'✓ '+result.reason : '✕ '+result.reason) : 'Not yet verified — no submission allowed'));
+  wrapper.append(textPart);
+  if(result?.suggestion && result.suggestion!==c.name){
+   const button=elem('button','btn','Use '+result.suggestion);
+   button.type='button';
+   button.addEventListener('click',()=>replaceWithSuggestion(c.name,result.suggestion));
+   wrapper.append(button);
+  }
+  $('selected').append(wrapper);
+ }
+ const eligible=currentEligibility();
+ text('verificationStatus',checking?'Checking printed names against Scryfall…':
+   !eligible.ok?eligible.reason:allVerified()?'All selected cards verified. You may review the GitHub request.':
+   'Select cards and tap Verify selected cards. Copilot-unsupported cards cannot be submitted through this route.');
  text('picked',chosen.size+' card'+(chosen.size===1?'':'s')+' selected');
- $('request').disabled=!chosen.size;$('clear').disabled=!chosen.size;save();
+ $('verifyCards').disabled=checking||!chosen.size||!eligible.ok;
+ $('request').disabled=!allVerified();$('clear').disabled=checking||!chosen.size;save();
+}
+function resetVerification(){revision++;verified.clear();}
+function replaceWithSuggestion(oldName, suggested){
+ if(checking)return;
+ const old=chosen.get(key(oldName));
+ if(!old||chosen.has(key(suggested)))return;
+ chosen.delete(key(oldName));chosen.set(key(suggested),{...old,name:suggested,origin:'owner-confirmed-canonical-name'});
+ resetVerification();selected();draw();
 }
 function choose(item,on){
+ if(checking)return false;
  const k=key(item.name);
- if(!on){chosen.delete(k);selected();draw();return true;}
+ if(!on){chosen.delete(k);resetVerification();selected();draw();return true;}
  if(!chosen.has(k)&&chosen.size>=MAX){text('notice','Limit: 8 cards per request. Submit this batch before selecting more.');draw();return false;}
  chosen.set(k,{name:item.name,status:item.status,decks:item.decks,origin:item.origin});
- text('notice','');selected();draw();return true;
+ resetVerification();text('notice','');selected();draw();return true;
 }
 function deckNames(){
  const found=new Set();
@@ -112,7 +154,7 @@ async function loadDecks(){
   deckCards=data.cards;deckSource=report.sourceRef;
   const missing=deckCards.filter(c=>c.status==='missing').length,review=deckCards.filter(c=>c.status==='face-name-review').length;
   text('deckUnique',number(deckCards.length));text('deckMissing',number(missing));text('deckReview',number(review));
-  deckReady=true;
+  deckReady=true;eligibility=currentEligibility();selected();
   if(view==='decks')syncMode();else updateDeckFilter();
  }catch(e){
   text('deckUnique','—');text('deckMissing','—');text('deckReview','—');
@@ -127,7 +169,7 @@ async function loadCatalog(){
   const report=await r.json();libraryCards=digestCatalog(report);librarySource=report.sourceRef;
   text('libraryTotal',number(libraryCards.length));
   text('libraryStatus','Index snapshot: '+librarySource+' · indexed names only; not rules-certified. Token-only entries excluded.');
-  libraryReady=true;if(view==='library')syncMode();
+  libraryReady=true;eligibility=currentEligibility();selected();if(view==='library')syncMode();
  }catch(e){
   text('libraryStatus','Library catalog unavailable: '+e.message+'. Deck Needs may still work.');
   text('libraryTotal','—');libraryReady=true;librarySource='Library unavailable';
@@ -157,6 +199,7 @@ async function loadPriorityStatus(){
   const match=row?.body?.match(/```json\s*\n([\s\S]*?)\n```/);
   if(!match)throw Error('No published feeder snapshot');
   const data=JSON.parse(match[1]);
+  feederData=data;eligibility=currentEligibility();resetVerification();selected();
   const blocked=Array.isArray(data.blockedRequests)?data.blockedRequests:[];
   const ready=Array.isArray(data.suggestions)?data.suggestions.filter(x=>x.ready&&Number.isSafeInteger(x.requestedIssue)):[];
   el.replaceChildren();
@@ -175,11 +218,40 @@ async function loadPriorityStatus(){
   el.replaceChildren(elem('p','muted','Priority status unavailable: '+e.message+'. Your GitHub request remains the source of record.'));
  }
 }
+async function verifySelected(){
+ if(checking||!chosen.size)return;
+ eligibility=currentEligibility();
+ if(!eligibility.ok){text('notice',eligibility.reason);selected();return;}
+ resetVerification();const token=revision;
+ checking=true;selected();
+ for(const c of [...chosen.values()]){
+  const identity=await Preflight.verifyPrintedCard(fetch,c.name);
+  if(token!==revision)return;
+  const capability=identity.ok?Preflight.assessCard(identity.name,eligibility):{ok:false,reason:identity.reason};
+  verified.set(key(c.name),{ok:identity.ok&&capability.ok,
+    reason:identity.ok?capability.reason:identity.reason,
+    suggestion:identity.suggestion||null,verifiedName:identity.name||null});
+  selected();
+ }
+ checking=false;selected();
+ const rejected=[...chosen.values()].filter(c=>!verified.get(key(c.name))?.ok);
+ text('notice',rejected.length?rejected.length+' card(s) failed verification; correct or remove them before submitting.':
+   'Verified. You can now review the GitHub request.');
+}
 function request(){
- const picked=[...chosen.values()];if(!picked.length||picked.length>MAX)return;
+ const picked=[...chosen.values()];
+ if(!allVerified()||!picked.length||picked.length>MAX){
+  text('notice','Verify every selected printed card and Cardkit eligibility first. No request opened.');return;
+ }
+ // A stale source never authorizes a new request, even if an old verification passed.
+ eligibility=currentEligibility();
+ if(!eligibility.ok){text('notice',eligibility.reason);selected();return;}
  const title='[Card Request] '+picked.map(c=>c.name).join(', ').slice(0,175);
  const lines=['## Cards requested',...picked.map(c=>'- '+c.name+' — '+status(c.status)+(c.decks.length?' — '+c.decks.join('; '):' — outside scanned decks or manually entered')+' ('+(c.origin||'unverified')+')'),
   '','## Source and triage','- Deck scan source: '+(deckSource||'unavailable'),'- Argentum index source: '+(librarySource||'unavailable'),
+  '- Card identity was checked against Scryfall exact printed names before submission.', 
+  '- Cardkit eligibility checked against complete unclaimed SUPPORTED/copilot allowlist at '+eligibility.baseSha+'.',
+  '- These preliminary checks are NOT gameplay certification; the dispatcher independently rechecks feasibility, CI and billing.',
   '- An indexed card is NOT necessarily implemented or Oracle-verified. The catalog excludes token-only names.',
   '- Check existing PRs, engine blockers, and regression acceptance before making any worker unit.','- Coordinate with #321 and #81; do not duplicate assignments.',
   '','## Request status','Owner-selected priority request only, not an [Arcana Queue] work unit. The trusted feeder prioritizes ONLY Cardkit SUPPORTED/copilot, unclaimed cards; unsupported or unknown cards must remain blocked. Paid assignment still requires fresh exact-SHA feasibility, CI, budget reserve and worker-capacity gates. No immediate worker, merge or APK build authorized.'];
@@ -194,7 +266,8 @@ $('deck').addEventListener('change',()=>{showCount=PAGE;draw();});
 $('coverage').addEventListener('change',()=>{showCount=PAGE;draw();});
 $('showMore').addEventListener('click',()=>{showCount+=PAGE;draw();});
 $('add').addEventListener('submit',e=>{e.preventDefault();const name=clean($('manual').value);if(name.length<2){text('notice','Enter a complete card name.');return;}if(choose({name,status:'manual',decks:[],origin:'manual'},true))$('manual').value='';});
-$('clear').addEventListener('click',()=>{chosen.clear();selected();draw();});
+$('clear').addEventListener('click',()=>{if(checking)return;chosen.clear();resetVerification();selected();draw();});
+$('verifyCards').addEventListener('click',verifySelected);
 $('request').addEventListener('click',request);
 restore();selected();syncMode();loadDecks();loadCatalog();openIssues();loadPriorityStatus();
 })();
