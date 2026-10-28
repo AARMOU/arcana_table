@@ -809,12 +809,23 @@ jobs:
             git add -N -- "$path"
           done
           patch=combined-evidence/build134-integrated-source.patch
+          # Generated Argentum JARs are build products, not reviewable source.
+          # Including four rebuilt JAR binary deltas inflated the previous patch
+          # to 39,452,543 bytes and failed the 25 MB source-only limit.
+          # Preserve their hashes separately for build provenance.
+          sha256sum android/app/libs/argentum-*.jar > combined-evidence/argentum-generated-jars.sha256
           git diff --binary --full-index "$GITHUB_SHA" -- . \
-            ':(exclude)android/app/src/test/java/com/arcanatable/Build134ReleaseScopeTest.kt' > "$patch"
+            ':(exclude)android/app/src/test/java/com/arcanatable/Build134ReleaseScopeTest.kt' \
+            ':(exclude)android/app/libs/*.jar' > "$patch"
           test -s "$patch"
           test "$(wc -c < "$patch")" -lt 25000000
+          if grep -q '^diff --git a/android/app/libs/.*\\.jar ' "$patch"; then
+            echo "::error::Generated JAR included in source-only review patch"
+            exit 1
+          fi
           git diff --name-status "$GITHUB_SHA" -- . \
             ':(exclude)android/app/src/test/java/com/arcanatable/Build134ReleaseScopeTest.kt' \
+            ':(exclude)android/app/libs/*.jar' \
             > combined-evidence/build134-integrated-source-files.txt
           # Prove the exported patch applies to the immutable checkout; this is
           # a read-only review artifact, never a remote branch or signed build.
