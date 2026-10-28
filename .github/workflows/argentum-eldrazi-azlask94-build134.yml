@@ -647,7 +647,7 @@ jobs:
           cat combined-evidence/apk.sha256
       - name: Upload APK only when every integrated source, card, AI, and app gate passed
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: arcana-combined-argentum-eldrazi94-build134-logo-polish-debug-apk
           retention-days: 14
