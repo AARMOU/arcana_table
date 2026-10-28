@@ -120,3 +120,25 @@ test('review inbox shows Copilot cards awaiting owner review, read-only, linking
   const script = html.slice(html.indexOf('// REVIEW_INBOX'), html.indexOf('async function fetchControl'));
   assert.ok(!/POST|PUT|PATCH|DELETE|innerHTML/.test(script));
 });
+test('authorization button follows the dispatcher verdict, not a client copy of its rules',()=>{
+  const {eligibility,reasonText}=require('./authorize.js');
+  const src=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
+  assert.ok(!src.includes('Exact current Oracle behavior'),'no mirrored Worker schema');
+  assert.deepEqual(eligibility({n:1,state:'queued',eligible:true,skip:null}),{ok:true});
+  // A status published before verdicts existed carries no eligible flag: fail closed.
+  assert.equal(eligibility({n:1,state:'queued',skip:null}).ok,false);
+  assert.equal(eligibility(undefined).ok,false);
+  assert.match(reasonText('has-open-pr #219'),/open PR \(#219\)/);
+  assert.match(reasonText('feasibility: not Copilot-ready: X=NEEDS_REVIEW'),/Not Copilot-ready/);
+  assert.match(reasonText('feasibility: feasibility-stale (classified a, base is b)'),/pending/);
+  assert.match(reasonText('not-actionable: cards-or-discovery,acceptance,base-missing'),/Old-format/);
+});
+test('service worker revalidates the shell so a deploy reaches the installed app',()=>{
+  const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
+  assert.ok(sw.includes("fetch(request,{cache:'no-cache'})"));
+  assert.ok(sw.includes('caches.match(request)'),'offline fallback kept');
+});
+test('an approved card that cannot run yet says why it is waiting',()=>{
+  const src=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
+  assert.ok(src.includes("'Approved — waiting: ' + reasonText(unit.skip)"));
+});

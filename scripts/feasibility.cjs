@@ -72,26 +72,28 @@ function overrideOf(events, labels) {
 }
 
 // { ok, reason, cards:[{name, readiness, route, hint}] }. Unknown or missing data is "not ok".
+// Every result carries a structured `code` (ok, override-ok, auto-override-prohibited,
+// override-unauthorized, unavailable, stale, no-cards, not-ready); callers branch on it, not on text.
 function assess({ body, override = null, approvers = [], verdicts, baseSha }) {
   const allowed = (approvers || []).map(a => String(a).toLowerCase());
   // Automatically queued issues never bypass Cardkit, even with an owner-added
   // feasibility override. Manual/legacy units retain their explicit override.
   if (override && String(body || '').startsWith('<!-- arcana-auto-queue-v1 -->\n'))
-    return { ok: false, reason: 'automatic queue: Cardkit feasibility override prohibited', cards: [] };
+    return { ok: false, reason: 'automatic queue: Cardkit feasibility override prohibited', cards: [], code: 'auto-override-prohibited' };
   if (override) {
     if (override.actor && allowed.includes(String(override.actor).toLowerCase()))
-      return { ok: true, reason: 'owner-reviewed by ' + override.actor, cards: [] };
-    return { ok: false, reason: 'feasibility label not applied by an approver', cards: [] };
+      return { ok: true, reason: 'owner-reviewed by ' + override.actor, cards: [], code: 'override-ok' };
+    return { ok: false, reason: 'feasibility label not applied by an approver', cards: [], code: 'override-unauthorized' };
   }
   const names = unitCards(body);
-  if (!verdicts) return { ok: false, reason: 'feasibility-unavailable (Cardkit verdicts missing)', cards: [] };
-  if (baseSha && verdicts.baseSha !== baseSha) return { ok: false, reason: 'feasibility-stale (classified ' + verdicts.baseSha.slice(0, 7) + ', base is ' + String(baseSha).slice(0, 7) + ')', cards: [] };
-  if (!names.length) return { ok: false, reason: 'no named cards to classify (discovery unit needs owner review)', cards: [] };
+  if (!verdicts) return { ok: false, reason: 'feasibility-unavailable (Cardkit verdicts missing)', cards: [], code: 'unavailable' };
+  if (baseSha && verdicts.baseSha !== baseSha) return { ok: false, reason: 'feasibility-stale (classified ' + verdicts.baseSha.slice(0, 7) + ', base is ' + String(baseSha).slice(0, 7) + ')', cards: [], code: 'stale' };
+  if (!names.length) return { ok: false, reason: 'no named cards to classify (discovery unit needs owner review)', cards: [], code: 'no-cards' };
   const cards = names.map(n => ({ name: n, ...(verdicts.cards[normName(n)] || { readiness: 'UNCLASSIFIED', route: null }) }));
   const bad = cards.filter(c => c.readiness !== READY.readiness || c.route !== READY.route);
-  if (bad.length) return { ok: false, cards,
+  if (bad.length) return { ok: false, cards, code: 'not-ready',
     reason: 'not Copilot-ready: ' + bad.map(c => `${c.name}=${c.readiness}${c.hint ? '(' + c.hint + ')' : ''}${c.route && c.route !== 'copilot' ? ' route ' + c.route : ''}`).join('; ') };
-  return { ok: true, reason: 'cardkit SUPPORTED', cards };
+  return { ok: true, reason: 'cardkit SUPPORTED', cards, code: 'ok' };
 }
 
 module.exports = { FEASIBILITY_LABEL, unitCards, collectNames, buildVerdicts, parseVerdicts, overrideOf, assess, normName };

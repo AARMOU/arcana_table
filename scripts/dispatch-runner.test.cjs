@@ -161,13 +161,28 @@ test('a vague unit is denied before any write or assignment, in every mode', asy
     const r = await run(f, { ARCANA_DISPATCH_MODE: mode }, { fetchImpl: fetchOk(calls) });
     // A specifically authorized normal-mode unit fails visibly instead of silently
     // selecting another card. Dry-run continues to skip incomplete ordinary candidates.
-    if (mode === 'dry-run') assert.equal(r.state, 'nothing-eligible', mode);
-    else { assert.equal(r.state, 'denied', mode); assert.match(r.reason, /unit-not-actionable/); }
-    assert.equal(calls.length, 0); assert.equal(f.writes.length, 0);
+    // An approved unit that can never be assigned as written has its approval withdrawn instead
+    // of pinning the queue; nothing else is written, assigned or billed.
+    if (mode === 'dry-run') { assert.equal(r.state, 'nothing-eligible', mode); assert.equal(f.writes.length, 0); }
+    else {
+      assert.equal(r.state, 'authorized-unit-not-eligible', mode); assert.match(r.reason, /approval withdrawn: not-actionable/);
+      assert.deepEqual(f.writes.map(w => w[0]), ['removeLabel', 'comment'], mode);
+      assert.match(f.writes[1][2], /op:observation[\s\S]*reason:owner approval withdrawn, not assignable: not-actionable/);
+    }
+    assert.equal(calls.length, 0);
   }
 });
 
 test('a unit whose Base line names another branch is denied', async () => {
   const f = fake({ issues: [queue(68, [A.ONE_SHOT_LABEL], BODY.replace(BASE, 'gpt/six-precon-worker-integration-20261022'))] });
   assert.match((await run(f, {})).reason, /base-mismatch/);
+});
+
+test('every queued unit carries the dispatcher verdict even when another unit was selected', async () => {
+  const report = {};
+  const f = fake({ issues: [queue(68), queue(70, [], 'Please do the next batch.')] });
+  await run(f, { ARCANA_DISPATCH_MODE: 'normal' }, { fetchImpl: fetchOk([]), report });
+  const byN = Object.fromEntries(report.units.map(u => [u.number, u]));
+  assert.equal(byN[70].eligible, false); assert.match(byN[70].skip, /^not-actionable/);
+  assert.ok('eligible' in byN[68]);
 });

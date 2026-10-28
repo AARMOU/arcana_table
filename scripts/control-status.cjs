@@ -125,6 +125,8 @@ function dispatcherAction(state, reason = '') {
     case 'ci-not-ready': return 'Wait: the integration base head has no successful "Arcana Development CI" run yet.';
     case 'authorize-once-needs-exactly-one-label': return 'Owner: in authorize-once mode, add the arcana:authorize-once label to exactly one [Arcana Queue] issue.';
     case 'nothing-eligible': return 'Queue empty: no queued, trusted, complete, Copilot-ready [Arcana Queue] issue without an open PR. See skipped units, and the Queue Feeder suggestions on #78 for cards ready to queue.';
+    case 'authorized-unit-not-eligible': return 'None: the approved issue can never be assigned as written, or its work is already in an open PR (see reason). The approval was withdrawn and a notice was left on that issue. Normal queue order resumes on the next run.';
+    case 'authorization-clear-failed': return 'Owner: an approved card can never be assigned (see reason) and its arcana:authorize-once label could not be removed. Remove it on GitHub.';
     case 'label-removal-failed': return 'Owner: the one-shot label could not be removed; review the attempt in #81.';
     case 'dry-run': return 'None: dry run only. The admission decision is shown; nothing was assigned.';
     case 'attempted': return null;
@@ -184,7 +186,7 @@ function summarizeUnits(units = []) {
     blocked: counts.halted || 0,
     holdingSlots: units.filter(u => u.holdsSlot).map(u => u.number),
     list: units.slice(0, MAX_UNITS_LISTED).map(u => ({ n: u.number, state: u.state, reason: u.reason || null, holdsSlot: !!u.holdsSlot,
-      recentlyFinished: !!u.recentlyFinished, skip: u.skip || null })),
+      recentlyFinished: !!u.recentlyFinished, skip: u.skip || null, eligible: u.eligible === true, verdict: u.verdict || null })),
   };
 }
 

@@ -130,6 +130,7 @@ test('authorize-once on an engine-gap unit is denied before billing or any ledge
   let billingReads = 0;
   const r = await W.dispatcher({ github: f.github, context: ctx(), core: core(), env: env({ ARCANA_DISPATCH_MODE: 'authorize-once' }),
     readBudget: async () => { billingReads++; return budget(); }, fetchImpl: async () => { throw Error('must not assign'); } });
+  // Not Copilot-ready YET is temporary: deny, and keep the owner's approval for when it is.
   assert.equal(r.result.state, 'denied'); assert.match(r.result.reason, /^feasibility: not Copilot-ready/);
   assert.match(r.payload.action, /arcana:feasibility-reviewed/);
   assert.ok(f.writes.every(w => w[1] === 78)); assert.ok(f.writes.every(w => w[0] !== 'removeLabel'), 'one-shot label not consumed');
@@ -200,4 +201,19 @@ test('feeder workflow never writes issues from the job that runs base-branch cod
   assert.match(publish, /createNextAutoQueue/);
   assert.match(publish, /createWorkflowDispatch/);
   assert.match(publish, /ARCANA_AUTOMATION_READY/);
+});
+
+test('assess returns a structured code for every outcome', () => {
+  const F = require('./feasibility.cjs');
+  const body = '## Cards\n- Malanthrope\n';
+  const v = { baseSha: 'a'.repeat(40), cards: { malanthrope: { name: 'Malanthrope', readiness: 'SUPPORTED', route: 'copilot' } } };
+  const code = o => F.assess({ baseSha: 'a'.repeat(40), approvers: ['aarmou'], verdicts: v, body, ...o }).code;
+  assert.equal(code({}), 'ok');
+  assert.equal(code({ verdicts: null }), 'unavailable');
+  assert.equal(code({ baseSha: 'b'.repeat(40) }), 'stale');
+  assert.equal(code({ body: 'nothing' }), 'no-cards');
+  assert.equal(code({ body: '## Cards\n- Opal Palace\n' }), 'not-ready');
+  assert.equal(code({ override: { actor: 'AARMOU' } }), 'override-ok');
+  assert.equal(code({ override: { actor: 'someone' } }), 'override-unauthorized');
+  assert.equal(code({ override: { actor: 'AARMOU' }, body: '<!-- arcana-auto-queue-v1 -->\n' + body }), 'auto-override-prohibited');
 });

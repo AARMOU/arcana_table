@@ -13,8 +13,10 @@ on:
   # Copilot PR activity wakes the feeder promptly when scheduled workflows are delayed.
   # Run only trusted main code, and only for Copilot PRs targeting our integration base.
   # Never check out or execute the PR head in a workflow with write permissions.
+  # review_requested is what Copilot emits when its session finishes (copilot_work_finished), i.e. the
+  # moment its dispatcher slot frees; the last synchronize happens while the slot is still held.
   pull_request_target:
-    types: [opened, synchronize, ready_for_review]
+    types: [opened, synchronize, ready_for_review, review_requested]
   workflow_dispatch:
     inputs:
       max:

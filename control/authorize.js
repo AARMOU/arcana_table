@@ -9,16 +9,21 @@ const KEY = 'arcana-review-session-v1';
 const LOGIN = API + '/auth/login?return=' + encodeURIComponent('https://aarmou.github.io/arcana_table/control/');
 const issueUrl = n => 'https://github.com/AARMOU/arcana_table/issues/' + n;
 const safeNumber = n => Number.isSafeInteger(n) && n > 0 && n < 10000000;
-// Display-only preflight mirrors the Worker's actionable-unit shape; the Worker remains authoritative.
-function actionable(info) {
-  const body = String(info?.body || '');
-  const trusted = ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(info?.author_association) ||
-    (info?.user?.login === 'github-actions[bot]' && info?.user?.type === 'Bot' && body.startsWith('<!-- arcana-auto-queue-v1 -->\n'));
-  return info?.state === 'open' && !info?.pull_request && trusted &&
-    /^Base: [A-Za-z0-9._/-]+$/m.test(body) && /## Cards\b/.test(body) &&
-    /## Acceptance\b/.test(body) && body.includes('Exact current Oracle behavior') &&
-    body.includes('Executable regression scenarios');
+// Eligibility is the dispatcher's own published verdict (`eligible`, else its `skip` reason), not a copy of its
+// rules. The Worker still re-checks the live issue on tap, and the dispatcher re-checks everything.
+function reasonText(skip) {
+  const s = String(skip || '');
+  if (/^has-open-pr/.test(s)) return 'Already being worked on in an open PR (' + s.replace(/^has-open-pr\s*/, '') + ').';
+  if (/^feasibility: .*(unavailable|stale)/.test(s)) return 'Cardkit check for the current base is pending. Try again after the next dispatcher run.';
+  if (/^feasibility/.test(s)) return 'Not Copilot-ready per Cardkit (claimed elsewhere, needs engine work, or rules review). Routed away from Copilot.';
+  if (/^not-actionable/.test(s)) return 'Old-format or incomplete work unit. Not authorizable; the feeder queues a fresh unit when the card is Copilot-ready.';
+  if (/^untrusted-origin/.test(s)) return 'Contains content from an untrusted account. Not authorizable.';
+  if (/^not-a-queue-issue/.test(s)) return 'Not a queue work unit.';
+  return 'Not eligible: ' + s.slice(0, 160);
 }
+// A status published before verdicts existed has no `eligible` flag: fail closed until the next run.
+const eligibility = unit => unit?.eligible === true ? { ok: true }
+  : { ok: false, reason: unit?.skip ? reasonText(unit.skip) : 'Waiting for the dispatcher to check this card.' };
 function session() {
   for (const name of ['localStorage', 'sessionStorage']) {
     try { const v = root[name]?.getItem(KEY); if (v) return v; } catch {}
@@ -56,6 +61,7 @@ function render(container, units) {
     const main = el('div', 'row-main');
     const link = el('a', 'row-title', 'Card work #' + unit.n);
     link.href = issueUrl(unit.n); link.target = '_blank'; link.rel = 'noopener noreferrer';
+    const verdict = eligibility(unit);
     const message = el('div', 'row-sub', 'Checking the card request…');
     main.append(link, message);
     const button = el('button', 'btn accent', 'I agree. Do it');
@@ -73,11 +79,13 @@ function render(container, units) {
         link.textContent = '#' + unit.n + ' · ' + info.title.replace(/^\[Arcana Queue\]\s*/, '');
         if ((info.labels || []).some(l => l.name === 'arcana:authorize-once')) {
           button.disabled = true; button.textContent = 'Authorized';
-          message.textContent = 'Authorized — waiting for safe dispatcher pickup.';
-        } else if (!actionable(info)) {
+          // An approval can wait (e.g. Cardkit not ready yet); say why instead of a bare "waiting".
+          message.textContent = verdict.ok || !unit?.skip ? 'Authorized — waiting for safe dispatcher pickup.'
+            : 'Approved — waiting: ' + reasonText(unit.skip);
+        } else if (!verdict.ok) {
           button.disabled = true;
           button.textContent = 'Not eligible';
-          message.textContent = 'Legacy or incomplete work unit. Needs a verified queue-unit conversion before authorization.';
+          message.textContent = verdict.reason;
         } else if ((info.assignees || []).some(a => ['copilot', 'copilot-swe-agent[bot]'].includes(String(a.login || '').toLowerCase()))) {
           button.disabled = true;
           button.textContent = 'Already assigned';
@@ -117,7 +125,7 @@ function render(container, units) {
     });
   }
 }
-const api = { render, statusText };
+const api = { render, statusText, eligibility, reasonText };
 root.ArcanaAuthorize = api;
 if (typeof module === 'object' && module.exports) module.exports = api;
 })(typeof globalThis === 'object' ? globalThis : this);
