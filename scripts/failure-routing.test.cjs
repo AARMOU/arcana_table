@@ -1,7 +1,10 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {routeFailure,reconcileFailures,createAuthorizer,MARKER,OBSERVED}=require('./failure-routing.cjs');
+const {routeFailure,reconcileFailures,createAuthorizer,MARKER,OBSERVED,WORKFLOWS}=require('./failure-routing.cjs');
+test('Cardkit failures are eligible for existing repair routing', () => {
+  assert.equal(WORKFLOWS.has('Arcana Cardkit'), true);
+});
 const A=require('./admission.cjs');
 const sha='a'.repeat(40);
 const allow=records=>async()=>({allowed:true,reason:'admitted',attempt:1,unit:67,record:async()=>records.push(1)});
