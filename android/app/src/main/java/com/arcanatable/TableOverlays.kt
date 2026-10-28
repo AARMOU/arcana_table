@@ -165,7 +165,21 @@ internal fun TableController.TableOverlays() {
             feedOpen = playFeedOpen, onToggleFeed = { playFeedOpen = !playFeedOpen; runCatching { context.getSharedPreferences("arcana-table-ui", Context.MODE_PRIVATE).edit().putBoolean("playFeedOpen", playFeedOpen).apply() } },
             popupDurationSeconds = playedPopupSeconds,
             onDismissBanner = { playBanner = null }, onDismissRecap = { recapText = null })
-        val pickDeck: (DeckChoice) -> Unit = { choice ->                deckPickerOpen = false                // Choosing a deck during the deck lesson really chooses it, then the lesson moves on.                if (tutorialChapterId != null && !tutorialPracticeActive) TutorialActions.tap("deck-select")                run {                activeDeckId = choice.id; saveActiveDeck(context, choice.id)                recordDiagnostic("Deck chosen: ${choice.name}", DiagnosticCategory.ACTION)                // Also put it on your table (card art, online play). Offline games read the choice directly.                val text = preconDecks.firstOrNull { "precon:${it.id}" == choice.id }?.decklist                    ?: savedDecks.firstOrNull { it.name == choice.id }?.text                    ?: premadeDecks.firstOrNull { "builtin:${it.id}" == choice.id }?.let { d -> "Commander\n1 ${d.commander}\nDeck\n" + d.cards.filterNot { it == d.commander }.groupingBy { it }.eachCount().entries.joinToString("\n") { (n, c) -> "$c $n" } }                if (text != null) { selectedPlayer = localSeat; importDeck(text, saveAsMine = false) }                }        }
+        val pickDeck: (DeckChoice) -> Unit = { choice ->
+                deckPickerOpen = false
+                // Choosing a deck during the deck lesson really chooses it, then the lesson moves on.
+                if (tutorialChapterId != null && !tutorialPracticeActive) TutorialActions.tap("deck-select")
+                run {
+                activeDeckId = choice.id; saveActiveDeck(context, choice.id)
+                recordDiagnostic("Deck chosen: ${choice.name}", DiagnosticCategory.ACTION)
+                // Also put it on your table (card art, online play). Offline games read the choice directly.
+                val text = preconDecks.firstOrNull { "precon:${it.id}" == choice.id }?.decklist
+                    ?: savedDecks.firstOrNull { it.name == choice.id }?.text
+                    ?: premadeDecks.firstOrNull { "builtin:${it.id}" == choice.id }?.let { d -> "Commander\n1 ${d.commander}\nDeck\n" + d.cards.filterNot { it == d.commander }.groupingBy { it }.eachCount().entries.joinToString("\n") { (n, c) -> "$c $n" } }
+                if (text != null) { selectedPlayer = localSeat; importDeck(text, saveAsMine = false) }
+                }
+        }
+
         if (homeOpen) {
             if (offlineDiscardConfirm) AlertDialog(
                 onDismissRequest = { offlineDiscardConfirm = false },
