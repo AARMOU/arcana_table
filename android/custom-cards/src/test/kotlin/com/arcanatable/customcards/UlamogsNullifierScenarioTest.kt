@@ -106,4 +106,27 @@ class UlamogsNullifierScenarioTest {
         assertEquals(listOf("Swamp"), d.zoneNames(opponent, Zone.EXILE))
         assertNotNull("Only one opponent-owned exile: processing is impossible", d.findPermanent(opponent, "Grizzly Bears"))
     }
+
+    @Test
+    fun entersWithNoSpellOnStackAndDoesNotProcessExile() {
+        val d = customScenario(UlamogsNullifier, "Island", "Swamp")
+        val p = d.player1
+        val opponent = d.player2
+        d.putCardInExile(opponent, "Island")
+        d.putCardInExile(opponent, "Swamp")
+
+        // Nullifier may enter even without a legal spell to target. Its
+        // optional processing cannot move exiled cards without that target.
+        d.putCreatureOnBattlefield(p, "Ulamog's Nullifier")
+        d.resolveAll()
+
+        assertNotNull("Nullifier must remain on the battlefield", d.findPermanent(p, "Ulamog's Nullifier"))
+        assertEquals(
+            "without a target spell, both opponent-owned cards remain exiled",
+            setOf("Island", "Swamp"),
+            d.zoneNames(opponent, Zone.EXILE).toSet(),
+        )
+        assertFalse(d.zoneNames(opponent, Zone.GRAVEYARD).contains("Island"))
+        assertFalse(d.zoneNames(opponent, Zone.GRAVEYARD).contains("Swamp"))
+    }
 }
