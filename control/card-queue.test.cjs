@@ -60,3 +60,16 @@ test('dual source browser labels indexed names as unverified and counts deck gap
  assert.ok(worker.includes('shellUrls.has(url.href)'));
  assert.ok(!worker.includes("'./argentum-catalog.json'"));
 });
+
+test('owner card priority requires GitHub sign-in and shows Cardkit skipped reasons, never directly dispatches',()=>{
+ assert.ok(page.includes('id="priorityStatus"'));
+ assert.ok(page.includes('Cardkit verifies SUPPORTED / copilot'));
+ assert.ok(page.includes('Review priority request'));
+ assert.ok(script.includes("loadPriorityStatus()"));
+ assert.ok(script.includes("arcana-control-status-v1:queue"));
+ assert.ok(script.includes("Not sent to Copilot:"));
+ assert.ok(script.includes("Owner-selected priority request only"));
+ assert.ok(script.includes("Not an [Arcana Queue]")===false);
+ assert.ok(!script.includes('createWorkflowDispatch'));
+ assert.ok(!script.includes('issues.create'));
+});
