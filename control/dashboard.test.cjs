@@ -48,3 +48,47 @@ test('Pages publishes the install manifest, worker and icons',()=>{
   const workflow=fs.readFileSync(path.join(__dirname,'../.github/workflows/pages.yml'),'utf8');
   for(const asset of ['manifest.webmanifest','sw.js','icons'])assert.ok(workflow.includes('control/'+asset),asset);
 });
+
+
+test('current Copilot assignment panel is visible on mobile overview and uses read-only public evidence',()=>{
+  for(const id of ['assignmentCard','assignmentStage','assignmentDetail','assignmentIssue','assignmentPr','assignmentAgentRun','assignmentFresh'])
+    assert.match(html,new RegExp('id="'+id+'"'),id);
+  assert.match(html,/Current Copilot assignment/);
+  for(const route of ["'/issues/'+candidate.number","'/issues/'+candidate.number+'/timeline?per_page=100'","'/pulls/'+latest.number","'/actions/runs?branch='"])
+    assert.ok(script.includes(route),route);
+  assert.ok(script.includes("x.actor?.login==='Copilot'"));
+  assert.ok(script.includes("x.source?.issue?.user?.login==='Copilot'"));
+  assert.ok(script.includes("detail.data?.head?.repo?.full_name===REPO"));
+  assert.ok(script.includes("x.head_branch===pr.head.ref"));
+  assert.ok(script.includes("a.href=safelyLink(url)"));
+  assert.ok(!script.includes('innerHTML'));
+});
+const pureSrc=script.split('// COPILOT_PURE_START')[1]?.split('// COPILOT_PURE_END')[0];
+function pureFunction(name){
+  assert.ok(pureSrc,'tested pure Copilot helpers');
+  const ctx=vm.createContext({});
+  vm.runInContext(pureSrc,ctx);
+  return vm.runInContext(name,ctx);
+}
+test('assignment selection picks an active worker, then confirmed dispatch, then recent finished',()=>{
+  const select=pureFunction('selectCopilotAssignment');
+  assert.equal(select(null),null);
+  assert.equal(select({workers:{list:[]}}),null);
+  assert.equal(select({issue:173,result:'confirmed',workers:{list:[{n:172,state:'queued'}]}}).number,173);
+  assert.equal(select({issue:173,result:'confirmed',workers:{list:[{n:151,state:'working'},{n:173,state:'queued'}]}}).number,151);
+  assert.equal(select({workers:{list:[{n:173,state:'review',recentlyFinished:true}]}}).kind,'recent');
+  assert.equal(select({issue:173,result:'denied',workers:{list:[{n:173,state:'queued'}]}}),null);
+  assert.equal(select({issue:0,result:'confirmed',workers:{list:[]}}),null);
+});
+test('Copilot lifecycle distinguishes assignment, pickup, agent running and finished without claiming card support',()=>{
+  const stage=pureFunction('copilotStage');
+  const pr={number:330,title:'Hold Ulamog pending engine support'};
+  assert.equal(stage(null,null,'confirmed').label,'Assigned');
+  assert.equal(stage(pr,null,'confirmed').label,'PR opened');
+  assert.equal(stage(pr,{status:'in_progress'},'confirmed').label,'Agent running');
+  const success=stage(pr,{status:'completed',conclusion:'success'},'confirmed');
+  assert.equal(success.label,'Agent finished');
+  assert.match(success.detail,/does not certify the card/);
+  assert.match(stage(pr,{status:'completed',conclusion:'failure'},'confirmed').label,/Run failure/);
+  assert.equal(stage(null,null,'recent').label,'Recently finished');
+});
