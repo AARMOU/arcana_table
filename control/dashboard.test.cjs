@@ -169,5 +169,5 @@ test('installed PWA refreshes when an updated service worker activates',()=>{
   assert.ok(html.includes("addEventListener('controllerchange'"));
   assert.ok(html.includes('if (reloading) return'));
   assert.ok(html.includes('location.reload()'));
-  assert.ok(sw.includes("arcana-control-shell-v11"));
+  assert.ok(html.includes("updateViaCache: 'none'"));
 });
