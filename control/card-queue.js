@@ -202,9 +202,17 @@ async function loadPriorityStatus(){
   feederData=data;eligibility=currentEligibility();resetVerification();selected();
   const blocked=Array.isArray(data.blockedRequests)?data.blockedRequests:[];
   const ready=Array.isArray(data.suggestions)?data.suggestions.filter(x=>x.ready&&Number.isSafeInteger(x.requestedIssue)):[];
+  // Trusted feeder already filters Cardkit-unsupported or claimed cards before ranking.
+  const ranked=Array.isArray(data.demand)?data.demand.filter(x=>x&&typeof x.name==='string'&&
+    Number.isSafeInteger(x.totalRequests)&&x.totalRequests>0).slice(0,10):[];
   el.replaceChildren();
   const checked=Date.parse(data.checkedAt);
   el.append(elem('p','muted',Number.isFinite(checked)?'Last check: '+new Date(checked).toLocaleString():'Last check: unknown'));
+  if(ranked.length){
+   el.append(elem('p','','Most requested Copilot-ready cards (highest demand first):'));
+   for(const [i,card] of ranked.entries())el.append(elem('p','',
+     '#'+(i+1)+' '+card.name+' · '+card.totalRequests+' recorded request'+(card.totalRequests===1?'':'s')));
+  }
   if(!blocked.length&&!ready.length)el.append(elem('p','muted','No owner-priority results in the last feeder snapshot. Existing GitHub requests may be awaiting the next scan.'));
   for(const x of ready){
     const p=elem('p','','Eligible: '+String(x.name||'')+' · selected in #'+x.requestedIssue+' · still subject to dispatcher gates');
