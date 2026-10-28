@@ -95,6 +95,13 @@ class OfflineHumanAutoPassParityTest {
             val response = d.putCardInHand(p, "Elder Deep-Fiend") // response with flash, if affordable
             d.giveColorlessMana(p, available)
             assertNull("Initial Eldrazi cast must be legal", d.castSpell(p, first).error)
+            // Elder Deep-Fiend's on-cast tap trigger requires choosing zero to
+            // four targets during casting. Complete that real engine decision
+            // before examining Ulalek's subsequent priority window.
+            assertTrue("First cast must request the Fiend's optional targets",
+                d.state.pendingDecision is com.wingedsheep.engine.core.ChooseTargetsDecision)
+            assertNull("Choosing zero Fiend targets must complete casting",
+                d.submitTargetSelection(p, emptyList()).error)
             assertEquals("Caster retains priority after casting", p, d.state.priorityPlayerId)
             assertNull("Priority must not already be a payment decision", d.state.pendingDecision)
             assertTrue("Ulalek trigger must be on the stack", d.state.stack.any { id ->
@@ -125,6 +132,10 @@ class OfflineHumanAutoPassParityTest {
             val responseError = d.castSpell(p, response).error
             if (expectStop) {
                 assertNull("Affordable flash Eldrazi must actually cast in this window", responseError)
+                assertTrue("Second flash cast must request its optional targets",
+                    d.state.pendingDecision is com.wingedsheep.engine.core.ChooseTargetsDecision)
+                assertNull("Zero optional targets must complete second flash cast",
+                    d.submitTargetSelection(p, emptyList()).error)
                 assertEquals("Second Elder Deep-Fiend costs eight colorless", beforeResponse - 8,
                     d.manaPool(p).colorless)
                 assertTrue("Original Ulalek trigger must remain on the stack",
