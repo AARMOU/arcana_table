@@ -1896,6 +1896,17 @@
     }
    ]
   },
+  "Effects.Fight": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Mawloc",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mawloc.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MawlocScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.FlipCoin": {
    "count": 1,
    "examples": [
@@ -2227,6 +2238,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SufferThePast.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SufferThePastScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.MarkExileOnDeath": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Mawloc",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mawloc.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MawlocScenarioTest.kt"
     }
    ]
   },
@@ -3887,7 +3909,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 40,
+   "count": 41,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -4335,13 +4357,19 @@
    ]
   },
   "ravenous()": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Zoanthrope",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Zoanthrope.kt",
      "lines": 27,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ZoanthropeScenarioTest.kt"
+    },
+    {
+     "card": "Mawloc",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mawloc.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MawlocScenarioTest.kt"
     },
     {
      "card": "Aberrant",
@@ -4539,7 +4567,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5007,13 +5035,19 @@
    ]
   },
   "Duration.EndOfTurn": {
-   "count": 9,
+   "count": 10,
    "examples": [
     {
      "card": "Silence",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Silence.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SilenceScenarioTest.kt"
+    },
+    {
+     "card": "Mawloc",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mawloc.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MawlocScenarioTest.kt"
     },
     {
      "card": "Rampaging Brontodon",
@@ -5038,12 +5072,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AllosaurusShepherd.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AllosaurusShepherdScenarioTest.kt"
-    },
-    {
-     "card": "Purphoros, God of the Forge",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PurphorosGodOfTheForge.kt",
-     "lines": 57,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PurphorosGodOfTheForgeScenarioTest.kt"
     }
    ]
   },
@@ -6044,7 +6072,7 @@
    ]
   },
   "EffectTarget.Self": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -6077,10 +6105,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimarisChaplainScenarioTest.kt"
     },
     {
-     "card": "Skorpekh Destroyer",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SkorpekhDestroyer.kt",
-     "lines": 35,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SkorpekhDestroyerScenarioTest.kt"
+     "card": "Mawloc",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mawloc.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MawlocScenarioTest.kt"
     }
    ]
   },
@@ -6985,8 +7013,14 @@
    ]
   },
   "TargetFilter.CreatureOpponentControls": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Mawloc",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mawloc.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MawlocScenarioTest.kt"
+    },
     {
      "card": "Constricting Sliver",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ConstrictingSliver.kt",
@@ -7239,7 +7273,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 62,
+   "count": 63,
    "examples": [
     {
      "card": "Defile",
