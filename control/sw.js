@@ -1,6 +1,6 @@
 // Cache only the installable Arcana Control shell. Never cache scanner or billing/GitHub API data.
-const CACHE='arcana-control-shell-v3';
-const SHELL=['./','./index.html','./cards.html','./credits.html','./card-queue.js','./credit-budget.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
+const CACHE='arcana-control-shell-v4';
+const SHELL=['./','./index.html','./cards.html','./credits.html','./card-queue.js','./card-preflight.js','./credit-budget.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 const scope=new URL(self.registration.scope);
 const shellUrls=new Set(SHELL.map(s=>new URL(s,scope).href));
 self.addEventListener('install',event=>{
