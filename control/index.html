@@ -328,7 +328,17 @@
     // A website install, not an Android gameplay APK; keep the public dashboard read-only.
     if ('serviceWorker' in navigator && location.protocol === 'https:') {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js', {scope: './'}).catch(() => {});
+        // Installed PWAs may stay open across deployments. Revalidate the worker
+        // script itself and reload once when a newly activated worker takes over.
+        let reloading = false;
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+          if (reloading) return;
+          reloading = true;
+          location.reload();
+        });
+        navigator.serviceWorker.register('./sw.js', {
+          scope: './', updateViaCache: 'none'
+        }).then(registration => registration.update()).catch(() => {});
       });
     }
   </script>
