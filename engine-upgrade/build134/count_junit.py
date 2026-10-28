@@ -22,3 +22,10 @@ for x in sorted(Path(".").glob(pattern)):
 print(f"{label}: files={files} {c}")
 for f in failed[:25]:
     print("  FAILED", f)
+# Also as annotations: logs/artifacts are not always reachable, the checks API is.
+import os
+if os.environ.get("GITHUB_ACTIONS") == "true":
+    level = "error" if (c["failures"] or c["errors"]) else "notice"
+    print(f"::{level} title=JUnit {label}::files={files} tests={c['tests']} failures={c['failures']} errors={c['errors']} skipped={c['skipped']}")
+    for f in failed[:8]:
+        print(f"::error title=FAILED {label}::{f[:600]}")
