@@ -65,7 +65,7 @@ function deckNames(){
 function updateDeckFilter(){
  const select=$('deck');select.replaceChildren();
  const empty=elem('option','',view==='decks'?'All scanned decks':'All indexed names');empty.value='';select.append(empty);
- if(view==='library'){const outside=elem('option','','Outside the 19 scanned decks');outside.value=OUTSIDE;select.append(outside);}
+ if(view==='library'){const outside=elem('option','','Outside scanned decks');outside.value=OUTSIDE;select.append(outside);}
  for(const name of deckNames()){const option=elem('option','',name);option.value=name;select.append(option);}
  text('deckLabel',view==='decks'?'Deck':'Appears in deck');
 }
