@@ -55,7 +55,7 @@ jobs:
 
           root = Path('android/custom-cards/build/test-results/test')
           expected = {
-              'com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest': 18,
+              'com.arcanatable.customcards.UlalekFusedAtrocityScenarioTest': 19,
               'com.arcanatable.customcards.OfflineHumanAutoPassParityTest': 9,
           }
           executed = {key: [] for key in expected}
@@ -80,6 +80,7 @@ jobs:
               'opponentsEldraziCastDoesNotTriggerMyUlalek',
               'opponentsActivatedAbilitiesAreNotCopiedEvenWhenTheyAreOnTheStack',
               'activatedAbilitiesAreCopiedWithTheirTargets',
+              'oneColorlessPlusColoredCannotPartiallyPayTheOptionalCopyCost',
           ):
               assert required in names, f'Critical regression did not execute: {required}'
           PY
