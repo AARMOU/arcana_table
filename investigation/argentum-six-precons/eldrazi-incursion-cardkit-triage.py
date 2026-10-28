@@ -197,6 +197,17 @@ TRIAGE = {
 
 
 
+# Cardkit routes are advisory, never dispatch authorization. Refuse an
+# unexpected readiness/route pairing rather than publishing a misleading
+# Copilot-ready classification for an engine-blocked card.
+CARDKIT_ROUTES = {
+    "SUPPORTED": {"copilot"},
+    "NEEDS_REVIEW": {"gpt", "claude"},
+    "ENGINE_BLOCKED": {"claude"},
+    "IMPLEMENTED_AND_TESTED": {None},
+}
+
+
 def require_exact_cardkit_classifications(names: list[str], classified: object) -> dict[str, dict]:
     """Fail closed if Cardkit omits, duplicates or invents a requested result.
 
@@ -216,8 +227,13 @@ def require_exact_cardkit_classifications(names: list[str], classified: object) 
         readiness = item.get("readiness")
         if not isinstance(name, str) or not name or name != name.strip():
             raise ValueError(f"Invalid Cardkit name at row {row_number}: {name!r}")
-        if not isinstance(readiness, str) or not readiness.strip():
-            raise ValueError(f"Invalid Cardkit readiness for {name!r}")
+        if not isinstance(readiness, str) or readiness not in CARDKIT_ROUTES:
+            raise ValueError(f"Invalid Cardkit readiness for {name!r}: {readiness!r}")
+        route = item.get("route")
+        if route not in CARDKIT_ROUTES[readiness]:
+            raise ValueError(
+                f"Invalid Cardkit route for {name!r}: readiness={readiness!r}, route={route!r}"
+            )
         if name in by_name:
             raise ValueError(f"Duplicate Cardkit classification: {name!r}")
         by_name[name] = item
