@@ -231,12 +231,12 @@ class CardkitClassificationIntegrityTest(unittest.TestCase):
         self.assertEqual(actual["Eldrazi Temple"]["readiness"], "SUPPORTED")
 
     def test_duplicate_cardkit_result_rejected_instead_of_last_row_wins(self):
-        duplicate = self.rows + [{"name": "Eldrazi Temple", "readiness": "BLOCKED"}]
+        duplicate = self.rows + [{"name": "Eldrazi Temple", "readiness": "SUPPORTED", "route": "copilot"}]
         with self.assertRaisesRegex(ValueError, "Duplicate Cardkit classification"):
             audit.require_exact_cardkit_classifications(self.names, duplicate)
 
     def test_missing_or_unrequested_classification_rejected(self):
-        for rows in (self.rows[:1], self.rows + [{"name": "Extra Card", "readiness": "SUPPORTED"}]):
+        for rows in (self.rows[:1], self.rows + [{"name": "Extra Card", "readiness": "SUPPORTED", "route": "copilot"}]):
             with self.subTest(rows=rows):
                 with self.assertRaisesRegex(ValueError, "classification mismatch"):
                     audit.require_exact_cardkit_classifications(self.names, rows)
