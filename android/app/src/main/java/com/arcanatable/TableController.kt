@@ -300,6 +300,8 @@ internal class TableController(
     var savedDecksOpen by run { mutableStateOf(false) }
     /** Developer-preview deck builder (see [DeckBuilderFlag]). */
     var deckBuilderOpen by run { mutableStateOf(false) }
+    /** Return to the import dialog when Deck Builder was opened from that dialog. */
+    var deckBuilderReturnToImport by run { mutableStateOf(false) }
     var localDeckSyncConfirmed by run { mutableStateOf(false) }
     // Structured, redacted diagnostic log (DiagnosticLog.kt). Legacy free-text entries are migrated on load.
     val diagnosticLog = run { DiagnosticLog().apply { restore(optionPrefs.getString("diagnostic_events", "").orEmpty()) } }
@@ -310,9 +312,6 @@ internal class TableController(
     var lastDiagnosticZoneSnapshot by run { mutableStateOf<List<TablePlayer>?>(null) }
     var inboundSnapshotSequence by run { mutableIntStateOf(0) }
     var importing by run { mutableStateOf(false) }
-    var argentumDeckLoading by run { mutableStateOf(false) }
-    var argentumDeckPickerOpen by run { mutableStateOf(false) }
-    var argentumDeckOptions by run { mutableStateOf<List<ArgentumExampleDeck>>(emptyList()) }
     var importError by run { mutableStateOf<String?>(null) }
     var importReviewOpen by run { mutableStateOf(false) }
     var importReviewMessage by run { mutableStateOf("") }
