@@ -36,6 +36,13 @@ class ForsakenMonumentScenarioTest {
             power = 1
             toughness = 1
         })
+        registerCard(card("Monument Green Cost Probe") {
+            manaCost = "{1}{G}"
+            colorIdentity = "G"
+            typeLine = "Creature — Eldrazi"
+            power = 2
+            toughness = 2
+        })
     }
 
     private fun GameTestDriver.tapForMana(p: EntityId, source: EntityId) {
@@ -239,6 +246,37 @@ class ForsakenMonumentScenarioTest {
         assertNull(d.castSpell(d.player1, second).error)
         d.resolveStack()
         assertEquals("the second colorless spell generates its own trigger", before + 4, d.getLifeTotal(d.player1))
+    }
+
+    @Test fun colorlessSpellPaidWithColoredManaStillTriggersLifeGain() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val probe = d.putCardInHand(d.player1, "Monument Colorless Probe")
+        // Generic {2} may be paid using colored mana; that does not change spell color.
+        d.giveMana(d.player1, Color.RED, 2)
+        assertNull(d.castSpell(d.player1, probe).error)
+        d.resolveStack()
+        assertEquals("colored payment does not make a colorless spell colored", before + 2, d.getLifeTotal(d.player1))
+        val permanent = d.findPermanent(d.player1, "Monument Colorless Probe")
+        assertNotNull(permanent)
+        assertEquals(5 to 5, d.stats(permanent!!))
+    }
+
+    @Test fun coloredSpellPaidPartlyWithColorlessManaDoesNotTriggerLifeGain() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val probe = d.putCardInHand(d.player1, "Monument Green Cost Probe")
+        // Paying the generic portion with {C} does not make this {1}{G} spell colorless.
+        d.giveColorlessMana(d.player1, 1)
+        d.giveMana(d.player1, Color.GREEN, 1)
+        assertNull(d.castSpell(d.player1, probe).error)
+        d.resolveStack()
+        assertEquals("colorless payment does not change the spell's green color", before, d.getLifeTotal(d.player1))
+        val permanent = d.findPermanent(d.player1, "Monument Green Cost Probe")
+        assertNotNull(permanent)
+        assertEquals(2 to 2, d.stats(permanent!!))
     }
 
     @Test fun coloredSpellsGainNoLife() {
