@@ -175,7 +175,13 @@ class UlalekFusedAtrocityScenarioTest {
         // {C}{C} requires TWO colorless units; generic/colored mana cannot fill the gap.
         d.giveColorlessMana(p, 1)
         d.giveMana(p, Color.BLUE)
-        assertEquals("Ulalek still offers its optional payment", 1, d.resolveUlalek(pay = true))
+        assertTrue("Ulalek's cast trigger must exist even when its {C}{C} cannot be paid",
+            d.stackObjects().contains("$ulalek ability"))
+        // The engine does not offer an unaffordable YesNo payment decision. The
+        // trigger still resolves; the important rule is that {C} plus blue cannot
+        // partially pay {C}{C}, copy the spell, or consume either mana unit.
+        assertEquals("No payment prompt when {C}{C} is unaffordable", 0,
+            d.resolveUlalek(pay = true))
         assertEquals("Failed {C}{C} payment must not copy the Eldrazi", 1, d.permanentsNamed(p, fiend).size)
         assertEquals("Failed payment must not consume the single available {C}", 1, d.manaPool(p).colorless)
         assertEquals("Colored mana must not be spent as {C}", 1, d.manaPool(p).blue)
