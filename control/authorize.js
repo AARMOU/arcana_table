@@ -73,33 +73,62 @@ function render(container, units, checkedAt) {
     button.setAttribute('aria-label', 'Authorize card work issue ' + unit.n);
     row.append(main, button); container.append(row);
 
-    // The cached public issue is display-only. A tap always re-fetches the current issue through
-    // the authenticated Worker and uses that timestamp; cached values cannot authorize spending.
-    fetch(API + '/v1/public/github?path=' + encodeURIComponent('/issues/' + unit.n), { cache: 'no-store' })
-      .then(r => r.ok ? r.json() : null).then(info => {
-        if (!info || info.number !== unit.n || !String(info.title || '').startsWith('[Arcana Queue]'))
-          throw Error('No verified queue issue');
-        // The dispatcher snapshot can predate a closure. A closed issue is never a candidate.
-        if (info.state !== 'open') { row.remove(); if (!container.children.length) container.append(el('div', 'empty', 'No queued card units currently waiting. Check back when new work appears.')); return; }
-        link.textContent = '#' + unit.n + ' · ' + info.title.replace(/^\[Arcana Queue\]\s*/, '');
-        if ((info.labels || []).some(l => l.name === 'arcana:authorize-once')) {
+    // Authenticated owner status is authoritative and uncached. The public GitHub proxy can
+    // lag after a label write, so it must never re-enable a previously authorized card.
+    // If the live owner check fails, fail closed instead of inviting duplicate approvals.
+    (async () => {
+      const token = session();
+      if (token) {
+        const live = await call('/v1/authorization?issue=' + unit.n, token, 'GET');
+        if (live.status !== 200 || !live.body?.ok) throw Error('Owner status unavailable');
+        const info = live.body;
+        link.textContent = '#' + unit.n + ' · ' + String(info.title || '').replace(/^\[Arcana Queue\]\s*/, '');
+        if (info.authorized) {
           button.disabled = true; button.textContent = 'Authorized';
-          // An approval can wait (e.g. Cardkit not ready yet); say why instead of a bare "waiting".
-          message.textContent = verdict.ok || !unit?.skip ? 'Authorized — waiting for safe dispatcher pickup.'
-            : 'Approved — waiting: ' + reasonText(unit.skip);
-        } else if (!verdict.ok) {
-          button.disabled = true;
-          button.textContent = 'Not eligible';
-          message.textContent = verdict.reason + age;
-        } else if ((info.assignees || []).some(a => ['copilot', 'copilot-swe-agent[bot]'].includes(String(a.login || '').toLowerCase()))) {
-          button.disabled = true;
-          button.textContent = 'Already assigned';
+          message.textContent = 'Authorization recorded — waiting for guarded dispatcher' +
+            (unit.skip && /^capacity/.test(unit.skip) ? ' (worker slot occupied).' : '.');
+        } else if (info.claimed) {
+          button.disabled = true; button.textContent = 'Already assigned';
           message.textContent = 'Copilot already has this work.';
+        } else if (!verdict.ok) {
+          button.disabled = true; button.textContent = 'Not eligible';
+          message.textContent = verdict.reason + age;
         } else {
           button.disabled = false;
           message.textContent = 'Eligible queue unit · owner authorization required' + age;
         }
-      }).catch(() => { message.textContent = 'Issue details unavailable — authorization disabled for safety.'; });
+        return;
+      }
+      // Signed-out visitors may see public status, but cannot authorize without login.
+      const response = await fetch(API + '/v1/public/github?path=' +
+        encodeURIComponent('/issues/' + unit.n), { cache: 'no-store' });
+      const info = response.ok ? await response.json() : null;
+      if (!info || info.number !== unit.n || !String(info.title || '').startsWith('[Arcana Queue]'))
+        throw Error('No verified queue issue');
+      if (info.state !== 'open') {
+        row.remove();
+        if (!container.children.length) container.append(el('div', 'empty', 'No queued card units currently waiting.'));
+        return;
+      }
+      link.textContent = '#' + unit.n + ' · ' + info.title.replace(/^\[Arcana Queue\]\s*/, '');
+      if ((info.labels || []).some(l => l.name === 'arcana:authorize-once')) {
+        button.disabled = true; button.textContent = 'Authorized';
+        message.textContent = 'Authorization recorded — waiting for guarded dispatcher.';
+      } else if ((info.assignees || []).some(a =>
+        ['copilot', 'copilot-swe-agent[bot]'].includes(String(a.login || '').toLowerCase()))) {
+        button.disabled = true; button.textContent = 'Already assigned';
+        message.textContent = 'Copilot already has this work.';
+      } else if (!verdict.ok) {
+        button.disabled = true; button.textContent = 'Not eligible';
+        message.textContent = verdict.reason + age;
+      } else {
+        button.disabled = false;
+        message.textContent = 'Eligible queue unit · sign in to authorize' + age;
+      }
+    })().catch(() => {
+      button.disabled = true;
+      message.textContent = 'Live authorization status unavailable — refresh later. Duplicate approval blocked.';
+    });
 
     button.addEventListener('click', async () => {
       if (button.disabled) return;
