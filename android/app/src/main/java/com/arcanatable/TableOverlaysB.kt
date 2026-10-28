@@ -456,25 +456,18 @@ internal fun TableController.TableOverlaysB() {
                         Text("Paste a deck list or choose a .txt/.csv file. Import replaces this player's deck.", color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                         TextButton(onClick = { run { savedDecksOpen = true } }, modifier = Modifier.fillMaxWidth().heightIn(min = 42.dp)) { Text("SAVED DECKS · ${savedDecks.size}", color = Mint) }
                         Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            OutlinedButton(onClick = { run { filePicker.launch(arrayOf("text/*", "application/*")) } }, enabled = !importing && !argentumDeckLoading, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("CHOOSE FILE", fontSize = 9.sp) }
-                            OutlinedButton(
+                            OutlinedButton(onClick = { run { filePicker.launch(arrayOf("text/*", "application/*")) } }, enabled = !importing, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) { Text("CHOOSE FILE", fontSize = 9.sp) }
+                            if (DeckBuilderFlag.enabled) OutlinedButton(
                                 onClick = { run {
-                                    argentumDeckLoading = true
-                                    importError = null
-                                    scope.launch {
-                                        try {
-                                            val decks = withContext(Dispatchers.IO) { ArgentumDeckApi(argentumOrigin).commanderExamples() }
-                                            argentumDeckOptions = decks
-                                            if (decks.isEmpty()) importError = "Argentum did not return any Commander examples that pass its current deck validator."
-                                            else argentumDeckPickerOpen = true
-                                        } catch (error: Exception) {
-                                            importError = error.message ?: "Could not load Argentum's premade decks. Check your connection and try again."
-                                        } finally { argentumDeckLoading = false }
+                                    if (!importing) {
+                                        deckBuilderReturnToImport = true
+                                        importOpen = false
+                                        deckBuilderOpen = true
                                     }
                                 } },
-                                enabled = !importing && !argentumDeckLoading,
-                                modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                            ) { Text(if (argentumDeckLoading) "LOADING…" else "ARGENTUM DECKS", fontSize = 9.sp, color = Mint) }
+                                enabled = !importing,
+                                modifier = Modifier.weight(1f).heightIn(min = 48.dp).testTag("import-open-deck-builder")
+                            ) { Text("DECK BUILDER", fontSize = 9.sp, color = Mint) }
                         }
                         OutlinedTextField(
                             value = importText,
@@ -483,7 +476,7 @@ internal fun TableController.TableOverlaysB() {
                             placeholder = { Text("1 Sol Ring\n36 Island\n...") },
                             minLines = 5,
                             maxLines = 10,
-                            enabled = !importing && !argentumDeckLoading
+                            enabled = !importing
                         )
                         if (importText.isNotBlank()) {
                             val importedCardCount = remember(importText) { parseDeckList(importText).sumOf { it.count } }
@@ -507,41 +500,10 @@ internal fun TableController.TableOverlaysB() {
                         if (importing) Text("Matching card names and trying automatic fixes…", color = Mint, fontSize = 11.sp, modifier = Modifier.padding(top = 6.dp))
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
                             TextButton(onClick = { run { if (!importing) cancelDeckImport() } }, modifier = Modifier.heightIn(min = 48.dp)) { Text("CANCEL", color = Muted) }
-                            Button(onClick = { run { importDeck(importText) } }, enabled = !importing && !argentumDeckLoading, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (importing || argentumDeckLoading) "LOADING" else "IMPORT") }
+                            Button(onClick = { run { importDeck(importText) } }, enabled = !importing, modifier = Modifier.heightIn(min = 48.dp)) { Text(if (importing) "LOADING" else "IMPORT") }
                         }
                     }
                 }
-            }
-        }
-    }
-
-    if (argentumDeckPickerOpen) Dialog(onDismissRequest = { argentumDeckPickerOpen = false }) {
-        Surface(
-            Modifier.fillMaxWidth(0.96f).heightIn(max = LocalConfiguration.current.screenHeightDp.dp * 0.78f),
-            shape = RoundedCornerShape(18.dp), color = Panel
-        ) {
-            Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text("ARGENTUM COMMANDER DECKS", color = SoftWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-                Text("These lists come from Argentum and passed its live Commander deck validator.", color = Muted, fontSize = 12.sp)
-                argentumDeckOptions.forEach { deck ->
-                    Surface(
-                        Modifier.fillMaxWidth().clickable {
-                            importText = deck.asImportText()
-                            importError = null
-                            // The list is now in the import box above; no pop-up needed.
-                            argentumDeckPickerOpen = false
-                        },
-                        shape = RoundedCornerShape(12.dp), color = PanelLight, border = BorderStroke(1.dp, Muted.copy(alpha = 0.35f))
-                    ) {
-                        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Text(deck.name, color = Mint, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-                            Text("Commander · ${deck.commander} · 100 cards", color = SoftWhite, fontSize = 11.sp)
-                            if (deck.description.isNotBlank()) Text(deck.description, color = Muted, fontSize = 11.sp)
-                            deck.note?.let { Text(it, color = Color(0xFFFFD271), fontSize = 10.sp) }
-                        }
-                    }
-                }
-                TextButton(onClick = { argentumDeckPickerOpen = false }, modifier = Modifier.align(Alignment.End).heightIn(min = 44.dp)) { Text("CLOSE", color = Muted) }
             }
         }
     }
