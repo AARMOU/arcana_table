@@ -153,6 +153,7 @@ object CustomCards {
         Entry(BlightGrenade, "40K", "Six WotC precons"),
         Entry(DenyReality, "ARB", "Six WotC precons"),
         Entry(BituminousBlast, "ARB", "Six WotC precons"),
+        Entry(BloodForTheBloodGod, "40K", "Six WotC precons"),
         Entry(AwakeningZone, "ROE", "Six WotC precons"),
         Entry(CrashingDrawbridge, "ELD", "Six WotC precons"),
         Entry(AllIsDust, "ROE", "Six WotC precons"),

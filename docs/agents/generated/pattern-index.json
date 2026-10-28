@@ -768,13 +768,19 @@
    ]
   },
   "DynamicAmounts.creaturesDiedThisTurn": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Sautekh Immortal",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SautekhImmortal.kt",
      "lines": 28,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SautekhImmortalScenarioTest.kt"
+    },
+    {
+     "card": "Blood for the Blood God!",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BloodForTheBloodGod.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BloodForTheBloodGodScenarioTest.kt"
     },
     {
      "card": "Tallyman of Nurgle",
@@ -1648,7 +1654,7 @@
    ]
   },
   "Effects.DealDamage": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Noise Marine",
@@ -1805,7 +1811,7 @@
    ]
   },
   "Effects.DrawCards": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Ugin's Insight",
@@ -2729,6 +2735,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Rewind.kt",
      "lines": 28,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RewindScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.discardHand": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Blood for the Blood God!",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BloodForTheBloodGod.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BloodForTheBloodGodScenarioTest.kt"
     }
    ]
   }
@@ -4422,7 +4439,7 @@
    ]
   },
   "spell { }": {
-   "count": 41,
+   "count": 42,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -4498,7 +4515,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 52,
+   "count": 53,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -5776,13 +5793,19 @@
    ]
   },
   "ModifySpellCost": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Herald of Slaanesh",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HeraldOfSlaanesh.kt",
      "lines": 28,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HeraldOfSlaaneshScenarioTest.kt"
+    },
+    {
+     "card": "Blood for the Blood God!",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BloodForTheBloodGod.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BloodForTheBloodGodScenarioTest.kt"
     },
     {
      "card": "Primal Amulet",
@@ -5893,7 +5916,7 @@
    ]
   },
   "EffectTarget.Controller": {
-   "count": 11,
+   "count": 12,
    "examples": [
     {
      "card": "Druid's Deliverance",
@@ -6003,7 +6026,7 @@
    ]
   },
   "EffectTarget.PlayerRef": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -6690,7 +6713,7 @@
    ]
   },
   "Player.Each": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Sautekh Immortal",
@@ -6703,6 +6726,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DeployToTheFront.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DeployToTheFrontScenarioTest.kt"
+    },
+    {
+     "card": "Blood for the Blood God!",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BloodForTheBloodGod.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BloodForTheBloodGodScenarioTest.kt"
     },
     {
      "card": "Rampaging Ferocidon",
@@ -6725,7 +6754,7 @@
    ]
   },
   "Player.EachOpponent": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Silence",
