@@ -106,3 +106,14 @@ test('queue feeder transfers suggestions through an artifact and fails closed on
   assert.ok(!feeder.includes('needs.suggest.outputs.result'));
   assert.ok(!feeder.includes("core.setOutput('result'"));
 });
+
+test('review inbox shows Copilot cards awaiting owner review, read-only, linking only to repository PRs', () => {
+  const fs = require('node:fs');
+  const html = fs.readFileSync(require('node:path').join(__dirname, 'index.html'), 'utf8');
+  assert.ok(html.includes('id="reviewList"') && html.includes('id="reviewBadge"'));
+  assert.ok(html.includes("d.kind==='review'"));
+  assert.ok(html.includes("const href=ROOT+'/pull/'+i.pr+'/files'"));
+  assert.ok(html.includes('navigator.setAppBadge'));
+  const script = html.slice(html.indexOf('// REVIEW_INBOX'), html.indexOf('async function fetchControl'));
+  assert.ok(!/POST|PUT|PATCH|DELETE|innerHTML/.test(script));
+});
