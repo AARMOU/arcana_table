@@ -1,5 +1,5 @@
 name: Deploy Arcana Control review Worker (manual only)
-# Owner-run only. Deploys control/review-worker (card Approve / Request Fix from Arcana Control) from main.
+# Owner-run only. Deploys control/review-worker (card Approve / Request Fix and exact-unit owner authorization) from main.
 # Reuses the existing Cloudflare secrets of the card-request Worker. Needs, once:
 #   variable REVIEW_OAUTH_CLIENT_ID, secrets REVIEW_OAUTH_CLIENT_SECRET and REVIEW_SESSION_SECRET (>= 32 chars).
 on:

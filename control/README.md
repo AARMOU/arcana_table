@@ -1,6 +1,14 @@
-# Arcana Control — mobile dashboard (read-only v0.1)
+# Arcana Control — mobile status dashboard with owner-gated card work
 
-This is a **public read-only** dashboard for the public `AARMOU/arcana_table` GitHub repository. Designed for an Android Fold and ordinary phone browsers. It is intentionally self-contained with no package installation, backend credentials, third-party assets, cookies or analytics.
+The dashboard displays **public read-only status** for `AARMOU/arcana_table`, with a single **owner-only card-work authorization** action through the existing encrypted OAuth session and separate Cloudflare Worker. Designed for an Android Fold and ordinary phone browsers. No GitHub tokens or billing secrets are shipped in the PWA.
+
+## One-tap work authorization (owner only)
+
+On the Overview screen, queued, genuine [Arcana Queue] issue units have an **I agree. Do it** button. You sign in once with the existing GitHub owner OAuth flow. The button asks the review Worker for the live issue and then, only if it is unchanged and genuinely actionable, posts one scoped label \`arcana:authorize-once\` to **that exact issue**. Duplicate clicks are idempotent. Non-owner requests, stale issues, untrusted submitters, invalid work units, already-assigned cards and conflicting outstanding authorizations fail closed.
+
+**Authorized — waiting** means permission recorded, **NOT** that a worker started. The existing dispatcher remains authoritative for Cardkit feasibility, exact integration base CI, provenance, usage/credit reserve including pending liabilities, active capacity, and one-assignment/two-repair ceilings. A dedicated normal-mode selection guard makes an owner-authorized issue outrank the unrelated lowest-numbered candidate. Ordinary unlabeled normal-mode queueing remains unchanged. Oracle tests, positive and negative runtime scenarios, card registration/export and independent certification remain engineering gates after this authorization. This feature never merges, signs, builds or releases the Android app.
+
+Deployment sequencing: this branch and its Worker endpoint must pass exact-head CI and receive explicit owner merge approval. GitHub Pages automatically updates on a later merge; **Cloudflare review Worker deployment is a separate explicit owner action** via \`.github/workflows/deploy-review-worker.yml\`. Before both are live, the UI is not an operational authorization button.
 
 ## Data and limits
 

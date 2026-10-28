@@ -95,6 +95,28 @@ async function resolveInterrupted({ github, owner, repo, unit, runId }) {
   return { issue: n, runs: open, observed, actor };
 }
 
+// One selected owner authorization ALWAYS wins over the ordinary lowest-numbered normal
+// candidate. Without this, a dashboard tap on #379 in normal mode could dispatch #100.
+// Multiple labels fail closed. Feasibility/provenance/billing are checked AFTER selection.
+function selectCandidate(allUnits, mode, base, feasible, actionable = A.unitActionable) {
+  const labeled = allUnits.filter(u => u.raw.labels.includes(A.ONE_SHOT_LABEL));
+  if (mode === 'authorize-once') {
+    return labeled.length === 1
+      ? { candidate: labeled[0], labeled, error: null }
+      : { candidate: null, labeled, error: 'authorize-once-needs-exactly-one-label' };
+  }
+  // Explicit priority is active in NORMAL mode. Dry-run continues to model ordinary
+  // automatic eligibility without treating a pending owner label as a paid assignment.
+  if (mode === 'normal') {
+    if (labeled.length > 1) return { candidate: null, labeled, error: 'multiple-owner-authorizations' };
+    if (labeled.length === 1) return { candidate: labeled[0], labeled, error: null };
+  }
+  const candidate = allUnits.filter(u => u.derived.state === 'queued' && u.raw.title.startsWith('[Arcana Queue]') &&
+    !u.prs.length && u.derived.provenance?.ok && actionable(u.raw.body, base).ok && feasible(u).ok)
+    .sort((a, b) => a.raw.number - b.raw.number)[0];
+  return { candidate, labeled, error: null };
+}
+
 // `report` is an optional sink the workflow publishes to the Arcana Control status comment. It never
 // feeds back into admission.
 async function runDispatch({ github, context, core, env, readBudget, now = Date.now(), fetchImpl, report = {} }) {
@@ -147,18 +169,9 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   const verdicts = F.parseVerdicts(env.ARCANA_FEASIBILITY);
   const feasible = u => F.assess({ body: u.raw.body, override: u.raw.feasibilityOverride, approvers, verdicts, baseSha });
   report.feasibility = verdicts ? { baseSha: verdicts.baseSha, classified: Object.keys(verdicts.cards).length } : { unavailable: true };
-  const labeled = data.units.filter(u => u.raw.labels.includes(A.ONE_SHOT_LABEL));
-  let candidate;
-  if (ready.dispatch === 'authorize-once') {
-    if (labeled.length !== 1) return done('authorize-once-needs-exactly-one-label', { labeled: labeled.map(u => u.raw.number) });
-    candidate = labeled[0];
-  } else {
-    // Untrusted issues are never candidates, so they can't spend credits or hold up the queue.
-    // Incomplete issues are skipped (and reported), so one unfinished issue can't block the whole queue.
-    candidate = data.units.filter(u => u.derived.state === 'queued' && u.raw.title.startsWith('[Arcana Queue]') &&
-      !u.prs.length && u.derived.provenance?.ok && A.unitActionable(u.raw.body, base).ok && feasible(u).ok)
-      .sort((a, b) => a.raw.number - b.raw.number)[0];
-  }
+  const selection = selectCandidate(data.units, ready.dispatch, base, feasible);
+  const { candidate, labeled } = selection;
+  if (selection.error) return done(selection.error, { labeled: labeled.map(u => u.raw.number) });
   if (!candidate) {
     // Explain why every queued unit was passed over instead of staying silently blocked.
     for (const u of data.units) {
@@ -205,10 +218,10 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   // 1. Record before spending anything. If this fails, the label is still present and nothing ran.
   await github.rest.issues.createComment({ owner, repo, issue_number: n,
     body: A.formatLedger({ op: 'authorizing', issue: n, run: runId,
-      ...(ready.dispatch === 'authorize-once' ? { reason: 'approved-by ' + String(candidate.raw.approval?.actor || 'unknown').replace(/[^A-Za-z0-9-]/g, '') } : {}),
+      ...(labeled.includes(candidate) ? { reason: 'approved-by ' + String(candidate.raw.approval?.actor || 'unknown').replace(/[^A-Za-z0-9-]/g, '') } : {}),
       at: at() }) });
   // 2. Consume the one-shot authorization. Failure leaves an interrupted attempt for owner review.
-  if (ready.dispatch === 'authorize-once') {
+  if (labeled.includes(candidate)) {
     try { await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: A.ONE_SHOT_LABEL }); }
     catch { core.setFailed('Could not consume one-shot label; attempt left for owner review.'); return done('label-removal-failed', { issue: n }); }
   }
@@ -216,7 +229,7 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   const fresh = (await github.rest.issues.get({ owner, repo, issue_number: n })).data;
   let result, reason;
   const claimed = fresh.state !== 'open' || (fresh.assignees || []).length > 0;
-  const origin = claimed ? null : await revalidate({ github, owner, repo, n, fresh, needApproval: ready.dispatch === 'authorize-once', approvers, base });
+  const origin = claimed ? null : await revalidate({ github, owner, repo, n, fresh, needApproval: labeled.includes(candidate), approvers, base });
   if (claimed) result = 'not-attempted';
   else if (!origin.ok) { result = 'not-attempted'; reason = 'revalidation ' + origin.reasons.join(' '); }
   else {
@@ -230,4 +243,4 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   return done('attempted', { issue: n, result, ...(reason ? { reason } : {}) });
 }
 
-module.exports = { runDispatch, assignCopilot, unitInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
+module.exports = { runDispatch, selectCandidate, assignCopilot, unitInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
