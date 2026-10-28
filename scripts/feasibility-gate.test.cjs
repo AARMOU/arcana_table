@@ -67,6 +67,17 @@ test('owner override label counts only when an approver applied it', () => {
   assert.equal(F.overrideOf(events('AARMOU'), []), null, 'label removed -> no override');
 });
 
+test('automatic queue cannot use feasibility override to spend on engine-blocked cards', () => {
+  const autoBody = '<!-- arcana-auto-queue-v1 -->\n' + body(['The Swarmlord']);
+  const overridden = F.assess({ body: autoBody, override: { actor: 'AARMOU' },
+    approvers: ['AARMOU'], verdicts, baseSha: SHA });
+  assert.equal(overridden.ok, false);
+  assert.match(overridden.reason, /override prohibited/);
+  const ordinary = F.assess({ body: autoBody, verdicts, baseSha: SHA });
+  assert.equal(ordinary.ok, false);
+  assert.match(ordinary.reason, /NEEDS_REVIEW/);
+});
+
 // ---- Dispatcher integration --------------------------------------------------------------------
 function dispatchGithub(issues) {
   const writes = [];
