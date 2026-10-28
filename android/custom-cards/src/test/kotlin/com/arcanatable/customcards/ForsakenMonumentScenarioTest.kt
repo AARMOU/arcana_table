@@ -111,6 +111,19 @@ class ForsakenMonumentScenarioTest {
         assertEquals("opponent's {C} is not doubled", 1, d.manaPool(d.player2).colorless)
     }
 
+    @Test fun manaGrantedWithoutTappingDoesNotReceiveMonumentBonus() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        // Mana entering the pool is not itself a tap-for-{C} event.
+        // The bonus must be tied to an actual permanent tapped for colorless.
+        d.giveColorlessMana(d.player1, 2)
+        assertEquals("directly granted {C}{C} receives no Monument bonus", 2, d.manaPool(d.player1).colorless)
+
+        val wastes = d.putLandOnBattlefield(d.player1, "Wastes")
+        d.tapForMana(d.player1, wastes)
+        assertEquals("only the real Wastes tap adds one extra {C}", 4, d.manaPool(d.player1).colorless)
+    }
+
     @Test fun withoutMonumentNoExtraMana() {
         val d = setup()
         val wastes = d.putLandOnBattlefield(d.player1, "Wastes")
