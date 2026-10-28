@@ -9,8 +9,8 @@ code=${PIPESTATUS[0]}
 mkdir -p "${GITHUB_WORKSPACE:-.}/gradle-logs"
 cp "$log" "${GITHUB_WORKSPACE:-.}/gradle-logs/${label//[^A-Za-z0-9_-]/_}.log"
 if [ "$code" -ne 0 ]; then
-  grep -E '^e: |^\* What went wrong|^> |FAILED$|Unresolved reference|Execution failed|Could not' "$log" \
-    | grep -vE '^> Task .* (UP-TO-DATE|NO-SOURCE|SKIPPED|FROM-CACHE)$' | head -12 \
+  grep -E '^e: |^\* What went wrong|^  > |^> [^T]|FAILED$|Unresolved reference|Execution failed|Could not|tests completed' "$log" \
+    | grep -vE '^> Task ' | head -12 \
     | while IFS= read -r line; do
         line="${line//'%'/'%25'}"
         echo "::error title=${label}::${line:0:900}"

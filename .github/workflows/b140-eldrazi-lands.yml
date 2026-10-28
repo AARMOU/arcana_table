@@ -22,7 +22,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: b140-eldrazi-lands
+  group: b140-eldrazi-lands-v2
   cancel-in-progress: true
 
 env:
@@ -56,11 +56,11 @@ jobs:
       - name: SDK, rules engine (incl. Temple/Crossroads/Ulalek specs) and AI suites
         if: matrix.suite == 'sdk-rules-ai'
         working-directory: argentum-engine
-        run: bash ../engine-upgrade/build140/run_gradle.sh engine-sdk-rules-ai ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:test :rules-engine:test :ai:test
+        run: bash ../engine-upgrade/build140/run_gradle.sh engine-sdk-rules-ai ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:test :rules-engine:test :ai:test --continue
       - name: Every set's card scenario suite
         if: matrix.suite == 'set-scenarios'
         working-directory: argentum-engine
-        run: bash ../engine-upgrade/build140/run_gradle.sh engine-set-scenarios ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sets:scenarioTest
+        run: bash ../engine-upgrade/build140/run_gradle.sh engine-set-scenarios ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sets:scenarioTest --continue
       - name: Count engine test results
         if: always()
         run: |

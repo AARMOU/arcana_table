@@ -7,6 +7,7 @@
 #   + Ulalek stage confirmation and its engine specs (engine-upgrade/ulalek/apply_patches.py)
 #   + engine-upgrade/eldrazi-temple/patches/0001  (ColorlessSubtypeSpellsOrAbilitiesOnly)
 #   + engine-upgrade/eldrazi-combined/patches/0002 (DevoidSpellsOnly; applies after Temple)
+#   + engine-upgrade/build140/patches/0001 (DevoidSpellsOnly SDK baseline + sdk-index; no rules change)
 #   + the Temple and Corrupted Crossroads engine specs.
 # Fails on any patch that does not apply exactly. Writes engine-source.txt (provenance).
 set -euo pipefail
@@ -21,6 +22,8 @@ python3 engine-upgrade/ulalek/apply_patches.py
 ELDRAZI=(
   engine-upgrade/eldrazi-temple/patches/0001-colorless-eldrazi-source-mana.patch
   engine-upgrade/eldrazi-combined/patches/0002-devoid-after-temple.patch
+  # Engine bookkeeping 0002 omitted: DevoidSpellsOnly's SDK surface-baseline line and sdk-index entry.
+  engine-upgrade/build140/patches/0001-devoid-sdk-surface.patch
 )
 for p in "${ELDRAZI[@]}"; do
   git -C argentum-engine apply --check "$ROOT/$p"
