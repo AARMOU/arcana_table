@@ -1,6 +1,6 @@
 // Arcana Control app shell only. Never cache GitHub API data or status/billing responses.
-const CACHE = 'arcana-control-shell-v1';
-const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
+const CACHE = 'arcana-control-shell-v2';
+const SHELL = ['./', './index.html', './cards.html', './card-queue.js', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(SHELL)).then(() => self.skipWaiting()));
 });
