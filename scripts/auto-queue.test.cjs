@@ -171,7 +171,7 @@ test('Copilot PR wakeups are restricted to trusted main code and the configured 
   // These checks must be present on BOTH read-only classification and write-enabled publishing.
   for (const gate of [
     "github.event_name != 'pull_request_target' && github.ref == 'refs/heads/main'",
-    "github.event_name == 'pull_request_target'",
+    "github.event_name == 'pull_request_target' &&\n      github.event.pull_request.user.login",
     "github.event.pull_request.user.login == 'Copilot'",
     'github.event.pull_request.base.ref == vars.ARCANA_INTEGRATION_BASE',
     'github.event.pull_request.head.repo.full_name == github.repository',
