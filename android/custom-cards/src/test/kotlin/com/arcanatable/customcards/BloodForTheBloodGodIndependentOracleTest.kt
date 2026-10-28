@@ -71,9 +71,7 @@ class BloodForTheBloodGodIndependentOracleTest {
 
     @Test
     fun resolvingInFourPlayerGameDamagesAllThreeOpponentsExactlyEight() {
-        val d = CardPool.driver().apply {
-            registerCard(BloodForTheBloodGod)
-        }
+        val d = customScenario(BloodForTheBloodGod)
         val seats = d.initMultiplayer(List(4) { Deck.of("Plains" to 40) })
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = seats[0])
         val spell = d.putCardInHand(seats[0], "Blood for the Blood God!")
