@@ -179,7 +179,7 @@ async function loadCatalog(){
 }
 async function openIssues(){
  try{
-  const r=await fetch('https://api.github.com/repos/AARMOU/arcana_table/issues?state=open&per_page=100',{cache:'no-store'});if(!r.ok)throw Error('GitHub HTTP '+r.status);
+  const r=await fetch('https://arcana-review.arcanamtg.workers.dev/v1/public/github?path='+encodeURIComponent('/issues?state=open&per_page=100'),{cache:'no-store'});if(!r.ok)throw Error('GitHub HTTP '+r.status);
   const data=await r.json();if(!Array.isArray(data))throw Error('Unexpected response');
   const visible=data.filter(x=>!x.pull_request&&/^\[(?:Arcana Queue|Card Request)\]/i.test(x.title)).slice(0,20);
   $('issues').replaceChildren();
@@ -191,7 +191,7 @@ async function openIssues(){
 async function loadPriorityStatus(){
  const el=$('priorityStatus');
  try{
-  const r=await fetch('https://api.github.com/repos/AARMOU/arcana_table/issues/78/comments?per_page=100',{cache:'no-store'});
+  const r=await fetch('https://arcana-review.arcanamtg.workers.dev/v1/public/github?path='+encodeURIComponent('/issues/78/comments?per_page=100'),{cache:'no-store'});
   if(!r.ok)throw Error('GitHub HTTP '+r.status);
   const comments=await r.json();
   if(!Array.isArray(comments))throw Error('Unexpected status response');

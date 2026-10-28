@@ -10,7 +10,7 @@ test('self-contained dashboard exists',()=>{assert.ok(html.startsWith('<!doctype
   assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"']);});
 test('inline JavaScript parses',()=>{assert.doesNotThrow(()=>new vm.Script(script));});
 test('all mobile navigation targets exist',()=>{for(const id of ['overview','work','safety']){assert.match(html,new RegExp('id="'+id+'"'));assert.match(html,new RegExp('data-view="'+id+'"'));}});
-test('read only public API data sources',()=>{assert.match(script,/api\.github\.com\/repos/);for(const path of ['/pulls?state=open','/actions/runs?per_page=30','/issues/81/comments?'])assert.ok(script.includes(path),path);assert.ok(!/\b(method:\s*['"](?:POST|PUT|PATCH|DELETE))/.test(script));});
+test('read only public API data sources',()=>{assert.match(script,/arcana-review\.arcanamtg\.workers\.dev\/v1\/public\/github/);assert.ok(!script.includes('https://api.github.com/repos/'));for(const path of ['/pulls?state=open','/actions/runs?per_page=30','/issues/81/comments?'])assert.ok(script.includes(path),path);assert.ok(!/\b(method:\s*['"](?:POST|PUT|PATCH|DELETE))/.test(script));});
 test('unknown budget and worker presence are explicit',()=>{assert.ok(html.includes('No verified billing feed'));assert.ok(html.includes('Presence unknown'));assert.ok(html.includes('Live session state not exposed'));});
 test('live GitHub response rendered as text, not HTML',()=>{assert.match(script,/node\.textContent\s*=\s*value/);assert.ok(script.includes('a.textContent')===false);assert.ok(!script.includes('innerHTML'));});
 test('public dashboard links limited to this repo',()=>{assert.ok(script.includes("url.startsWith(ROOT + '/')"));});

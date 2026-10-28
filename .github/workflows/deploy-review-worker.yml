@@ -41,7 +41,7 @@ jobs:
         with:
           node-version: '22'
       - name: Worker tests before production
-        run: node --test control/review-worker/tests/review-worker.test.mjs
+        run: node --test control/review-worker/tests/*.test.mjs
       - name: Deploy and configure
         shell: bash
         env:
