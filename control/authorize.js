@@ -50,7 +50,10 @@ const statusText = (status, body) => {
   if (status === 409 && body?.error === 'already-assigned') return 'Copilot already has this card. No new work was authorized.';
   return 'Authorization refused (' + (body?.error || 'HTTP ' + status) + '). No work was launched.';
 };
-function render(container, units) {
+function render(container, units, checkedAt) {
+  // How old the dispatcher verdicts are; shown so a stale snapshot never looks freshly verified.
+  const ageMin = Math.round((Date.now() - Date.parse(checkedAt || '')) / 60000);
+  const age = Number.isFinite(ageMin) && ageMin >= 0 ? ' · checked ' + (ageMin < 1 ? 'just now' : ageMin + ' min ago') : '';
   if (!container) return;
   container.replaceChildren();
   const queued = (Array.isArray(units) ? units : []).filter(u => safeNumber(u?.n) && u.state === 'queued').slice(0,25);
@@ -76,6 +79,8 @@ function render(container, units) {
       .then(r => r.ok ? r.json() : null).then(info => {
         if (!info || info.number !== unit.n || !String(info.title || '').startsWith('[Arcana Queue]'))
           throw Error('No verified queue issue');
+        // The dispatcher snapshot can predate a closure. A closed issue is never a candidate.
+        if (info.state !== 'open') { row.remove(); if (!container.children.length) container.append(el('div', 'empty', 'No queued card units currently waiting. Check back when new work appears.')); return; }
         link.textContent = '#' + unit.n + ' · ' + info.title.replace(/^\[Arcana Queue\]\s*/, '');
         if ((info.labels || []).some(l => l.name === 'arcana:authorize-once')) {
           button.disabled = true; button.textContent = 'Authorized';
@@ -85,14 +90,14 @@ function render(container, units) {
         } else if (!verdict.ok) {
           button.disabled = true;
           button.textContent = 'Not eligible';
-          message.textContent = verdict.reason;
+          message.textContent = verdict.reason + age;
         } else if ((info.assignees || []).some(a => ['copilot', 'copilot-swe-agent[bot]'].includes(String(a.login || '').toLowerCase()))) {
           button.disabled = true;
           button.textContent = 'Already assigned';
           message.textContent = 'Copilot already has this work.';
         } else {
           button.disabled = false;
-          message.textContent = 'Eligible queue unit · owner authorization required';
+          message.textContent = 'Eligible queue unit · owner authorization required' + age;
         }
       }).catch(() => { message.textContent = 'Issue details unavailable — authorization disabled for safety.'; });
 
