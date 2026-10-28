@@ -100,7 +100,9 @@ test('queue feeder transfers suggestions through an artifact and fails closed on
   assert.ok(feeder.includes('actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'));
   assert.ok(feeder.includes('actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'));
   assert.ok(feeder.includes("readFileSync('feeder-result.json','utf8')"));
-  assert.ok(feeder.includes("if(!r||published.startsWith('failed'))core.setFailed"));
+  assert.ok(feeder.includes("if(!r||published.startsWith('failed'))"));
+  assert.ok(feeder.includes("core.setFailed('Queue status not published"));
+  assert.match(feeder,/createNextAutoQueue/);
   assert.ok(!feeder.includes('needs.suggest.outputs.result'));
   assert.ok(!feeder.includes("core.setOutput('result'"));
 });
