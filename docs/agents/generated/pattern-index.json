@@ -817,6 +817,17 @@
     }
    ]
   },
+  "DynamicAmounts.lifeGainedThisTurn": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Celestine, the Living Saint",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CelestineTheLivingSaint.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineTheLivingSaintScenarioTest.kt"
+    }
+   ]
+  },
   "DynamicAmounts.lifeTotal": {
    "count": 1,
    "examples": [
@@ -2456,6 +2467,17 @@
     }
    ]
   },
+  "Effects.PutOntoBattlefield": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Celestine, the Living Saint",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CelestineTheLivingSaint.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineTheLivingSaintScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.ReflexiveTrigger": {
    "count": 1,
    "examples": [
@@ -2983,7 +3005,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3135,7 +3157,7 @@
    ]
   },
   "Keyword.LIFELINK": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Flayed One",
@@ -3162,16 +3184,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VenomcrawlerScenarioTest.kt"
     },
     {
+     "card": "Celestine, the Living Saint",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CelestineTheLivingSaint.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineTheLivingSaintScenarioTest.kt"
+    },
+    {
      "card": "Tallyman of Nurgle",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TallymanOfNurgle.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TallymanOfNurgleScenarioTest.kt"
-    },
-    {
-     "card": "Leonardo, the Balance",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/LeonardoTheBalance.kt",
-     "lines": 58,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LeonardoTheBalanceScenarioTest.kt"
     }
    ]
   },
@@ -4025,7 +4047,7 @@
    ]
   },
   "Triggers.you.beginningOf": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -4294,7 +4316,7 @@
    ]
   },
   "keywords()": {
-   "count": 78,
+   "count": 79,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4539,7 +4561,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5225,7 +5247,7 @@
    ]
   },
   "Step.END": {
-   "count": 10,
+   "count": 11,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -5246,6 +5268,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GargoyleFlockScenarioTest.kt"
     },
     {
+     "card": "Celestine, the Living Saint",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CelestineTheLivingSaint.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineTheLivingSaintScenarioTest.kt"
+    },
+    {
      "card": "Frenetic Sliver",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/FreneticSliver.kt",
      "lines": 44,
@@ -5256,12 +5284,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SneakAttack.kt",
      "lines": 44,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SneakAttackScenarioTest.kt"
-    },
-    {
-     "card": "Kratos, God of War",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KratosGodOfWar.kt",
-     "lines": 46,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KratosGodOfWarScenarioTest.kt"
     }
    ]
   },
@@ -6347,7 +6369,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 95,
+   "count": 96,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -6835,7 +6857,7 @@
    ]
   },
   "Player.You": {
-   "count": 33,
+   "count": 34,
    "examples": [
     {
      "card": "Defile",
@@ -7239,7 +7261,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 62,
+   "count": 63,
    "examples": [
     {
      "card": "Defile",
