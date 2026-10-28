@@ -45,3 +45,18 @@ test('app shell never caches scanner, billing or GitHub API data',()=>{
  assert.ok(!worker.includes("'./card-gaps.json'"));
  assert.ok(!worker.includes("'https://api.github.com"));
 });
+
+test('dual source browser labels indexed names as unverified and counts deck gaps separately',()=>{
+ for(const id of ['deckTab','libraryTab','deckUnique','deckMissing','deckReview','libraryTotal','libraryStatus','showMore'])assert.ok(page.includes('id="'+id+'"'),id);
+ assert.ok(script.includes("fetch('./argentum-catalog.json'"));
+ assert.ok(script.includes("fetch('./card-gaps.json'"));
+ assert.ok(script.includes("const PAGE=100"));
+ assert.ok(script.includes("status:'indexed'"));
+ assert.ok(script.includes("status:'missing'")===false || script.includes("deckCards.filter(c=>c.status==='missing')"));
+ assert.ok(script.includes('Not indexed'));
+ assert.ok(script.includes('Indexed · rules unverified'));
+ assert.ok(script.includes('Outside the 19 scanned decks'));
+ assert.ok(workflow.includes('--json _site/control/argentum-catalog.json'));
+ assert.ok(worker.includes('shellUrls.has(url.href)'));
+ assert.ok(!worker.includes("'./argentum-catalog.json'"));
+});
