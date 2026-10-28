@@ -254,6 +254,21 @@ class CardkitClassificationIntegrityTest(unittest.TestCase):
             audit.require_exact_cardkit_classifications(self.names + self.names[:1], self.rows)
 
 
+class ExistingCardOwnerSafetyTest(unittest.TestCase):
+    def test_forsaken_source_is_claimed_and_paid_copilot_pickup_is_on_hold(self):
+        lane, review = audit.TRIAGE["Forsaken Monument"]
+        self.assertIn("CLAUDE SOURCE #171", lane)
+        self.assertIn("GPT VALIDATION #180", lane)
+        self.assertIn("Copilot #151 HOLD", lane)
+        self.assertIn("NO duplicate paid dispatch", review)
+        self.assertIn("deterministic export", review)
+
+    def test_displacer_existing_gpt_owner_remains_exclusive(self):
+        lane, review = audit.TRIAGE["Eldrazi Displacer"]
+        self.assertIn("GPT #154 / existing draft #163", lane)
+        self.assertIn("DO NOT dispatch a duplicate", review)
+
+
 
 if __name__ == "__main__":
     unittest.main()
