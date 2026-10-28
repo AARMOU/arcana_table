@@ -88,9 +88,12 @@ async function resolveInterrupted({ github, owner, repo, unit, runId }) {
   return { issue: n, runs: open, observed, actor };
 }
 
-async function runDispatch({ github, context, core, env, readBudget, now = Date.now(), fetchImpl }) {
+// `report` is an optional sink the workflow publishes to the Arcana Control status comment. It never
+// feeds back into admission.
+async function runDispatch({ github, context, core, env, readBudget, now = Date.now(), fetchImpl, report = {} }) {
   const { owner, repo } = context.repo;
   const ready = A.readiness(env);
+  report.ready = ready;
   const done = (state, extra = {}) => { const r = { state, ...extra }; core.info(JSON.stringify(r)); return r; };
   if (ready.errors.length) return done('configuration-error', { errors: ready.errors });
   if (ready.dispatch === 'off') return done('dispatch-off');
@@ -99,8 +102,9 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
 
   // One-shot approvers: ARCANA_SPEND_APPROVERS, else the repository owner alone.
   const approvers = ready.approvers || [owner];
-  const data = await loadUnits({ github, owner, repo, now, approvers });
+  const data = await loadUnits({ github, owner, repo, now, approvers, lagMs: ready.billingLagMs });
   const units = data.units.map(u => u.derived);
+  report.units = units;
   const interrupted = data.units.filter(u => u.derived.blocksAll);
   if (interrupted.length) {
     const resolved = [];
@@ -117,10 +121,20 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   const base = env.ARCANA_INTEGRATION_BASE;
   if (!base || !/^[A-Za-z0-9._\/-]+$/.test(base)) return done('base-not-configured');
   const baseSha = (await github.rest.repos.getBranch({ owner, repo, branch: base })).data.commit.sha;
+  report.base = { branch: base, sha: baseSha };
   const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo,
     { owner, repo, head_sha: baseSha, status: 'success', per_page: 100 });
-  if (!runs.some(r => r.head_sha === baseSha && r.name === 'Arcana Development CI' && r.conclusion === 'success'))
+  if (!runs.some(r => r.head_sha === baseSha && r.name === 'Arcana Development CI' && r.conclusion === 'success')) {
+    // Say what GitHub actually has for this commit (e.g. a run waiting for approval), not just "no".
+    let ciRuns = [];
+    try {
+      const all = await github.paginate(github.rest.actions.listWorkflowRunsForRepo, { owner, repo, head_sha: baseSha, per_page: 100 });
+      ciRuns = all.filter(r => r.head_sha === baseSha && r.name === 'Arcana Development CI')
+        .slice(0, 5).map(r => ({ id: r.id, event: r.event, status: r.status, conclusion: r.conclusion }));
+    } catch { ciRuns = null; }
+    report.ciRuns = ciRuns;
     return done('ci-not-ready', { base, baseSha });
+  }
 
   const labeled = data.units.filter(u => u.raw.labels.includes(A.ONE_SHOT_LABEL));
   let candidate;
@@ -129,10 +143,22 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
     candidate = labeled[0];
   } else {
     // Untrusted issues are never candidates, so they can't spend credits or hold up the queue.
+    // Incomplete issues are skipped (and reported), so one unfinished issue can't block the whole queue.
     candidate = data.units.filter(u => u.derived.state === 'queued' && u.raw.title.startsWith('[Arcana Queue]') &&
-      !u.prs.length && u.derived.provenance?.ok).sort((a, b) => a.raw.number - b.raw.number)[0];
+      !u.prs.length && u.derived.provenance?.ok && A.unitActionable(u.raw.body, base).ok)
+      .sort((a, b) => a.raw.number - b.raw.number)[0];
   }
-  if (!candidate) return done('nothing-eligible');
+  if (!candidate) {
+    // Explain why every queued unit was passed over instead of staying silently blocked.
+    for (const u of data.units) {
+      if (u.derived.state !== 'queued') continue;
+      u.derived.skip = !u.raw.title.startsWith('[Arcana Queue]') ? 'not-a-queue-issue'
+        : u.prs.length ? 'has-open-pr ' + u.prs.map(p => '#' + p.number).join(',')
+          : !u.derived.provenance?.ok ? 'untrusted-origin: ' + (u.derived.provenance?.reasons || []).join(',')
+            : !A.unitActionable(u.raw.body, base).ok ? 'not-actionable: ' + A.unitActionable(u.raw.body, base).missing.join(',') : 'not-labeled';
+    }
+    return done('nothing-eligible');
+  }
 
   const n = candidate.raw.number;
   // Non-spending preflight: dry-run proves the edit-history lookup works from Actions before any
@@ -142,11 +168,16 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
     await core.summary.addHeading('Edit-history preflight').addCodeBlock(JSON.stringify({ issue: n, available: Number.isFinite(edit) })).write();
     core.info(JSON.stringify({ editHistoryPreflight: Number.isFinite(edit) ? 'ok' : 'unavailable', issue: n }));
   }
-  const { snapshot } = await readBudget(env);
+  const billing = await readBudget(env);
+  report.billing = billing;
+  const { snapshot } = billing;
   const decision = A.admit({ op: 'assign', unit: { ...candidate.derived, labeled: labeled.includes(candidate),
     actionable: A.unitActionable(candidate.raw.body, base) },
     units, labeledCount: labeled.length, ready, snapshot, now: Math.max(now, Date.now()) });
-  await core.summary.addHeading('Admission decision').addCodeBlock(JSON.stringify({ issue: n, ...decision })).write();
+  report.decision = { issue: n, ...decision };
+  // Job summaries of a public repository are public: no usage ratio or credit totals.
+  await core.summary.addHeading('Admission decision').addCodeBlock(JSON.stringify({ issue: n, allowed: !!decision.allowed,
+    dryRun: !!decision.dryRun, wouldAllow: !!decision.wouldAllow, reason: decision.reason, level: decision.budget?.level || null })).write();
   if (!decision.allowed) return done(decision.dryRun ? 'dry-run' : 'denied', { issue: n, reason: decision.reason });
 
   const runId = String(context.runId);

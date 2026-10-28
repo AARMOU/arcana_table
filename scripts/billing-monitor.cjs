@@ -2,6 +2,29 @@
 const {budgetFromEnv}=require('./usage-gate.cjs');
 const ACCOUNT='AARMOU', API='https://api.github.com';
 const MARKER='<!-- arcana-billing-alert-v1 -->';
+const KNOWN_REASON=/^(invalid-owner-budget|invalid-reservation|missing-token|billing-http-\d{3}|billing-timeout|billing-network-error|invalid-billing-response|wrong-account|wrong-period|wrong-unit-or-quantity|overflow|empty-billing-usage-items|unrecognized-copilot-sku|no-copilot-usage-items|unverified-snapshot)$/;
+const SETUP='docs/BILLING-SETUP.md';
+// Owner-facing next step for every fail-closed billing reason. Never includes secrets or response bodies.
+function billingAction(reason,env={}){
+ const legacy=env.ARCANA_PREMIUM_REQUEST_BUDGET!==undefined&&env.ARCANA_PREMIUM_REQUEST_BUDGET!==null&&env.ARCANA_PREMIUM_REQUEST_BUDGET!=='';
+ const r=String(reason||'');
+ if(r==='missing-token')return 'Owner: add the Actions secret COPILOT_BILLING_READ_TOKEN (step 1-2 of '+SETUP+').';
+ if(r==='invalid-owner-budget')return 'Owner: set the Actions variable ARCANA_AI_CREDIT_BUDGET to the monthly included AI credits as a whole number (step 3 of '+SETUP+')'+
+  (legacy?'. ARCANA_PREMIUM_REQUEST_BUDGET is a retired variable and is ignored.':'.');
+ if(r==='invalid-reservation')return 'Owner: ARCANA_AI_CREDIT_RESERVE must be a whole number of credits, or unset for the 10% default.';
+ if(r==='billing-http-401')return 'Owner: COPILOT_BILLING_READ_TOKEN is invalid or expired. Create a new token and replace the secret ('+SETUP+').';
+ if(r==='billing-http-403')return 'Owner: the token is not allowed to read AARMOU billing. Recreate it from the AARMOU account with the permission in '+SETUP+'.';
+ if(r==='billing-http-404')return 'Owner: GitHub did not find personal AI-credit billing for AARMOU. Confirm the token belongs to AARMOU and Copilot is billed to that personal account.';
+ if(/^billing-http-5\d\d$|^billing-timeout$|^billing-network-error$/.test(r))return 'None: GitHub billing was temporarily unavailable (retried once). The next scheduled check retries.';
+ if(/^billing-http-4\d\d$/.test(r))return 'Owner: GitHub rejected the billing request ('+r+'). Check the token and '+SETUP+'.';
+ if(r==='empty-billing-usage-items')return 'Wait: GitHub reports no AI-credit usage for this month yet (normal right after the 1st, UTC). Dispatch stays blocked until usage is reported.';
+ if(r==='no-copilot-usage-items'||r==='unrecognized-copilot-sku')return 'Engineer: the billing report has no recognizable Copilot AI-credit rows. Inspect the report format before trusting any figure.';
+ if(r==='wrong-account'||r==='wrong-period'||r==='wrong-unit-or-quantity'||r==='invalid-billing-response'||r==='overflow')
+  return 'Engineer: the billing response failed validation ('+r+'). Do not trust or substitute figures; inspect the API contract.';
+ if(r==='unverified-snapshot')return 'Engineer: the collected snapshot failed the freshness/provenance contract.';
+ if(r)return 'Engineer: billing unavailable ('+r+'). Check the Billing Watch run.';
+ return null;
+}
 function positiveBudget(raw){
  if(!/^[1-9]\d*$/.test(String(raw||'')) || !Number.isSafeInteger(Number(raw))) throw Error('invalid-owner-budget');
  return Number(raw);
@@ -31,17 +54,37 @@ function usageQuantity(report,now){
   report.usageItems.some(x=>/copilot/i.test(String(x.product||'')))?'unrecognized-copilot-sku':'no-copilot-usage-items');
  return sum;
 }
-async function collect({token,budget:raw,reserveCredits,now=new Date(),fetchImpl=fetch}){
+// One retry for transient GitHub errors (5xx) and timeouts. 4xx answers are definitive.
+const TRANSIENT=new Set([500,502,503,504]);
+async function fetchReport({url,token,fetchImpl,retryDelayMs}){
+ let lastError;
+ for(let attempt=0;attempt<2;attempt++){
+  if(attempt&&retryDelayMs)await new Promise(r=>setTimeout(r,retryDelayMs));
+  let response;
+  try{
+   response=await fetchImpl(url,{headers:{
+    Authorization:'Bearer '+token,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2026-03-10'
+   },signal:AbortSignal.timeout(12000)});
+  }catch(e){
+   lastError=Error(e?.name==='TimeoutError'||e?.name==='AbortError'?'billing-timeout':'billing-network-error');
+   continue;
+  }
+  if(response.ok)return response;
+  lastError=Error('billing-http-'+response.status);
+  if(!TRANSIENT.has(response.status))break;
+ }
+ throw lastError;
+}
+async function collect({token,budget:raw,reserveCredits,now=new Date(),fetchImpl=fetch,retryDelayMs=2000}){
  const allowance=positiveBudget(raw),pendingReserve=reserve(allowance,reserveCredits);
  if(!token)throw Error('missing-token');
  const period=now.toISOString().slice(0,7);
  const url=API+'/users/'+ACCOUNT+'/settings/billing/ai_credit/usage?year='+
  now.getUTCFullYear()+'&month='+(now.getUTCMonth()+1);
- const response=await fetchImpl(url,{headers:{
-  Authorization:'Bearer '+token,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2026-03-10'
- },signal:AbortSignal.timeout(12000)});
- if(!response.ok)throw Error('billing-http-'+response.status);
- const measured=usageQuantity(await response.json(),now);
+ const response=await fetchReport({url,token,fetchImpl,retryDelayMs});
+ let body;
+ try{body=await response.json();}catch{throw Error('invalid-billing-response');}
+ const measured=usageQuantity(body,now);
  const snapshot={account:ACCOUNT,metric:'ai_credits',source:'github-billing-api',
  sourceUrl:API+'/users/'+ACCOUNT+'/settings/billing/ai_credit/usage',
  period,allowanceSource:'owner-configured-budget',used:measured+pendingReserve,
@@ -58,14 +101,14 @@ async function readBudget(env=process.env,opts={}){
   return {...x,error:null};
  }catch(e){
   // Never include HTTP response bodies, request headers or tokens in public logs.
-  const reason=/^(invalid-owner-budget|invalid-reservation|missing-token|billing-http-\d{3}|invalid-billing-response|wrong-account|wrong-period|wrong-unit-or-quantity|overflow|empty-billing-usage-items|unrecognized-copilot-sku|no-copilot-usage-items|unverified-snapshot)$/.test(e.message)?e.message:'billing-unavailable';
+  const reason=KNOWN_REASON.test(e.message)?e.message:'billing-unavailable';
   return {snapshot:null,status:{level:'unknown',maxNewAssignments:0,warn:true,reason},error:reason};
  }
 }
 const messages={normal:'Usage returned below the warning threshold',warn:'Copilot AI credit usage at warning level (50%)',
  slow:'Copilot AI credit usage at throttling level (75%)',paused:'Copilot AI credit usage at pause level (90%)',
  unknown:'Copilot billing data unavailable; new assignments blocked'};
-async function alertChange({github,level,period,reason}){
+async function alertChange({github,level,period,reason,env={}}){
  if(!Object.hasOwn(messages,level)||! /^\d{4}-\d{2}$/.test(period))throw Error('invalid-alert');
  const owner='AARMOU',repo='arcana_table',issue_number=78;
  const comments=await github.paginate(github.rest.issues.listComments,{owner,repo,issue_number,per_page:100});
@@ -75,9 +118,11 @@ async function alertChange({github,level,period,reason}){
  const body=[MARKER,'period:'+period,'level:'+level,
   '@AARMOU **Arcana Table usage alert:** '+messages[level]+'.',
   'The billing API can lag. The existing readiness gate is independent; no automatic worker launch is authorized by this comment.',
-  level==='unknown'?'Please check the read-only billing token and owner-configured AI credit allowance.':'The worker budget gate uses a conservative buffer.',
+  level==='unknown'?'Reason: `'+(KNOWN_REASON.test(String(reason||''))?reason:'billing-unavailable')+'`. Next step: '+
+   (billingAction(KNOWN_REASON.test(String(reason||''))?reason:'billing-unavailable',env)||'check the Billing Watch run.'):'The worker budget gate uses a conservative buffer.',
+  'Live status: https://aarmou.github.io/arcana_table/control/#safety',
   'Details: https://github.com/AARMOU/arcana_table/issues/81'].join('\n\n');
  await github.rest.issues.createComment({owner,repo,issue_number,body});
  return 'posted';
 }
-module.exports={positiveBudget,reserve,usageQuantity,collect,readBudget,alertChange,MARKER};
+module.exports={positiveBudget,reserve,usageQuantity,collect,readBudget,alertChange,billingAction,fetchReport,MARKER};

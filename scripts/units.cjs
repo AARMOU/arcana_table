@@ -30,7 +30,8 @@ function approvalOf(events, contentAt) {
 }
 
 const isCopilot = a => ['copilot', 'copilot-swe-agent[bot]'].includes(String(a?.login || '').toLowerCase());
-const SESSION = { copilot_work_started: 'started', copilot_work_finished: 'finished' };
+// A failed Copilot session also ends the session (if GitHub emits this event); without it a failed run would look like it is still working.
+const SESSION = { copilot_work_started: 'started', copilot_work_finished: 'finished', copilot_work_finished_failure: 'finished' };
 
 // Explicit "Unit: #N" wins; otherwise the lowest referenced unit issue number.
 function unitOf(body, unitNumbers) {
@@ -56,7 +57,7 @@ function connectedPrs(events) {
   return [...linked];
 }
 
-async function loadUnits({ github, owner, repo, now = Date.now(), approvers }) {
+async function loadUnits({ github, owner, repo, now = Date.now(), approvers, lagMs }) {
   const open = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
   const prs = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', per_page: 100 });
   const unitIssues = open.filter(i => !i.pull_request &&
@@ -94,7 +95,7 @@ async function loadUnits({ github, owner, repo, now = Date.now(), approvers }) {
       authorAssociation: issue.author_association, commenters: commentersOf(comments) };
     const oneShot = labels.includes(ONE_SHOT_LABEL);
     if (oneShot) raw.approval = approvalOf(events.get(issue.number), await contentWrittenAt(github, owner, repo, issue.number));
-    units.push({ raw, derived: { ...deriveUnit(raw, now), ambiguousLink: ambiguous.has(issue.number),
+    units.push({ raw, derived: { ...deriveUnit(raw, now, lagMs === undefined ? undefined : { lagMs }), ambiguousLink: ambiguous.has(issue.number),
       provenance: provenance(raw, { needApproval: oneShot, approvers }) }, prs: linked });
   }
   return { units, prsByUnit, numbers };

@@ -16,7 +16,7 @@ function createAuthorizer({ github, owner, repo, env, readBudget, now = Date.now
   return async ({ pr, run }) => {
     const ready = A.readiness(env);
     if (ready.repair !== 'request' || !ready.master) return { allowed: false, reason: 'readiness: repair mode ' + ready.repair };
-    const data = await loadUnits({ github, owner, repo, now });
+    const data = await loadUnits({ github, owner, repo, now, lagMs: ready.billingLagMs });
     const n = unitOf(pr.body, data.numbers);
     const unit = data.units.find(u => u.raw.number === n);
     if (!unit) return { allowed: false, reason: 'no work unit linked to PR' };

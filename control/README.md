@@ -9,10 +9,13 @@ On page load and on **Refresh**, the browser reads the public GitHub REST API:
 - `GET /repos/AARMOU/arcana_table/pulls?state=open&sort=updated&direction=desc&per_page=100`
 - `GET /repos/AARMOU/arcana_table/actions/runs?per_page=30`
 - `GET /repos/AARMOU/arcana_table/issues/81/comments?per_page=100&page=1` (also the last page if more than 100 comments)
+- `GET /repos/AARMOU/arcana_table/issues/78/comments?per_page=100&page=1` (also the last page) — only `github-actions[bot]` comments starting with `<!-- arcana-control-status-v1:billing -->` or `:dispatcher -->` are read, as JSON, and rendered as text.
 
 PRs are displayed as open/draft, not "currently coding". Running workflows refer only to the latest 30 returned runs. The GitHub REST API can rate-limit anonymous visitors (normally 60 requests/hour per IP); the dashboard gracefully shows unavailable/partial data instead of inventing numbers. The user can manually refresh; no background polling is installed.
 
-**Not provided by public GitHub:** live ChatGPT or Claude session presence, actual Copilot worker activity, real-time billing/budget/credit balances, branch protection configuration, actual readiness/repair variable values. These indicators are explicitly unknown and historical notes are labeled as such. Public visitor access is not suitable for viewing private usage data; any future private extension requires authentication, server-side access controls, and explicit authorization.
+**Billing and dispatcher status (since 2026-10-27):** the Safeguards view shows the Copilot AI-credit usage level and band (never credit counts, allowance or percentages — the repository is public; exact figures stay in GitHub's private billing settings), estimated pending usage liabilities, the time of the last successful billing check, dispatcher readiness, the current blocker with its next step, and Copilot work units (running, pending pickup, queued, completed, blocked). These are copies published by the Billing Watch and Dispatcher workflows; they are as fresh as the timestamps shown (GitHub runs those schedules every few hours). Admission never reads them.
+
+**Still not provided:** live ChatGPT or Claude session presence, GitHub Actions minutes, ChatGPT usage, branch protection configuration. These indicators are explicitly unknown and historical notes are labeled as such. Public visitor access is not suitable for viewing private usage data; any future private extension requires authentication, server-side access controls, and explicit authorization.
 
 ## Local preview
 

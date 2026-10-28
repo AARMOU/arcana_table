@@ -6,6 +6,8 @@ on:
       - '.github/workflows/arcana-copilot-billing-watch.yml'
       - 'scripts/billing-monitor.cjs'
       - 'scripts/usage-gate.cjs'
+      - 'scripts/control-status.cjs'
+      - 'scripts/control-workflows.cjs'
   schedule:
     - cron: '11,41 * * * *'
   workflow_dispatch:
@@ -29,13 +31,9 @@ jobs:
           COPILOT_BILLING_READ_TOKEN: ${{ secrets.COPILOT_BILLING_READ_TOKEN }}
           ARCANA_AI_CREDIT_BUDGET: ${{ vars.ARCANA_AI_CREDIT_BUDGET }}
           ARCANA_AI_CREDIT_RESERVE: ${{ vars.ARCANA_AI_CREDIT_RESERVE }}
+          # Retired; read only to warn when it is still set.
+          ARCANA_PREMIUM_REQUEST_BUDGET: ${{ vars.ARCANA_PREMIUM_REQUEST_BUDGET }}
         with:
           script: |
-            const {readBudget,alertChange}=require('./scripts/billing-monitor.cjs');
-            const result=await readBudget(process.env);
-            core.info('Arcana AI credit usage state: '+result.status.level);
-            const period=new Date().toISOString().slice(0,7);
-            const alert=await alertChange({github,level:result.status.level,period,reason:result.error});
-            core.info('Alert state: '+alert);
-            await core.summary.addHeading('Arcana budget status').addRaw(result.status.level).write();
-            if(result.status.level==='unknown')core.warning('Billing unavailable ('+result.error+'): new assignments stay blocked.');
+            const {billingWatch}=require('./scripts/control-workflows.cjs');
+            await billingWatch({github,context,core,env:process.env});

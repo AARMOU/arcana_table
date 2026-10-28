@@ -43,6 +43,7 @@ jobs:
           ARCANA_MAX_ACTIVE_UNITS: ${{ vars.ARCANA_MAX_ACTIVE_UNITS }}
           ARCANA_EST_CREDITS_PER_SESSION: ${{ vars.ARCANA_EST_CREDITS_PER_SESSION }}
           ARCANA_EST_CREDITS_PER_REPAIR: ${{ vars.ARCANA_EST_CREDITS_PER_REPAIR }}
+          ARCANA_BILLING_LAG_HOURS: ${{ vars.ARCANA_BILLING_LAG_HOURS }}
         with:
           script: |
             const {readBudget}=require('./scripts/billing-monitor.cjs');
