@@ -1,0 +1,45 @@
+name: One-time owner-authorized Card Request live intake acceptance
+on:
+  pull_request:
+    types: [opened]
+    paths:
+      - '.github/workflows/card-request-one-time-intake.yml'
+permissions:
+  contents: read
+jobs:
+  one-real-card:
+    # This one-time PR test intentionally submits one real owner-requested missing
+    # card (Goblin Welder) to #321. No dummy names, full decks, secrets or dispatch.
+    if: github.event.action == 'opened' && github.event.pull_request.head.ref == 'gpt/card-request-one-shot-intake-20261028' && github.run_attempt == 1
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    steps:
+      - name: Submit one known unsupported Rocco card and inspect receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,urllib.request,urllib.error
+          endpoint="https://arcana-card-requests.arcanamtg.workers.dev/v1/card-requests"
+          payload={"requestId":"8d1c58a0-4070-4d5a-b140-202610280001","cardNames":["Goblin Welder"]}
+          req=urllib.request.Request(endpoint,data=json.dumps(payload).encode("utf-8"),
+              headers={"Content-Type":"application/json","Accept":"application/json"},
+              method="POST")
+          try:
+              with urllib.request.urlopen(req,timeout=20) as response:
+                  status=response.status
+                  data=json.load(response)
+          except urllib.error.HTTPError as error:
+              print("HTTP failure:",error.code,"(request not certified)")
+              raise
+          assert status in (200,202),("status",status)
+          assert data.get("ok") is True,data
+          assert data.get("accepted")==1,data
+          assert data.get("tracker")=="https://github.com/AARMOU/arcana_table/issues/321",data
+          print("LIVE CARD REQUEST ACCEPTED, status",status,"pending",data.get("pending"))
+          print("Tracker: https://github.com/AARMOU/arcana_table/issues/321")
+          if status==200:
+              assert data.get("pending") is False
+          else:
+              assert data.get("pending") is True
+          PY
