@@ -1,11 +1,21 @@
 name: Arcana Card Worker Dispatcher
 # Admission control: docs/automation/ADMISSION-CONTROL-DESIGN.md.
 # Paid work needs ARCANA_AUTOMATION_READY=true AND ARCANA_DISPATCH_MODE=authorize-once|normal.
-# Defaults (unset) make no GitHub API calls at all.
+# Defaults (unset) make no paid calls; every run reads billing and refreshes the Arcana Control
+# status comment on #78 (display only, never an input to admission).
 on:
   schedule:
     - cron: '*/30 * * * *'
+  # GitHub runs this schedule only every few hours in practice (observed 3.5-5 h gaps, Oct 2026),
+  # so owner label actions also start a run instead of waiting for the next scheduled slot.
+  issues:
+    types: [labeled]
   workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Force dry-run: evaluate admission and publish status without assigning anyone'
+        type: boolean
+        default: false
 permissions:
   contents: read
   actions: read
@@ -16,7 +26,9 @@ concurrency:
   cancel-in-progress: false
 jobs:
   dispatch:
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: >-
+      ${{ github.ref == 'refs/heads/main' && (github.event_name != 'issues' ||
+      contains(fromJSON('["arcana:authorize-once","wu:resolve-interrupted","wu:halted"]'), github.event.label.name)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -38,10 +50,12 @@ jobs:
           COPILOT_BILLING_READ_TOKEN: ${{ secrets.COPILOT_BILLING_READ_TOKEN }}
           ARCANA_AI_CREDIT_BUDGET: ${{ vars.ARCANA_AI_CREDIT_BUDGET }}
           ARCANA_AI_CREDIT_RESERVE: ${{ vars.ARCANA_AI_CREDIT_RESERVE }}
+          ARCANA_BILLING_LAG_HOURS: ${{ vars.ARCANA_BILLING_LAG_HOURS }}
+          # Retired; read only to warn when it is still set.
+          ARCANA_PREMIUM_REQUEST_BUDGET: ${{ vars.ARCANA_PREMIUM_REQUEST_BUDGET }}
           # Used only for the Copilot assignment call; all reads and ledger writes use GITHUB_TOKEN.
           COPILOT_DISPATCH_TOKEN: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
         with:
           script: |
-            const {readBudget}=require('./scripts/billing-monitor.cjs');
-            const {runDispatch}=require('./scripts/dispatch-runner.cjs');
-            await runDispatch({github,context,core,env:process.env,readBudget});
+            const {dispatcher}=require('./scripts/control-workflows.cjs');
+            await dispatcher({github,context,core,env:process.env});

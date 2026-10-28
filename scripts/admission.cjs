@@ -11,6 +11,12 @@ const RESOLVE_LABEL = 'wu:resolve-interrupted';
 const HARD_MAX_UNITS = 2;
 const CEILING = { assign: 1, repair: 2 };
 const PICKUP_TIMEOUT_MS = 30 * 60 * 1000;
+// A Copilot session that started but never reported finishing for this long is reported as stale.
+// It keeps its slot (it may still be spending) until it finishes or the owner releases it.
+const SESSION_STALE_MS = 3 * 60 * 60 * 1000;
+// Billing can report a finished session's credits late. Finished units count as pending liabilities
+// for this long (owner variable ARCANA_BILLING_LAG_HOURS, 0-72; 0 disables).
+const DEFAULT_BILLING_LAG_HOURS = 24;
 const DISPATCH_MODES = ['off', 'dry-run', 'authorize-once', 'normal'];
 const REPAIR_MODES = ['off', 'observe', 'request'];
 const LEDGER_OPS = ['authorizing', 'attempt-result', 'resolution', 'repair-request', 'halt', 'observation'];
@@ -35,6 +41,12 @@ function readiness(env = {}) {
   if (maxUnits === null || maxUnits > HARD_MAX_UNITS) errors.push('ARCANA_MAX_ACTIVE_UNITS invalid');
   const estSession = positiveInt(env.ARCANA_EST_CREDITS_PER_SESSION, 60);
   const estRepair = positiveInt(env.ARCANA_EST_CREDITS_PER_REPAIR, 30);
+  let billingLagMs = DEFAULT_BILLING_LAG_HOURS * 3600000;
+  const rawLag = env.ARCANA_BILLING_LAG_HOURS;
+  if (rawLag !== undefined && rawLag !== null && rawLag !== '') {
+    if (/^(?:0|[1-9]\d?)$/.test(String(rawLag)) && Number(rawLag) <= 72) billingLagMs = Number(rawLag) * 3600000;
+    else errors.push('ARCANA_BILLING_LAG_HOURS invalid');
+  }
   if (estSession === null) errors.push('ARCANA_EST_CREDITS_PER_SESSION invalid');
   if (estRepair === null) errors.push('ARCANA_EST_CREDITS_PER_REPAIR invalid');
   // Who may approve one-shot spending, as GitHub logins. Unset = the repository owner only
@@ -52,7 +64,7 @@ function readiness(env = {}) {
     dispatch: mode('ARCANA_DISPATCH_MODE', DISPATCH_MODES, 'off'),
     repair: mode('ARCANA_REPAIR_MODE', REPAIR_MODES, 'observe'),
     maxUnits: maxUnits !== null && maxUnits <= HARD_MAX_UNITS ? maxUnits : null,
-    estSession, estRepair, errors,
+    estSession, estRepair, billingLagMs, errors,
   };
 }
 
@@ -93,7 +105,21 @@ const latest = (xs, pred) => xs.filter(pred).reduce((m, x) => Math.max(m, x.at),
 // - An authorization with neither an `attempt-result` nor an owner `resolution` is interrupted.
 // - `confirmed`, `error` and `not-confirmed` results may have started paid work, so they are
 //   treated as an assignment that is pending pickup (and keep their slot after a timeout).
-function deriveUnit(unit, now = Date.now()) {
+// - A slot held only because of a timeout (pickup-timeout, session-stale) is released when the owner
+//   applies the wu:halted label. Any later session start takes the slot back automatically.
+// - A unit whose last session finished within lagMs is `recentlyFinished`: its credits may not be
+//   billed yet, so admission reserves for it.
+function deriveUnit(unit, now = Date.now(), { lagMs = DEFAULT_BILLING_LAG_HOURS * 3600000 } = {}) {
+  const d = deriveState(unit, now);
+  const finished = latest(unit.sessions || [], s => s.event === 'finished');
+  const recentlyFinished = !d.holdsSlot && finished > -Infinity && now - finished < lagMs;
+  const released = d.holdsSlot && ['pickup-timeout', 'session-stale'].includes(d.reason) &&
+    (unit.labels || []).includes(HALTED_LABEL);
+  if (released) return { ...d, holdsSlot: false, reason: 'owner-released', releasedFrom: d.reason, recentlyFinished: false };
+  return { ...d, recentlyFinished };
+}
+
+function deriveState(unit, now) {
   const ledger = unit.ledger || [];
   const sessions = unit.sessions || [];
   const authorized = new Set(ledger.filter(r => r.op === 'authorizing').map(r => r.run));
@@ -107,7 +133,10 @@ function deriveUnit(unit, now = Date.now()) {
   const started = latest(sessions, s => s.event === 'started');
   const finished = latest(sessions, s => s.event === 'finished');
   const repairAt = latest(ledger, r => r.op === 'repair-request');
-  if (started > -Infinity && started > finished) return { ...base, state: 'working', holdsSlot: true };
+  if (started > -Infinity && started > finished) {
+    return now - started > SESSION_STALE_MS ? { ...base, state: 'halted', reason: 'session-stale', holdsSlot: true }
+      : { ...base, state: 'working', holdsSlot: true };
+  }
   if (repairAt > -Infinity && !(finished > repairAt)) {
     const late = now - repairAt > PICKUP_TIMEOUT_MS && !(started > repairAt);
     return late ? { ...base, state: 'halted', reason: 'pickup-timeout', holdsSlot: true }
@@ -155,7 +184,9 @@ function sections(body) {
   let cur = null;
   for (const line of stripComments(body).split(/\r?\n/)) {
     const h = line.match(/^#{2,3}\s+(.+?)\s*$/);
-    if (h) { cur = h[1].toLowerCase(); out[cur] = out[cur] || []; continue; }
+    // "## Acceptance — complete rules behavior" is the Acceptance section: a heading's qualifier after
+    // a dash, colon or parenthesis does not rename it.
+    if (h) { cur = h[1].toLowerCase().split(/\s+[-—–]\s+|\s*[—–:(]/)[0].trim(); out[cur] = out[cur] || []; continue; }
     if (cur) out[cur].push(line);
   }
   return out;
@@ -226,13 +257,24 @@ function provenance(raw = {}, { needApproval = false, approvers } = {}) {
   return { ok: reasons.length === 0, reasons };
 }
 
-function budgetWithReservations({ snapshot, active, pendingRepairs, candidate, ready, now = Date.now() }) {
+// snapshot.used already includes the fixed reserve (10% by default). On top of it, reserve for every
+// unit that holds a slot, every pending repair, every recently finished unit whose credits may not be
+// billed yet, and the candidate itself. Estimates only ever ADD to authenticated usage.
+function budgetWithReservations({ snapshot, active, pendingRepairs, recentFinished = 0, candidate, ready, now = Date.now() }) {
   if (!snapshot || !Number.isFinite(snapshot.used) || ready.estSession === null || ready.estRepair === null)
     return { level: 'unknown', maxNewAssignments: 0, reason: 'no verified usage snapshot' };
-  const extra = (active + (candidate === 'assign' ? 1 : 0)) * ready.estSession +
-    (pendingRepairs + (candidate === 'repair' ? 1 : 0)) * ready.estRepair;
+  const liabilities = {
+    activeUnits: active * ready.estSession,
+    pendingRepairs: pendingRepairs * ready.estRepair,
+    recentlyFinished: recentFinished * ready.estSession,
+    candidate: candidate === 'assign' ? ready.estSession : candidate === 'repair' ? ready.estRepair : 0,
+  };
+  const extra = liabilities.activeUnits + liabilities.pendingRepairs + liabilities.recentlyFinished + liabilities.candidate;
+  const fixed = Number.isFinite(snapshot.reserved) ? snapshot.reserved : null;
   return { ...decideBudget({ used: snapshot.used + extra, allowance: snapshot.allowance,
-    measuredAt: Date.parse(snapshot.measuredAt), now }), reserved: extra };
+    measuredAt: Date.parse(snapshot.measuredAt), now }), reserved: extra,
+    liabilities: { ...liabilities, fixedReserve: fixed, total: extra + (fixed || 0),
+      reportedCredits: Number.isFinite(snapshot.reportedUsed) ? snapshot.reportedUsed : null, allowance: snapshot.allowance } };
 }
 
 // op: 'assign' | 'repair'. units: deriveUnit() results for every known unit.
@@ -260,16 +302,22 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
     if (unit.state !== 'review') return deny('unit state ' + unit.state);
     if (unit.repairs >= CEILING.repair) return deny('repair ceiling reached');
   }
-  const active = units.filter(u => u.holdsSlot).length;
-  if (ready.maxUnits === null || active >= ready.maxUnits) return deny(`capacity: ${active} of ${ready.maxUnits} active`);
+  const holders = units.filter(u => u.holdsSlot);
+  const active = holders.length;
+  if (ready.maxUnits === null || active >= ready.maxUnits) {
+    const who = holders.map(u => `#${u.number} ${u.state}${u.reason ? ':' + u.reason : ''}`).join(', ');
+    return deny(`capacity: ${active} of ${ready.maxUnits} active${who ? ' (' + who + ')' : ''}`);
+  }
   const pendingRepairs = units.filter(u => u.state === 'repairing').length;
-  const budget = budgetWithReservations({ snapshot, active, pendingRepairs, candidate: op, ready, now });
-  if (!budget.maxNewAssignments) return deny('budget: ' + budget.level);
-  if (budget.level === 'slow' && active > 0) return deny('budget: slow allows one operation at a time');
+  const recentFinished = units.filter(u => u.recentlyFinished && !u.holdsSlot).length;
+  const budget = budgetWithReservations({ snapshot, active, pendingRepairs, recentFinished, candidate: op, ready, now });
+  if (!budget.maxNewAssignments) return { ...deny('budget: ' + budget.level + (budget.reason ? ' (' + budget.reason + ')' : '')), budget };
+  if (budget.level === 'slow' && active > 0) return { ...deny('budget: slow allows one operation at a time'), budget };
   return dryRun ? { allowed: false, dryRun: true, wouldAllow: true, reason: 'dry-run', budget }
     : { allowed: true, reason: 'admitted', budget };
 }
 
 module.exports = { LEDGER, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
+  SESSION_STALE_MS, DEFAULT_BILLING_LAG_HOURS,
   readiness, formatLedger, parseLedger, deriveUnit, unitActionable, budgetWithReservations, admit, isBot,
   provenance, trustedCommenter, TRUSTED_ASSOCIATIONS };
