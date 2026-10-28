@@ -52,8 +52,14 @@ jobs:
           SESSION_SECRET: ${{ secrets.REVIEW_SESSION_SECRET }}
         run: |
           set -euo pipefail
-          npm install --no-save --no-audit --no-fund wrangler@4.69.0
-          npx wrangler deploy --config control/review-worker/wrangler.toml --var "GITHUB_OAUTH_CLIENT_ID:$CLIENT_ID"
-          printf '%s' "$CLIENT_SECRET" | npx wrangler secret put GITHUB_OAUTH_CLIENT_SECRET --config control/review-worker/wrangler.toml
-          printf '%s' "$SESSION_SECRET" | npx wrangler secret put SESSION_SECRET --config control/review-worker/wrangler.toml
-          echo 'Review Worker deployed. Check https://arcana-review.arcanamtg.workers.dev/health'
+          # Wrangler >=4.74 supports uploading code and both secrets in ONE deployment.
+          # Sequential secret put creates extra deployments and can leave a partial rollout
+          # if Cloudflare rejects the second secrets API call (observed run #40759087947).
+          npm install --no-save --no-audit --no-fund wrangler@4.74.0
+          npx wrangler deploy --help | grep -F -- '--secrets-file' >/dev/null
+          umask 077
+          secrets_file="$(mktemp --suffix=.json "${RUNNER_TEMP}/arcana-review-secrets.XXXXXX")"
+          trap 'rm -f "$secrets_file"' EXIT
+          node -e 'const fs = require("node:fs"); fs.writeFileSync(process.argv[1], JSON.stringify({GITHUB_OAUTH_CLIENT_SECRET: process.env.CLIENT_SECRET, SESSION_SECRET: process.env.SESSION_SECRET}));' "$secrets_file"
+          npx wrangler deploy --config control/review-worker/wrangler.toml --var "GITHUB_OAUTH_CLIENT_ID:$CLIENT_ID" --secrets-file "$secrets_file"
+          echo 'Review Worker deployed with both secrets. Check https://arcana-review.arcanamtg.workers.dev/health'
