@@ -9,6 +9,8 @@ on:
       - "closed-testing.html"
       - "assets/**"
       - "control/**"
+      - "tools/argentum-catalog.cjs"
+      - "tools/deck-gap-audit.cjs"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
