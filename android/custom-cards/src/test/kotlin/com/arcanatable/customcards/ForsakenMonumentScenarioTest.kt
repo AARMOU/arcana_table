@@ -106,6 +106,42 @@ class ForsakenMonumentScenarioTest {
         assertEquals(before + 2, d.getLifeTotal(d.player1))
     }
 
+    @Test fun colorlessNonCreatureSpellAlsoGainsTwoLife() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val ring = d.putCardInHand(d.player1, "Sol Ring")
+        d.giveColorlessMana(d.player1, 1)
+        assertNull(d.castSpell(d.player1, ring).error)
+        d.resolveStack()
+        assertEquals("a colorless artifact spell also triggers Monument", before + 2, d.getLifeTotal(d.player1))
+    }
+
+    @Test fun opponentsMonumentDoesNotTriggerFromMyColorlessCast() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player2, "Forsaken Monument")
+        val theirLife = d.getLifeTotal(d.player2)
+        val myLife = d.getLifeTotal(d.player1)
+        val probe = d.putCardInHand(d.player1, "Monument Colorless Probe")
+        d.giveColorlessMana(d.player1, 2)
+        assertNull(d.castSpell(d.player1, probe).error)
+        d.resolveStack()
+        assertEquals("opponent's Monument cannot gain life from my spell", theirLife, d.getLifeTotal(d.player2))
+        assertEquals("I do not control a Monument", myLife, d.getLifeTotal(d.player1))
+    }
+
+    @Test fun manaBonusEndsWhenMonumentLeavesBattlefield() {
+        val d = setup()
+        val monument = d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val first = d.putLandOnBattlefield(d.player1, "Wastes")
+        d.tapForMana(d.player1, first)
+        assertEquals(2, d.manaPool(d.player1).colorless)
+        d.moveToGraveyard(monument)
+        val second = d.putLandOnBattlefield(d.player1, "Wastes")
+        d.tapForMana(d.player1, second)
+        assertEquals("the second tap gets no additional {C} after Monument leaves", 3, d.manaPool(d.player1).colorless)
+    }
+
     @Test fun coloredSpellsGainNoLife() {
         val d = setup()
         d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
