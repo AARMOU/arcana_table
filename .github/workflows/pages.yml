@@ -43,6 +43,9 @@ jobs:
           cp -R assets _site/assets
           mkdir -p _site/control
           cp control/index.html _site/control/index.html
+          cp control/manifest.webmanifest _site/control/manifest.webmanifest
+          cp control/sw.js _site/control/sw.js
+          cp -R control/icons _site/control/icons
       - name: Upload site files
         uses: actions/upload-pages-artifact@v3
         with:

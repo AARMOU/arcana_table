@@ -30,3 +30,10 @@ A separate local browser simulation was executed with mocked GitHub responses at
 ## Publishing
 
 This folder is only exposed through the existing GitHub Pages site after the website workflow change is merged and GitHub Pages deployment succeeds. Proposed URL: `https://aarmou.github.io/arcana_table/control/` — **do not describe it as live until deployed and checked.** No changes to Android gameplay, billing settings, or paid workers are included.
+## Install as an Android app (PWA)
+
+After merging and deploying the PWA files, open `https://aarmou.github.io/arcana_table/control/` in Chrome on Android. Tap **⋮ → Install app** (or **Add to Home screen** when install promotion is unavailable). The launcher entry is **Arcana Control**, separate from the Arcana Table game. It uses its own standalone window and receives website updates without APK rebuilds.
+
+The service worker caches only the dashboard shell and install assets for offline launch. **GitHub data, worker state and billing/status comments are never cached by the worker**; they require a network connection and should remain unknown or show errors if unavailable. It does not grant permission to run workers, alter billing, merge PRs, or change game releases. PWA installation is not a Play Store / signed Android APK release.
+
+PWA tests run alongside existing dashboard checks using `node --test control/dashboard.test.cjs`. Deployment is handled by the existing Pages workflow. Do not claim installability until the merged deployment is verified on an Android browser.
