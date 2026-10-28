@@ -11,7 +11,7 @@ test('self-contained dashboard exists',()=>{assert.ok(html.startsWith('<!doctype
 test('owner authorization has a visible queue panel and guarded client module',()=>{assert.match(html,/id="authorizationList"/);assert.match(html,/authorize\.js/);assert.ok(html.includes('I agree. Do it'));});
 test('inline JavaScript parses',()=>{assert.doesNotThrow(()=>new vm.Script(script));});
 test('all mobile navigation targets exist',()=>{for(const id of ['overview','work','safety']){assert.match(html,new RegExp('id="'+id+'"'));assert.match(html,new RegExp('data-view="'+id+'"'));}});
-test('read only public API data sources',()=>{assert.match(script,/arcana-review\.arcanamtg\.workers\.dev\/v1\/public\/github/);assert.ok(!script.includes('https://api.github.com/repos/'));for(const path of ['/pulls?state=open','/actions/runs?per_page=30','/issues/81/comments?'])assert.ok(script.includes(path),path);assert.ok(!/\b(method:\s*['"](?:POST|PUT|PATCH|DELETE))/.test(script));});
+test('read only public API data sources',()=>{assert.match(script,/arcana-review\.arcanamtg\.workers\.dev\/v1\/public\/github/);assert.ok(script.includes("fetch('https://api.github.com/repos/'+REPO+path"));for(const path of ['/pulls?state=open','/actions/runs?per_page=30','/issues/81/comments?'])assert.ok(script.includes(path),path);assert.ok(!/\b(method:\s*['"](?:POST|PUT|PATCH|DELETE))/.test(script));});
 test('unknown budget and worker presence are explicit',()=>{assert.ok(html.includes('No verified billing feed'));assert.ok(html.includes('Presence unknown'));assert.ok(html.includes('Live session state not exposed'));});
 test('live GitHub response rendered as text, not HTML',()=>{assert.match(script,/node\.textContent\s*=\s*value/);assert.ok(script.includes('a.textContent')===false);assert.ok(!script.includes('innerHTML'));});
 test('public dashboard links limited to this repo',()=>{assert.ok(script.includes("url.startsWith(ROOT + '/')"));});
@@ -150,7 +150,15 @@ test('closed issues are never shown as candidates and verdict age is shown',()=>
   assert.ok(src.includes('function render(container, units, checkedAt)'));
   assert.ok(html.includes("window.ArcanaAuthorize.render($('authorizationList'),w.list||[],d.checkedAt);"));
 });
-test('a stale-served feed is re-asked once (no polling) before being reported stale',()=>{
-  assert.ok(html.includes("if(res.ok&&isStaleFeed(res)){await new Promise(r=>setTimeout(r,2000));const again=await fetch(PUBLIC_GITHUB+encodeURIComponent(path),{cache:'no-cache'})"));
-  assert.equal((html.match(/isStaleFeed\(res\)/g)||[]).length,1,'single retry only');
+test('stale public feed falls back to fresh GitHub without polling',()=>{
+  assert.ok(html.includes("if(res.ok&&isStaleFeed(res)){"));
+  assert.ok(html.includes("fetch('https://api.github.com/repos/'+REPO+path"));
+  assert.ok(html.includes("if(fresh?.ok)res=fresh"));
+  assert.equal((html.match(/isStaleFeed\(res\)/g)||[]).length,1);
+});
+test('signed-out approval checks GitHub live before showing a button',()=>{
+  const auth=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
+  assert.ok(auth.includes("https://api.github.com/repos/AARMOU/arcana_table/issues/"));
+  assert.ok(auth.includes("if (!direct?.ok) throw Error('Fresh issue state unavailable')"));
+  assert.ok(auth.includes("button.textContent = 'Sign in to authorize'"));
 });

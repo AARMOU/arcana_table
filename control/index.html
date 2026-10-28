@@ -168,7 +168,15 @@
         // Let the browser and native Cloudflare Workers cache honor the published 15-minute TTL.
         // cache:'no-store' bypassed caching and repeatedly exhausted public GitHub API limits.
         let res=await fetch(PUBLIC_GITHUB+encodeURIComponent(path));
-        if(res.ok&&isStaleFeed(res)){await new Promise(r=>setTimeout(r,2000));const again=await fetch(PUBLIC_GITHUB+encodeURIComponent(path),{cache:'no-cache'}).catch(()=>null);if(again?.ok)res=again;}
+        if(res.ok&&isStaleFeed(res)){
+          // An edge cache can return the same stale response after a page refresh.
+          // Bypass that edge only when stale, without turning every normal refresh into
+          // an uncached GitHub API request. If GitHub is unavailable, retain the warning.
+          const fresh=await fetch('https://api.github.com/repos/'+REPO+path,{
+            cache:'no-store',headers:{'Accept':'application/vnd.github+json'}
+          }).catch(()=>null);
+          if(fresh?.ok)res=fresh;
+        }
         if(!res.ok){
           const body=await res.json().catch(()=>({}));
           throw Error('GitHub feed HTTP '+res.status+(body?.error?' ('+body.error+')':''));
