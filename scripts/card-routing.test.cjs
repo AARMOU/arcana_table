@@ -266,3 +266,33 @@ test('public demand is classified with the owner selections, capped and de-dupli
   assert.equal(deck[1], '1 Broodlord');
   assert.equal(deck.length, 2 + 49); // owner's 2 + top 50 demand, minus the duplicate Card 0
 });
+
+
+test('repeated separate owner requests rank within owner lane, never behind public votes', () => {
+  const ownerFirst = request(701, ['Owner A', 'Owner A', 'Owner B']);
+  const ownerSecond = request(702, ['Owner B']);
+  const ownerThird = request(703, ['Owner B'], { author_association: 'NONE', user: {login:'outsider',type:'User'} });
+  const precons = gaps([card('Owner A', 'SUPPORTED', 'copilot'),
+    card('Owner B', 'SUPPORTED', 'copilot'), card('Public C', 'SUPPORTED', 'copilot')]);
+  const publicVotes = [{name:'Public C', votes:999}, {name:'Owner A', votes:5}];
+  const r = Q.candidates({ gaps:precons, openIssues:[ownerFirst,ownerSecond,ownerThird],
+    demand:publicVotes, max:3 });
+  assert.deepEqual([...Q.ownerRequestCounts([ownerFirst,ownerSecond,ownerThird])], [['owner a',1],['owner b',2]]);
+  assert.deepEqual(r.names, ['Owner B','Owner A','Public C']);
+  assert.deepEqual(r.ownerDemand.map(d => [d.name,d.requests]), [['Owner B',2],['Owner A',1]]);
+  const payload = Q.queuePayload({result:r,units:[],base:BASE,baseSha:SHA});
+  assert.deepEqual(payload.ownerDemand,r.ownerDemand);
+  assert.match(Q.queueSummary(payload).join('\n'), /Owner-requested priorities/);
+});
+
+test('duplicate owner card lines count once, blocked cards never become Copilot jobs', () => {
+  const owner = request(704, ['Supported A','Supported A','Blocked B']);
+  const precons = gaps([card('Supported A','SUPPORTED','copilot'),
+    card('Blocked B','ENGINE_BLOCKED','claude')]);
+  const r = Q.candidates({gaps:precons,openIssues:[owner],
+    demand:[{name:'Blocked B',votes:999}],max:3});
+  assert.deepEqual(r.names,['Supported A']);
+  assert.equal(Q.ownerRequestCounts([owner]).get('supported a'),1);
+  assert.equal(r.blockedRequests[0].outcome,'engine-work');
+  assert.deepEqual(r.workRequests.map(w=>w.name),['Blocked B']);
+});

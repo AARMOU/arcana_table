@@ -77,3 +77,22 @@ On the opening **Overview** screen, the **Current Copilot assignment** card show
 For that issue, the public browser makes read-only GitHub GET requests to the issue, its timeline, and a Copilot-authored cross-referenced PR (if one exists). For a verified PR it checks **only that PR branch** for a GitHub Actions `Running Copilot cloud agent` run. An agent workflow that finished successfully means the **agent run** finished; it does **not** mean the card is playable, merged or validated. PR titles remain visible so blocker/scaffold PRs are not confused with card completion. Unknown or stale data remains explicitly labeled; no GitHub write capability, billing amount, private token, or worker trigger was added.
 
 This panel refreshes on manual dashboard **Refresh**, as permitted by the public API rate limit, rather than assuming a continuous live connection. Its read-only status is based on the currently published dispatcher report and may lag an assignment until the next dispatcher snapshot.
+
+
+## Reconciled request ranking (after routing PR #355)
+
+Public app submissions tracked through #321 remain **votes only**: they reorder
+verified Copilot-ready candidates, never authorize paid work or create a GPT
+engine-work ticket. The owner's distinct, trusted GitHub `[Card Request]`
+issues retain priority over public votes. Within that owner queue, a card
+requested in more separate owner issues ranks first; repeated lines in one
+issue count once. Cardkit and existing no-duplicate, billing, 10% reserve and
+CI gates still control actual pickup. The read-only priority panel shows owner
+issue counts and public request counts **separately**, with public card
+eligibility labels, not a combined count that confuses voting with authority.
+
+This follows PR #355's new outside-precon classification and GPT routing. It
+supersedes obsolete PR #354's pre-#355 feeder/workflow changes; they must not be
+merged wholesale. Counts are accepted submissions, not unique people or verified
+rules certifications. No app-side GitHub token, write action, worker trigger,
+merge, APK build or release is added.

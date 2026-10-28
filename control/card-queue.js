@@ -203,9 +203,22 @@ async function loadPriorityStatus(){
   feederData=data;eligibility=currentEligibility();resetVerification();selected();
   const blocked=Array.isArray(data.blockedRequests)?data.blockedRequests:[];
   const ready=Array.isArray(data.suggestions)?data.suggestions.filter(x=>x.ready&&Number.isSafeInteger(x.requestedIssue)):[];
+  const ownerRank=Array.isArray(data.ownerDemand)?data.ownerDemand.filter(x=>x&&
+    typeof x.name==='string'&&Number.isSafeInteger(x.requests)&&x.requests>0).slice(0,10):[];
+  const publicRank=Array.isArray(data.publicRequests)?data.publicRequests.filter(x=>x&&
+    typeof x.name==='string'&&Number.isSafeInteger(x.votes)&&x.votes>0).slice(0,10):[];
   el.replaceChildren();
   const checked=Date.parse(data.checkedAt);
   el.append(elem('p','muted',Number.isFinite(checked)?'Last check: '+new Date(checked).toLocaleString():'Last check: unknown'));
+  if(ownerRank.length){
+    el.append(elem('p','','Owner card requests (most repeated requests first):'));
+    for(const x of ownerRank)el.append(elem('p','',x.name+' · '+x.requests+' recorded owner request'+(x.requests===1?'':'s')));
+  }
+  if(publicRank.length){
+    el.append(elem('p','','Public app requests (votes only; no automatic approval):'));
+    for(const x of publicRank)el.append(elem('p','',x.name+' · '+x.votes+' requests · '+
+      (x.status==='copilot-ready'?'Copilot-ready':x.status==='queued'?'Already queued':'Not Copilot-ready')));
+  }
   if(!blocked.length&&!ready.length)el.append(elem('p','muted','No owner-priority results in the last feeder snapshot. Existing GitHub requests may be awaiting the next scan.'));
   for(const x of ready){
     const p=elem('p','','Eligible: '+String(x.name||'')+' · selected in #'+x.requestedIssue+' · still subject to dispatcher gates');

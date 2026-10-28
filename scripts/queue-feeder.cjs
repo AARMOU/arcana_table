@@ -43,6 +43,17 @@ function ownerSelections(openIssues = []) {
   return selected;
 }
 
+// A separate trusted owner-authored [Card Request] issue is another recorded request.
+// Repeated lines within a single issue count once; public Worker demand never enters here.
+function ownerRequestCounts(openIssues = []) {
+  const counts = new Map();
+  for (const issue of openIssues) for (const card of ownerSelections([issue])) {
+    const key = F.normName(card.name);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  }
+  return counts;
+}
+
 // Cardkit decklist (ManaBox text) of the owner's selected cards. The default `gaps` run only covers
 // the six precon decks, so without this second classification no card outside those decks could
 // ever become Copilot-eligible or be routed anywhere else.
@@ -137,6 +148,7 @@ function candidates({ gaps, requestedGaps = null, openIssues = [], demand = [], 
   const ready = new Map(available.map(n => [F.normName(n), n]));
   const verdicts = verdictMap(gaps, requestedVerified ? requestedGaps : null);
   const selected = ownerSelections(openIssues);
+  const ownerCounts = ownerRequestCounts(openIssues);
   const requested = selected.filter(r => ready.has(F.normName(r.name))).map(r => ({ name: ready.get(F.normName(r.name)), issue: r.issue }));
   const blockedRequests = selected.filter(r => !ready.has(F.normName(r.name))).slice(0, 30).map(r => {
     const v = verdicts.get(F.normName(r.name));
@@ -159,17 +171,24 @@ function candidates({ gaps, requestedGaps = null, openIssues = [], demand = [], 
     return v && !ready.has(F.normName(n)) && !alreadyQueued.some(q => F.normName(q) === F.normName(n)) &&
       (v.claimedBy || v.readiness !== 'SUPPORTED' || v.route !== 'copilot');
   });
-  // Owner priorities first. Unknown / unsupported owner requests NEVER become units.
+  // Keep owner-authorized priorities ahead of public demand. Within that owner's
+  // ready cards, repeated genuine request issues increase priority; equal counts
+  // retain oldest selection order. Public demand is never an owner authorization.
+  const ownerOrdered = requested.map((r, i) => ({ ...r, i })).sort((a, b) =>
+    (ownerCounts.get(F.normName(b.name)) || 0) - (ownerCounts.get(F.normName(a.name)) || 0) || a.i - b.i);
+  const ownerDemand = ownerOrdered.slice(0, 30).map(r => ({
+    name: r.name, issue: r.issue, requests: ownerCounts.get(F.normName(r.name)) || 0,
+  }));
   // Public demand reorders only what is already Copilot-ready; ties keep Cardkit's order.
   const votesOf = new Map(demand.map(d => [F.normName(d.name), d.votes]));
   const byDemand = available.map((n, i) => ({ n, i, v: votesOf.get(F.normName(n)) || 0 }))
     .sort((a, b) => b.v - a.v || a.i - b.i).map(x => x.n);
-  const names = [...new Set([...requested.map(r => r.name), ...byDemand])].slice(0, max);
+  const names = [...new Set([...ownerOrdered.map(r => r.name), ...byDemand])].slice(0, max);
   const isReady = n => ready.has(F.normName(n));
   const publicRequests = demand.slice(0, 30).map(d => ({ name: d.name, votes: d.votes,
     status: isReady(d.name) ? 'copilot-ready' : isQueued(d.name) ? 'queued' : 'not-copilot-ready' }));
   return { ok: true, reason: null, names, requested, blockedRequests, workRequests, resolvedRequests, notReady, publicRequests,
-    requestedClassified: requestedVerified, alreadyQueued, eligibleNames: available, available: copilot.length };
+    ownerDemand, requestedClassified: requestedVerified, alreadyQueued, eligibleNames: available, available: copilot.length };
 }
 
 function newIssueUrl(title, body) {
@@ -193,7 +212,7 @@ function queuePayload({ result, units = [], base, baseSha, now = new Date(), run
     alreadyQueued: result?.alreadyQueued || [], blockedRequests: result?.blockedRequests || [], suggestions,
     workRequests: result?.workRequests || [], resolvedRequests: result?.resolvedRequests || [],
     notReady: result?.notReady || [], requestedClassified: !!result?.requestedClassified,
-    publicRequests: result?.publicRequests || [],
+    publicRequests: result?.publicRequests || [], ownerDemand: result?.ownerDemand || [],
     // This is the ENTIRE unclaimed Cardkit SUPPORTED/copilot allowlist for
     // owner-facing preflight. Never infer eligibility from the first 3 suggestions.
     // Above this bound, fail closed instead of publishing an incomplete allowlist.
@@ -212,6 +231,8 @@ function queueSummary(p) {
   ...ready.map(s => `${s.name}${s.requestedIssue ? ' (owner selected #' + s.requestedIssue + ')' : ''}: ${s.newIssueUrl ? '[open prefilled queue issue](' + s.newIssueUrl + ')' : 'body in JSON below'}`),
   ...(p.blockedRequests?.length ? ['Owner-selected cards not Cardkit Copilot-ready (NO assignment): ' +
     p.blockedRequests.map(r => r.name + ' (#' + r.issue + ', ' + (r.outcome || 'unclassified') + ')').join(', ').slice(0, 900)] : []),
+  ...((p.ownerDemand || []).length ? ['Owner-requested priorities (multiple separate trusted request issues count separately): ' +
+    p.ownerDemand.slice(0, 10).map(d => d.name + ' ×' + d.requests).join(', ').slice(0, 400)] : []),
   ...((p.publicRequests || []).length ? ['Public app demand (#321, votes reorder Copilot-ready cards only): ' +
     p.publicRequests.slice(0, 12).map(d => d.name + ' ×' + d.votes + (d.status === 'copilot-ready' ? ' (ready)' : '')).join(', ').slice(0, 600)] : []),
   ...(work.created ? ['Card work for GPT opened: #' + work.created.issue + ' (' + work.created.name + ').'] : []),
@@ -373,6 +394,6 @@ function needsSiteRefresh(previous, payload) {
     previous && /^[a-f0-9]{40}$/.test(String(previous.baseSha || '')) && previous.baseSha !== payload.baseSha);
 }
 
-module.exports = { candidates, ownerSelections, requestedDeck, publicDemand, DEMAND_ISSUE, outcomeOf, newIssueUrl, queuePayload, queueSummary,
+module.exports = { candidates, ownerSelections, ownerRequestCounts, requestedDeck, publicDemand, DEMAND_ISSUE, outcomeOf, newIssueUrl, queuePayload, queueSummary,
   chooseAutoQueue, createNextAutoQueue, planCardWork, syncCardWork, cardWorkTitle, cardWorkBody, needsSiteRefresh,
   CARD_WORK_MARKER };

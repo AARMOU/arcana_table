@@ -120,3 +120,13 @@ test('Scryfall exact card is accepted, abbreviated fuzzy only suggests owner-con
  assert.equal((await Preflight.verifyPrintedCard(async()=>{throw Error('offline')},'Broodlord')).ok,false);
  assert.equal((await Preflight.verifyPrintedCard(async()=>({ok:false,status:429}),'Broodlord')).ok,false);
 });
+
+
+test('priority inbox shows trusted owner and public demand separately, without an approval action',()=>{
+ assert.ok(script.includes('data.ownerDemand'));
+ assert.ok(script.includes('data.publicRequests'));
+ assert.ok(script.includes('Owner card requests (most repeated requests first)'));
+ assert.ok(script.includes('Public app requests (votes only; no automatic approval)'));
+ assert.ok(script.includes('Not Copilot-ready'));
+ assert.ok(!/\b(?:POST|PUT|PATCH|DELETE)\b/.test(script));
+});
