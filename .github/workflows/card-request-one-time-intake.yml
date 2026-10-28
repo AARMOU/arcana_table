@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
-      - name: Submit one known unsupported Rocco card and inspect receipt
+      - name: Verify one known unsupported Rocco card reaches live tracker after fixed Worker deploy
         shell: bash
         run: |
           set -euo pipefail
@@ -31,6 +31,7 @@ jobs:
                   data=json.load(response)
           except urllib.error.HTTPError as error:
               print("HTTP failure:",error.code,"(request not certified)")
+              print("Server response:",error.read(300).decode("utf-8","replace"))
               raise
           assert status in (200,202),("status",status)
           assert data.get("ok") is True,data
