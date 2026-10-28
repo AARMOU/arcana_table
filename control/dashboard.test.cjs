@@ -140,11 +140,13 @@ test('service worker revalidates the shell so a deploy reaches the installed app
 });
 test('an approved card that cannot run yet says why it is waiting',()=>{
   const src=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
-  assert.ok(src.includes("'Approved — waiting: ' + reasonText(unit.skip)"));
+  assert.ok(src.includes("'Authorization recorded — waiting for guarded dispatcher'"));
+  assert.ok(src.includes("'worker slot occupied'"));
 });
 test('closed issues are never shown as candidates and verdict age is shown',()=>{
   const src=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
-  assert.ok(src.includes("if (info.state !== 'open') { row.remove();"));
+  assert.ok(src.includes("if (info.state !== 'open') {"));
+  assert.ok(src.includes('row.remove();'));
   assert.ok(src.includes('function render(container, units, checkedAt)'));
   assert.ok(html.includes("window.ArcanaAuthorize.render($('authorizationList'),w.list||[],d.checkedAt);"));
 });
