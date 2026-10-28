@@ -1,7 +1,7 @@
 package com.arcanatable
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class CardRequestsTest {
@@ -21,7 +21,13 @@ class CardRequestsTest {
         assertEquals("Missing Card 10", names.last())
     }
 
-    @Test fun noDefaultPublicRequestsUntilIndependentlyConfigured() {
-        assertFalse("No deployed request service is configured by default", CardRequestApi.isConfigured)
+    @Test fun endpointRequiresExplicitHttpsBuildConfiguration() {
+        val endpoint = BuildConfig.CARD_REQUEST_ENDPOINT
+        assertEquals(endpoint.startsWith("https://"), CardRequestApi.isConfigured)
+        assertTrue("Configured request endpoint must be HTTPS", endpoint.isBlank() || endpoint.startsWith("https://"))
+    }
+
+    @Test fun clientUsesExplicitCloudflareAcceptedIdentity() {
+        assertEquals("ArcanaTable-CardRequests/1.0", CardRequestApi.USER_AGENT)
     }
 }
