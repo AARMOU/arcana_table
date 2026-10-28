@@ -164,6 +164,24 @@ class UlalekFusedAtrocityScenarioTest {
     }
 
     @Test
+    fun oneColorlessPlusColoredCannotPartiallyPayTheOptionalCopyCost() {
+        val d = withUlalekOnBattlefield()
+        val p = d.player1
+        val card = d.putCardInHand(p, fiend)
+        d.giveColorlessMana(p, 8)
+        assertNull("Eldrazi cast must be legal before testing the optional trigger", d.castSpell(p, card).error)
+
+        // Mana produced while Ulalek's cast trigger is waiting is legal to use.
+        // {C}{C} requires TWO colorless units; generic/colored mana cannot fill the gap.
+        d.giveColorlessMana(p, 1)
+        d.giveMana(p, Color.BLUE)
+        assertEquals("Ulalek still offers its optional payment", 1, d.resolveUlalek(pay = true))
+        assertEquals("Failed {C}{C} payment must not copy the Eldrazi", 1, d.permanentsNamed(p, fiend).size)
+        assertEquals("Failed payment must not consume the single available {C}", 1, d.manaPool(p).colorless)
+        assertEquals("Colored mana must not be spent as {C}", 1, d.manaPool(p).blue)
+    }
+
+    @Test
     fun nonEldraziSpellsDoNotTrigger() {
         val d = withUlalekOnBattlefield("Grizzly Bears")
         val bears = d.putCardInHand(d.player1, "Grizzly Bears")
