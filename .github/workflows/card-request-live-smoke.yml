@@ -1,0 +1,49 @@
+name: Card Request live service smoke (read-only)
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/card-request-live-smoke.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check-live-endpoint:
+    name: Verify deployed Worker health and invalid-input rejection
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check public health response (no credentials)
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint='https://arcana-card-requests.arcanamtg.workers.dev'
+          health_file="$RUNNER_TEMP/card-request-health.json"
+          status=$(curl --silent --show-error --retry 2 --max-time 15 \
+            --proto '=https' \
+            -o "$health_file" -w '%{http_code}' "$endpoint/health")
+          test "$status" = "200" || { echo "::error::Worker /health returned HTTP $status"; exit 1; }
+          python3 - "$health_file" <<'PY'
+          import json,sys
+          with open(sys.argv[1], encoding='utf-8') as f:
+              reply=json.load(f)
+          assert reply == {"ok": True, "service": "arcana-card-requests", "protocol": 1}, reply
+          print("PASS: deployed Worker /health returns the expected service and protocol")
+          PY
+      - name: Verify invalid JSON cannot enqueue a public card request
+        shell: bash
+        run: |
+          set -euo pipefail
+          endpoint='https://arcana-card-requests.arcanamtg.workers.dev/v1/card-requests'
+          response_file="$RUNNER_TEMP/card-request-rejection.json"
+          status=$(curl --silent --show-error --retry 2 --max-time 15 \
+            --proto '=https' \
+            -H 'Content-Type: application/json' -X POST --data-binary '{' \
+            -o "$response_file" -w '%{http_code}' "$endpoint")
+          test "$status" = "400" || { echo "::error::Malformed JSON returned HTTP $status instead of 400"; exit 1; }
+          python3 - "$response_file" <<'PY'
+          import json,sys
+          with open(sys.argv[1], encoding='utf-8') as f:
+              reply=json.load(f)
+          assert reply == {"error": "Invalid JSON"}, reply
+          print("PASS: live intake rejects malformed JSON before writing to GitHub")
+          PY
