@@ -198,6 +198,8 @@ data class GameCard(
     val combatRole: String? = null,
     val damage: Int = 0,
     val summoningSick: Boolean = false,
+    /** Argentum games: display id of the permanent this Equipment/Aura/Fortification is attached to. */
+    val attachedTo: Int? = null,
 )
 
 /** Sandbox only: the originating zone matters when a land is played from outside the hand. */

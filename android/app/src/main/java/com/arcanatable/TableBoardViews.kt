@@ -586,6 +586,20 @@ internal fun PlayerBoard(
                 Text("Your battlefield is empty", color = Muted, fontSize = 12.sp)
             }
         } else {
+            // Equipment and Auras sit with the permanent they're attached to (Argentum games).
+            val (standalone, attachedByHost) = remember(player.battlefield) { splitAttachments(player.battlefield) }
+            val spreadHosts = remember { androidx.compose.runtime.mutableStateMapOf<Int, Boolean>() }
+            val drawCard: @Composable (GameCard, androidx.compose.ui.unit.Dp, Boolean) -> Unit = { card, width, glow ->
+                BattlefieldCard(
+                    card, width,
+                    interactive = canControl,
+                    isCommander = card.id == player.commanderCard?.id,
+                    canSetCommander = player.commanderCard == null && player.commanderName.isNullOrBlank(),
+                    onTap = { onTapCard(card.id) }, onPreview = { onPreview(card) },
+                    onAction = { action -> onCardAction(card, action) },
+                    glow = glow || card.id in playableIds
+                )
+            }
             LazyColumn(
                 state = battlefieldListState,
                 modifier = Modifier.fillMaxWidth().weight(1f).tutorialTarget("battlefield-row").tutorialTarget("table-zoom").clip(RoundedCornerShape(12.dp)).background(Panel)
@@ -593,23 +607,28 @@ internal fun PlayerBoard(
                     .padding(5.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp), contentPadding = PaddingValues(3.dp)
             ) {
-                battlefieldGroups(player.battlefield).forEach { (type, cards) ->
+                battlefieldGroups(standalone).forEach { (type, cards) ->
                     item(key = "header-$type") { Text("$type  ·  ${cards.size}", color = Mint, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, modifier = Modifier.padding(start = 3.dp, top = 2.dp)) }
                     item(key = "cards-$type") {
                         // Full rows wrap onto the next line; identical cards share one spot with a count.
-                        val stacks = if (engineGame && stackIdenticalCards) stackIdentical(cards) else cards.map { CardStack(listOf(it)) }
+                        // A permanent with something attached never merges into a count stack.
+                        val stacks = if (engineGame && stackIdenticalCards) stackIdentical(cards, attachedByHost.keys) else cards.map { CardStack(listOf(it)) }
                         WrappingCardStacks(stacks, battlefieldCardWidth * boardZoom.floatValue) { stack, width ->
-                            // Tapping a stack acts on a copy Argentum offers something for, if any.
-                            val card = stack.cards.firstOrNull { it.id in playableIds } ?: stack.top
-                            BattlefieldCard(
-                                card, width,
-                                interactive = canControl,
-                                isCommander = card.id == player.commanderCard?.id,
-                                canSetCommander = player.commanderCard == null && player.commanderName.isNullOrBlank(),
-                                onTap = { onTapCard(card.id) }, onPreview = { onPreview(card) },
-                                onAction = { action -> onCardAction(card, action) },
-                                glow = stack.cards.any { it.id in playableIds }
-                            )
+                            val attachments = attachedByHost[stack.top.id].orEmpty()
+                            if (stack.count == 1 && attachments.isNotEmpty()) {
+                                val host = stack.top
+                                AttachedPile(
+                                    host, attachments, width,
+                                    expanded = spreadHosts[host.id] == true,
+                                    onToggle = { spreadHosts[host.id] = spreadHosts[host.id] != true },
+                                    glow = (attachments + host).any { it.id in playableIds },
+                                    card = drawCard,
+                                )
+                            } else {
+                                // Tapping a stack acts on a copy Argentum offers something for, if any.
+                                val card = stack.cards.firstOrNull { it.id in playableIds } ?: stack.top
+                                drawCard(card, width, stack.cards.any { it.id in playableIds })
+                            }
                         }
                     }
                 }
