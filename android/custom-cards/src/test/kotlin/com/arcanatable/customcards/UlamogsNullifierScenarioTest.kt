@@ -129,4 +129,42 @@ class UlamogsNullifierScenarioTest {
         assertFalse(d.zoneNames(opponent, Zone.GRAVEYARD).contains("Island"))
         assertFalse(d.zoneNames(opponent, Zone.GRAVEYARD).contains("Swamp"))
     }
+
+    @Test
+    fun choosingTwoOfThreeOpponentOwnedExilesLeavesUnselectedCardExiled() {
+        val d = customScenario(UlamogsNullifier, "Grizzly Bears", "Island", "Swamp", "Mountain")
+        val p = d.player1
+        val opponent = d.player2
+        d.putCardInExile(opponent, "Island")
+        d.putCardInExile(opponent, "Swamp")
+        d.putCardInExile(opponent, "Mountain")
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
+        val bears = d.putCardInHand(opponent, "Grizzly Bears")
+        d.giveMana(opponent, Color.GREEN, 2)
+        assertNull(d.castSpell(opponent, bears).error)
+        val stackTarget = d.getTopOfStack()!!
+        assertNull(d.passPriority(opponent).error)
+
+        val nullifier = d.putCardInHand(p, "Ulamog's Nullifier")
+        d.giveColorlessMana(p, 2)
+        d.giveMana(p, Color.BLUE)
+        d.giveMana(p, Color.BLACK)
+        assertNull(d.castSpell(p, nullifier).error)
+        assertNull(d.bothPass().error)
+        d.resolveAll(Choices(
+            targets = listOf(stackTarget),
+            yes = true,
+            pick = listOf("Island", "Swamp"),
+        ))
+
+        assertNotNull(d.findPermanent(p, "Ulamog's Nullifier"))
+        assertTrue("Two processed cards must counter the target spell", d.permanentsNamed(opponent, "Grizzly Bears").isEmpty())
+        assertEquals(
+            "Only the two chosen opponent-owned cards may leave exile",
+            setOf("Mountain"),
+            d.zoneNames(opponent, Zone.EXILE).toSet(),
+        )
+        assertTrue(d.zoneNames(opponent, Zone.GRAVEYARD).containsAll(listOf("Island", "Swamp", "Grizzly Bears")))
+        assertFalse("Unselected exile must not enter graveyard", d.zoneNames(opponent, Zone.GRAVEYARD).contains("Mountain"))
+    }
 }
