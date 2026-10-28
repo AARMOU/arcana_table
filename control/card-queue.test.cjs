@@ -141,3 +141,13 @@ test('one-tap authorization reconciles live owner state on refresh and fails clo
  assert.ok(auth.includes('worker slot occupied'));
  assert.ok(!auth.includes("button.disabled = false; message.textContent = 'Issue details unavailable"));
 });
+
+test('manual entry uses Scryfall suggestions and requires exact verification',()=>{
+ assert.ok(page.includes('id="manualMatches"'));
+ assert.ok(page.includes('id="manualStatus"'));
+ assert.ok(script.includes('api.scryfall.com/cards/autocomplete?q='));
+ assert.ok(script.includes('Preflight.verifyPrintedCard(fetch,name)'));
+ assert.ok(script.includes('Select and verify a Scryfall suggestion before adding.'));
+ assert.ok(script.includes('manualSeq++'));
+ assert.doesNotThrow(()=>new vm.Script(script));
+});

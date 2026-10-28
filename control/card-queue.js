@@ -278,7 +278,49 @@ $('search').addEventListener('input',()=>{showCount=PAGE;draw();});
 $('deck').addEventListener('change',()=>{showCount=PAGE;draw();});
 $('coverage').addEventListener('change',()=>{showCount=PAGE;draw();});
 $('showMore').addEventListener('click',()=>{showCount+=PAGE;draw();});
-$('add').addEventListener('submit',e=>{e.preventDefault();const name=clean($('manual').value);if(name.length<2){text('notice','Enter a complete card name.');return;}if(choose({name,status:'manual',decks:[],origin:'manual'},true))$('manual').value='';});
+let manualTimer=null,manualSeq=0,manualChoice=null;
+function resetManual(){manualChoice=null;$('manualMatches').replaceChildren();}
+async function lookupManual(query,seq){
+ try{
+  const response=await fetch('https://api.scryfall.com/cards/autocomplete?q='+encodeURIComponent(query),{cache:'no-store',headers:{Accept:'application/json'}});
+  if(seq!==manualSeq)return;
+  if(!response.ok)throw Error('HTTP '+response.status);
+  const data=await response.json();
+  if(!Array.isArray(data.data))throw Error('Invalid Scryfall response');
+  $('manualMatches').replaceChildren();
+  const names=data.data.filter(x=>typeof x==='string').slice(0,12);
+  text('manualStatus',names.length?'Select the correct Scryfall card below.':'No matching Magic cards found.');
+  for(const name of names){
+   const button=elem('button','btn',name);button.type='button';
+   button.addEventListener('click',async()=>{
+    manualSeq++;resetManual();$('manual').value=name;
+    text('manualStatus','Verifying exact printed card…');
+    const result=await Preflight.verifyPrintedCard(fetch,name);
+    if(result.ok&&key($('manual').value)===key(name)){
+     manualChoice=result.name;text('manualStatus','Verified: '+result.name+'. Tap Add to selection.');
+    }else{text('manualStatus',result.reason||'Verification failed.');}
+   });
+   $('manualMatches').append(button);
+  }
+ }catch(e){if(seq===manualSeq){resetManual();text('manualStatus','Scryfall unavailable. Try again later; unverified names cannot be added.');}}
+}
+$('manual').addEventListener('input',()=>{
+ clearTimeout(manualTimer);manualSeq++;resetManual();
+ const query=clean($('manual').value);
+ if(query.length<2){text('manualStatus','Type at least two letters to search Scryfall.');return;}
+ text('manualStatus','Searching Scryfall…');
+ const seq=manualSeq;manualTimer=setTimeout(()=>lookupManual(query,seq),350);
+});
+$('add').addEventListener('submit',e=>{
+ e.preventDefault();
+ const name=clean($('manual').value);
+ if(!manualChoice||key(name)!==key(manualChoice)){
+  text('notice','Select and verify a Scryfall suggestion before adding.');return;
+ }
+ if(choose({name:manualChoice,status:'manual',decks:[],origin:'Scryfall-verified manual'},true)){
+  $('manual').value='';resetManual();text('manualStatus','Card added. Verify selected cards before submitting.');
+ }
+});
 $('clear').addEventListener('click',()=>{if(checking)return;chosen.clear();resetVerification();selected();draw();});
 $('verifyCards').addEventListener('click',verifySelected);
 $('request').addEventListener('click',request);
