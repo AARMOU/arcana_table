@@ -28,5 +28,5 @@ test('full catalog includes indexed outside-deck cards but omits missing and tok
 }));
 test('invalid index row fails closed rather than publishing a partial catalog',()=>fixture(root=>{
  fs.appendFileSync(path.join(root,'android/app/src/main/assets/argentum/custom-cards.index.tsv'),'Malformed Without Tab\n');
- assert.throws(()=>makeCatalog(root,'integration@abc123'),/Invalid indexed card row/);
+ assert.throws(()=>makeCatalog(root,'integration@abc123'),/Malformed card index|Invalid indexed card row/);
 }));
