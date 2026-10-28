@@ -163,6 +163,7 @@ jobs:
       - name: Count app and custom-card results
         if: always()
         run: |
+          echo "::error title=gates-summary::compile=${{ steps.custom_compile.outcome }} export=${{ steps.export.outcome }} cardkit=${{ steps.cardkit.outcome }} custom-tests=${{ steps.custom_tests.outcome }} app-debug=${{ steps.app_debug.outcome }} app-release=${{ steps.app_release.outcome }} assemble=${{ steps.assemble.outcome }}"
           {
             python3 engine-upgrade/build140/count_junit.py custom-cards "android/custom-cards/build/test-results/**/TEST-*.xml"
             python3 engine-upgrade/build140/count_junit.py eldrazi-lands "android/custom-cards/build/test-results/**/TEST-*.xml" "EldraziTemple|CorruptedCrossroads"
@@ -210,6 +211,48 @@ jobs:
       - name: Fail if any gate failed (all gates already ran)
         if: steps.verdict.outputs.all_gates != 'true'
         run: exit 1
+
+  baseline:
+    # Same app tests on UNMODIFIED B140 (its committed jars, no Eldrazi lands), so a failure in the
+    # candidate can be told apart from one B140 already had. Read-only; never blocks the commit job.
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check out unmodified B140 (49d0b8c) beside this lane's tools
+        run: |
+          git fetch --no-tags --depth 1 origin 49d0b8c02a4137ef23ee9bb04b2c2b5f0f9bb4eb
+          git worktree add ../b140-baseline FETCH_HEAD
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - id: custom_tests
+        continue-on-error: true
+        working-directory: ../b140-baseline/android
+        run: bash $GITHUB_WORKSPACE/engine-upgrade/build140/run_gradle.sh baseline-custom-tests ./gradlew --no-daemon --max-workers=2 :custom-cards:test
+      - id: app_debug
+        continue-on-error: true
+        working-directory: ../b140-baseline/android
+        run: bash $GITHUB_WORKSPACE/engine-upgrade/build140/run_gradle.sh baseline-app-debug ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest
+      - id: app_release
+        continue-on-error: true
+        working-directory: ../b140-baseline/android
+        run: bash $GITHUB_WORKSPACE/engine-upgrade/build140/run_gradle.sh baseline-app-release ./gradlew --no-daemon --max-workers=2 :app:testReleaseUnitTest
+      - name: Count baseline results
+        if: always()
+        working-directory: ../b140-baseline
+        run: |
+          echo "::notice title=baseline gates::custom-tests=${{ steps.custom_tests.outcome }} app-debug=${{ steps.app_debug.outcome }} app-release=${{ steps.app_release.outcome }}"
+          python3 $GITHUB_WORKSPACE/engine-upgrade/build140/count_junit.py baseline-custom-cards "android/custom-cards/build/test-results/**/TEST-*.xml"
+          python3 $GITHUB_WORKSPACE/engine-upgrade/build140/count_junit.py baseline-app-debug "android/app/build/test-results/testDebugUnitTest/TEST-*.xml"
+          python3 $GITHUB_WORKSPACE/engine-upgrade/build140/count_junit.py baseline-app-release "android/app/build/test-results/testReleaseUnitTest/TEST-*.xml"
 
   commit-generated:
     # Separate job with the only write permission: it never runs engine or app code.
