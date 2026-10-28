@@ -64,7 +64,7 @@ test('dual source browser labels indexed names as unverified and counts deck gap
 test('owner card priority requires GitHub sign-in and shows Cardkit skipped reasons, never directly dispatches',()=>{
  assert.ok(page.includes('id="priorityStatus"'));
  assert.ok(page.includes('Cardkit verifies SUPPORTED / copilot'));
- assert.ok(page.includes('Review priority request'));
+ assert.ok(page.includes('Review verified request'));
  assert.ok(script.includes("loadPriorityStatus()"));
  assert.ok(script.includes("arcana-control-status-v1:queue"));
  assert.ok(script.includes("Not sent to Copilot:"));
@@ -72,4 +72,51 @@ test('owner card priority requires GitHub sign-in and shows Cardkit skipped reas
  assert.ok(script.includes("Not an [Arcana Queue]")===false);
  assert.ok(!script.includes('createWorkflowDispatch'));
  assert.ok(!script.includes('issues.create'));
+});
+
+const Preflight=require('./card-preflight.js');
+const sha='9dd5fc9c8da129d8aeb58ef6ecbfecc9ff575c9f';
+const source='gpt/arcana-integration-next@'+sha;
+const timestamp=Date.parse('2026-10-28T14:40:00Z');
+const allow={ok:true,eligibilityComplete:true,baseSha:sha,checkedAt:'2026-10-28T14:39:00Z',eligibleNames:['Broodlord']};
+test('pre-submit verification is mandatory in the installed app, never a direct paid dispatch',()=>{
+ for(const id of ['verifyCards','verificationStatus','request'])assert.ok(page.includes('id="'+id+'"'));
+ assert.ok(page.includes('src="./card-preflight.js" defer'));
+ assert.ok(script.includes('verifyPrintedCard(fetch,c.name)'));
+ assert.ok(script.includes('Preflight.assessCard(identity.name,eligibility)'));
+ assert.ok(script.includes('if(!allVerified()'));
+ assert.ok(workflow.includes('cp control/card-preflight.js _site/control/card-preflight.js'));
+ assert.ok(worker.includes("'./card-preflight.js'"));
+ assert.ok(!/POST|PUT|PATCH|DELETE|createWorkflowDispatch/.test(script));
+});
+test('Cardkit preflight requires complete, fresh, same-SHA, claimed-filtered list',()=>{
+ const ok=Preflight.parseSnapshot(allow,source,timestamp);
+ assert.equal(ok.ok,true);
+ assert.equal(Preflight.assessCard('Broodlord',ok).ok,true);
+ assert.equal(Preflight.assessCard('Knuckles the Echidna',ok).ok,false);
+ for(const candidate of [
+  {...allow,eligibleNames:[],eligibilityComplete:false},
+  {...allow,ok:false},
+  {...allow,baseSha:'b'.repeat(40)},
+  {...allow,checkedAt:'2026-10-27T00:00:00Z'},
+  {...allow,eligibleNames:['Broodlord',null]},
+  {...allow,eligibleNames:['Broodlord'],checkedAt:'2026-10-29T01:00:00Z'}
+ ])assert.equal(Preflight.parseSnapshot(candidate,source,timestamp).ok,false);
+});
+test('Scryfall exact card is accepted, abbreviated fuzzy only suggests owner-confirmed name',async()=>{
+ const replies={
+  exact:{ok:true,status:200,json:async()=>({object:'card',name:'Knuckles the Echidna',id:'scry-id'})},
+  miss:{ok:false,status:404,json:async()=>({object:'error'})},
+  fuzzy:{ok:true,status:200,json:async()=>({object:'card',name:'Knuckles the Echidna',id:'scry-id'})}
+ };
+ const calls=[];
+ const exact=await Preflight.verifyPrintedCard(async url=>{calls.push(url);return replies.exact},'Knuckles the Echidna');
+ assert.equal(exact.ok,true);
+ assert.match(calls[0],/exact=Knuckles%20the%20Echidna/);
+ const maybe=await Preflight.verifyPrintedCard(async url=>url.includes('exact=')?replies.miss:replies.fuzzy,'Knuckles');
+ assert.equal(maybe.ok,false);
+ assert.equal(maybe.suggestion,'Knuckles the Echidna');
+ assert.match(maybe.reason,/Confirm/);
+ assert.equal((await Preflight.verifyPrintedCard(async()=>{throw Error('offline')},'Broodlord')).ok,false);
+ assert.equal((await Preflight.verifyPrintedCard(async()=>({ok:false,status:429}),'Broodlord')).ok,false);
 });
