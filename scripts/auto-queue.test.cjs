@@ -20,7 +20,7 @@ const payload = () => Q.queuePayload({
   units: [{ name: CARD, body: BODY }], base: BASE, baseSha: SHA, runId: 555,
 });
 
-function fakeGitHub({ open = [], head = SHA, issuer = { login: 'github-actions[bot]', type: 'Bot' } } = {}) {
+function fakeGitHub({ open = [], closed = [], head = SHA, issuer = { login: 'github-actions[bot]', type: 'Bot' } } = {}) {
   const calls = [];
   const github = {
     rest: {
@@ -30,7 +30,7 @@ function fakeGitHub({ open = [], head = SHA, issuer = { login: 'github-actions[b
         create: async args => { calls.push(['create', args]); return { data: { number: 777, user: issuer, html_url: 'https://github.com/AARMOU/arcana_table/issues/777' } }; },
       },
     },
-    paginate: async (fn, args) => { calls.push(['list', args]); return open; },
+    paginate: async (fn, args) => { calls.push(['list', args]); return args.state === 'closed' ? closed : open; },
   };
   return { github, calls };
 }
@@ -72,9 +72,9 @@ test('disabled auto mode never calls GitHub or queues anything', async () => {
 test('one trusted bot issue is created with immutable provenance and exact unit requirements', async () => {
   const { result, calls } = await run();
   assert.equal(result.created, true); assert.equal(result.issue, 777);
-  assert.deepEqual(calls.map(([kind]) => kind), ['branch', 'list', 'create']);
-  const body = calls[2][1].body;
-  assert.equal(calls[2][1].title, title);
+  assert.deepEqual(calls.map(([kind]) => kind), ['branch', 'list', 'list', 'create']);
+  const body = calls[3][1].body;
+  assert.equal(calls[3][1].title, title);
   assert.ok(body.startsWith(A.AUTO_QUEUE_MARKER + '\n'));
   assert.match(body, /run:123456; base-sha:9dd5fc9/);
   assert.equal(A.unitActionable(body, BASE).ok, true);

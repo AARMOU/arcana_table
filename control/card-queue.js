@@ -12,9 +12,10 @@ function currentEligibility(){
   return {ok:false,reason:'Deck and library sources disagree. Refresh the published app.'};
  return Preflight.parseSnapshot(feederData,sourceRef());
 }
+// Submission needs exact printed names only. Copilot readiness is shown per card but no longer
+// blocks a request: cards Copilot cannot take are routed to GPT by the feeder (no Copilot credits).
 function allVerified(){
- const current=currentEligibility();
- return !checking && current.ok && chosen.size>0 &&
+ return !checking && chosen.size>0 &&
   [...chosen].every(([k])=>verified.get(k)?.ok);
 }
 const rank=s=>({missing:0,'face-name-review':1,indexed:2,manual:3})[s]??3;
@@ -65,7 +66,7 @@ function selected(){
   const result=verified.get(key(c.name));
   const textPart=elem('span','');
   textPart.append(elem('span','name',c.name),elem('span','decks',
-    result ? (result.ok?'✓ '+result.reason : '✕ '+result.reason) : 'Not yet verified — no submission allowed'));
+    result ? (result.ok?'✓ '+result.reason+(result.route?' · '+result.route:'') : '✕ '+result.reason) : 'Not yet verified — no submission allowed'));
   wrapper.append(textPart);
   if(result?.suggestion && result.suggestion!==c.name){
    const button=elem('button','btn','Use '+result.suggestion);
@@ -77,10 +78,10 @@ function selected(){
  }
  const eligible=currentEligibility();
  text('verificationStatus',checking?'Checking printed names against Scryfall…':
-   !eligible.ok?eligible.reason:allVerified()?'All selected cards verified. You may review the GitHub request.':
-   'Select cards and tap Verify selected cards. Copilot-unsupported cards cannot be submitted through this route.');
+   allVerified()?'All selected cards verified. You may review the GitHub request.'+(eligible.ok?'':' Routing is decided after submission ('+eligible.reason+')'):
+   'Select cards and tap Verify selected cards. Cards Copilot cannot take yet are routed to GPT, never to paid Copilot work.');
  text('picked',chosen.size+' card'+(chosen.size===1?'':'s')+' selected');
- $('verifyCards').disabled=checking||!chosen.size||!eligible.ok;
+ $('verifyCards').disabled=checking||!chosen.size;
  $('request').disabled=!allVerified();$('clear').disabled=checking||!chosen.size;save();
 }
 function resetVerification(){revision++;verified.clear();}
@@ -221,15 +222,16 @@ async function loadPriorityStatus(){
 async function verifySelected(){
  if(checking||!chosen.size)return;
  eligibility=currentEligibility();
- if(!eligibility.ok){text('notice',eligibility.reason);selected();return;}
  resetVerification();const token=revision;
  checking=true;selected();
  for(const c of [...chosen.values()]){
   const identity=await Preflight.verifyPrintedCard(fetch,c.name);
   if(token!==revision){checking=false;selected();return;}
-  const capability=identity.ok?Preflight.assessCard(identity.name,eligibility):{ok:false,reason:identity.reason};
-  verified.set(key(c.name),{ok:identity.ok&&capability.ok,
-    reason:identity.ok?capability.reason:identity.reason,
+  const capability=identity.ok&&eligibility.ok?Preflight.assessCard(identity.name,eligibility):null;
+  verified.set(key(c.name),{ok:identity.ok,
+    reason:identity.reason,
+    route:!identity.ok?null:!capability?'Copilot readiness checked after submission':
+      capability.ok?'Copilot-ready':'Not Copilot-ready yet: will be routed to GPT for engine/rules work (no Copilot credits)',
     suggestion:identity.suggestion||null,verifiedName:identity.name||null});
   selected();
  }
@@ -241,20 +243,18 @@ async function verifySelected(){
 function request(){
  const picked=[...chosen.values()];
  if(!allVerified()||!picked.length||picked.length>MAX){
-  text('notice','Verify every selected printed card and Cardkit eligibility first. No request opened.');return;
+  text('notice','Verify every selected printed card first. No request opened.');return;
  }
- // A stale source never authorizes a new request, even if an old verification passed.
  eligibility=currentEligibility();
- if(!eligibility.ok){text('notice',eligibility.reason);selected();return;}
  const title='[Card Request] '+picked.map(c=>c.name).join(', ').slice(0,175);
  const lines=['## Cards requested',...picked.map(c=>'- '+c.name+' — '+status(c.status)+(c.decks.length?' — '+c.decks.join('; '):' — outside scanned decks or manually entered')+' ('+(c.origin||'unverified')+')'),
   '','## Source and triage','- Deck scan source: '+(deckSource||'unavailable'),'- Argentum index source: '+(librarySource||'unavailable'),
   '- Card identity was checked against Scryfall exact printed names before submission.', 
-  '- Cardkit eligibility checked against complete unclaimed SUPPORTED/copilot allowlist at '+eligibility.baseSha+'.',
+  '- Copilot readiness at submission: '+(eligibility.ok?'checked against the unclaimed SUPPORTED/copilot allowlist at '+eligibility.baseSha:'not available ('+eligibility.reason+')')+'. The feeder re-classifies every card itself.',
   '- These preliminary checks are NOT gameplay certification; the dispatcher independently rechecks feasibility, CI and billing.',
   '- An indexed card is NOT necessarily implemented or Oracle-verified. The catalog excludes token-only names.',
   '- Check existing PRs, engine blockers, and regression acceptance before making any worker unit.','- Coordinate with #321 and #81; do not duplicate assignments.',
-  '','## Request status','Owner-selected priority request only, not an [Arcana Queue] work unit. The trusted feeder prioritizes ONLY Cardkit SUPPORTED/copilot, unclaimed cards; unsupported or unknown cards must remain blocked. Paid assignment still requires fresh exact-SHA feasibility, CI, budget reserve and worker-capacity gates. No immediate worker, merge or APK build authorized.'];
+  '','## Request status','Owner-selected priority request only, not an [Arcana Queue] work unit. Keep it open until every card is in the game. The trusted feeder sends ONLY Cardkit SUPPORTED/copilot, unclaimed cards to Copilot; cards that need engine or rules work get one [Card Work] issue for GPT (no paid assignment) and return to the Copilot queue automatically once Cardkit classifies them ready. Paid assignment still requires fresh exact-SHA feasibility, CI, budget reserve and worker-capacity gates. No immediate worker, merge or APK build authorized.'];
  const url=ISSUES+'new?title='+encodeURIComponent(title)+'&body='+encodeURIComponent(lines.join('\n'));
  if(url.length>8000){text('notice','Request too long. Select fewer cards.');return;}
  window.open(url,'_blank','noopener,noreferrer');

@@ -42,6 +42,20 @@ jobs:
           ref: ${{ vars.ARCANA_INTEGRATION_BASE }}
           path: base
           persist-credentials: false
+      - name: List owner-selected cards (trusted main code)
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {requestedDeck,publicDemand,DEMAND_ISSUE}=require('./ctl/scripts/queue-feeder.cjs');
+            const openIssues=await github.paginate(github.rest.issues.listForRepo,{...context.repo,state:'open',per_page:100});
+            // Public app demand (#321): votes only. Read failures just mean no reordering this pass.
+            let demand=[];
+            try{demand=publicDemand(await github.paginate(github.rest.issues.listComments,{...context.repo,issue_number:DEMAND_ISSUE,per_page:100}));}
+            catch(e){core.warning('Public demand unavailable: '+e.message);}
+            require('fs').writeFileSync('demand.json',JSON.stringify(demand));
+            const deck=requestedDeck(openIssues,demand);
+            require('fs').writeFileSync('requested.txt',deck);
+            core.info('Cards to classify (owner selections + top public demand): '+deck.split('\n').filter(Boolean).length);
       - name: Cardkit coverage with verified open-PR claims
         env:
           GH_TOKEN: ${{ github.token }}
@@ -49,6 +63,13 @@ jobs:
           set -euo pipefail
           git -C base rev-parse HEAD > base-sha.txt
           (cd base && python3 -I tools/cardkit/cardkit.py gaps --claims-from-github --json-output ../gaps.json > /dev/null)
+          # The precon run only covers the six precon decks. Classify the owner's own requests too, so a
+          # requested card outside those decks can reach Copilot, or be routed to GPT when it cannot.
+          # Fails soft: without this file the requested cards are simply reported as unclassified.
+          if [ -s requested.txt ]; then
+            (cd base && python3 -I tools/cardkit/cardkit.py gaps --claims-from-github --deck ../requested.txt --json-output ../requested-gaps.json > /dev/null) \
+              || { echo '::warning::Owner-requested cards could not be classified; they stay unclassified this pass.'; rm -f requested-gaps.json; }
+          fi
       - name: Pick unqueued Copilot-ready cards (trusted main code)
         uses: actions/github-script@v7
         with:
@@ -56,7 +77,10 @@ jobs:
             const fs=require('fs');const {candidates}=require('./ctl/scripts/queue-feeder.cjs');
             const max=Math.min(5,Math.max(1,Number(context.payload.inputs?.max||3)||3));
             const openIssues=await github.paginate(github.rest.issues.listForRepo,{...context.repo,state:'open',per_page:100});
-            const r=candidates({gaps:JSON.parse(fs.readFileSync('gaps.json','utf8')),openIssues,max});
+            let requestedGaps=null;
+            try{if(fs.existsSync('requested-gaps.json'))requestedGaps=JSON.parse(fs.readFileSync('requested-gaps.json','utf8'));}catch(e){core.warning('Requested-card classification unreadable: '+e.message);}
+            let demand=[];try{demand=JSON.parse(fs.readFileSync('demand.json','utf8'));}catch(e){core.warning('No public demand: '+e.message);}
+            const r=candidates({gaps:JSON.parse(fs.readFileSync('gaps.json','utf8')),requestedGaps,openIssues,demand,max});
             fs.writeFileSync('pick.json',JSON.stringify(r));fs.writeFileSync('names.txt',r.names.join('\n')+(r.names.length?'\n':''));
             core.info(JSON.stringify(r));
       - name: Generate queue bodies (cardkit unit, fails closed per card)
@@ -119,8 +143,12 @@ jobs:
             const result=r||{ok:false,reason:'feeder job produced no result (see the suggest job)'};
             let payload=Q.queuePayload({result,units:r?.units||[],base:process.env.ARCANA_INTEGRATION_BASE,baseSha:r?.baseSha,runId:context.runId});
             const enabled=process.env.ARCANA_AUTOMATION_READY==='true' && process.env.ARCANA_DISPATCH_MODE==='normal';
+            const previous=await S.previousStatus({github,...context.repo,kind:'queue'});
             const auto=await Q.createNextAutoQueue({github,...context.repo,payload,runId:context.runId,enabled});
             payload.autoQueue=auto;
+            // Blocked owner requests -> one [Card Work] issue for GPT; resolved ones handed back. Never paid.
+            try{payload.cardWork=await Q.syncCardWork({github,...context.repo,payload,runId:context.runId,enabled});}
+            catch(e){payload.cardWork={reason:'card-work-sync-failed'};core.warning('Card work sync failed: '+e.message);}
             // Stay well under GitHub's 65,536-character comment limit.
             while(S.formatStatus('queue',payload,Q.queueSummary(payload)).length>60000&&payload.suggestions.length)payload={...payload,suggestions:payload.suggestions.slice(0,-1)};
             const published=await S.publishStatus({github,...context.repo,kind:'queue',payload,summary:Q.queueSummary(payload)});
@@ -128,3 +156,8 @@ jobs:
             await core.summary.addHeading('Queue feeder').addRaw(Q.queueSummary(payload).join('\n')).write();
             if(!r||published.startsWith('failed')){core.setFailed('Queue status not published ('+published+').');return;}
             if(auto.created||auto.pending)await github.rest.actions.createWorkflowDispatch({...context.repo,workflow_id:'arcana-card-dispatcher.yml',ref:'main',inputs:{dry_run:'false'}});
+            // The card picker's deck/library data is built at Pages deploy time; rebuild it when the base moves.
+            if(Q.needsSiteRefresh(previous,payload)){
+              try{await github.rest.actions.createWorkflowDispatch({...context.repo,workflow_id:'pages.yml',ref:'main'});core.info('Integration base moved; control site refresh requested.');}
+              catch(e){core.warning('Control site refresh not requested: '+e.message);}
+            }
