@@ -30,10 +30,21 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      # Hosted runners provide Android cmdline-tools; avoid setup-android's retired 'tools' package.
+      # Pin Google's published commandline-tools SHA-256; the hosted runner does not include sdkmanager.
       - name: Prepare SDK 36
+        shell: bash
         run: |
-          sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+          set -euo pipefail
+          export ANDROID_HOME="$RUNNER_TEMP/android-sdk"
+          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
+          curl -fL --retry 2 "https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip" -o "$RUNNER_TEMP/cmdline.zip"
+          echo "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583  $RUNNER_TEMP/cmdline.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/cmdline.zip" -d "$RUNNER_TEMP/sdk-unpacked"
+          mv "$RUNNER_TEMP/sdk-unpacked/cmdline-tools/"* "$ANDROID_HOME/cmdline-tools/latest/"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          (yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses > /dev/null) || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" 'platforms;android-36' 'build-tools;36.0.0'
       - name: Compile importer UI and run focused Android test
         working-directory: android
         run: ./gradlew :app:testDebugUnitTest --tests com.arcanatable.CardRequestsTest --no-daemon --stacktrace
