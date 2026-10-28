@@ -181,7 +181,7 @@
         const action=d.action||(d.billing&&!d.billing.ok?d.billing.action:null);if(!d.dispatchReady||action){$('blockerBox').hidden=false;text('blockerTitle',d.state+(d.reason?': '+d.reason:''));text('blockerAction',action||'See the dispatcher run summary.');}
         const w=d.workers;if(w){text('wRunning',String(w.running));text('wPending',String(w.pendingPickup));text('wQueued',String(w.queued));text('wDone',String(w.completed));text('wBlocked',String(w.blocked));text('copilotLaneTag',w.running?w.running+' running':'Idle');text('copilotLaneStatus',w.running+' running · '+w.queued+' queued · '+w.blocked+' blocked');const list=$('workerList');list.replaceChildren();const order={working:0,repairing:0,'pending-pickup':1,halted:2,queued:3,review:4};(w.list||[]).slice().sort((a,b)=>(order[a.state]??5)-(order[b.state]??5)||a.n-b.n).forEach(u=>{const st={working:{klass:'running',tag:'amber',label:'Running'},repairing:{klass:'running',tag:'amber',label:'Repairing'},'pending-pickup':{klass:'running',tag:'amber',label:'Pending pickup'},halted:{klass:'failure',tag:'red',label:'Blocked'},queued:{klass:'neutral',tag:'blue',label:'Queued'},review:{klass:'success',tag:'green',label:'Completed'}}[u.state]||{klass:'neutral',tag:'gray',label:u.state};addRow(list,'#'+Number(u.n),[u.reason,u.skip,u.holdsSlot?'holds a slot':'',u.recentlyFinished?'credits may still be billing':''].filter(Boolean).join(' · ')||u.state,ROOT+'/issues/'+Number(u.n),st);});if(!(w.list||[]).length)list.append(e('div','empty','No Copilot work units.'));text('workerMeta','Run '+(d.runId||'?')+' · '+timeAgo(d.checkedAt));}}
 
-      // COPILOT_PURE_START — test pure selection and lifecycle separately from DOM and network.
+      // COPILOT_PURE_START
       function selectCopilotAssignment(d){
         if(!d || !d.workers) return null;
         const units=Array.isArray(d.workers.list)?d.workers.list:[];
@@ -211,7 +211,7 @@
       function showAssignmentLink(id, url, label){
         const a=$(id),ok=typeof url==='string'&&url.startsWith(ROOT+'/');
         a.hidden=!ok;
-        if(ok){a.href=safelyLink(url);a.textContent=label;}
+        if(ok){a.href=safelyLink(url);text(id,label);}
       }
       function showAssignment(candidate,issue,pr,run,checkedAt,warning){
         const stage=candidate?copilotStage(pr,run,candidate.kind):checkedAt?
