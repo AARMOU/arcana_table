@@ -1,13 +1,13 @@
 package com.arcanatable
 
-/** Initial production scope: premade decks and a single offline AI opponent.
- * Debug builds retain experimental import and multiplayer testing.
+/** Build 134 release scope: deck importing and four-seat multiplayer are enabled.
+ * The AI opponent count is bounded separately from WAN multiplayer seat admission.
  */
 internal object ReleaseFeatures {
-    val deckImportEnabled: Boolean get() = BuildConfig.DEBUG
-    val multiplayerPreviewEnabled: Boolean get() = BuildConfig.DEBUG
+    val deckImportEnabled: Boolean get() = true
+    val multiplayerPreviewEnabled: Boolean get() = true
     fun aiCount(requested: Int, debug: Boolean = BuildConfig.DEBUG): Int =
-        requested.coerceIn(1, if (debug) 3 else 1)
+        requested.coerceIn(1, 3)
     fun availableDecks(decks: List<DeckChoice>, debug: Boolean = BuildConfig.DEBUG): List<DeckChoice> =
-        if (debug) decks else decks.filter { it.builtIn }
+        decks
 }
