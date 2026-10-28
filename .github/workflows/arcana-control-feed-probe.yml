@@ -1,0 +1,51 @@
+name: Temporary Arcana Control public feed probe
+# Read-only diagnostics only. Do not merge into main.
+on:
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Probe live public Worker and GitHub endpoints (no secrets)
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          const base = 'https://arcana-review.arcanamtg.workers.dev';
+          const paths = [
+            '/pulls?state=open&sort=updated&direction=desc&per_page=100',
+            '/actions/runs?per_page=30',
+            '/issues/81/comments?per_page=100&page=1',
+            '/issues/78/comments?per_page=100&page=1'
+          ];
+          async function probe(label, target) {
+            try {
+              const res = await fetch(target, {
+                headers: { Origin: 'https://aarmou.github.io' },
+                signal: AbortSignal.timeout(14000),
+                redirect: 'manual'
+              });
+              const content = await res.text();
+              console.log(JSON.stringify({
+                label,
+                status:res.status,
+                feed:res.headers.get('x-arcana-feed'),
+                cors:res.headers.get('access-control-allow-origin'),
+                source:res.headers.get('x-arcana-checked-at'),
+                githubRateRemaining:res.headers.get('x-ratelimit-remaining'),
+                redirect:res.headers.get('location') ? '[redirect]' : null,
+                bytes:content.length,
+                // Only public non-success bodies, never private data or tokens.
+                error:res.ok ? null : content.slice(0,220)
+              }));
+            } catch(err) {
+              console.log(JSON.stringify({label,error:String(err?.cause?.code||err?.message||err)}));
+            }
+          }
+          await probe('worker-health', base+'/health');
+          await Promise.all(paths.map((path,i)=>probe('worker-public-'+i,base+'/v1/public/github?path='+encodeURIComponent(path))));
+          await probe('github-direct-public', 'https://api.github.com/repos/AARMOU/arcana_table/pulls?state=open&sort=updated&direction=desc&per_page=1');
+          NODE
