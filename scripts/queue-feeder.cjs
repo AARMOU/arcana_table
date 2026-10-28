@@ -57,7 +57,9 @@ function candidates({ gaps, openIssues = [], max = 5 }) {
   const selected = ownerSelections(openIssues);
   const requested = selected.filter(r => ready.has(F.normName(r.name))).map(r => ({ name: ready.get(F.normName(r.name)), issue: r.issue }));
   const blockedRequests = selected.filter(r => !ready.has(F.normName(r.name))).slice(0, 30).map(r =>
-    ({ ...r, reason: 'Not certified SUPPORTED / copilot and unclaimed by Cardkit on this base; do not dispatch.' }));
+    ({ ...r, reason: queued.has(F.normName(r.name)) || titles.some(t => t.includes(F.normName(r.name)))
+      ? 'Already queued; duplicate Copilot work not permitted.'
+      : 'Cardkit did not list this as unclaimed SUPPORTED / copilot (may be indexed, claimed or need engine work); do not dispatch.' }));
   // Owner priorities first. Unknown / unsupported owner requests NEVER become units.
   const names = [...new Set([...requested.map(r => r.name), ...available])].slice(0, max);
   return { ok: true, reason: null, names, requested, blockedRequests, alreadyQueued, available: copilot.length };
