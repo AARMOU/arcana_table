@@ -26,7 +26,7 @@ def fixture():
         '          sha256sum android/app/build/outputs/apk/debug/app-debug.apk > combined-evidence/apk.sha256\n',
         '      - name: Upload APK only when every integrated source, card, AI, and app gate passed\n'
         '        if: success()\n'
-        '        uses: actions/upload-artifact@v4\n'
+        '        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02\n'
         '        with:\n'
         '          name: arcana-combined-argentum-eldrazi94-build134-logo-polish-debug-apk\n'
         '          retention-days: 14\n'
@@ -334,6 +334,20 @@ class WorkflowAuditTest(unittest.TestCase):
                 '        if: false\n')
         problems = audit(weaken(a), weaken(b))
         self.assertTrue(any('required-gate condition' in x for x in problems), problems)
+
+    def test_preview_upload_mutable_tag_rejected(self):
+        a, b = fixture()
+        weakened = b.replace('actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
+                             'actions/upload-artifact@v4')
+        self.assertTrue(any('preview upload success/fail-closed' in x
+                            for x in audit(a, weakened)))
+
+    def test_preview_upload_unreviewed_sha_rejected(self):
+        a, b = fixture()
+        weakened = b.replace('actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02',
+                             'actions/upload-artifact@' + '0' * 40)
+        self.assertTrue(any('preview upload success/fail-closed' in x
+                            for x in audit(a, weakened)))
 
     def test_git_blob_hash(self):
         self.assertEqual(git_blob_sha(b'hello\n'), 'ce013625030ba8dba906f756967f9e9ca394464a')

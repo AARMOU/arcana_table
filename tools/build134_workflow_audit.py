@@ -10,7 +10,7 @@ import re
 from pathlib import Path
 
 RELEASE_BLOB = '2acf0538f14a7e2ec51f20a827e564cdff46cbb7'
-PREVIEW_BLOB = '1aba82df5dfc07f88f9bfa54f9d9fff485494de6'
+PREVIEW_BLOB = 'eff59ac367d8fda0a6a12efc1d8fd4d33a10cba4'
 PREVIEW_ONLY = (
     'Build installable combined test APK',
     'Verify installable APK and record provenance',
@@ -194,7 +194,7 @@ def audit(release: str, preview: str) -> list[str]:
         upload = extras[2][1]
         if (re.findall(r'^        if: [^\n]+$', upload, re.M) != ['        if: success()']
                 or not re.search(r'^          if-no-files-found: error$', upload, re.M)
-                or not re.search(r'^        uses: actions/upload-artifact@v4$', upload, re.M)):
+                or not re.search(r'^        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02$', upload, re.M)):
             problems.append('preview upload success/fail-closed conditions changed')
     return problems
 
@@ -215,7 +215,7 @@ def main() -> int:
             print('FAIL:', problem)
         return 1
     print('PASS: frozen 33 shared steps (28 named, 5 unnamed); 3 preview-only steps; read-only permissions; manual preview')
-    print('NOTICE: preview upload-artifact@v4 remains tag-referenced; pin/review before authorized activation')
+    print('PASS: preview APK upload uses reviewed immutable upload-artifact commit pin')
     return 0
 
 

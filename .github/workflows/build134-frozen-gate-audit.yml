@@ -29,7 +29,7 @@ jobs:
         run: |
           set -euo pipefail
           release=b32e499a65f0a4a9b70367a67ea00f91eef8dbaa
-          preview=57ed89604c9a520387550a1df417a487186aa564
+          preview=16e78fc042b6f2a681443558b24777e176106475
           git fetch --no-tags --depth=1 origin "$release"
           git fetch --no-tags --depth=1 origin "$preview"
           git show "$release":.github/workflows/release-upgraded-source-validation.yml > "$RUNNER_TEMP/release.yml"
