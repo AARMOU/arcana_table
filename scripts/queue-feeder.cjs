@@ -7,21 +7,60 @@ const F = require('./feasibility.cjs');
 
 const REPO_URL = 'https://github.com/AARMOU/arcana_table';
 const MAX_URL = 7500;
+// Only owner-authored Card Request issues may influence Copilot scheduling.
+// A public request or a request from a contributor must never be interpreted as priority.
+const OWNER = 'aarmou';
 const trustedIssue = i => !i.pull_request && (A.TRUSTED_ASSOCIATIONS.includes(i.author_association) ||
   (i.user?.login === 'github-actions[bot]' && i.user?.type === 'Bot' &&
     String(i.body || '').startsWith(A.AUTO_QUEUE_MARKER + '\n')));
+
+// Extract card names from an authenticated owner's Card Queue selection.
+// Keep the order chosen in the UI, oldest request first; allow at most eight per issue.
+function ownerSelections(openIssues = []) {
+  const requests = openIssues.filter(i => !i.pull_request &&
+    String(i.title || '').startsWith('[Card Request]') &&
+    i.author_association === 'OWNER' && String(i.user?.login || '').toLowerCase() === OWNER &&
+    i.user?.type === 'User').sort((a, b) =>
+      String(a.created_at || '').localeCompare(String(b.created_at || '')) ||
+      Number(a.number || 0) - Number(b.number || 0));
+  const selected = [], seen = new Set();
+  for (const issue of requests) {
+    let inCards = false, count = 0;
+    for (const line of String(issue.body || '').split(/\r?\n/)) {
+      const heading = line.match(/^#{2,3}\s+(.+?)\s*$/);
+      if (heading) { inCards = /^cards requested\s*$/i.test(heading[1]); continue; }
+      if (!inCards || count >= 8) continue;
+      const entry = line.match(/^\s*[-*]\s+(.+?)\s*$/);
+      if (!entry) continue;
+      const name = entry[1].split(/\s+—\s+(?:Not indexed|Double-face name review|Indexed|Manually entered)\b/i)[0].trim();
+      const normalized = F.normName(name);
+      if (!normalized || name.length > 141) continue;
+      count++;
+      if (seen.has(normalized)) continue;
+      seen.add(normalized);selected.push({ name, issue: issue.number });
+    }
+  }
+  return selected;
+}
 
 // gaps: Cardkit `gaps --claims-from-github` JSON. openIssues: open issues (REST shape).
 function candidates({ gaps, openIssues = [], max = 5 }) {
   if (!gaps || !gaps.dispatch || gaps.dispatch.claimsVerified !== true || gaps.dispatch.dispatchable !== true)
     return { ok: false, reason: 'Cardkit could not verify open-PR claims; no suggestions (fail closed).', names: [], alreadyQueued: [] };
-  const safeIssues = openIssues.filter(trustedIssue);
-  const queued = new Set(F.collectNames(safeIssues, 1000).map(F.normName));
-  const titles = safeIssues.map(i => F.normName(i.title));
+  const units = openIssues.filter(i => trustedIssue(i) && String(i.title || '').startsWith('[Arcana Queue]'));
+  const queued = new Set(F.collectNames(units, 1000).map(F.normName));
+  const titles = units.map(i => F.normName(i.title));
   const copilot = Array.isArray(gaps.dispatch.copilot) ? gaps.dispatch.copilot.filter(n => typeof n === 'string') : [];
   const alreadyQueued = copilot.filter(n => queued.has(F.normName(n)) || titles.some(t => t.includes(F.normName(n))));
-  const names = copilot.filter(n => !alreadyQueued.includes(n)).slice(0, max);
-  return { ok: true, reason: null, names, alreadyQueued, available: copilot.length };
+  const available = copilot.filter(n => !alreadyQueued.includes(n));
+  const ready = new Map(available.map(n => [F.normName(n), n]));
+  const selected = ownerSelections(openIssues);
+  const requested = selected.filter(r => ready.has(F.normName(r.name))).map(r => ({ name: ready.get(F.normName(r.name)), issue: r.issue }));
+  const blockedRequests = selected.filter(r => !ready.has(F.normName(r.name))).slice(0, 30).map(r =>
+    ({ ...r, reason: 'Not certified SUPPORTED / copilot and unclaimed by Cardkit on this base; do not dispatch.' }));
+  // Owner priorities first. Unknown / unsupported owner requests NEVER become units.
+  const names = [...new Set([...requested.map(r => r.name), ...available])].slice(0, max);
+  return { ok: true, reason: null, names, requested, blockedRequests, alreadyQueued, available: copilot.length };
 }
 
 function newIssueUrl(title, body) {
@@ -35,13 +74,14 @@ function queuePayload({ result, units = [], base, baseSha, now = new Date(), run
     const body = typeof u.body === 'string' ? u.body.trim() + '\n' : null;
     const act = body ? A.unitActionable(body, base) : { ok: false, missing: ['no-body'] };
     const title = `[Arcana Queue] ${u.name} — Cardkit SUPPORTED, unclaimed`;
-    return { name: u.name, ready: !!body && act.ok, missing: act.ok ? [] : act.missing,
-      error: u.error ? String(u.error).slice(0, 200) : null, title,
+    const request = (result?.requested || []).find(r => F.normName(r.name) === F.normName(u.name));
+    return { name: u.name, ready: !!body && act.ok, requestedIssue: Number.isSafeInteger(request?.issue) ? request.issue : null,
+      missing: act.ok ? [] : act.missing, error: u.error ? String(u.error).slice(0, 200) : null, title,
       newIssueUrl: body && act.ok ? newIssueUrl(title, body) : null, body: body && act.ok ? body : null };
   });
   return { checkedAt: now.toISOString(), runId: runId ? String(runId) : null, base: base || null, baseSha: baseSha || null,
     ok: !!result?.ok, reason: result?.reason || null, available: result?.available ?? null,
-    alreadyQueued: result?.alreadyQueued || [], suggestions,
+    alreadyQueued: result?.alreadyQueued || [], blockedRequests: result?.blockedRequests || [], suggestions,
     note: 'Cardkit routing is not gameplay certification. Normal auto mode may queue one card; the dispatcher independently enforces provenance, CI, capacity and billing before spending.' };
 }
 
@@ -50,7 +90,9 @@ function queueSummary(p) {
   const ready = p.suggestions.filter(s => s.ready);
   return [`Queue feeder: ${ready.length} Copilot-ready card(s) suggested of ${p.available} SUPPORTED and unclaimed on ${String(p.baseSha || '').slice(0, 7)}` +
     (p.alreadyQueued.length ? `; already queued: ${p.alreadyQueued.join(', ')}` : '') + '.',
-  ...ready.map(s => `${s.name}: ${s.newIssueUrl ? '[open prefilled queue issue](' + s.newIssueUrl + ')' : 'body in JSON below'}`),
+  ...ready.map(s => `${s.name}${s.requestedIssue ? ' (owner selected #' + s.requestedIssue + ')' : ''}: ${s.newIssueUrl ? '[open prefilled queue issue](' + s.newIssueUrl + ')' : 'body in JSON below'}`),
+  ...(p.blockedRequests?.length ? ['Owner-selected cards not Cardkit Copilot-ready (NO assignment): ' +
+    p.blockedRequests.map(r => r.name + ' (#' + r.issue + ')').join(', ').slice(0, 900)] : []),
   ...(p.autoQueue?.created ? ['Auto-queued #' + p.autoQueue.issue + ' (' + p.autoQueue.name + '); guarded dispatcher requested.'] :
     ['Auto-queue: ' + (p.autoQueue?.reason || 'not attempted') +
       (p.autoQueue?.pending ? ' (#' + p.autoQueue.issue + ' queued; guarded dispatcher requested)' : '') + '.'])];
@@ -89,6 +131,7 @@ async function createNextAutoQueue({ github, owner, repo, payload, runId, enable
   const s = pick.suggestion;
   const body = [A.AUTO_QUEUE_MARKER,
     '<!-- source: trusted-main-queue-feeder; run:' + runId + '; base-sha:' + payload.baseSha + ' -->',
+    ...(s.requestedIssue ? ['<!-- owner-selected-card-request: #' + s.requestedIssue + ' -->'] : []),
     s.body.trim(), ''].join('\n');
   const issue = (await github.rest.issues.create({ owner, repo, title: s.title, body })).data;
   if (issue.user?.login !== 'github-actions[bot]' || issue.user?.type !== 'Bot')
@@ -96,4 +139,4 @@ async function createNextAutoQueue({ github, owner, repo, payload, runId, enable
   return { created: true, issue: issue.number, name: s.name, url: issue.html_url };
 }
 
-module.exports = { candidates, newIssueUrl, queuePayload, queueSummary, chooseAutoQueue, createNextAutoQueue };
+module.exports = { candidates, ownerSelections, newIssueUrl, queuePayload, queueSummary, chooseAutoQueue, createNextAutoQueue };
