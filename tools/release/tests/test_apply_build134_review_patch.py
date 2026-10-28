@@ -31,6 +31,13 @@ class ReviewPatchTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "ephemeral"):
             tool.verify_patch(patch, hashlib.sha256(patch).hexdigest())
 
+    def test_rejects_parent_traversal_and_absolute_paths(self):
+        for name in (b"../escape.txt", b"/tmp/escape.txt", b"foo/../../escape.txt", b"foo\\\\bar.txt"):
+            with self.subTest(path=name):
+                patch = b"diff --git a/" + name + b" b/" + name + b"\n"
+                with self.assertRaisesRegex(ValueError, "unsafe"):
+                    tool.verify_patch(patch, hashlib.sha256(patch).hexdigest())
+
     def test_checkout_requires_exact_head_and_clean_tree(self):
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp)
