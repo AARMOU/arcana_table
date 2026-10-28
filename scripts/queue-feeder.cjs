@@ -62,7 +62,7 @@ function candidates({ gaps, openIssues = [], max = 5 }) {
       : 'Cardkit did not list this as unclaimed SUPPORTED / copilot (may be indexed, claimed or need engine work); do not dispatch.' }));
   // Owner priorities first. Unknown / unsupported owner requests NEVER become units.
   const names = [...new Set([...requested.map(r => r.name), ...available])].slice(0, max);
-  return { ok: true, reason: null, names, requested, blockedRequests, alreadyQueued, available: copilot.length };
+  return { ok: true, reason: null, names, requested, blockedRequests, alreadyQueued, eligibleNames: available, available: copilot.length };
 }
 
 function newIssueUrl(title, body) {
@@ -84,6 +84,12 @@ function queuePayload({ result, units = [], base, baseSha, now = new Date(), run
   return { checkedAt: now.toISOString(), runId: runId ? String(runId) : null, base: base || null, baseSha: baseSha || null,
     ok: !!result?.ok, reason: result?.reason || null, available: result?.available ?? null,
     alreadyQueued: result?.alreadyQueued || [], blockedRequests: result?.blockedRequests || [], suggestions,
+    // This is the ENTIRE unclaimed Cardkit SUPPORTED/copilot allowlist for
+    // owner-facing preflight. Never infer eligibility from the first 3 suggestions.
+    // Above this bound, fail closed instead of publishing an incomplete allowlist.
+    eligibilityComplete: !!result?.ok && Array.isArray(result?.eligibleNames) && result.eligibleNames.length <= 500,
+    eligibleNames: result?.ok && Array.isArray(result?.eligibleNames) && result.eligibleNames.length <= 500
+      ? result.eligibleNames : [],
     note: 'Cardkit routing is not gameplay certification. Normal auto mode may queue one card; the dispatcher independently enforces provenance, CI, capacity and billing before spending.' };
 }
 
