@@ -9,7 +9,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class UlamogsNullifierScenarioTest {
-    private fun setup() = customScenario(UlamogsNullifier, "Grizzly Bears", "Sol Ring", "Island")
+    private fun setup() = customScenario(UlamogsNullifier, "Grizzly Bears", "Sol Ring", "Island", "Rest in Peace", "Dark Ritual")
 
     /** I cast Bears, then flash in Nullifier holding priority; its ETB targets the Bears spell. */
     private fun GameTestDriver.respondToOwnBears(c: Choices): EntityId {
@@ -150,4 +150,45 @@ class UlamogsNullifierScenarioTest {
             d.getGraveyardCardNames(seats[3]).contains("Island"))
     }
 
+
+    /**
+     * Prerequisite: prove that the shipped Argentum Rest in Peace definition
+     * actually redirects a graveyard-bound card before relying on it as a fixture.
+     */
+    @Test fun restInPeaceFixtureExilesResolvedInstantInsteadOfGraveyard() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Rest in Peace")
+        val ritual = d.putCardInHand(d.player1, "Dark Ritual")
+        d.giveMana(d.player1, Color.BLACK)
+        assertNull(d.castSpell(d.player1, ritual).error)
+        d.resolveAll()
+
+        assertTrue("Replacement fixture must exile a resolved instant",
+            d.getExileCardNames(d.player1).contains("Dark Ritual"))
+        assertFalse("Fixture is invalid if the instant reaches the graveyard",
+            d.getGraveyardCardNames(d.player1).contains("Dark Ritual"))
+    }
+
+    /**
+     * Oracle ruling: cards processed from exile can be redirected back to exile
+     * by Rest in Peace; they are still processed, so Nullifier must counter.
+     * This is a genuine replacement-effect engine scenario, not a mock.
+     */
+    @Test fun restInPeaceReplacementStillCountsTwoProcessedExiledCards() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Rest in Peace")
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Island")
+
+        d.respondToOwnBears(Choices(yes = true, pick = listOf("Sol Ring", "Island")))
+
+        assertTrue("Two processed cards must counter the targeted spell despite redirection",
+            d.permanentsNamed(d.player1, "Grizzly Bears").isEmpty())
+        assertEquals("Both opponent-owned cards are redirected back into exile",
+            listOf("Island", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
+        assertTrue("Neither processed card may enter the opponent's graveyard",
+            d.getGraveyardCardNames(d.player2).isEmpty())
+        assertTrue("Rest in Peace also redirects the countered spell",
+            d.getExileCardNames(d.player1).contains("Grizzly Bears"))
+    }
 }
