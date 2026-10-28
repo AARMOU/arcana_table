@@ -1,0 +1,292 @@
+name: Arcana B140 Attachment Stacks Turbo DEBUG APK
+# One-branch owner-authorized phone-test build. No main merges, engine rebuild,
+# Play upload, production signing or Cloudflare deployment.
+on:
+  push:
+    branches:
+      - gpt/b140-attachment-turbo-debug-20261027
+    paths:
+      - .github/workflows/b140-attachment-turbo-debug.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arcana-b140-attachment-turbo-debug
+  cancel-in-progress: false
+
+jobs:
+  turbo-debug:
+    name: B140 combat source plus PR317; test attachment stacks, assemble DEBUG APK
+    if: github.repository == 'AARMOU/arcana_table'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+      - name: Checkout exact Claude PR317 attachment source plus B140 combat
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify frozen B138 engine JAR and card asset identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ci-out
+          BASE=41f7556676fd5d5d0b493d47db65450ecdd142e4
+          git merge-base --is-ancestor "$BASE" HEAD
+          git merge-base --is-ancestor "9313fe00e2ff738512e8b825da9105bf03903093" HEAD || { echo "::error::B140 combat source not present"; exit 1; }
+          git merge-base --is-ancestor "badb40d0d3ad8f0846c4dbeddfc2ee56fbe89af7" HEAD || { echo "::error::PR317 source pin drift"; exit 1; }
+          test "$(git diff --name-only badb40d0d3ad8f0846c4dbeddfc2ee56fbe89af7 HEAD)" = ".github/workflows/b140-attachment-turbo-debug.yml" || { echo "::error::Unexpected post-integration changes"; exit 1; }
+          git rev-parse HEAD | tee ci-out/combined-source-head.txt
+          for p in \
+            android/app/libs/argentum-ai.jar \
+            android/app/libs/argentum-mtg-sdk-tooling.jar \
+            android/app/libs/argentum-mtg-sdk.jar \
+            android/app/libs/argentum-rules-engine.jar \
+            android/app/src/main/assets/argentum/all-cards.index.tsv \
+            android/app/src/main/assets/argentum/all-cards.jsonl \
+            android/app/src/main/assets/argentum/custom-cards.index.tsv \
+            android/app/src/main/assets/argentum/custom-cards.jsonl; do
+              test "$(git rev-parse "HEAD:$p")" = "$(git rev-parse "$BASE:$p")" || { echo "::error::Unexpected engine/card asset drift in $p"; exit 1; }
+              printf '%s %s\n' "$(git rev-parse "HEAD:$p")" "$p" >> ci-out/reused-b138-assets.txt
+          done
+          echo 'PASS: four B138 engine JARs and both shipped card libraries unchanged from validated B138 source'
+      - name: Reconcile B138 six owner-reviewed fixes in disposable runner ONLY
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name arcana-turbo-assembly
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          for item in \
+            303:4317184c3fb1666a95a5242e20f4fd777eb47e44 \
+            304:e82b57621374c7aca0a5d854f029ddda4176d597 \
+            305:0f08acef5ea02dc0ee9469adabcf7f0871efc77d \
+            306:1fafb3b1adfb52fdabb8a4f9f27283a263b3faf9 \
+            307:d171b27a21aed98dd3074c02f2c4f01e84c96fd7 \
+            308:abcae2a5e3b9bfb8bff80aa393c34112199b1bbd; do
+              IFS=: read -r pr sha <<< "$item"
+              git fetch --no-tags origin "$sha"
+              test "$(git rev-parse FETCH_HEAD)" = "$sha"
+              git merge --no-ff --no-edit -X ours "$sha" -m "Temporary B138 PR #$pr $sha"
+              printf 'PR #%s %s\n' "$pr" "$sha" >> ci-out/runner-only-source-pins.txt
+          done
+          git rev-parse HEAD | tee ci-out/assembled-source-sha.txt
+          git diff --check
+          # Assert the exact final combat code survived the temporary six-PR reconciliation.
+          for p in CombatStackBoard.kt CombatStacks.kt ArgentumCombatBoard.kt; do
+            expected=$(git rev-parse 87e047ca4ec57eabd94fde8ce1d2613d48b53a5d:android/app/src/main/java/com/arcanatable/$p)
+            actual=$(git rev-parse HEAD:android/app/src/main/java/com/arcanatable/$p)
+            test "$expected" = "$actual" || { echo "::error::Combat $p overwritten by runner reconcile"; exit 1; }
+          done
+          echo 'PASS: Claude PR315 combat screens preserved byte-for-byte in disposable assembly'
+          # Pin all five PR317 attachment display files after runner-only B138 merges.
+          for p in \
+            android/app/src/main/java/com/arcanatable/ArgentumBackend.kt \
+            android/app/src/main/java/com/arcanatable/BattlefieldLayout.kt \
+            android/app/src/main/java/com/arcanatable/TableBoardViews.kt \
+            android/app/src/main/java/com/arcanatable/TableModel.kt \
+            android/app/src/test/java/com/arcanatable/AttachmentPileTest.kt; do
+              test "$(git rev-parse HEAD:$p)" = "$(git rev-parse badb40d0d3ad8f0846c4dbeddfc2ee56fbe89af7:$p)" || { echo "::error::PR317 attachment source drift in $p"; exit 1; }
+          done
+          echo 'PASS: all five Claude PR317 source/test blobs preserved exactly'
+      - name: Fail closed on missing B139 UI, PR314 cascade, PR315 combat or PR316 safety
+        shell: bash
+        run: |
+          set -euo pipefail
+          a=android/app/src/main/java/com/arcanatable
+          t=android/app/src/test/java/com/arcanatable
+          grep -Fq 'shouldKeepMultiplayerConnectionGuard(' "$a/TableEffects.kt"
+          grep -Fq 'argentumOpeningHand = hand' "$a/TableArgentum.kt"
+          grep -Fq 'val hostLobbyState = wifiMultiLobbyState' "$a/TableMultiLobby.kt"
+          grep -Fq 'tutorialCoachRegion(maxW, maxH, target)' "$a/TutorialCoach.kt"
+          grep -Fq 'receiveRoomChatFromGuest' "$a/TableWifi.kt"
+          grep -Fq 'ArgentumRoomChat.DELIVERY' "$a/TableArgentum.kt"
+          grep -Fq 'class TutorialRun' "$a/TutorialProgress.kt"
+          test -s "$t/MultiplayerConnectionGuardTest.kt"
+          test -s "$t/ArgentumRoomChatTest.kt"
+          grep -Fq 'playedCardPopupDurationMs(popupDurationSeconds)' "$a/PlayFeed.kt"
+          grep -Fq 'Played-card popup time' "$a/AdjustUiPage.kt"
+          grep -Fq 'lastBackgroundYourMoveKey' "$a/TableEffects.kt"
+          grep -Fq 'ArgentumPassing.interruptingStackItem' "$a/TableEffects.kt"
+          grep -Fq 'onAutoPass = { if (argentumEnabled) togglePassToMyTurn() }' "$a/TableOverlays.kt"
+          grep -Fq 'targetCount > item.targetIds.size' "$a/ArgentumPassing.kt"
+          test -s "$t/ArgentumPassingTest.kt"
+          test -s "$t/ReadableNotificationDurationTest.kt"
+          test -s "$a/engine/ai/AiCascadeThrottle.kt"
+          test -s "$a/engine/ai/AiPriorityChoice.kt"
+          grep -Fq 'LifeTotalComponent' "$a/engine/ai/AiCascadeThrottle.kt"
+          grep -Fq 'aiLifeChangeInvalidatesCascadeResourceFingerprint' android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TokenCascadeEndStepStressTest.kt
+          test -s "$a/CombatStackBoard.kt"
+          test -s "$a/CombatStacks.kt"
+          grep -Fq 'fun ArgentumAttackBoard(' "$a/CombatStackBoard.kt"
+          grep -Fq 'fun ArgentumBlockBoard(' "$a/CombatStackBoard.kt"
+          grep -Fq 'attackTargets = attackTargetsFrom(state, attackers)' "$a/ArgentumInteraction.kt"
+          test -s "$t/CombatStacksTest.kt"
+          test -s "$t/AttachmentPileTest.kt"
+          grep -Fq 'fun splitAttachments(' "$a/BattlefieldLayout.kt"
+          grep -Fq 'attachedTo' "$a/ArgentumBackend.kt"
+          test -s "$t/ui/TutorialAuditUiTest.kt"
+          grep -Fq '@Test fun practiceChapters()' "$t/ui/TutorialAuditUiTest.kt"
+          test -s "$t/ui/DesignPreviewTest.kt"
+          grep -Fq 'aiThrottle.skipSearch(current, priority)' "$a/engine/LocalArgentumHost.kt"
+          grep -Fq 'otherFaceScripts(def)' "$a/engine/priority/OfflineHumanAutoPass.kt"
+          test -s android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TokenCascadeEndStepStressTest.kt
+          test -s android/custom-cards/src/test/kotlin/com/arcanatable/customcards/OfflineHumanAutoPassParityTest.kt
+          python3 tools/check_android_regex.py
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          p=Path('android/app/src/main/assets/tutorials/catalog.json')
+          assert len(json.loads(p.read_text())['chapters'])==20
+          print('PASS: 20 tutorial chapters; B139 fixes, PR314 cascade, PR315 combat and PR316 safety preserved')
+          PY
+      - name: Install Java 17 with reusable Gradle cache
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Configure Android SDK for fast assembly
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Install Android compilation tools
+        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Stamp side-by-side B140 Attachment Turbo DEBUG identity on runner only
+        shell: bash
+        run: |
+          python3 tools/fast_apk_snapshot.py version --version-code 140
+          grep -F 'versionCode = 140' android/app/build.gradle.kts
+          printf '%s\n' 'B140 Attachment Turbo: debug-only APK; B140 combat and cascade plus Claude PR317 Equipment/Aura attachment stacks; unchanged engine JARs/cards; targeted tests, NOT Play signing.' > ci-out/DEBUG-ONLY-NOT-RELEASE.txt
+      - name: Compile Turbo debug APK and run gameplay/UI regressions
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --max-workers=2 \
+            -Parcana.debugApplicationIdSuffix=.turboattachments \
+            -Parcana.debugLabel=Arcana-Attach \
+            :app:assembleDebug :app:testDebugUnitTest \
+            --tests 'com.arcanatable.ArgentumPassingTest' \
+            --tests 'com.arcanatable.ReadableNotificationDurationTest' \
+            --tests 'com.arcanatable.MultiplayerConnectionGuardTest' \
+            --tests 'com.arcanatable.ArgentumRoomChatTest' \
+            --tests 'com.arcanatable.MultiplayerLobbyVisibilityTest' \
+            --tests 'com.arcanatable.TutorialRunTest' \
+            --tests 'com.arcanatable.TutorialCoachPlacementTest' \
+            --tests 'com.arcanatable.CombatStacksTest' \
+            --tests 'com.arcanatable.ui.DesignPreviewTest' \
+            --tests 'com.arcanatable.AttachmentPileTest' \
+            2>&1 | tee ../ci-out/turbo-compile-and-tests.log | tail -180
+      - name: Prove PR314 cascade, PR316 life safety and multifaced auto-pass regressions
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:test \
+            --tests 'com.arcanatable.customcards.TokenCascadeEndStepStressTest' \
+            --tests 'com.arcanatable.customcards.OfflineHumanAutoPassParityTest' \
+            2>&1 | tee ../ci-out/pr314-cascade-regressions.log | tail -120
+      - name: Verify PR314 and PR316 stress, life safety and parity JUnit evidence
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as E
+          base=Path('android/custom-cards/build/test-results/test')
+          for name in ('TokenCascadeEndStepStressTest','OfflineHumanAutoPassParityTest'):
+            files=list(base.glob('TEST-*'+name+'.xml'))
+            assert len(files)==1,(name, files)
+            root=E.parse(files[0]).getroot()
+            assert int(root.get('tests','0'))>0,(name,'no tests')
+            assert all(int(root.get(k,'0'))==0 for k in ('failures','errors','skipped')), (name,root.attrib)
+            print('PASS:', name, root.get('tests'))
+          PY
+      - name: Confirm B140 attachment/UI/combat tests ran with zero failures and skips
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as E
+          base=Path('android/app/build/test-results/testDebugUnitTest')
+          names=['ArgentumPassingTest','ReadableNotificationDurationTest','MultiplayerConnectionGuardTest','ArgentumRoomChatTest','MultiplayerLobbyVisibilityTest','TutorialRunTest','TutorialCoachPlacementTest','CombatStacksTest','DesignPreviewTest','AttachmentPileTest']
+          total=0
+          for name in names:
+            files=list(base.glob('TEST-*'+name+'.xml'))
+            assert len(files)==1,(name,files)
+            root=E.parse(files[0]).getroot()
+            count=int(root.get('tests','0')); total+=count
+            assert count>0,(name,'no tests')
+            for key in ('failures','errors','skipped'):
+              assert int(root.get(key,'0'))==0,(name,key,root.attrib)
+            print('PASS',name,count)
+          print('PASS: targeted B140 attachment Turbo regressions:',total)
+          PY
+      - name: Execute the full tutorial UI audit in an isolated Gradle invocation
+        working-directory: android
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A filtered multi-suite run can silently omit this suite. Require a dedicated
+          # JUnit execution, rather than treating a missing XML file as a green result.
+          ./gradlew --no-daemon --max-workers=2 \
+            -Parcana.debugApplicationIdSuffix=.turboattachments \
+            -Parcana.debugLabel=Arcana-Attach \
+            :app:testDebugUnitTest \
+            --tests 'com.arcanatable.ui.TutorialAuditUiTest' \
+            2>&1 | tee ../ci-out/tutorial-audit.log | tail -180
+      - name: Require all three tutorial audit methods with zero failures or skips
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as E
+          base=Path('android/app/build/test-results/testDebugUnitTest')
+          files=list(base.glob('TEST-*TutorialAuditUiTest.xml'))
+          assert len(files)==1, ('missing/duplicate tutorial audit XML', files, sorted(p.name for p in base.glob('TEST-*.xml')))
+          root=E.parse(files[0]).getroot()
+          assert int(root.get('tests','0'))==3, ('all three tutorial chapters must run', root.attrib)
+          assert all(int(root.get(k,'0'))==0 for k in ('failures','errors','skipped')), root.attrib
+          print('PASS: all three tutorial UI audit methods executed successfully')
+          PY
+      - name: Verify debug signature, side-by-side package and shipped assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$apk"
+          mkdir -p ci-out
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > ci-out/apk-badging.txt
+          grep -F "package: name='com.arcanatable.turboattachments' versionCode='140'" ci-out/apk-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" > ci-out/apk-debug-signature.txt
+          grep -F 'Signer #1 certificate SHA-256 digest' ci-out/apk-debug-signature.txt
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          from zipfile import ZipFile
+          with ZipFile('android/app/build/outputs/apk/debug/app-debug.apk') as z:
+            assert len(json.loads(z.read('assets/tutorials/catalog.json'))['chapters'])==20
+            for name in ('all-cards.index.tsv','custom-cards.index.tsv'):
+              assert z.read('assets/argentum/'+name)==Path('android/app/src/main/assets/argentum',name).read_bytes()
+          print('PASS: matching shipped card indexes and 20 tutorials')
+          PY
+          cp "$apk" ci-out/ArcanaTable-B140-Attachment-Turbo-debug.apk
+          sha256sum ci-out/ArcanaTable-B140-Attachment-Turbo-debug.apk > ci-out/APK-SHA256.txt
+      - name: Publish directly installable debug APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArcanaTable-B140-Attachment-Turbo-debug
+          path: ci-out/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Preserve diagnostics if any build gate fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ArcanaTable-B139-Combat-Turbo-diagnostics
+          path: |
+            ci-out/
+            android/app/build/test-results/testDebugUnitTest/
+          retention-days: 14
+          if-no-files-found: warn
