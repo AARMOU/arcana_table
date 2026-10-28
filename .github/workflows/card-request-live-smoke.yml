@@ -47,3 +47,34 @@ jobs:
           assert reply == {"error": "Invalid JSON"}, reply
           print("PASS: live intake rejects malformed JSON before writing to GitHub")
           PY
+      - name: Diagnose machine-client POST edge handling without recording a card
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import urllib.request,urllib.error
+          endpoint="https://arcana-card-requests.arcanamtg.workers.dev/v1/card-requests"
+          agents=[
+            ("python-urllib-default",None),
+            ("android-dalvik","Dalvik/2.1.0 (Linux; U; Android 17; Arcana Table)"),
+            ("arcana-client","ArcanaTable-CardRequests/1.0"),
+          ]
+          results={}
+          for label,agent in agents:
+              headers={"Content-Type":"application/json","Accept":"application/json"}
+              if agent: headers["User-Agent"]=agent
+              request=urllib.request.Request(endpoint,data=b"{",headers=headers,method="POST")
+              try:
+                  with urllib.request.urlopen(request,timeout=15) as response:
+                      status=response.status
+                      server=response.headers.get("server","")
+                      body=response.read(500).decode("utf-8","replace")
+              except urllib.error.HTTPError as error:
+                  status=error.code
+                  server=error.headers.get("server","")
+                  body=error.read(500).decode("utf-8","replace")
+              print(f"agent={label} status={status} server={server} body={body[:160]!r}")
+              results[label]=status
+          assert results["android-dalvik"]==400, "Mobile POST is blocked before JSON validation"
+          assert results["arcana-client"]==400, "Explicit app POST is blocked before JSON validation"
+          PY
