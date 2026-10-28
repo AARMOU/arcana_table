@@ -142,6 +142,31 @@ class ForsakenMonumentScenarioTest {
         assertEquals("the second tap gets no additional {C} after Monument leaves", 3, d.manaPool(d.player1).colorless)
     }
 
+    @Test fun castTriggerSurvivesMonumentLeavingBeforeItResolves() {
+        val d = setup()
+        val monument = d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        val before = d.getLifeTotal(d.player1)
+        val probe = d.putCardInHand(d.player1, "Monument Colorless Probe")
+        d.giveColorlessMana(d.player1, 2)
+        assertNull(d.castSpell(d.player1, probe).error)
+        // A cast trigger already created on the stack must survive losing its source.
+        d.moveToGraveyard(monument)
+        d.resolveStack()
+        assertEquals("the existing cast trigger survives Monument leaving", before + 2, d.getLifeTotal(d.player1))
+    }
+
+    @Test fun colorlessCastAfterMonumentLeavesCannotCreateItsLifeTrigger() {
+        val d = setup()
+        val monument = d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
+        d.moveToGraveyard(monument)
+        val before = d.getLifeTotal(d.player1)
+        val probe = d.putCardInHand(d.player1, "Monument Colorless Probe")
+        d.giveColorlessMana(d.player1, 2)
+        assertNull(d.castSpell(d.player1, probe).error)
+        d.resolveStack()
+        assertEquals("a later cast cannot trigger a Monument in the graveyard", before, d.getLifeTotal(d.player1))
+    }
+
     @Test fun coloredSpellsGainNoLife() {
         val d = setup()
         d.putPermanentOnBattlefield(d.player1, "Forsaken Monument")
