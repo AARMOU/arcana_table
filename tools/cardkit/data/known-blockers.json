@@ -1,6 +1,11 @@
 {
   "_about": "Engine gaps recorded by earlier verified work. cardkit marks matching cards ENGINE_BLOCKED and routes them to Claude. Add an entry only with a source (issue, PR, doc) that reproduced the gap on the pinned engine; remove it when the primitive lands. 'verified': false = reported by a worker but not yet independently reproduced. 'patterns' match normalized rules text (card name → ~, numbers → n) so every card that needs the same missing primitive is classified the same way.",
   "cards": {
+    "Azlask, the Swelling Scourge": {
+      "reason": "pinned B131 TriggerMatcher.matchesCardPredicate has no HasExactlyColors branch for colorless creature battlefield-death triggers (including last-known projected colors). All three executable Azlask scenarios fail with IllegalStateException rather than a trigger; requires a generic LKI-aware predicate engine fix, not an Eldrazi-only subtype approximation",
+      "source": "draft PR #228 / Development CI run 40231560450 (3 failing Azlask scenarios out of 460 executed); pinned Argentum rules-engine/event/TriggerMatcher.kt:1829",
+      "verified": true
+    },
     "Acolyte Hybrid": {
       "reason": "needs the outcome of one specific Destroy (did it destroy that artifact?) to give its controller a draw; no effect-local destroy result",
       "source": "#137 / #138 / #141 Priority A",
