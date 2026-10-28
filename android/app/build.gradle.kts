@@ -19,6 +19,13 @@ android {
         targetSdk = 36
         versionCode = 131
         versionName = "0.33.9-build131-argentum-upgrade"
+        // Controlled by the release build after separate owner-approved Cloudflare deployment.
+        // An empty endpoint makes request submission explicitly unavailable.
+        val cardRequestUrl = providers.gradleProperty("arcanaCardRequestUrl").orNull.orEmpty()
+        require(cardRequestUrl.isEmpty() || (cardRequestUrl.startsWith("https://") && !cardRequestUrl.contains('"') && !cardRequestUrl.contains('\\'))) {
+            "arcanaCardRequestUrl must be an HTTPS endpoint without quotes or backslashes"
+        }
+        buildConfigField("String", "CARD_REQUEST_ENDPOINT", "\\\"$cardRequestUrl\\\"")
         buildConfigField("int", "BASE_BUILD", "120")
         buildConfigField("String", "BASE_SOURCE", "\"3e17b24\"")
         manifestPlaceholders["appLabel"] = "Arcana Table · Argentum · Build $versionCode"
