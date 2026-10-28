@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {selectCandidate,skipReason,permanentRefusal}=require('./dispatch-runner.cjs');
+const {selectCandidate,skipReason,verdictOf}=require('./dispatch-runner.cjs');
 const ONE_SHOT='arcana:authorize-once';
 const unit=(n,labels=[])=>({
   raw:{number:n,title:'[Arcana Queue] ' + n,body:'valid unit',labels},
@@ -31,24 +31,32 @@ test('incomplete labeled card is not replaced with a different lower-numbered un
   assert.equal(r.clear.unit.raw.number,379);assert.match(r.clear.reason,/^not-actionable: base-missing/);
   assert.equal(r.error,'authorized-unit-not-eligible');
 });
-test('a labeled card Cardkit refuses is withdrawn; a stale/unavailable Cardkit check keeps the approval',()=>{
-  const refused=selectCandidate([unit(379,[ONE_SHOT])],'normal','base',()=>({ok:false,reason:'not Copilot-ready: X=NEEDS_REVIEW'}),()=>({ok:true}));
-  assert.equal(refused.clear.unit.raw.number,379);
-  for (const reason of ['feasibility-unavailable (Cardkit verdicts missing)','feasibility-stale (classified a, base is b)']) {
-    const r=selectCandidate([unit(379,[ONE_SHOT])],'normal','base',()=>({ok:false,reason}),()=>({ok:true}));
-    assert.equal(r.clear,undefined,reason);assert.equal(r.candidate.raw.number,379,reason);
+const blockedFeas=()=>({ok:false,code:'not-ready',reason:'not Copilot-ready: X=NEEDS_REVIEW'});
+test('a labeled card that is only temporarily blocked keeps its approval and does not freeze the queue',()=>{
+  const blocked={...unit(379,[ONE_SHOT])};
+  const feas=u=>u.raw.number===379?blockedFeas():{ok:true,code:'ok'};
+  const r=selectCandidate([unit(50),blocked],'normal','base',feas,()=>({ok:true}));
+  assert.equal(r.clear,undefined,'approval kept');assert.equal(r.candidate.raw.number,50,'ordinary order continues');
+  assert.ok(!r.labeled.includes(r.candidate),'the ordinary unit is not treated as the approved one');
+  const once=selectCandidate([blocked],'authorize-once','base',feas,()=>({ok:true}));
+  assert.equal(once.clear,undefined);assert.equal(once.candidate.raw.number,379,'authorize-once: deny later, keep label');
+});
+test('transient Cardkit checks and unknown codes keep the approval and its priority',()=>{
+  for (const f of [{ok:false,code:'unavailable',reason:'feasibility-unavailable'},{ok:false,code:'stale',reason:'feasibility-stale'}]) {
+    const r=selectCandidate([unit(379,[ONE_SHOT])],'normal','base',()=>f,()=>({ok:true}));
+    assert.equal(r.clear,undefined,f.code);assert.equal(r.candidate.raw.number,379,f.code);
   }
+  assert.equal(verdictOf(unit(1),'base',()=>({ok:false,reason:'?'}),()=>({ok:true})).cls,'blocked');
 });
-test('a labeled card already in an open PR is withdrawn; provenance problems keep deny-and-keep-label',()=>{
+test('a labeled card already in an open PR or with no cards is withdrawn; provenance keeps deny-and-keep-label',()=>{
   const pr={...unit(379,[ONE_SHOT]),prs:[{number:500}]};
-  assert.match(selectCandidate([pr],'authorize-once','base',feasible,()=>({ok:true})).clear.reason,/^has-open-pr #500/);
+  const r=selectCandidate([pr],'authorize-once','base',feasible,()=>({ok:true}));
+  assert.match(r.clear.reason,/^has-open-pr #500/);assert.equal(r.candidate,null);
+  const none=selectCandidate([unit(379,[ONE_SHOT])],'normal','base',()=>({ok:false,code:'no-cards',reason:'no named cards'}),()=>({ok:true}));
+  assert.equal(none.clear.unit.raw.number,379);assert.equal(none.candidate,null);
   const untrusted={...unit(379,[ONE_SHOT]),derived:{state:'queued',provenance:{ok:false,reasons:['edited-after-approval']}}};
-  const r=selectCandidate([untrusted],'authorize-once','base',feasible,()=>({ok:true}));
-  assert.equal(r.clear,undefined);assert.equal(r.candidate.raw.number,379);
-});
-test('transient denials (capacity, budget, CI) are never classified as permanent',()=>{
-  for (const reason of ['capacity: 1 of 1 active','budget: stop','ci-not-ready','untrusted-origin: comments-unavailable',null])
-    assert.equal(permanentRefusal(reason),false,String(reason));
+  const p=selectCandidate([untrusted],'authorize-once','base',feasible,()=>({ok:true}));
+  assert.equal(p.clear,undefined);assert.equal(p.candidate.raw.number,379);
 });
 test('every queued unit gets the dispatcher verdict, not only when nothing was selected',()=>{
   assert.equal(skipReason(unit(1),'base',feasible,()=>({ok:true})),null);

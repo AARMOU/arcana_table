@@ -13,8 +13,10 @@ on:
   # Copilot PR activity wakes the feeder promptly when scheduled workflows are delayed.
   # Run only trusted main code, and only for Copilot PRs targeting our integration base.
   # Never check out or execute the PR head in a workflow with write permissions.
+  # review_requested is what Copilot emits when its session finishes (copilot_work_finished), i.e. the
+  # moment its dispatcher slot frees; the last synchronize happens while the slot is still held.
   pull_request_target:
-    types: [opened, synchronize, ready_for_review]
+    types: [opened, synchronize, ready_for_review, review_requested]
   workflow_dispatch:
     inputs:
       max:
@@ -176,10 +178,7 @@ jobs:
             core.info('Status comment: '+published);
             await core.summary.addHeading('Queue feeder').addRaw(Q.queueSummary(payload).join('\n')).write();
             if(!r||published.startsWith('failed')){core.setFailed('Queue status not published ('+published+').');return;}
-            // A waiting unit only needs a dispatcher run when a slot can have freed (Copilot activity woke us);
-            // scheduled passes would just be denied for capacity. Schedule and label triggers stay as backstops.
-            const copilotWake=['workflow_run','pull_request_target'].includes(context.eventName);
-            if(auto.created||(auto.pending&&copilotWake))await github.rest.actions.createWorkflowDispatch({...context.repo,workflow_id:'arcana-card-dispatcher.yml',ref:'main',inputs:{dry_run:'false'}});
+            if(auto.created||auto.pending)await github.rest.actions.createWorkflowDispatch({...context.repo,workflow_id:'arcana-card-dispatcher.yml',ref:'main',inputs:{dry_run:'false'}});
             // Owner card-review inbox for the app (read-only; approving happens on GitHub). Never blocks the feeder.
             try{const R=require('./scripts/review-inbox.cjs');const inbox=await R.buildReviewInbox({github,...context.repo});
               core.info('Review inbox: '+await S.publishStatus({github,...context.repo,kind:'review',payload:inbox,summary:R.inboxSummary(inbox)}));}

@@ -138,3 +138,7 @@ test('service worker revalidates the shell so a deploy reaches the installed app
   assert.ok(sw.includes("fetch(request,{cache:'no-cache'})"));
   assert.ok(sw.includes('caches.match(request)'),'offline fallback kept');
 });
+test('an approved card that cannot run yet says why it is waiting',()=>{
+  const src=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
+  assert.ok(src.includes("'Approved — waiting: ' + reasonText(unit.skip)"));
+});

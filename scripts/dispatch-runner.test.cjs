@@ -166,7 +166,8 @@ test('a vague unit is denied before any write or assignment, in every mode', asy
     if (mode === 'dry-run') { assert.equal(r.state, 'nothing-eligible', mode); assert.equal(f.writes.length, 0); }
     else {
       assert.equal(r.state, 'authorized-unit-not-eligible', mode); assert.match(r.reason, /approval withdrawn: not-actionable/);
-      assert.deepEqual(f.writes.map(w => w[0]), ['removeLabel'], mode);
+      assert.deepEqual(f.writes.map(w => w[0]), ['removeLabel', 'comment'], mode);
+      assert.match(f.writes[1][2], /op:observation[\s\S]*reason:owner approval withdrawn, not assignable: not-actionable/);
     }
     assert.equal(calls.length, 0);
   }

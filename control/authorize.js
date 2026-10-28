@@ -79,7 +79,9 @@ function render(container, units) {
         link.textContent = '#' + unit.n + ' · ' + info.title.replace(/^\[Arcana Queue\]\s*/, '');
         if ((info.labels || []).some(l => l.name === 'arcana:authorize-once')) {
           button.disabled = true; button.textContent = 'Authorized';
-          message.textContent = 'Authorized — waiting for safe dispatcher pickup.';
+          // An approval can wait (e.g. Cardkit not ready yet); say why instead of a bare "waiting".
+          message.textContent = verdict.ok || !unit?.skip ? 'Authorized — waiting for safe dispatcher pickup.'
+            : 'Approved — waiting: ' + reasonText(unit.skip);
         } else if (!verdict.ok) {
           button.disabled = true;
           button.textContent = 'Not eligible';

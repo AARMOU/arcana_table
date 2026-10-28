@@ -98,50 +98,52 @@ async function resolveInterrupted({ github, owner, repo, unit, runId }) {
 // One selected owner authorization ALWAYS wins over the ordinary lowest-numbered normal
 // candidate. Without this, a dashboard tap on #379 in normal mode could dispatch #100.
 // Multiple labels fail closed. Feasibility/provenance/billing are checked AFTER selection.
-// The dispatcher's own reason a queued unit cannot be assigned, or null when it is eligible.
-// Published per unit to Arcana Control, which shows it instead of re-deriving eligibility.
-function skipReason(u, base, feasible, actionable = A.unitActionable) {
-  if (!u.raw.title.startsWith('[Arcana Queue]')) return 'not-a-queue-issue';
-  if (u.prs.length) return 'has-open-pr ' + u.prs.map(p => '#' + p.number).join(',');
-  if (!u.derived.provenance?.ok) return 'untrusted-origin: ' + (u.derived.provenance?.reasons || []).join(',');
+// The dispatcher's own verdict on a queued unit, from structured checks (never from reason text):
+//   eligible  - assignable now (still subject to CI, capacity and billing admission)
+//   invalid   - the issue itself can never be assigned as written (not a unit, incomplete, no cards)
+//   claimed   - an open PR is already linked to this unit
+//   blocked   - Cardkit says not Copilot-ready yet (may change after engine work)
+//   transient - a check was unavailable or stale this run
+//   provenance- untrusted content or approval problem (owner must look)
+// `reason` is the human-readable text published to Arcana Control.
+const FEAS_CLASS = { 'no-cards': 'invalid', 'auto-override-prohibited': 'invalid', 'not-ready': 'blocked',
+  'override-unauthorized': 'blocked', unavailable: 'transient', stale: 'transient' };
+function verdictOf(u, base, feasible, actionable = A.unitActionable) {
+  if (!u.raw.title.startsWith('[Arcana Queue]')) return { cls: 'invalid', reason: 'not-a-queue-issue' };
+  if (u.prs.length) return { cls: 'claimed', reason: 'has-open-pr ' + u.prs.map(p => '#' + p.number).join(',') };
+  if (!u.derived.provenance?.ok) return { cls: 'provenance', reason: 'untrusted-origin: ' + (u.derived.provenance?.reasons || []).join(',') };
   const act = actionable(u.raw.body, base);
-  if (!act.ok) return 'not-actionable: ' + (act.missing || []).join(',');
+  if (!act.ok) return { cls: 'invalid', reason: 'not-actionable: ' + (act.missing || []).join(',') };
   const feas = feasible(u);
-  if (!feas.ok) return 'feasibility: ' + (feas.reason || 'not Copilot-ready');
-  return null;
+  // An unknown/missing code is treated as blocked: the approval is kept, never discarded.
+  if (!feas.ok) return { cls: FEAS_CLASS[feas.code] || 'blocked', reason: 'feasibility: ' + (feas.reason || 'not Copilot-ready') };
+  return { cls: 'eligible', reason: null };
 }
-
-// A refusal about the WORK ITSELF that no later run can fix (incomplete unit, Cardkit says not
-// Copilot-ready, already in an open PR). Only these clear a pending one-shot approval. Capacity,
-// budget, CI, lookups that were merely unavailable, and provenance/approval problems (a security
-// signal the owner must see) keep the existing deny-and-keep-label behavior.
-const TRANSIENT = /unavailable|feasibility-stale/;
-const permanentRefusal = reason => !!reason && /^(not-a-queue-issue|has-open-pr|not-actionable|feasibility)/.test(reason) &&
-  !TRANSIENT.test(reason);
+const skipReason = (u, base, feasible, actionable) => verdictOf(u, base, feasible, actionable).reason;
+// Only these withdraw a pending one-shot approval: the approved issue can never be assigned, or the
+// work already exists. Blocked, transient and provenance verdicts keep the owner's approval.
+const WITHDRAW = new Set(['invalid', 'claimed']);
 
 function selectCandidate(allUnits, mode, base, feasible, actionable = A.unitActionable) {
   const labeled = allUnits.filter(u => u.raw.labels.includes(A.ONE_SHOT_LABEL));
-  // An approval the dispatcher can never honor is cleared instead of pinning the queue forever.
-  // Nothing else is dispatched in the same run: the owner sees the reason first.
-  const impossible = u => {
-    if (u.derived.state !== 'queued') return null; // admission reports other states as before
-    const reason = skipReason(u, base, feasible, actionable);
-    return permanentRefusal(reason) ? reason : null;
-  };
+  const verdict = u => u.derived.state === 'queued' ? verdictOf(u, base, feasible, actionable) : { cls: 'other', reason: null };
+  const withdraw = u => ({ candidate: null, labeled: [], clear: { unit: u, reason: verdict(u).reason }, error: 'authorized-unit-not-eligible' });
   if (mode === 'authorize-once') {
     if (labeled.length !== 1) return { candidate: null, labeled, error: 'authorize-once-needs-exactly-one-label' };
-    const reason = impossible(labeled[0]);
-    return reason ? { candidate: null, labeled: [], clear: { unit: labeled[0], reason }, error: 'authorized-unit-not-eligible' }
-      : { candidate: labeled[0], labeled, error: null };
+    // Withdrawal dispatches nothing else in the same run; blocked/transient deny and keep the label.
+    return WITHDRAW.has(verdict(labeled[0]).cls) ? withdraw(labeled[0]) : { candidate: labeled[0], labeled, error: null };
   }
   // Explicit priority is active in NORMAL mode. Dry-run continues to model ordinary
   // automatic eligibility without treating a pending owner label as a paid assignment.
   if (mode === 'normal') {
     if (labeled.length > 1) return { candidate: null, labeled, error: 'multiple-owner-authorizations' };
     if (labeled.length === 1) {
-      const reason = impossible(labeled[0]);
-      return reason ? { candidate: null, labeled: [], clear: { unit: labeled[0], reason }, error: 'authorized-unit-not-eligible' }
-        : { candidate: labeled[0], labeled, error: null };
+      const cls = verdict(labeled[0]).cls;
+      if (WITHDRAW.has(cls)) return withdraw(labeled[0]);
+      // A temporarily blocked approval keeps its label but does not freeze the queue: ordinary
+      // automatic order continues (the same policy as with no tap) and the approved card is taken
+      // first once Cardkit says it is ready. Everything else keeps the existing priority path.
+      if (cls !== 'blocked') return { candidate: labeled[0], labeled, error: null };
     }
   }
   const candidate = allUnits.filter(u => u.derived.state === 'queued' && u.raw.title.startsWith('[Arcana Queue]') &&
@@ -205,8 +207,8 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   // Every run publishes the dispatcher's own reason for each queued unit (null = eligible), so
   // Arcana Control never has to re-derive eligibility. Pure: no extra API calls.
   for (const u of data.units) if (u.derived.state === 'queued') {
-    u.derived.skip = skipReason(u, base, feasible);
-    u.derived.eligible = u.derived.skip === null;
+    const v = verdictOf(u, base, feasible);
+    u.derived.skip = v.reason; u.derived.verdict = v.cls; u.derived.eligible = v.cls === 'eligible';
   }
   const selection = selectCandidate(data.units, ready.dispatch, base, feasible);
   const { candidate, labeled } = selection;
@@ -217,6 +219,14 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
     report.clearedAuthorization = { issue: c.unit.raw.number, reason: c.reason };
     try { await github.rest.issues.removeLabel({ owner, repo, issue_number: c.unit.raw.number, name: A.ONE_SHOT_LABEL }); }
     catch { return done('authorization-clear-failed', { issue: c.unit.raw.number, reason: c.reason }); }
+    // Durable notice on the issue itself. A ledger observation is exempt from provenance and never
+    // changes the unit's state, so re-approving later stays a clean one-shot approval.
+    try {
+      await github.rest.issues.createComment({ owner, repo, issue_number: c.unit.raw.number,
+        body: A.formatLedger({ op: 'observation', issue: c.unit.raw.number, run: String(context.runId),
+          reason: ('owner approval withdrawn, not assignable: ' + c.reason).replace(/[\r\n@]/g, ' ').slice(0, 300),
+          at: new Date().toISOString() }) });
+    } catch { core.warning('Approval withdrawn but the notice comment could not be written.'); }
     return done(selection.error, { issue: c.unit.raw.number, reason: 'approval withdrawn: ' + c.reason });
   }
   if (selection.error) return done(selection.error, { labeled: labeled.map(u => u.raw.number) });
@@ -280,4 +290,4 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   return done('attempted', { issue: n, result, ...(reason ? { reason } : {}) });
 }
 
-module.exports = { runDispatch, selectCandidate, skipReason, permanentRefusal, assignCopilot, unitInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
+module.exports = { runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
