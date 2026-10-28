@@ -93,3 +93,14 @@ test('Copilot lifecycle distinguishes assignment, pickup, agent running and fini
   assert.equal(stage(null,null,'recent').label,'Recently finished');
 });
 test('queue feeder suggestions render with repo-only new-issue links',()=>{assert.ok(script.includes("d.kind==='queue'"));assert.match(html,/id="queueList"/);assert.ok(script.includes("s.newIssueUrl.startsWith(ROOT+'/issues/new?')"));});
+
+test('queue feeder transfers suggestions through an artifact and fails closed on missing results',()=>{
+  const feeder=fs.readFileSync(path.join(__dirname,'../.github/workflows/arcana-queue-feeder.yml'),'utf8');
+  assert.ok(feeder.includes("fs.writeFileSync('feeder-result.json'"));
+  assert.ok(feeder.includes('actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02'));
+  assert.ok(feeder.includes('actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093'));
+  assert.ok(feeder.includes("readFileSync('feeder-result.json','utf8')"));
+  assert.ok(feeder.includes("if(!r||published.startsWith('failed'))core.setFailed"));
+  assert.ok(!feeder.includes('needs.suggest.outputs.result'));
+  assert.ok(!feeder.includes("core.setOutput('result'"));
+});
