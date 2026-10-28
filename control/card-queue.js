@@ -144,6 +144,37 @@ async function openIssues(){
   for(const issue of visible){if(!Number.isSafeInteger(issue.number))continue;const a=elem('a','','#'+issue.number+' · '+issue.title);a.href=ISSUES+issue.number;a.target='_blank';a.rel='noopener noreferrer';$('issues').append(a);}
  }catch(e){$('issues').replaceChildren(elem('p','muted','Cannot load issues right now. Use #321 directly.'));}
 }
+// Public, read-only feeder status; NEVER an admission or payment authority.
+async function loadPriorityStatus(){
+ const el=$('priorityStatus');
+ try{
+  const r=await fetch('https://api.github.com/repos/AARMOU/arcana_table/issues/78/comments?per_page=100',{cache:'no-store'});
+  if(!r.ok)throw Error('GitHub HTTP '+r.status);
+  const comments=await r.json();
+  if(!Array.isArray(comments))throw Error('Unexpected status response');
+  const row=comments.find(c=>c.user?.login==='github-actions[bot]'&&c.user?.type==='Bot'&&
+    String(c.body||'').startsWith('<!-- arcana-control-status-v1:queue -->'));
+  const match=row?.body?.match(/```json\s*\n([\s\S]*?)\n```/);
+  if(!match)throw Error('No published feeder snapshot');
+  const data=JSON.parse(match[1]);
+  const blocked=Array.isArray(data.blockedRequests)?data.blockedRequests:[];
+  const ready=Array.isArray(data.suggestions)?data.suggestions.filter(x=>x.ready&&Number.isSafeInteger(x.requestedIssue)):[];
+  el.replaceChildren();
+  const checked=Date.parse(data.checkedAt);
+  el.append(elem('p','muted',Number.isFinite(checked)?'Last check: '+new Date(checked).toLocaleString():'Last check: unknown'));
+  if(!blocked.length&&!ready.length)el.append(elem('p','muted','No owner-priority results in the last feeder snapshot. Existing GitHub requests may be awaiting the next scan.'));
+  for(const x of ready){
+    const p=elem('p','','Eligible: '+String(x.name||'')+' · selected in #'+x.requestedIssue+' · still subject to dispatcher gates');
+    el.append(p);
+  }
+  for(const x of blocked){
+    const p=elem('p','','Not sent to Copilot: '+String(x.name||'')+' (#'+x.issue+') — '+String(x.reason||'not verified'));
+    el.append(p);
+  }
+ }catch(e){
+  el.replaceChildren(elem('p','muted','Priority status unavailable: '+e.message+'. Your GitHub request remains the source of record.'));
+ }
+}
 function request(){
  const picked=[...chosen.values()];if(!picked.length||picked.length>MAX)return;
  const title='[Card Request] '+picked.map(c=>c.name).join(', ').slice(0,175);
@@ -151,7 +182,7 @@ function request(){
   '','## Source and triage','- Deck scan source: '+(deckSource||'unavailable'),'- Argentum index source: '+(librarySource||'unavailable'),
   '- An indexed card is NOT necessarily implemented or Oracle-verified. The catalog excludes token-only names.',
   '- Check existing PRs, engine blockers, and regression acceptance before making any worker unit.','- Coordinate with #321 and #81; do not duplicate assignments.',
-  '','## Request status','Owner-reviewed tracking request only. Not an [Arcana Queue] dispatchable work unit. No authorization label, paid worker, merge, or APK build requested.'];
+  '','## Request status','Owner-selected priority request only, not an [Arcana Queue] work unit. The trusted feeder prioritizes ONLY Cardkit SUPPORTED/copilot, unclaimed cards; unsupported or unknown cards must remain blocked. Paid assignment still requires fresh exact-SHA feasibility, CI, budget reserve and worker-capacity gates. No immediate worker, merge or APK build authorized.'];
  const url=ISSUES+'new?title='+encodeURIComponent(title)+'&body='+encodeURIComponent(lines.join('\n'));
  if(url.length>8000){text('notice','Request too long. Select fewer cards.');return;}
  window.open(url,'_blank','noopener,noreferrer');
@@ -165,5 +196,5 @@ $('showMore').addEventListener('click',()=>{showCount+=PAGE;draw();});
 $('add').addEventListener('submit',e=>{e.preventDefault();const name=clean($('manual').value);if(name.length<2){text('notice','Enter a complete card name.');return;}if(choose({name,status:'manual',decks:[],origin:'manual'},true))$('manual').value='';});
 $('clear').addEventListener('click',()=>{chosen.clear();selected();draw();});
 $('request').addEventListener('click',request);
-restore();selected();syncMode();loadDecks();loadCatalog();openIssues();
+restore();selected();syncMode();loadDecks();loadCatalog();openIssues();loadPriorityStatus();
 })();
