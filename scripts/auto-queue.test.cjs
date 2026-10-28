@@ -166,15 +166,15 @@ test('owner selections never fake an actionable queue unit or suppress eligibili
 const optInComment = (name, count, overrides = {}) => ({
   author_association: 'OWNER', user: { login: 'AARMOU', type: 'User' },
   body: '<!-- arcana-card-request-v1 -->\n**Requested card:** ' + name +
-    '\\n**Opt-in requests:** ' + count +
-    '\\n**Status:** Needs library, duplicate-claim and rules-engine verification.',
+    '\n**Opt-in requests:** ' + count +
+    '\n**Status:** Needs library, duplicate-claim and rules-engine verification.',
   ...overrides,
 });
 const ownerRequest = (number, names, when = '2026-10-28T11:00:00Z') => ({
   number, title: '[Card Request] ' + names.join(', '),
   author_association: 'OWNER', user: { login: 'AARMOU', type: 'User' },
-  created_at: when, body: '## Cards requested\\n' + names.map(n => '- ' + n + ' — Not indexed').join('\\n') +
-    '\\n\\n## Source and triage',
+  created_at: when, body: '## Cards requested\n' + names.map(n => '- ' + n + ' — Not indexed').join('\n') +
+    '\n\n## Source and triage',
 });
 test('popular opt-in cards rank first even over less-requested owner priority cards', () => {
   const gaps = { dispatch: { claimsVerified: true, dispatchable: true,
