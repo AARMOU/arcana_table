@@ -1,16 +1,16 @@
 name: One-time owner-authorized Card Request live intake acceptance
 on:
   pull_request:
-    types: [opened]
+    types: [opened, synchronize]
     paths:
       - '.github/workflows/card-request-one-time-intake.yml'
 permissions:
   contents: read
 jobs:
   one-real-card:
-    # This one-time PR test intentionally submits one real owner-requested missing
+    # This revised one-time PR test intentionally submits one real owner-requested missing
     # card (Goblin Welder) to #321. No dummy names, full decks, secrets or dispatch.
-    if: github.event.action == 'opened' && github.event.pull_request.head.ref == 'gpt/card-request-one-shot-intake-20261028' && github.run_attempt == 1
+    if: github.event.action == 'synchronize' && github.event.pull_request.head.ref == 'gpt/card-request-one-shot-intake-20261028' && github.run_attempt == 1
     runs-on: ubuntu-24.04
     timeout-minutes: 3
     steps:
@@ -23,7 +23,7 @@ jobs:
           endpoint="https://arcana-card-requests.arcanamtg.workers.dev/v1/card-requests"
           payload={"requestId":"8d1c58a0-4070-4d5a-b140-202610280001","cardNames":["Goblin Welder"]}
           req=urllib.request.Request(endpoint,data=json.dumps(payload).encode("utf-8"),
-              headers={"Content-Type":"application/json","Accept":"application/json"},
+              headers={"Content-Type":"application/json","Accept":"application/json","User-Agent":"ArcanaTable-CardRequests/1.0"},
               method="POST")
           try:
               with urllib.request.urlopen(req,timeout=20) as response:
