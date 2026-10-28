@@ -1,0 +1,134 @@
+name: B140 Card Request TEST APK (isolated, no release)
+on:
+  pull_request:
+    types: [opened, synchronize]
+    paths:
+      - '.github/workflows/b140-card-request-test-apk.yml'
+permissions:
+  contents: read
+jobs:
+  card-request-test-apk:
+    if: github.repository == 'AARMOU/arcana_table' && github.event.pull_request.head.repo.full_name == 'AARMOU/arcana_table' && github.event.pull_request.head.ref == 'gpt/b140-card-request-test-apk-20261028' && github.event.pull_request.base.ref == 'gpt/b140-attachment-turbo-debug-20261027'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact B140 preview source without stored GitHub credentials
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - name: Validate source and required UI are the reviewed B140 implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --quiet --no-tags origin '+refs/heads/gpt/b140-attachment-turbo-debug-20261027:refs/remotes/origin/gpt/b140-attachment-turbo-debug-20261027'
+          git merge-base --is-ancestor de3a19fce866abb7431d0e29c59f15bc0b294a8f HEAD
+          test -f android/card-request-worker/src/index.mjs
+          grep -F 'setRequestProperty("User-Agent", USER_AGENT)' android/app/src/main/java/com/arcanatable/CardRequests.kt
+          grep -F 'REQUEST MISSING CARDS' android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
+          grep -F 'DECK BUILDER' android/app/src/main/java/com/arcanatable/TableOverlaysB.kt
+          echo "BUILD_SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install pinned Android 36 SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          export ANDROID_HOME="$RUNNER_TEMP/android-sdk"
+          mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
+          curl -fL --retry 2 "https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip" -o "$RUNNER_TEMP/cmdline.zip"
+          echo "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583  $RUNNER_TEMP/cmdline.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/cmdline.zip" -d "$RUNNER_TEMP/sdk-unpacked"
+          mv "$RUNNER_TEMP/sdk-unpacked/cmdline-tools/"* "$ANDROID_HOME/cmdline-tools/latest/"
+          echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin" >> "$GITHUB_PATH"
+          (yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses > /dev/null) || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Stamp B140 *test only* label and version in checkout (never commit)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("android/app/build.gradle.kts")
+          s=p.read_text()
+          assert s.count("versionCode = 131")==1
+          assert s.count('versionName = "0.33.9-build131-argentum-upgrade"')==1
+          s=s.replace("versionCode = 131","versionCode = 140")
+          s=s.replace('versionName = "0.33.9-build131-argentum-upgrade"','versionName = "0.34.0-b140-cardrequests-test-only"')
+          p.write_text(s)
+          print("B140 test-only version stamp verified (does not change repository)")
+          PY
+      - name: Compile focused card request and first-use Deck Builder UI tests with LIVE endpoint
+        shell: bash
+        working-directory: android
+        run: |
+          set -euo pipefail
+          unset ANDROID_SDK_ROOT
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
+            -ParcanaCardRequestUrl=https://arcana-card-requests.arcanamtg.workers.dev/v1/card-requests \
+            '-Parcana.debugApplicationIdSuffix=.cardrequests' \
+            --tests com.arcanatable.CardRequestsTest \
+            --tests com.arcanatable.ui.DeckBuilderUiTest
+      - name: Compile separately installable, DEBUG-signed TEST APK (no release/AAB)
+        shell: bash
+        working-directory: android
+        run: |
+          set -euo pipefail
+          unset ANDROID_SDK_ROOT
+          ./gradlew --no-daemon --max-workers=2 :app:assembleDebug \
+            -ParcanaCardRequestUrl=https://arcana-card-requests.arcanamtg.workers.dev/v1/card-requests \
+            '-Parcana.debugApplicationIdSuffix=.cardrequests' \
+            '-Parcana.debugLabel=Arcana Card Requests TEST B140'
+      - name: Verify compiled endpoint, distinct Android package, signature and APK integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$APK"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$APK" > card-request-b140-badging.txt
+          grep -F "package: name='com.arcanatable.cardrequests' versionCode='140'" card-request-b140-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$APK" > card-request-b140-signature.txt
+          grep -F 'Signer #1 certificate SHA-256 digest:' card-request-b140-signature.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          from zipfile import ZipFile
+          url=b"https://arcana-card-requests.arcanamtg.workers.dev/v1/card-requests"
+          agent=b"ArcanaTable-CardRequests/1.0"
+          apk=Path("android/app/build/outputs/apk/debug/app-debug.apk")
+          with ZipFile(apk) as z:
+              dex=[z.read(name) for name in z.namelist() if name.startswith("classes") and name.endswith(".dex")]
+              assert dex,"APK has no compiled DEX"
+              assert any(url in part for part in dex),"configured URL not embedded in APK DEX"
+              assert any(agent in part for part in dex),"explicit Arcana User-Agent not embedded in APK DEX"
+              assert "assets/argentum/all-cards.index.tsv" in z.namelist(),"card index missing from APK"
+          generated=list(Path("android/app/build/generated").rglob("BuildConfig.java"))
+          assert generated,"BuildConfig source missing"
+          assert any(url.decode() in p.read_text(errors="replace") for p in generated),"BuildConfig endpoint did not match"
+          print("PASS: APK contains HTTPS Card Request endpoint, Arcana identity, and card assets")
+          PY
+          sha256sum "$APK" > card-request-b140-apk.sha256
+          printf 'TEST-ONLY Android debug APK from B140 branch. No full engine certification, Play release, production signing or AAB.\nSource: %s\nEndpoint: https://arcana-card-requests.arcanamtg.workers.dev/v1/card-requests\n' "$BUILD_SOURCE_SHA" > card-request-b140-scope.txt
+      - name: Upload the verified test-only APK and signing/build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: arcana-b140-card-request-debug-test-apk
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            card-request-b140-apk.sha256
+            card-request-b140-signature.txt
+            card-request-b140-badging.txt
+            card-request-b140-scope.txt
+          retention-days: 14
+          if-no-files-found: error
+      - name: Summarize test-only download
+        shell: bash
+        run: |
+          {
+            echo "## TEST-only APK produced: Card Request live endpoint configured"
+            echo "Source: $BUILD_SOURCE_SHA"
+            echo "Package: com.arcanatable.cardrequests (separate install)"
+            echo "Download via this run's Artifacts: arcana-b140-card-request-debug-test-apk"
+            echo "Not a production certified APK or AAB. Full B140 card/engine regression failures remain open."
+          } >> "$GITHUB_STEP_SUMMARY"
