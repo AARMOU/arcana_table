@@ -4,11 +4,7 @@ name: Arcana Queue Feeder
 # "new issue" links the owner reviews and submits.
 on:
   schedule:
-    - cron: '*/15 * * *'
-  # Best-effort completion wakeup. The schedule handles missed dynamic agent events.
-  workflow_run:
-    workflows: ['Running Copilot cloud agent']
-    types: [completed]
+    - cron: '47 13 * * *'
   workflow_dispatch:
     inputs:
       max:
