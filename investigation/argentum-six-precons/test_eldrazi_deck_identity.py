@@ -221,8 +221,8 @@ class CardkitClassificationIntegrityTest(unittest.TestCase):
     def setUp(self):
         self.names = ["Eldrazi Temple", "Ugin, the Ineffable"]
         self.rows = [
-            {"name": "Eldrazi Temple", "readiness": "SUPPORTED"},
-            {"name": "Ugin, the Ineffable", "readiness": "NEEDS_ENGINE"},
+            {"name": "Eldrazi Temple", "readiness": "SUPPORTED", "route": "copilot"},
+            {"name": "Ugin, the Ineffable", "readiness": "ENGINE_BLOCKED", "route": "claude"},
         ]
 
     def test_complete_classification_accepts_any_result_order(self):
@@ -252,6 +252,41 @@ class CardkitClassificationIntegrityTest(unittest.TestCase):
     def test_duplicate_requested_name_rejected(self):
         with self.assertRaisesRegex(ValueError, "Duplicate requested"):
             audit.require_exact_cardkit_classifications(self.names + self.names[:1], self.rows)
+
+    def test_unknown_readiness_never_becomes_eligible_work(self):
+        for bad in ("NEEDS_ENGINE", "READY", "BLOCKED", True, None):
+            with self.subTest(readiness=bad):
+                rows = [dict(self.rows[0], readiness=bad), self.rows[1]]
+                with self.assertRaisesRegex(ValueError, "Invalid Cardkit readiness"):
+                    audit.require_exact_cardkit_classifications(self.names, rows)
+
+    def test_worker_route_must_match_cardkit_readiness(self):
+        for readiness, route in (
+            ("SUPPORTED", "gpt"),
+            ("ENGINE_BLOCKED", "copilot"),
+            ("NEEDS_REVIEW", "copilot"),
+            ("IMPLEMENTED_AND_TESTED", "copilot"),
+            ("SUPPORTED", None),
+        ):
+            with self.subTest(readiness=readiness, route=route):
+                rows = [dict(self.rows[0], readiness=readiness, route=route), self.rows[1]]
+                with self.assertRaisesRegex(ValueError, "Invalid Cardkit route"):
+                    audit.require_exact_cardkit_classifications(self.names, rows)
+
+    def test_every_supported_cardkit_route_is_accepted_as_advisory_only(self):
+        for readiness, route in (
+            ("SUPPORTED", "copilot"),
+            ("NEEDS_REVIEW", "gpt"),
+            ("NEEDS_REVIEW", "claude"),
+            ("ENGINE_BLOCKED", "claude"),
+            ("IMPLEMENTED_AND_TESTED", None),
+        ):
+            with self.subTest(readiness=readiness, route=route):
+                rows = [dict(self.rows[0], readiness=readiness, route=route), self.rows[1]]
+                self.assertEqual(
+                    set(audit.require_exact_cardkit_classifications(self.names, rows)),
+                    set(self.names),
+                )
 
 
 class ExistingCardOwnerSafetyTest(unittest.TestCase):
