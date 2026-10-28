@@ -20,7 +20,8 @@ permissions:
   contents: read
   actions: read
   issues: write
-  pull-requests: read
+  # write: owner fix requests post the (admission-gated) repair or observation comment on the card PR.
+  pull-requests: write
 concurrency:
   group: arcana-copilot-control
   cancel-in-progress: false
@@ -31,7 +32,7 @@ jobs:
   feasibility:
     if: >-
       ${{ github.ref == 'refs/heads/main' && (github.event_name != 'issues' ||
-      contains(fromJSON('["arcana:authorize-once","wu:resolve-interrupted","wu:halted","arcana:feasibility-reviewed"]'), github.event.label.name)) }}
+      contains(fromJSON('["arcana:authorize-once","wu:resolve-interrupted","wu:halted","arcana:feasibility-reviewed","arcana:owner-fix-requested"]'), github.event.label.name)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -87,7 +88,7 @@ jobs:
     # Runs even if the feasibility job failed: the gate then fails closed with a stated reason.
     if: >-
       ${{ !cancelled() && github.ref == 'refs/heads/main' && (github.event_name != 'issues' ||
-      contains(fromJSON('["arcana:authorize-once","wu:resolve-interrupted","wu:halted","arcana:feasibility-reviewed"]'), github.event.label.name)) }}
+      contains(fromJSON('["arcana:authorize-once","wu:resolve-interrupted","wu:halted","arcana:feasibility-reviewed","arcana:owner-fix-requested"]'), github.event.label.name)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

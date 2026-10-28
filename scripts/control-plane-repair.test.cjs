@@ -330,7 +330,7 @@ test('label-event trigger is limited to control labels on main and keeps the rea
   const y = fs.readFileSync('.github/workflows/arcana-card-dispatcher.yml', 'utf8');
   assert.match(y, /issues:\n    types: \[labeled\]/);
   assert.match(y, /github\.ref == 'refs\/heads\/main'/);
-  assert.match(y, /\["arcana:authorize-once","wu:resolve-interrupted","wu:halted","arcana:feasibility-reviewed"\]/);
+  assert.match(y, /\["arcana:authorize-once","wu:resolve-interrupted","wu:halted","arcana:feasibility-reviewed","arcana:owner-fix-requested"\]/);
   assert.match(y, /dry_run:/);
   assert.doesNotMatch(y, /ARCANA_AUTOMATION_READY: ['"]?true/);
   assert.match(y, /ARCANA_AUTOMATION_READY: \$\{\{ vars\.ARCANA_AUTOMATION_READY \}\}/);

@@ -35,7 +35,7 @@ test('payload puts cards needing the owner first and counts the badge', () => {
   ], new Date('2026-10-28T17:00:00Z'));
   assert.equal(p.awaitingReview, 2);
   assert.deepEqual(p.items.map(i => i.pr), [2, 4, 1, 3]);
-  assert.match(R.inboxSummary({ ...p, items: p.items.map(i => ({ ...i, card: 'X' })) })[0], /2 awaiting owner review of 4/);
+  assert.match(R.inboxSummary({ ...p, items: p.items.map(i => ({ ...i, card: 'X' })) })[0], /2 need owner attention of 4/);
 });
 
 test('published as the public #78 review status the app can read without a token', () => {
@@ -52,13 +52,37 @@ test('buildReviewInbox reads only Copilot PRs and never writes', async () => {
       ? [pr(), pr({ number: 9, user: { login: 'AARMOU' } }), pr({ number: 330, body: 'Fixes #173' }), pr({ number: 331, body: 'no link' })]
       : [review('APPROVED')]; },
     rest: {
-      pulls: { list: function list() {}, listReviews: function listReviews() {} },
+      pulls: { list: async function list() { return { data: [
+        { number: 340, title: 'Implement Old Card', body: 'Fixes #300', user: { login: 'Copilot' }, merged_at: '2026-10-27T10:00:00Z', merge_commit_sha: 'm'.repeat(40) },
+        { number: 341, title: 'Implement Ancient', body: 'Fixes #301', user: { login: 'Copilot' }, merged_at: '2026-10-01T10:00:00Z' },
+        { number: 342, title: 'Closed unmerged', body: 'Fixes #302', user: { login: 'Copilot' }, merged_at: null }] }; }, listReviews: function listReviews() {} },
       checks: { listForRef: async () => ({ data: { check_runs: [run('toolkit', 'success')] } }) },
       issues: { get: async ({ issue_number }) => ({ data: issue_number === 358
         ? { state: 'open', title: '[Arcana Queue] Celestine, the Living Saint — Cardkit SUPPORTED, unclaimed' }
         : { state: 'open', title: 'Some other issue' } }) },
     },
   };
-  const p = await R.buildReviewInbox({ github, owner: 'AARMOU', repo: 'arcana_table' });
-  assert.deepEqual(p.items.map(i => [i.pr, i.state]), [[360, 'approved']]);
+  const p = await R.buildReviewInbox({ github, owner: 'AARMOU', repo: 'arcana_table', now: new Date('2026-10-28T17:00:00Z') });
+  assert.deepEqual(p.items.map(i => [i.pr, i.state]), [[360, 'approved'], [340, 'integrated']]);
+});
+
+test('certification is only an explicit certification check, never plain CI', () => {
+  const green = [run('toolkit', 'success'), run('cards-and-android', 'success')];
+  assert.deepEqual([R.classify(pr(), green).state, R.classify(pr(), green).certification], ['awaiting-review', 'not-run']);
+  const certified = R.classify(pr(), [...green, run('Arcana card certification', 'success')]);
+  assert.deepEqual([certified.state, certified.certification], ['certified', 'certified']);
+  const failedCert = R.classify(pr(), [...green, run('card-certification', 'failure')]);
+  assert.deepEqual([failedCert.state, failedCert.certification], ['checks-failed', 'failed']);
+  assert.equal(R.inboxPayload([certified, R.classify(pr({ number: 1 }), green)]).awaitingReview, 2);
+});
+
+test('details carry abilities, check links, problems and stale-review warnings', () => {
+  const unitBody = ['## Cards', '- Celestine', '', '## Acceptance',
+    '- Celestine, the Living Saint: Flying, lifelink; at end step, return creature card with MV <= life gained', '- Exact current Oracle behavior (cost)',
+    '- Executable regression scenarios for positive and negative behavior', 'Base: x'].join('\n');
+  const row = R.classify(pr(), [{ ...run('cards-and-android', 'failure'), html_url: 'https://github.com/AARMOU/arcana_table/runs/1' }],
+    [review('APPROVED', 'old-sha')], unitBody);
+  assert.deepEqual(row.abilities, ['Celestine, the Living Saint: Flying, lifelink; at end step, return creature card with MV <= life gained']);
+  assert.deepEqual(row.checkRuns, [{ name: 'cards-and-android', result: 'failure', url: 'https://github.com/AARMOU/arcana_table/runs/1' }]);
+  assert.deepEqual(row.problems, ['Check failed: cards-and-android (failure)', 'New commit since your last review: review again']);
 });

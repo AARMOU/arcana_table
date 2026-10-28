@@ -5,7 +5,9 @@ const vm=require('node:vm');
 const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
 const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
-test('self-contained dashboard exists',()=>{assert.ok(html.startsWith('<!doctype html>'));assert.ok(html.includes('<title>Arcana Control'));assert.ok(script);assert.ok(!/<script\s+src=/.test(html));});
+test('self-contained dashboard exists',()=>{assert.ok(html.startsWith('<!doctype html>'));assert.ok(html.includes('<title>Arcana Control'));assert.ok(script);
+  // Only the same-origin review module may load (Phase 2 approvals); the inline dashboard script stays read-only.
+  assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"']);});
 test('inline JavaScript parses',()=>{assert.doesNotThrow(()=>new vm.Script(script));});
 test('all mobile navigation targets exist',()=>{for(const id of ['overview','work','safety']){assert.match(html,new RegExp('id="'+id+'"'));assert.match(html,new RegExp('data-view="'+id+'"'));}});
 test('read only public API data sources',()=>{assert.match(script,/api\.github\.com\/repos/);for(const path of ['/pulls?state=open','/actions/runs?per_page=30','/issues/81/comments?'])assert.ok(script.includes(path),path);assert.ok(!/\b(method:\s*['"](?:POST|PUT|PATCH|DELETE))/.test(script));});

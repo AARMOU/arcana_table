@@ -62,6 +62,7 @@ jobs:
           cp control/cards.html _site/control/cards.html
           cp control/card-queue.js _site/control/card-queue.js
           cp control/card-preflight.js _site/control/card-preflight.js
+          cp control/review.js _site/control/review.js
           cp control/credits.html _site/control/credits.html
           cp control/credit-budget.js _site/control/credit-budget.js
           cp control/manifest.webmanifest _site/control/manifest.webmanifest

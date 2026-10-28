@@ -39,11 +39,21 @@ async function dispatcher({ github, context, core, env, readBudget = defaultRead
     failure = e;
     result = { state: 'error', reason: 'dispatcher exception: ' + String(e?.message || 'unknown').slice(0, 200) };
   }
+  // Owner "Request Fix" decisions from Arcana Control: same repair admission as CI repairs; a forced
+  // dry run never requests one. Failures here never change the assignment result above.
+  let ownerFixes = [];
+  try {
+    const { routeOwnerFixes } = require('./owner-fix.cjs');
+    ownerFixes = await routeOwnerFixes({ github, owner, repo, env: runEnv, readBudget, runId: context.runId,
+      ...(forcedDry ? { authorizer: async () => ({ allowed: false, reason: 'manual dry run' }) } : {}) });
+    if (ownerFixes.length) core.info('Owner fix requests: ' + JSON.stringify(ownerFixes));
+  } catch (e) { core.warning('Owner fix requests not processed: ' + String(e?.message || e).slice(0, 200)); }
   // Display only: if the run never reached admission, read billing once so the dashboard stays fresh.
   let billing = report.billing;
   if (!billing) { try { billing = await readBudget(runEnv); } catch { billing = null; } }
   const payload = S.dispatcherPayload({ result, report, ready: report.ready, now: now(), runId: context.runId, event: context.eventName });
   payload.forcedDryRun = forcedDry;
+  payload.ownerFixes = ownerFixes.slice(0, 10);
   payload.billing = billing ? S.billingPayload(billing, { env: runEnv, now: now(), source: 'dispatcher' }) : null;
   if (payload.billing && !payload.billing.ok && result.state === 'denied' && String(result.reason).startsWith('budget'))
     payload.action = payload.billing.action || payload.action;

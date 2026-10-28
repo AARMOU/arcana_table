@@ -133,6 +133,7 @@
     </div>
   </div>
   <nav class="mobile-nav" aria-label="Mobile navigation"><button data-view="overview" aria-current="page"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg>Overview</button><button data-view="work"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="15" rx="2"/><path d="M8 5V3h8v2M8 12h8"/></svg>Work</button><a class="mobile-card-link" href="./cards.html">♧<span>Cards</span></a><a class="mobile-card-link" href="./credits.html">◈<span>Credits</span></a><button data-view="safety"><svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>Safety</button></nav>
+  <script src="./review.js" defer></script>
   <script>
     (() => {
       'use strict';
@@ -266,9 +267,12 @@
       function renderQueue(st){const q=st.queue?.data;if(!q)return;const list=$('queueList');list.replaceChildren();text('queueMeta',(q.ok?((q.suggestions||[]).filter(s=>s.ready).length+' ready · '+(q.available??'?')+' Copilot-ready unclaimed'):'unavailable')+' · '+timeAgo(q.checkedAt));if(!q.ok){list.append(e('div','empty',q.reason||'Feeder could not verify claims.'));return;}const ready=(q.suggestions||[]).filter(s=>s.ready);ready.forEach(s=>{const href=typeof s.newIssueUrl==='string'&&s.newIssueUrl.startsWith(ROOT+'/issues/new?')?s.newIssueUrl:ROOT+'/issues/78';addRow(list,s.name,'Open a prefilled [Arcana Queue] issue · dispatch still applies every gate',href,{klass:'neutral',tag:'blue',label:'Queue it'});});(q.suggestions||[]).filter(s=>!s.ready).forEach(s=>addRow(list,s.name,'Refused: '+(s.error||s.missing.join(', ')),ROOT+'/issues/78',{klass:'failure',tag:'gray',label:'Skipped'}));if(!q.suggestions?.length)list.append(e('div','empty','No unqueued Copilot-ready cards right now.'));}
       // REVIEW_INBOX: read-only; every link goes to this repository's PR pages, where GitHub authenticates the owner.
       const REVIEW_STATES={'awaiting-review':{klass:'neutral',tag:'blue',label:'Verify'},'checks-failed':{klass:'failure',tag:'gray',label:'Checks failed'},'changes-requested':{klass:'failure',tag:'amber',label:'Fix requested'},'checks-running':{klass:'neutral',tag:'amber',label:'Checks running'},approved:{klass:'success',tag:'gray',label:'Approved'}};
-      function renderReview(st){const r=st.review?.data;const list=$('reviewList');if(!r||!Array.isArray(r.items))return;list.replaceChildren();const n=Number.isSafeInteger(r.awaitingReview)?r.awaitingReview:0;
+      function reviewBadge(r){const n=Number.isSafeInteger(r.awaitingReview)?r.awaitingReview:0;
         const badge=$('reviewBadge');badge.textContent=n?n+' to verify':'Nothing waiting';badge.className='tag '+(n?'blue':'gray');
-        document.title=(n?'('+n+') ':'')+document.title.replace(/^\(\d+\) /,'');try{if(navigator.setAppBadge)(n?navigator.setAppBadge(n):navigator.clearAppBadge()).catch(()=>{});}catch{}
+        document.title=(n?'('+n+') ':'')+document.title.replace(/^\(\d+\) /,'');try{if(navigator.setAppBadge)(n?navigator.setAppBadge(n):navigator.clearAppBadge()).catch(()=>{});}catch{}}
+      function renderReview(st){const r=st.review?.data;const list=$('reviewList');if(!r||!Array.isArray(r.items))return;list.replaceChildren();reviewBadge(r);
+        // Phase 2: tap a card for details and Approve / Request Fix (control/review.js); links remain as fallback.
+        if(window.ArcanaReview?.render){window.ArcanaReview.render(list,r,reviewBadge);return;}
         if(!r.items.length){list.append(e('div','empty','No Copilot card PRs open.'));return;}
         for(const i of r.items){if(!Number.isSafeInteger(i?.pr))continue;const href=ROOT+'/pull/'+i.pr+'/files';const checks=Object.entries(i.checks||{}).map(([k,v])=>k+' '+v).join(' · ');
           addRow(list,'#'+i.pr+' '+String(i.card||'Card').slice(0,120),(checks||'no checks yet')+' · head '+String(i.headSha||'').slice(0,7)+' · '+timeAgo(r.checkedAt),href,REVIEW_STATES[i.state]||{klass:'neutral',tag:'gray',label:String(i.state||'unknown')});}}
