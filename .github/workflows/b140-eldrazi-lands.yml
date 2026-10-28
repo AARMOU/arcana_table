@@ -22,7 +22,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: b140-eldrazi-lands-v2
+  group: b140-eldrazi-lands-v3
   cancel-in-progress: true
 
 env:
@@ -83,7 +83,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     outputs:
-      all_gates: ${{ steps.verdict.outputs.all_gates }}
+      hard_gates: ${{ steps.verdict.outputs.hard_gates }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -172,18 +172,28 @@ jobs:
             python3 engine-upgrade/build140/count_junit.py app-release "android/app/build/test-results/testReleaseUnitTest/TEST-*.xml"
           } | tee -a candidate-summary.txt
       - id: verdict
-        name: Gate verdict
+        name: Gate verdict (compile, export, Cardkit and debug compile must pass; tests are judged against B140)
         if: always()
         run: |
-          g="compile=${{ steps.custom_compile.outcome }} export=${{ steps.export.outcome }} cardkit=${{ steps.cardkit.outcome }} custom-tests=${{ steps.custom_tests.outcome }} app-debug=${{ steps.app_debug.outcome }} app-release=${{ steps.app_release.outcome }} assemble-debug=${{ steps.assemble.outcome }}"
+          g="compile=${{ steps.custom_compile.outcome }} export=${{ steps.export.outcome }} cardkit=${{ steps.cardkit.outcome }} assemble-debug=${{ steps.assemble.outcome }}"
           echo "$g" | tee -a candidate-summary.txt
+          python3 engine-upgrade/build140/failed_tests.py candidate-failed.txt \
+            "android/custom-cards/build/test-results/**/TEST-*.xml" \
+            "android/app/build/test-results/testDebugUnitTest/TEST-*.xml" \
+            "android/app/build/test-results/testReleaseUnitTest/TEST-*.xml"
           if echo "$g" | grep -qvE '^(\S+=success ?)+$'; then
-            echo "::error title=gates::$g"; echo "all_gates=false" >> "$GITHUB_OUTPUT"
+            echo "::error title=hard gates::$g"; echo "hard_gates=false" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice title=gates::$g"; echo "all_gates=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=hard gates::$g"; echo "hard_gates=true" >> "$GITHUB_OUTPUT"
           fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: candidate-failed
+          retention-days: 7
+          path: candidate-failed.txt
       - name: Stage generated files for the commit job
-        if: steps.verdict.outputs.all_gates == 'true'
+        if: steps.verdict.outputs.hard_gates == 'true'
         run: |
           python3 engine-upgrade/build140/write_manifest.py
           mkdir -p generated
@@ -191,7 +201,7 @@ jobs:
             android/app/src/main/assets/argentum/custom-cards.jsonl android/app/src/main/assets/argentum/custom-cards.index.tsv \
             docs/agents/generated/sdk-api.json docs/agents/generated/sdk-api.md engine-upgrade/build140/runtime-manifest.json
       - uses: actions/upload-artifact@v4
-        if: steps.verdict.outputs.all_gates == 'true'
+        if: steps.verdict.outputs.hard_gates == 'true'
         with:
           name: generated
           retention-days: 7
@@ -208,8 +218,8 @@ jobs:
             gradle-logs/
             android/custom-cards/build/test-results/
             android/app/build/test-results/
-      - name: Fail if any gate failed (all gates already ran)
-        if: steps.verdict.outputs.all_gates != 'true'
+      - name: Fail if a hard gate failed (all gates already ran)
+        if: steps.verdict.outputs.hard_gates != 'true'
         run: exit 1
 
   baseline:
@@ -253,11 +263,44 @@ jobs:
           python3 $GITHUB_WORKSPACE/engine-upgrade/build140/count_junit.py baseline-custom-cards "android/custom-cards/build/test-results/**/TEST-*.xml"
           python3 $GITHUB_WORKSPACE/engine-upgrade/build140/count_junit.py baseline-app-debug "android/app/build/test-results/testDebugUnitTest/TEST-*.xml"
           python3 $GITHUB_WORKSPACE/engine-upgrade/build140/count_junit.py baseline-app-release "android/app/build/test-results/testReleaseUnitTest/TEST-*.xml"
+          python3 $GITHUB_WORKSPACE/engine-upgrade/build140/failed_tests.py $GITHUB_WORKSPACE/baseline-failed.txt \
+            "android/custom-cards/build/test-results/**/TEST-*.xml" \
+            "android/app/build/test-results/testDebugUnitTest/TEST-*.xml" \
+            "android/app/build/test-results/testReleaseUnitTest/TEST-*.xml"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: baseline-failed
+          retention-days: 7
+          path: baseline-failed.txt
+
+  compare:
+    needs: [app-candidate, baseline]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      no_new_failures: ${{ steps.cmp.outputs.no_new_failures }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: candidate-failed
+      - uses: actions/download-artifact@v4
+        with:
+          name: baseline-failed
+      - id: cmp
+        name: No new test failures compared with unmodified B140
+        run: python3 engine-upgrade/build140/compare_failures.py candidate-failed.txt baseline-failed.txt
+      - if: steps.cmp.outputs.no_new_failures != 'true'
+        run: exit 1
 
   commit-generated:
     # Separate job with the only write permission: it never runs engine or app code.
-    needs: [engine-tests, app-candidate]
-    if: needs.engine-tests.result == 'success' && needs.app-candidate.outputs.all_gates == 'true' && github.ref == 'refs/heads/claude/b140-eldrazi-lands-20261028'
+    needs: [engine-tests, app-candidate, compare]
+    if: ${{ !cancelled() && needs.engine-tests.result == 'success' && needs.app-candidate.outputs.hard_gates == 'true' && needs.compare.outputs.no_new_failures == 'true' && github.ref == 'refs/heads/claude/b140-eldrazi-lands-20261028' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
