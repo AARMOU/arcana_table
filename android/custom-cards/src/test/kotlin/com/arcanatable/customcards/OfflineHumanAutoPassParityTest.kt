@@ -79,6 +79,46 @@ class OfflineHumanAutoPassParityTest {
         assertFalse("Explicit own-stack stops let the player respond with flash", passes(com.wingedsheep.engine.legalactions.OwnStackStop.entries.toSet()))
     }
 
+    /**
+     * #132: Ulalek's own cast trigger is an actual priority window, not an
+     * automatic payment decision. An opted-in player must be able to flash
+     * another Eldrazi in response; an unaffordable card cannot create a stop.
+     * This exercises the real engine legal-action list on both sides.
+     */
+    @Test(timeout = 60000)
+    fun ulalekOwnTriggerKeepsOptInFlashResponseAndUnaffordableNegative() {
+        for ((available, expectStop) in listOf(18 to true, 9 to false)) {
+            val d = customScenario(com.arcanatable.customcards.cards.UlalekFusedAtrocity, "Elder Deep-Fiend")
+            val p = d.player1
+            d.putCreatureOnBattlefield(p, "Ulalek, Fused Atrocity")
+            val first = d.putCardInHand(p, "Elder Deep-Fiend")
+            d.putCardInHand(p, "Elder Deep-Fiend") // response with flash, if affordable
+            d.giveColorlessMana(p, available)
+            assertNull("Initial Eldrazi cast must be legal", d.castSpell(p, first).error)
+            assertEquals("Caster retains priority after casting", p, d.state.priorityPlayerId)
+            assertNull("Priority must not already be a payment decision", d.state.pendingDecision)
+            assertTrue("Ulalek trigger must be on the stack", d.state.stack.any { id ->
+                d.state.getEntity(id)
+                    ?.get<com.wingedsheep.engine.state.components.stack.TriggeredAbilityOnStackComponent>()
+                    ?.sourceName == "Ulalek, Fused Atrocity"
+            })
+
+            val enumerator = LegalActionEnumerator(d.cardRegistry, d.services.manaSolver,
+                d.services.costCalculator, d.services.predicateEvaluator,
+                d.services.conditionEvaluator, d.services.turnManager)
+            fun passes(stops: Set<com.wingedsheep.engine.legalactions.OwnStackStop>) =
+                OfflineHumanAutoPass.shouldPass(d.state, p, d.cardRegistry,
+                    { enumerator.enumerate(d.state, p, EnumerationMode.ACTIONS_ONLY) },
+                    ownStackStops = stops)
+
+            assertTrue("Default own-stack behavior stays fast-pass",
+                OfflineHumanAutoPass.canPassOwnedStackWithoutEnumerating(d.state, p, d.cardRegistry))
+            assertTrue("Default should pass without explicit own-stack stops", passes(emptySet()))
+            assertEquals("Opt-in stop must follow real flash affordability (initial mana=$available)",
+                !expectStop, passes(com.wingedsheep.engine.legalactions.OwnStackStop.entries.toSet()))
+        }
+    }
+
     @Test(timeout = 60000)
     fun ownStackOptInDoesNotStopForUnaffordableResponsesOrJustMana() {
         val d = scenario("Lightning Bolt", "Elder Deep-Fiend")
