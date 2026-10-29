@@ -81,6 +81,11 @@ jobs:
           # requested card outside those decks can reach Copilot, or be routed to GPT when it cannot.
           # Fails soft: without this file the requested cards are simply reported as unclassified.
           if [ -s requested.txt ]; then
+            # The committed Oracle cache lacks most newly requested cards, and an uncached card can
+            # only classify as NEEDS_REVIEW. Fetch their Oracle text into this read-only checkout
+            # (never committed). On failure they simply stay NEEDS_REVIEW, as before.
+            (cd base && python3 -I tools/cardkit/cardkit.py oracle fetch --deck ../requested.txt) \
+              || echo '::warning::Oracle fetch for requested cards incomplete; uncached cards stay NEEDS_REVIEW.'
             (cd base && python3 -I tools/cardkit/cardkit.py gaps --claims-from-github --deck ../requested.txt --json-output ../requested-gaps.json > /dev/null) \
               || { echo '::warning::Owner-requested cards could not be classified; they stay unclassified this pass.'; rm -f requested-gaps.json; }
           fi
