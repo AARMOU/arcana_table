@@ -99,6 +99,32 @@ test('reconcile backfills observations only, even when admission would allow',as
   assert.deepEqual(await reconcileFailures({github:again.github,context:again.context}),[{run:12,state:'already-observed'}]);
 });
 
+test('scheduled backfill upgrades an observation only when admitted',async()=>{
+  const x=fixture({comments:[bot(`${OBSERVED}\nworkflow-id:4\nhead-sha:${sha}`,88)]});
+  const r=await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize});
+  assert.deepEqual(r,[{run:12,state:'repair-requested'}]);
+  assert.equal(x.calls.length,1);assert.equal(x.calls[0].comment_id,88);
+  assert.equal(x.records.length,1);
+});
+test('scheduled backfill caps paid requests at one per tick',async()=>{
+  const x=fixture({runs:[{id:12,workflow_id:4,name:'Arcana Cardkit',conclusion:'failure',
+    event:'push',head_branch:'copilot/cards',head_sha:sha,head_repository:{id:1}},
+    {id:13,workflow_id:4,name:'Arcana Cardkit',conclusion:'failure',
+    event:'push',head_branch:'copilot/cards',head_sha:sha,head_repository:{id:1}}]});
+  const r=await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize});
+  assert.deepEqual(r,[{run:12,state:'repair-requested'},{run:13,state:'observed-only'}]);
+  assert.equal(x.records.length,1);
+  assert.equal(x.calls.filter(c=>c.body.includes('@copilot')).length,1);
+});
+test('scheduled backfill respects capacity denial without consuming a repair',async()=>{
+  const x=fixture({authorize:deny('capacity: 1 of 1 active')});
+  const r=await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize});
+  assert.deepEqual(r,[{run:12,state:'observed-only'}]);
+  assert.equal(x.records.length,0);
+  assert.equal(x.calls.length,1);
+  assert.match(x.calls[0].body,/capacity: 1 of 1 active/);
+});
+
 // createAuthorizer against a fake GitHub with one finished unit (#67) and its PR.
 function unitsGithub({assigned=true,sessions=true,ledger=[]}={}){
   const comments=[];
