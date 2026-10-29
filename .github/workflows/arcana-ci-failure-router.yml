@@ -13,7 +13,7 @@ on:
       - Six-precon worker integration — full custom card regressions
     types: [completed]
   schedule:
-    # Backfill observations for failures whose router run was dropped from the queue.
+    # Backfill missed failures. Paid requests still require repair=request and admission.
     - cron: '23 */2 * * *'
 permissions:
   actions: read
@@ -54,7 +54,10 @@ jobs:
             if(ready.repair==='off'){core.info('Repair mode off; router disabled.');return;}
             let result;
             if(context.eventName==='schedule'){
-              result=await reconcileFailures({github,context});
+              const {owner,repo}=context.repo;
+              const authorize=ready.repair==='request' ?
+                createAuthorizer({github,owner,repo,env:process.env,readBudget}) : undefined;
+              result=await reconcileFailures({github,context,authorize});
             }else{
               const {owner,repo}=context.repo;
               const authorize=createAuthorizer({github,owner,repo,env:process.env,readBudget});
