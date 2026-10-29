@@ -1,0 +1,80 @@
+name: Card packaging plumbing checks (NO APK)
+on:
+  push:
+    branches: [gpt/b140-card-packaging-plumbing-20261028]
+  pull_request:
+    paths:
+      - android/app/build.gradle.kts
+      - tools/verify_packaged_card_assets.py
+      - tools/tests/test_packaged_card_assets.py
+      - .github/workflows/card-packaging-plumbing-no-apk.yml
+permissions:
+  contents: read
+concurrency:
+  group: card-packaging-plumbing-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
+jobs:
+  export-and-task-graph:
+    if: github.repository == 'AARMOU/arcana_table' && (github.event_name == 'push' || github.event.pull_request.head.ref == 'gpt/b140-card-packaging-plumbing-20261028')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - name: Exercise corrupt, stale and missing packaged-asset fixtures
+        run: python3 -m unittest discover -s tools/tests -p test_packaged_card_assets.py -v
+      - name: Required Cardkit and generated-document checks (NO APK)
+        run: |
+          python3 -m unittest discover -s tools/cardkit/tests
+          tools/cardkit/cardkit check
+          tools/cardkit/cardkit docs-check
+          git diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export actual B140 registered cards and run existing data round-trip suite (NO APK)
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests com.arcanatable.customcards.CustomCardDataTest
+      - name: Prove Android asset merge depends on the exporter WITHOUT building Android
+        working-directory: android
+        run: |
+          set -euo pipefail
+          ./gradlew --no-daemon --max-workers=2 --console=plain :app:mergeDebugAssets --dry-run | tee "$RUNNER_TEMP/card-asset-task-graph.txt"
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          lines = Path(os.environ['RUNNER_TEMP'], 'card-asset-task-graph.txt').read_text().splitlines()
+          export = lines.index(':custom-cards:exportCards SKIPPED')
+          merge = lines.index(':app:mergeDebugAssets SKIPPED')
+          assert export < merge, 'Android can merge stale assets before custom-card export'
+          print('PASS: exporter precedes Android asset merge; --dry-run executed NO Android build tasks')
+          PY
+      - name: Verify all five existing data tests really executed
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          files = list(Path('android/custom-cards/build/test-results/test').glob('TEST-*CustomCardDataTest.xml'))
+          assert len(files) == 1, files
+          suite = ET.parse(files[0]).getroot()
+          assert int(suite.get('tests', '0')) == 5, suite.attrib
+          assert all(int(suite.get(k, '0')) == 0 for k in ('failures', 'errors', 'skipped')), suite.attrib
+          print('PASS: 5 existing pinned-SDK data/registry tests, no failures/errors/skips; NO APK')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: card-packaging-plumbing-no-apk-evidence
+          path: |
+            android/custom-cards/build/test-results/test/
+            ${{ runner.temp }}/card-asset-task-graph.txt
+          if-no-files-found: warn
