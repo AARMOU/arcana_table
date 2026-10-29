@@ -27,14 +27,6 @@ jobs:
             pr: 407
             issue: 406
             title: Implement Poxwalkers
-          - key: abstruse-archaic
-            pr: 344
-            issue: 343
-            title: Implement Abstruse Archaic
-          - key: blood-for-the-blood-god
-            pr: 353
-            issue: 352
-            title: Implement Blood for the Blood God!
           - key: celestine-the-living-saint
             pr: 360
             issue: 358

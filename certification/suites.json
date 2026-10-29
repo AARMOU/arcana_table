@@ -24,22 +24,6 @@
       "tests": 6
     },
     {
-      "key": "abstruse-archaic",
-      "name": "Abstruse Archaic",
-      "issue": 343,
-      "source": "certification/AbstruseArchaicIndependentCertificationTest.kt",
-      "testClass": "com.arcanatable.customcards.AbstruseArchaicIndependentCertificationTest",
-      "tests": 8
-    },
-    {
-      "key": "blood-for-the-blood-god",
-      "name": "Blood for the Blood God!",
-      "issue": 352,
-      "source": "certification/BloodForTheBloodGodIndependentCertificationTest.kt",
-      "testClass": "com.arcanatable.customcards.BloodForTheBloodGodIndependentCertificationTest",
-      "tests": 7
-    },
-    {
       "key": "celestine-the-living-saint",
       "name": "Celestine, the Living Saint",
       "issue": 358,

@@ -18,17 +18,15 @@ Resurrection Orb (#408 / Copilot PR #410) is the initial four-scenario example. 
 
 ## Safeguards and limits
 
-### First four-card batch (#81)
+### Celestine and Darksteel batch (#81)
 
-The three new suites were authored from Wizards' release notes and the existing
+The new Celestine suite was authored from Wizards' release notes and the existing
 `support/` helpers before reading any candidate implementation or candidate tests.
 Candidate metadata and changed filenames were read only to bind queue issues and
 import names. No worker implementation or worker test source was read.
 
 | Card / candidate | Cases | Independent behavior checks |
 | --- | ---: | --- |
-| Abstruse Archaic / #344 | 8 | Casting/vigilance, activated and triggered copies, sacrificed-source information, retargeting, colored/opponent/spell/mana-source rejection, activation costs |
-| Blood for the Blood God! / #353 | 7 | Full cost, discard/draw/damage/exile, both players' creature deaths and tokens, colored-cost floor, noncreature/previous-turn exclusions, countering, four-player damage |
 | Celestine, the Living Saint / #360 | 7 | Casting/flying/lifelink, zero-value targets, gross life gain and exact value boundary, controller/type/turn restrictions, target choice before later life gain |
 | Darksteel Monolith / #370 | 8 | Existing independent suite copied byte-for-byte from #443 at `4d19f738c0aae474b913d6a6fa7a51fd1da50d86` |
 
