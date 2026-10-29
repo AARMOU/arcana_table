@@ -78,6 +78,14 @@ async function previousStatus({ github, owner, repo, kind }) {
   catch { return null; }
 }
 
+// Display-only status rebuilds are API-expensive and all workflows share one hourly token
+// quota; event bursts exhausted it (403 mid-integration, 2026-10-29). True when the published
+// copy is younger than maxAgeMs. Unreadable or missing status is never fresh.
+async function freshStatus({ github, owner, repo, kind, maxAgeMs, now = Date.now() }) {
+  const at = Date.parse((await previousStatus({ github, owner, repo, kind }))?.checkedAt);
+  return Number.isFinite(at) && now >= at && now - at < maxAgeMs;
+}
+
 // result: readBudget() output. previous: last published billing status (display carry-forward only).
 function billingPayload(result, { env = {}, previous = null, now = new Date(), source = 'billing-watch' } = {}) {
   const s = result?.snapshot;
@@ -216,5 +224,5 @@ function dispatcherSummary(p) {
     `Checked: ${p.checkedAt}.`].filter(Boolean);
 }
 
-module.exports = { STATUS_ISSUE, MARKERS, PRIVATE_BILLING_URL, publicDecision, publicLiabilities, formatStatus, parseStatus, publishStatus, previousStatus, billingPayload,
+module.exports = { STATUS_ISSUE, MARKERS, PRIVATE_BILLING_URL, publicDecision, publicLiabilities, formatStatus, parseStatus, publishStatus, previousStatus, freshStatus, billingPayload,
   billingSummary, dispatcherAction, dispatcherPayload, dispatcherSummary, summarizeUnits, clean };
