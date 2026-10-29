@@ -9,7 +9,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class UlamogsNullifierScenarioTest {
-    private fun setup() = customScenario(UlamogsNullifier, "Grizzly Bears", "Sol Ring", "Island", "Rest in Peace", "Dark Ritual")
+    private fun setup() = customScenario(UlamogsNullifier, "Grizzly Bears", "Sol Ring", "Island", "Rest in Peace", "Dark Ritual", "Carnage Tyrant")
 
     /** I cast Bears, then flash in Nullifier holding priority; its ETB targets the Bears spell. */
     private fun GameTestDriver.respondToOwnBears(c: Choices): EntityId {
@@ -33,6 +33,7 @@ class UlamogsNullifierScenarioTest {
         when (spellName) {
             "Sol Ring" -> giveColorlessMana(player2, 1)
             "Dark Ritual" -> giveMana(player2, Color.BLACK)
+            "Carnage Tyrant" -> { giveColorlessMana(player2, 4); giveMana(player2, Color.GREEN); giveMana(player2, Color.GREEN) }
             else -> { giveMana(player2, Color.GREEN); giveColorlessMana(player2, 1) }
         }
         assertNull(castSpell(player2, spell).error)
@@ -43,6 +44,26 @@ class UlamogsNullifierScenarioTest {
         giveMana(player1, Color.BLUE); giveMana(player1, Color.BLACK); giveColorlessMana(player1, 2)
         assertNull(castSpell(player1, nullifier).error)
         resolveAll(c.copy(targets = listOf(spell)))
+    }
+
+    /**
+     * Processing two cards is independent of whether the target spell can be
+     * countered. Carnage Tyrant's Oracle text forbids countering the spell;
+     * its hexproof applies only on the battlefield, not on the stack.
+     */
+    @Test fun uncounterableOpponentsCreatureStillResolvesAfterTwoCardsAreProcessed() {
+        val d = setup()
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Island")
+        d.respondToOpponentsSpell(
+            Choices(yes = true, pick = listOf("Sol Ring", "Island")),
+            spellName = "Carnage Tyrant",
+        )
+        assertEquals("Uncounterable creature spell must resolve despite Nullifier",
+            1, d.permanentsNamed(d.player2, "Carnage Tyrant").size)
+        assertEquals("Nullifier still processes exactly two opponent-owned cards",
+            listOf("Island", "Sol Ring"), d.getGraveyardCardNames(d.player2).sorted())
+        assertTrue(d.getExileCardNames(d.player2).isEmpty())
     }
 
     @Test fun opponentsSpellCanBeCounteredAfterProcessingTheirExiledCards() {
