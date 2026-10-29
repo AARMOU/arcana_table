@@ -13,6 +13,7 @@ import com.wingedsheep.engine.state.GameState
 import com.wingedsheep.sdk.core.Format
 import com.wingedsheep.sdk.model.Deck
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -70,17 +71,54 @@ class EldraziIncursionPlayableTest {
         assertTrue(leftOut, "${expectedMissing.size} card" in leftOut)
     }
 
+    private fun mirrorRegistry() = CardRegistry().apply { register(lib.load(names.toSet())) }
+
+    private fun mirrorConfig(seed: Int): GameConfig {
+        val list = OfflineGameSetup.argentumLibraryList(names, commander).mapNotNull(lib::canonical)
+        return GameConfig(
+            players = (0..1).map { i ->
+                PlayerConfig(if (i == 0) "Incursion A" else "Incursion B",
+                    Deck(list.shuffled(Random(seed * 10 + i))), startingLife = 40,
+                    commanderCardNames = listOf(lib.canonical(commander)!!))
+            },
+            skipMulligans = true, format = Format.Commander(), startingPlayerIndex = seed % 2,
+            // GameInitializer shuffles the libraries again. Seeding only the input lists
+            // leaves opening hands, entity IDs and all subsequent engine RNG unseeded.
+            seed = seed.toLong(),
+        )
+    }
+
+    @Test fun sameEngineSeedReproducesTheEntireInitializedMirrorState() {
+        val registry = mirrorRegistry()
+        for (seed in listOf(1, 2, 3)) {
+            val first = GameInitializer(registry).initializeGame(mirrorConfig(seed))
+            val replay = GameInitializer(registry).initializeGame(mirrorConfig(seed))
+            assertEquals(seed.toLong(), first.seed)
+            assertEquals(first.seed, replay.seed)
+            assertEquals("seed=$seed: includes actual hands, libraries, IDs and RNG", first.state, replay.state)
+        }
+    }
+
+    @Test fun differentEngineSeedChangesTheActualInitializedMirror() {
+        val registry = mirrorRegistry()
+        val config = mirrorConfig(1)
+        val first = GameInitializer(registry).initializeGame(config)
+        // Keep the player configs (and pre-shuffled deck lists) IDENTICAL. Only change
+        // the engine seed: this is the missing variable in the old differential proof.
+        val other = GameInitializer(registry).initializeGame(config.copy(seed = 2L))
+        assertNotEquals(first.seed, other.seed)
+        assertNotEquals(first.state.zones, other.state.zones)
+        assertNotEquals(first.state.rng, other.state.rng)
+    }
+
     /** Eldrazi Incursion mirror run by Argentum's AI on both sides: no engine stall or crash. */
     @Test fun incursionMirrorAiGame() {
         assertTrue("Offline library must be present; never skip Eldrazi acceptance tests", lib.isFullLibrary)
-        val list = OfflineGameSetup.argentumLibraryList(names, commander).mapNotNull(lib::canonical)
-        val registry = CardRegistry().apply { register(lib.load(names.toSet())) }
+        val registry = mirrorRegistry()
         for (seed in listOf(1, 2, 3)) {
-            val players = (0..1).map { i ->
-                PlayerConfig(if (i == 0) "Incursion A" else "Incursion B", Deck(list.shuffled(Random(seed * 10 + i))),
-                    startingLife = 40, commanderCardNames = listOf(lib.canonical(commander)!!))
-            }
-            val init = GameInitializer(registry).initializeGame(GameConfig(players = players, skipMulligans = true, format = Format.Commander(), startingPlayerIndex = seed % 2))
+            val init = GameInitializer(registry).initializeGame(mirrorConfig(seed))
+            println("[eldrazi-incursion-init] fixtureSeed=$seed engineSeed=${init.seed} " +
+                "zones=${init.state.zones} rng=${init.state.rng}")
             val processor = ActionProcessor(registry)
             val ais = init.state.turnOrder.associateWith { AIPlayer.create(registry, it) }
             var state: GameState = init.state
