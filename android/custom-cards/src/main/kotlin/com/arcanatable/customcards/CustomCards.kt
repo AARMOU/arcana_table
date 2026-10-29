@@ -175,6 +175,7 @@ object CustomCards {
         Entry(NoiseMarine, "40K", "Six WotC precons"),
         Entry(ChaosTerminatorLord, "40K", "Six WotC precons"),
         Entry(SisterHospitaller, "40K", "Six WotC precons"),
+        Entry(SisterRepentia, "40K", "Six WotC precons"),
         Entry(DesertOfTheGlorified, "HOU", "Six WotC precons"),
         Entry(GuildlessCommons, "CMR", "Six WotC precons"),
         Entry(TendoIceBridge, "BOK", "Six WotC precons"),
