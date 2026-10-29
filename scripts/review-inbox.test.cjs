@@ -64,6 +64,7 @@ test('buildReviewInbox reads only Copilot PRs and never writes', async () => {
   };
   const p = await R.buildReviewInbox({ github, owner: 'AARMOU', repo: 'arcana_table', now: new Date('2026-10-28T17:00:00Z') });
   assert.deepEqual(p.items.map(i => [i.pr, i.state]), [[360, 'approved'], [340, 'integrated']]);
+  assert.deepEqual(p.integratedActivity, [{ pr: 340, card: 'Old Card', mergedAt: '2026-10-27T10:00:00Z' }]);
 });
 
 test('certification is only an explicit certification check, never plain CI', () => {
@@ -85,4 +86,13 @@ test('details carry abilities, check links, problems and stale-review warnings',
   assert.deepEqual(row.abilities, ['Celestine, the Living Saint: Flying, lifelink; at end step, return creature card with MV <= life gained']);
   assert.deepEqual(row.checkRuns, [{ name: 'cards-and-android', result: 'failure', url: 'https://github.com/AARMOU/arcana_table/runs/1' }]);
   assert.deepEqual(row.problems, ['Check failed: cards-and-android (failure)', 'New commit since your last review: review again']);
+});
+
+
+test('daily activity is not truncated to the owner review inbox and excludes unmerged PRs', () => {
+  const merged = Array.from({length: 42}, (_,i) => ({pr: 500+i, card:'Card '+i, mergedAt:'2026-10-28T12:00:00Z'}));
+  const p = R.inboxPayload(merged.map(x=>({...x,state:'integrated'})), new Date('2026-10-28T18:00:00Z'), merged);
+  assert.equal(p.items.length, 30);
+  assert.equal(p.integratedActivity.length, 42);
+  assert.equal(p.integratedActivity[0].pr, 500);
 });
