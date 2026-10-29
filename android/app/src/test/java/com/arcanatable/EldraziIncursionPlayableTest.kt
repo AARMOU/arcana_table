@@ -10,6 +10,7 @@ import com.wingedsheep.engine.core.PlayerConfig
 import com.wingedsheep.engine.core.SubmitDecision
 import com.wingedsheep.engine.registry.CardRegistry
 import com.wingedsheep.engine.state.GameState
+import com.wingedsheep.engine.state.components.identity.LifeTotalComponent
 import com.wingedsheep.sdk.core.Format
 import com.wingedsheep.sdk.model.Deck
 import org.junit.Assert.assertEquals
@@ -87,6 +88,13 @@ class EldraziIncursionPlayableTest {
             var actions = 0
             val started = System.nanoTime()
             var stepFailure: String? = null
+            // Track real life-total progression to distinguish a long 40-life mirror from
+            // a game that never deals damage. Record once per turn, not per AI action.
+            fun lifeSnapshot(): String = state.turnOrder.joinToString(",") { seat ->
+                "${seat.value}:${state.getEntity(seat)?.get<LifeTotalComponent>()?.life ?: "?"}"
+            }
+            val lifeByTurn = mutableListOf("${state.turnNumber}=${lifeSnapshot()}")
+            var lastObservedTurn = state.turnNumber
             while (!state.gameOver && state.turnNumber <= 30 && actions < 8_000) {
                 val decision = state.pendingDecision
                 val next = if (decision != null) {
@@ -106,6 +114,10 @@ class EldraziIncursionPlayableTest {
                 }
                 actions++
                 state = next ?: break
+                if (state.turnNumber != lastObservedTurn) {
+                    lastObservedTurn = state.turnNumber
+                    lifeByTurn += "$lastObservedTurn=${lifeSnapshot()}"
+                }
             }
             val stopReason = when {
                 state.gameOver -> "game over"
@@ -116,7 +128,8 @@ class EldraziIncursionPlayableTest {
             val diagnostic = "seed=$seed turn=${state.turnNumber} actions=$actions over=${state.gameOver} " +
                 "winner=${state.winnerId} priority=${state.priorityPlayerId} " +
                 "pendingDecisionPlayer=${state.pendingDecision?.playerId} stop=$stopReason " +
-                "ms=${(System.nanoTime() - started) / 1_000_000}"
+                "ms=${(System.nanoTime() - started) / 1_000_000} " +
+                "lifeByTurn=${lifeByTurn.joinToString(";")}"
             println("[eldrazi-incursion] $diagnostic")
             assertTrue("AI mirror must finish: $diagnostic", state.gameOver)
         }
