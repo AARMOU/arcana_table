@@ -405,4 +405,52 @@ class UlamogsNullifierScenarioTest {
             reexiled.contains("Island"))
     }
 
+
+    /**
+     * Two physically distinct opponent-owned cards may share the same printed name.
+     * Rest in Peace must process both as separate exile objects, while an identically
+     * named card owned by Nullifier's controller stays in exile.
+     */
+    @Test fun restInPeaceProcessesTwoSameNamedOpponentExilesWithoutTouchingOwnCopy() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Rest in Peace")
+        d.putCardInExile(d.player1, "Sol Ring")
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Sol Ring")
+
+        d.respondToOwnBears(Choices(yes = true, pick = listOf("Sol Ring")))
+
+        assertTrue("Processing two distinct cards with the same name must counter",
+            d.permanentsNamed(d.player1, "Grizzly Bears").isEmpty())
+        assertEquals(listOf("Sol Ring"), d.getExileCardNames(d.player1))
+        assertEquals(listOf("Sol Ring", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
+        assertTrue(d.getGraveyardCardNames(d.player2).isEmpty())
+        val processed = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
+            .filter { it.fromZone == com.wingedsheep.sdk.core.Zone.EXILE &&
+                it.toZone == com.wingedsheep.sdk.core.Zone.EXILE &&
+                it.entityName == "Sol Ring" }
+        assertEquals("Exactly two separate opponent-owned exile objects must move", 2, processed.size)
+        assertTrue("Own same-named exile must never be selected",
+            processed.all { it.ownerId == d.player2 })
+    }
+
+    /** A same-named own exile cannot be counted as the second opponent-owned card. */
+    @Test fun restInPeaceCannotCountOwnSameNamedExileTowardTwoCardCost() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Rest in Peace")
+        d.putCardInExile(d.player1, "Sol Ring")
+        d.putCardInExile(d.player2, "Sol Ring")
+
+        d.respondToOwnBears(Choices(yes = true, pick = listOf("Sol Ring")))
+
+        assertEquals("One eligible opponent-owned card is insufficient to counter",
+            1, d.permanentsNamed(d.player1, "Grizzly Bears").size)
+        assertEquals(listOf("Sol Ring"), d.getExileCardNames(d.player1))
+        assertEquals(listOf("Sol Ring"), d.getExileCardNames(d.player2))
+        val processed = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
+            .filter { it.fromZone == com.wingedsheep.sdk.core.Zone.EXILE &&
+                it.toZone == com.wingedsheep.sdk.core.Zone.EXILE }
+        assertTrue("No card may be processed when the two-card cost is unavailable",
+            processed.isEmpty())
+    }
 }
