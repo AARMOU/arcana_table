@@ -27,6 +27,14 @@ jobs:
             pr: 407
             issue: 406
             title: Implement Poxwalkers
+          - key: blood-for-the-blood-god
+            pr: 353
+            issue: 352
+            title: Implement Blood for the Blood God!
+          - key: sporocyst
+            pr: 419
+            issue: 417
+            title: Add Sporocyst with Ravenous and Spore Chimney
     steps:
       - uses: actions/checkout@v4
         with:
