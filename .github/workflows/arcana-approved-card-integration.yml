@@ -129,10 +129,7 @@ jobs:
         if: always()
         with:
           name: card-integration-result
-          path: |
-            result/
-            candidate/android/custom-cards/build/test-results/
-            candidate/android/app/build/test-results/
+          path: result/
           retention-days: 14
           if-no-files-found: error
 
@@ -159,9 +156,9 @@ jobs:
           script: |
             const fs=require('node:fs'), P=require('./scripts/card-integration.cjs');
             const plan=JSON.parse(Buffer.from(process.env.PLAN_B64,'base64').toString());
-            const report=JSON.parse(fs.readFileSync('result/result/report.json','utf8'));
+            const report=JSON.parse(fs.readFileSync('result/report.json','utf8'));
             P.validateOutcome(plan,report);
-            if(report.status==='passed') P.validateReport(plan,report,JSON.parse(fs.readFileSync('result/result/files.json','utf8')));
+            if(report.status==='passed') P.validateReport(plan,report,JSON.parse(fs.readFileSync('result/files.json','utf8')));
             const blocked=report.gates.filter(g=>!g.ok).map(g=>g.name+': '+g.detail);
             core.summary.addHeading('PR #'+plan.pr+' destination result: '+report.status)
               .addList([...blocked,...(report.failures||[]).slice(0,8)])
@@ -206,7 +203,7 @@ jobs:
           python3 - <<'PY'
           import json,subprocess
           from pathlib import Path
-          report=json.loads(Path('result/result/report.json').read_text())
+          report=json.loads(Path('result/report.json').read_text())
           if report['status']=='passed':
               subprocess.run(['python3','trusted/integration/runner.py','prepare','--plan','expected-plan.json',
                               '--candidate','expected','--output','expected-sources.json'],check=True)
@@ -222,8 +219,8 @@ jobs:
             const fs = require('node:fs');
             const P = require('./trusted/scripts/card-integration.cjs');
             const plan = JSON.parse(Buffer.from(process.env.PLAN_B64,'base64').toString());
-            const report = JSON.parse(fs.readFileSync('result/result/report.json','utf8'));
-            const files = JSON.parse(fs.readFileSync('result/result/files.json','utf8'));
+            const report = JSON.parse(fs.readFileSync('result/report.json','utf8'));
+            const files = JSON.parse(fs.readFileSync('result/files.json','utf8'));
             const expectedSources = JSON.parse(fs.readFileSync('expected-sources.json','utf8'));
             const receipt = await P.publish({github,...context.repo,cfg:P.config('trusted'),plan,report,files,expectedSources,
               runUrl:`${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`});

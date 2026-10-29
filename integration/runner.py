@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
+import shutil
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
@@ -265,6 +266,12 @@ def validate(plan, trusted, candidate, output):
             report['status'] = 'passed'
         (output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')
         (output / 'files.json').write_text(json.dumps(files, ensure_ascii=False) + '\n')
+        for module in ('custom-cards', 'app'):
+            root = candidate / 'android' / module / 'build/test-results'
+            for xml in root.rglob('TEST-*.xml'):
+                dest = output / 'junit' / module / xml.relative_to(root)
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(xml, dest)
         print('INTEGRATION RESULT:', report['status'], flush=True)
 
 
