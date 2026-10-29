@@ -69,7 +69,7 @@ async function routeFailure({ github, context, authorize = observeOnly, openPrs,
   // Fail closed before admission/ledger writes if the existing dispatch
   // credential cannot prove it belongs to the owner.
   const sender = delivery || createCopilotDelivery({owner,repo,token:null});
-  const proof = await sender.preflight();
+  const proof = authorize === observeOnly ? {ok:true} : await sender.preflight();
   const decision = proof.ok ? await authorize({pr,run}) :
     {allowed:false,reason:proof.reason};
   const allowed = decision.allowed === true;
