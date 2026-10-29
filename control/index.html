@@ -404,11 +404,11 @@
           if(Number.isFinite(checked)&&newer<=checked)return;
           reviewLatest={data,url:comment.html_url};
           out.review=reviewLatest;
-          directFeedFallbacks++;
+          sourceTimes.push(Date.now());
         }catch{ /* Keep cached snapshot and expose its age; never claim it was verified. */ }
       }
       // REVIEW_FRESHNESS_END
-      async function fetchStatus(){const first=await api('/issues/78/comments?per_page=100&page=1');let comments=first.data;const last=first.link.match(/<[^>]*[?&]page=(\\d+)[^>]*>;\\s*rel="last"/);if(last&&Number(last[1])>1){comments=comments.concat((await api('/issues/78/comments?per_page=100&page='+Number(last[1]))).data);}const out={};let trustedReview=null;for(const c of comments){if(!isBotComment(c))continue;const d=parseStatus(c.body);if(d){out[d.kind]={data:d,url:c.html_url};if(d.kind==='review')trustedReview=c;}}await refreshReviewSnapshot(out,trustedReview);return out;}
+      async function fetchStatus(){const first=await api('/issues/78/comments?per_page=100&page=1');let comments=first.data;const last=first.link.match(/<[^>]*[?&]page=(\d+)[^>]*>;\s*rel="last"/);if(last&&Number(last[1])>1){comments=comments.concat((await api('/issues/78/comments?per_page=100&page='+Number(last[1]))).data);}const out={};let trustedReview=null;for(const c of comments){if(!isBotComment(c))continue;const d=parseStatus(c.body);if(d){out[d.kind]={data:d,url:c.html_url};if(d.kind==='review')trustedReview=c;}}await refreshReviewSnapshot(out,trustedReview);return out;}
       const num=x=>Number.isFinite(x)?(Math.round(x*10)/10).toLocaleString():'—';
       const pct=x=>Number.isFinite(x)?Math.round(x*100)+'%':'—';
       const levelColor=l=>({normal:'var(--green)',warn:'var(--amber)',slow:'var(--amber)',paused:'var(--red)',unknown:'var(--red)'}[l]||'var(--muted)');
