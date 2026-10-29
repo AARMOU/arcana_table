@@ -1,0 +1,73 @@
+name: Arcana Card Certification Premerge
+on:
+  pull_request:
+    paths:
+      - 'certification/**'
+      - '.github/workflows/arcana-independent-card-certification.yml'
+      - '.github/workflows/arcana-card-certification-premerge.yml'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  independent-card-scenarios:
+    name: Compile and execute all four independent Resurrection Orb scenarios
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: trusted
+          persist-credentials: false
+      - name: Find current Copilot card implementation
+        id: candidate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const p = (await github.rest.pulls.get({
+              owner: context.repo.owner, repo: context.repo.repo, pull_number: 410
+            })).data;
+            if (p.state !== 'open' ||
+                p.base.ref !== 'gpt/arcana-integration-next' ||
+                p.title !== 'Implement Resurrection Orb' ||
+                String(p.user?.login || '').toLowerCase() !== 'copilot' ||
+                !/Fixes #408\b/.test(p.body || '')) {
+              core.setFailed('The referenced Resurrection Orb card candidate changed.');
+              return;
+            }
+            core.setOutput('sha', p.head.sha);
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.candidate.outputs.sha }}
+          path: candidate
+          persist-credentials: false
+      - name: Inject independent scenarios
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp trusted/certification/ResurrectionOrbIndependentCertificationTest.kt \
+            candidate/android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ResurrectionOrbIndependentCertificationTest.kt
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Run trusted tests against real pinned Argentum engine
+        working-directory: candidate/android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests com.arcanatable.customcards.ResurrectionOrbIndependentCertificationTest
+      - name: Verify exactly four independent tests passed
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          files = list(Path('candidate/android/custom-cards/build/test-results/test').glob('TEST-*ResurrectionOrbIndependentCertificationTest.xml'))
+          if len(files) != 1:
+              raise SystemExit(f'Expected 1 JUnit XML; got {len(files)}')
+          result = ET.parse(files[0]).getroot()
+          if int(result.attrib.get('tests', 0)) != 4 or any(int(result.attrib.get(k, 0)) for k in ('failures','errors','skipped')):
+              raise SystemExit(f'Independent certification incomplete: {result.attrib}')
+          print('4 independent Resurrection Orb scenarios passed')
+          PY
