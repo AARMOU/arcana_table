@@ -201,6 +201,45 @@ test('outcome mapping never invents readiness', () => {
   assert.equal(Q.outcomeOf({ readiness: 'IMPLEMENTED_AND_TESTED', claimedBy: 'PR #1' }), 'implemented');
 });
 
+test('feeder status counts verified Cardkit classes once per normalized card and names its exact source', () => {
+  const source = gaps([
+    card('Free Card', 'SUPPORTED', 'copilot'),
+    card('Review Card', 'NEEDS_REVIEW', 'gpt'),
+    card('Engine Card', 'ENGINE_BLOCKED', 'claude'),
+    card('Landed Card', 'IMPLEMENTED_AND_TESTED'),
+    card('Claimed Card', 'SUPPORTED', 'copilot'),
+    card('Other Route', 'SUPPORTED', 'gpt'),
+    card('Front // Back', 'SUPPORTED', 'copilot'),
+  ], { claimed: { 'Claimed Card': 'PR #9' } });
+  const requested = gaps([
+    card('free card', 'SUPPORTED', 'copilot'),
+    card('Front // Back', 'NEEDS_REVIEW', 'gpt'),
+  ]);
+  const result = Q.candidates({ gaps: source, requestedGaps: requested });
+  assert.deepEqual(result.classificationCounts, {
+    distinctNames: 7,
+    counts: { supportedCopilotUnclaimed: 1, needsReview: 1, engineBlocked: 1,
+      implementedAndTested: 1, claimed: 1, unclassified: 2 },
+  });
+  const p = Q.queuePayload({ result, base: BASE, baseSha: SHA, now: new Date('2026-10-29T16:00:00Z') });
+  const summary = Q.queueSummary(p).join('\n');
+  assert.match(summary, /not an index-gap or rules-playability count/);
+  assert.match(summary, new RegExp(SHA));
+  assert.match(summary, /checked 2026-10-29T16:00:00.000Z/);
+  assert.match(summary, /SUPPORTED\/copilot\/unclaimed 1, NEEDS_REVIEW 1, ENGINE_BLOCKED 1, IMPLEMENTED_AND_TESTED 1, claimed 1, unclassified 2/);
+  assert.equal(p.available, result.available);
+});
+
+test('incomplete claim evidence suppresses the diagnostic breakdown', () => {
+  const incomplete = gaps([card('Unverified Claim', 'SUPPORTED', 'copilot')]);
+  delete incomplete.dispatch.claimed;
+  const result = Q.candidates({ gaps: incomplete });
+  assert.equal(result.classificationCounts, null);
+  const p = Q.queuePayload({ result, base: BASE, baseSha: SHA });
+  assert.match(Q.queueSummary(p).join('\n'), /Cardkit classification breakdown unavailable/);
+  assert.equal(result.eligibleNames.includes('Unverified Claim'), true);
+});
+
 test('feeder workflow classifies owner requests in the no-secret job and routes in the trusted publish job', () => {
   const fs = require('node:fs');
   const y = fs.readFileSync('.github/workflows/arcana-queue-feeder.yml', 'utf8');
