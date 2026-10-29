@@ -40,7 +40,7 @@ function createAuthorizer({ github, owner, repo, env, readBudget, now = Date.now
 }
 
 // Trusted default-branch workflow calls this module. Never loads failed-branch code.
-async function routeFailure({ github, context, authorize = observeOnly }) {
+async function routeFailure({ github, context, authorize = observeOnly, openPrs }) {
   const run = context.payload.workflow_run;
   const repoId = context.payload.repository.id;
   if (!run || run.conclusion !== 'failure' || run.event === 'workflow_run' ||
@@ -48,7 +48,7 @@ async function routeFailure({ github, context, authorize = observeOnly }) {
       !/^(gpt\/|copilot\/)/.test(run.head_branch || '') ||
       !/^[a-f0-9]{40}$/.test(run.head_sha || '')) return {state:'ignored'};
   const {owner, repo} = context.repo;
-  const prs = await github.paginate(github.rest.pulls.list, {owner, repo, state:'open', per_page:100});
+  const prs = openPrs || await github.paginate(github.rest.pulls.list, {owner, repo, state:'open', per_page:100});
   const pr = prs.find(p => p.draft && p.head.repo?.id === repoId &&
     p.head.ref === run.head_branch && p.head.sha === run.head_sha);
   if (!pr) return {state:'stale-or-unmatched'};
@@ -105,13 +105,27 @@ async function reconcileFailures({ github, context, authorize = observeOnly,
   const since = new Date(now - windowMs).toISOString();
   const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo,
     { owner, repo, status: 'failure', created: '>=' + since, per_page: 100 });
-  const results = [];
-  let requested = 0;
-  for (const run of runs.filter(r => WORKFLOWS.has(r.name))) {
+  // Pre-filter stale commits and duplicate runs before potentially expensive admission.
+  const openPrs = await github.paginate(github.rest.pulls.list,
+    { owner, repo, state:'open', per_page:100 });
+  const repoId = context.payload.repository.id;
+  const heads = new Set(openPrs.filter(p => p.draft && p.head.repo?.id === repoId &&
+    /^(gpt\\/|copilot\\/)/.test(p.head.ref || '')).map(p => p.head.ref + ':' + p.head.sha));
+  const results = [], seen = new Set();
+  let requested = 0, admissionBlocked = false;
+  for (const run of runs.filter(r => WORKFLOWS.has(r.name) &&
+    r.head_repository?.id === repoId && heads.has(run.head_branch + ':' + run.head_sha))) {
+    const fingerprint = run.workflow_id + ':' + run.head_sha;
+    if (seen.has(fingerprint)) continue;
+    seen.add(fingerprint);
     const ctx = { repo: context.repo, payload: { repository: context.payload.repository, workflow_run: run } };
-    const r = await routeFailure({ github, context: ctx,
-      authorize: requested < 1 ? authorize : observeOnly });
+    const r = await routeFailure({ github, context: ctx, openPrs,
+      authorize: requested < 1 && !admissionBlocked ? authorize : observeOnly });
     if (r.state === 'repair-requested') requested++;
+    // Capacity and billing are shared gates: don't re-fetch the same admission
+    // state for every other PR when no repair could be admitted this tick.
+    if (/^(capacity|budget|readiness|configuration):/.test(String(r.reason || '')))
+      admissionBlocked = true;
     results.push({ run: run.id, state: r.state });
   }
   return results;
