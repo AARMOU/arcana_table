@@ -66,7 +66,7 @@ class ResurrectionOrbScenarioTest {
             d.castSpellWithTargets(player, actOfTreason, listOf(ChosenTarget.Permanent(bearer))).error,
         )
         d.resolveAll()
-        assertEquals(player, d.getController(bearer))
+        assertEquals(player, d.projected.getController(bearer))
         val controlledBearer = bearer
         d.giveColorlessMana(player, 4)
 
@@ -100,7 +100,7 @@ class ResurrectionOrbScenarioTest {
 
         val returnedBearer = d.findPermanent(owner, "Grizzly Bears")
         assertNotNull(returnedBearer)
-        assertEquals(owner, d.getController(returnedBearer!!))
+        assertEquals(owner, d.projected.getController(returnedBearer!!))
         assertNull(d.findPermanent(player, "Grizzly Bears"))
         assertTrue(d.zoneNames(player, Zone.GRAVEYARD).contains("Craw Wurm"))
         assertFalse(d.zoneNames(player, Zone.GRAVEYARD).contains("Grizzly Bears"))
