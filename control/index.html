@@ -237,6 +237,7 @@
       function updateWorkerFreshness(){
         const checkedAt=workerSnapshot?.checkedAt,workers=workerSnapshot?.workers;
         const status=workerSnapshotStatus(checkedAt);
+        const source=workerSnapshot?.source==='read-only-worker-observer'?'GitHub observer':'Dispatcher';
         const report=Number.isFinite(Date.parse(checkedAt))?denverTime(checkedAt):'unavailable';
         const freshness=status==='aging'?' · older snapshot':status==='stale'?' · stale (60+ min)':'';
         if(!workers||status==='unknown'||status==='stale'){
@@ -246,11 +247,11 @@
           if(status==='stale')$('opsWorkers').replaceChildren(e('span','ops-placeholder','Previous assignments expired. Open the issue or Actions for confirmation.'));
         }else{
           text('opsWorkerCount',workers.running+' reported working · '+workers.pendingPickup+' pending');
-          text('opsWorkerFresh','Dispatcher reported '+report+' ('+timeAgo(checkedAt)+')'+freshness+' · not live Copilot telemetry.');
+          text('opsWorkerFresh',source+' reported '+report+' ('+timeAgo(checkedAt)+')'+freshness+' · not live Copilot telemetry.');
         }
         const refreshed=controlLastRead?'Last successful page read '+denverTime(controlLastRead):'No successful page read yet';
         text('opsWorkerChecked',refreshed+(controlLastError?' · last refresh failed: '+controlLastError:'')+
-          ' · auto-checks every 2 min while open; only a dispatcher run can publish a newer report.');
+          ' · auto-checks every 2 min while open; GitHub worker observer or dispatcher publishes a newer report.');
       }
       function renderOpsWorkers(d){
         workerSnapshot=d||null;
@@ -372,7 +373,7 @@
       function renderNotes(notes){const container=$('noteList');container.replaceChildren();if(!Array.isArray(notes)||!notes.length){container.append(e('div','empty','No recent Issue #81 comments.'));return;}notes.slice(-5).reverse().forEach(note=>addRow(container,firstHeading(note.body),timeAgo(note.created_at)+' · Issue #81',safelyLink(note.html_url),null));}
       async function fetchNotes(){const first=await api('/issues/81/comments?per_page=100&page=1');let notes=first.data;const last=first.link.match(/<[^>]*[?&]page=(\d+)[^>]*>;\s*rel="last"/);if(last&&Number(last[1])>1){const newer=await api('/issues/81/comments?per_page=100&page='+Number(last[1]));notes=newer.data;}return notes;}
       const STATUS_MARKER='<!-- arcana-control-status-v1:';
-      function parseStatus(body){const t=String(body||'');if(!t.startsWith(STATUS_MARKER))return null;const m=t.match(/```json\n([\s\S]*?)\n```/);if(!m)return null;try{const d=JSON.parse(m[1]);return d&&typeof d==='object'&&(d.kind==='billing'||d.kind==='dispatcher'||d.kind==='queue'||d.kind==='review')?d:null;}catch{return null;}}
+      function parseStatus(body){const t=String(body||'');if(!t.startsWith(STATUS_MARKER))return null;const m=t.match(/```json\n([\s\S]*?)\n```/);if(!m)return null;try{const d=JSON.parse(m[1]);return d&&typeof d==='object'&&(d.kind==='billing'||d.kind==='dispatcher'||d.kind==='workers'||d.kind==='queue'||d.kind==='review')?d:null;}catch{return null;}}
       const isBotComment=c=>c?.user?.login==='github-actions[bot]'&&c?.user?.type==='Bot';
       async function fetchStatus(){const first=await api('/issues/78/comments?per_page=100&page=1');let comments=first.data;const last=first.link.match(/<[^>]*[?&]page=(\d+)[^>]*>;\s*rel="last"/);if(last&&Number(last[1])>1){comments=comments.concat((await api('/issues/78/comments?per_page=100&page='+Number(last[1]))).data);}const out={};for(const c of comments){if(!isBotComment(c))continue;const d=parseStatus(c.body);if(d)out[d.kind]={data:d,url:c.html_url};}return out;}
       const num=x=>Number.isFinite(x)?(Math.round(x*10)/10).toLocaleString():'—';
@@ -388,12 +389,12 @@
         text('creditsDetail','Usage band '+(BANDS[level]||'unknown')+' of the monthly AI-credit allowance, 10% reserve included. Exact figures are private: open GitHub billing settings while signed in. AI credits only: premium requests, Actions minutes and ChatGPT usage are separate.');
         const pos={normal:25,warn:62,slow:82,paused:100}[level];$('creditsMeter').style.width=(pos||0)+'%';$('creditsReserveMeter').style.width='0%';
         text('creditsFresh',(lastOk?'Last successful billing check: '+new Date(lastOk.measuredAt).toLocaleString()+' ('+timeAgo(lastOk.measuredAt)+')':'No successful billing check recorded')+(latest.ok?'':' · Latest check failed: '+latest.reason));}
-      function renderDispatcher(st){const d=st.dispatcher?.data;if(!d)return;renderOpsWorkers(d);const r=d.readiness||{};text('masterValue',r.master?'ON':'OFF');$('masterValue').style.color=r.master?'var(--green)':'var(--amber)';text('masterDetail','ARCANA_AUTOMATION_READY '+(r.master?'is true':'is not true')+' · dispatch mode '+(r.dispatch||'unknown')+(d.forcedDryRun?' (manual dry run)':''));text('repairValue',(r.repair||'unknown').toUpperCase());$('repairValue').style.color=r.repair==='request'?'var(--green)':'var(--amber)';text('repairDetail','ARCANA_REPAIR_MODE='+(r.repair||'unknown')+'. Repair requests also need the master switch, capacity and budget.');
+      function renderDispatcher(st){const d=st.dispatcher?.data;if(!d)return;const observed=st.workers?.data;const workerReport=observed?.workers&&Number.isFinite(Date.parse(observed.checkedAt))&&Date.parse(observed.checkedAt)>Date.parse(d.checkedAt)?observed:d;renderOpsWorkers(workerReport);text('quickDoItCount',String((d.workers?.list||[]).filter(u=>u.state==='queued'&&u.eligible===true).length)+' eligible');const r=d.readiness||{};text('masterValue',r.master?'ON':'OFF');$('masterValue').style.color=r.master?'var(--green)':'var(--amber)';text('masterDetail','ARCANA_AUTOMATION_READY '+(r.master?'is true':'is not true')+' · dispatch mode '+(r.dispatch||'unknown')+(d.forcedDryRun?' (manual dry run)':''));text('repairValue',(r.repair||'unknown').toUpperCase());$('repairValue').style.color=r.repair==='request'?'var(--green)':'var(--amber)';text('repairDetail','ARCANA_REPAIR_MODE='+(r.repair||'unknown')+'. Repair requests also need the master switch, capacity and budget.');
         text('readyValue',d.dispatchReady?'Ready':'Blocked');$('readyValue').style.color=d.dispatchReady?'var(--green)':'var(--amber)';text('readyDetail',d.state+(d.reason?' — '+d.reason:''));text('readyFresh','Dispatcher run '+(d.runId||'?')+' · '+timeAgo(d.checkedAt)+(ageHours(d.checkedAt)>6?' · stale':''));
         const liab=d.liabilities;if(liab){const est=[liab.activeUnits,liab.recentlyFinished,liab.pendingRepairs,liab.candidate].reduce((a,x)=>a+(Number.isFinite(x)?x:0),0);text('liabValue',num(est)+' est. credits');text('liabDetail','Reserved on top of the private 10% reserve: running units '+num(liab.activeUnits)+' · recently finished '+num(liab.recentlyFinished)+' · pending repairs '+num(liab.pendingRepairs)+' · this candidate '+num(liab.candidate)+'. Estimates are added on top of authenticated usage, never substituted for it.');}
         else{text('liabValue','—');text('liabDetail','Per-unit liabilities appear once the dispatcher reaches an admission decision. The 10% reserve always applies.');}
         const action=d.action||(d.billing&&!d.billing.ok?d.billing.action:null);if(!d.dispatchReady||action){$('blockerBox').hidden=false;text('blockerTitle',d.state+(d.reason?': '+d.reason:''));text('blockerAction',action||'See the dispatcher run summary.');}
-        const w=d.workers;if(w){text('wRunning',String(w.running));text('wPending',String(w.pendingPickup));text('wQueued',String(w.queued));text('wDone',String(w.completed));text('wBlocked',String(w.blocked));text('copilotLaneTag',w.running?w.running+' running':'Idle');text('copilotLaneStatus',w.running+' running · '+w.queued+' queued · '+w.blocked+' blocked');const list=$('workerList');list.replaceChildren();const order={working:0,repairing:0,'pending-pickup':1,halted:2,queued:3,review:4};(w.list||[]).slice().sort((a,b)=>(order[a.state]??5)-(order[b.state]??5)||a.n-b.n).forEach(u=>{const st={working:{klass:'running',tag:'amber',label:'Running'},repairing:{klass:'running',tag:'amber',label:'Repairing'},'pending-pickup':{klass:'running',tag:'amber',label:'Pending pickup'},halted:{klass:'failure',tag:'red',label:'Blocked'},queued:{klass:'neutral',tag:'blue',label:'Queued'},review:{klass:'success',tag:'green',label:'Completed'}}[u.state]||{klass:'neutral',tag:'gray',label:u.state};addRow(list,'#'+Number(u.n),[u.reason,u.skip,u.holdsSlot?'holds a slot':'',u.recentlyFinished?'credits may still be billing':''].filter(Boolean).join(' · ')||u.state,ROOT+'/issues/'+Number(u.n),st);});if(!(w.list||[]).length)list.append(e('div','empty','No Copilot work units.'));text('workerMeta','Run '+(d.runId||'?')+' · '+timeAgo(d.checkedAt));if(window.ArcanaAuthorize?.render)window.ArcanaAuthorize.render($('authorizationList'),w.list||[],d.checkedAt);}}
+        const w=workerReport.workers;if(w){text('wRunning',String(w.running));text('wPending',String(w.pendingPickup));text('wQueued',String(w.queued));text('wDone',String(w.completed));text('wBlocked',String(w.blocked));text('copilotLaneTag',w.running?w.running+' running':'Idle');text('copilotLaneStatus',w.running+' running · '+w.queued+' queued · '+w.blocked+' blocked');const list=$('workerList');list.replaceChildren();const order={working:0,repairing:0,'pending-pickup':1,halted:2,queued:3,review:4};(w.list||[]).slice().sort((a,b)=>(order[a.state]??5)-(order[b.state]??5)||a.n-b.n).forEach(u=>{const st={working:{klass:'running',tag:'amber',label:'Running'},repairing:{klass:'running',tag:'amber',label:'Repairing'},'pending-pickup':{klass:'running',tag:'amber',label:'Pending pickup'},halted:{klass:'failure',tag:'red',label:'Blocked'},queued:{klass:'neutral',tag:'blue',label:'Queued'},review:{klass:'success',tag:'green',label:'Completed'}}[u.state]||{klass:'neutral',tag:'gray',label:u.state};addRow(list,'#'+Number(u.n),[u.reason,u.skip,u.holdsSlot?'holds a slot':'',u.recentlyFinished?'credits may still be billing':''].filter(Boolean).join(' · ')||u.state,ROOT+'/issues/'+Number(u.n),st);});if(!(w.list||[]).length)list.append(e('div','empty','No Copilot work units.'));text('workerMeta','Observed '+timeAgo(workerReport.checkedAt)+' · '+(workerReport.source==='read-only-worker-observer'?'independent worker snapshot':'dispatcher report'));if(window.ArcanaAuthorize?.render)window.ArcanaAuthorize.render($('authorizationList'),d.workers?.list||[],d.checkedAt);}}
 
       // COPILOT_PURE_START
       function selectCopilotAssignment(d){
@@ -494,8 +495,9 @@
           controlLastAttempt=Date.now();
           try{
             const st=await fetchStatus();
-            renderBilling(st);if(st.dispatcher)renderDispatcher(st);else renderOpsWorkers(null);renderQueue(st);renderReview(st);
-            if(!summaryOnly)void fetchCopilotAssignment(st.dispatcher?.data||null);
+            const observed=st.workers?.data,dispatched=st.dispatcher?.data;const current=observed?.workers&&Number.isFinite(Date.parse(observed.checkedAt))&&Date.parse(observed.checkedAt)>Date.parse(dispatched?.checkedAt||0)?observed:dispatched||null;
+            renderBilling(st);if(st.dispatcher)renderDispatcher(st);else renderOpsWorkers(current);renderQueue(st);renderReview(st);
+            if(!summaryOnly)void fetchCopilotAssignment(current);
             if(!st.billing&&!st.dispatcher)text('readyDetail','No status comments published yet on issue #78.');
             controlLastRead=Date.now();controlLastError=null;
           }catch(err){
