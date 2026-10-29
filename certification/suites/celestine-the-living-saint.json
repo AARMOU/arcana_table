@@ -1,0 +1,8 @@
+{
+  "key": "celestine-the-living-saint",
+  "name": "Celestine, the Living Saint",
+  "issue": 358,
+  "source": "certification/CelestineTheLivingSaintIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.CelestineTheLivingSaintIndependentCertificationTest",
+  "tests": 7
+}

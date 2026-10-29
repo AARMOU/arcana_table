@@ -12,6 +12,9 @@ Arcana Control's Verify / Approve gate intentionally requires **independent real
 
 ## How to add another card
 
+**Preferred (conflict-free):** add `certification/suites/<key>.json` containing one suite object (same fields as a `suites.json` entry; the file name must equal its `key`) plus the reviewed test source in `certification/`. Do **not** edit `suites.json` or the premerge workflow: the premerge job builds its matrix from the manifest and runs the suites a PR adds or changes against their open Copilot card PR. After the suite merges, `arcana-certification-backfill.yml` re-runs that card PR's latest successful CI so certification runs without a manual re-run.
+
+
 Add one **trusted-main** manifest entry (key, exact Magic card name, its queue issue number, independent Kotlin source, JUnit test class, expected number of cases), and a reviewed test source in `certification/`. No new copy of the YAML workflow, Cloudflare Worker, dispatcher, or agent subscription is needed. Reuse support helpers/mechanic scenarios where appropriate; still test the card's own exceptions, timing, ownership, and negative cases. Validation fails on missing or ambiguous suites and unsafe paths. A card without independent test coverage **remains blocked**, not auto-certified.
 
 Resurrection Orb (#408 / Copilot PR #410) is the initial four-scenario example. Its premerge engine run [#40800975564](https://github.com/AARMOU/arcana_table/actions/runs/40800975564) passed four independent tests against PR #410's exact source SHA `56f1842`. This is evidence for that card, not a general claim that every supported card already has coverage.

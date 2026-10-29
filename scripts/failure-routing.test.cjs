@@ -289,3 +289,15 @@ test('router workflow revisits failures after dispatcher success and keeps share
   new AsyncFunction('github','context','core','require',blocks[0][1].replace(/^            /gm,''));
 });
 
+
+test('one authorizer reads work units once per router invocation, and retries after a failed read', async () => {
+  let listCalls = 0, fail = true;
+  const counting = { rest: { issues: { listForRepo() {} }, pulls: { list() {} } },
+    paginate: async fn => { if (fn === counting.rest.issues.listForRepo) { listCalls++; if (fail) { fail = false; throw Error('503'); } } return []; },
+    graphql: async () => ({}) };
+  const authorize = createAuthorizer({ github: counting, owner: 'o', repo: 'r', env, readBudget });
+  await assert.rejects(authorize({ pr: { body: 'no unit' }, run: { id: 1, head_sha: sha } }), /503/);
+  for (let i = 0; i < 3; i++)
+    assert.equal((await authorize({ pr: { body: 'no unit' }, run: { id: i, head_sha: sha } })).reason, 'no work unit linked to PR');
+  assert.equal(listCalls, 2);
+});

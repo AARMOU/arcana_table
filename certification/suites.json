@@ -24,12 +24,28 @@
       "tests": 6
     },
     {
-      "key": "celestine-the-living-saint",
-      "name": "Celestine, the Living Saint",
-      "issue": 358,
-      "source": "certification/CelestineTheLivingSaintIndependentCertificationTest.kt",
-      "testClass": "com.arcanatable.customcards.CelestineTheLivingSaintIndependentCertificationTest",
-      "tests": 7
+      "key": "blood-for-the-blood-god",
+      "name": "Blood for the Blood God!",
+      "issue": 352,
+      "source": "certification/BloodForTheBloodGodIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.BloodForTheBloodGodIndependentCertificationTest",
+      "tests": 4
+    },
+    {
+      "key": "sporocyst",
+      "name": "Sporocyst",
+      "issue": 417,
+      "source": "certification/SporocystIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.SporocystIndependentCertificationTest",
+      "tests": 5
+    },
+    {
+      "key": "verdant-suns-avatar",
+      "name": "Verdant Sun's Avatar",
+      "issue": 462,
+      "source": "certification/VerdantSunsAvatarIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.VerdantSunsAvatarIndependentCertificationTest",
+      "tests": 5
     }
   ]
 }
