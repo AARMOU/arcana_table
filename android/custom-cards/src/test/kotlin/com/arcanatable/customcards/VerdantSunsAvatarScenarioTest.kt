@@ -2,22 +2,50 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.VerdantSunsAvatar
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.sdk.core.Color
+import com.wingedsheep.sdk.core.Step
 import org.junit.Assert.*
 import org.junit.Test
 
 class VerdantSunsAvatarScenarioTest {
-    // CARDKIT-SCAFFOLD: replace this whole test with real scenarios on the engine, e.g.
-    //   val d = customScenario(VerdantSunsAvatar)            // a real game, card round-tripped through its JSON data
-    //   val p = d.player1
-    //   val card = d.putCardInHand(p, "Verdant Sun's Avatar")
-    //   d.giveMana(p, Color.WHITE); d.giveColorlessMana(p, 2)
-    //   assertNull(d.castSpell(p, card).error)
-    //   d.resolveAll(Choices(yes = true))
-    // Cover, for every line below, the positive case AND a negative/edge case (declined "may",
-    // no legal target, intervening-if false, wrong controller, source gone before resolution):
-    //   - Whenever this creature or another creature you control enters, you gain life equal to that creature's toughness.
     @Test
-    fun scaffoldIsNotImplementedYet() {
-        fail("Verdant Sun's Avatar is a cardkit scaffold: implement its abilities and real scenarios first")
+    fun avatarAndOtherControlledCreatureEntryGainThatCreaturesToughness() {
+        val d = customScenario(VerdantSunsAvatar, "Grizzly Bears")
+        val player = d.player1
+
+        val avatar = d.putCardInHand(player, "Verdant Sun's Avatar")
+        d.giveMana(player, Color.GREEN, 2)
+        d.giveColorlessMana(player, 5)
+        assertNull(d.castSpell(player, avatar).error)
+        d.resolveAll()
+        assertEquals(25, d.getLifeTotal(player))
+
+        val bears = d.putCardInHand(player, "Grizzly Bears")
+        d.giveMana(player, Color.GREEN)
+        d.giveColorlessMana(player, 1)
+        assertNull(d.castSpell(player, bears).error)
+        d.resolveAll()
+        assertEquals(27, d.getLifeTotal(player))
+    }
+
+    @Test
+    fun opponentCreatureEntryDoesNotGainLife() {
+        val d = customScenario(VerdantSunsAvatar, "Grizzly Bears")
+        val player = d.player1
+
+        val avatar = d.putCardInHand(player, "Verdant Sun's Avatar")
+        d.giveMana(player, Color.GREEN, 2)
+        d.giveColorlessMana(player, 5)
+        assertNull(d.castSpell(player, avatar).error)
+        d.resolveAll()
+        assertEquals(25, d.getLifeTotal(player))
+
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = d.player2)
+        val bears = d.putCardInHand(d.player2, "Grizzly Bears")
+        d.giveMana(d.player2, Color.GREEN)
+        d.giveColorlessMana(d.player2, 1)
+        assertNull(d.castSpell(d.player2, bears).error)
+        d.resolveAll()
+        assertEquals(25, d.getLifeTotal(player))
     }
 }
