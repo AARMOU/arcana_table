@@ -68,5 +68,6 @@ jobs:
             }
             core.info(JSON.stringify(result));
             await core.summary.addHeading('Failure routing evidence').addCodeBlock(JSON.stringify(result)).write();
-            if(result.state==='permission-blocked')core.setFailed('PR comment permission missing; no retry issued.');
-            if(result.state==='delivery-uncertain')core.setFailed('Owner-authorized Copilot handoff unconfirmed; repair attempt reserved, never blindly retried.');
+            const outcomes=Array.isArray(result)?result:[result];
+            if(outcomes.some(r=>r.state==='permission-blocked'))core.setFailed('PR comment permission missing; no retry issued.');
+            if(outcomes.some(r=>r.state==='delivery-uncertain'))core.setFailed('Owner-authenticated Copilot handoff unconfirmed; attempt reserved; owner review required.');
