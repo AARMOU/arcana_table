@@ -123,9 +123,16 @@ async function planNext({github,owner,repo,cfg,controlSha,retry=false}) {
   }
   return null;
 }
+function validateOutcome(plan, report) {
+  if (report.schema !== 1 || !['passed','blocked'].includes(report.status) ||
+      report.planHash !== hash(JSON.stringify(plan)) || !Array.isArray(report.gates) ||
+      report.gates.length !== GATES.length || new Set(report.gates.map(g=>g.name)).size !== GATES.length ||
+      report.gates.some(g=>!GATES.includes(g.name)||typeof g.ok!=='boolean'))
+    throw Error('Missing, malformed or wrong-plan destination evidence');
+}
 function validateReport(plan, report, files) {
-  if (report.schema !== 1 || report.status !== 'passed' || report.planHash !== hash(JSON.stringify(plan)) ||
-      !Array.isArray(report.gates) || GATES.some(g => !report.gates.some(x=>x.name===g && x.ok===true)) ||
+  validateOutcome(plan,report);
+  if (report.status !== 'passed' || GATES.some(g => !report.gates.some(x=>x.name===g && x.ok===true)) ||
       report.gates.some(x=>x.ok!==true)) throw Error('Destination validation did not pass every gate');
   const allowed = [plan.paths.source,plan.paths.scenario,REGISTRY,...GENERATED];
   if (!Array.isArray(files) || files.length !== allowed.length ||
@@ -141,6 +148,7 @@ function receiptBody(receipt, reason='') {
       '**Integration blocked.** '+String(reason).replace(/@/g,'＠').slice(0,1400));
 }
 async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,runUrl}) {
+  validateOutcome(plan,report);
   const control = (await github.rest.git.getRef({owner,repo,ref:'heads/main'})).data.object.sha;
   if (control !== plan.controlSha) throw Error('Trusted main advanced; revalidate on next pass');
   const snap = await snapshot(github,owner,repo,plan.pr);
@@ -183,4 +191,4 @@ async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,
   return receipt;
 }
 module.exports={MARKER,TARGET,REGISTRY,GENERATED,GATES,hash,config,validatePolicy,paths,ownerDecision,
-  sourceEligible,snapshot,parseReceipt,receiptFor,planNext,validateReport,receiptBody,publish};
+  sourceEligible,snapshot,parseReceipt,receiptFor,planNext,validateOutcome,validateReport,receiptBody,publish};

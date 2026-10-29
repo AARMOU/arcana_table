@@ -77,7 +77,10 @@ test('report binds destination, exact plan, every gate, file contents and allowl
 });
 test('failed destination tests publish blocker, with zero target/git writes',async()=>{
   const {github,writes}=githubMock();
-  const receipt=await P.publish({...common,github,plan:plan(),report:{status:'blocked',gates:[{name:'independent',ok:false,detail:'wrong owner'}]},files:[],expectedSources:{}});
+  const p=plan();const report={...result(p).report,status:'blocked'};
+  report.gates.find(g=>g.name==='independent').ok=false;
+  report.gates.find(g=>g.name==='independent').detail='wrong owner';
+  const receipt=await P.publish({...common,github,plan:p,report,files:[],expectedSources:{}});
   assert.equal(receipt.status,'blocked');assert.match(receipt.reason,/wrong owner/);
   assert.deepEqual(writes.map(w=>w[0]),['comment','comment']);
 });

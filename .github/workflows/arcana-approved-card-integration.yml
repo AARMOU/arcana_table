@@ -136,10 +136,41 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-  publish:
+  receipt-contract:
     needs: [plan, destination-tests]
+    if: needs.destination-tests.result == 'success' && needs.plan.outputs.eligible == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.control }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: card-integration-result
+          path: result
+      - name: Verify real artifact/report contract without a write token
+        uses: actions/github-script@v7
+        env:
+          PLAN_B64: ${{ needs.plan.outputs.plan }}
+        with:
+          script: |
+            const fs=require('node:fs'), P=require('./scripts/card-integration.cjs');
+            const plan=JSON.parse(Buffer.from(process.env.PLAN_B64,'base64').toString());
+            const report=JSON.parse(fs.readFileSync('result/result/report.json','utf8'));
+            P.validateOutcome(plan,report);
+            if(report.status==='passed') P.validateReport(plan,report,JSON.parse(fs.readFileSync('result/result/files.json','utf8')));
+            const blocked=report.gates.filter(g=>!g.ok).map(g=>g.name+': '+g.detail);
+            core.summary.addHeading('PR #'+plan.pr+' destination result: '+report.status)
+              .addList([...blocked,...(report.failures||[]).slice(0,8)])
+              .addRaw('NO APK. A blocked card is not integrated.').write();
+
+  publish:
+    needs: [plan, destination-tests, receipt-contract]
     # PR premerge probes can test real approved cards but can NEVER write or merge.
-    if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.destination-tests.result == 'success' && needs.plan.outputs.eligible == 'true'
+    if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.receipt-contract.result == 'success' && needs.plan.outputs.eligible == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 12
     permissions:
