@@ -279,6 +279,7 @@ object CustomCards {
         Entry(OblivionSower, "M3C", "Eldrazi Incursion"),
         Entry(SireOfStagnation, "BFZ", "Eldrazi Incursion"),
         Entry(SufferThePast, "ROE", "Eldrazi Incursion"),
+        Entry(WhispererOfTheWilds, "2XM", POOL),
         Entry(ForsakenMonument, "CMM", "Eldrazi Incursion"),
         Entry(EldraziConfluence, "M3C", "Eldrazi Incursion"),
         Entry(SelectiveObliteration, "M3C", "Eldrazi Incursion"),

@@ -277,13 +277,19 @@
    ]
   },
   "Conditions.YouControl": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Eldrazi Monument",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziMonument.kt",
      "lines": 40,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldraziMonumentScenarioTest.kt"
+    },
+    {
+     "card": "Whisperer of the Wilds",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WhispererOfTheWilds.kt",
+     "lines": 43,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WhispererOfTheWildsScenarioTest.kt"
     },
     {
      "card": "Reflecting Pool",
@@ -594,7 +600,7 @@
    ]
   },
   "Costs.Tap": {
-   "count": 40,
+   "count": 41,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -1248,7 +1254,7 @@
    ]
   },
   "Effects.AddMana": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -1267,6 +1273,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Werebear.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WerebearScenarioTest.kt"
+    },
+    {
+     "card": "Whisperer of the Wilds",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WhispererOfTheWilds.kt",
+     "lines": 43,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WhispererOfTheWildsScenarioTest.kt"
     },
     {
      "card": "Jaheira, Friend of the Forest",
@@ -4391,7 +4403,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 57,
+   "count": 58,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4993,7 +5005,7 @@
    ]
   },
   "manaAbility": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5086,7 +5098,7 @@
    ]
   },
   "restrictions": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Sea Gate Wreckage",
@@ -5107,6 +5119,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShrineOfTheForsakenGodsScenarioTest.kt"
     },
     {
+     "card": "Whisperer of the Wilds",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WhispererOfTheWilds.kt",
+     "lines": 43,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WhispererOfTheWildsScenarioTest.kt"
+    },
+    {
      "card": "Sceptre of Eternal Glory",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SceptreOfEternalGlory.kt",
      "lines": 45,
@@ -5117,17 +5135,11 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ReflectingPool.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ReflectingPoolScenarioTest.kt"
-    },
-    {
-     "card": "Raphael, the Muscle",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RaphaelTheMuscle.kt",
-     "lines": 48,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RaphaelTheMuscleScenarioTest.kt"
     }
    ]
   },
   "timing": {
-   "count": 32,
+   "count": 33,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5657,7 +5669,7 @@
    ]
   },
   "TimingRule.ManaAbility": {
-   "count": 29,
+   "count": 30,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -6738,7 +6750,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 101,
+   "count": 102,
    "examples": [
     {
      "card": "Their Name Is Death",
