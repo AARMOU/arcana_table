@@ -110,7 +110,7 @@ async function reconcileFailures({ github, context, authorize = observeOnly,
     { owner, repo, state:'open', per_page:100 });
   const repoId = context.payload.repository.id;
   const heads = new Set(openPrs.filter(p => p.draft && p.head.repo?.id === repoId &&
-    /^(gpt\\/|copilot\\/)/.test(p.head.ref || '')).map(p => p.head.ref + ':' + p.head.sha));
+    /^(gpt\/|copilot\/)/.test(p.head.ref || '')).map(p => p.head.ref + ':' + p.head.sha));
   const results = [], seen = new Set();
   let requested = 0, admissionBlocked = false;
   for (const run of runs.filter(r => WORKFLOWS.has(r.name) &&
