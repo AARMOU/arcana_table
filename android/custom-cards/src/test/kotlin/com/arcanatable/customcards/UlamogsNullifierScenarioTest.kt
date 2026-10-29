@@ -66,6 +66,37 @@ class UlamogsNullifierScenarioTest {
         assertTrue(d.getExileCardNames(d.player2).isEmpty())
     }
 
+    /**
+     * A replacement effect cannot override a spell's uncounterability:
+     * processing still moves two exiled cards as new exile objects, while
+     * Carnage Tyrant must resolve rather than become a countered spell.
+     */
+    @Test fun uncounterableCreatureWithRestInPeaceStillResolvesAfterProcessing() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Rest in Peace")
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Island")
+
+        d.respondToOpponentsSpell(
+            Choices(yes = true, pick = listOf("Sol Ring", "Island")),
+            spellName = "Carnage Tyrant",
+        )
+
+        assertEquals("Uncounterable creature must resolve even when processing succeeds",
+            1, d.permanentsNamed(d.player2, "Carnage Tyrant").size)
+        assertEquals("Rest in Peace must preserve both processed cards in exile",
+            listOf("Island", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
+        assertTrue("Neither processed card may enter the graveyard",
+            d.getGraveyardCardNames(d.player2).isEmpty())
+        val processed = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
+            .filter { it.ownerId == d.player2 &&
+                it.fromZone == com.wingedsheep.sdk.core.Zone.EXILE &&
+                it.toZone == com.wingedsheep.sdk.core.Zone.EXILE }
+            .map { it.entityName }.sorted()
+        assertEquals("Both cards must be processed as new exile objects",
+            listOf("Island", "Sol Ring"), processed)
+    }
+
     @Test fun opponentsSpellCanBeCounteredAfterProcessingTheirExiledCards() {
         val d = setup()
         d.putCardInExile(d.player2, "Sol Ring")
