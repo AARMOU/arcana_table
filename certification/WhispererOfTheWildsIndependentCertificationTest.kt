@@ -69,7 +69,7 @@ class WhispererOfTheWildsIndependentCertificationTest {
         val p = d.player1
         val opponent = d.player2
         val dreadmaw = d.putCreatureOnBattlefield(opponent, "Colossal Dreadmaw")
-        assertTrue(d.projected.getPower(dreadmaw) >= 4)
+        assertEquals(6, d.projected.getPower(dreadmaw))
         val whisperer = d.readyWhisperer(p)
 
         assertNotNull(d.activate(p, whisperer, index = 1).error)
