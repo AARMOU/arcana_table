@@ -69,7 +69,48 @@ test('capacity counts work units once, including pending pickups and repairs', (
   // Finished sessions (issue + its PR) are one unit in review, holding no slot.
   assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [review(63), review(64)], ready, snapshot: snap(), now: NOW }).allowed, true);
   const two = A.readiness(env({ ARCANA_MAX_ACTIVE_UNITS: '2' }));
-  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [working(1)], ready: two, snapshot: snap(), now: NOW }).allowed, true);
+  assert.match(A.admit({ op: 'assign', unit: queued(68), units: [working(1)], ready: two, snapshot: snap(), now: NOW }).reason, /builder slot occupied/);
+  assert.equal(A.admit({ op: 'repair', unit: review(67), units: [working(1)], ready: two, snapshot: snap(), now: NOW }).allowed, true);
+});
+
+test('two-worker mode separates a builder and a repair reservation', () => {
+  const two = A.readiness(env({ ARCANA_MAX_ACTIVE_UNITS: '2' }));
+  const builder = working(1);
+  const waitingRepair = review(67, { ledger: A.parseLedger([bot(A.formatLedger({
+    op: 'repair-request', issue: 67, run: 100, at: iso(NOW - 5 * MIN) }))]) });
+  assert.equal(builder.lane, 'build');
+  assert.equal(waitingRepair.lane, 'repair');
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [waitingRepair], ready: two, snapshot: snap(), now: NOW }).allowed, true);
+  assert.match(A.admit({ op: 'repair', unit: review(66), units: [waitingRepair], ready: two, snapshot: snap(), now: NOW }).reason, /repair slot occupied/);
+  assert.match(A.admit({ op: 'assign', unit: queued(68), units: [builder, waitingRepair], ready: two, snapshot: snap(), now: NOW }).reason, /capacity: 2 of 2/);
+  assert.match(A.admit({ op: 'repair', unit: review(66), units: [builder, waitingRepair], ready: two, snapshot: snap(), now: NOW }).reason, /capacity: 2 of 2/);
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [review(1)], ready: two, snapshot: snap(), now: NOW }).allowed, true);
+});
+
+test('a working repair retains the repair lane and cannot be duplicated', () => {
+  const two = A.readiness(env({ ARCANA_MAX_ACTIVE_UNITS: '2' }));
+  const u = A.deriveUnit({ number: 67, assignedToCopilot: true,
+    sessions: [
+      { event: 'started', at: NOW - 60 * MIN },
+      { event: 'finished', at: NOW - 30 * MIN },
+      { event: 'started', at: NOW - 5 * MIN },
+    ],
+    ledger: A.parseLedger([bot(A.formatLedger({
+      op: 'repair-request', issue: 67, run: 101, at: iso(NOW - 8 * MIN) }))]),
+  }, NOW);
+  assert.deepEqual([u.state, u.holdsSlot, u.lane], ['working', true, 'repair']);
+  assert.match(A.admit({ op: 'repair', unit: review(66), units: [u], ready: two, snapshot: snap(), now: NOW }).reason, /repair slot occupied/);
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [u], ready: two, snapshot: snap(), now: NOW }).allowed, true);
+});
+
+test('stalled and unknown lane reservations fail closed', () => {
+  const two = A.readiness(env({ ARCANA_MAX_ACTIVE_UNITS: '2' }));
+  const stale = A.deriveUnit({ number: 1, assignedToCopilot: true }, NOW);
+  assert.equal(stale.lane, 'build');
+  assert.match(A.admit({ op: 'assign', unit: queued(68), units: [stale], ready: two, snapshot: snap(), now: NOW }).reason, /builder slot occupied/);
+  assert.match(A.admit({ op: 'repair', unit: review(67), units: [{holdsSlot:true}], ready: two, snapshot: snap(), now: NOW }).reason, /unknown lane/);
+  const released = A.deriveUnit({ number: 1, assignedToCopilot:true, labels:['wu:halted'] }, NOW);
+  assert.deepEqual([released.holdsSlot, released.lane], [false, null]);
 });
 
 test('legacy assignment without a session holds a slot as an unreviewed pickup timeout', () => {

@@ -113,11 +113,16 @@ const latest = (xs, pred) => xs.filter(pred).reduce((m, x) => Math.max(m, x.at),
 function deriveUnit(unit, now = Date.now(), { lagMs = DEFAULT_BILLING_LAG_HOURS * 3600000 } = {}) {
   const d = deriveState(unit, now);
   const finished = latest(unit.sessions || [], s => s.event === 'finished');
+  const repairAt = latest(unit.ledger || [], r => r.op === 'repair-request');
+  // A running repair is reported as "working" by GitHub, like a new build.
+  // Recover its lane from the trusted repair ledger and most recent session finish.
+  // Interrupted authorizations are never mistaken for repairs.
+  const lane = d.holdsSlot ? (d.reason !== 'interrupted' && repairAt > finished ? 'repair' : 'build') : null;
   const recentlyFinished = !d.holdsSlot && finished > -Infinity && now - finished < lagMs;
   const released = d.holdsSlot && ['pickup-timeout', 'session-stale'].includes(d.reason) &&
     (unit.labels || []).includes(HALTED_LABEL);
-  if (released) return { ...d, holdsSlot: false, reason: 'owner-released', releasedFrom: d.reason, recentlyFinished: false };
-  return { ...d, recentlyFinished };
+  if (released) return { ...d, lane: null, holdsSlot: false, reason: 'owner-released', releasedFrom: d.reason, recentlyFinished: false };
+  return { ...d, lane, recentlyFinished };
 }
 
 function deriveState(unit, now) {
@@ -314,11 +319,25 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
     const who = holders.map(u => `#${u.number} ${u.state}${u.reason ? ':' + u.reason : ''}`).join(', ');
     return deny(`capacity: ${active} of ${ready.maxUnits} active${who ? ' (' + who + ')' : ''}`);
   }
+  // Determine lane capacity, but still evaluate budget below. This preserves
+  // budget diagnostics and fail-closed spending thresholds even for a busy lane.
+  // The total active-worker cap above continues to reject immediately.
+  let laneDenied = null;
+  if (ready.maxUnits === 2) {
+    if (holders.some(u => u.lane !== 'build' && u.lane !== 'repair'))
+      laneDenied = 'capacity: existing active unit has unknown lane';
+    else {
+      const occupied = holders.filter(u => u.lane === (op === 'assign' ? 'build' : 'repair'));
+      if (occupied.length)
+        laneDenied = `capacity: ${op === 'assign' ? 'builder' : 'repair'} slot occupied by ${occupied.map(u => '#'+u.number).join(', ')}`;
+    }
+  }
   const pendingRepairs = units.filter(u => u.state === 'repairing').length;
   const recentFinished = units.filter(u => u.recentlyFinished && !u.holdsSlot).length;
   const budget = budgetWithReservations({ snapshot, active, pendingRepairs, recentFinished, candidate: op, ready, now });
   if (!budget.maxNewAssignments) return { ...deny('budget: ' + budget.level + (budget.reason ? ' (' + budget.reason + ')' : '')), budget };
   if (budget.level === 'slow' && active > 0) return { ...deny('budget: slow allows one operation at a time'), budget };
+  if (laneDenied) return { ...deny(laneDenied), budget };
   return dryRun ? { allowed: false, dryRun: true, wouldAllow: true, reason: 'dry-run', budget }
     : { allowed: true, reason: 'admitted', budget };
 }
