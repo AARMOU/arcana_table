@@ -29,6 +29,19 @@
     @media(max-width:370px){.hero h2{font-size:22px}.metric{padding:11px}.metric-label{font-size:9px}.lane-grid{grid-template-columns:1fr}.lane{display:flex;gap:12px;align-items:center}.lane h3{margin:0}.lane-status{margin:4px 0}.lane-top .tag{display:none}}
     @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;scroll-behavior:auto!important}}
 
+
+    /* High-priority owner work replaces the decorative overview banner. */
+    .ops-hub{border:1px solid #2c5556;border-radius:19px;padding:20px;background:linear-gradient(135deg,#142734,#101e2b 67%,#122a2d);margin-bottom:19px}
+    .ops-header{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:15px}.ops-header h2{margin:4px 0 0;font-size:24px;letter-spacing:-.035em}
+    .ops-grid{display:grid;grid-template-columns:1.05fr 1.15fr .9fr;gap:12px}.ops-cell{border:1px solid #2a4550;border-radius:14px;background:rgba(6,18,28,.35);padding:16px;min-width:0}
+    .ops-cell h3{margin:0 0 13px;font-size:13px;font-weight:800}.ops-cell-head{display:flex;align-items:center;justify-content:space-between;gap:9px}.ops-cell-head strong{color:var(--teal);font-size:13px;white-space:nowrap}
+    .ops-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ops-buttons .btn{display:flex;flex-direction:column;align-items:center;gap:5px;padding:13px 7px;min-height:72px;font-size:16px;white-space:normal}.ops-count{font-size:11px;opacity:.82}
+    .ops-cell p{color:var(--muted);font-size:11px;line-height:1.45;margin:11px 0 0}.ops-workers{display:grid;gap:9px}.ops-worker{border-left:3px solid var(--amber);padding-left:10px;min-width:0}.ops-worker a{color:var(--ink);font-size:13px;font-weight:750;display:block;overflow-wrap:anywhere}.ops-worker a:hover{color:var(--teal)}.ops-worker span,.ops-placeholder{font-size:11px;color:var(--muted)}
+    .ops-total{display:flex;align-items:baseline;gap:9px}.ops-total strong{font-size:42px;line-height:1;color:var(--teal)}.ops-total span,.ops-counter-label{font-size:11px;color:var(--muted)}
+    .ops-bars{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;align-items:end;min-height:65px;margin-top:12px}.ops-day{display:flex;flex-direction:column;gap:5px;align-items:center;min-width:0}.ops-bar{display:block;width:100%;max-width:28px;min-height:3px;border-radius:5px 5px 2px 2px;background:#4a837d}.ops-day:last-child .ops-bar{background:var(--teal)}.ops-day label{font-size:9px;color:var(--muted);white-space:nowrap}
+    @media(max-width:1150px){.ops-grid{grid-template-columns:1fr 1fr}.ops-grid>.ops-cell:last-child{grid-column:1/-1}.ops-bars{min-height:48px}}
+    @media(max-width:720px){.ops-hub{padding:14px}.ops-header h2{font-size:21px}.ops-grid{grid-template-columns:1fr}.ops-grid>.ops-cell:last-child{grid-column:auto}.ops-cell{padding:14px}.ops-buttons .btn{min-height:70px}.ops-bars{min-height:70px}.ops-header .more-link{font-size:10px}}
+
     .assignment-panel{border-color:#2d5b5b;margin-bottom:20px}
     .assignment-main{padding:18px 21px 20px}
     .assignment-card-name{font-size:21px;font-weight:820;letter-spacing:-.025em;line-height:1.25}
@@ -66,7 +79,17 @@
       <main class="page" id="main">
         <section id="overview" class="view" aria-labelledby="overviewTitle">
           <div class="page-heading"><div><div class="eyebrow" id="todayLabel">ARCANA TABLE // CONTROL</div><h1 id="overviewTitle">Mission overview<span style="color:var(--teal)">.</span></h1><p>Your development command center, one glance at a time.</p></div><div class="statusline" role="status"><span class="pulse" id="connectionDot"></span><span id="connectionText">Connecting to GitHub…</span></div></div>
-          <div class="hero"><div><div class="hero-label">OPERATIONAL OVERVIEW · OWNER-GATED WORK</div><h2>All systems. One command center.</h2><p>Real repository updates without digging through branches, workflow logs, or an 80-comment thread.</p></div><div class="hero-actions"><a class="btn accent" href="https://github.com/AARMOU/arcana_table/issues/81" target="_blank" rel="noopener noreferrer">Open #81 <svg class="icon" viewBox="0 0 24 24"><path d="M7 17 17 7M8 7h9v9"/></svg></a></div></div>
+          <section class="ops-hub" aria-label="Card operations">
+            <div class="ops-header"><div><div class="hero-label">ARCANA CONTROL · OWNER-GATED OPERATIONS</div><h2>Card operations</h2></div><a href="https://github.com/AARMOU/arcana_table/issues/81" target="_blank" rel="noopener noreferrer" class="more-link">Coordination #81 ↗</a></div>
+            <div class="ops-grid">
+              <div class="ops-cell ops-decisions"><h3>Decide what happens next</h3><div class="ops-buttons">
+                <button type="button" class="btn accent" id="quickVerify"><span>✓ Verify</span><span class="ops-count" id="quickVerifyCount">—</span></button>
+                <button type="button" class="btn" id="quickDoIt"><span>↗ Do It</span><span class="ops-count" id="quickDoItCount">—</span></button>
+              </div><p id="opsActionDetail">Verify opens the next card review. Do It takes you to exact-card authorization; nothing starts automatically.</p></div>
+              <div class="ops-cell"><div class="ops-cell-head"><h3>Current workers</h3><strong id="opsWorkerCount">—</strong></div><div id="opsWorkers" class="ops-workers"><span class="ops-placeholder">Checking dispatcher assignments…</span></div><p id="opsWorkerFresh">Dispatcher status, not a live Copilot session feed.</p></div>
+              <div class="ops-cell"><div class="ops-cell-head"><h3>Daily card count</h3><span class="ops-counter-label">Merged</span></div><div class="ops-total"><strong id="dailyCardCount">—</strong><span>today · Mountain Time</span></div><div class="ops-bars" id="dailyBars" aria-label="Last seven days of merged Copilot card pull requests"></div><p id="dailyFresh">Awaiting card integration activity.</p></div>
+            </div>
+          </section>
           <div class="metrics">
             <div class="metric"><div class="metric-top"><span class="metric-label">Open pull requests</span><span class="metric-icon teal">↗</span></div><div class="metric-num" id="prCount">—</div><p class="metric-sub" id="prSub">Checking GitHub…</p></div>
             <div class="metric"><div class="metric-top"><span class="metric-label">Latest CI result</span><span class="metric-icon">✓</span></div><div class="metric-num unknown" id="ciResult">—</div><p class="metric-sub" id="ciSub">Checking workflows…</p></div>
@@ -155,6 +178,74 @@
       const e = (tag, cls, value) => { const node=document.createElement(tag); if(cls) node.className=cls; if(value!==undefined) node.textContent=value; return node; };
       const safelyLink = url => typeof url === 'string' && url.startsWith(ROOT + '/') ? url : ROOT;
       const timeAgo = input => { const time=Date.parse(input); if(!Number.isFinite(time)) return 'time unknown'; const n=Math.max(0,Math.floor((Date.now()-time)/60000)); if(n<1)return 'just now'; if(n<60)return n+'m ago'; if(n<1440)return Math.floor(n/60)+'h ago'; return Math.floor(n/1440)+'d ago'; };
+      // DAILY_CARDS_PURE_START
+      function dayKeyDenver(input){
+        const d=new Date(input);
+        if(!Number.isFinite(d.getTime()))return null;
+        const parts=new Intl.DateTimeFormat('en-US',{timeZone:'America/Denver',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(d);
+        const get=k=>parts.find(p=>p.type===k)?.value;
+        return get('year')+'-'+get('month')+'-'+get('day');
+      }
+      function dailyCardStats(activity,now=new Date()){
+        if(!Array.isArray(activity))return null;
+        const today=dayKeyDenver(now);
+        if(!today)return null;
+        const [y,m,d]=today.split('-').map(Number);
+        const days=Array.from({length:7},(_,i)=>new Date(Date.UTC(y,m-1,d-6+i)).toISOString().slice(0,10));
+        const counts=Object.fromEntries(days.map(day=>[day,0]));
+        const seen=new Set();
+        for(const row of activity){
+          if(!Number.isSafeInteger(row?.pr)||!row.card||seen.has(row.pr))continue;
+          const day=dayKeyDenver(row.mergedAt);
+          if(day&&Object.prototype.hasOwnProperty.call(counts,day)){counts[day]++;seen.add(row.pr);}
+        }
+        return {today:counts[today],total:days.reduce((sum,day)=>sum+counts[day],0),
+          days:days.map(day=>({day,count:counts[day]}))};
+      }
+      // DAILY_CARDS_PURE_END
+      function renderDailyCards(r){
+        const activity=r?.integratedActivity;
+        const fresh=ageHours(r?.checkedAt)<=6;
+        const stats=fresh?dailyCardStats(activity):null;
+        const bars=$('dailyBars');bars.replaceChildren();
+        if(!stats){text('dailyCardCount','—');text('dailyFresh',r?.checkedAt?'Merge activity feed stale or unavailable · '+timeAgo(r.checkedAt):'Awaiting updated review feed; no guesswork.');return;}
+        text('dailyCardCount',String(stats.today));
+        text('dailyFresh',stats.total+' merged over 7 days · Copilot card PRs only · source: latest 100 closed PRs · '+timeAgo(r.checkedAt)+'. Merged ≠ independently certified.');
+        const max=Math.max(1,...stats.days.map(x=>x.count));
+        for(const day of stats.days){
+          const cell=e('div','ops-day');const bar=e('span','ops-bar');
+          bar.style.height=(6+Math.round(39*day.count/max))+'px';
+          bar.title=day.day+': '+day.count+' merged';
+          const label=e('label','',day.day.slice(5));cell.append(bar,label);bars.append(cell);
+        }
+      }
+      let workerSnapshotAt='';
+      function renderOpsWorkers(d){
+        const list=$('opsWorkers');list.replaceChildren();
+        const w=d?.workers,checkedAt=d?.checkedAt;
+        if(!w||ageHours(checkedAt)>6){
+          text('opsWorkerCount','Unverified');
+          text('opsWorkerFresh',w?'Dispatcher snapshot stale · '+timeAgo(checkedAt):'No dispatcher status available');
+          list.append(e('span','ops-placeholder','Worker assignments cannot be confirmed.'));return;
+        }
+        workerSnapshotAt=checkedAt;
+        const units=(w.list||[]).filter(u=>Number.isSafeInteger(u.n)&&['working','repairing','pending-pickup'].includes(u.state)).slice(0,4);
+        text('opsWorkerCount',w.running+' active · '+w.pendingPickup+' pending');
+        text('quickDoItCount',String((w.list||[]).filter(u=>u.state==='queued'&&u.eligible===true).length)+' eligible');
+        text('opsWorkerFresh','Reported '+timeAgo(checkedAt)+' · dispatcher states, not confirmed live sessions.');
+        if(!units.length){list.append(e('span','ops-placeholder','No active assignments reported.'));return;}
+        for(const u of units){
+          const row=e('div','ops-worker');
+          const link=e('a','','#'+u.n+' · loading card…');
+          link.href=ROOT+'/issues/'+u.n;link.target='_blank';link.rel='noopener noreferrer';
+          row.append(link,e('span','',u.state==='repairing'?'Copilot · repair requested':u.state==='working'?'Copilot · assigned/work in progress':'Copilot · awaiting pickup'));list.append(row);
+          void api('/issues/'+u.n).then(({data})=>{
+            if(workerSnapshotAt!==checkedAt||!Number.isSafeInteger(data?.number)||data.number!==u.n)return;
+            const name=String(data.title||'').replace(/^\[Arcana Queue\]\s*/,'').slice(0,100);
+            link.textContent='#'+u.n+' · '+(name||'Card assignment');
+          }).catch(()=>{if(workerSnapshotAt===checkedAt)link.textContent='#'+u.n+' · card title unavailable';});
+        }
+      }
       function changeView(view) { if(!['overview','work','safety'].includes(view)) return; document.querySelectorAll('.view').forEach(n=>{n.hidden=n.id!==view}); document.querySelectorAll('[data-view]').forEach(n=>{if(n.dataset.view===view)n.setAttribute('aria-current','page');else n.removeAttribute('aria-current')}); window.location.hash=view; window.scrollTo({top:0,behavior:'instant'}); }
       document.querySelectorAll('[data-view]').forEach(node=>node.addEventListener('click',()=>changeView(node.dataset.view)));
       document.querySelectorAll('[data-view-link]').forEach(node=>node.addEventListener('click',ev=>{ev.preventDefault();changeView(node.dataset.viewLink)}));
@@ -214,7 +305,7 @@
         text('creditsDetail','Usage band '+(BANDS[level]||'unknown')+' of the monthly AI-credit allowance, 10% reserve included. Exact figures are private: open GitHub billing settings while signed in. AI credits only: premium requests, Actions minutes and ChatGPT usage are separate.');
         const pos={normal:25,warn:62,slow:82,paused:100}[level];$('creditsMeter').style.width=(pos||0)+'%';$('creditsReserveMeter').style.width='0%';
         text('creditsFresh',(lastOk?'Last successful billing check: '+new Date(lastOk.measuredAt).toLocaleString()+' ('+timeAgo(lastOk.measuredAt)+')':'No successful billing check recorded')+(latest.ok?'':' · Latest check failed: '+latest.reason));}
-      function renderDispatcher(st){const d=st.dispatcher?.data;if(!d)return;const r=d.readiness||{};text('masterValue',r.master?'ON':'OFF');$('masterValue').style.color=r.master?'var(--green)':'var(--amber)';text('masterDetail','ARCANA_AUTOMATION_READY '+(r.master?'is true':'is not true')+' · dispatch mode '+(r.dispatch||'unknown')+(d.forcedDryRun?' (manual dry run)':''));text('repairValue',(r.repair||'unknown').toUpperCase());$('repairValue').style.color=r.repair==='request'?'var(--green)':'var(--amber)';text('repairDetail','ARCANA_REPAIR_MODE='+(r.repair||'unknown')+'. Repair requests also need the master switch, capacity and budget.');
+      function renderDispatcher(st){const d=st.dispatcher?.data;if(!d)return;renderOpsWorkers(d);const r=d.readiness||{};text('masterValue',r.master?'ON':'OFF');$('masterValue').style.color=r.master?'var(--green)':'var(--amber)';text('masterDetail','ARCANA_AUTOMATION_READY '+(r.master?'is true':'is not true')+' · dispatch mode '+(r.dispatch||'unknown')+(d.forcedDryRun?' (manual dry run)':''));text('repairValue',(r.repair||'unknown').toUpperCase());$('repairValue').style.color=r.repair==='request'?'var(--green)':'var(--amber)';text('repairDetail','ARCANA_REPAIR_MODE='+(r.repair||'unknown')+'. Repair requests also need the master switch, capacity and budget.');
         text('readyValue',d.dispatchReady?'Ready':'Blocked');$('readyValue').style.color=d.dispatchReady?'var(--green)':'var(--amber)';text('readyDetail',d.state+(d.reason?' — '+d.reason:''));text('readyFresh','Dispatcher run '+(d.runId||'?')+' · '+timeAgo(d.checkedAt)+(ageHours(d.checkedAt)>6?' · stale':''));
         const liab=d.liabilities;if(liab){const est=[liab.activeUnits,liab.recentlyFinished,liab.pendingRepairs,liab.candidate].reduce((a,x)=>a+(Number.isFinite(x)?x:0),0);text('liabValue',num(est)+' est. credits');text('liabDetail','Reserved on top of the private 10% reserve: running units '+num(liab.activeUnits)+' · recently finished '+num(liab.recentlyFinished)+' · pending repairs '+num(liab.pendingRepairs)+' · this candidate '+num(liab.candidate)+'. Estimates are added on top of authenticated usage, never substituted for it.');}
         else{text('liabValue','—');text('liabDetail','Per-unit liabilities appear once the dispatcher reaches an admission decision. The 10% reserve always applies.');}
@@ -306,7 +397,7 @@
       function reviewBadge(r){const n=Number.isSafeInteger(r.awaitingReview)?r.awaitingReview:0;
         const badge=$('reviewBadge');badge.textContent=n?n+' to verify':'Nothing waiting';badge.className='tag '+(n?'blue':'gray');
         document.title=(n?'('+n+') ':'')+document.title.replace(/^\(\d+\) /,'');try{if(navigator.setAppBadge)(n?navigator.setAppBadge(n):navigator.clearAppBadge()).catch(()=>{});}catch{}}
-      function renderReview(st){const r=st.review?.data;const list=$('reviewList');if(!r||!Array.isArray(r.items))return;list.replaceChildren();reviewBadge(r);
+      function renderReview(st){const r=st.review?.data;const list=$('reviewList');if(!r||!Array.isArray(r.items))return;list.replaceChildren();reviewBadge(r);renderDailyCards(r);text('quickVerifyCount',String(Number.isSafeInteger(r.awaitingReview)?r.awaitingReview:0)+' waiting');
         // Phase 2: tap a card for details and Approve / Request Fix (control/review.js); links remain as fallback.
         if(window.ArcanaReview?.render){window.ArcanaReview.render(list,r,reviewBadge);return;}
         if(!r.items.length){list.append(e('div','empty','No Copilot card PRs open.'));return;}
@@ -320,6 +411,16 @@
         text('connectionText',staleFeeds?'GitHub snapshot stale':successful===5?(cachedFeeds?'GitHub cached data':'GitHub data · '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})):successful?'Partial data · '+failures.length+' issue(s)':'GitHub feed unavailable');
         const sourceAt=sourceTimes.length?new Date(Math.min(...sourceTimes)).toLocaleString():null;
         text('fetchedAt',successful?(sourceAt?'Source checked '+sourceAt:'Source time unavailable')+(staleFeeds?' · Stale feeds: '+staleSources.join('; '):'')+(failures.length?' · Some feeds unavailable':''):'Refresh later · '+(failures[0]||'Cached feed unavailable'));$('refresh').disabled=false;$('refreshIcon').classList.remove('spin');loading=false;}
+      $('quickVerify').addEventListener('click',()=>{
+        if(window.ArcanaReview?.openNext?.())return;
+        $('reviewList').scrollIntoView({behavior:'smooth',block:'center'});
+      });
+      $('quickDoIt').addEventListener('click',()=>{
+        const list=$('authorizationList');
+        list.scrollIntoView({behavior:'smooth',block:'start'});
+        const button=Array.from(list.querySelectorAll('button')).find(b=>!b.disabled);
+        if(button)button.focus({preventScroll:true});
+      });
       $('refresh').addEventListener('click',refresh);
       refresh();
     })();
