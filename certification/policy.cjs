@@ -43,6 +43,14 @@ function currentHeadGreen(checks, sha, required) {
   return required.every(name => checks.some(c => c.name === name && c.head_sha === sha &&
     c.status === 'completed' && c.conclusion === 'success'));
 }
+// Copilot titles often append detail ("Add X custom card", "Implement X’s trigger").
+// The exact card binding comes from the trusted queue issue below; the title must
+// still name that card as a whole word, so "Add Xylophone" never matches card "X".
+function titleNames(title, name) {
+  const t = String(title || '');
+  return ['Implement ', 'Add '].some(prefix => t.startsWith(prefix + name) &&
+    /^(?:$|\s|[’']s(?:$|\s))/.test(t.slice(prefix.length + name.length)));
+}
 // Does not trust agent-authored test names, issue claims, status, or filenames.
 function candidate(manifest, {pr, issue, sha, checks, repository = 'AARMOU/arcana_table'}) {
   if (!SHA.test(String(sha)) || !pr || pr.state !== 'open' ||
@@ -52,7 +60,7 @@ function candidate(manifest, {pr, issue, sha, checks, repository = 'AARMOU/arcan
     return null;
   const issueNo = issueFromBody(pr.body);
   const suite = manifest.suites.find(s => s.issue === issueNo &&
-    (pr.title === 'Implement ' + s.name || pr.title === 'Add ' + s.name));
+    titleNames(pr.title, s.name));
   if (!suite || !issue || issue.number !== suite.issue || issue.state !== 'open' ||
       issue.title !== '[Arcana Queue] ' + suite.name + ' — Cardkit SUPPORTED, unclaimed' ||
       !String(issue.body||'').includes('<!-- arcana-auto-queue-v1 -->') ||
@@ -75,4 +83,4 @@ function certOutput(suite, ok) {
       : 'Independent tests failed or current-head prerequisites are not green. No owner approval is permitted.',
   };
 }
-module.exports = { readManifest,validateManifest,candidate,currentHeadGreen,workflowEventEligible,issueFromBody,certOutput,CHECK_NAME };
+module.exports = { readManifest,titleNames,validateManifest,candidate,currentHeadGreen,workflowEventEligible,issueFromBody,certOutput,CHECK_NAME };

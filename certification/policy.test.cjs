@@ -82,6 +82,10 @@ test('Poxwalkers certification accepts only exact current Copilot head and trust
   assert.equal(match()?.key,'poxwalkers');
   assert.equal(match('b'.repeat(40)),null);
   assert.equal(match(sha,checks.slice(0,2)),null);
-  assert.equal(match(sha,checks,{title:'Implement Poxwalkers custom card'}),null);
+  // Descriptive suffixes name the same card; the trusted issue still binds it exactly.
+  assert.equal(match(sha,checks,{title:'Implement Poxwalkers custom card'})?.key,'poxwalkers');
+  assert.equal(match(sha,checks,{title:'Add Poxwalkers’s rise trigger'})?.key,'poxwalkers');
+  for(const title of ['Implement Poxwalkersbane','Add Poxwalkers2','Implement Poxwalkers’sx','Fix Poxwalkers','Implement poxwalkers'])
+    assert.equal(match(sha,checks,{title}),null,title);
   assert.equal(match(sha,checks,{user:{login:'AARMOU'}}),null);
 });
