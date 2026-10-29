@@ -103,6 +103,20 @@ class EldraziIncursionPlayableTest {
             }
             val lifeByTurn = mutableListOf("${state.turnNumber}=${lifeSnapshot()}")
             var lastObservedTurn = state.turnNumber
+            // Coarse, deterministic control-flow fingerprint: per AI step record the
+            // turn, priority/decision owner, and life totals. This is NOT a full
+            // game-state hash, but comparing first divergent turns across identical
+            // B140 JVMs distinguishes control-flow variance from deck-order drift.
+            val actionTrace = StringBuilder()
+            val turnTraceSha256 = mutableListOf<String>()
+            fun recordActionState() {
+                actionTrace.append("$actions|${state.turnNumber}|${state.priorityPlayerId}|" +
+                    "${state.pendingDecision?.playerId}|${lifeSnapshot()}|${state.gameOver}\n")
+            }
+            fun traceFingerprint(): String = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(actionTrace.toString().toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            recordActionState()
             while (!state.gameOver && state.turnNumber <= 30 && actions < 8_000) {
                 val decision = state.pendingDecision
                 val next = if (decision != null) {
@@ -122,9 +136,11 @@ class EldraziIncursionPlayableTest {
                 }
                 actions++
                 state = next ?: break
+                recordActionState()
                 if (state.turnNumber != lastObservedTurn) {
                     lastObservedTurn = state.turnNumber
                     lifeByTurn += "$lastObservedTurn=${lifeSnapshot()}"
+                    turnTraceSha256 += "$lastObservedTurn=${traceFingerprint()}"
                 }
             }
             val stopReason = when {
@@ -137,7 +153,8 @@ class EldraziIncursionPlayableTest {
                 "winner=${state.winnerId} priority=${state.priorityPlayerId} " +
                 "pendingDecisionPlayer=${state.pendingDecision?.playerId} stop=$stopReason " +
                 "ms=${(System.nanoTime() - started) / 1_000_000} " +
-                "lifeByTurn=${lifeByTurn.joinToString(";")}"
+                "lifeByTurn=${lifeByTurn.joinToString(";")} " +
+                "turnControlFlowSha256=${turnTraceSha256.joinToString(";")}"
             println("[eldrazi-incursion] $diagnostic")
             assertTrue("AI mirror must finish: $diagnostic", state.gameOver)
         }
