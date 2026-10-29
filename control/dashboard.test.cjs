@@ -212,3 +212,38 @@ test('daily count is sourced from merged Copilot PR activity rather than incompl
   assert.ok(script.includes('integratedActivity'));
   assert.ok(script.includes('Merged ≠ independently certified'));
 });
+
+test('dispatcher report age is distinct from page freshness and never implies a live agent',()=>{
+  for(const id of ['opsWorkerFresh','opsWorkerChecked','opsWorkerCount'])
+    assert.match(html,new RegExp('id="'+id+'"'),id);
+  assert.ok(script.includes('dispatcher reports working (unconfirmed)'));
+  assert.ok(script.includes('reported working'));
+  assert.ok(script.includes('not live Copilot telemetry'));
+  assert.ok(script.includes('only a dispatcher run can publish a newer report'));
+  const pure = script.split('// WORKER_FRESHNESS_PURE_START')[1]?.split('// WORKER_FRESHNESS_PURE_END')[0];
+  assert.ok(pure);
+  const ctx=vm.createContext({});
+  vm.runInContext(pure,ctx);
+  const freshness=vm.runInContext('workerSnapshotStatus',ctx);
+  const start='2026-10-28T18:00:00Z';
+  const minutes=n=>Date.parse(start)+n*60000;
+  assert.equal(freshness(start,minutes(2)),'recent');
+  assert.equal(freshness(start,minutes(21)),'aging');
+  assert.equal(freshness(start,minutes(59)),'aging');
+  assert.equal(freshness(start,minutes(60)),'stale');
+  assert.equal(freshness('invalid',minutes(20)),'unknown');
+  assert.equal(freshness('2026-10-28T20:00:00Z',minutes(20)),'unknown');
+});
+test('periodic status refresh is bounded, read-only, visibility gated and coalesced',()=>{
+  assert.match(script,/const WORKER_POLL_MS=120000/);
+  assert.match(script,/document\.visibilityState==='visible'&&navigator\.onLine!==false/);
+  assert.match(script,/Date\.now\(\)-controlLastAttempt>=WORKER_POLL_MS/);
+  assert.match(script,/document\.addEventListener\('visibilitychange'/);
+  assert.match(script,/fetchControl\(\{summaryOnly:true\}\)/);
+  assert.match(script,/if\(controlInFlight\)return controlInFlight/);
+  assert.match(script,/if\(!summaryOnly\)void fetchCopilotAssignment/);
+  assert.ok(!script.includes("fetch('/actions/workflows/"));
+  assert.ok(!/method:\s*['"](?:POST|PUT|PATCH|DELETE)/.test(script));
+  const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
+  assert.ok(sw.includes('arcana-control-shell-v13'));
+});
