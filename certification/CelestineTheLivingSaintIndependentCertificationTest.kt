@@ -24,11 +24,17 @@ class CelestineTheLivingSaintIndependentCertificationTest {
 
     @Test
     fun costsFourAndWhiteAndActuallyHasFlyingAndLifelinkInCombat() {
+        val withoutWhite = customScenario(CelestineTheLivingSaint)
+        val unpaid = withoutWhite.putCardInHand(withoutWhite.player1, "Celestine, the Living Saint")
+        withoutWhite.giveColorlessMana(withoutWhite.player1, 5)
+        assertNotNull(withoutWhite.castSpell(withoutWhite.player1, unpaid).error)
+
         val d = customScenario(CelestineTheLivingSaint)
         val card = d.putCardInHand(d.player1, "Celestine, the Living Saint")
-        d.giveColorlessMana(d.player1, 5)
-        assertNotNull(d.castSpell(d.player1, card).error)
+        d.giveColorlessMana(d.player1, 3)
         d.giveMana(d.player1, Color.WHITE)
+        assertNotNull(d.castSpell(d.player1, card).error)
+        d.giveColorlessMana(d.player1, 1)
         assertNull(d.castSpell(d.player1, card).error)
         d.resolveAll()
         val saint = d.findPermanent(d.player1, "Celestine, the Living Saint")!!
@@ -131,6 +137,7 @@ class CelestineTheLivingSaintIndependentCertificationTest {
         val offered = choice!!.legalTargets.values.flatten()
         assertTrue(offered.contains(one))
         assertFalse(offered.contains(two))
+        assertNotNull(d.submitTargetSelection(d.player1, listOf(two)).error)
         assertNull(d.submitTargetSelection(d.player1, listOf(one)).error)
         d.untapPermanent(soulmender)
         assertNull(d.activate(d.player1, soulmender).error)
