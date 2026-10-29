@@ -100,7 +100,8 @@ test('per-suite files beside the manifest register suites without editing the sh
     testClass: 'com.arcanatable.customcards.SampleCardIndependentCertificationTest', tests: 3 };
   fs.writeFileSync(path.join(dir, 'suites', 'sample-card.json'), JSON.stringify(extra));
   const m = P.readManifest(path.join(dir, 'suites.json'));
-  assert.equal(m.suites.length, manifest.suites.length + 1);
+  // Only suites.json was copied: compare with its own array, not the live per-file suites.
+  assert.equal(m.suites.length, JSON.parse(fs.readFileSync(__dirname + '/suites.json', 'utf8')).suites.length + 1);
   assert.deepEqual(m.suites.at(-1), extra);
   assert.deepEqual(P.manifestFiles(path.join(dir, 'suites.json')).map(f => path.basename(f)), ['suites.json', 'sample-card.json']);
   // File name must equal the key, and keys/issues stay unique across all files.
