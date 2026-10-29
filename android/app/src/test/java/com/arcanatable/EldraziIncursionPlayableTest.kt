@@ -77,8 +77,16 @@ class EldraziIncursionPlayableTest {
         val list = OfflineGameSetup.argentumLibraryList(names, commander).mapNotNull(lib::canonical)
         val registry = CardRegistry().apply { register(lib.load(names.toSet())) }
         for (seed in listOf(1, 2, 3)) {
+            // Fingerprint the *actual shuffled deck order* on both sides of the
+            // exact-source AI differential. Matching seeds alone cannot prove
+            // identical opening libraries if canonicalization/order changes.
+            val shuffledDecks = (0..1).map { i -> list.shuffled(Random(seed * 10 + i)) }
+            val deckOrderSha256 = java.security.MessageDigest.getInstance("SHA-256")
+                .digest(shuffledDecks.joinToString("\n---\n") { it.joinToString("\n") }
+                    .toByteArray(Charsets.UTF_8))
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
             val players = (0..1).map { i ->
-                PlayerConfig(if (i == 0) "Incursion A" else "Incursion B", Deck(list.shuffled(Random(seed * 10 + i))),
+                PlayerConfig(if (i == 0) "Incursion A" else "Incursion B", Deck(shuffledDecks[i]),
                     startingLife = 40, commanderCardNames = listOf(lib.canonical(commander)!!))
             }
             val init = GameInitializer(registry).initializeGame(GameConfig(players = players, skipMulligans = true, format = Format.Commander(), startingPlayerIndex = seed % 2))
@@ -125,7 +133,7 @@ class EldraziIncursionPlayableTest {
                 actions >= 8_000 -> "action limit"
                 else -> stepFailure ?: "unknown early exit"
             }
-            val diagnostic = "seed=$seed turn=${state.turnNumber} actions=$actions over=${state.gameOver} " +
+            val diagnostic = "seed=$seed deckOrderSha256=$deckOrderSha256 turn=${state.turnNumber} actions=$actions over=${state.gameOver} " +
                 "winner=${state.winnerId} priority=${state.priorityPlayerId} " +
                 "pendingDecisionPlayer=${state.pendingDecision?.playerId} stop=$stopReason " +
                 "ms=${(System.nanoTime() - started) / 1_000_000} " +
