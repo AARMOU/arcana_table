@@ -34,6 +34,8 @@ jobs:
           allowed = {
             '.github/workflows/b140-six-library-restore-no-apk.yml',
             'engine-upgrade/build140/test_restored_registry.py',
+            'docs/agents/generated/pattern-index.json',
+            'docs/agents/generated/pattern-index.md',
             'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt',
             'android/app/src/main/assets/argentum/custom-cards.index.tsv',
             'android/app/src/main/assets/argentum/custom-cards.jsonl',
