@@ -140,3 +140,23 @@ test('a blocked approved card does not hold up the next eligible card',async()=>
     [{user:{id:41898282,login:'github-actions[bot]'},body:P.receiptBody(blocked)}]:[]});
   assert.equal((await P.planNext({...common,cfg:cfg2,github,controlSha:control})).pr,411);
 });
+test('unrelated main merges during destination tests do not discard a passing integration',async()=>{
+  const live='9'.repeat(40);
+  const setup=compare=>{const m=githubMock();const getRef=m.github.rest.git.getRef;
+    m.github.rest.git.getRef=async a=>a.ref==='heads/main'?{data:{object:{sha:live}}}:getRef(a);
+    m.github.rest.repos.compareCommitsWithBasehead=async({basehead})=>{assert.equal(basehead,control+'...'+live);return {data:compare};};
+    return m;};
+  const {github,writes}=setup({status:'ahead',files:[{filename:'control/index.html'},{filename:'scripts/worker-status.cjs'}]});
+  const p=plan();assert.equal((await P.publish({...common,github,plan:p,...result(p)})).status,'integrated');
+  assert.ok(writes.some(w=>w[0]==='ref'));
+  for(const compare of [{status:'ahead',files:[{filename:'integration/policy.json'}]},
+    {status:'ahead',files:[{filename:'certification/suites.json'}]},
+    {status:'ahead',files:[{filename:'scripts/x.cjs',previous_filename:'scripts/card-integration.cjs'}]},
+    {status:'ahead',files:[{filename:'.github/workflows/arcana-approved-card-integration.yml'}]},
+    {status:'diverged',files:[]},{status:'ahead'},
+    {status:'ahead',files:Array.from({length:300},(_,i)=>({filename:'docs/'+i+'.md'}))}]){
+    const m=setup(compare);
+    await assert.rejects(P.publish({...common,github:m.github,plan:p,...result(p)}),/control changed/);
+    assert.equal(m.writes.length,0,JSON.stringify(compare).slice(0,80));
+  }
+});
