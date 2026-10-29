@@ -1,23 +1,26 @@
-name: Integration comment capability smoke (NO APK)
+name: Stop superseded integration validation (NO APK)
 on:
   push:
     branches: [gpt/integration-comment-scope-smoke-20261028]
 permissions:
   contents: read
-  issues: write
-  pull-requests: write
+  actions: write
 jobs:
-  comment-capability:
+  stop-superseded-read-only-run:
+    if: github.repository == 'AARMOU/arcana_table'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/github-script@v7
         with:
           script: |
-            try {
-              const r=await github.rest.issues.createComment({...context.repo,issue_number:433,
-                body:'Integration publisher permission smoke: this bot can post PR timeline results with the configured publisher scopes. No card result, merge or APK is claimed.'});
-              core.info('PR timeline write capability PASS: '+r.data.html_url);
-            } catch(e) {
-              core.info('Safe permission diagnostic: HTTP '+e.status+'; accepted='+String(e.response?.headers?.['x-accepted-github-permissions']));
-              core.setFailed('PR timeline write capability failed: HTTP '+e.status);
-            }
+            const run_id=40816705613;
+            const run=(await github.rest.actions.getWorkflowRun({...context.repo,run_id})).data;
+            if(run.name!=='Arcana Approved Card Integration (NO APK)' ||
+               run.head_sha!=='0aed4fb070b45d52bbede71a9779e2b0506c6183' || run.event!=='push')
+              throw Error('Refusing cancellation: unexpected workflow/source');
+            if(run.status==='completed'){core.info('Superseded run already finished; nothing cancelled');return;}
+            const jobs=await github.paginate(github.rest.actions.listJobsForWorkflowRun,{...context.repo,run_id,per_page:100});
+            if(jobs.some(j=>j.name==='publish'&&j.status==='in_progress'))
+              throw Error('Refusing cancellation: publisher is active');
+            await github.rest.actions.cancelWorkflowRun({...context.repo,run_id});
+            core.info('Cancelled only superseded read-only integration validation '+run_id+'; corrected main run can proceed.');
