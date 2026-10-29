@@ -63,6 +63,54 @@ class UlamogsNullifierScenarioTest {
         assertTrue(d.getGraveyardCardNames(d.player2).isEmpty())
     }
 
+    /**
+     * Cross-check two independent Oracle constraints together: the targeted
+     * spell belongs to an opponent, and Rest in Peace replaces both the
+     * processing moves and the countered spell's graveyard destination.
+     */
+    @Test fun restInPeaceOpponentSpellIsCounteredAfterProcessingTwoExiles() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Rest in Peace")
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Island")
+
+        d.respondToOpponentsBears(Choices(yes = true, pick = listOf("Sol Ring", "Island")))
+
+        assertTrue("Opponent's targeted spell must be countered",
+            d.permanentsNamed(d.player2, "Grizzly Bears").isEmpty())
+        assertEquals("Rest in Peace must also exile the opponent's countered spell",
+            listOf("Grizzly Bears", "Island", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
+        assertTrue("Neither processed cards nor countered spell enter the graveyard",
+            d.getGraveyardCardNames(d.player2).isEmpty())
+        val reexiled = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
+            .filter { it.ownerId == d.player2 &&
+                it.fromZone == com.wingedsheep.sdk.core.Zone.EXILE &&
+                it.toZone == com.wingedsheep.sdk.core.Zone.EXILE }
+            .map { it.entityName }.sorted()
+        assertEquals("Both selected cards must become new exile objects",
+            listOf("Island", "Sol Ring"), reexiled)
+    }
+
+    /** Declining the optional processing must still allow an opponent's spell to resolve. */
+    @Test fun restInPeaceDeclineOnOpponentSpellPreservesExilesAndLetsItResolve() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Rest in Peace")
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Island")
+
+        d.respondToOpponentsBears(Choices(yes = false))
+
+        assertEquals("Declining cannot counter the opponent's spell",
+            1, d.permanentsNamed(d.player2, "Grizzly Bears").size)
+        assertEquals(listOf("Island", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
+        assertTrue(d.getGraveyardCardNames(d.player2).isEmpty())
+        val reexiled = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
+            .filter { it.ownerId == d.player2 &&
+                it.fromZone == com.wingedsheep.sdk.core.Zone.EXILE &&
+                it.toZone == com.wingedsheep.sdk.core.Zone.EXILE }
+        assertTrue("Declining must not process either exiled object", reexiled.isEmpty())
+    }
+
     @Test fun processingTwoOpponentCardsCountersTheSpell() {
         val d = setup()
         d.putCardInExile(d.player2, "Sol Ring"); d.putCardInExile(d.player2, "Grizzly Bears")
