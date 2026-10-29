@@ -190,3 +190,23 @@ test('slow owner approval disables duplicate taps until first request completes'
   assert.equal(b.requests.filter(x=>x.url.endsWith('/v1/decision')).length,1);
   assert.ok(items(b.body).some(x=>x.textContent.includes('Approved. Recorded on GitHub')));
 });
+
+test('PR-read failure diagnostics tell the owner the next safe action and do not imply approval',async()=>{
+  const cases=[
+    [401,{error:'github-credential-rejected'},'rejected the stored OAuth credential'],
+    [503,{error:'github-rate-limited',upstreamStatus:403},'limiting API requests'],
+    [403,{error:'github-access-denied',upstreamStatus:403},'denied the approval service'],
+    [404,{error:'github-pr-not-accessible'},'returned HTTP 404'],
+    [502,{error:'github-pr-read-failed',upstreamStatus:502},'could not read the PR']
+  ];
+  for(const [decisionStatus,decisionBody,explanation] of cases) {
+    const b=browser({hash:'#review-session=test.session',decisionStatus,decisionBody});
+    await tick();
+    b.open();
+    b.find('Verify / Approve').dispatch('click');
+    await tick();
+    assert.ok(items(b.body).some(x=>x.textContent.includes(explanation)),JSON.stringify(decisionBody));
+    assert.equal(b.requests.filter(x=>x.url.endsWith('/v1/decision')).length,1);
+    assert.ok(items(b.body).some(x=>x.textContent.includes('No approval recorded')));
+  }
+});
