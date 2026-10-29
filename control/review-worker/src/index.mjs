@@ -29,6 +29,10 @@ export const FIX_LABEL = "arcana:owner-fix-requested";
 export const DECISION_MARKER = "<!-- arcana-owner-decision-v1 -->";
 const COPILOT = new Set(["copilot", "copilot-swe-agent[bot]"]);
 const GREEN = new Set(["success", "skipped", "neutral"]);
+// Control-plane runs (queue feeder, worker observer) attach to every Copilot PR head and say
+// nothing about the card; a running or quota-failed one made Verify flap. Keep in sync with
+// scripts/card-checks.cjs. All other checks, including certification, must still be green.
+export const CONTROL_PLANE_CHECKS = new Set(["suggest", "publish", "observe"]);
 
 const enc = new TextEncoder();
 const dec = new TextDecoder();
@@ -153,7 +157,7 @@ export async function decide(api, { pr, sha, decision, note }) {
     const checks = await api(`/commits/${sha}/check-runs?per_page=100`);
     if (!checks.ok) return [502, { error: "checks-unavailable" }];
     const runs = checks.body?.check_runs || [];
-    const notGreen = runs.filter(r => r.status !== "completed" || !GREEN.has(r.conclusion)).map(r => r.name);
+    const notGreen = runs.filter(r => !CONTROL_PLANE_CHECKS.has(r.name) && (r.status !== "completed" || !GREEN.has(r.conclusion))).map(r => r.name);
     if (!runs.length || notGreen.length) return [422, { error: "checks-not-green", checks: notGreen.slice(0, 10) }];
     // A green ordinary job or look-alike check is never a rules certificate.
     // Require trusted GitHub Actions app, exact check name/evidence and exact commit.
@@ -177,7 +181,7 @@ export default {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
     if (url.pathname === "/health") return json({ ok: true, service: "arcana-review", protocol: 1 }, 200, origin);
-    if (url.pathname === "/v1/public/github") return publicGithub(request, { fetchImpl });
+    if (url.pathname === "/v1/public/github") return publicGithub(request, { fetchImpl, token: String(env.GITHUB_PUBLIC_READ_TOKEN || "") });
     if (!env.GITHUB_OAUTH_CLIENT_ID || !env.GITHUB_OAUTH_CLIENT_SECRET || !env.SESSION_SECRET || String(env.SESSION_SECRET).length < 32)
       return json({ error: "not-configured" }, 503, origin);
 

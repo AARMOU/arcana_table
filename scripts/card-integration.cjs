@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const crypto = require('node:crypto');
 const C = require('../certification/policy.cjs');
 const V = require('./verified-certification.cjs');
+const { isCardCheck } = require('./card-checks.cjs');
 const MARKER = '<!-- arcana-card-integration-v1 -->';
 const SHA = /^[a-f0-9]{40}$/;
 const TARGET = 'gpt/b140-card-request-test-apk-20261028';
@@ -54,7 +55,7 @@ function sourceEligible(cfg, snapshot) {
   if (!cfg.policy.enabled || !suite || pr.draft || !ownerDecision(reviews,pr.head.sha,cfg.policy) ||
       V.certification(checks,pr.head.sha) !== 'certified') return null;
   // Pending or failing ancillary checks are not silently discarded.
-  if (checks.some(c => c.head_sha === pr.head.sha &&
+  if (checks.some(c => c.head_sha === pr.head.sha && isCardCheck(c) &&
     (c.status !== 'completed' || !['success','skipped','neutral'].includes(c.conclusion)))) return null;
   const p = paths(suite), allowed = [p.source,p.scenario,p.registry,...GENERATED];
   if (!Array.isArray(files) || files.length < 3 || files.length > allowed.length ||
@@ -149,7 +150,7 @@ function receiptBody(receipt, reason='') {
 }
 // Paths whose change on main means the tested plan no longer reflects trusted policy/code.
 const CONTROL_PATHS = ['integration/','certification/','scripts/card-integration.cjs',
-  'scripts/verified-certification.cjs','scripts/review-inbox.cjs','scripts/control-status.cjs',
+  'scripts/verified-certification.cjs','scripts/card-checks.cjs','scripts/review-inbox.cjs','scripts/control-status.cjs',
   '.github/workflows/arcana-approved-card-integration.yml'];
 // Unrelated owner merges may advance main during long destination tests. Accept only a
 // fast-forward whose complete changed-file list avoids every control path; else fail closed.

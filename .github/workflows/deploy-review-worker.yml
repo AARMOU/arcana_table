@@ -50,10 +50,17 @@ jobs:
           CLIENT_ID: ${{ vars.REVIEW_OAUTH_CLIENT_ID }}
           CLIENT_SECRET: ${{ secrets.REVIEW_OAUTH_CLIENT_SECRET }}
           SESSION_SECRET: ${{ secrets.REVIEW_SESSION_SECRET }}
+          # Optional: read-only token for the public status feed (no repository write scopes).
+          PUBLIC_READ_TOKEN: ${{ secrets.REVIEW_PUBLIC_READ_TOKEN }}
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund wrangler@4.69.0
           npx wrangler deploy --config control/review-worker/wrangler.toml --var "GITHUB_OAUTH_CLIENT_ID:$CLIENT_ID"
           printf '%s' "$CLIENT_SECRET" | npx wrangler secret put GITHUB_OAUTH_CLIENT_SECRET --config control/review-worker/wrangler.toml
           printf '%s' "$SESSION_SECRET" | npx wrangler secret put SESSION_SECRET --config control/review-worker/wrangler.toml
+          if [ -n "${PUBLIC_READ_TOKEN:-}" ]; then
+            printf '%s' "$PUBLIC_READ_TOKEN" | npx wrangler secret put GITHUB_PUBLIC_READ_TOKEN --config control/review-worker/wrangler.toml
+          else
+            echo 'REVIEW_PUBLIC_READ_TOKEN not set: public feed stays anonymous with a 15-minute cache.'
+          fi
           echo 'Review Worker deployed. Check https://arcana-review.arcanamtg.workers.dev/health'

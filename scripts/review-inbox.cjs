@@ -20,6 +20,7 @@ const INTEGRATED_DAYS = 7;
 const GREEN = new Set(['success', 'skipped', 'neutral']);
 const V = require('./verified-certification.cjs');
 const I = require('./card-integration.cjs');
+const { isCardCheck } = require('./card-checks.cjs');
 const DECISION_MARKER = '<!-- arcana-owner-decision-v1 -->';
 
 const unitOf = body => Number((String(body || '').match(/(?:Fixes|Closes|Resolves|Unit:)\s*#(\d+)/i) || [])[1]) || null;
@@ -57,7 +58,7 @@ function abilitiesOf(unitBody) {
 function classify(pr, checkRuns = [], reviews = [], unitBody = '', files = null) {
   const change = classifyChangeFiles(files, pr.title);
   const head = pr.head?.sha || '';
-  const runs = checkRuns.filter(r => r.head_sha === undefined || r.head_sha === head);
+  const runs = checkRuns.filter(r => (r.head_sha === undefined || r.head_sha === head) && isCardCheck(r));
   const checks = Object.fromEntries(runs.map(r => [r.name, r.status === 'completed' ? (r.conclusion || 'unknown') : r.status]));
   const checkRuns2 = runs.slice(0, 12).map(r => ({ name: String(r.name).slice(0, 80), result: r.status === 'completed' ? (r.conclusion || 'unknown') : r.status,
     url: typeof r.html_url === 'string' && r.html_url.startsWith('https://github.com/') ? r.html_url : null }));

@@ -6,6 +6,10 @@
 const GH_REPO_API = 'https://api.github.com/repos/AARMOU/arcana_table';
 const PWA_ORIGIN = 'https://aarmou.github.io';
 const FRESH_S = 15 * 60;
+// With an optional read-only token (secret GITHUB_PUBLIC_READ_TOKEN) the Worker has its own
+// 5000/h GitHub allowance instead of sharing the anonymous 60/h per Cloudflare egress IP, so
+// feeds can be refreshed every minute and the dashboard's Refresh actually shows new data.
+const FRESH_WITH_TOKEN_S = 60;
 const STALE_S = 24 * 60 * 60;
 const REFRESH_S = 60 * 60;
 
@@ -42,7 +46,7 @@ const error = (code, status) => new Response(JSON.stringify({ error: code }), { 
 // Cloudflare Workers Caching operates before this handler runs. A valid 200 response is
 // cached for 15 minutes; expired responses may be served stale for up to 24 hours on
 // origin errors. All error responses and authenticated routes are explicitly no-store.
-export async function publicGithub(request, { fetchImpl = fetch, clock = () => new Date() } = {}) {
+export async function publicGithub(request, { fetchImpl = fetch, clock = () => new Date(), token = '' } = {}) {
   const url = new URL(request.url);
   if (request.method !== 'GET') return error('method-not-allowed', 405);
   const path = url.searchParams.get('path');
@@ -52,11 +56,12 @@ export async function publicGithub(request, { fetchImpl = fetch, clock = () => n
       'Accept': 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
       'User-Agent': 'ArcanaControlPublicFeed/1.0',
+      ...(token ? { Authorization: 'Bearer ' + token } : {}),
     } });
     if (!upstream.ok) return error('github-upstream-http-' + upstream.status, 503);
     const body = await upstream.text();
     JSON.parse(body); // Never cache a GitHub login page, proxy error, or malformed response.
-    return reply(body, 'live', clock().toISOString(), upstream.headers.get('Link'), FRESH_S);
+    return reply(body, 'live', clock().toISOString(), upstream.headers.get('Link'), token ? FRESH_WITH_TOKEN_S : FRESH_S);
   } catch {
     return error('public-github-feed-unavailable', 503);
   }

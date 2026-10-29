@@ -160,3 +160,12 @@ test('unrelated main merges during destination tests do not discard a passing in
     assert.equal(m.writes.length,0,JSON.stringify(compare).slice(0,80));
   }
 });
+
+test('control-plane feeder/observer runs cannot block an approved card; real failing checks still do', () => {
+  const s = snapshot();
+  s.checks.push({ name: 'suggest', head_sha: source, status: 'in_progress', conclusion: null },
+    { name: 'publish', head_sha: source, status: 'completed', conclusion: 'failure' });
+  assert.equal(P.sourceEligible(cfg, s).key, suite.key);
+  s.checks.push({ name: 'coordination-guard', head_sha: source, status: 'completed', conclusion: 'failure' });
+  assert.equal(P.sourceEligible(cfg, s), null);
+});

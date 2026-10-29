@@ -89,3 +89,20 @@ test('no legacy caches.default calls: they cannot be relied on for workers.dev',
   const source = readFileSync(new URL('../src/public-github.mjs', import.meta.url), 'utf8');
   assert.doesNotMatch(source.replace(/^\/\/.*$/gm, ''), /globalThis\.caches\b|caches\.default|cache\.put\(/);
 });
+
+test('optional read token authenticates the upstream read and shortens the edge cache', async () => {
+  let sent;
+  const ok = async (_u, init) => { sent = init.headers; return new Response('[]', { status: 200 }); };
+  const anon = await publicGithub(new Request(url(path)), { fetchImpl: ok });
+  assert.equal(sent.Authorization, undefined);
+  assert.match(anon.headers.get('Cache-Control'), /max-age=900\b/);
+  const authed = await publicGithub(new Request(url(path)), { fetchImpl: ok, token: 'ghp_readonly' });
+  assert.equal(sent.Authorization, 'Bearer ghp_readonly');
+  assert.match(authed.headers.get('Cache-Control'), /max-age=60\b/);
+  // The token never appears in the response.
+  assert.doesNotMatch(JSON.stringify([...authed.headers]) + await authed.text(), /ghp_readonly/);
+  // Disallowed paths are still refused before any upstream call.
+  sent = null;
+  assert.equal((await publicGithub(new Request(url('/user')), { fetchImpl: ok, token: 'ghp_readonly' })).status, 403);
+  assert.equal(sent, null);
+});
