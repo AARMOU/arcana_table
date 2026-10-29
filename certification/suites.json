@@ -30,14 +30,6 @@
       "source": "certification/CelestineTheLivingSaintIndependentCertificationTest.kt",
       "testClass": "com.arcanatable.customcards.CelestineTheLivingSaintIndependentCertificationTest",
       "tests": 7
-    },
-    {
-      "key": "darksteel-monolith",
-      "name": "Darksteel Monolith",
-      "issue": 368,
-      "source": "certification/DarksteelMonolithIndependentCertificationTest.kt",
-      "testClass": "com.arcanatable.customcards.DarksteelMonolithIndependentCertificationTest",
-      "tests": 8
     }
   ]
 }

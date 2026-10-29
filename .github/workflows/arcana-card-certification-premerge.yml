@@ -31,10 +31,6 @@ jobs:
             pr: 360
             issue: 358
             title: Implement Celestine, the Living Saint
-          - key: darksteel-monolith
-            pr: 370
-            issue: 368
-            title: Add Darksteel Monolith
     steps:
       - uses: actions/checkout@v4
         with:

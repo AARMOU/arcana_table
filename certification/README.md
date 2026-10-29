@@ -18,7 +18,7 @@ Resurrection Orb (#408 / Copilot PR #410) is the initial four-scenario example. 
 
 ## Safeguards and limits
 
-### Celestine and Darksteel batch (#81)
+### Celestine certification (#81)
 
 The new Celestine suite was authored from Wizards' release notes and the existing
 `support/` helpers before reading any candidate implementation or candidate tests.
@@ -28,7 +28,6 @@ import names. No worker implementation or worker test source was read.
 | Card / candidate | Cases | Independent behavior checks |
 | --- | ---: | --- |
 | Celestine, the Living Saint / #360 | 7 | Casting/flying/lifelink, zero-value targets, gross life gain and exact value boundary, controller/type/turn restrictions, target choice before later life gain |
-| Darksteel Monolith / #370 | 8 | Existing independent suite copied byte-for-byte from #443 at `4d19f738c0aae474b913d6a6fa7a51fd1da50d86` |
 
 Rules sources: [Commander Masters Release Notes](https://magic.wizards.com/en/news/feature/commander-masters-release-notes)
 and [Warhammer 40,000 Release Notes](https://magic.wizards.com/en/news/feature/warhammer-40000-commander-release-notes-2022-09-19).
@@ -38,8 +37,10 @@ SHA with raw JUnit XML. This PR's green policy checks alone cannot certify a car
 **Known blocked card:** #443 demonstrated that Monolith cannot grant its free cast
 on an opponent's turn. Its failing scenario is preserved, with no exception in
 the runner or certification policy. Do not approve #370 on ordinary CI alone.
-The reused Monolith suite has the authorship/review history documented in #443;
-it is not claimed as newly blind-authored in this batch.
+The existing #443 retains Monolith's independent suite and registration. It was
+re-run unchanged at `f79b95dc` (7/8 pass; opponent-turn permission fails) and is kept
+separate so it cannot prevent review of Celestine's passing suite. No Monolith
+scenario, expectation, runner requirement or implementation is weakened.
 
 - The default-branch workflow requires a fresh completed Cardkit/Android event; a completed historical CI run alone won't activate a newly registered suite.
 - Only the trusted manifest's explicit suites unlock approvals. Current matching requires queue-feeder provenance `arcana-auto-queue-v1` and the expected Copilot integration base. Other worker types need an separately designed pathway.
