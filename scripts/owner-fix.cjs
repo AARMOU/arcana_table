@@ -10,6 +10,7 @@
 // and NO worker starts. The label is always consumed so a decision is processed exactly once.
 const A = require('./admission.cjs');
 const { createAuthorizer } = require('./failure-routing.cjs');
+const { createCopilotDelivery } = require('./copilot-delivery.cjs');
 
 const FIX_LABEL = 'arcana:owner-fix-requested';
 const DECISION_MARKER = '<!-- arcana-owner-decision-v1 -->';
@@ -27,13 +28,14 @@ function ownerFixReview(reviews, head, owner) {
   return last && last.state === 'CHANGES_REQUESTED' && String(last.body || '').startsWith(DECISION_MARKER) ? last : null;
 }
 
-async function routeOwnerFixes({ github, owner, repo, env, readBudget, runId, authorizer }) {
+async function routeOwnerFixes({ github, owner, repo, env, readBudget, runId, authorizer, delivery }) {
   const ownerLc = String(owner).toLowerCase();
   // Filter locally as well: never act on an issue that does not actually carry the label.
   const labeled = (await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', labels: FIX_LABEL, per_page: 100 }))
     .filter(i => (i.labels || []).some(l => (l?.name || l) === FIX_LABEL));
   if (!labeled.length) return [];
   const authorize = authorizer || createAuthorizer({ github, owner, repo, env, readBudget });
+  const sender = delivery || createCopilotDelivery({owner,repo,token:env?.COPILOT_DISPATCH_TOKEN});
   const prs = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', per_page: 100 });
   const results = [];
   for (const unit of labeled.filter(i => !i.pull_request).slice(0, MAX_PER_RUN)) {
@@ -56,11 +58,19 @@ async function routeOwnerFixes({ github, owner, repo, env, readBudget, runId, au
     if (!review) { await done('no-current-fix-request', { pr: pr.number }); continue; }
     const fingerprint = `owner-review-id:${review.id}\nhead-sha:${pr.head.sha}`;
     const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: pr.number, per_page: 100 });
-    if (comments.some(c => isOurs(c) && String(c.body || '').startsWith(ROUTED_MARKER) && c.body.includes(fingerprint))) {
+    if (comments.some(c => (isOurs(c) ||
+      (String(c.user?.login || '').toLowerCase() === ownerLc &&
+        A.TRUSTED_ASSOCIATIONS.includes(c.author_association))) &&
+      String(c.body || '').startsWith(ROUTED_MARKER) && c.body.includes(fingerprint))) {
       await done('already-routed', { pr: pr.number }); continue;
     }
     const note = neutralize(String(review.body || '').split('\n').filter(l => !l.startsWith(DECISION_MARKER) && !l.startsWith('sha:')).join('\n').trim());
-    const decision = await authorize({ pr, run: { id: runId, head_sha: pr.head.sha } });
+    // Verify the owner-token identity before paid admission. Missing/mismatched
+    // credentials produce a non-spending observation, not a bot-authored mention.
+    const proof = await sender.preflight();
+    const decision = proof.ok ?
+      await authorize({ pr, run: { id: runId, head_sha: pr.head.sha } }) :
+      {allowed:false,reason:proof.reason};
     const allowed = decision.allowed === true;
     const body = [ROUTED_MARKER, fingerprint,
       allowed ? '@copilot The owner reviewed this exact commit in Arcana Control and requested changes. Fix exactly what is described below, keep every existing test assertion and exact Oracle behavior, and add a regression test for the problem.'
@@ -72,8 +82,16 @@ async function routeOwnerFixes({ github, owner, repo, env, readBudget, runId, au
     // Re-check the head right before posting.
     const fresh = (await github.rest.pulls.get({ owner, repo, pull_number: pr.number })).data;
     if (fresh.state !== 'open' || fresh.head.sha !== pr.head.sha) { await done('stale-before-post', { pr: pr.number }); continue; }
-    if (allowed) await decision.record();
-    await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
+    if (allowed) {
+      await decision.record();
+      const posted = await sender.post({issue_number:pr.number,body});
+      if (!posted.ok) {
+        await done('delivery-uncertain', {pr:pr.number,reason:posted.reason});
+        continue;
+      }
+    } else {
+      await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
+    }
     await done(allowed ? 'repair-requested' : 'observed-only', { pr: pr.number, reason: decision.reason || null });
   }
   return results;
