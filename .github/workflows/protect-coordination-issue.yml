@@ -1,0 +1,41 @@
+name: Protect coordination issue 81
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+  issues:
+    types: [closed]
+
+permissions:
+  contents: read
+  issues: read
+  pull-requests: read
+
+jobs:
+  coordination-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject automatic closing references and report unexpected closure
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_PATH: ${{ github.event_path }}
+          REPO: ${{ github.repository }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const event = JSON.parse(fs.readFileSync(process.env.EVENT_PATH, 'utf8'));
+          if (process.env.EVENT_NAME === 'issues') {
+            if (event.issue?.number === 81) {
+              console.error('ALERT: permanent coordination issue #81 was closed. Inspect issue timeline and reopen only after owner authorization.');
+              process.exitCode = 1;
+            }
+          } else {
+            const text = [event.pull_request?.body || '', event.pull_request?.title || ''].join('\n');
+            const autoClose = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\s+(?:(?:AARMOU\/arcana_table)?#81|https:\/\/github\.com\/AARMOU\/arcana_table\/issues\/81)\b/ig;
+            if (autoClose.test(text)) {
+              console.error('PR attempts to automatically close permanent coordination issue #81. Close a scoped work issue instead.');
+              process.exitCode = 1;
+            }
+          }
+          NODE
