@@ -35,6 +35,10 @@ jobs:
             pr: 419
             issue: 417
             title: Add Sporocyst with Ravenous and Spore Chimney
+          - key: whisperer-of-the-wilds
+            pr: 465
+            issue: 464
+            title: Add Whisperer of the Wilds
     steps:
       - uses: actions/checkout@v4
         with:
