@@ -40,12 +40,12 @@
       "tests": 5
     },
     {
-      "key": "whisperer-of-the-wilds",
-      "name": "Whisperer of the Wilds",
-      "issue": 464,
-      "source": "certification/WhispererOfTheWildsIndependentCertificationTest.kt",
-      "testClass": "com.arcanatable.customcards.WhispererOfTheWildsIndependentCertificationTest",
-      "tests": 6
+      "key": "verdant-suns-avatar",
+      "name": "Verdant Sun's Avatar",
+      "issue": 462,
+      "source": "certification/VerdantSunsAvatarIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.VerdantSunsAvatarIndependentCertificationTest",
+      "tests": 5
     }
   ]
 }
