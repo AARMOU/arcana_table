@@ -27,25 +27,26 @@ class UlamogsNullifierScenarioTest {
      * Flash timing and ownership must also work when the targeted spell belongs
      * to an opponent, not only when responding to our own spell.
      */
-    private fun GameTestDriver.respondToOpponentsBears(c: Choices) {
+    private fun GameTestDriver.respondToOpponentsSpell(c: Choices, spellName: String = "Grizzly Bears") {
         passPriorityUntil(com.wingedsheep.sdk.core.Step.PRECOMBAT_MAIN, player2)
-        val bears = putCardInHand(player2, "Grizzly Bears")
-        giveMana(player2, Color.GREEN); giveColorlessMana(player2, 1)
-        assertNull(castSpell(player2, bears).error)
+        val spell = putCardInHand(player2, spellName)
+        if (spellName == "Sol Ring") giveColorlessMana(player2, 1)
+        else { giveMana(player2, Color.GREEN); giveColorlessMana(player2, 1) }
+        assertNull(castSpell(player2, spell).error)
         assertEquals("Caster retains priority after casting", player2, priorityPlayer)
         assertNull(passPriority(player2).error)
         assertEquals("Nullifier controller must receive priority", player1, priorityPlayer)
         val nullifier = putCardInHand(player1, "Ulamog's Nullifier")
         giveMana(player1, Color.BLUE); giveMana(player1, Color.BLACK); giveColorlessMana(player1, 2)
         assertNull(castSpell(player1, nullifier).error)
-        resolveAll(c.copy(targets = listOf(bears)))
+        resolveAll(c.copy(targets = listOf(spell)))
     }
 
     @Test fun opponentsSpellCanBeCounteredAfterProcessingTheirExiledCards() {
         val d = setup()
         d.putCardInExile(d.player2, "Sol Ring")
         d.putCardInExile(d.player2, "Island")
-        d.respondToOpponentsBears(Choices(yes = true, pick = listOf("Sol Ring", "Island")))
+        d.respondToOpponentsSpell(Choices(yes = true, pick = listOf("Sol Ring", "Island")))
         assertEquals(1, d.permanentsNamed(d.player1, "Ulamog's Nullifier").size)
         assertTrue("Opponent's spell was countered", d.permanentsNamed(d.player2, "Grizzly Bears").isEmpty())
         assertEquals(listOf("Grizzly Bears", "Island", "Sol Ring"),
@@ -57,9 +58,38 @@ class UlamogsNullifierScenarioTest {
         val d = setup()
         d.putCardInExile(d.player2, "Sol Ring")
         d.putCardInExile(d.player2, "Island")
-        d.respondToOpponentsBears(Choices(yes = false))
+        d.respondToOpponentsSpell(Choices(yes = false))
         assertEquals(1, d.permanentsNamed(d.player2, "Grizzly Bears").size)
         assertEquals(listOf("Island", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
+        assertTrue(d.getGraveyardCardNames(d.player2).isEmpty())
+    }
+
+    /** Nullifier can target any spell, not just a creature spell. */
+    @Test fun opponentsArtifactSpellIsCounteredAfterProcessingTwoExiles() {
+        val d = setup()
+        d.putCardInExile(d.player2, "Island")
+        d.putCardInExile(d.player2, "Grizzly Bears")
+        d.respondToOpponentsSpell(
+            Choices(yes = true, pick = listOf("Island", "Grizzly Bears")),
+            spellName = "Sol Ring",
+        )
+        assertTrue("The opponent's artifact spell must be countered",
+            d.permanentsNamed(d.player2, "Sol Ring").isEmpty())
+        assertEquals(listOf("Grizzly Bears", "Island", "Sol Ring"),
+            d.getGraveyardCardNames(d.player2).sorted())
+        assertTrue("Exactly two opponent-owned exiles were processed",
+            d.getExileCardNames(d.player2).isEmpty())
+    }
+
+    /** Declining processing cannot counter an artifact spell either. */
+    @Test fun decliningProcessingOfOpponentsArtifactSpellLetsItResolve() {
+        val d = setup()
+        d.putCardInExile(d.player2, "Island")
+        d.putCardInExile(d.player2, "Grizzly Bears")
+        d.respondToOpponentsSpell(Choices(yes = false), spellName = "Sol Ring")
+        assertEquals(1, d.permanentsNamed(d.player2, "Sol Ring").size)
+        assertEquals(listOf("Grizzly Bears", "Island"),
+            d.getExileCardNames(d.player2).sorted())
         assertTrue(d.getGraveyardCardNames(d.player2).isEmpty())
     }
 
@@ -74,7 +104,7 @@ class UlamogsNullifierScenarioTest {
         d.putCardInExile(d.player2, "Sol Ring")
         d.putCardInExile(d.player2, "Island")
 
-        d.respondToOpponentsBears(Choices(yes = true, pick = listOf("Sol Ring", "Island")))
+        d.respondToOpponentsSpell(Choices(yes = true, pick = listOf("Sol Ring", "Island")))
 
         assertTrue("Opponent's targeted spell must be countered",
             d.permanentsNamed(d.player2, "Grizzly Bears").isEmpty())
@@ -98,7 +128,7 @@ class UlamogsNullifierScenarioTest {
         d.putCardInExile(d.player2, "Sol Ring")
         d.putCardInExile(d.player2, "Island")
 
-        d.respondToOpponentsBears(Choices(yes = false))
+        d.respondToOpponentsSpell(Choices(yes = false))
 
         assertEquals("Declining cannot counter the opponent's spell",
             1, d.permanentsNamed(d.player2, "Grizzly Bears").size)
