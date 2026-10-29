@@ -1,0 +1,46 @@
+name: Arcana Card Review Inbox Refresh
+# Independent of the queue feeder. Read-only on cards, no dispatcher, credit
+# budget, approval, or worker launch. Only updates one public review-status comment.
+on:
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_run:
+    workflows: ['Arcana Independent Card Certification']
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: arcana-review-inbox-refresh
+  cancel-in-progress: false
+
+jobs:
+  review:
+    name: Publish independently verified card review status
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: write
+      checks: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Build exact-head review inbox and update issue 78
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const R = require('./scripts/review-inbox.cjs');
+            const S = require('./scripts/control-status.cjs');
+            const payload = await R.buildReviewInbox({github, ...context.repo});
+            const result = await S.publishStatus({github, ...context.repo,
+              kind:'review',payload,summary:R.inboxSummary(payload)});
+            core.info('Review inbox published: ' + result);
+            core.info('Ready for owner review: ' + payload.awaitingReview);
+            if (result.startsWith('failed')) core.setFailed('Review inbox status publication failed: ' + result);

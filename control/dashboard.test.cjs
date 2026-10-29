@@ -306,3 +306,26 @@ test('dashboard never treats arbitrary edge 503 as permission to bypass its publ
   await assert.rejects(context.callApi('/issues/78/comments?per_page=100&page=1'),/GitHub feed HTTP 503/);
   assert.equal(direct,0);
 });
+
+test('independent review refresh requires no Copilot worker, dispatcher or paid authorization',()=>{
+  const flow=fs.readFileSync(path.join(__dirname,'../.github/workflows/arcana-card-review-inbox-refresh.yml'),'utf8');
+  assert.match(flow,/workflow_run:/);
+  assert.match(flow,/Arcana Independent Card Certification/);
+  assert.match(flow,/cron: '\*\/15 \* \* \* \*'/);
+  assert.match(flow,/workflow_dispatch:/);
+  assert.match(flow,/github\.ref == 'refs\/heads\/main'/);
+  assert.match(flow,/R\.buildReviewInbox/);
+  assert.match(flow,/S\.publishStatus/);
+  assert.match(flow,/kind:'review'/);
+  assert.match(flow,/if \(result\.startsWith\('failed'\)\)/);
+  assert.doesNotMatch(flow,/createWorkflowDispatch|arcana-card-dispatcher|arcana:authorize-once|GITHUB_OAUTH_CLIENT_SECRET|ARCANA_AI_CREDIT_BUDGET/);
+});
+test('signed-out card authorization falls back to a fresh public GitHub issue when edge is unavailable',()=>{
+  const source=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
+  assert.match(source,/const response = await fetch\(API \+ '\/v1\/public\/github\?path='/);
+  assert.match(source,/\.catch\(\(\) => null\)/);
+  assert.match(source,/if \(!info \|\| \(info\.state === 'open' && verdict\.ok/);
+  assert.match(source,/cache: 'no-store', headers: \{ Accept:/);
+  assert.match(source,/if \(!direct\?\.ok\) throw Error\('Fresh issue state unavailable'\)/);
+  assert.match(source,/button\.disabled = true;[\s\S]*Duplicate approval blocked/);
+});
