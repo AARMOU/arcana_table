@@ -1,0 +1,110 @@
+name: B140 restore orphaned library cards - exact-head proof (NO APK)
+on:
+  push:
+    branches:
+      - gpt/b140-restore-six-registry-collisions-20261028
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: b140-six-registry-proof-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  exact-head-registry-and-engine:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify confirmed B140 ancestry, scope and branch source pin
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=310f7dd6a7f1829aa90955af02c2cd48fb8d1a61
+          git merge-base --is-ancestor "$base" HEAD
+          actual="$(git ls-remote https://github.com/AARMOU/arcana_table.git refs/heads/gpt/b140-card-request-test-apk-20261028 | cut -f1)"
+          test "$actual" = "$base" || { echo "::error::Owner-confirmed source moved; reverify numbered build"; exit 1; }
+          git diff --check "$base" HEAD
+          git diff --name-only "$base" HEAD | tee /tmp/b140-six-changed
+          python3 - <<'PY'
+          from pathlib import Path
+          paths = Path('/tmp/b140-six-changed').read_text().splitlines()
+          allowed = {
+            '.github/workflows/b140-six-library-restore-no-apk.yml',
+            'engine-upgrade/build140/test_restored_registry.py',
+            'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt',
+            'android/app/src/main/assets/argentum/custom-cards.index.tsv',
+            'android/app/src/main/assets/argentum/custom-cards.jsonl',
+          }
+          stems = ('BlackMarketConnections', 'CommissarSeverinaRaine',
+                   'JaheiraFriendOfTheForest', 'ScurryOak', 'TataruTaru',
+                   'WaywardSwordtooth')
+          allowed.update(f'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/{s}.kt'
+                         for s in stems)
+          assert set(paths) == allowed, f'unexpected or missing changes: {set(paths) ^ allowed}'
+          print('PASS: B140-only reversible source and export diff, no APK/runtime JAR')
+          PY
+      - name: Test registry/export parity and negative fixtures
+        run: python3 -m unittest engine-upgrade/build140/test_restored_registry.py -v
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Re-export authoritative Argentum DSL cards; require tracked asset parity
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          git diff --exit-code -- app/src/main/assets/argentum/custom-cards.index.tsv app/src/main/assets/argentum/custom-cards.jsonl
+      - name: Six existing positive/negative Argentum scenarios
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:test \
+            --tests 'com.arcanatable.customcards.BlackMarketConnectionsScenarioTest' \
+            --tests 'com.arcanatable.customcards.CommissarSeverinaRaineScenarioTest' \
+            --tests 'com.arcanatable.customcards.JaheiraFriendOfTheForestScenarioTest' \
+            --tests 'com.arcanatable.customcards.ScurryOakScenarioTest' \
+            --tests 'com.arcanatable.customcards.TataruTaruScenarioTest' \
+            --tests 'com.arcanatable.customcards.WaywardSwordtoothScenarioTest'
+      - name: Three independently failing B140 Android regressions
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
+            --tests 'com.arcanatable.CustomDecksOfflineTest.tokensWinUsesCustomCardsAndOnlyLeavesOutGoblinWelder' \
+            --tests 'com.arcanatable.DeckSupportTest.cardsDoNotInheritKeywordLabelsFromCreatedTokensOrAnimationEffects' \
+            --tests 'com.arcanatable.NewPremadeDecksTest.everyCardResolves'
+      - name: Summarize actual JUnit XML (no compile-only success claims)
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          for label, folder in [
+            ('custom', Path('android/custom-cards/build/test-results/test')),
+            ('android', Path('android/app/build/test-results/testDebugUnitTest')),
+          ]:
+            files = sorted(folder.glob('TEST-*.xml'))
+            counts = {k: 0 for k in ('tests','failures','errors','skipped')}
+            for f in files:
+              root = ET.parse(f).getroot()
+              for k in counts: counts[k] += int(root.get(k, '0'))
+              for case in root.iter('testcase'):
+                for kind in ('failure','error'):
+                  for failure in case.findall(kind):
+                    print(f'{label}: {case.get("classname")}.{case.get("name")}: {kind}: {failure.get("message")}')
+            print(f'{label}: files={len(files)} {counts}')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b140-six-registry-junit-${{ github.sha }}
+          path: |
+            android/custom-cards/build/test-results/test/TEST-*.xml
+            android/app/build/test-results/testDebugUnitTest/TEST-*.xml
+          if-no-files-found: warn
