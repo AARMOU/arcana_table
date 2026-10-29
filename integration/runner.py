@@ -61,6 +61,24 @@ def registry_addition(patch, symbol):
     return lines[0][1:]
 
 
+def merge_registry(destination, source, addition, symbol):
+    """Insert the one approved Entry without conflicting with other approved additions."""
+    if re.search(r'\bEntry\(\s*' + re.escape(symbol) + r'\s*,', destination):
+        raise Blocked('Card is already registered on destination')
+    lines = source.splitlines(keepends=True)
+    matches = [i for i, line in enumerate(lines) if line.rstrip('\r\n') == addition]
+    if len(matches) != 1:
+        raise Blocked('Approved registry insertion is ambiguous')
+    at = matches[0]
+    for line in lines[at + 1:]:
+        if re.match(r'\s*Entry\(', line) and destination.count(line) == 1:
+            return destination.replace(line, addition + '\n' + line, 1)
+    for line in reversed(lines[:at]):
+        if re.match(r'\s*Entry\(', line) and destination.count(line) == 1:
+            return destination.replace(line, line + addition + '\n', 1)
+    raise Blocked('Card-only forward-port conflict: no unique registry anchor remains')
+
+
 def prepare(plan, candidate):
     candidate = Path(candidate).resolve()
     source_paths = validate_plan(plan)
@@ -78,13 +96,17 @@ def prepare(plan, candidate):
         if mode != '100644':
             raise Blocked('Source is not a regular UTF-8 file: ' + path)
     registry_patch = call(['git', 'diff', ancestor, plan['sourceSha'], '--', REGISTRY], candidate, True)
-    registry_addition(registry_patch, plan['paths']['symbol'])
-    patch = call(['git', 'diff', '--binary', ancestor, plan['sourceSha'], '--', *source_paths], candidate, True)
+    addition = registry_addition(registry_patch, plan['paths']['symbol'])
+    registry_source = call(['git', 'show', plan['sourceSha'] + ':' + REGISTRY], candidate, True)
+    registry_path = candidate / REGISTRY
+    merged_registry = merge_registry(registry_path.read_text(), registry_source, addition, plan['paths']['symbol'])
+    patch = call(['git', 'diff', '--binary', ancestor, plan['sourceSha'], '--', *source_paths[:2]], candidate, True)
     result = subprocess.run(['git', 'apply', '--check', '-'], cwd=candidate, input=patch, text=True,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     if result.returncode:
         raise Blocked('Card-only forward-port conflict: ' + result.stdout[-1800:])
     subprocess.run(['git', 'apply', '-'], cwd=candidate, input=patch, text=True, check=True)
+    registry_path.write_text(merged_registry, encoding='utf-8')
     return {path: (candidate / path).read_text(encoding='utf-8') for path in source_paths}
 
 

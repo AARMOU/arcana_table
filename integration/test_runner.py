@@ -69,6 +69,15 @@ class ForwardPortTests(unittest.TestCase):
         with self.assertRaisesRegex(runner.Blocked, 'not clean'):
             runner.prepare(self.plan, self.candidate)
 
+    def test_registry_accepts_other_integrated_cards_without_overwriting_them(self):
+        old = 'object Registry {\n    val all = listOf(\n        Entry(Existing, "SET", "Deck"),\n    )\n}\n'
+        source = old.replace('        Entry(Existing', '        Entry(Example, "SET", "Deck"),\n        Entry(Existing')
+        destination = old.replace('        Entry(Existing', '        Entry(PreviouslyApproved, "SET", "Deck"),\n        Entry(Existing')
+        merged = runner.merge_registry(destination, source, '        Entry(Example, "SET", "Deck"),', 'Example')
+        self.assertIn('Entry(PreviouslyApproved', merged)
+        self.assertIn('Entry(Example', merged)
+        self.assertEqual(merged.replace('        Entry(Example, "SET", "Deck"),\n', ''), destination)
+
     def test_wrong_base_and_unsafe_paths_rejected(self):
         for patch in ({'baseSha': self.head}, {'target': 'main'}, {'paths': {**self.plan['paths'], 'source': '../outside'}}):
             with self.subTest(patch=patch), self.assertRaises(runner.Blocked):
