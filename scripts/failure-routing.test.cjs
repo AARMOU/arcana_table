@@ -109,7 +109,7 @@ test('scheduled backfill upgrades an observation only when admitted',async()=>{
 test('scheduled backfill caps paid requests at one per tick',async()=>{
   const x=fixture({runs:[{id:12,workflow_id:4,name:'Arcana Cardkit',conclusion:'failure',
     event:'push',head_branch:'copilot/cards',head_sha:sha,head_repository:{id:1}},
-    {id:13,workflow_id:4,name:'Arcana Cardkit',conclusion:'failure',
+    {id:13,workflow_id:5,name:'Arcana Cardkit',conclusion:'failure',
     event:'push',head_branch:'copilot/cards',head_sha:sha,head_repository:{id:1}}]});
   const r=await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize});
   assert.deepEqual(r,[{run:12,state:'repair-requested'},{run:13,state:'observed-only'}]);
@@ -123,6 +123,23 @@ test('scheduled backfill respects capacity denial without consuming a repair',as
   assert.equal(x.records.length,0);
   assert.equal(x.calls.length,1);
   assert.match(x.calls[0].body,/capacity: 1 of 1 active/);
+});
+
+test('scheduled backfill skips stale heads without spending admission work',async()=>{
+  const x=fixture({pr:{head:{ref:'copilot/cards',sha:'b'.repeat(40),repo:{id:1}}}});
+  const r=await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize});
+  assert.deepEqual(r,[]);assert.equal(x.records.length,0);assert.equal(x.calls.length,0);
+});
+test('shared capacity denial short-circuits subsequent paid admissions',async()=>{
+  const x=fixture({runs:[{id:12,workflow_id:4,name:'Arcana Cardkit',conclusion:'failure',
+    event:'push',head_branch:'copilot/cards',head_sha:sha,head_repository:{id:1}},
+    {id:13,workflow_id:5,name:'Arcana Development CI',conclusion:'failure',
+    event:'push',head_branch:'copilot/cards',head_sha:sha,head_repository:{id:1}}]});
+  let admissions=0;
+  const authorize=async()=>{admissions++;return {allowed:false,reason:'capacity: 1 of 1 active'};};
+  const r=await reconcileFailures({github:x.github,context:x.context,authorize});
+  assert.equal(admissions,1);assert.equal(r.length,2);
+  assert.ok(r.every(x=>x.state==='observed-only'));assert.equal(x.records.length,0);
 });
 
 // createAuthorizer against a fake GitHub with one finished unit (#67) and its PR.
