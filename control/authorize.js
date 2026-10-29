@@ -101,12 +101,13 @@ function render(container, units, checkedAt) {
       }
       // Signed-out visitors may see public status, but cannot authorize without login.
       const response = await fetch(API + '/v1/public/github?path=' +
-        encodeURIComponent('/issues/' + unit.n), { cache: 'no-store' });
-      let info = response.ok ? await response.json() : null;
-      // The public Worker may serve a 15-minute-old issue after authorization.
-      // Recheck an apparently unapproved candidate at GitHub before offering a button.
-      if (info?.state === 'open' && verdict.ok &&
-          !(info.labels || []).some(l => l.name === 'arcana:authorize-once')) {
+        encodeURIComponent('/issues/' + unit.n)).catch(() => null);
+      let info = response?.ok ? await response.json().catch(() => null) : null;
+      // Edge GitHub quota can fail while the owner's browser can still read the
+      // public issue. Always verify current live issue state BEFORE offering any
+      // authorization: a cached issue alone must never enable duplicate approval.
+      if (!info || (info.state === 'open' && verdict.ok &&
+          !(info.labels || []).some(l => l.name === 'arcana:authorize-once'))) {
         const direct = await fetch('https://api.github.com/repos/AARMOU/arcana_table/issues/' +
           unit.n, { cache: 'no-store', headers: { Accept: 'application/vnd.github+json' } }).catch(() => null);
         if (!direct?.ok) throw Error('Fresh issue state unavailable');
