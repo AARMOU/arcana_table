@@ -50,3 +50,46 @@ jobs:
           path: |
             android/custom-cards/build/test-results/test/
             android/custom-cards/build/reports/tests/test/
+
+  incursion-ai-differential:
+    # Diagnostic-only comparison; never mask a failing AI game or count it as playable.
+    # Both runs execute the same existing B140 mirror-game test with different card sources.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: b140-control
+            ref: 310f7dd6a7f1829aa90955af02c2cd48fb8d1a61
+          - label: nullifier-candidate
+            ref: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+          persist-credentials: false
+      - name: Show exact checked-out source
+        run: |
+          git rev-parse HEAD
+          git diff --exit-code
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Execute identical Eldrazi Incursion AI mirror on each exact source
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.EldraziIncursionPlayableTest.incursionMirrorAiGame' --info
+      - name: Preserve seed, assertion and stack trace for differential triage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: incursion-ai-mirror-${{ matrix.label }}-${{ github.sha }}
+          retention-days: 14
+          path: |
+            android/app/build/test-results/test/
+            android/app/build/reports/tests/testDebugUnitTest/
