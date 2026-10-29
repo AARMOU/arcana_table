@@ -1,0 +1,56 @@
+name: Commander cast history engine probe (NO APK)
+on:
+  push:
+    branches:
+      - gpt/commander-cast-history-primitive-20261028
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  pinned-engine-probe:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check source and patch scope
+        run: |
+          set -euo pipefail
+          echo "Arcana source $(git rev-parse HEAD)"
+          test -f engine-upgrade/proposals/0017-commander-cast-history-sdk.patch
+          git diff --check
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: argentum-engine
+          persist-credentials: false
+      - name: Audit existing B140 Argentum patches, then apply isolated proposal
+        run: |
+          set -euo pipefail
+          python3 engine-upgrade/audit_patches.py
+          git -C argentum-engine apply --check ../engine-upgrade/proposals/0017-commander-cast-history-sdk.patch
+          git -C argentum-engine apply ../engine-upgrade/proposals/0017-commander-cast-history-sdk.patch
+          git -C argentum-engine diff --check
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Compile AI and execute actual rules-engine cast-history tests
+        working-directory: argentum-engine
+        run: |
+          set -euo pipefail
+          ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :rules-engine:test --tests com.wingedsheep.engine.mana.CommanderCastHistoryAmountTest \
+            :rules-engine:test --tests com.wingedsheep.engine.mana.CommanderTaxTest \
+            :ai:compileKotlin
+      - name: Preserve focused JUnit results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: commander-cast-history-junit
+          path: argentum-engine/rules-engine/build/test-results/test/*.xml
+          if-no-files-found: warn
