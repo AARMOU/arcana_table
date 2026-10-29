@@ -319,20 +319,25 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
     const who = holders.map(u => `#${u.number} ${u.state}${u.reason ? ':' + u.reason : ''}`).join(', ');
     return deny(`capacity: ${active} of ${ready.maxUnits} active${who ? ' (' + who + ')' : ''}`);
   }
-  // With the two-unit mode enabled, reserve one build slot and one repair slot.
-  // Unknown lanes fail closed so legacy/incomplete work cannot double-spend a slot.
+  // Determine lane capacity, but still evaluate budget below. This preserves
+  // budget diagnostics and fail-closed spending thresholds even for a busy lane.
+  // The total active-worker cap above continues to reject immediately.
+  let laneDenied = null;
   if (ready.maxUnits === 2) {
     if (holders.some(u => u.lane !== 'build' && u.lane !== 'repair'))
-      return deny('capacity: existing active unit has unknown lane');
-    const occupied = holders.filter(u => u.lane === (op === 'assign' ? 'build' : 'repair'));
-    if (occupied.length)
-      return deny(`capacity: ${op === 'assign' ? 'builder' : 'repair'} slot occupied by ${occupied.map(u => '#'+u.number).join(', ')}`);
+      laneDenied = 'capacity: existing active unit has unknown lane';
+    else {
+      const occupied = holders.filter(u => u.lane === (op === 'assign' ? 'build' : 'repair'));
+      if (occupied.length)
+        laneDenied = `capacity: ${op === 'assign' ? 'builder' : 'repair'} slot occupied by ${occupied.map(u => '#'+u.number).join(', ')}`;
+    }
   }
   const pendingRepairs = units.filter(u => u.state === 'repairing').length;
   const recentFinished = units.filter(u => u.recentlyFinished && !u.holdsSlot).length;
   const budget = budgetWithReservations({ snapshot, active, pendingRepairs, recentFinished, candidate: op, ready, now });
   if (!budget.maxNewAssignments) return { ...deny('budget: ' + budget.level + (budget.reason ? ' (' + budget.reason + ')' : '')), budget };
   if (budget.level === 'slow' && active > 0) return { ...deny('budget: slow allows one operation at a time'), budget };
+  if (laneDenied) return { ...deny(laneDenied), budget };
   return dryRun ? { allowed: false, dryRun: true, wouldAllow: true, reason: 'dry-run', budget }
     : { allowed: true, reason: 'admitted', budget };
 }
