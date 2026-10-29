@@ -32,6 +32,7 @@ function decisionMessage(status, body) {
   if (status === 200 || status === 207) return { ok: true, text: body?.state === 'approved'
     ? 'Approved. Recorded on GitHub for this exact commit. Integration review is next; nothing was merged or built.'
     : 'Fix requested. Recorded on GitHub; the dispatcher will request a repair only if budget, reserve and capacity allow.' + (body?.warning ? ' (Repair queue not reached: ' + body.warning + ')' : '') };
+  if (status === 0) return { ok: false, uncertain: true, text: 'No response from the review service. Approval is NOT confirmed; check the PR reviews before retrying.' };
   if (status === 401) return { ok: false, signIn: true, text: 'Please sign in again (owner only).' };
   if (status === 409 && body?.error === 'stale-commit') return { ok: false, stale: true, text: 'A newer commit arrived. Nothing was recorded. Refresh and review the new commit.' };
   if (status === 422 && body?.error === 'not-certified') return { ok: false, text: 'Cannot approve: this exact commit has not passed independent certification (' + (body.certification || 'not-run') + '). You can still request a fix.' };
@@ -174,7 +175,7 @@ function openSheet(item) {
   const close = el('button', 'btn', 'Close'); close.type = 'button'; close.addEventListener('click', () => { sheet.close(); refreshSheet = () => {}; });
   const head = el('div'); head.style.cssText = 'display:flex;justify-content:space-between;gap:8px;align-items:start';
   head.append(el('h2', '', String(item.card || 'Card')), close);
-  const status = el('p', '', (LABELS[item.state] || item.state) + ' · ' + CERT[item.certification || 'not-run']);
+  const statusLabel = el('p', '', (LABELS[item.state] || item.state) + ' · ' + CERT[item.certification || 'not-run']);
   const link = el('a', '', 'PR #' + item.pr + ' · commit ' + String(item.headSha || '').slice(0, 12) + ' ↗');
   link.href = safeUrl(item.url); link.target = '_blank'; link.rel = 'noopener noreferrer';
   const oracle = el('p', 'muted', 'Loading Oracle rules…');
@@ -188,22 +189,33 @@ function openSheet(item) {
   const signIn = el('button', 'btn', 'Sign in with GitHub (owner)'); signIn.type = 'button';
   signIn.addEventListener('click', () => { location.href = REVIEW_API + '/auth/login?return=' + encodeURIComponent(PWA_RETURN); });
   const actions = el('div'); actions.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:8px';
+  // Keep the decision result separate from session notices. Previously refresh()
+  // replaced every server error with "Signed in ... No card decision", making taps
+  // appear inert. The result remains visible until the sheet is closed or retried.
+  let decisionResult = null;
+  let submitting = false;
   const refresh = () => {
     const session = store.get();
     const ownerReady = !!session && authenticated;
-    approve.disabled = !ownerReady || !canApprove(item) || serviceUp !== true;
-    reject.disabled = !ownerReady || !canDecide(item) || serviceUp !== true;
+    approve.disabled = submitting || !ownerReady || !canApprove(item) || serviceUp !== true;
+    reject.disabled = submitting || !ownerReady || !canDecide(item) || serviceUp !== true;
     signIn.hidden = ownerReady;
-    signIn.disabled = serviceUp === false;
-    if (serviceUp === false) msg.textContent = 'Review service unavailable. No card decision can be sent.';
+    signIn.disabled = submitting || serviceUp === false;
+    if (submitting) msg.textContent = 'Submitting to GitHub…';
+    else if (decisionResult) msg.textContent = decisionResult.text;
+    else if (serviceUp === false) msg.textContent = 'Review service unavailable. No card decision can be sent.';
     else if (authNotice) msg.textContent = authNotice;
     else if (!session) msg.textContent = 'Sign in with GitHub to approve or request a fix.';
     else msg.textContent = ownerReady && serviceUp === true && approveBlocked(item) ? approveBlocked(item) : 'Validating your owner session…';
   };
   refreshSheet = refresh;
   async function send(decision) {
-    const session = store.get(); if (!session || !authenticated || serviceUp !== true) return refresh();
-    approve.disabled = reject.disabled = true; msg.textContent = 'Recording…';
+    if (submitting) return;
+    const session = store.get();
+    if (!session || !authenticated || serviceUp !== true) { refresh(); return; }
+    submitting = true;
+    decisionResult = null;
+    refresh();
     let status = 0, body = null;
     try {
       const res = await fetch(REVIEW_API + '/v1/decision', { method: 'POST', cache: 'no-store',
@@ -211,17 +223,22 @@ function openSheet(item) {
         body: JSON.stringify({ pr: item.pr, sha: item.headSha, decision, note: note.value }) });
       status = res.status; body = await res.json().catch(() => null);
     } catch { status = 0; }
-    const m = decisionMessage(status, body);
-    msg.textContent = m.text;
-    if (m.signIn) { store.set(null); authenticated = false; authNotice = m.text; }
-    if (m.ok && body?.state) { item.state = body.state; item.problems = body.state === 'changes-requested' ? ['You requested a fix on this commit'] : [];
-      if (data) { data.awaitingReview = data.items.filter(isReadyForOwner).length; render(listEl, data); onChange?.(data); } }
+    const result = decisionMessage(status, body);
+    decisionResult = result;
+    submitting = false;
+    if (result.signIn) { store.set(null); authenticated = false; authNotice = result.text; }
+    if (result.ok && body?.state) {
+      item.state = body.state;
+      statusLabel.textContent = (LABELS[item.state] || item.state) + ' · ' + (CERT[item.certification || 'not-run'] || '');
+      item.problems = body.state === 'changes-requested' ? ['You requested a fix on this commit'] : [];
+      if (data) { data.awaitingReview = data.items.filter(isReadyForOwner).length; render(listEl, data); onChange?.(data); }
+    }
     refresh();
   }
   approve.addEventListener('click', () => send('approve'));
   reject.addEventListener('click', () => send('request-fix'));
   actions.append(approve, reject, signIn);
-  sheet.append(head, status, link,
+  sheet.append(head, statusLabel, link,
     section('Oracle rules', [oracle], ''),
     section('Implemented abilities (requested)', item.abilities || [], 'Not listed for this card.'),
     section('Automated checks (this commit)', checkItems, 'No checks reported yet.'),

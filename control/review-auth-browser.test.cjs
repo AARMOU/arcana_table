@@ -35,7 +35,8 @@ const memory = blocked => {
     removeItem(key) { if (blocked) throw Error('storage-blocked'); map.delete(key); },
   };
 };
-function browser({ hash='', localBlocked=false, sessionBlocked=false, authStatus=200 }={}) {
+function browser({ hash='', localBlocked=false, sessionBlocked=false, authStatus=200,
+  decisionStatus=200, decisionBody={ok:true,state:'approved'}, decisionThrows=false, decisionHold=null }={}) {
   const localStorage=memory(localBlocked),sessionStorage=memory(sessionBlocked);
   const requests=[], listeners={}, location={ hash, pathname:'/arcana_table/control/',search:'',href:'' };
   const body = new Element('body');
@@ -46,6 +47,11 @@ function browser({ hash='', localBlocked=false, sessionBlocked=false, authStatus
     if(url.endsWith('/health')) return new Response(JSON.stringify({ok:true}));
     if(url.endsWith('/v1/session')) return new Response(JSON.stringify(authStatus===200 ?
       {ok:true,login:'AARMOU',expiresAt:1900000000} : {error:'sign-in-required'}),{status:authStatus});
+    if(url.endsWith('/v1/decision')) {
+      if(decisionHold) await decisionHold;
+      if(decisionThrows) throw Error('network-blocked');
+      return new Response(JSON.stringify(decisionBody),{status:decisionStatus});
+    }
     if(url.includes('api.scryfall.com')) return new Response('{}');
     throw Error('Unexpected network call');
   };
@@ -127,4 +133,60 @@ test('expired or invalid session clears it and never enables review writes',asyn
   assert.equal(b.find('Sign in with GitHub (owner)').hidden,false);
   assert.ok(items(b.body).some(x=>x.textContent.includes('expired or could not be verified')));
   assert.equal(b.requests.some(x=>x.opts?.method==='POST'),false);
+});
+
+test('server rejection stays visible after pressing Verify / Approve, instead of being replaced by sign-in notice',async()=>{
+  const b=browser({hash:'#review-session=test.session',decisionStatus:422,
+    decisionBody:{error:'checks-not-green',checks:['publish']}});
+  await tick();
+  b.open();
+  assert.equal(b.find('Verify / Approve').disabled,false);
+  b.find('Verify / Approve').dispatch('click');
+  await tick();
+  assert.ok(items(b.body).some(x=>x.textContent.includes('Cannot approve: checks are not all passing (publish)')));
+  assert.ok(!items(b.body).some(x=>x.textContent==='Signed in as GitHub owner. No card decision has been submitted.'));
+  assert.equal(b.find('Verify / Approve').disabled,false,'a confirmed rejection may be retried after the blocker is fixed');
+  const posts=b.requests.filter(x=>x.url.endsWith('/v1/decision'));
+  assert.equal(posts.length,1);
+  assert.equal(JSON.parse(posts[0].opts.body).pr,360);
+  assert.equal(JSON.parse(posts[0].opts.body).sha,'a'.repeat(40));
+  assert.equal(JSON.parse(posts[0].opts.body).decision,'approve');
+});
+
+test('one successful owner approval displays persistent confirmation and disables the old exact-head button',async()=>{
+  const b=browser({hash:'#review-session=test.session'});
+  await tick();
+  b.open();
+  b.find('Verify / Approve').dispatch('click');
+  await tick();
+  assert.ok(items(b.body).some(x=>x.textContent.includes('Approved. Recorded on GitHub for this exact commit.')));
+  assert.equal(b.find('Verify / Approve').disabled,true);
+  assert.equal(b.requests.filter(x=>x.url.endsWith('/v1/decision')).length,1);
+});
+
+test('unconfirmed network response warns to inspect GitHub rather than reporting generic sign-in status',async()=>{
+  const b=browser({hash:'#review-session=test.session',decisionThrows:true});
+  await tick();
+  b.open();
+  b.find('Verify / Approve').dispatch('click');
+  await tick();
+  assert.ok(items(b.body).some(x=>x.textContent.includes('Approval is NOT confirmed; check the PR reviews before retrying.')));
+  assert.equal(b.requests.filter(x=>x.url.endsWith('/v1/decision')).length,1);
+});
+
+test('slow owner approval disables duplicate taps until first request completes',async()=>{
+  let release;
+  const hold=new Promise(resolve=>{release=resolve;});
+  const b=browser({hash:'#review-session=test.session',decisionHold:hold});
+  await tick();
+  b.open();
+  const button=b.find('Verify / Approve');
+  button.dispatch('click');
+  assert.equal(button.disabled,true);
+  button.dispatch('click');
+  assert.ok(items(b.body).some(x=>x.textContent.includes('Submitting to GitHub')));
+  release();
+  await tick();
+  assert.equal(b.requests.filter(x=>x.url.endsWith('/v1/decision')).length,1);
+  assert.ok(items(b.body).some(x=>x.textContent.includes('Approved. Recorded on GitHub')));
 });
