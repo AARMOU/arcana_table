@@ -106,7 +106,7 @@ diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/CommanderC
 new file mode 100644
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/CommanderCastHistoryAmountTest.kt
-@@ -0,0 +1,128 @@
+@@ -0,0 +1,157 @@
 +package com.wingedsheep.engine.mana
 +
 +import com.wingedsheep.engine.handlers.EffectContext
@@ -232,6 +232,35 @@ new file mode 100644
 +        read(driver.state, opponent) shouldBe 0
 +        driver.bothPass()
 +        read(driver.state, owner) shouldBe 1 // history persists after the spell resolves
++        // Move the resolved original commander back to its command zone as test setup.
++        // Each subsequent cast still uses the real authoritative action processor.
++        fun returnResolvedCommanderToCommandZone() {
++            val permanent = driver.findPermanent(owner, commander.name)
++                ?: error("Expected resolved commander on battlefield")
++            var next = driver.state
++            for (key in next.zones.keys.filter { permanent in next.getZone(it) }) {
++                next = next.removeFromZone(key, permanent)
++            }
++            driver.replaceState(next.addToZone(ZoneKey(owner, Zone.COMMAND), permanent))
++        }
++        returnResolvedCommanderToCommandZone()
++        val second = driver.state.getZone(ZoneKey(owner, Zone.COMMAND)).single()
++        driver.giveMana(owner, Color.WHITE, 1)
++        driver.giveColorlessMana(owner, 1)
++        driver.castSpell(owner, second).error shouldNotBe null // commander tax +2
++        read(driver.state, owner) shouldBe 1 // rejected cast does not commit
++        driver.giveColorlessMana(owner, 2)
++        driver.castSpell(owner, second).error shouldBe null
++        read(driver.state, owner) shouldBe 2
++        read(driver.state, opponent) shouldBe 0
++        driver.bothPass()
++        returnResolvedCommanderToCommandZone()
++        val third = driver.state.getZone(ZoneKey(owner, Zone.COMMAND)).single()
++        driver.giveMana(owner, Color.WHITE, 1)
++        driver.giveColorlessMana(owner, 5) // commander tax +4
++        driver.castSpell(owner, third).error shouldBe null
++        read(driver.state, owner) shouldBe 3
++        read(driver.state, opponent) shouldBe 0
 +    }
 +
 +})
