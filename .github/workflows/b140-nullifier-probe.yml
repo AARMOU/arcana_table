@@ -73,6 +73,22 @@ jobs:
         run: |
           git rev-parse HEAD
           git diff --exit-code
+      - name: Use the same diagnostic-only AI mirror test on both engine sources
+        # The historical B140 test has no per-turn life trace. Without this overlay
+        # a failing B140 control cannot distinguish a long game from stalled combat.
+        # Only the test fixture is overlaid: B140 runtime/cards/assets stay untouched.
+        run: |
+          set -euo pipefail
+          fixture=android/app/src/test/java/com/arcanatable/EldraziIncursionPlayableTest.kt
+          git fetch --no-tags --depth=1 origin "${{ github.sha }}"
+          git show "${{ github.sha }}:$fixture" > "$fixture"
+          expected=$(git rev-parse "${{ github.sha }}:$fixture")
+          actual=$(git hash-object "$fixture")
+          test "$actual" = "$expected"
+          echo "Mirror test fixture SHA: $actual"
+          echo "Engine source SHA: $(git rev-parse HEAD)"
+          git diff --name-only
+          test "$(git diff --name-only | grep -v -x "$fixture" | wc -l)" -eq 0
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
