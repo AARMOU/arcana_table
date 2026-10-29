@@ -86,7 +86,7 @@
                 <button type="button" class="btn accent" id="quickVerify"><span>✓ Verify</span><span class="ops-count" id="quickVerifyCount">—</span></button>
                 <button type="button" class="btn" id="quickDoIt"><span>↗ Do It</span><span class="ops-count" id="quickDoItCount">—</span></button>
               </div><p id="opsActionDetail">Verify opens the next card review. Do It takes you to exact-card authorization; nothing starts automatically.</p></div>
-              <div class="ops-cell"><div class="ops-cell-head"><h3>Current workers</h3><strong id="opsWorkerCount">—</strong></div><div id="opsWorkers" class="ops-workers"><span class="ops-placeholder">Checking dispatcher assignments…</span></div><p id="opsWorkerFresh">Dispatcher status, not a live Copilot session feed.</p></div>
+              <div class="ops-cell"><div class="ops-cell-head"><h3>Current workers</h3><strong id="opsWorkerCount">—</strong></div><div id="opsWorkers" class="ops-workers"><span class="ops-placeholder">Checking dispatcher assignments…</span></div><p id="opsWorkerFresh" role="status">Dispatcher status, not a live Copilot session feed.</p><p id="opsWorkerChecked">App refresh: waiting for first read.</p></div>
               <div class="ops-cell"><div class="ops-cell-head"><h3>Daily card count</h3><span class="ops-counter-label">Merged</span></div><div class="ops-total"><strong id="dailyCardCount">—</strong><span>today · Mountain Time</span></div><div class="ops-bars" id="dailyBars" aria-label="Last seven days of merged Copilot card pull requests"></div><p id="dailyFresh">Awaiting card integration activity.</p></div>
             </div>
           </section>
@@ -219,30 +219,63 @@
           const label=e('label','',day.day.slice(5));cell.append(bar,label);bars.append(cell);
         }
       }
-      let workerSnapshotAt='';
+      // WORKER_FRESHNESS_PURE_START
+      // Reporting age is not agent-session age. Do not claim stale slots are active.
+      function workerSnapshotStatus(checkedAt, now=Date.now()){
+        const measured=Date.parse(checkedAt);
+        if(!Number.isFinite(measured)||measured>now+60000)return 'unknown';
+        const minutes=(now-measured)/60000;
+        return minutes>=60?'stale':minutes>=15?'aging':'recent';
+      }
+      // WORKER_FRESHNESS_PURE_END
+      const WORKER_POLL_MS=120000; // Read only; public feed is edge cached for 15 minutes.
+      let workerSnapshotAt='',workerSnapshot=null,controlLastRead=0,controlLastAttempt=0,controlLastError=null,controlInFlight=null;
+      const workerTitles=new Map();
+      const denverTime=value=>new Date(value).toLocaleString('en-US',{
+        timeZone:'America/Denver',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'
+      });
+      function updateWorkerFreshness(){
+        const checkedAt=workerSnapshot?.checkedAt,workers=workerSnapshot?.workers;
+        const status=workerSnapshotStatus(checkedAt);
+        const report=Number.isFinite(Date.parse(checkedAt))?denverTime(checkedAt):'unavailable';
+        const freshness=status==='aging'?' · older snapshot':status==='stale'?' · stale (60+ min)':'';
+        if(!workers||status==='unknown'||status==='stale'){
+          text('opsWorkerCount','Not verified');
+          text('quickDoItCount','—');
+          text('opsWorkerFresh',workers?'Last dispatcher report: '+report+freshness+' · assignments not confirmed.':'No verified dispatcher status currently available.');
+          if(status==='stale')$('opsWorkers').replaceChildren(e('span','ops-placeholder','Previous assignments expired. Open the issue or Actions for confirmation.'));
+        }else{
+          text('opsWorkerCount',workers.running+' reported working · '+workers.pendingPickup+' pending');
+          text('opsWorkerFresh','Dispatcher reported '+report+' ('+timeAgo(checkedAt)+')'+freshness+' · not live Copilot telemetry.');
+        }
+        const refreshed=controlLastRead?'Page checked '+denverTime(controlLastRead):'Page has not checked yet';
+        text('opsWorkerChecked',refreshed+(controlLastError?' · last refresh failed: '+controlLastError:'')+
+          ' · auto-checks every 2 min while open; only a dispatcher run can publish a newer report.');
+      }
       function renderOpsWorkers(d){
+        workerSnapshot=d||null;
         const list=$('opsWorkers');list.replaceChildren();
         const w=d?.workers,checkedAt=d?.checkedAt;
-        if(!w||ageHours(checkedAt)>6){
-          text('opsWorkerCount','Unverified');
-          text('opsWorkerFresh',w?'Dispatcher snapshot stale · '+timeAgo(checkedAt):'No dispatcher status available');
-          list.append(e('span','ops-placeholder','Worker assignments cannot be confirmed.'));return;
+        if(!w||!['recent','aging'].includes(workerSnapshotStatus(checkedAt))){
+          list.append(e('span','ops-placeholder','Worker assignments cannot currently be confirmed.'));
+          updateWorkerFreshness();return;
         }
         workerSnapshotAt=checkedAt;
         const units=(w.list||[]).filter(u=>Number.isSafeInteger(u.n)&&['working','repairing','pending-pickup'].includes(u.state)).slice(0,4);
-        text('opsWorkerCount',w.running+' active · '+w.pendingPickup+' pending');
         text('quickDoItCount',String((w.list||[]).filter(u=>u.state==='queued'&&u.eligible===true).length)+' eligible');
-        text('opsWorkerFresh','Reported '+timeAgo(checkedAt)+' · dispatcher states, not confirmed live sessions.');
-        if(!units.length){list.append(e('span','ops-placeholder','No active assignments reported.'));return;}
+        updateWorkerFreshness();
+        if(!units.length){list.append(e('span','ops-placeholder','No working or pending assignments reported.'));return;}
         for(const u of units){
           const row=e('div','ops-worker');
-          const link=e('a','','#'+u.n+' · loading card…');
+          const link=e('a','',workerTitles.has(u.n)?('#'+u.n+' · '+workerTitles.get(u.n)):'#'+u.n+' · loading card…');
           link.href=ROOT+'/issues/'+u.n;link.target='_blank';link.rel='noopener noreferrer';
-          row.append(link,e('span','',u.state==='repairing'?'Copilot · repair requested':u.state==='working'?'Copilot · assigned/work in progress':'Copilot · awaiting pickup'));list.append(row);
+          row.append(link,e('span','',u.state==='repairing'?'Copilot · dispatcher reports repair (unconfirmed)':u.state==='working'?'Copilot · dispatcher reports working (unconfirmed)':'Copilot · awaiting pickup'));list.append(row);
+          if(workerTitles.has(u.n))continue;
           void api('/issues/'+u.n).then(({data})=>{
             if(workerSnapshotAt!==checkedAt||!Number.isSafeInteger(data?.number)||data.number!==u.n)return;
             const name=String(data.title||'').replace(/^\[Arcana Queue\]\s*/,'').slice(0,100);
-            link.textContent='#'+u.n+' · '+(name||'Card assignment');
+            workerTitles.set(u.n,name||'Card assignment');
+            link.textContent='#'+u.n+' · '+workerTitles.get(u.n);
           }).catch(()=>{if(workerSnapshotAt===checkedAt)link.textContent='#'+u.n+' · card title unavailable';});
         }
       }
@@ -403,7 +436,25 @@
         if(!r.items.length){list.append(e('div','empty','No Copilot card PRs open.'));return;}
         for(const i of r.items){if(!Number.isSafeInteger(i?.pr))continue;const href=ROOT+'/pull/'+i.pr+'/files';const checks=Object.entries(i.checks||{}).map(([k,v])=>k+' '+v).join(' · ');
           addRow(list,'#'+i.pr+' '+String(i.card||'Card').slice(0,120),(checks||'no checks yet')+' · head '+String(i.headSha||'').slice(0,7)+' · '+timeAgo(r.checkedAt),href,REVIEW_STATES[i.state]||{klass:'neutral',tag:'gray',label:String(i.state||'unknown')});}}
-      async function fetchControl(){try{const st=await fetchStatus();renderBilling(st);renderDispatcher(st);renderQueue(st);renderReview(st);fetchCopilotAssignment(st.dispatcher?.data||null);if(!st.billing&&!st.dispatcher)text('readyDetail','No status comments published yet on issue #78.');}catch(err){text('readyDetail','Status feed unavailable: '+err.message);fetchCopilotAssignment(null);}}
+      async function fetchControl({summaryOnly=false}={}){
+        // Coalesce manual and periodic reads to avoid duplicate upstream requests.
+        if(controlInFlight)return controlInFlight;
+        controlInFlight=(async()=>{
+          controlLastAttempt=Date.now();
+          try{
+            const st=await fetchStatus();
+            renderBilling(st);renderDispatcher(st);renderQueue(st);renderReview(st);
+            if(!summaryOnly)void fetchCopilotAssignment(st.dispatcher?.data||null);
+            if(!st.billing&&!st.dispatcher)text('readyDetail','No status comments published yet on issue #78.');
+            controlLastRead=Date.now();controlLastError=null;
+          }catch(err){
+            controlLastError=String(err?.message||err).slice(0,110);
+            text('readyDetail','Status feed unavailable: '+controlLastError);
+            if(!summaryOnly)void fetchCopilotAssignment(null);
+          }finally{updateWorkerFreshness();}
+        })();
+        try{return await controlInFlight;}finally{controlInFlight=null;}
+      }
       let loading=false;
       async function refresh(){if(loading)return;loading=true;staleFeeds=0;cachedFeeds=0;sourceTimes=[];staleSources=[];$('refresh').disabled=true;$('refreshIcon').classList.add('spin');text('connectionText','Checking cached GitHub feeds…');$('connectionDot').className='pulse';const checks=await Promise.allSettled([api('/pulls?state=open&sort=updated&direction=desc&per_page=100'),api('/actions/runs?per_page=30'),fetchNotes(),fetchUpgrade(),fetchControl()]);let successful=0;const failures=[];checks.slice(0,3).forEach((result,i)=>{if(result.status==='fulfilled'){try{if(i===0)renderPRs(result.value.data);if(i===1)renderRuns(result.value.data);if(i===2)renderNotes(result.value);successful++;}catch(err){failures.push(err.message);}}else{failures.push(result.reason?.message||'Network request failed');}});if(checks[0].status==='rejected'){text('prCount','—');text('prSub','Unavailable');$('prList').replaceChildren(e('div','empty','Cannot fetch pull requests. Use the GitHub links to inspect directly.'));}if(checks[1].status==='rejected'){text('ciResult','Unknown');text('ciSub','Workflow feed unavailable');text('runningCount','—');$('runList').replaceChildren(e('div','empty','Cannot fetch workflow runs.'));}if(checks[2].status==='rejected')$('noteList').replaceChildren(e('div','empty','Cannot fetch coordination notes.'));
         for(const result of checks.slice(3)){if(result.status==='rejected')failures.push(result.reason?.message||'Additional feed unavailable');else successful++;}
@@ -422,6 +473,18 @@
         if(button)button.focus({preventScroll:true});
       });
       $('refresh').addEventListener('click',refresh);
+      // Lightweight status-only polling. No dispatcher wake-up, paid work or workflow dispatch.
+      // A dormant installed PWA does not poll; recheck on resume if the last attempt was old.
+      setInterval(()=>{
+        updateWorkerFreshness();
+        if(document.visibilityState==='visible'&&navigator.onLine!==false&&Date.now()-controlLastAttempt>=WORKER_POLL_MS)
+          void fetchControl({summaryOnly:true});
+      },30000);
+      document.addEventListener('visibilitychange',()=>{
+        updateWorkerFreshness();
+        if(document.visibilityState==='visible'&&navigator.onLine!==false&&Date.now()-controlLastAttempt>=WORKER_POLL_MS)
+          void fetchControl({summaryOnly:true});
+      });
       refresh();
     })();
   </script>
