@@ -14,6 +14,14 @@
       "source": "certification/ResurrectionOrbIndependentCertificationTest.kt",
       "testClass": "com.arcanatable.customcards.ResurrectionOrbIndependentCertificationTest",
       "tests": 4
+    },
+    {
+      "key": "poxwalkers",
+      "name": "Poxwalkers",
+      "issue": 406,
+      "source": "certification/PoxwalkersIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.PoxwalkersIndependentCertificationTest",
+      "tests": 6
     }
   ]
 }
