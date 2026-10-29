@@ -295,7 +295,7 @@
       const directFeedCache=new Map();
       const pendingPublicReads=new Map();
       // Bound only read-only status requests; authorization actions are unaffected.
-      const readTimeout=()=>AbortSignal.timeout(8000);
+      const readTimeout=()=>typeof AbortSignal==='undefined'||typeof AbortSignal.timeout!=='function'?undefined:AbortSignal.timeout(8000);
       const DIRECT_FEED_TTL_MS=5*60*1000;
       let directFeedFallbacks=0;
       async function publicGithubDirect(path){
