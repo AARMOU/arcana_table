@@ -422,7 +422,8 @@ class UlamogsNullifierScenarioTest {
 
         assertTrue("Processing two distinct cards with the same name must counter",
             d.permanentsNamed(d.player1, "Grizzly Bears").isEmpty())
-        assertEquals(listOf("Sol Ring"), d.getExileCardNames(d.player1))
+        assertEquals("Own Sol Ring stays exiled; Rest in Peace also exiles the countered Bears spell",
+            listOf("Grizzly Bears", "Sol Ring"), d.getExileCardNames(d.player1).sorted())
         assertEquals(listOf("Sol Ring", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
         assertTrue(d.getGraveyardCardNames(d.player2).isEmpty())
         val processed = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
