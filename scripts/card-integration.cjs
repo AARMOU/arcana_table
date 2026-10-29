@@ -147,10 +147,25 @@ function receiptBody(receipt, reason='') {
     (receipt.status==='integrated' ? '**Integrated into Android source; ready for a separately authorized APK build.** No APK built.' :
       '**Integration blocked.** '+String(reason).replace(/@/g,'＠').slice(0,1400));
 }
+// Paths whose change on main means the tested plan no longer reflects trusted policy/code.
+const CONTROL_PATHS = ['integration/','certification/','scripts/card-integration.cjs',
+  'scripts/verified-certification.cjs','scripts/review-inbox.cjs','scripts/control-status.cjs',
+  '.github/workflows/arcana-approved-card-integration.yml'];
+// Unrelated owner merges may advance main during long destination tests. Accept only a
+// fast-forward whose complete changed-file list avoids every control path; else fail closed.
+async function controlUnchanged({github,owner,repo,controlSha}) {
+  const live = (await github.rest.git.getRef({owner,repo,ref:'heads/main'})).data.object.sha;
+  if (live === controlSha) return true;
+  const d = (await github.rest.repos.compareCommitsWithBasehead({owner,repo,basehead:controlSha+'...'+live})).data;
+  // GitHub truncates compare file lists at 300; a truncated list cannot prove absence.
+  if (d.status !== 'ahead' || !Array.isArray(d.files) || d.files.length >= 300) return false;
+  return !d.files.some(f => [f.filename,f.previous_filename].some(n => n &&
+    CONTROL_PATHS.some(p => p.endsWith('/') ? n.startsWith(p) : n === p)));
+}
 async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,runUrl}) {
   validateOutcome(plan,report);
-  const control = (await github.rest.git.getRef({owner,repo,ref:'heads/main'})).data.object.sha;
-  if (control !== plan.controlSha) throw Error('Trusted main advanced; revalidate on next pass');
+  if (!await controlUnchanged({github,owner,repo,controlSha:plan.controlSha}))
+    throw Error('Trusted integration control changed on main; revalidate on next pass');
   const snap = await snapshot(github,owner,repo,plan.pr);
   const suite = sourceEligible(cfg,snap);
   if (!suite || suite.key !== plan.suite.key || snap.pr.head.sha !== plan.sourceSha ||
@@ -190,5 +205,5 @@ async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,
   }
   return receipt;
 }
-module.exports={MARKER,TARGET,REGISTRY,GENERATED,GATES,hash,config,validatePolicy,paths,ownerDecision,
+module.exports={MARKER,TARGET,REGISTRY,GENERATED,GATES,CONTROL_PATHS,hash,config,validatePolicy,paths,ownerDecision,controlUnchanged,
   sourceEligible,snapshot,parseReceipt,receiptFor,planNext,validateOutcome,validateReport,receiptBody,publish};
