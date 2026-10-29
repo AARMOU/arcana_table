@@ -453,4 +453,27 @@ class UlamogsNullifierScenarioTest {
         assertTrue("No card may be processed when the two-card cost is unavailable",
             processed.isEmpty())
     }
+
+    /** Without replacement, two same-named exiled cards are two actual processing moves. */
+    @Test fun duplicateNamedOpponentExilesReachGraveyardAsTwoCards() {
+        val d = setup()
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Sol Ring")
+
+        d.respondToOwnBears(Choices(yes = true, pick = listOf("Sol Ring")))
+
+        assertTrue("Processing two separate cards must counter the targeted spell",
+            d.permanentsNamed(d.player1, "Grizzly Bears").isEmpty())
+        assertTrue("Both same-named opponent cards must leave exile",
+            d.getExileCardNames(d.player2).isEmpty())
+        assertEquals("Both cards must reach their owner's graveyard",
+            listOf("Sol Ring", "Sol Ring"), d.getGraveyardCardNames(d.player2).sorted())
+        val processed = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
+            .filter { it.ownerId == d.player2 &&
+                it.fromZone == com.wingedsheep.sdk.core.Zone.EXILE &&
+                it.toZone == com.wingedsheep.sdk.core.Zone.GRAVEYARD &&
+                it.entityName == "Sol Ring" }
+        assertEquals("Two cards with the same name must generate two real zone changes",
+            2, processed.size)
+    }
 }
