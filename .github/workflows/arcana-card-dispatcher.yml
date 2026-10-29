@@ -69,6 +69,9 @@ jobs:
           git -C base rev-parse HEAD > base-sha.txt
           mapfile -t names < names.txt
           if [ "${#names[@]}" -eq 0 ]; then echo '[]' > classified.json; exit 0; fi
+          # Same Oracle text the feeder classified with; a failed fetch leaves cards NEEDS_REVIEW (refused).
+          (cd base && python3 -I tools/cardkit/cardkit.py oracle fetch -- "${names[@]}" >&2) \
+            || echo '::warning::Oracle fetch incomplete; uncached cards stay NEEDS_REVIEW.'
           (cd base && python3 -I tools/cardkit/cardkit.py classify --json -- "${names[@]}") > classified.json
       - id: verdicts
         name: Build verdicts (trusted main code)
