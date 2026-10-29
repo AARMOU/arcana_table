@@ -27,7 +27,7 @@ class ForwardPortTests(unittest.TestCase):
         self.source = 'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Example.kt'
         self.scenario = 'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ExampleScenarioTest.kt'
         self.registry = runner.REGISTRY
-        self.write(self.registry, 'object Registry {\n    val all = listOf(\n        Entry(Existing, "SET", "Deck"),\n    )\n}\n')
+        self.write(self.registry, 'object Registry {\n    private const val POOL = "Card pool 10/26"\n    val all = listOf(\n        Entry(Existing, "SET", "Deck"),\n    )\n}\n')
         self.write('ui.txt', 'original UI\n')
         self.commit()
         self.ancestor = git(self.origin, 'rev-parse', 'HEAD')
@@ -95,6 +95,61 @@ class ForwardPortTests(unittest.TestCase):
                       '+        Entry(Example, "SET", "Deck"),\n+        danger()\n'):
             with self.subTest(patch=patch), self.assertRaises(runner.Blocked):
                 runner.registry_addition(patch, 'Example')
+
+    def test_named_deck_constant_forward_port_preserves_other_destination_changes(self):
+        registry = self.origin / self.registry
+        registry.write_text(registry.read_text().replace(
+            'Entry(Example, "SET", "Deck")', 'Entry(Example, "SET", POOL)'))
+        self.commit()
+        self.plan['sourceSha'] = git(self.origin, 'rev-parse', 'HEAD')
+        result = runner.prepare(self.plan, self.candidate)
+        self.assertIn('Entry(Example, "SET", POOL)', result[self.registry])
+        self.assertIn('private const val POOL = "Card pool 10/26"', result[self.registry])
+        self.assertEqual((self.candidate / 'ui.txt').read_text(), 'new Android UI preserved\n')
+
+    def test_named_deck_constant_requires_identical_immutable_literal(self):
+        addition = '        Entry(Example, "SET", POOL),'
+        patch = '+' + addition + '\n'
+        self.assertEqual(runner.registry_addition(patch, 'Example'), addition)
+        good = 'private const val POOL = "Card pool 10/26"\n'
+        runner.validate_registry_deck_constant(addition, good, good)
+        for source, destination in (
+            (good, ''),
+            (good, 'private const val POOL = "Different"\n'),
+            ('val POOL = "Card pool 10/26"\n', good),
+            (good + good, good),
+            (good, good + good),
+        ):
+            with self.subTest(source=source, destination=destination), self.assertRaisesRegex(
+                    runner.Blocked, 'deck constant'):
+                runner.validate_registry_deck_constant(addition, source, destination)
+        for bad in (
+            '+        Entry(Example, "SET", POOL + "extra"),\n',
+            '+        Entry(Example, "SET", pool),\n',
+            '+        Entry(Example, "SET", getDeck()),\n',
+            '+        Entry(Example, "SET", POOL),\n+        Entry(Other, "SET", POOL),\n',
+        ):
+            with self.subTest(patch=bad), self.assertRaises(runner.Blocked):
+                runner.registry_addition(bad, 'Example')
+
+    def test_named_deck_constant_drift_blocks_before_any_source_is_applied(self):
+        registry = self.origin / self.registry
+        registry.write_text(registry.read_text().replace(
+            'Entry(Example, "SET", "Deck")', 'Entry(Example, "SET", POOL)'))
+        self.commit()
+        self.plan['sourceSha'] = git(self.origin, 'rev-parse', 'HEAD')
+        dest = self.candidate / self.registry
+        dest.write_text(dest.read_text().replace(
+            'private const val POOL = "Card pool 10/26"',
+            'private const val POOL = "Different destination"'))
+        git(self.candidate, 'config', 'user.name', 'Test')
+        git(self.candidate, 'config', 'user.email', 'test@example.invalid')
+        git(self.candidate, 'add', '.')
+        git(self.candidate, 'commit', '-qm', 'destination constant drift')
+        self.plan['baseSha'] = git(self.candidate, 'rev-parse', 'HEAD')
+        with self.assertRaisesRegex(runner.Blocked, 'deck constant'):
+            runner.prepare(self.plan, self.candidate)
+        self.assertFalse((self.candidate / self.source).exists())
 
     def test_conflict_does_not_modify_destination(self):
         p = self.candidate / self.registry

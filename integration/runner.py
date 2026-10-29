@@ -56,10 +56,26 @@ def validate_plan(plan):
 
 def registry_addition(patch, symbol):
     lines = [line for line in patch.splitlines() if line[:1] in ('+', '-') and not line.startswith(('+++', '---'))]
-    pattern = r'\+\s*Entry\(' + re.escape(symbol) + r',\s*"[^"\n]+",\s*"[^"\n]+"\),\s*'
+    pattern = r'\+\s*Entry\(' + re.escape(symbol) + r',\s*"[^"\n]+",\s*(?:"[^"\n]+"|[A-Z][A-Z0-9_]*)\),\s*'
     if len(lines) != 1 or not re.fullmatch(pattern, lines[0]):
         raise Blocked('Registry change is not exactly one new card entry')
     return lines[0][1:]
+
+
+
+def validate_registry_deck_constant(addition, source, destination):
+    """Named deck constants are safe only when both registries define the same immutable literal."""
+    match = re.search(r',\s*([A-Z][A-Z0-9_]*)\),\s*$', addition)
+    if not match:
+        return  # Existing quoted-literal entries remain valid.
+    name = match.group(1)
+    declaration = re.compile(
+        r'^\s*private const val ' + re.escape(name) + r'\s*=\s*"([^"\r\n]+)"\s*$',
+        re.MULTILINE)
+    source_values = declaration.findall(source)
+    destination_values = declaration.findall(destination)
+    if len(source_values) != 1 or destination_values != source_values:
+        raise Blocked('Registry deck constant missing or differs between source and destination: ' + name)
 
 
 def merge_registry(destination, source, addition, symbol):
@@ -100,7 +116,9 @@ def prepare(plan, candidate):
     addition = registry_addition(registry_patch, plan['paths']['symbol'])
     registry_source = call(['git', 'show', plan['sourceSha'] + ':' + REGISTRY], candidate, True)
     registry_path = candidate / REGISTRY
-    merged_registry = merge_registry(registry_path.read_text(), registry_source, addition, plan['paths']['symbol'])
+    destination_registry = registry_path.read_text()
+    validate_registry_deck_constant(addition, registry_source, destination_registry)
+    merged_registry = merge_registry(destination_registry, registry_source, addition, plan['paths']['symbol'])
     patch = call(['git', 'diff', '--binary', ancestor, plan['sourceSha'], '--', *source_paths[:2]], candidate, True)
     result = subprocess.run(['git', 'apply', '--check', '-'], cwd=candidate, input=patch, text=True,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
