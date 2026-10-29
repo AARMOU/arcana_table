@@ -26,8 +26,10 @@ object CustomCards {
         // Tokens Win 9/26 (Rocco, Cabaretti Caterer)
         Entry(AncientCopperDragon, "CLB", TOKENS_WIN),
         Entry(DisplacedDinosaurs, "WHO", TOKENS_WIN),
+        Entry(JaheiraFriendOfTheForest, "CLB", TOKENS_WIN),
         Entry(JawsRelentlessPredator, "SLD", TOKENS_WIN),
         Entry(MotherOfRunes, "ULG", TOKENS_WIN),
+        Entry(TataruTaru, "FIC", TOKENS_WIN),
         Entry(TheCabbageMerchant, "TLE", TOKENS_WIN),
         Entry(BagEndBanquet, "HOC", TOKENS_WIN),
         Entry(DefenseOfTheHeart, "ULG", TOKENS_WIN),
@@ -63,6 +65,7 @@ object CustomCards {
         // Hazel of the Rootbloom deck. Tippy-Toe is omitted: its copy-token replacement
         // behavior is not represented by the pinned engine's current building blocks.
         Entry(FrogSquirrels, "TLE", HAZEL),
+        Entry(ScurryOak, "MH2", HAZEL),
         Entry(NutCollector, "DMR", HAZEL),
         Entry(CompySwarm, "REX", HAZEL),
         Entry(PrimalAmulet, "XLN", HAZEL),
@@ -72,6 +75,7 @@ object CustomCards {
         Entry(SpringleafParade, "ECC", HAZEL),
         // Sliver Overlord deck. Hatchery Sliver (Replicate) and Pulmonic Sliver's
         // optional replacement effect remain unsupported by this engine version.
+        Entry(BlackMarketConnections, "MSC", HAZEL),
         Entry(AcidicSliver, "TPR", SLIVERS),
         Entry(CloudshredderSliver, "CMM", SLIVERS),
         Entry(CrystallineSliver, "CMM", SLIVERS),
@@ -127,6 +131,7 @@ object CustomCards {
         Entry(UnclaimedTerritory, "XLN", "Velociramptor Beefcake 9/26"),
         Entry(Rewind, "M21", "Velociramptor Beefcake 9/26"),
         Entry(SunkenRuins, "SHM", "Velociramptor Beefcake 9/26"),
+        Entry(WaywardSwordtooth, "RIX", "Velociramptor Beefcake 9/26"),
         Entry(WakeningSunsAvatar, "XLN", "Velociramptor Beefcake 9/26"),
         // Requested follow-up cards: dinosaur deck and Mabel deck.
         Entry(PantlazaSunFavored, "LCC", "Velociramptor Beefcake 9/26"),
@@ -250,6 +255,7 @@ object CustomCards {
         // Backported, isolated distinct precon batches: PRs #74, #76, #77, #84 and #85.
         Entry(ArcoFlagellant, "40K", "Six WotC precons"),
         Entry(UltramarinesHonourGuard, "40K", "Six WotC precons"),
+        Entry(CommissarSeverinaRaine, "40K", "Six WotC precons"),
         Entry(BoneSabres, "40K", "Six WotC precons"),
         Entry(Tervigon, "40K", "Six WotC precons"),
         Entry(CranialPlating, "40K", "Six WotC precons"),
