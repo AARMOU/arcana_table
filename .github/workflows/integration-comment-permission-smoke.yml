@@ -1,0 +1,23 @@
+name: Integration comment capability smoke (NO APK)
+on:
+  push:
+    branches: [gpt/integration-comment-scope-smoke-20261028]
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+jobs:
+  comment-capability:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            try {
+              const r=await github.rest.issues.createComment({...context.repo,issue_number:433,
+                body:'Integration publisher permission smoke: this bot can post PR timeline results with the configured scopes. No card result, merge or APK is claimed.'});
+              core.info('PR timeline write capability PASS: '+r.data.html_url);
+            } catch(e) {
+              core.info('Safe permission diagnostic: HTTP '+e.status+'; accepted='+String(e.response?.headers?.['x-accepted-github-permissions']));
+              core.setFailed('PR timeline write capability failed: HTTP '+e.status);
+            }
