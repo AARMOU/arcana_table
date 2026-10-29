@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.DarksteelMonolith
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.CastSpell
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
@@ -32,16 +33,22 @@ class DarksteelMonolithScenarioTest {
         d.putPermanentOnBattlefield(p, "Darksteel Monolith")
 
         val firstRing = d.putCardInHand(p, "Sol Ring")
-        assertNull(d.castSpell(p, firstRing).error)
+        assertNull(d.submit(CastSpell(playerId = p, cardId = firstRing, useWithoutPayingManaCost = true)).error)
         d.resolveAll(Choices(yes = true))
         assertEquals(1, d.permanentsNamed(p, "Sol Ring").size)
         assertEquals(0, d.manaPool(p).colorless)
 
         val secondRing = d.putCardInHand(p, "Sol Ring")
-        assertNotNull("The free-cast permission is limited to once each turn", d.castSpell(p, secondRing).error)
+        assertNotNull(
+            "The free-cast permission is limited to once each turn",
+            d.submit(CastSpell(playerId = p, cardId = secondRing, useWithoutPayingManaCost = true)).error,
+        )
 
         val coloredSpell = d.putCardInHand(p, "Grizzly Bears")
-        assertNotNull("The free-cast permission applies only to colorless spells", d.castSpell(p, coloredSpell).error)
+        assertNotNull(
+            "The free-cast permission applies only to colorless spells",
+            d.submit(CastSpell(playerId = p, cardId = coloredSpell, useWithoutPayingManaCost = true)).error,
+        )
     }
 
     @Test
@@ -53,7 +60,7 @@ class DarksteelMonolithScenarioTest {
         val ring = d.putCardInHand(p, "Sol Ring")
 
         assertNull(d.castSpell(p, ring).error)
-        d.resolveAll(Choices(yes = false))
+        d.resolveAll()
 
         assertEquals(1, d.permanentsNamed(p, "Sol Ring").size)
         assertEquals(0, d.manaPool(p).colorless)
@@ -66,6 +73,10 @@ class DarksteelMonolithScenarioTest {
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = d.player2)
         val ring = d.putCardInHand(d.player2, "Sol Ring")
 
-        assertNotNull(d.castSpell(d.player2, ring).error)
+        assertNotNull(
+            d.submit(
+                CastSpell(playerId = d.player2, cardId = ring, useWithoutPayingManaCost = true),
+            ).error,
+        )
     }
 }
