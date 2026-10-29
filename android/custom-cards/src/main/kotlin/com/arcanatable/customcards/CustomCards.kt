@@ -151,6 +151,7 @@ object CustomCards {
         Entry(SpatialContortion, "OGW", "Six WotC precons"),
         Entry(SkitteringInvasion, "ROE", "Six WotC precons"),
         Entry(BlightGrenade, "40K", "Six WotC precons"),
+        Entry(CelestineTheLivingSaint, "40K", "Six WotC precons"),
         Entry(DenyReality, "ARB", "Six WotC precons"),
         Entry(BituminousBlast, "ARB", "Six WotC precons"),
         Entry(BloodForTheBloodGod, "40K", "Six WotC precons"),
