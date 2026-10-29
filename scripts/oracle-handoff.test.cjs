@@ -21,6 +21,8 @@ test('appends the exact offline JSONL record without weakening the verified unit
   const body = appendOracle(unit, JSON.stringify(card, null, 2), name);
   assert.match(body, /## Offline Oracle record \(trusted feeder snapshot\)/);
   assert.match(body, /Copilot environment cannot reach Scryfall/);
+  assert.match(body, /locally only\. Do not commit tools\/cardkit\/data\/oracle-cache\.jsonl/);
+  assert.doesNotMatch(body, /Only commit cache changes when needed/);
   assert.equal(unitActionable(body, BASE).ok, true);
   const raw = body.split('\n').find(l => l.startsWith('    {"name":'));
   assert.deepEqual(JSON.parse(raw.trim()), card);
