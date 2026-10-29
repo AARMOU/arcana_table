@@ -101,4 +101,26 @@ function certOutput(suite, ok) {
       : 'Independent tests failed or current-head prerequisites are not green. No owner approval is permitted.',
   };
 }
-module.exports = { readManifest,manifestFiles,titleNames,validateManifest,candidate,currentHeadGreen,workflowEventEligible,issueFromBody,certOutput,CHECK_NAME };
+// A successful exact-head independent certification may expose the existing Copilot PR
+// to owner review, but it never approves, merges, dispatches or integrates that PR.
+async function markReadyAfterCertification({github, owner, repo, number, sha, certified}) {
+  if (certified !== true || !SHA.test(String(sha))) return false;
+  // Read live PR state immediately before the GraphQL mutation: do not trust the
+  // earlier certification gate's PR snapshot or an agent-supplied draft flag.
+  const live = (await github.rest.pulls.get({owner, repo, pull_number:number})).data;
+  if (live?.state !== 'open' || live.draft !== true || live.head?.sha !== sha ||
+      live.head?.repo?.full_name !== owner + '/' + repo ||
+      live.base?.repo?.full_name !== owner + '/' + repo ||
+      live.base?.ref !== 'gpt/arcana-integration-next' ||
+      !['copilot','copilot-swe-agent[bot]'].includes(String(live.user?.login || '').toLowerCase()) ||
+      typeof live.node_id !== 'string' || !live.node_id) return false;
+  const result = await github.graphql(
+    'mutation MarkReadyAfterCertification($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { pullRequest { isDraft } } }',
+    {id: live.node_id}
+  );
+  if (result?.markPullRequestReadyForReview?.pullRequest?.isDraft !== false)
+    throw Error('GitHub did not confirm ready-for-review transition');
+  return true;
+}
+
+module.exports = { readManifest,manifestFiles,titleNames,validateManifest,candidate,currentHeadGreen,workflowEventEligible,issueFromBody,certOutput,markReadyAfterCertification,CHECK_NAME };
