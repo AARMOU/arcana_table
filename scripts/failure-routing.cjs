@@ -32,10 +32,15 @@ async function runRouter({ github, context, env, readBudget, delivery }) {
 
 // Shared admission for repair requests: readiness, work unit, capacity, ceilings, budget.
 function createAuthorizer({ github, owner, repo, env, readBudget, now = Date.now() }) {
+  // One router invocation reconciles many failures; loadUnits costs ~100 API calls against the
+  // shared hourly quota. Units are read once per invocation: after any admitted repair the
+  // router stops authorizing (one paid request per tick), so the snapshot cannot go stale.
+  let units;
   return async ({ pr, run }) => {
     const ready = A.readiness(env);
     if (ready.repair !== 'request' || !ready.master) return { allowed: false, reason: 'readiness: repair mode ' + ready.repair };
-    const data = await loadUnits({ github, owner, repo, now, lagMs: ready.billingLagMs });
+    units ??= loadUnits({ github, owner, repo, now, lagMs: ready.billingLagMs }).catch(e => { units = undefined; throw e; });
+    const data = await units;
     const n = unitOf(pr.body, data.numbers);
     const unit = data.units.find(u => u.raw.number === n);
     if (!unit) return { allowed: false, reason: 'no work unit linked to PR' };
