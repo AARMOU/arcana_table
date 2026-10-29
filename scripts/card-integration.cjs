@@ -1,0 +1,186 @@
+'use strict';
+// Trusted control-plane code. Never require candidate code in a write-capable job.
+const fs = require('node:fs');
+const crypto = require('node:crypto');
+const C = require('../certification/policy.cjs');
+const V = require('./verified-certification.cjs');
+const MARKER = '<!-- arcana-card-integration-v1 -->';
+const SHA = /^[a-f0-9]{40}$/;
+const TARGET = 'gpt/b140-card-request-test-apk-20261028';
+const REGISTRY = 'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt';
+const GENERATED = ['android/app/src/main/assets/argentum/custom-cards.jsonl',
+  'android/app/src/main/assets/argentum/custom-cards.index.tsv',
+  'docs/agents/generated/pattern-index.json', 'docs/agents/generated/pattern-index.md'];
+const GATES = ['engine-pins','export','patterns','cardkit','scenario','independent',
+  'custom-and-android','release-safety','scope'];
+const hash = value => crypto.createHash('sha256').update(value).digest('hex');
+
+function validatePolicy(p) {
+  if (p?.schema !== 1 || typeof p.enabled !== 'boolean' || p.repository !== 'AARMOU/arcana_table' ||
+      p.ownerId !== 132252902 || p.target !== TARGET || !SHA.test(p.targetSeed || '') ||
+      typeof p.authorization !== 'string' || p.authorization.length < 40 ||
+      JSON.stringify(Object.keys(p.engineJars || {}).sort()) !== JSON.stringify([
+        'argentum-ai.jar','argentum-mtg-sdk-tooling.jar','argentum-mtg-sdk.jar','argentum-rules-engine.jar']) ||
+      Object.values(p.engineJars).some(x => !/^[a-f0-9]{64}$/.test(x)))
+    throw Error('Invalid card-only integration policy');
+  return p;
+}
+function config(root = '.') {
+  const policyBytes = fs.readFileSync(root + '/integration/policy.json');
+  const suitesBytes = fs.readFileSync(root + '/certification/suites.json');
+  const manifest = C.validateManifest(JSON.parse(suitesBytes));
+  const trustedInputs = [policyBytes,suitesBytes,fs.readFileSync(root+'/scripts/card-integration.cjs'),
+    fs.readFileSync(root+'/integration/runner.py'),fs.readFileSync(root+'/certification/runner.py'),
+    ...manifest.suites.map(s=>fs.readFileSync(root+'/'+s.source))];
+  return {policy:validatePolicy(JSON.parse(policyBytes)), manifest, policyHash:hash(Buffer.concat(trustedInputs))};
+}
+function paths(suite) {
+  const symbol = suite.source.split('/').pop().replace('IndependentCertificationTest.kt','');
+  if (!/^[A-Z][A-Za-z0-9]+$/.test(symbol)) throw Error('Unsafe card symbol');
+  return {symbol, source:`android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/${symbol}.kt`,
+    scenario:`android/custom-cards/src/test/kotlin/com/arcanatable/customcards/${symbol}ScenarioTest.kt`, registry:REGISTRY};
+}
+function ownerDecision(reviews, sha, policy) {
+  const meaningful = reviews.filter(r => r.user?.id === policy.ownerId &&
+    String(r.user?.login).toLowerCase() === 'aarmou' &&
+    ['APPROVED','CHANGES_REQUESTED','DISMISSED'].includes(r.state))
+    .sort((a,b) => Number(a.id)-Number(b.id));
+  const last = meaningful.at(-1);
+  return last?.state === 'APPROVED' && last.commit_id === sha ? last : null;
+}
+function sourceEligible(cfg, snapshot) {
+  const {pr,issue,checks,reviews,files} = snapshot;
+  const suite = C.candidate(cfg.manifest,{pr,issue,sha:pr.head?.sha,checks,repository:cfg.policy.repository});
+  if (!cfg.policy.enabled || !suite || pr.draft || !ownerDecision(reviews,pr.head.sha,cfg.policy) ||
+      V.certification(checks,pr.head.sha) !== 'certified') return null;
+  // Pending or failing ancillary checks are not silently discarded.
+  if (checks.some(c => c.head_sha === pr.head.sha &&
+    (c.status !== 'completed' || !['success','skipped','neutral'].includes(c.conclusion)))) return null;
+  const p = paths(suite), allowed = [p.source,p.scenario,p.registry,...GENERATED];
+  if (!Array.isArray(files) || files.length < 3 || files.length > allowed.length ||
+      files.some(f => !allowed.includes(f.filename) || !['added','modified'].includes(f.status)) ||
+      ![p.source,p.scenario].every(name => files.some(f => f.filename === name && f.status === 'added')) ||
+      !files.some(f => f.filename === p.registry && f.status === 'modified')) return null;
+  return suite;
+}
+async function snapshot(github, owner, repo, number) {
+  const pr = (await github.rest.pulls.get({owner,repo,pull_number:number})).data;
+  const unit = C.issueFromBody(pr.body);
+  if (!unit) return {pr,issue:null,checks:[],reviews:[],files:[]};
+  const [issue,checks,reviews,files] = await Promise.all([
+    github.rest.issues.get({owner,repo,issue_number:unit}),
+    github.paginate(github.rest.checks.listForRef,{owner,repo,ref:pr.head.sha,per_page:100}),
+    github.paginate(github.rest.pulls.listReviews,{owner,repo,pull_number:number,per_page:100}),
+    github.paginate(github.rest.pulls.listFiles,{owner,repo,pull_number:number,per_page:100})]);
+  return {pr,issue:issue.data,checks,reviews,files};
+}
+function parseReceipt(comment) {
+  if (comment.user?.id !== 41898282 || comment.user?.login !== 'github-actions[bot]') return null;
+  const body = String(comment.body || '');
+  if (!body.startsWith(MARKER + '\n```json\n')) return null;
+  try {
+    const r = JSON.parse(body.split('\n```json\n')[1].split('\n```')[0]);
+    if (r.schema !== 1 || !Number.isSafeInteger(r.pr) || r.pr <= 0 || !SHA.test(r.sourceSha) ||
+        !SHA.test(r.baseSha) || r.target !== TARGET ||
+        !['blocked','integrated'].includes(r.status) ||
+        !/^https:\/\/github\.com\/AARMOU\/arcana_table\/actions\/runs\/\d+$/.test(r.runUrl) ||
+        (r.status === 'integrated' && !SHA.test(r.destinationSha))) return null;
+    return {...r,commentUrl:comment.html_url};
+  } catch { return null; }
+}
+async function receiptFor({github,owner,repo,pr,verifyIntegrated=true}) {
+  if (!github.rest.issues.listComments || !github.rest.git?.getRef) return null;
+  const comments = await github.paginate(github.rest.issues.listComments,{owner,repo,issue_number:pr.number,per_page:100});
+  const receipts = comments.map(parseReceipt).filter(r => r?.pr === pr.number && r.sourceSha === pr.head.sha);
+  const integrated = receipts.filter(r => r.status === 'integrated').at(-1);
+  if (integrated && verifyIntegrated) {
+    const ref = (await github.rest.git.getRef({owner,repo,ref:'heads/'+TARGET})).data.object.sha;
+    const comparison = (await github.rest.repos.compareCommitsWithBasehead({owner,repo,
+      basehead:integrated.destinationSha+'...'+ref})).data;
+    if (['ahead','identical'].includes(comparison.status)) return integrated;
+  }
+  return receipts.filter(r => r.status === 'blocked').at(-1) || null;
+}
+async function planNext({github,owner,repo,cfg,controlSha,retry=false}) {
+  if (!cfg.policy.enabled || !SHA.test(controlSha)) return null;
+  const baseSha = (await github.rest.git.getRef({owner,repo,ref:'heads/'+cfg.policy.target})).data.object.sha;
+  const ancestor = (await github.rest.repos.compareCommitsWithBasehead({owner,repo,
+    basehead:cfg.policy.targetSeed+'...'+baseSha})).data;
+  if (!['ahead','identical'].includes(ancestor.status)) throw Error('Android branch no longer descends from authorized seed');
+  const prs = await github.paginate(github.rest.pulls.list,{owner,repo,state:'open',per_page:100});
+  for (const pr of prs.sort((a,b)=>a.number-b.number)) {
+    if (!['copilot','copilot-swe-agent[bot]'].includes(String(pr.user?.login).toLowerCase()) || pr.draft) continue;
+    const snap = await snapshot(github,owner,repo,pr.number);
+    const suite = sourceEligible(cfg,snap);
+    if (!suite) continue;
+    const receipt = await receiptFor({github,owner,repo,pr:snap.pr});
+    if (receipt?.status === 'integrated') continue;
+    if (!retry && receipt?.status === 'blocked' && receipt.baseSha === baseSha && receipt.policyHash === cfg.policyHash) continue;
+    return {schema:1,pr:pr.number,sourceSha:snap.pr.head.sha,sourceBase:snap.pr.base.sha,
+      sourceBaseRef:snap.pr.base.ref,baseSha,target:cfg.policy.target,controlSha,policyHash:cfg.policyHash,
+      reviewId:ownerDecision(snap.reviews,snap.pr.head.sha,cfg.policy).id,
+      suite,paths:paths(suite),sourceFiles:snap.files.map(f=>f.filename)};
+  }
+  return null;
+}
+function validateReport(plan, report, files) {
+  if (report.schema !== 1 || report.status !== 'passed' || report.planHash !== hash(JSON.stringify(plan)) ||
+      !Array.isArray(report.gates) || GATES.some(g => !report.gates.some(x=>x.name===g && x.ok===true)) ||
+      report.gates.some(x=>x.ok!==true)) throw Error('Destination validation did not pass every gate');
+  const allowed = [plan.paths.source,plan.paths.scenario,REGISTRY,...GENERATED];
+  if (!Array.isArray(files) || files.length !== allowed.length ||
+      new Set(files.map(f=>f.path)).size !== allowed.length || files.some(f => !allowed.includes(f.path) ||
+        f.mode !== '100644' || f.type !== 'blob' || typeof f.content !== 'string' ||
+        !f.content.trim() || Buffer.byteLength(f.content) > 2*1024*1024 || report.hashes?.[f.path] !== hash(f.content)))
+    throw Error('Invalid, duplicate, out-of-scope or tampered integration files');
+  return files;
+}
+function receiptBody(receipt, reason='') {
+  return MARKER+'\n```json\n'+JSON.stringify(receipt,null,2)+'\n```\n'+
+    (receipt.status==='integrated' ? '**Integrated into Android source; ready for a separately authorized APK build.** No APK built.' :
+      '**Integration blocked.** '+String(reason).replace(/@/g,'＠').slice(0,1400));
+}
+async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,runUrl}) {
+  const control = (await github.rest.git.getRef({owner,repo,ref:'heads/main'})).data.object.sha;
+  if (control !== plan.controlSha) throw Error('Trusted main advanced; revalidate on next pass');
+  const snap = await snapshot(github,owner,repo,plan.pr);
+  const suite = sourceEligible(cfg,snap);
+  if (!suite || suite.key !== plan.suite.key || snap.pr.head.sha !== plan.sourceSha ||
+      ownerDecision(snap.reviews,plan.sourceSha,cfg.policy)?.id !== plan.reviewId ||
+      cfg.policyHash !== plan.policyHash || cfg.policy.target !== plan.target)
+    throw Error('Approval, certification, source or trusted policy changed during validation');
+  const ref = (await github.rest.git.getRef({owner,repo,ref:'heads/'+plan.target})).data.object.sha;
+  if (ref !== plan.baseSha) throw Error('Android target advanced; revalidate on next pass');
+  const receipt = {schema:1,pr:plan.pr,card:suite.name,sourceSha:plan.sourceSha,baseSha:plan.baseSha,
+    target:plan.target,policyHash:plan.policyHash,status:'blocked',runUrl,at:new Date().toISOString()};
+  if (report.status === 'passed') {
+    validateReport(plan,report,files);
+    for (const path of [plan.paths.source,plan.paths.scenario,REGISTRY]) {
+      if (files.find(f=>f.path===path)?.content !== expectedSources[path])
+        throw Error('Tested source differs from independently reconstructed approved changes');
+    }
+    const commit = (await github.rest.git.getCommit({owner,repo,commit_sha:plan.baseSha})).data;
+    const tree = (await github.rest.git.createTree({owner,repo,base_tree:commit.tree.sha,tree:files})).data;
+    const result = (await github.rest.git.createCommit({owner,repo,tree:tree.sha,parents:[plan.baseSha],
+      message:`Integrate ${suite.name} from approved PR #${plan.pr}\n\nSource: ${plan.sourceSha}\nOwner review: ${plan.reviewId}\nDestination tests: ${runUrl}\nCard-only integration; no APK or release.`})).data;
+    // Non-forced fast-forward of a single-parent commit is also an atomic base lease:
+    // if another writer advanced the target after our read, GitHub rejects this update.
+    await github.rest.git.updateRef({owner,repo,ref:'heads/'+plan.target,sha:result.sha,force:false});
+    receipt.status='integrated'; receipt.destinationSha=result.sha;
+  }
+  const previous = await receiptFor({github,owner,repo,pr:snap.pr,verifyIntegrated:false});
+  const reason = ((report.gates || []).filter(g=>!g.ok).map(g=>g.name+': '+g.detail).join('\n') || report.reason || 'Validation did not pass')+
+    '\n'+(report.failures||[]).slice(0,4).join('\n');
+  if (receipt.status==='blocked') receipt.reason=String(reason).slice(0,2000);
+  const body = receiptBody(receipt,reason);
+  // Dedupe blocked notifications for unchanged source/base/policy. Integrated receipts
+  // remain permanent source-PR evidence even if the source PR targets a legacy branch.
+  if (!previous || previous.sourceSha!==receipt.sourceSha || previous.baseSha!==receipt.baseSha ||
+      previous.policyHash!==receipt.policyHash || previous.status!==receipt.status) {
+    await github.rest.issues.createComment({owner,repo,issue_number:plan.pr,body});
+    await github.rest.issues.createComment({owner,repo,issue_number:81,body});
+  }
+  return receipt;
+}
+module.exports={MARKER,TARGET,REGISTRY,GENERATED,GATES,hash,config,validatePolicy,paths,ownerDecision,
+  sourceEligible,snapshot,parseReceipt,receiptFor,planNext,validateReport,receiptBody,publish};
