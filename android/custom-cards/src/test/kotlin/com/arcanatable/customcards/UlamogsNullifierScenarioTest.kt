@@ -30,8 +30,11 @@ class UlamogsNullifierScenarioTest {
     private fun GameTestDriver.respondToOpponentsSpell(c: Choices, spellName: String = "Grizzly Bears") {
         passPriorityUntil(com.wingedsheep.sdk.core.Step.PRECOMBAT_MAIN, player2)
         val spell = putCardInHand(player2, spellName)
-        if (spellName == "Sol Ring") giveColorlessMana(player2, 1)
-        else { giveMana(player2, Color.GREEN); giveColorlessMana(player2, 1) }
+        when (spellName) {
+            "Sol Ring" -> giveColorlessMana(player2, 1)
+            "Dark Ritual" -> giveMana(player2, Color.BLACK)
+            else -> { giveMana(player2, Color.GREEN); giveColorlessMana(player2, 1) }
+        }
         assertNull(castSpell(player2, spell).error)
         assertEquals("Caster retains priority after casting", player2, priorityPlayer)
         assertNull(passPriority(player2).error)
@@ -91,6 +94,32 @@ class UlamogsNullifierScenarioTest {
         assertEquals(listOf("Grizzly Bears", "Island"),
             d.getExileCardNames(d.player2).sorted())
         assertTrue(d.getGraveyardCardNames(d.player2).isEmpty())
+    }
+
+    /** The processor ETB may counter an opponent's instant, not only permanent spells. */
+    @Test fun opponentsInstantSpellIsCounteredAfterProcessingTwoExiles() {
+        val d = setup()
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Island")
+        d.respondToOpponentsSpell(
+            Choices(yes = true, pick = listOf("Sol Ring", "Island")),
+            spellName = "Dark Ritual",
+        )
+        assertEquals("The instant and both processed cards go to their owner's graveyard",
+            listOf("Dark Ritual", "Island", "Sol Ring"), d.getGraveyardCardNames(d.player2).sorted())
+        assertTrue("Both processed exiles must leave exile", d.getExileCardNames(d.player2).isEmpty())
+    }
+
+    /** Declining the optional processing must let the opponent's instant resolve. */
+    @Test fun decliningProcessingOfOpponentsInstantSpellLetsItResolve() {
+        val d = setup()
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Island")
+        d.respondToOpponentsSpell(Choices(yes = false), spellName = "Dark Ritual")
+        assertEquals("The resolved instant goes to its owner's graveyard",
+            listOf("Dark Ritual"), d.getGraveyardCardNames(d.player2))
+        assertEquals("Declining must preserve both exiled cards",
+            listOf("Island", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
     }
 
     /**
