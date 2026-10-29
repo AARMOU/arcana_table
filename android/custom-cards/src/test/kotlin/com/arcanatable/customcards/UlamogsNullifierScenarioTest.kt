@@ -536,4 +536,56 @@ class UlamogsNullifierScenarioTest {
         assertEquals("Two cards with the same name must generate two real zone changes",
             2, processed.size)
     }
+
+    /**
+     * The target may be an opponent's instant while Rest in Peace redirects
+     * both processed cards and the countered instant back into exile.
+     * This must still count as paying Nullifier's optional two-card cost.
+     */
+    @Test fun restInPeaceCountersOpponentsInstantAfterTwoRealReplacementMoves() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Rest in Peace")
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Island")
+
+        d.respondToOpponentsSpell(
+            Choices(yes = true, pick = listOf("Sol Ring", "Island")),
+            spellName = "Dark Ritual",
+        )
+
+        assertEquals("Rest in Peace redirects the processed cards and countered instant",
+            listOf("Dark Ritual", "Island", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
+        assertTrue("No opponent-owned card may reach the graveyard",
+            d.getGraveyardCardNames(d.player2).isEmpty())
+        val processed = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
+            .filter { it.ownerId == d.player2 &&
+                it.fromZone == com.wingedsheep.sdk.core.Zone.EXILE &&
+                it.toZone == com.wingedsheep.sdk.core.Zone.EXILE }
+            .map { it.entityName }.sorted()
+        assertEquals("Two separately owned exile objects must be processed",
+            listOf("Island", "Sol Ring"), processed)
+    }
+
+    /**
+     * Declining Nullifier's optional cost must not create EXILE-to-EXILE
+     * replacement moves, even though Rest in Peace exiles a resolved instant.
+     */
+    @Test fun restInPeaceDeclineOnOpponentsInstantNeverProcessesExiledCards() {
+        val d = setup()
+        d.putPermanentOnBattlefield(d.player1, "Rest in Peace")
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Island")
+
+        d.respondToOpponentsSpell(Choices(yes = false), spellName = "Dark Ritual")
+
+        assertEquals("Resolved instant is exiled; original two exiles remain",
+            listOf("Dark Ritual", "Island", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
+        assertTrue(d.getGraveyardCardNames(d.player2).isEmpty())
+        val processed = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
+            .filter { it.ownerId == d.player2 &&
+                it.fromZone == com.wingedsheep.sdk.core.Zone.EXILE &&
+                it.toZone == com.wingedsheep.sdk.core.Zone.EXILE }
+        assertTrue("Declining may not move either exiled object", processed.isEmpty())
+    }
+
 }

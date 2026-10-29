@@ -30,7 +30,7 @@ jobs:
       - name: Execute B140 registered Nullifier engine regressions
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.UlamogsNullifierScenarioTest'
-      - name: Require exactly twenty-five executed, no skipped or failing scenarios
+      - name: Require exactly twenty-seven executed, no skipped or failing scenarios
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -40,7 +40,7 @@ jobs:
           root = ET.parse(report).getroot()
           stats = {key: int(root.get(key, '0')) for key in ('tests', 'failures', 'errors', 'skipped')}
           print(stats)
-          assert stats == {'tests': 25, 'failures': 0, 'errors': 0, 'skipped': 0}, stats
+          assert stats == {'tests': 27, 'failures': 0, 'errors': 0, 'skipped': 0}, stats
           PY
       - uses: actions/upload-artifact@v4
         if: always()
