@@ -19,6 +19,7 @@ const MAX_ITEMS = 30;
 const INTEGRATED_DAYS = 7;
 const GREEN = new Set(['success', 'skipped', 'neutral']);
 const V = require('./verified-certification.cjs');
+const I = require('./card-integration.cjs');
 const DECISION_MARKER = '<!-- arcana-owner-decision-v1 -->';
 
 const unitOf = body => Number((String(body || '').match(/(?:Fixes|Closes|Resolves|Unit:)\s*#(\d+)/i) || [])[1]) || null;
@@ -95,7 +96,7 @@ function inboxPayload(items, now = new Date(), integratedActivity = []) {
   return { checkedAt: now.toISOString(), awaitingReview: sorted.filter(isReadyForOwner).length, items: sorted,
     // Separate from the 30-row review inbox: this timestamped sample powers a conservative daily merge count.
     integratedActivity: integratedActivity.slice(0, 100),
-    note: 'Owner approval is card sign-off for integration review only: no merge, build, signing or release follows from it. Checks passing is not rules certification.' };
+    note: 'Owner-approved cards may integrate automatically under the standing card-only policy after destination-engine checks pass. APK builds, signing and releases remain separately authorized. Checks passing is not rules certification.' };
 }
 
 function inboxSummary(p) {
@@ -108,7 +109,10 @@ async function buildReviewInbox({ github, owner, repo, now = new Date() }) {
   const prs = (await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', per_page: 100 }))
     .filter(p => COPILOT.has(String(p.user?.login || '').toLowerCase()));
   const items = [];
-  for (const pr of prs.slice(0, MAX_ITEMS)) {
+  const integratedActivity = [];
+  // The display cap must not prevent newly approved cards or verified integration
+  // receipts from being considered. Source PRs may remain open on a legacy base.
+  for (const pr of prs) {
     // Card PRs only: the PR must fix an open [Arcana Queue] work unit (skips blocker notes and old work).
     const n = unitOf(pr.body);
     if (!n) continue;
@@ -121,12 +125,31 @@ async function buildReviewInbox({ github, owner, repo, now = new Date() }) {
       changedFiles = (await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number: pr.number, per_page: 100 }))
         .map(f => f.filename);
     } catch { /* Unknown is not an implementation: fail closed, without dropping the row. */ }
-    items.push(classify(pr, checkRuns, reviews, unit.body, changedFiles));
+    const row = classify(pr, checkRuns, reviews, unit.body, changedFiles);
+    if (row.state === 'approved') {
+      try {
+        const integration = await I.receiptFor({github,owner,repo,pr});
+        if (integration) {
+          row.integration = integration;
+          row.checkRuns.unshift({name:'Android integration',result:integration.status==='integrated'?'success':'failure',url:integration.runUrl});
+          if (integration.status === 'integrated') {
+            row.state='integrated'; row.readyForOwner=false;
+            row.updatedAt=integration.at;
+            row.url=`https://github.com/${owner}/${repo}/commit/${integration.destinationSha}`;
+            integratedActivity.push({pr:pr.number,card:row.card,mergedAt:integration.at});
+          } else {
+            row.problems.unshift('Integration blocked: '+String(integration.reason||'See destination test run').slice(0,1000));
+          }
+        }
+      } catch {
+        row.problems.unshift('Android integration status could not be verified');
+      }
+    }
+    items.push(row);
   }
   // Recently integrated cards (merged Copilot card PRs), so an approval visibly reaches "Integrated".
   const since = now.getTime() - INTEGRATED_DAYS * 864e5;
   const closed = (await github.rest.pulls.list({ owner, repo, state: 'closed', sort: 'updated', direction: 'desc', per_page: 100 })).data || [];
-  const integratedActivity = [];
   for (const pr of closed) {
     if (!COPILOT.has(String(pr.user?.login || '').toLowerCase()) || !pr.merged_at || Date.parse(pr.merged_at) < since || !unitOf(pr.body)) continue;
     // Daily card count must also exclude blocker/audit PRs linked to a card unit.

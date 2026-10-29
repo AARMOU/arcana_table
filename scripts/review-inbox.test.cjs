@@ -141,3 +141,28 @@ test('look-alike check names or untrusted apps cannot certify the owner review i
   const good=R.classify(pr(),[...green,certRun()],[],'',cardFiles);
   assert.equal(good.readyForOwner,true);
 });
+
+test('verified Android receipts distinguish integrated cards and destination blockers', async () => {
+  const I=require('./card-integration.cjs');
+  const receipt={schema:1,pr:360,sourceSha:'a'.repeat(40),baseSha:'b'.repeat(40),target:I.TARGET,
+    status:'integrated',destinationSha:'d'.repeat(40),at:'2026-10-28T18:00:00Z',
+    runUrl:'https://github.com/AARMOU/arcana_table/actions/runs/123456'};
+  const github={rest:{
+    pulls:{list:async args=>({data:args.state==='open'?[pr()]:[]}),listFiles:async()=>({data:cardFiles.map(filename=>({filename}))}),
+      listReviews:async()=>({data:[review('APPROVED')]})},
+    issues:{get:async()=>({data:{state:'open',title:'[Arcana Queue] Card',body:''}}),
+      listComments:async()=>({data:[{user:{id:41898282,login:'github-actions[bot]'},body:I.receiptBody(receipt)}]})},
+    checks:{listForRef:async()=>({data:{check_runs:[run('toolkit','success'),certRun()]}})},
+    git:{getRef:async()=>({data:{object:{sha:'e'.repeat(40)}}})},
+    repos:{compareCommitsWithBasehead:async()=>({data:{status:'ahead'}})}
+  },paginate:async(fn,args)=>(await fn(args)).data};
+  let payload=await R.buildReviewInbox({github,owner:'AARMOU',repo:'arcana_table'});
+  assert.equal(payload.items[0].state,'integrated');
+  assert.equal(payload.items[0].readyForOwner,false);
+  assert.equal(payload.integratedActivity.length,1);
+  receipt.status='blocked';receipt.reason='Independent test failed on destination engine';
+  payload=await R.buildReviewInbox({github,owner:'AARMOU',repo:'arcana_table'});
+  assert.equal(payload.items[0].state,'approved');
+  assert.match(payload.items[0].problems[0],/Integration blocked: Independent test failed/);
+  assert.equal(payload.integratedActivity.length,0);
+});

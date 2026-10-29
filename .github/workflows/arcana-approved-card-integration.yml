@@ -1,0 +1,232 @@
+name: Arcana Approved Card Integration (NO APK)
+# Owner-authorized card-only merges after destination tests. No paid workers,
+# APK/AAB, signing, release, runtime replacements or production deployments.
+on:
+  push:
+    branches: [main]
+    paths:
+      - integration/**
+      - scripts/card-integration.cjs
+      - .github/workflows/arcana-approved-card-integration.yml
+  schedule:
+    - cron: '*/15 * * * *'
+  workflow_run:
+    workflows: ['Arcana Card Review Inbox Refresh']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      retry_blocked:
+        description: 'Retry one unchanged blocked card; never bypass its tests'
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - integration/**
+      - scripts/card-integration*
+      - scripts/review-inbox.cjs
+      - .github/workflows/arcana-approved-card-integration.yml
+permissions: {}
+concurrency:
+  group: arcana-approved-card-integration
+  cancel-in-progress: false
+jobs:
+  policy-tests:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test scripts/card-integration.test.cjs scripts/review-inbox.test.cjs
+      - run: python3 -m unittest discover -s integration -p 'test_*.py' -v
+      - run: git diff --check
+
+  plan:
+    needs: policy-tests
+    if: (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) || (github.ref == 'refs/heads/main' && (github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'))
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+      checks: read
+      issues: read
+    outputs:
+      eligible: ${{ steps.plan.outputs.eligible }}
+      plan: ${{ steps.plan.outputs.plan }}
+      base: ${{ steps.plan.outputs.base }}
+      control: ${{ steps.plan.outputs.control }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/github-script@v7
+        id: plan
+        env:
+          RETRY_BLOCKED: ${{ inputs.retry_blocked == true }}
+        with:
+          script: |
+            const P = require('./scripts/card-integration.cjs');
+            const fs = require('node:fs');
+            const controlSha = require('node:child_process').execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+            const plan = await P.planNext({github,...context.repo,cfg:P.config(),controlSha,
+              retry:process.env.RETRY_BLOCKED==='true'});
+            if (!plan) { core.summary.addRaw('No eligible approved card awaiting integration; unchanged blocked cards are not retried automatically.').write(); return; }
+            fs.mkdirSync('integration-plan',{recursive:true});
+            fs.writeFileSync('integration-plan/plan.json',JSON.stringify(plan));
+            core.setOutput('eligible','true');
+            core.setOutput('plan',Buffer.from(JSON.stringify(plan)).toString('base64'));
+            core.setOutput('base',plan.baseSha);
+            core.setOutput('control',controlSha);
+            core.summary.addRaw(`Queued approved PR #${plan.pr} on exact Android base ${plan.baseSha}. NO APK.`).write();
+      - uses: actions/upload-artifact@v4
+        if: steps.plan.outputs.eligible == 'true'
+        with:
+          name: card-integration-plan
+          path: integration-plan/plan.json
+          retention-days: 14
+          if-no-files-found: error
+
+  destination-tests:
+    needs: plan
+    if: needs.plan.outputs.eligible == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.control }}
+          path: trusted
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.base }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: card-integration-plan
+          path: plan
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Forward-port approved changes and execute every destination gate (NO APK)
+        run: python3 trusted/integration/runner.py validate --plan plan/plan.json --trusted trusted --candidate candidate --output result
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: card-integration-result
+          path: result/
+          retention-days: 14
+          if-no-files-found: error
+
+  receipt-contract:
+    needs: [plan, destination-tests]
+    if: needs.destination-tests.result == 'success' && needs.plan.outputs.eligible == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.control }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: card-integration-result
+          path: result
+      - name: Verify real artifact/report contract without a write token
+        uses: actions/github-script@v7
+        env:
+          PLAN_B64: ${{ needs.plan.outputs.plan }}
+        with:
+          script: |
+            const fs=require('node:fs'), P=require('./scripts/card-integration.cjs');
+            const plan=JSON.parse(Buffer.from(process.env.PLAN_B64,'base64').toString());
+            const report=JSON.parse(fs.readFileSync('result/report.json','utf8'));
+            P.validateOutcome(plan,report);
+            if(report.status==='passed') P.validateReport(plan,report,JSON.parse(fs.readFileSync('result/files.json','utf8')));
+            const blocked=report.gates.filter(g=>!g.ok).map(g=>g.name+': '+g.detail);
+            core.summary.addHeading('PR #'+plan.pr+' destination result: '+report.status)
+              .addList([...blocked,...(report.failures||[]).slice(0,8)])
+              .addRaw('NO APK. A blocked card is not integrated.').write();
+
+  publish:
+    needs: [plan, destination-tests, receipt-contract]
+    # PR premerge probes can test real approved cards but can NEVER write or merge.
+    if: always() && github.event_name != 'pull_request' && github.ref == 'refs/heads/main' && needs.receipt-contract.result == 'success' && needs.plan.outputs.eligible == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    permissions:
+      contents: write
+      pull-requests: read
+      issues: write
+      checks: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.control }}
+          path: trusted
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.base }}
+          path: expected
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: card-integration-result
+          path: result
+      - name: Reconstruct approved source without executing candidate code
+        env:
+          PLAN_B64: ${{ needs.plan.outputs.plan }}
+        run: |
+          python3 - <<'PY'
+          import os,base64
+          from pathlib import Path
+          Path('expected-plan.json').write_bytes(base64.b64decode(os.environ['PLAN_B64'],validate=True))
+          PY
+          python3 - <<'PY'
+          import json,subprocess
+          from pathlib import Path
+          report=json.loads(Path('result/report.json').read_text())
+          if report['status']=='passed':
+              subprocess.run(['python3','trusted/integration/runner.py','prepare','--plan','expected-plan.json',
+                              '--candidate','expected','--output','expected-sources.json'],check=True)
+          else:
+              Path('expected-sources.json').write_text('{}')
+          PY
+      - name: Recheck live approval/base/policy, integrate only passed files, publish receipt
+        uses: actions/github-script@v7
+        env:
+          PLAN_B64: ${{ needs.plan.outputs.plan }}
+        with:
+          script: |
+            const fs = require('node:fs');
+            const P = require('./trusted/scripts/card-integration.cjs');
+            const plan = JSON.parse(Buffer.from(process.env.PLAN_B64,'base64').toString());
+            const report = JSON.parse(fs.readFileSync('result/report.json','utf8'));
+            const files = JSON.parse(fs.readFileSync('result/files.json','utf8'));
+            const expectedSources = JSON.parse(fs.readFileSync('expected-sources.json','utf8'));
+            const receipt = await P.publish({github,...context.repo,cfg:P.config('trusted'),plan,report,files,expectedSources,
+              runUrl:`${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`});
+            core.summary.addRaw(P.receiptBody(receipt,receipt.reason)).write();
+            const R = require('./trusted/scripts/review-inbox.cjs');
+            const S = require('./trusted/scripts/control-status.cjs');
+            const payload = await R.buildReviewInbox({github,...context.repo});
+            const status = await S.publishStatus({github,...context.repo,kind:'review',payload,summary:R.inboxSummary(payload)});
+            if (status.startsWith('failed')) core.setFailed(status);
