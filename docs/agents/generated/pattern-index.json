@@ -280,7 +280,7 @@
  },
  "Costs": {
   "Costs.Composite": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -418,7 +418,7 @@
    ]
   },
   "Costs.PayLife": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Arco-Flagellant",
@@ -431,6 +431,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HibernationSliver.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HibernationSliverScenarioTest.kt"
+    },
+    {
+     "card": "Corrupted Crossroads",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CorruptedCrossroads.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CorruptedCrossroadsScenarioTest.kt"
     }
    ]
   },
@@ -549,7 +555,7 @@
    ]
   },
   "Costs.Tap": {
-   "count": 37,
+   "count": 39,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -1007,7 +1013,7 @@
  },
  "Effects": {
   "Effects.AddAnyColorMana": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -1020,6 +1026,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/FoodChain.kt",
      "lines": 42,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/FoodChainScenarioTest.kt"
+    },
+    {
+     "card": "Corrupted Crossroads",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CorruptedCrossroads.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CorruptedCrossroadsScenarioTest.kt"
     },
     {
      "card": "Lotus Field",
@@ -1038,12 +1050,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/NinjaPizza.kt",
      "lines": 49,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/NinjaPizzaScenarioTest.kt"
-    },
-    {
-     "card": "The Cabbage Merchant",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheCabbageMerchant.kt",
-     "lines": 52,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheCabbageMerchantScenarioTest.kt"
     }
    ]
   },
@@ -1059,7 +1065,7 @@
    ]
   },
   "Effects.AddColorlessMana": {
-   "count": 19,
+   "count": 21,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -4230,7 +4236,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 54,
+   "count": 56,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4820,7 +4826,7 @@
    ]
   },
   "manaAbility": {
-   "count": 25,
+   "count": 27,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4901,6 +4907,17 @@
     }
    ]
   },
+  "restriction": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Eldrazi Temple",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziTemple.kt",
+     "lines": 50,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldraziTempleScenarioTest.kt"
+    }
+   ]
+  },
   "restrictions": {
    "count": 7,
    "examples": [
@@ -4943,7 +4960,7 @@
    ]
   },
   "timing": {
-   "count": 29,
+   "count": 31,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5456,7 +5473,7 @@
    ]
   },
   "TimingRule.ManaAbility": {
-   "count": 26,
+   "count": 28,
    "examples": [
     {
      "card": "Desert of the Glorified",

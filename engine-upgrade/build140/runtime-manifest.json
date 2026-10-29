@@ -1,0 +1,94 @@
+{
+  "schema": 1,
+  "upstream": "61e71e586b100faa661f86cac827ac3c3bbb5a78",
+  "patches": {
+    "argentum-patches/0001-android-regex.patch": {
+      "sha256": "c8fe9813f3624167d5cc85209276760e8b2daa4dd229eb7ae55bb7b7ccf2711b",
+      "status": "applied"
+    },
+    "argentum-patches/0002-engine-trial-build.patch": {
+      "sha256": "9e2a32ecd0b9e3214726390f45731ff18b2c01811971bab9ed0d381ffa33fd8c",
+      "status": "applied"
+    },
+    "argentum-patches/0003-full-library-export.patch": {
+      "sha256": "a0a1b4b36bb313c6796012dee1f0a718c94b09efabecc8ff779317b8830b4823",
+      "status": "applied"
+    },
+    "argentum-patches/0004-token-copy-triggered-abilities.patch": {
+      "sha256": "77db9e78d406762a3c9e73b93ef3304c51e535c8e9bcce0959d3c300ef5958f0",
+      "status": "applied"
+    },
+    "argentum-patches/0005-last-known-negative-subtype.patch": {
+      "sha256": "3a5ae03a41cf2007c6161635f2be1471e57ebeca5e23821a3a5440d0e5d577de",
+      "status": "applied"
+    },
+    "argentum-patches/0006-ai-decision-deadline.patch": {
+      "sha256": "419262640efeab400a71eef3586fc29f24a116dc508625507ed3beea7270d3ef",
+      "status": "applied"
+    },
+    "argentum-patches/0007-ai-bounded-stack-search.patch": {
+      "sha256": "e426bfa8c1d73b3f91fa8f71d866b585e9fdc3748f1c366710e909855a77206e",
+      "status": "applied"
+    },
+    "argentum-patches/0008-jvm-test-toolchain.patch": {
+      "sha256": "629e1b3b7371c699b7d7a6232ea1f8442ea537369cf8dc1b929ceb01ec2e6932",
+      "status": "applied"
+    },
+    "argentum-patches/0010-enumeration-absence-index.patch": {
+      "sha256": "75371d456181cf8c11e01ee2cb0f1c0f72d1fc8af0af31b30fca5ff68ee6f350",
+      "status": "experimental_conflict"
+    },
+    "argentum-patches/0011-stack-object-copying.patch": {
+      "sha256": "355e9bc4ae1479ff3f2e36be8250af2e741e39d89f65209118c47d61c5675899",
+      "status": "applied"
+    },
+    "argentum-patches/0012-colorless-hybrid-sdk.patch": {
+      "sha256": "957ba557b52f504cc55f860d151dc9b0408e13361ba86f90a9678c2fd6ca55ef",
+      "status": "applied"
+    },
+    "argentum-patches/0013-colorless-hybrid-floating-payment.patch": {
+      "sha256": "a2630a36d9c88b6664abad5f6356e954e6cbd4f434e71684395fea173da078c0",
+      "status": "applied"
+    },
+    "argentum-patches/0014-colorless-hybrid-auto-tap.patch": {
+      "sha256": "838a6e867960cccb7b97e057e3144ec61a067699c8af6158d19f4cbfcc0edbe4",
+      "status": "applied"
+    },
+    "argentum-patches/0015-granted-cascade.patch": {
+      "sha256": "1074333a3bb6846655d5d2999debdb8925899dd26888534b1356f5e47ffaf2d1",
+      "status": "applied"
+    },
+    "argentum-patches/0016-granted-keyword-mana-value-cap.patch": {
+      "sha256": "7f5e11c422199a7c5a281f261529fc5c593795f66c1c8abc181ccb11b1bf948b",
+      "status": "applied"
+    },
+    "engine-upgrade/eldrazi-temple/patches/0001-colorless-eldrazi-source-mana.patch": {
+      "sha256": "1572e822da7d82223d59921a73eadc2b6f0eb5cdbde7916fd1ae7cb27620de61",
+      "status": "applied"
+    },
+    "engine-upgrade/eldrazi-combined/patches/0002-devoid-after-temple.patch": {
+      "sha256": "53a7b0b1843c6b45cffd6ec923f2532917f7e8439c0f587a1d43f440841b9b8e",
+      "status": "applied"
+    },
+    "engine-upgrade/build140/patches/0001-devoid-sdk-surface.patch": {
+      "sha256": "95637cd103534605eb479ec56c3d47043f9ad30f9b4331bb397f6647a2234e87",
+      "status": "applied"
+    },
+    "engine-upgrade/build140/patches/0002-temple-projected-source-subtypes.patch": {
+      "sha256": "cd269517e1490345f5694c81b043173c94a35544b4816e2c583131481b7f676b",
+      "status": "applied"
+    }
+  },
+  "jars": {
+    "argentum-ai.jar": "10321247e9d3b052547123bdab6dab8f720882a2dd8a2782c8a8a74714eb5757",
+    "argentum-mtg-sdk-tooling.jar": "b2849dfc2f95412a415a0cacb786333c3232dd73291670583f6396c81033694d",
+    "argentum-mtg-sdk.jar": "d0da1c9bd4159f700d5b0390dd0458135695794e46758bfbe7138cff67c03d22",
+    "argentum-rules-engine.jar": "d370af1c2a7888787b9550f36348439f9f10dc4ff981c0d9550789077d0484d7"
+  },
+  "builtBy": {
+    "workflow": "B140 Eldrazi lands (engine jars + Temple + Crossroads)",
+    "run": "40729681472",
+    "sourceCommit": "30fcd504a6cc0070e012ebf1c3b58f25f57d177e"
+  },
+  "build": "engine-upgrade/build140/apply_engine.sh, then gradle :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar"
+}
