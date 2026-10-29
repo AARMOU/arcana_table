@@ -117,3 +117,69 @@ test('typographic apostrophes in Copilot titles match ASCII Oracle names', () =>
   assert.equal(P.titleNames('Implement Verdant Suns Avatar', "Verdant Sun's Avatar"), false);
   assert.equal(P.titleNames('Implement Verdant Sun’s Avatarx', "Verdant Sun's Avatar"), false);
 });
+
+test('successful exact-head independent certification un-drafts only the verified Copilot PR', async () => {
+  const calls = [];
+  const live = { ...pr(), node_id:'PR_test', draft:true };
+  const github = {
+    rest:{pulls:{get:async args => {calls.push(['get',args]); return {data:live};}}},
+    graphql:async (query,variables) => {
+      calls.push(['graphql',query,variables]);
+      return {markPullRequestReadyForReview:{pullRequest:{isDraft:false}}};
+    }
+  };
+  assert.equal(await P.markReadyAfterCertification({
+    github,owner:'AARMOU',repo:'arcana_table',number:410,sha,certified:true
+  }),true);
+  assert.equal(calls.length,2);
+  assert.equal(calls[0][1].pull_number,410);
+  assert.match(calls[1][1],/markPullRequestReadyForReview/);
+  assert.equal(calls[1][2].id,'PR_test');
+});
+
+test('failed certification cannot look up or un-draft a PR', async () => {
+  let calls=0;
+  const github={rest:{pulls:{get:async()=>{calls++;return {data:{}};}}},graphql:async()=>{calls++;}};
+  for(const certified of [false,undefined,null]) {
+    assert.equal(await P.markReadyAfterCertification({
+      github,owner:'AARMOU',repo:'arcana_table',number:410,sha,certified
+    }),false);
+  }
+  assert.equal(calls,0);
+});
+
+test('stale, non-Copilot, closed, ready and untrusted PRs never get un-drafted', async () => {
+  const good={...pr(),node_id:'PR_test',draft:true};
+  const badCases=[
+    {draft:false},
+    {state:'closed'},
+    {head:{...good.head,sha:'b'.repeat(40)}},
+    {user:{login:'AARMOU'}},
+    {user:{login:'another-bot'}},
+    {head:{...good.head,repo:{full_name:'attacker/fork'}}},
+    {base:{...good.base,ref:'main'}},
+    {base:{...good.base,repo:{full_name:'attacker/fork'}}},
+    {node_id:''}
+  ];
+  for(const change of badCases) {
+    let writes=0;
+    const github={
+      rest:{pulls:{get:async()=>({data:{...good,...change}})}},
+      graphql:async()=>{writes++;throw Error('unexpected write');}
+    };
+    assert.equal(await P.markReadyAfterCertification({
+      github,owner:'AARMOU',repo:'arcana_table',number:410,sha,certified:true
+    }),false,JSON.stringify(change));
+    assert.equal(writes,0);
+  }
+});
+
+test('GraphQL refusal never pretends to have marked a PR ready', async () => {
+  const github={
+    rest:{pulls:{get:async()=>({data:{...pr(),node_id:'PR_test',draft:true}})}},
+    graphql:async()=>({markPullRequestReadyForReview:{pullRequest:{isDraft:true}}})
+  };
+  await assert.rejects(P.markReadyAfterCertification({
+    github,owner:'AARMOU',repo:'arcana_table',number:410,sha,certified:true
+  }),/did not confirm/);
+});

@@ -115,7 +115,7 @@ jobs:
     permissions:
       contents: read
       checks: write
-      pull-requests: read
+      pull-requests: write
       issues: read
     steps:
       - uses: actions/checkout@v4
@@ -156,3 +156,21 @@ jobs:
                 conclusion:ok?'success':'failure',output});
             }
             core.info('Independent certification: '+suite.name+' '+(ok?'PASS':'FAIL')+' @ '+sha);
+            // The check is already published for this exact source head. Only a
+            // successful result may expose the Copilot draft to owner review.
+            // The existing review-inbox workflow runs on this workflow's completion.
+            if (ok) {
+              try {
+                const ready = await P.markReadyAfterCertification({
+                  github, owner, repo, number, sha, certified:ok
+                });
+                core.info(ready
+                  ? 'Certified Copilot PR #'+number+' marked ready for OWNER review.'
+                  : 'No ready transition: source is no longer an eligible current Copilot draft.');
+              } catch (error) {
+                // Certification remains factually valid; a permission/GraphQL error
+                // must not invent approval or block the normal inbox refresh.
+                core.warning('Certification passed, but GitHub could not mark PR #'+number+
+                  ' ready for review (HTTP '+(Number(error?.status)||'unknown')+').');
+              }
+            }
