@@ -247,3 +247,62 @@ test('periodic status refresh is bounded, read-only, visibility gated and coales
   const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
   assert.ok(sw.includes('arcana-control-shell-v14'));
 });
+
+test('rate-limited public edge falls back to read-only GitHub with a bounded per-path browser cache',async()=>{
+  const from=script.indexOf('const directFeedCache=new Map();');
+  const to=script.indexOf('function statusForRun(run)',from);
+  assert.ok(from>=0&&to>from,'public feed fallback functions found');
+  const src=script.slice(from,to);
+  let edge=0,direct=0;
+  const path='/issues/78/comments?per_page=100&page=1';
+  const host='https://api.github.com/repos/AARMOU/arcana_table';
+  const context=vm.createContext({
+    Map, Date, REPO:'AARMOU/arcana_table',
+    PUBLIC_GITHUB:'https://arcana-review.arcanamtg.workers.dev/v1/public/github?path=',
+    staleFeeds:0,cachedFeeds:0,sourceTimes:[],staleSources:[],
+    isStaleFeed:()=>false,
+    fetch:async(url,options={})=>{
+      if(String(url).startsWith('https://arcana-review.')){
+        edge++;
+        return new Response(JSON.stringify({error:'github-upstream-http-403'}),{status:503});
+      }
+      direct++;
+      assert.equal(String(url),host+path);
+      assert.equal(options.headers.Accept,'application/vnd.github+json');
+      assert.equal(options.method,undefined,'direct fallback must never mutate GitHub');
+      assert.equal(options.headers.Authorization,undefined,'no OAuth or repository tokens in browser');
+      return new Response(JSON.stringify([{user:{login:'github-actions[bot]'}}]),{
+        status:200,headers:{Link:'<https://api.github.com/mock>; rel="next"'}
+      });
+    },
+  });
+  vm.runInContext(src+'\\nthis.callApi=api;',context);
+  const first=await context.callApi(path);
+  assert.equal(first.data.length,1);
+  assert.ok(first.link.includes('next'));
+  const second=await context.callApi(path);
+  assert.equal(second.data.length,1);
+  assert.equal(edge,2);
+  assert.equal(direct,1,'a two-minute refresh must not spend another public rate-limit request');
+  assert.equal(context.directFeedFallbacks,2);
+  assert.equal(context.cachedFeeds,1);
+  assert.equal(await context.publicGithubDirect('/private/admin'),null);
+  assert.equal(direct,1);
+});
+
+test('dashboard never treats arbitrary edge 503 as permission to bypass its public feed',async()=>{
+  const from=script.indexOf('const directFeedCache=new Map();');
+  const to=script.indexOf('function statusForRun(run)',from);
+  let direct=0;
+  const context=vm.createContext({
+    Map,Date,REPO:'AARMOU/arcana_table',PUBLIC_GITHUB:'https://arcana-review.example/v1/public/github?path=',
+    staleFeeds:0,cachedFeeds:0,sourceTimes:[],staleSources:[],isStaleFeed:()=>false,
+    fetch:async url=>{
+      if(String(url).startsWith('https://api.github.com')){direct++;return new Response('{}');}
+      return new Response(JSON.stringify({error:'public-github-feed-unavailable'}),{status:503});
+    }
+  });
+  vm.runInContext(script.slice(from,to)+'\\nthis.callApi=api;',context);
+  await assert.rejects(context.callApi('/issues/78/comments?per_page=100&page=1'),/GitHub feed HTTP 503/);
+  assert.equal(direct,0);
+});
