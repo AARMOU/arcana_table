@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import worker, { sealSession, openSession, decide, cleanNote, FIX_LABEL, DECISION_MARKER } from "../src/index.mjs";
+import worker, { sealSession, openSession, decide, prReadFailure, cleanNote, FIX_LABEL, DECISION_MARKER } from "../src/index.mjs";
 
 const SECRET = "s".repeat(40);
 const ENV = { GITHUB_OAUTH_CLIENT_ID: "cid", GITHUB_OAUTH_CLIENT_SECRET: "csecret", SESSION_SECRET: SECRET };
@@ -17,13 +17,17 @@ function fakeGitHub({ head = SHA, checks = [{ name: "toolkit", status: "complete
   author = "Copilot", prState = "open", draft = false,
   files = ["android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt",
     "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineScenarioTest.kt"],
-  unitTitle = "[Arcana Queue] Celestine — Cardkit SUPPORTED, unclaimed", user = "AARMOU" } = {}) {
+  unitTitle = "[Arcana Queue] Celestine — Cardkit SUPPORTED, unclaimed", user = "AARMOU",
+  prError = null } = {}) {
   const writes = [];
   const fetchImpl = async (url, init = {}) => {
     const u = String(url); const method = init.method || "GET";
     const ok = (body, status = 200) => new Response(body === null ? null : JSON.stringify(body), { status });
     if (u === "https://github.com/login/oauth/access_token") return ok({ access_token: "gho_owner" });
     if (u === "https://api.github.com/user") return ok({ login: user });
+    if (u.endsWith("/pulls/360") && method === "GET" && prError) return new Response(
+      JSON.stringify({message:prError.message||"GitHub rejected the request"}),
+      {status:prError.status,headers:prError.headers||{}});
     if (u.endsWith("/pulls/360") && method === "GET") return ok({ state: prState, draft, user: { login: author }, head: { sha: head }, body: "- Fixes #358" });
     if (u.includes("/pulls/360/files?") && method === "GET") return ok(files.map(filename => ({ filename })));
     if (u.endsWith("/issues/358") && method === "GET") return ok({ state: "open", title: unitTitle });
@@ -252,4 +256,26 @@ test("fake certificate names/apps cannot cause owner approval, even with green C
   }
   const legitimate=fakeGitHub({checks:[toolkit,CERTIFIED]});
   assert.equal((await decision(legitimate,{pr:360,sha:SHA,decision:'approve'})).status,200);
+});
+
+test("GitHub PR-read error categorization preserves status but never exposes owner credential or upstream response", async () => {
+  const cases = [
+    [{ status:401, message:"Bad credentials" },401,"github-credential-rejected"],
+    [{ status:403, message:"API rate limit exceeded" },503,"github-rate-limited"],
+    [{ status:403, message:"Access forbidden", headers:{"x-ratelimit-remaining":"0"} },503,"github-rate-limited"],
+    [{ status:403, message:"Resource not accessible by integration" },403,"github-access-denied"],
+    [{ status:429, message:"Rate quota",headers:{"retry-after":"60"} },503,"github-rate-limited"],
+    [{ status:404, message:"Not Found" },404,"github-pr-not-accessible"],
+    [{ status:502, message:"upstream internal failure" },502,"github-pr-read-failed"]
+  ];
+  for(const [prError,code,error] of cases){
+    const gh=fakeGitHub({prError});
+    const r=await decision(gh,{pr:360,sha:SHA,decision:"approve"});
+    assert.equal(r.status,code,JSON.stringify(prError));
+    assert.equal(r.body.error,error,JSON.stringify(prError));
+    assert.equal(gh.writes.length,0,"a failed first read never submits a review");
+    assert.ok(!JSON.stringify(r.body).includes(prError.message),"no upstream details escape");
+  }
+  assert.deepEqual(prReadFailure({status:403,rateLimited:false}),[403,{error:"github-access-denied",upstreamStatus:403}]);
+  assert.deepEqual(prReadFailure({status:503}),[502,{error:"github-pr-read-failed",upstreamStatus:503}]);
 });
