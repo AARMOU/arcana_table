@@ -38,6 +38,14 @@
       "source": "certification/SporocystIndependentCertificationTest.kt",
       "testClass": "com.arcanatable.customcards.SporocystIndependentCertificationTest",
       "tests": 5
+    },
+    {
+      "key": "whisperer-of-the-wilds",
+      "name": "Whisperer of the Wilds",
+      "issue": 464,
+      "source": "certification/WhispererOfTheWildsIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.WhispererOfTheWildsIndependentCertificationTest",
+      "tests": 6
     }
   ]
 }
