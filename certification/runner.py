@@ -12,8 +12,8 @@ import sys
 import xml.etree.ElementTree as ET
 
 KEY = re.compile(r"^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$")
-TEST = re.compile(r"^certification/[A-Z][A-Za-z0-9]*IndependentCertificationTest\\.kt$")
-CLASS = re.compile(r"^com\\.arcanatable\\.customcards\\.[A-Z][A-Za-z0-9]*IndependentCertificationTest$")
+TEST = re.compile(r"^certification/[A-Z][A-Za-z0-9]*IndependentCertificationTest\.kt$")
+CLASS = re.compile(r"^com\.arcanatable\.customcards\.[A-Z][A-Za-z0-9]*IndependentCertificationTest$")
 DEST = Path("android/custom-cards/src/test/kotlin/com/arcanatable/customcards/")
 RESULTS = Path("android/custom-cards/build/test-results/test")
 
@@ -52,7 +52,7 @@ def prepare(suite, trusted, candidate, output_file):
         raise ValueError("Independent test file appears incomplete")
     # Step outputs contain only validation-constrained literals.
     with Path(output_file).open("a", encoding="utf-8") as f:
-        f.write(f"testClass={suite['testClass']}\\n")
+        f.write(f"testClass={suite['testClass']}\n")
     print(f"Trusted independent suite loaded: {suite['testClass']}")
 
 
