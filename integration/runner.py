@@ -118,6 +118,13 @@ def data_delta(before, after, name):
         raise Blocked('Export changes cards other than the approved addition')
 
 
+def reject_upstream_collision(index, name):
+    for row in index.splitlines():
+        fields = row.split('\t')
+        if len(fields) >= 2 and fields[1] in ('card', 'basic') and fields[0].casefold() == name.casefold():
+            raise Blocked('Destination upstream already defines this card; automatic override is forbidden')
+
+
 def failures(candidate):
     out = []
     for root in ('android/custom-cards/build/test-results', 'android/app/build/test-results'):
@@ -157,6 +164,7 @@ def validate(plan, trusted, candidate, output):
             for name, expected in policy['engineJars'].items():
                 if sha((candidate / 'android/app/libs' / name).read_bytes()) != expected:
                     raise Blocked('Destination engine differs from authorized pin: ' + name)
+            reject_upstream_collision((candidate / 'android/app/src/main/assets/argentum/all-cards.index.tsv').read_text(), plan['suite']['name'])
         if not gate('engine-pins', engine):
             raise Blocked('Engine upgrade requires a reviewed integration-policy update')
         old_data = call(['git', 'show', plan['baseSha'] + ':' + GENERATED[0]], candidate, True)

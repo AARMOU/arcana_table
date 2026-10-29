@@ -102,6 +102,11 @@ class ForwardPortTests(unittest.TestCase):
 
 
 class ExportAndJUnitTests(unittest.TestCase):
+    def test_new_custom_card_cannot_silently_be_shadowed_by_upstream(self):
+        runner.reject_upstream_collision('Existing\tcard\nExample\ttoken\n', 'Example')
+        with self.assertRaisesRegex(runner.Blocked, 'already defines'):
+            runner.reject_upstream_collision('Existing\tcard\neXample\tcard\n', 'Example')
+
     def test_only_the_approved_card_may_be_added_to_export(self):
         old = json.dumps({'name': 'Existing', 'script': {'life': 1}})
         new = old + '\n' + json.dumps({'name': 'Example'})
