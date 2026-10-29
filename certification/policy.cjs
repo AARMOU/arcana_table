@@ -2,6 +2,7 @@
 // Trusted-main-only certification policy. Never load this from a Copilot branch.
 // Each suite is reviewed once in main; no per-card workflow changes are needed.
 const fs = require('node:fs');
+const path = require('node:path');
 const crypto = require('node:crypto');
 
 const SHA = /^[0-9a-f]{40}$/;
@@ -31,8 +32,22 @@ function validateManifest(input) {
   }
   return input;
 }
+// Suites may also be registered one per file in suites/<key>.json beside the manifest, so
+// parallel suite PRs add files instead of editing one shared array (no merge conflicts).
+function manifestFiles(filename) {
+  const dir = path.join(path.dirname(filename), 'suites');
+  const extra = fs.existsSync(dir) ? fs.readdirSync(dir).filter(f => f.endsWith('.json')).sort() : [];
+  return [filename, ...extra.map(f => path.join(dir, f))];
+}
 function readManifest(filename) {
-  return validateManifest(JSON.parse(fs.readFileSync(filename, 'utf8')));
+  const [base, ...extra] = manifestFiles(filename);
+  const data = JSON.parse(fs.readFileSync(base, 'utf8'));
+  for (const f of extra) {
+    const s = JSON.parse(fs.readFileSync(f, 'utf8'));
+    if (path.basename(f) !== String(s?.key) + '.json') throw Error('Suite file name must equal its key: ' + path.basename(f));
+    if (Array.isArray(data?.suites)) data.suites.push(s);
+  }
+  return validateManifest(data);
 }
 const issueFromBody = body => {
   const match = String(body || '').match(/(?:Fixes|Closes|Resolves|Unit:)\s*#(\d+)\b/i);
@@ -83,4 +98,4 @@ function certOutput(suite, ok) {
       : 'Independent tests failed or current-head prerequisites are not green. No owner approval is permitted.',
   };
 }
-module.exports = { readManifest,titleNames,validateManifest,candidate,currentHeadGreen,workflowEventEligible,issueFromBody,certOutput,CHECK_NAME };
+module.exports = { readManifest,manifestFiles,titleNames,validateManifest,candidate,currentHeadGreen,workflowEventEligible,issueFromBody,certOutput,CHECK_NAME };

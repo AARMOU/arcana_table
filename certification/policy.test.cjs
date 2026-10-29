@@ -89,3 +89,23 @@ test('Poxwalkers certification accepts only exact current Copilot head and trust
     assert.equal(match(sha,checks,{title}),null,title);
   assert.equal(match(sha,checks,{user:{login:'AARMOU'}}),null);
 });
+
+test('per-suite files beside the manifest register suites without editing the shared array', () => {
+  const fs = require('node:fs'), os = require('node:os'), path = require('node:path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'suites-'));
+  fs.copyFileSync(__dirname + '/suites.json', path.join(dir, 'suites.json'));
+  fs.mkdirSync(path.join(dir, 'suites'));
+  const extra = { key: 'sample-card', name: 'Sample Card', issue: 9999,
+    source: 'certification/SampleCardIndependentCertificationTest.kt',
+    testClass: 'com.arcanatable.customcards.SampleCardIndependentCertificationTest', tests: 3 };
+  fs.writeFileSync(path.join(dir, 'suites', 'sample-card.json'), JSON.stringify(extra));
+  const m = P.readManifest(path.join(dir, 'suites.json'));
+  assert.equal(m.suites.length, manifest.suites.length + 1);
+  assert.deepEqual(m.suites.at(-1), extra);
+  assert.deepEqual(P.manifestFiles(path.join(dir, 'suites.json')).map(f => path.basename(f)), ['suites.json', 'sample-card.json']);
+  // File name must equal the key, and keys/issues stay unique across all files.
+  fs.renameSync(path.join(dir, 'suites', 'sample-card.json'), path.join(dir, 'suites', 'other.json'));
+  assert.throws(() => P.readManifest(path.join(dir, 'suites.json')), /must equal its key/);
+  fs.writeFileSync(path.join(dir, 'suites', 'other.json'), JSON.stringify({ ...suite, key: 'other' }));
+  assert.throws(() => P.readManifest(path.join(dir, 'suites.json')), /duplicate/i);
+});

@@ -20,6 +20,14 @@ RESULTS = Path("android/custom-cards/build/test-results/test")
 
 def load_suite(manifest, key):
     data = json.loads(Path(manifest).read_text(encoding="utf-8"))
+    # Per-suite registrations in suites/<key>.json beside the manifest (same as policy.cjs).
+    extra = Path(manifest).parent / "suites"
+    for f in sorted(extra.glob("*.json")) if extra.is_dir() else []:
+        s = json.loads(f.read_text(encoding="utf-8"))
+        if not isinstance(s, dict) or f.name != f"{s.get('key')}.json":
+            raise ValueError("Suite file name must equal its key")
+        if isinstance(data.get("suites"), list):
+            data["suites"].append(s)
     if not KEY.fullmatch(key) or data.get("schema") != 1 or not isinstance(data.get("suites"), list):
         raise ValueError("Invalid certification suite selection")
     match = [s for s in data["suites"] if s.get("key") == key]
