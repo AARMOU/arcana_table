@@ -109,3 +109,10 @@ test('per-suite files beside the manifest register suites without editing the sh
   fs.writeFileSync(path.join(dir, 'suites', 'other.json'), JSON.stringify({ ...suite, key: 'other' }));
   assert.throws(() => P.readManifest(path.join(dir, 'suites.json')), /duplicate/i);
 });
+
+test('typographic apostrophes in Copilot titles match ASCII Oracle names', () => {
+  assert.equal(P.titleNames('Implement Verdant Sun’s Avatar', "Verdant Sun's Avatar"), true);
+  assert.equal(P.titleNames("Add Kenrith‘s Transformation", "Kenrith's Transformation"), true);
+  assert.equal(P.titleNames('Implement Verdant Suns Avatar', "Verdant Sun's Avatar"), false);
+  assert.equal(P.titleNames('Implement Verdant Sun’s Avatarx', "Verdant Sun's Avatar"), false);
+});

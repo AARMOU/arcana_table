@@ -62,7 +62,10 @@ function currentHeadGreen(checks, sha, required) {
 // The exact card binding comes from the trusted queue issue below; the title must
 // still name that card as a whole word, so "Add Xylophone" never matches card "X".
 function titleNames(title, name) {
-  const t = String(title || '');
+  // Copilot often types typographic apostrophes ("Sun’s") where Oracle names use ASCII ones.
+  const plain = v => String(v || '').replace(/[\u2018\u2019]/g, "'");
+  const t = plain(title);
+  name = plain(name);
   return ['Implement ', 'Add '].some(prefix => t.startsWith(prefix + name) &&
     /^(?:$|\s|[’']s(?:$|\s))/.test(t.slice(prefix.length + name.length)));
 }
