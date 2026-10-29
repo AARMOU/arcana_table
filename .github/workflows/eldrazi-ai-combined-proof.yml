@@ -1,0 +1,51 @@
+name: Eldrazi AI correction on combined proof (NO APK)
+on:
+  push:
+    branches: [gpt/b140-ai-proof-442-20261029]
+permissions:
+  contents: read
+jobs:
+  combined-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: fixture
+          ref: d0cf53a358afa25735c24099a3edaa6acc071e06
+      - uses: actions/checkout@v4
+        with:
+          path: combined
+          ref: 78c645bd5d260561a74d63fc191401b95c81ac37
+      - name: Overlay only the coordinated AI regression fixture
+        run: |
+          set -euo pipefail
+          test "$(git -C fixture rev-parse HEAD)" = d0cf53a358afa25735c24099a3edaa6acc071e06
+          test "$(git -C combined rev-parse HEAD)" = 78c645bd5d260561a74d63fc191401b95c81ac37
+          TEST=android/app/src/test/java/com/arcanatable/EldraziIncursionPlayableTest.kt
+          cp "fixture/$TEST" "combined/$TEST"
+          test "$(git -C combined diff --name-only)" = "$TEST"
+          sha256sum combined/android/app/libs/argentum-*.jar
+          git -C combined diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Full combined custom-card and Android validation
+        working-directory: combined/android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:test :app:testDebugUnitTest --continue --info
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: combined-442-ai-444-proof
+          path: |
+            combined/android/custom-cards/build/test-results/
+            combined/android/app/build/test-results/
+          if-no-files-found: error
+          retention-days: 14
