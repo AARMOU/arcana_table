@@ -49,6 +49,16 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/Dynami
  import com.wingedsheep.engine.state.components.identity.RoomComponent
  import com.wingedsheep.engine.state.components.identity.ToxicComponent
 +import com.wingedsheep.engine.state.components.identity.TokenComponent
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.sdk.core.Color
++import com.wingedsheep.sdk.core.Format
++import com.wingedsheep.sdk.core.ManaCost
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.core.Subtype
++import com.wingedsheep.sdk.core.Supertype
++import com.wingedsheep.sdk.model.CardDefinition
++import com.wingedsheep.sdk.model.Deck
++import io.kotest.matchers.shouldNotBe
  import com.wingedsheep.engine.state.components.stack.SpellOnStackComponent
  import com.wingedsheep.sdk.core.CounterType
  import com.wingedsheep.sdk.core.Keyword
@@ -106,7 +116,7 @@ diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/CommanderC
 new file mode 100644
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/CommanderCastHistoryAmountTest.kt
-@@ -0,0 +1,74 @@
+@@ -0,0 +1,118 @@
 +package com.wingedsheep.engine.mana
 +
 +import com.wingedsheep.engine.handlers.EffectContext
@@ -122,7 +132,7 @@ new file mode 100644
 +import io.kotest.core.spec.style.FunSpec
 +import io.kotest.matchers.shouldBe
 +
-+/** Read-only commander history primitive. Actual cast-commit bookkeeping is tested by CommanderTaxTest. */
++/** The new SDK amount reads committed commander history, including real accepted/rejected casts. */
 +class CommanderCastHistoryAmountTest : FunSpec({
 +    val players = List(4) { EntityId.generate() }
 +    val amounts = PredicateEvaluator(cardRegistry = null).amounts
@@ -180,4 +190,48 @@ new file mode 100644
 +    test("no commander history yields zero rather than a color-identity count") {
 +        read(emptyState(), players[0]) shouldBe 0
 +    }
++
++    test("real rejected cast leaves history at zero, successful cast commits once and survives resolution") {
++        val commander = CardDefinition.creature(
++            name = "Cast History Commander",
++            manaCost = ManaCost.parse("{1}{W}"),
++            subtypes = setOf(Subtype("Human")),
++            power = 2,
++            toughness = 2,
++            supertypes = setOf(Supertype.LEGENDARY),
++        )
++        val filler = CardDefinition.creature(
++            name = "Cast History Filler",
++            manaCost = ManaCost.parse("{1}{W}"),
++            subtypes = setOf(Subtype("Human")),
++            power = 1,
++            toughness = 1,
++        )
++        val driver = GameTestDriver()
++        driver.registerCards(listOf(commander, filler))
++        val seats = driver.initMultiplayer(
++            decks = List(2) { Deck(cards = List(99) { filler.name }) },
++            format = Format.Commander(),
++            commanders = List(2) { commander.name },
++            skipMulligans = true,
++            startingPlayer = 0,
++        )
++        val owner = seats[0]
++        val opponent = seats[1]
++        val commanderId = driver.state.getZone(ZoneKey(owner, Zone.COMMAND)).single()
++        driver.passPriorityUntil(Step.PRECOMBAT_MAIN)
++        read(driver.state, owner) shouldBe 0
++        driver.castSpell(owner, commanderId).error shouldNotBe null // no mana: rejected
++        read(driver.state, owner) shouldBe 0
++        read(driver.state, opponent) shouldBe 0
++
++        driver.giveMana(owner, Color.WHITE, 1)
++        driver.giveColorlessMana(owner, 1)
++        driver.castSpell(owner, commanderId).error shouldBe null
++        read(driver.state, owner) shouldBe 1 // increment on cast commit, not resolution
++        read(driver.state, opponent) shouldBe 0
++        driver.bothPass()
++        read(driver.state, owner) shouldBe 1 // history persists after the spell resolves
++    }
++
 +})
