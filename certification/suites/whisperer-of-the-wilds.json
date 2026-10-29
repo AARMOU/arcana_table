@@ -1,0 +1,8 @@
+{
+  "key": "whisperer-of-the-wilds",
+  "name": "Whisperer of the Wilds",
+  "issue": 464,
+  "source": "certification/WhispererOfTheWildsIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.WhispererOfTheWildsIndependentCertificationTest",
+  "tests": 6
+}
