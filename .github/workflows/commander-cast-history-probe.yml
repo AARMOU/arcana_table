@@ -47,6 +47,31 @@ jobs:
             :rules-engine:test --tests com.wingedsheep.engine.mana.CommanderCastHistoryAmountTest \
             --tests com.wingedsheep.engine.mana.CommanderTaxTest \
             :ai:compileKotlin
+      - name: Require exact executed JUnit scenarios (no skips)
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+
+          directory = Path("argentum-engine/rules-engine/build/test-results/test")
+          expected = {
+              "CommanderCastHistoryAmountTest": 5,
+              "CommanderTaxTest": 5,
+          }
+          for suite, count in expected.items():
+              xml = directory / f"TEST-com.wingedsheep.engine.mana.{suite}.xml"
+              if not xml.is_file():
+                  raise SystemExit(f"Missing required JUnit XML: {xml}")
+              root = ET.parse(xml).getroot()
+              cases = root.findall(".//testcase")
+              failures = sum(len(c.findall("failure")) for c in cases)
+              errors = sum(len(c.findall("error")) for c in cases)
+              skipped = sum(len(c.findall("skipped")) for c in cases)
+              print(f"{suite}: executed={len(cases)} failures={failures} errors={errors} skipped={skipped}")
+              if len(cases) != count or failures or errors or skipped:
+                  raise SystemExit(f"Required {suite} suite failed its exact-case gate")
+          print("Commander history + tax: 10/10 required cases, zero failures/errors/skips")
+          PY
       - name: Preserve focused JUnit results
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
