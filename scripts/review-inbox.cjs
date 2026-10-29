@@ -72,10 +72,12 @@ function classify(pr, checkRuns = [], reviews = [], unitBody = '') {
 }
 
 const ATTENTION = new Set(['awaiting-review', 'certified']);
-function inboxPayload(items, now = new Date()) {
+function inboxPayload(items, now = new Date(), integratedActivity = []) {
   const order = { certified: 0, 'awaiting-review': 1, 'checks-failed': 2, 'changes-requested': 3, 'checks-running': 4, approved: 5, integrated: 6 };
   const sorted = [...items].sort((a, b) => order[a.state] - order[b.state] || a.pr - b.pr).slice(0, MAX_ITEMS);
   return { checkedAt: now.toISOString(), awaitingReview: sorted.filter(i => ATTENTION.has(i.state)).length, items: sorted,
+    // Separate from the 30-row review inbox: this timestamped sample powers a conservative daily merge count.
+    integratedActivity: integratedActivity.slice(0, 100),
     note: 'Owner approval is card sign-off for integration review only: no merge, build, signing or release follows from it. Checks passing is not rules certification.' };
 }
 
@@ -101,14 +103,16 @@ async function buildReviewInbox({ github, owner, repo, now = new Date() }) {
   }
   // Recently integrated cards (merged Copilot card PRs), so an approval visibly reaches "Integrated".
   const since = now.getTime() - INTEGRATED_DAYS * 864e5;
-  const closed = (await github.rest.pulls.list({ owner, repo, state: 'closed', sort: 'updated', direction: 'desc', per_page: 30 })).data || [];
+  const closed = (await github.rest.pulls.list({ owner, repo, state: 'closed', sort: 'updated', direction: 'desc', per_page: 100 })).data || [];
+  const integratedActivity = [];
   for (const pr of closed) {
     if (!COPILOT.has(String(pr.user?.login || '').toLowerCase()) || !pr.merged_at || Date.parse(pr.merged_at) < since || !unitOf(pr.body)) continue;
+    integratedActivity.push({ pr: pr.number, card: cardOf(pr.title), mergedAt: pr.merged_at });
     items.push({ pr: pr.number, issue: unitOf(pr.body), card: cardOf(pr.title), headSha: pr.merge_commit_sha || pr.head?.sha || '',
       state: 'integrated', checks: {}, checkRuns: [], certification: 'not-run', abilities: [], problems: [], decidedIn: null, draft: false,
       url: `https://github.com/${pr.base?.repo?.full_name || 'AARMOU/arcana_table'}/pull/${pr.number}`, updatedAt: pr.merged_at });
   }
-  return inboxPayload(items, now);
+  return inboxPayload(items, now, integratedActivity);
 }
 
 module.exports = { classify, inboxPayload, inboxSummary, buildReviewInbox, abilitiesOf };

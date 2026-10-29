@@ -212,4 +212,12 @@ function openSheet(item) {
     }).catch(() => { oracle.textContent = 'Oracle text unavailable (offline).'; });
 }
 api.render = render;
+// The top-level Verify action opens the next reviewable card's existing owner-gated sheet.
+// It does not send a decision or bypass exact-head certification.
+api.openNext = () => {
+  const item = data?.items?.find(i => i.state === 'certified' || i.state === 'awaiting-review');
+  if (!item) return false;
+  openSheet(item);
+  return true;
+};
 })(typeof globalThis === 'object' ? globalThis : this);
