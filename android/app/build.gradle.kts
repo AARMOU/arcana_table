@@ -66,6 +66,13 @@ kotlin {
     compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) }
 }
 
+// Package the registry from THIS checkout with THIS checkout's Argentum SDK.
+// exportCards round-trips every definition and fails before Android asset merging
+// if a card is incompatible. No engine rebuild or paid worker is involved.
+tasks.named("preBuild") {
+    dependsOn(":custom-cards:exportCards")
+}
+
 dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2025.12.00")
     implementation(composeBom)
@@ -96,4 +103,3 @@ dependencies {
     testImplementation("org.json:json:20240303")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
-
