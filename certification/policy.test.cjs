@@ -65,3 +65,23 @@ test('next independent card needs a manifest row and trusted tests, never a new 
   assert.equal(P.certOutput(second,true).title,'Sample Card: independent rules scenarios passed');
   assert.equal(P.issueFromBody('Fixes #999'),999);
 });
+
+test('Poxwalkers certification accepts only exact current Copilot head and trusted source',()=>{
+  const target=manifest.suites.find(s=>s.issue===406);
+  assert.equal(target.key,'poxwalkers');
+  assert.equal(target.tests,6);
+  const candidatePr=pr({title:'Implement Poxwalkers',body:'Six independent rules scenarios; Fixes #406'});
+  const candidateIssue=issue({
+    number:406,
+    title:'[Arcana Queue] Poxwalkers — Cardkit SUPPORTED, unclaimed',
+    body:'<!-- arcana-auto-queue-v1 -->\\n<!-- source: trusted-main-queue-feeder -->\\n## Cards\\n- Poxwalkers'
+  });
+  const match=(head=sha,currentChecks=checks,changes={})=>P.candidate(manifest,{
+    pr:{...candidatePr,...changes},issue:candidateIssue,sha:head,checks:currentChecks
+  });
+  assert.equal(match()?.key,'poxwalkers');
+  assert.equal(match('b'.repeat(40)),null);
+  assert.equal(match(sha,checks.slice(0,2)),null);
+  assert.equal(match(sha,checks,{title:'Implement Poxwalkers custom card'}),null);
+  assert.equal(match(sha,checks,{user:{login:'AARMOU'}}),null);
+});
