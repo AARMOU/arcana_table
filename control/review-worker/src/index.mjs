@@ -88,8 +88,27 @@ function gh(token, fetchImpl) {
       Authorization: "Bearer " + token, Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
       "User-Agent": "ArcanaReviewWorker/1.0", ...(init.body ? { "Content-Type": "application/json" } : {}) } });
     const body = res.status === 204 ? null : await res.json().catch(() => null);
-    return { ok: res.ok, status: res.status, body };
+    // Never return GitHub's response body, request headers or owner OAuth token to
+    // the browser. Only a bounded, diagnostic classification can leave this proxy.
+    const remaining = res.headers.get("x-ratelimit-remaining");
+    const retryAfter = res.headers.get("retry-after");
+    const message = String(body?.message || "");
+    const rateLimited = (res.status === 403 || res.status === 429) &&
+      (remaining === "0" || retryAfter !== null || /rate limit|secondary rate|abuse detection/i.test(message));
+    return { ok: res.ok, status: res.status, body, rateLimited };
   };
+}
+
+// Owner approval must not hide a real upstream failure behind one generic
+// `pr-unavailable` response. These statuses are diagnostic, never authorization.
+export function prReadFailure(result) {
+  if (result.status === 401) return [401, { error: "github-credential-rejected" }];
+  if (result.status === 403 || result.status === 429) return result.rateLimited
+    ? [503, { error: "github-rate-limited", upstreamStatus: result.status }]
+    : [403, { error: "github-access-denied", upstreamStatus: result.status }];
+  if (result.status === 404) return [404, { error: "github-pr-not-accessible" }];
+  return [502, { error: "github-pr-read-failed",
+    upstreamStatus: Number.isInteger(result.status) ? result.status : null }];
 }
 
 export function cleanNote(note) {
@@ -104,7 +123,7 @@ export async function decide(api, { pr, sha, decision, note }) {
   const text = cleanNote(note);
   if (decision === "request-fix" && text.length < 3) return [400, { error: "describe-the-fix" }];
   const p = await api(`/pulls/${pr}`);
-  if (!p.ok) return [p.status === 404 ? 404 : 502, { error: "pr-unavailable" }];
+  if (!p.ok) return prReadFailure(p);
   if (p.body.state !== "open") return [409, { error: "pr-not-open" }];
   if (!COPILOT.has(String(p.body.user?.login || "").toLowerCase())) return [422, { error: "not-a-copilot-card-pr" }];
   if (p.body.head?.sha !== sha) return [409, { error: "stale-commit", head: p.body.head?.sha || null }];

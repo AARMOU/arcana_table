@@ -33,6 +33,16 @@ function decisionMessage(status, body) {
     ? 'Approved. Recorded on GitHub for this exact commit. Integration review is next; nothing was merged or built.'
     : 'Fix requested. Recorded on GitHub; the dispatcher will request a repair only if budget, reserve and capacity allow.' + (body?.warning ? ' (Repair queue not reached: ' + body.warning + ')' : '') };
   if (status === 0) return { ok: false, uncertain: true, text: 'No response from the review service. Approval is NOT confirmed; check the PR reviews before retrying.' };
+  if (status === 401 && body?.error === 'github-credential-rejected')
+    return { ok: false, signIn: true, text: 'GitHub rejected the stored OAuth credential. No approval recorded. Sign in to GitHub again, then retry once.' };
+  if (status === 503 && body?.error === 'github-rate-limited')
+    return { ok: false, text: 'GitHub is limiting API requests from the approval service (HTTP ' + body.upstreamStatus + '). No approval recorded. Repeated taps will not help; retry when GitHub access recovers.' };
+  if (status === 403 && body?.error === 'github-access-denied')
+    return { ok: false, text: 'GitHub denied the approval service access to this PR (HTTP 403). No approval recorded. The OAuth permissions or GitHub access policy need checking.' };
+  if (status === 404 && body?.error === 'github-pr-not-accessible')
+    return { ok: false, text: 'GitHub returned HTTP 404 to the approval service. This PR exists publicly; the approval service may lack access with your current credential. No approval recorded.' };
+  if (status === 502 && body?.error === 'github-pr-read-failed')
+    return { ok: false, text: 'The approval service could not read the PR from GitHub (HTTP ' + (body.upstreamStatus || 'unknown') + '). No approval recorded. The upstream request needs investigation.' };
   if (status === 401) return { ok: false, signIn: true, text: 'Please sign in again (owner only).' };
   if (status === 409 && body?.error === 'stale-commit') return { ok: false, stale: true, text: 'A newer commit arrived. Nothing was recorded. Refresh and review the new commit.' };
   if (status === 422 && body?.error === 'not-certified') return { ok: false, text: 'Cannot approve: this exact commit has not passed independent certification (' + (body.certification || 'not-run') + '). You can still request a fix.' };
