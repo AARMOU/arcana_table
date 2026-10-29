@@ -16,6 +16,7 @@ const STATUS_ISSUE = 78;
 const MARKERS = {
   billing: '<!-- arcana-control-status-v1:billing -->',
   dispatcher: '<!-- arcana-control-status-v1:dispatcher -->',
+  workers: '<!-- arcana-control-status-v1:workers -->',
   queue: '<!-- arcana-control-status-v1:queue -->',
   review: '<!-- arcana-control-status-v1:review -->',
 };
