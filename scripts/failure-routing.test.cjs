@@ -1,7 +1,10 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {routeFailure,reconcileFailures,createAuthorizer,MARKER,OBSERVED}=require('./failure-routing.cjs');
+const {routeFailure,reconcileFailures,createAuthorizer,MARKER,OBSERVED,WORKFLOWS}=require('./failure-routing.cjs');
+test('Cardkit failures are eligible for existing repair routing', () => {
+  assert.equal(WORKFLOWS.has('Arcana Cardkit'), true);
+});
 const A=require('./admission.cjs');
 const sha='a'.repeat(40);
 const allow=records=>async()=>({allowed:true,reason:'admitted',attempt:1,unit:67,record:async()=>records.push(1)});
@@ -22,6 +25,16 @@ function fixture({comments=[],run={},pr={},authorize,status,runs}={}) {
 }
 const bot=(body,id=1)=>({id,body,user:{type:'Bot',login:'github-actions[bot]'}});
 
+test('Cardkit failed draft PR requests one repair and deduplicates the same head',async()=>{
+  const x=fixture({run:{name:'Arcana Cardkit',workflow_id:987}});
+  assert.equal((await routeFailure(x.args)).state,'repair-requested');
+  assert.equal(x.records.length,1);
+  assert.match(x.calls[0].body,/workflow-id:987/);
+  const repeat=fixture({run:{name:'Arcana Cardkit',workflow_id:987,id:13},comments:[bot(x.calls[0].body)]});
+  assert.equal((await routeFailure(repeat.args)).state,'already-routed');
+  assert.equal(repeat.records.length,0);
+  assert.equal(repeat.calls.length,0);
+});
 test('admitted failure records the unit reservation, then one controlled mention',async()=>{
   const x=fixture();assert.equal((await routeFailure(x.args)).state,'repair-requested');
   assert.equal(x.records.length,1);assert.equal(x.calls.length,1);const b=x.calls[0].body;
