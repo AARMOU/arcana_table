@@ -113,7 +113,8 @@ jobs:
           ARCANA_BILLING_LAG_HOURS: ${{ vars.ARCANA_BILLING_LAG_HOURS }}
           # Retired; read only to warn when it is still set.
           ARCANA_PREMIUM_REQUEST_BUDGET: ${{ vars.ARCANA_PREMIUM_REQUEST_BUDGET }}
-          # Used only for the Copilot assignment call; all reads and ledger writes use GITHUB_TOKEN.
+          # Used for Copilot issue assignments AND owner-verified PR repair delivery;
+          # all ordinary reads, ledgers and observations still use GITHUB_TOKEN.
           COPILOT_DISPATCH_TOKEN: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
           ARCANA_FEASIBILITY: ${{ needs.feasibility.outputs.verdicts }}
         with:
