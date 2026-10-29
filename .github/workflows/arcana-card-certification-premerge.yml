@@ -11,34 +11,44 @@ permissions:
   pull-requests: read
 
 jobs:
+  plan:
+    name: Select suites with an open card PR
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
+      - id: plan
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const P = require('./certification/policy.cjs');
+            const { planPremerge } = require('./certification/premerge-plan.cjs');
+            const manifest = P.readManifest('./certification/suites.json');
+            const changedFiles = (await github.paginate(github.rest.pulls.listFiles, {...context.repo,
+              pull_number: context.payload.pull_request.number, per_page: 100})).map(f => f.filename);
+            const openPrs = await github.paginate(github.rest.pulls.list, {...context.repo, state: 'open', per_page: 100});
+            const r = planPremerge({ manifest, changedFiles, openPrs });
+            if (r.missing.length) core.notice('No open card PR for: ' + r.missing.join(', '));
+            // A suite this PR adds or changes must actually execute; never pass without evidence.
+            if (r.blocking.length) core.setFailed('Changed suite(s) have no eligible open card PR, so premerge cannot execute them: ' + r.blocking.join(', '));
+            core.info('Suites to execute: ' + JSON.stringify(r.include));
+            core.setOutput('matrix', JSON.stringify({ include: r.include }));
+            core.setOutput('count', String(r.include.length));
+
   independent-card-scenarios:
     name: Execute trusted independent card scenarios
+    needs: plan
+    if: needs.plan.outputs.count != '0'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - key: resurrection-orb
-            pr: 410
-            issue: 408
-            title: Implement Resurrection Orb
-          - key: poxwalkers
-            pr: 407
-            issue: 406
-            title: Implement Poxwalkers
-          - key: blood-for-the-blood-god
-            pr: 353
-            issue: 352
-            title: Implement Blood for the Blood God!
-          - key: sporocyst
-            pr: 419
-            issue: 417
-            title: Add Sporocyst with Ravenous and Spore Chimney
-          - key: verdant-suns-avatar
-            pr: 463
-            issue: 462
-            title: Implement Verdant Sun’s Avatar
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -47,7 +57,7 @@ jobs:
           persist-credentials: false
       - name: Verify reusable policy and Python runner syntax
         run: |
-          node --test trusted/certification/policy.test.cjs
+          node --test trusted/certification/policy.test.cjs trusted/certification/premerge-plan.test.cjs trusted/certification/backfill.test.cjs
           python3 -m py_compile trusted/certification/runner.py
       - name: Find current Copilot card implementation
         id: candidate

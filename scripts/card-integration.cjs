@@ -27,8 +27,8 @@ function validatePolicy(p) {
 }
 function config(root = '.') {
   const policyBytes = fs.readFileSync(root + '/integration/policy.json');
-  const suitesBytes = fs.readFileSync(root + '/certification/suites.json');
-  const manifest = C.validateManifest(JSON.parse(suitesBytes));
+  const suitesBytes = Buffer.concat(C.manifestFiles(root + '/certification/suites.json').map(f => fs.readFileSync(f)));
+  const manifest = C.readManifest(root + '/certification/suites.json');
   const trustedInputs = [policyBytes,suitesBytes,fs.readFileSync(root+'/scripts/card-integration.cjs'),
     fs.readFileSync(root+'/integration/runner.py'),fs.readFileSync(root+'/certification/runner.py'),
     ...manifest.suites.map(s=>fs.readFileSync(root+'/'+s.source))];
