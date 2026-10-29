@@ -34,6 +34,8 @@ jobs:
             const openPrs = await github.paginate(github.rest.pulls.list, {...context.repo, state: 'open', per_page: 100});
             const r = planPremerge({ manifest, changedFiles, openPrs });
             if (r.missing.length) core.notice('No open card PR for: ' + r.missing.join(', '));
+            // A suite this PR adds or changes must actually execute; never pass without evidence.
+            if (r.blocking.length) core.setFailed('Changed suite(s) have no eligible open card PR, so premerge cannot execute them: ' + r.blocking.join(', '));
             core.info('Suites to execute: ' + JSON.stringify(r.include));
             core.setOutput('matrix', JSON.stringify({ include: r.include }));
             core.setOutput('count', String(r.include.length));

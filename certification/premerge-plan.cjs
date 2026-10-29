@@ -20,6 +20,14 @@ function cardPr(manifest, suite, openPrs) {
     P.issueFromBody(p.body) === suite.issue && P.titleNames(p.title, suite.name)) || null;
 }
 
+// Suites whose own registration or test source the PR adds or changes.
+function changedSuites(manifest, changedFiles) {
+  const changed = new Set(changedFiles);
+  return manifest.suites.filter(s => changed.has(s.source) || changed.has(`certification/suites/${s.key}.json`));
+}
+
+// `blocking` lists changed suites with no runnable candidate: premerge must fail rather than
+// pass without executing them. Unchanged suites without an open card PR are only reported.
 function planPremerge({ manifest, changedFiles, openPrs }) {
   const include = [], missing = [];
   for (const s of selectSuites(manifest, changedFiles)) {
@@ -27,7 +35,8 @@ function planPremerge({ manifest, changedFiles, openPrs }) {
     if (pr) include.push({ key: s.key, pr: pr.number, issue: s.issue, title: pr.title });
     else missing.push(s.key);
   }
-  return { include, missing };
+  const blocking = changedSuites(manifest, changedFiles).map(s => s.key).filter(k => missing.includes(k));
+  return { include, missing, blocking };
 }
 
-module.exports = { selectSuites, cardPr, planPremerge };
+module.exports = { selectSuites, changedSuites, cardPr, planPremerge };

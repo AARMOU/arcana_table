@@ -31,5 +31,19 @@ test('only an open Copilot PR on the base, naming the card and fixing its unit, 
     pr(3, 'Implement Resurrection Orbit', 408), pr(4, 'Implement Resurrection Orb', 999),
     pr(5, 'Implement Resurrection Orb', 408, { state: 'closed' })];
   const r = planPremerge({ manifest, changedFiles: [orb.source], openPrs: bad });
-  assert.deepEqual(r, { include: [], missing: ['resurrection-orb'] });
+  assert.deepEqual(r, { include: [], missing: ['resurrection-orb'], blocking: ['resurrection-orb'] });
+});
+
+test('a changed suite without a runnable candidate blocks premerge; unchanged ones only report', () => {
+  // All changed suites missing.
+  assert.deepEqual(planPremerge({ manifest, changedFiles: [orb.source], openPrs: [] }).blocking, ['resurrection-orb']);
+  assert.deepEqual(planPremerge({ manifest, changedFiles: ['certification/suites/poxwalkers.json'], openPrs: [] }).blocking, ['poxwalkers']);
+  // Partially missing: one changed suite runs, the other cannot.
+  const partial = planPremerge({ manifest, changedFiles: [orb.source, pox.source], openPrs: [open[0]] });
+  assert.deepEqual(partial.include.map(i => i.key), ['resurrection-orb']);
+  assert.deepEqual(partial.blocking, ['poxwalkers']);
+  // Infrastructure-only change: retired suites are skipped, nothing blocks.
+  const infra = planPremerge({ manifest, changedFiles: ['certification/policy.cjs'], openPrs: [] });
+  assert.deepEqual(infra.include, []);
+  assert.deepEqual(infra.blocking, []);
 });
