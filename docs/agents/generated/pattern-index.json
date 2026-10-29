@@ -797,13 +797,19 @@
    ]
   },
   "DynamicAmounts.creaturesDiedThisTurn": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Sautekh Immortal",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SautekhImmortal.kt",
      "lines": 28,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SautekhImmortalScenarioTest.kt"
+    },
+    {
+     "card": "Blood for the Blood God!",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BloodForTheBloodGod.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BloodForTheBloodGodScenarioTest.kt"
     },
     {
      "card": "Tallyman of Nurgle",
@@ -1734,7 +1740,7 @@
    ]
   },
   "Effects.DealDamage": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Noise Marine",
@@ -1891,7 +1897,7 @@
    ]
   },
   "Effects.DrawCards": {
-   "count": 31,
+   "count": 32,
    "examples": [
     {
      "card": "Ugin's Insight",
@@ -4664,7 +4670,7 @@
    ]
   },
   "spell { }": {
-   "count": 46,
+   "count": 47,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -4740,7 +4746,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 57,
+   "count": 58,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -5348,6 +5354,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CaptainJamesTKirk.kt",
      "lines": 61,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CaptainJamesTKirkScenarioTest.kt"
+    }
+   ]
+  },
+  "Patterns.Hand.discardHand": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Blood for the Blood God!",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BloodForTheBloodGod.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BloodForTheBloodGodScenarioTest.kt"
     }
    ]
   },
@@ -6069,13 +6086,19 @@
    ]
   },
   "ModifySpellCost": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Herald of Slaanesh",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HeraldOfSlaanesh.kt",
      "lines": 28,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HeraldOfSlaaneshScenarioTest.kt"
+    },
+    {
+     "card": "Blood for the Blood God!",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BloodForTheBloodGod.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BloodForTheBloodGodScenarioTest.kt"
     },
     {
      "card": "Morophon, the Boundless",
@@ -6204,7 +6227,7 @@
    ]
   },
   "EffectTarget.Controller": {
-   "count": 11,
+   "count": 12,
    "examples": [
     {
      "card": "Druid's Deliverance",
@@ -6325,7 +6348,7 @@
    ]
   },
   "EffectTarget.PlayerRef": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -7029,7 +7052,7 @@
    ]
   },
   "Player.Each": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Sautekh Immortal",
@@ -7042,6 +7065,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DeployToTheFront.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DeployToTheFrontScenarioTest.kt"
+    },
+    {
+     "card": "Blood for the Blood God!",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BloodForTheBloodGod.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BloodForTheBloodGodScenarioTest.kt"
     },
     {
      "card": "Rampaging Ferocidon",
@@ -7060,17 +7089,11 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TallymanOfNurgle.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TallymanOfNurgleScenarioTest.kt"
-    },
-    {
-     "card": "Oblivion Sower",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/OblivionSower.kt",
-     "lines": 48,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/OblivionSowerScenarioTest.kt"
     }
    ]
   },
   "Player.EachOpponent": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Silence",
