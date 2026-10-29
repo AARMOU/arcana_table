@@ -248,7 +248,7 @@
           text('opsWorkerCount',workers.running+' reported working · '+workers.pendingPickup+' pending');
           text('opsWorkerFresh','Dispatcher reported '+report+' ('+timeAgo(checkedAt)+')'+freshness+' · not live Copilot telemetry.');
         }
-        const refreshed=controlLastRead?'Page checked '+denverTime(controlLastRead):'Page has not checked yet';
+        const refreshed=controlLastRead?'Last successful page read '+denverTime(controlLastRead):'No successful page read yet';
         text('opsWorkerChecked',refreshed+(controlLastError?' · last refresh failed: '+controlLastError:'')+
           ' · auto-checks every 2 min while open; only a dispatcher run can publish a newer report.');
       }
@@ -443,7 +443,7 @@
           controlLastAttempt=Date.now();
           try{
             const st=await fetchStatus();
-            renderBilling(st);renderDispatcher(st);renderQueue(st);renderReview(st);
+            renderBilling(st);if(st.dispatcher)renderDispatcher(st);else renderOpsWorkers(null);renderQueue(st);renderReview(st);
             if(!summaryOnly)void fetchCopilotAssignment(st.dispatcher?.data||null);
             if(!st.billing&&!st.dispatcher)text('readyDetail','No status comments published yet on issue #78.');
             controlLastRead=Date.now();controlLastError=null;
