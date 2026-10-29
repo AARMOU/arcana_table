@@ -40,11 +40,11 @@ def open_pr_claims(repo_slug: str = "AARMOU/arcana_table") -> list[dict]:
         # gh's default exception hides captured stderr, obscuring HTTP 403/429 and jq failures.
         # Report only allowlisted diagnostics; never echo raw stderr or credential-bearing text.
         stderr = exc.stderr or ""
-        http = re.search(r"\\bHTTP\\s+([1-5][0-9]{2})\\b", stderr, re.IGNORECASE)
+        http = re.search(r"\bHTTP\s+([1-5][0-9]{2})\b", stderr, re.IGNORECASE)
         category = (
             "rate-limit" if re.search(r"rate.limit", stderr, re.IGNORECASE) else
             "integration-permission" if "resource not accessible by integration" in stderr.casefold() else
-            "jq-filter" if re.search(r"\\bjq\\b", stderr, re.IGNORECASE) else
+            "jq-filter" if re.search(r"\bjq\b", stderr, re.IGNORECASE) else
             "unclassified"
         )
         status = f"; HTTP {http.group(1)}" if http else ""
