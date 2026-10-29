@@ -87,4 +87,43 @@ class ResurrectionOrbIndependentCertificationTest {
         assertNotNull(d.findPermanent(player, "Grizzly Bears"))
         assertFalse(d.zoneNames(player, Zone.GRAVEYARD).contains("Grizzly Bears"))
     }
+    @Test
+    fun independentResurrectionUsesOriginalOwnerNotTemporaryController() {
+        val d = customScenario(ResurrectionOrb, "Act of Treason", "Grizzly Bears", "Murder")
+        val temporaryController = d.player1
+        val owner = d.player2
+        val borrowed = d.putCreatureOnBattlefield(owner, "Grizzly Bears")
+        val orb = d.putPermanentOnBattlefield(temporaryController, "Resurrection Orb")
+
+        val steal = d.putCardInHand(temporaryController, "Act of Treason")
+        d.giveMana(temporaryController, Color.RED)
+        d.giveColorlessMana(temporaryController, 2)
+        assertNull(d.castSpellWithTargets(temporaryController, steal,
+            listOf(ChosenTarget.Permanent(borrowed))).error)
+        d.resolveAll()
+        assertEquals(temporaryController, d.projected.getController(borrowed))
+
+        val ability = d.cardRegistry.getCard("Resurrection Orb")!!.script.activatedAbilities.single()
+        d.giveColorlessMana(temporaryController, 4)
+        assertNull(d.submit(ActivateAbility(temporaryController, orb, ability.id,
+            targets = listOf(ChosenTarget.Permanent(borrowed)))).error)
+        d.resolveAll(Choices(targets = listOf(borrowed)))
+
+        val kill = d.putCardInHand(temporaryController, "Murder")
+        d.giveMana(temporaryController, Color.BLACK, 2)
+        d.giveColorlessMana(temporaryController, 1)
+        assertNull(d.castSpellWithTargets(temporaryController, kill,
+            listOf(ChosenTarget.Permanent(borrowed))).error)
+        d.resolveAll()
+        assertTrue(d.zoneNames(owner, Zone.GRAVEYARD).contains("Grizzly Bears"))
+        assertNull(d.findPermanent(owner, "Grizzly Bears"))
+        d.passPriorityUntil(Step.END)
+        d.resolveAll()
+
+        val revived = d.findPermanent(owner, "Grizzly Bears")
+        assertNotNull(revived)
+        assertEquals(owner, d.projected.getController(revived!!))
+        assertNull(d.findPermanent(temporaryController, "Grizzly Bears"))
+    }
+
 }
