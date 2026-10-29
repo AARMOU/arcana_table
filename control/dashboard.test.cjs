@@ -336,3 +336,52 @@ test('fresh independent worker observations never change dispatcher authorizatio
   assert.ok(script.includes("renderOpsWorkers(workerReport)"));
   assert.ok(script.includes("window.ArcanaAuthorize.render($('authorizationList'),d.workers?.list||[],d.checkedAt)"));
 });
+
+test('aging review snapshot rechecks only its known bot comment, avoids rollback and respects 5m throttle',async()=>{
+  const src=script.split('// REVIEW_FRESHNESS_START')[1]?.split('// REVIEW_FRESHNESS_END')[0];
+  assert.ok(src,'review freshness code present');
+  let clock=Date.parse('2026-10-29T05:32:00Z'),calls=0,requestUrl='';
+  const legit={id:123,user:{login:'github-actions[bot]',type:'Bot'},body:'old',html_url:'https://github.com/AARMOU/arcana_table/issues/78#issuecomment-123'};
+  const response={...legit,body:JSON.stringify({kind:'review',checkedAt:'2026-10-29T05:30:25Z',awaitingReview:1,items:[{pr:407,readyForOwner:true}]})};
+  const ctx={Date:class extends Date{static now(){return clock}},
+    REPO:'AARMOU/arcana_table',sourceTimes:[],readTimeout:()=>undefined,
+    isBotComment:c=>c?.user?.login==='github-actions[bot]'&&c?.user?.type==='Bot',
+    parseStatus:body=>{try{return JSON.parse(body)}catch{return null}},
+    fetch:async (url,options)=>{calls++;requestUrl=url;assert.equal(options.cache,'no-store');return {ok:true,json:async()=>response}}
+  };
+  vm.createContext(ctx);
+  vm.runInContext(src,ctx);
+  const refresh=vm.runInContext('refreshReviewSnapshot',ctx);
+  const stale={data:{kind:'review',checkedAt:'2026-10-29T05:21:00Z',awaitingReview:0},url:legit.html_url};
+  const out={review:stale};
+  await refresh(out,legit);
+  assert.equal(calls,1);
+  assert.equal(requestUrl,'https://api.github.com/repos/AARMOU/arcana_table/issues/comments/123');
+  assert.equal(out.review.data.awaitingReview,1);
+  assert.equal(out.review.data.items[0].pr,407);
+  const regressed={review:stale};
+  await refresh(regressed,legit);
+  assert.equal(calls,1,'no extra GitHub API request within throttle period');
+  assert.equal(regressed.review.data.awaitingReview,1,'old edge cache cannot erase verified newer review');
+  clock+=5*60*1000+1000;
+  await refresh({review:stale},legit);
+  assert.equal(calls,2,'recheck becomes eligible again after 5m');
+});
+test('review recheck refuses untrusted source comments and does not mislabel stale review count as zero',async()=>{
+  const src=script.split('// REVIEW_FRESHNESS_START')[1]?.split('// REVIEW_FRESHNESS_END')[0];
+  let calls=0;
+  const ctx={Date:class extends Date{static now(){return Date.parse('2026-10-29T05:32:00Z')}},
+    REPO:'AARMOU/arcana_table',sourceTimes:[],readTimeout:()=>undefined,
+    isBotComment:c=>c?.user?.login==='github-actions[bot]'&&c?.user?.type==='Bot',
+    parseStatus:()=>null,
+    fetch:async()=>{calls++;throw Error('should not fetch')}
+  };
+  vm.createContext(ctx);vm.runInContext(src,ctx);
+  const refresh=vm.runInContext('refreshReviewSnapshot',ctx);
+  const out={review:{data:{kind:'review',checkedAt:'2026-10-29T05:22:00Z'}}};
+  await refresh(out,{id:123,user:{login:'attacker',type:'User'}});
+  assert.equal(calls,0);
+  assert.match(script,/text\('quickVerifyCount',reviewFresh\?/);
+  assert.ok(script.includes("'— stale'"));
+  assert.ok(!/method:\s*['"](?:POST|PUT|PATCH|DELETE)/.test(src));
+});
