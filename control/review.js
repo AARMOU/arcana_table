@@ -175,7 +175,7 @@ function openSheet(item) {
   const close = el('button', 'btn', 'Close'); close.type = 'button'; close.addEventListener('click', () => { sheet.close(); refreshSheet = () => {}; });
   const head = el('div'); head.style.cssText = 'display:flex;justify-content:space-between;gap:8px;align-items:start';
   head.append(el('h2', '', String(item.card || 'Card')), close);
-  const status = el('p', '', (LABELS[item.state] || item.state) + ' · ' + CERT[item.certification || 'not-run']);
+  const statusLabel = el('p', '', (LABELS[item.state] || item.state) + ' · ' + CERT[item.certification || 'not-run']);
   const link = el('a', '', 'PR #' + item.pr + ' · commit ' + String(item.headSha || '').slice(0, 12) + ' ↗');
   link.href = safeUrl(item.url); link.target = '_blank'; link.rel = 'noopener noreferrer';
   const oracle = el('p', 'muted', 'Loading Oracle rules…');
@@ -229,7 +229,7 @@ function openSheet(item) {
     if (result.signIn) { store.set(null); authenticated = false; authNotice = result.text; }
     if (result.ok && body?.state) {
       item.state = body.state;
-      status.textContent = (LABELS[item.state] || item.state) + ' · ' + (CERT[item.certification || 'not-run'] || '');
+      statusLabel.textContent = (LABELS[item.state] || item.state) + ' · ' + (CERT[item.certification || 'not-run'] || '');
       item.problems = body.state === 'changes-requested' ? ['You requested a fix on this commit'] : [];
       if (data) { data.awaitingReview = data.items.filter(isReadyForOwner).length; render(listEl, data); onChange?.(data); }
     }
@@ -238,7 +238,7 @@ function openSheet(item) {
   approve.addEventListener('click', () => send('approve'));
   reject.addEventListener('click', () => send('request-fix'));
   actions.append(approve, reject, signIn);
-  sheet.append(head, status, link,
+  sheet.append(head, statusLabel, link,
     section('Oracle rules', [oracle], ''),
     section('Implemented abilities (requested)', item.abilities || [], 'Not listed for this card.'),
     section('Automated checks (this commit)', checkItems, 'No checks reported yet.'),
