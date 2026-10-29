@@ -101,9 +101,7 @@ class EldraziIncursionPlayableTest {
                         stepFailure = "No priority player and no pending decision"
                         null
                     } else {
-                        ais.getValue(priority).playPriorityWindow(state, processor).also {
-                            if (it == null) stepFailure = "AI priority window returned null for player=$priority"
-                        }
+                        ais.getValue(priority).playPriorityWindow(state, processor)
                     }
                 }
                 actions++

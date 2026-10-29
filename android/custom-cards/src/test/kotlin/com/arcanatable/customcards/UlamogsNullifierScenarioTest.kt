@@ -23,6 +23,46 @@ class UlamogsNullifierScenarioTest {
         return bears
     }
 
+    /**
+     * Flash timing and ownership must also work when the targeted spell belongs
+     * to an opponent, not only when responding to our own spell.
+     */
+    private fun GameTestDriver.respondToOpponentsBears(c: Choices) {
+        passPriorityUntil(com.wingedsheep.sdk.core.Step.PRECOMBAT_MAIN, player2)
+        val bears = putCardInHand(player2, "Grizzly Bears")
+        giveMana(player2, Color.GREEN); giveColorlessMana(player2, 1)
+        assertNull(castSpell(player2, bears).error)
+        assertEquals("Caster retains priority after casting", player2, priorityPlayer)
+        assertNull(passPriority(player2).error)
+        assertEquals("Nullifier controller must receive priority", player1, priorityPlayer)
+        val nullifier = putCardInHand(player1, "Ulamog's Nullifier")
+        giveMana(player1, Color.BLUE); giveMana(player1, Color.BLACK); giveColorlessMana(player1, 2)
+        assertNull(castSpell(player1, nullifier).error)
+        resolveAll(c.copy(targets = listOf(bears)))
+    }
+
+    @Test fun opponentsSpellCanBeCounteredAfterProcessingTheirExiledCards() {
+        val d = setup()
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Island")
+        d.respondToOpponentsBears(Choices(yes = true, pick = listOf("Sol Ring", "Island")))
+        assertEquals(1, d.permanentsNamed(d.player1, "Ulamog's Nullifier").size)
+        assertTrue("Opponent's spell was countered", d.permanentsNamed(d.player2, "Grizzly Bears").isEmpty())
+        assertEquals(listOf("Grizzly Bears", "Island", "Sol Ring"),
+            d.getGraveyardCardNames(d.player2).sorted())
+        assertTrue(d.getExileCardNames(d.player2).isEmpty())
+    }
+
+    @Test fun decliningProcessingOfOpponentsSpellLetsItResolve() {
+        val d = setup()
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Island")
+        d.respondToOpponentsBears(Choices(yes = false))
+        assertEquals(1, d.permanentsNamed(d.player2, "Grizzly Bears").size)
+        assertEquals(listOf("Island", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
+        assertTrue(d.getGraveyardCardNames(d.player2).isEmpty())
+    }
+
     @Test fun processingTwoOpponentCardsCountersTheSpell() {
         val d = setup()
         d.putCardInExile(d.player2, "Sol Ring"); d.putCardInExile(d.player2, "Grizzly Bears")
