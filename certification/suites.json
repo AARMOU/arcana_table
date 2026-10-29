@@ -22,6 +22,14 @@
       "source": "certification/PoxwalkersIndependentCertificationTest.kt",
       "testClass": "com.arcanatable.customcards.PoxwalkersIndependentCertificationTest",
       "tests": 6
+    },
+    {
+      "key": "darksteel-monolith",
+      "name": "Darksteel Monolith",
+      "issue": 368,
+      "source": "certification/DarksteelMonolithIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.DarksteelMonolithIndependentCertificationTest",
+      "tests": 8
     }
   ]
 }

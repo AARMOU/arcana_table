@@ -85,3 +85,18 @@ test('Poxwalkers certification accepts only exact current Copilot head and trust
   assert.equal(match(sha,checks,{title:'Implement Poxwalkers custom card'}),null);
   assert.equal(match(sha,checks,{user:{login:'AARMOU'}}),null);
 });
+
+test('Darksteel Monolith uses its own trusted unit, exact title, head and eight scenarios',()=>{
+  const target=manifest.suites.find(s=>s.issue===368);
+  assert.equal(target?.key,'darksteel-monolith');
+  assert.equal(target.tests,8);
+  const p=pr({title:'Add Darksteel Monolith',body:'Fixes #368'});
+  const i=issue({number:368,title:'[Arcana Queue] Darksteel Monolith — Cardkit SUPPORTED, unclaimed',
+    body:'<!-- arcana-auto-queue-v1 -->\n<!-- source: trusted-main-queue-feeder -->\n## Cards\n- Darksteel Monolith'});
+  const select=(overrides={})=>P.candidate(manifest,{pr:p,issue:i,sha,checks,...overrides});
+  assert.equal(select()?.key,'darksteel-monolith');
+  assert.equal(select({pr:{...p,title:'Add Darksteel Monolith support'}}),null);
+  assert.equal(select({issue:{...i,number:406}}),null);
+  assert.equal(select({sha:'b'.repeat(40)}),null);
+  assert.equal(select({checks:checks.slice(0,2)}),null);
+});

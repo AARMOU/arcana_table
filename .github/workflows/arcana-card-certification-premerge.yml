@@ -27,6 +27,10 @@ jobs:
             pr: 407
             issue: 406
             title: Implement Poxwalkers
+          - key: darksteel-monolith
+            pr: 370
+            issue: 368
+            title: Add Darksteel Monolith
     steps:
       - uses: actions/checkout@v4
         with:
