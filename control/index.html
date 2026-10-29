@@ -375,7 +375,40 @@
       const STATUS_MARKER='<!-- arcana-control-status-v1:';
       function parseStatus(body){const t=String(body||'');if(!t.startsWith(STATUS_MARKER))return null;const m=t.match(/```json\n([\s\S]*?)\n```/);if(!m)return null;try{const d=JSON.parse(m[1]);return d&&typeof d==='object'&&(d.kind==='billing'||d.kind==='dispatcher'||d.kind==='workers'||d.kind==='queue'||d.kind==='review')?d:null;}catch{return null;}}
       const isBotComment=c=>c?.user?.login==='github-actions[bot]'&&c?.user?.type==='Bot';
-      async function fetchStatus(){const first=await api('/issues/78/comments?per_page=100&page=1');let comments=first.data;const last=first.link.match(/<[^>]*[?&]page=(\d+)[^>]*>;\s*rel="last"/);if(last&&Number(last[1])>1){comments=comments.concat((await api('/issues/78/comments?per_page=100&page='+Number(last[1]))).data);}const out={};for(const c of comments){if(!isBotComment(c))continue;const d=parseStatus(c.body);if(d)out[d.kind]={data:d,url:c.html_url};}return out;}
+            // REVIEW_FRESHNESS_START
+      // The public edge may cache this feed for 15 minutes. A green network indicator
+      // does not establish that the review snapshot is current. Recheck ONLY the
+      // already-verified bot's public review comment when its report is older than 2m.
+      // One credential-free GitHub direct read per five minutes per open page, even on
+      // failure. The owner decision endpoint remains separate and authenticated.
+      const REVIEW_DIRECT_AFTER_MS=2*60*1000, REVIEW_DIRECT_RETRY_MS=5*60*1000;
+      let reviewLastDirectAttempt=0, reviewLatest=null;
+      async function refreshReviewSnapshot(out, trustedComment){
+        if(reviewLatest && (!out.review || Date.parse(reviewLatest.data.checkedAt)>Date.parse(out.review.data?.checkedAt||'')))
+          out.review=reviewLatest; // a subsequent cached edge read must not roll back the display
+        const checked=Date.parse(out.review?.data?.checkedAt||'');
+        if(Number.isFinite(checked)&&Date.now()-checked<REVIEW_DIRECT_AFTER_MS)return;
+        if(!Number.isSafeInteger(trustedComment?.id)||trustedComment.id<=0||!isBotComment(trustedComment))return;
+        if(reviewLastDirectAttempt&&Date.now()-reviewLastDirectAttempt<REVIEW_DIRECT_RETRY_MS)return;
+        reviewLastDirectAttempt=Date.now();
+        try{
+          const res=await fetch('https://api.github.com/repos/'+REPO+'/issues/comments/'+trustedComment.id,{
+            cache:'no-store',headers:{'Accept':'application/vnd.github+json'},signal:readTimeout()
+          });
+          if(!res.ok)return;
+          const comment=await res.json();
+          if(comment?.id!==trustedComment.id||!isBotComment(comment))return;
+          const data=parseStatus(comment.body);
+          const newer=Date.parse(data?.checkedAt||'');
+          if(data?.kind!=='review'||!Number.isFinite(newer)||newer>Date.now()+60000)return;
+          if(Number.isFinite(checked)&&newer<=checked)return;
+          reviewLatest={data,url:comment.html_url};
+          out.review=reviewLatest;
+          directFeedFallbacks++;
+        }catch{ /* Keep cached snapshot and expose its age; never claim it was verified. */ }
+      }
+      // REVIEW_FRESHNESS_END
+      async function fetchStatus(){const first=await api('/issues/78/comments?per_page=100&page=1');let comments=first.data;const last=first.link.match(/<[^>]*[?&]page=(\\d+)[^>]*>;\\s*rel="last"/);if(last&&Number(last[1])>1){comments=comments.concat((await api('/issues/78/comments?per_page=100&page='+Number(last[1]))).data);}const out={};let trustedReview=null;for(const c of comments){if(!isBotComment(c))continue;const d=parseStatus(c.body);if(d){out[d.kind]={data:d,url:c.html_url};if(d.kind==='review')trustedReview=c;}}await refreshReviewSnapshot(out,trustedReview);return out;}
       const num=x=>Number.isFinite(x)?(Math.round(x*10)/10).toLocaleString():'—';
       const pct=x=>Number.isFinite(x)?Math.round(x*100)+'%':'—';
       const levelColor=l=>({normal:'var(--green)',warn:'var(--amber)',slow:'var(--amber)',paused:'var(--red)',unknown:'var(--red)'}[l]||'var(--muted)');
@@ -482,7 +515,7 @@
         r.items.filter(window.ArcanaReview.isReadyForOwner).length:0;
         const badge=$('reviewBadge');badge.textContent=n?n+' to verify':'Nothing waiting';badge.className='tag '+(n?'blue':'gray');
         document.title=(n?'('+n+') ':'')+document.title.replace(/^\(\d+\) /,'');try{if(navigator.setAppBadge)(n?navigator.setAppBadge(n):navigator.clearAppBadge()).catch(()=>{});}catch{}}
-      function renderReview(st){const r=st.review?.data;const list=$('reviewList');if(!r||!Array.isArray(r.items))return;list.replaceChildren();reviewBadge(r);renderDailyCards(r);text('quickVerifyCount',String(r.items.filter(i=>window.ArcanaReview?.isReadyForOwner?.(i)).length)+' ready');
+      function renderReview(st){const r=st.review?.data;const list=$('reviewList');if(!r||!Array.isArray(r.items))return;list.replaceChildren();reviewBadge(r);renderDailyCards(r);const age=Date.now()-Date.parse(r.checkedAt||'');const reviewFresh=Number.isFinite(age)&&age>=-60000&&age<=5*60*1000;text('quickVerifyCount',reviewFresh?String(r.items.filter(i=>window.ArcanaReview?.isReadyForOwner?.(i)).length)+' ready':'— stale');
         // Phase 2: tap a card for details and Approve / Request Fix (control/review.js); links remain as fallback.
         if(window.ArcanaReview?.render){window.ArcanaReview.render(list,r,reviewBadge);return;}
         if(!r.items.length){list.append(e('div','empty','No Copilot work PRs in the review feed.'));return;}
