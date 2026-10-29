@@ -5,7 +5,7 @@ on:
 permissions:
   contents: read
   issues: write
-  pull-requests: read
+  pull-requests: write
 jobs:
   comment-capability:
     runs-on: ubuntu-24.04
@@ -15,7 +15,7 @@ jobs:
           script: |
             try {
               const r=await github.rest.issues.createComment({...context.repo,issue_number:433,
-                body:'Integration publisher permission smoke: this bot can post PR timeline results with the configured scopes. No card result, merge or APK is claimed.'});
+                body:'Integration publisher permission smoke: this bot can post PR timeline results with the configured publisher scopes. No card result, merge or APK is claimed.'});
               core.info('PR timeline write capability PASS: '+r.data.html_url);
             } catch(e) {
               core.info('Safe permission diagnostic: HTTP '+e.status+'; accepted='+String(e.response?.headers?.['x-accepted-github-permissions']));
