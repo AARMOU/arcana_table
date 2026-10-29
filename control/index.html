@@ -511,11 +511,23 @@
       function renderQueue(st){const q=st.queue?.data;if(!q)return;const list=$('queueList');list.replaceChildren();text('queueMeta',(q.ok?((q.suggestions||[]).filter(s=>s.ready).length+' ready · '+(q.available??'?')+' Copilot-ready unclaimed'):'unavailable')+' · '+timeAgo(q.checkedAt));if(!q.ok){list.append(e('div','empty',q.reason||'Feeder could not verify claims.'));return;}const ready=(q.suggestions||[]).filter(s=>s.ready);ready.forEach(s=>{const href=typeof s.newIssueUrl==='string'&&s.newIssueUrl.startsWith(ROOT+'/issues/new?')?s.newIssueUrl:ROOT+'/issues/78';addRow(list,s.name,'Open a prefilled [Arcana Queue] issue · dispatch still applies every gate',href,{klass:'neutral',tag:'blue',label:'Queue it'});});(q.suggestions||[]).filter(s=>!s.ready).forEach(s=>addRow(list,s.name,'Refused: '+(s.error||s.missing.join(', ')),ROOT+'/issues/78',{klass:'failure',tag:'gray',label:'Skipped'}));if(!q.suggestions?.length)list.append(e('div','empty','No unqueued Copilot-ready cards right now.'));}
       // REVIEW_INBOX: read-only; every link goes to this repository's PR pages, where GitHub authenticates the owner.
       const REVIEW_STATES={'awaiting-review':{klass:'neutral',tag:'blue',label:'Verify'},'checks-failed':{klass:'failure',tag:'gray',label:'Checks failed'},'changes-requested':{klass:'failure',tag:'amber',label:'Fix requested'},'checks-running':{klass:'neutral',tag:'amber',label:'Checks running'},approved:{klass:'success',tag:'gray',label:'Approved'}};
+      // A report's age is not a new card decision. Preserve its last-known count
+      // while labeling older reports, rather than making Verify appear to disappear
+      // after five minutes. The authenticated review Worker checks live PR identity,
+      // exact head and certification before recording any approval.
+      function reviewCountLabel(r, now=Date.now()){
+        const checked=Date.parse(r?.checkedAt||'');
+        if(!Array.isArray(r?.items)||!Number.isFinite(checked)||checked>now+60000||
+           typeof window.ArcanaReview?.isReadyForOwner!=='function')return '— unavailable';
+        const n=r.items.filter(window.ArcanaReview.isReadyForOwner).length;
+        return now-checked>15*60*1000?n+' reported · old':n+' ready';
+      }
       function reviewBadge(r){const n=Array.isArray(r?.items)&&window.ArcanaReview?.isReadyForOwner?
         r.items.filter(window.ArcanaReview.isReadyForOwner).length:0;
+        text('quickVerifyCount',reviewCountLabel(r));
         const badge=$('reviewBadge');badge.textContent=n?n+' to verify':'Nothing waiting';badge.className='tag '+(n?'blue':'gray');
         document.title=(n?'('+n+') ':'')+document.title.replace(/^\(\d+\) /,'');try{if(navigator.setAppBadge)(n?navigator.setAppBadge(n):navigator.clearAppBadge()).catch(()=>{});}catch{}}
-      function renderReview(st){const r=st.review?.data;const list=$('reviewList');if(!r||!Array.isArray(r.items))return;list.replaceChildren();reviewBadge(r);renderDailyCards(r);const age=Date.now()-Date.parse(r.checkedAt||'');const reviewFresh=Number.isFinite(age)&&age>=-60000&&age<=5*60*1000;text('quickVerifyCount',reviewFresh?String(r.items.filter(i=>window.ArcanaReview?.isReadyForOwner?.(i)).length)+' ready':'— stale');
+      function renderReview(st){const r=st.review?.data;const list=$('reviewList');if(!r||!Array.isArray(r.items))return;list.replaceChildren();reviewBadge(r);renderDailyCards(r);
         // Phase 2: tap a card for details and Approve / Request Fix (control/review.js); links remain as fallback.
         if(window.ArcanaReview?.render){window.ArcanaReview.render(list,r,reviewBadge);return;}
         if(!r.items.length){list.append(e('div','empty','No Copilot work PRs in the review feed.'));return;}
