@@ -171,3 +171,44 @@ test('installed PWA refreshes when an updated service worker activates',()=>{
   assert.ok(html.includes('location.reload()'));
   assert.ok(html.includes("updateViaCache: 'none'"));
 });
+
+test('operations hub replaces marketing banner with real owner review and authorization entry points', () => {
+  assert.doesNotMatch(html,/All systems\. One command center\./);
+  for (const id of ['quickVerify','quickDoIt','quickVerifyCount','quickDoItCount','opsWorkers','opsWorkerCount','dailyCardCount','dailyBars','dailyFresh'])
+    assert.match(html,new RegExp('id="'+id+'"'),id);
+  assert.match(script,/ArcanaReview\?\.openNext\?\.\(\)/);
+  assert.match(script,/authorizationList/);
+  assert.match(script,/renderOpsWorkers\(d\)/);
+  assert.match(script,/renderDailyCards\(r\)/);
+  assert.match(fs.readFileSync(path.join(__dirname,'review.js'),'utf8'),/api\.openNext = \(\) =>/);
+  // The top-level action cannot send an owner authorization or review by itself.
+  assert.doesNotMatch(script,/method:\s*['"]POST/);
+});
+test('daily merged card counts use Mountain calendar days, do not count duplicates or pending work', () => {
+  const pure = script.split('// DAILY_CARDS_PURE_START')[1]?.split('// DAILY_CARDS_PURE_END')[0];
+  assert.ok(pure);
+  const ctx=vm.createContext({});
+  vm.runInContext(pure,ctx);
+  const sample=[
+    {pr:1,card:'A',mergedAt:'2026-10-29T01:30:00Z'},
+    {pr:1,card:'A',mergedAt:'2026-10-29T01:30:00Z'},
+    {pr:2,card:'B',mergedAt:'2026-10-28T06:05:00Z'},
+    {pr:3,card:'C',mergedAt:'2026-10-29T06:05:00Z'},
+    {pr:4,card:'Unmerged',state:'checks-running'}
+  ];
+  const stats=vm.runInContext('dailyCardStats',ctx)(sample,new Date('2026-10-29T01:45:00Z'));
+  assert.equal(stats.today,2);
+  assert.equal(stats.total,2);
+  assert.equal(stats.days.length,7);
+  assert.equal(stats.days[6].day,'2026-10-28');
+  assert.equal(vm.runInContext('dailyCardStats',ctx)([],new Date('2026-10-29T01:45:00Z')).today,0);
+  assert.equal(vm.runInContext('dailyCardStats',ctx)(null),null);
+});
+test('daily count is sourced from merged Copilot PR activity rather than incomplete 30-row review inbox', () => {
+  const source=fs.readFileSync(path.join(__dirname,'../scripts/review-inbox.cjs'),'utf8');
+  assert.match(source,/integratedActivity\.push\(/);
+  assert.match(source,/mergedAt: pr\.merged_at/);
+  assert.match(source,/per_page: 100/);
+  assert.ok(script.includes('integratedActivity'));
+  assert.ok(script.includes('Merged ≠ independently certified'));
+});
