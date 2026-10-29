@@ -1,0 +1,119 @@
+name: B140 Azlask last-known color matcher - NO APK
+on:
+  push:
+    branches: [gpt/b140-azlask-trigger-color-predicate-20261029]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: b140-azlask-exact-colors-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  engine-and-azlask:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - name: Confirm unchanged B140 base and narrow no-APK scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=310f7dd6a7f1829aa90955af02c2cd48fb8d1a61
+          test "$(git ls-remote https://github.com/AARMOU/arcana_table.git refs/heads/gpt/b140-card-request-test-apk-20261028 | cut -f1)" = "$base"
+          git merge-base --is-ancestor "$base" HEAD
+          git diff --check "$base" HEAD
+          git diff --name-only "$base" HEAD > changed.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          actual=set(Path("changed.txt").read_text().splitlines())
+          expected={
+             ".github/workflows/b140-azlask-trigger-color-no-apk.yml",
+             "engine-upgrade/build140/apply_engine.sh",
+             "engine-upgrade/build140/patches/0003-azlask-exact-colors-trigger.patch",
+          }
+          assert actual==expected, (actual-expected,expected-actual)
+          print("PASS: only pinned-engine patch, replay script and isolated NO-APK proof")
+          PY
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: argentum-engine
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Apply pinned Arcana engine patches and exact-color fix (fail closed)
+        run: |
+          bash engine-upgrade/build140/apply_engine.sh
+          git -C argentum-engine diff -- rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt | grep -q 'HasExactlyColors'
+      - name: Engine real rules regression suite and runtime jar
+        working-directory: argentum-engine
+        run: |
+          bash ../engine-upgrade/build140/run_gradle.sh azlask-rules-tests \
+            ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :rules-engine:test :rules-engine:jar
+      - name: Replace only rules jar in CI workspace (never committed)
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,zipfile,struct,shutil
+          dest=Path("android/app/libs/argentum-rules-engine.jar")
+          candidates=[]
+          for p in Path("argentum-engine/rules-engine/build/libs").glob("*.jar"):
+            if "sources" in p.name or "javadoc" in p.name: continue
+            with zipfile.ZipFile(p) as z:
+              if "com/wingedsheep/engine/core/GameAction.class" in z.namelist():
+                candidates.append(p)
+          assert len(candidates)==1,candidates
+          old=hashlib.sha256(dest.read_bytes()).hexdigest()
+          with zipfile.ZipFile(candidates[0]) as z:
+            version=max(struct.unpack(">H",z.read(n)[6:8])[0] for n in z.namelist() if n.endswith(".class"))
+          assert version<=61,version
+          shutil.copyfile(candidates[0],dest)
+          print(f"CI-only rules JAR {old} -> {hashlib.sha256(dest.read_bytes()).hexdigest()}, class major {version}")
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: All three Azlask real-engine scenarios (includes negative color/controller checks)
+        working-directory: android
+        run: |
+          bash ../engine-upgrade/build140/run_gradle.sh azlask-scenarios \
+            ./gradlew --no-daemon --max-workers=2 :custom-cards:test \
+            --tests 'com.arcanatable.customcards.AzlaskTheSwellingScourgeScenarioTest'
+      - name: Confirm actual Azlask JUnit pass, not compile-only
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from xml.etree import ElementTree as E
+          from pathlib import Path
+          paths=list(Path("android/custom-cards/build/test-results/test").glob("TEST-*AzlaskTheSwellingScourgeScenarioTest.xml"))
+          assert len(paths)==1,paths
+          root=E.parse(paths[0]).getroot()
+          counts={k:int(root.get(k,"0")) for k in ("tests","failures","errors","skipped")}
+          print("Azlask:",counts)
+          assert counts=={"tests":3,"failures":0,"errors":0,"skipped":0},counts
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b140-azlask-no-apk-${{ github.sha }}
+          if-no-files-found: warn
+          path: |
+            engine-source.txt
+            gradle-logs/
+            android/custom-cards/build/test-results/test/TEST-*Azlask*.xml
+            argentum-engine/rules-engine/build/test-results/test/TEST-*.xml

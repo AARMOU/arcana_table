@@ -1,0 +1,40 @@
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt
+@@ -1531,7 +1531,18 @@
+                             entity?.has<com.wingedsheep.engine.state.components.identity.TokenComponent>() == true
+                         }
+                     }
++                    is com.wingedsheep.sdk.scripting.predicates.CardPredicate.HasExactlyColors -> {
++                        // For a departure, read the departing permanent's layer-5 colors,
++                        // not its printed colors in the destination zone (CR 603.10/608.2h).
++                        // No LKI means no match; do not silently accept a wrong trigger.
++                        when {
++                            event.isBattlefieldDeparture -> event.lastKnown?.colors?.size == predicate.count
++                            event.toZone == Zone.BATTLEFIELD -> projected.getColors(event.entityId).size == predicate.count
++                            isFaceDown -> predicate.count == 0
++                            else -> cardComponent?.colors?.size == predicate.count
++                        }
++                    }
+                     is com.wingedsheep.sdk.scripting.predicates.CardPredicate.Or ->
+                         predicate.predicates.any { matchesLkiPredicate(it) }
+                     is com.wingedsheep.sdk.scripting.predicates.CardPredicate.And ->
+                         predicate.predicates.all { matchesLkiPredicate(it) }
+@@ -1806,7 +1817,17 @@
+                 !projected.hasKeyword(entityId, predicate.keyword)
+             is com.wingedsheep.sdk.scripting.predicates.CardPredicate.IsToken -> isToken()
+             is com.wingedsheep.sdk.scripting.predicates.CardPredicate.IsNontoken -> !isToken()
++            is com.wingedsheep.sdk.scripting.predicates.CardPredicate.HasExactlyColors -> {
++                // Live permanents use layer-5 colors; face-down objects are colorless.
++                // Objects with no battlefield projection use their printed colors.
++                val colors = when {
++                    isFaceDown -> emptySet<String>()
++                    projected.getProjectedValues(entityId) != null -> projected.getColors(entityId)
++                    else -> cardComponent.colors.map { it.name }.toSet()
++                }
++                colors.size == predicate.count
++            }
+             // Static whole-card layout characteristic, so it is read off the card component and is
+             // unaffected by face-down status or by which face is currently up.
+             is com.wingedsheep.sdk.scripting.predicates.CardPredicate.IsDoubleFaced ->
+                 cardComponent.isDoubleFaced
