@@ -22,6 +22,22 @@
       "source": "certification/PoxwalkersIndependentCertificationTest.kt",
       "testClass": "com.arcanatable.customcards.PoxwalkersIndependentCertificationTest",
       "tests": 6
+    },
+    {
+      "key": "blood-for-the-blood-god",
+      "name": "Blood for the Blood God!",
+      "issue": 352,
+      "source": "certification/BloodForTheBloodGodIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.BloodForTheBloodGodIndependentCertificationTest",
+      "tests": 4
+    },
+    {
+      "key": "sporocyst",
+      "name": "Sporocyst",
+      "issue": 417,
+      "source": "certification/SporocystIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.SporocystIndependentCertificationTest",
+      "tests": 5
     }
   ]
 }
