@@ -166,3 +166,22 @@ test('verified Android receipts distinguish integrated cards and destination blo
   assert.match(payload.items[0].problems[0],/Integration blocked: Independent test failed/);
   assert.equal(payload.integratedActivity.length,0);
 });
+
+test('control-plane feeder/observer runs do not hold a certified card in checks-running', () => {
+  const { classify } = require('./review-inbox.cjs');
+  const head = 'b'.repeat(40);
+  const pr = { number: 360, title: 'Implement Celestine, the Living Saint', body: 'Fixes #358', draft: false, head: { sha: head } };
+  const cert = { name: 'Arcana independent certification', status: 'completed', conclusion: 'success', head_sha: head,
+    app: { slug: 'github-actions', id: 15368 }, output: { title: 'Celestine, the Living Saint: independent rules scenarios passed',
+      summary: '7 trusted-main JUnit scenarios passed against the exact current Copilot PR commit' } };
+  const green = ['toolkit', 'scaffold', 'cards-and-android'].map(name => ({ name, status: 'completed', conclusion: 'success', head_sha: head }));
+  const files = ['android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CelestineTheLivingSaint.kt',
+    'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineTheLivingSaintScenarioTest.kt'];
+  const noisy = [...green, cert, { name: 'suggest', status: 'in_progress', head_sha: head },
+    { name: 'publish', status: 'completed', conclusion: 'failure', head_sha: head }];
+  const row = classify(pr, noisy, [], '', files);
+  assert.equal(row.state, 'certified');
+  assert.equal(row.readyForOwner, true);
+  const real = classify(pr, [...noisy, { name: 'cards-and-android', status: 'in_progress', head_sha: head }], [], '', files);
+  assert.equal(real.state, 'checks-running');
+});

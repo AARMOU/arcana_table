@@ -279,3 +279,20 @@ test("GitHub PR-read error categorization preserves status but never exposes own
   assert.deepEqual(prReadFailure({status:403,rateLimited:false}),[403,{error:"github-access-denied",upstreamStatus:403}]);
   assert.deepEqual(prReadFailure({status:503}),[502,{error:"github-pr-read-failed",upstreamStatus:503}]);
 });
+
+test("control-plane feeder/observer runs never block Verify; real failing checks still do", async () => {
+  const base = [{ name: "toolkit", status: "completed", conclusion: "success" }, CERTIFIED];
+  const noise = [{ name: "suggest", status: "in_progress", conclusion: null },
+    { name: "publish", status: "completed", conclusion: "failure" }, { name: "observe", status: "queued", conclusion: null }];
+  const gh = fakeGitHub({ checks: [...base, ...noise] });
+  const r = await decision(gh, { pr: 360, sha: SHA, decision: "approve" });
+  assert.equal(r.status, 200);
+  assert.equal(gh.writes.filter(w => w[0] === "review").length, 1);
+  for (const real of [{ name: "cards-and-android", status: "completed", conclusion: "failure" },
+    { name: "coordination-guard", status: "in_progress", conclusion: null }]) {
+    const blocked = fakeGitHub({ checks: [...base, ...noise, real] });
+    const b = await decision(blocked, { pr: 360, sha: SHA, decision: "approve" });
+    assert.deepEqual([b.status, b.body.error, b.body.checks], [422, "checks-not-green", [real.name]]);
+    assert.equal(blocked.writes.length, 0);
+  }
+});
