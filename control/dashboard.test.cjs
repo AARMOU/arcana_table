@@ -276,7 +276,7 @@ test('rate-limited public edge falls back to read-only GitHub with a bounded per
       });
     },
   });
-  vm.runInContext(src+'\\nthis.callApi=api;',context);
+  vm.runInContext(src+'\nthis.callApi=api;',context);
   const first=await context.callApi(path);
   assert.equal(first.data.length,1);
   assert.ok(first.link.includes('next'));
@@ -284,7 +284,7 @@ test('rate-limited public edge falls back to read-only GitHub with a bounded per
   assert.equal(second.data.length,1);
   assert.equal(edge,2);
   assert.equal(direct,1,'a two-minute refresh must not spend another public rate-limit request');
-  assert.equal(context.directFeedFallbacks,2);
+  assert.equal(vm.runInContext('directFeedFallbacks',context),2);
   assert.equal(context.cachedFeeds,1);
   assert.equal(await context.publicGithubDirect('/private/admin'),null);
   assert.equal(direct,1);
@@ -302,7 +302,7 @@ test('dashboard never treats arbitrary edge 503 as permission to bypass its publ
       return new Response(JSON.stringify({error:'public-github-feed-unavailable'}),{status:503});
     }
   });
-  vm.runInContext(script.slice(from,to)+'\\nthis.callApi=api;',context);
+  vm.runInContext(script.slice(from,to)+'\nthis.callApi=api;',context);
   await assert.rejects(context.callApi('/issues/78/comments?per_page=100&page=1'),/GitHub feed HTTP 503/);
   assert.equal(direct,0);
 });
