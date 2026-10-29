@@ -10,6 +10,9 @@ on:
       - .github/workflows/card-packaging-plumbing-no-apk.yml
 permissions:
   contents: read
+concurrency:
+  group: card-packaging-plumbing-${{ github.event.pull_request.head.ref || github.ref_name }}
+  cancel-in-progress: true
 jobs:
   export-and-task-graph:
     if: github.repository == 'AARMOU/arcana_table' && (github.event_name == 'push' || github.event.pull_request.head.ref == 'gpt/b140-card-packaging-plumbing-20261028')
@@ -22,6 +25,12 @@ jobs:
           persist-credentials: false
       - name: Exercise corrupt, stale and missing packaged-asset fixtures
         run: python3 -m unittest discover -s tools/tests -p test_packaged_card_assets.py -v
+      - name: Required Cardkit and generated-document checks (NO APK)
+        run: |
+          python3 -m unittest discover -s tools/cardkit/tests
+          tools/cardkit/cardkit check
+          tools/cardkit/cardkit docs-check
+          git diff --check
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -39,7 +48,7 @@ jobs:
         working-directory: android
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon --max-workers=2 :app:mergeDebugAssets --dry-run | tee "$RUNNER_TEMP/card-asset-task-graph.txt"
+          ./gradlew --no-daemon --max-workers=2 --console=plain :app:mergeDebugAssets --dry-run | tee "$RUNNER_TEMP/card-asset-task-graph.txt"
           python3 - <<'PY'
           import os
           from pathlib import Path
@@ -59,7 +68,7 @@ jobs:
           suite = ET.parse(files[0]).getroot()
           assert int(suite.get('tests', '0')) == 5, suite.attrib
           assert all(int(suite.get(k, '0')) == 0 for k in ('failures', 'errors', 'skipped')), suite.attrib
-          print('PASS: 5 real-engine data/registry scenarios, no failures/errors/skips; NO APK')
+          print('PASS: 5 existing pinned-SDK data/registry tests, no failures/errors/skips; NO APK')
           PY
       - uses: actions/upload-artifact@v4
         if: always()
