@@ -16,7 +16,7 @@ from cardkit_lib import gaps  # noqa: E402
 
 class OpenPrClaimsDiagnosticsTests(unittest.TestCase):
     def test_success_preserves_open_pr_claims(self):
-        payload = '{"number":419,"title":"Sporocyst","branch":"copilot/card","body":"owned"}\\n'
+        payload = '{"number":419,"title":"Sporocyst","branch":"copilot/card","body":"owned"}\n'
         with mock.patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0, stdout=payload)):
             self.assertEqual(gaps.open_pr_claims(), [
                 {"number": 419, "title": "Sporocyst", "branch": "copilot/card", "body": "owned"}
@@ -67,7 +67,7 @@ class OpenPrClaimsDiagnosticsTests(unittest.TestCase):
         self.assertNotIn("sensitive-path", str(ctx.exception))
 
     def test_malformed_json_remains_fail_closed(self):
-        with mock.patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0, stdout="{broken\\n")):
+        with mock.patch("subprocess.run", return_value=subprocess.CompletedProcess([], 0, stdout="{broken\n")):
             with self.assertRaises(gaps.ClaimsUnavailable):
                 gaps.open_pr_claims()
 
