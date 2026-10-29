@@ -36,8 +36,28 @@ def open_pr_claims(repo_slug: str = "AARMOU/arcana_table") -> list[dict]:
         out = subprocess.run(["gh", "api", "--paginate", f"repos/{repo_slug}/pulls?state=open&per_page=100", "--jq",
                               ".[] | {number, title, branch: .head.ref, body: (.body // \"\")[0:4000]}"],
                              capture_output=True, text=True, timeout=120, check=True).stdout
-    except (OSError, subprocess.SubprocessError) as exc:
-        raise ClaimsUnavailable(f"could not read open PRs via gh: {exc}") from exc
+    except subprocess.CalledProcessError as exc:
+        # gh's default exception hides captured stderr, obscuring HTTP 403/429 and jq failures.
+        # Report only allowlisted diagnostics; never echo raw stderr or credential-bearing text.
+        stderr = exc.stderr or ""
+        http = re.search(r"\bHTTP\s+([1-5][0-9]{2})\b", stderr, re.IGNORECASE)
+        category = (
+            "rate-limit" if re.search(r"rate.limit", stderr, re.IGNORECASE) else
+            "integration-permission" if "resource not accessible by integration" in stderr.casefold() else
+            "jq-filter" if re.search(r"\bjq\b", stderr, re.IGNORECASE) else
+            "unclassified"
+        )
+        status = f"; HTTP {http.group(1)}" if http else ""
+        raise ClaimsUnavailable(
+            f"could not read open PRs via gh: exit {exc.returncode}{status}; category={category}; "
+            "raw stderr withheld; claims unverified"
+        ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise ClaimsUnavailable("could not read open PRs via gh: timed out; claims unverified") from exc
+    except OSError as exc:
+        raise ClaimsUnavailable(
+            f"could not read open PRs via gh: execution unavailable ({type(exc).__name__}); claims unverified"
+        ) from exc
     try:
         return [json.loads(l) for l in out.splitlines() if l.strip()]
     except json.JSONDecodeError as exc:
