@@ -52,6 +52,7 @@ jobs:
             'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt',
             'android/app/src/main/assets/argentum/custom-cards.index.tsv',
             'android/app/src/main/assets/argentum/custom-cards.jsonl',
+            'android/app/src/test/java/com/arcanatable/EldraziIncursionPlayableTest.kt',
           }
           for name in ('BlackMarketConnections','CommissarSeverinaRaine',
                        'JaheiraFriendOfTheForest','ScurryOak','TataruTaru','WaywardSwordtooth'):
