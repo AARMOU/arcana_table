@@ -15,12 +15,18 @@ const CERT = { certified: 'Independently certified', running: 'Independent certi
 const SHA = /^[0-9a-f]{40}$/;
 
 const sessionFromHash = hash => { const m = String(hash || '').match(/(?:^#|&)review-session=([^&]+)/); return m ? decodeURIComponent(m[1]) : null; };
-const canDecide = i => !!i && i.state !== 'integrated' && SHA.test(String(i.headSha || '')) && Number.isSafeInteger(i.pr);
+// A linked work unit is insufficient evidence that this PR implements a card.
+const isReadyForOwner = i => !!i && i.kind === 'card' && i.hasTest === true && i.draft === false &&
+  i.state === 'certified' && i.certification === 'certified';
+const canDecide = i => !!i && i.kind === 'card' && i.state !== 'integrated' && SHA.test(String(i.headSha || '')) && Number.isSafeInteger(i.pr);
 // Approval needs independent rules certification on this head, not just green checks. The Worker
 // enforces the same rule on the live head; this only disables the button and explains why.
-const canApprove = i => canDecide(i) && i.state === 'certified' && i.certification === 'certified';
-const approveBlocked = i => !canDecide(i) || canApprove(i) ? null
-  : 'Approval needs independent certification of this exact commit (' + (CERT[i.certification || 'not-run'] || i.certification) + '). You can still request a fix.';
+const canApprove = i => canDecide(i) && isReadyForOwner(i);
+const approveBlocked = i => canApprove(i) ? null
+  : !canDecide(i) ? 'This is not a verified card implementation. Review its GitHub PR as engineering or audit work.'
+    : i.draft ? 'This PR is still a draft; it is not ready for owner approval.'
+      : !i.hasTest ? 'Executable card scenario tests are missing. You can still request a fix.'
+        : 'Approval needs independent certification of this exact commit (' + (CERT[i.certification || 'not-run'] || i.certification) + '). You can still request a fix.';
 function decisionMessage(status, body) {
   if (status === 200 && body?.duplicate) return { ok: true, text: 'Already recorded for this commit.' };
   if (status === 200 || status === 207) return { ok: true, text: body?.state === 'approved'
@@ -30,10 +36,12 @@ function decisionMessage(status, body) {
   if (status === 409 && body?.error === 'stale-commit') return { ok: false, stale: true, text: 'A newer commit arrived. Nothing was recorded. Refresh and review the new commit.' };
   if (status === 422 && body?.error === 'not-certified') return { ok: false, text: 'Cannot approve: this exact commit has not passed independent certification (' + (body.certification || 'not-run') + '). You can still request a fix.' };
   if (status === 422 && body?.error === 'checks-not-green') return { ok: false, text: 'Cannot approve: checks are not all passing (' + (body.checks || []).join(', ') + '). You can still request a fix.' };
+  if (status === 422 && body?.error === 'draft-pr') return { ok: false, text: 'This PR is still a draft. No approval was recorded.' };
+  if (status === 422 && body?.error === 'not-a-verified-card-implementation') return { ok: false, text: 'No verified card source and executable test were found. No approval was recorded.' };
   if (status === 400 && body?.error === 'describe-the-fix') return { ok: false, text: 'Describe what needs fixing.' };
   return { ok: false, text: 'Not recorded (' + (body?.error || 'HTTP ' + status) + ').' };
 }
-const api = { REVIEW_API, LABELS, sessionFromHash, canDecide, canApprove, approveBlocked, decisionMessage };
+const api = { REVIEW_API, LABELS, sessionFromHash, isReadyForOwner, canDecide, canApprove, approveBlocked, decisionMessage };
 root.ArcanaReview = api;
 if (typeof module === 'object' && module.exports) { module.exports = api; return; }
 if (typeof document === 'undefined') return;
@@ -128,17 +136,35 @@ const safeUrl = u => typeof u === 'string' && u.startsWith('https://github.com/A
 function render(container, payload, changed) {
   listEl = container; data = payload; onChange = changed || onChange;
   container.replaceChildren();
-  if (!payload?.items?.length) { container.append(el('div', 'empty', 'No Copilot card PRs open.')); return; }
-  for (const i of payload.items) {
-    if (!Number.isSafeInteger(i?.pr)) continue;
-    const row = el('button', 'list-row');
-    row.type = 'button'; row.style.cssText = 'width:100%;text-align:left;background:none;border:0;cursor:pointer;color:inherit';
-    const main = el('div', 'row-main');
-    main.append(el('div', 'row-title', '#' + i.pr + ' ' + String(i.card || 'Card')),
-      el('div', 'row-sub', (i.problems?.[0] || (LABELS[i.state] || i.state)) + ' · head ' + String(i.headSha || '').slice(0, 7)));
-    row.append(main, el('span', 'tag ' + (TAGS[i.state] || 'gray'), LABELS[i.state] || String(i.state)));
-    row.addEventListener('click', () => openSheet(i));
-    container.append(row);
+  if (!payload?.items?.length) { container.append(el('div', 'empty', 'No Copilot work PRs in the current review feed.')); return; }
+  const items = payload.items.filter(i => Number.isSafeInteger(i?.pr));
+  const groups = [
+    ['Ready for your approval', items.filter(isReadyForOwner)],
+    ['Card implementations · verification pending', items.filter(i => i.kind === 'card' && !isReadyForOwner(i))],
+    ['Engine work / blockers · no card approval', items.filter(i => i.kind === 'engine')],
+    ['Audits / documentation · no card approval', items.filter(i => i.kind === 'audit')],
+    ['Unclassified · GitHub file evidence needed', items.filter(i => !['card', 'engine', 'audit'].includes(i.kind))]
+  ];
+  for (const [heading, rows] of groups) {
+    if (!rows.length) continue;
+    const label = el('h3', 'row-sub', heading + ' (' + rows.length + ')');
+    label.style.cssText = 'margin:14px 14px 6px;font-weight:700;letter-spacing:.01em';
+    container.append(label);
+    for (const i of rows) {
+      const isCard = i.kind === 'card';
+      const row = el(isCard ? 'button' : 'a', 'list-row');
+      if (isCard) { row.type = 'button'; row.addEventListener('click', () => openSheet(i)); }
+      else { row.href = safeUrl(i.url); row.target = '_blank'; row.rel = 'noopener noreferrer'; }
+      row.style.cssText = 'width:100%;text-align:left;background:none;border:0;cursor:pointer;color:inherit;text-decoration:none';
+      const main = el('div', 'row-main');
+      const detail = (i.problems?.[0] || i.reason || (LABELS[i.state] || i.state)) +
+        ' · head ' + String(i.headSha || '').slice(0, 7);
+      main.append(el('div', 'row-title', '#' + i.pr + ' ' + String(i.card || 'Untitled work')),
+        el('div', 'row-sub', detail));
+      const status = isReadyForOwner(i) ? 'Ready' : i.draft ? 'Draft' : (LABELS[i.state] || String(i.state));
+      row.append(main, el('span', 'tag ' + (isReadyForOwner(i) ? 'blue' : 'gray'), status));
+      container.append(row);
+    }
   }
 }
 
@@ -189,7 +215,7 @@ function openSheet(item) {
     msg.textContent = m.text;
     if (m.signIn) { store.set(null); authenticated = false; authNotice = m.text; }
     if (m.ok && body?.state) { item.state = body.state; item.problems = body.state === 'changes-requested' ? ['You requested a fix on this commit'] : [];
-      if (data) { data.awaitingReview = data.items.filter(x => x.state === 'awaiting-review' || x.state === 'certified').length; render(listEl, data); onChange?.(data); } }
+      if (data) { data.awaitingReview = data.items.filter(isReadyForOwner).length; render(listEl, data); onChange?.(data); } }
     refresh();
   }
   approve.addEventListener('click', () => send('approve'));
@@ -215,7 +241,7 @@ api.render = render;
 // The top-level Verify action opens the next reviewable card's existing owner-gated sheet.
 // It does not send a decision or bypass exact-head certification.
 api.openNext = () => {
-  const item = data?.items?.find(i => i.state === 'certified' || i.state === 'awaiting-review');
+  const item = data?.items?.find(isReadyForOwner);
   if (!item) return false;
   openSheet(item);
   return true;
