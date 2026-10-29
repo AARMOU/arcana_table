@@ -66,7 +66,8 @@ class ResurrectionOrbScenarioTest {
             d.castSpellWithTargets(player, actOfTreason, listOf(ChosenTarget.Permanent(bearer))).error,
         )
         d.resolveAll()
-        val controlledBearer = d.findPermanent(player, "Grizzly Bears")!!
+        assertEquals(player, d.getController(bearer))
+        val controlledBearer = bearer
         d.giveColorlessMana(player, 4)
 
         val equip = d.cardRegistry.getCard("Resurrection Orb")!!.script.activatedAbilities.single()
@@ -86,19 +87,20 @@ class ResurrectionOrbScenarioTest {
         assertNull(d.findPermanent(player, "Craw Wurm"))
         assertTrue(d.zoneNames(player, Zone.GRAVEYARD).contains("Craw Wurm"))
 
-        val bears = d.findPermanent(player, "Grizzly Bears")!!
         val secondMurder = d.putCardInHand(player, "Murder")
         d.giveMana(player, Color.BLACK, 2)
         d.giveColorlessMana(player, 1)
-        assertNull(d.castSpellWithTargets(player, secondMurder, listOf(ChosenTarget.Permanent(bears))).error)
+        assertNull(d.castSpellWithTargets(player, secondMurder, listOf(ChosenTarget.Permanent(bearer))).error)
         d.resolveAll()
-        assertNull(d.findPermanent(player, "Grizzly Bears"))
+        assertNull(d.findPermanent(owner, "Grizzly Bears"))
         assertTrue(d.zoneNames(owner, Zone.GRAVEYARD).contains("Grizzly Bears"))
 
         d.passPriorityUntil(Step.END)
         d.resolveAll()
 
-        assertNotNull(d.findPermanent(owner, "Grizzly Bears"))
+        val returnedBearer = d.findPermanent(owner, "Grizzly Bears")
+        assertNotNull(returnedBearer)
+        assertEquals(owner, d.getController(returnedBearer!!))
         assertNull(d.findPermanent(player, "Grizzly Bears"))
         assertTrue(d.zoneNames(player, Zone.GRAVEYARD).contains("Craw Wurm"))
         assertFalse(d.zoneNames(player, Zone.GRAVEYARD).contains("Grizzly Bears"))
