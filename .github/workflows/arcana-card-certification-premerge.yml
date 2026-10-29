@@ -35,6 +35,10 @@ jobs:
             pr: 419
             issue: 417
             title: Add Sporocyst with Ravenous and Spore Chimney
+          - key: verdant-suns-avatar
+            pr: 463
+            issue: 462
+            title: Implement Verdant Sun’s Avatar
     steps:
       - uses: actions/checkout@v4
         with:
