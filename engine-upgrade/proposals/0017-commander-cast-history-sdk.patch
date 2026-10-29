@@ -49,16 +49,6 @@ diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/Dynami
  import com.wingedsheep.engine.state.components.identity.RoomComponent
  import com.wingedsheep.engine.state.components.identity.ToxicComponent
 +import com.wingedsheep.engine.state.components.identity.TokenComponent
-+import com.wingedsheep.engine.support.GameTestDriver
-+import com.wingedsheep.sdk.core.Color
-+import com.wingedsheep.sdk.core.Format
-+import com.wingedsheep.sdk.core.ManaCost
-+import com.wingedsheep.sdk.core.Step
-+import com.wingedsheep.sdk.core.Subtype
-+import com.wingedsheep.sdk.core.Supertype
-+import com.wingedsheep.sdk.model.CardDefinition
-+import com.wingedsheep.sdk.model.Deck
-+import io.kotest.matchers.shouldNotBe
  import com.wingedsheep.engine.state.components.stack.SpellOnStackComponent
  import com.wingedsheep.sdk.core.CounterType
  import com.wingedsheep.sdk.core.Keyword
@@ -116,7 +106,7 @@ diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/CommanderC
 new file mode 100644
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/CommanderCastHistoryAmountTest.kt
-@@ -0,0 +1,118 @@
+@@ -0,0 +1,128 @@
 +package com.wingedsheep.engine.mana
 +
 +import com.wingedsheep.engine.handlers.EffectContext
@@ -126,6 +116,16 @@ new file mode 100644
 +import com.wingedsheep.engine.state.ZoneKey
 +import com.wingedsheep.engine.state.components.identity.CommanderComponent
 +import com.wingedsheep.engine.state.components.identity.TokenComponent
++import com.wingedsheep.engine.support.GameTestDriver
++import com.wingedsheep.sdk.core.Color
++import com.wingedsheep.sdk.core.Format
++import com.wingedsheep.sdk.core.ManaCost
++import com.wingedsheep.sdk.core.Step
++import com.wingedsheep.sdk.core.Subtype
++import com.wingedsheep.sdk.core.Supertype
++import com.wingedsheep.sdk.model.CardDefinition
++import com.wingedsheep.sdk.model.Deck
++import io.kotest.matchers.shouldNotBe
 +import com.wingedsheep.sdk.core.Zone
 +import com.wingedsheep.sdk.dsl.DynamicAmounts
 +import com.wingedsheep.sdk.model.EntityId
