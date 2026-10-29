@@ -41,7 +41,7 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Validate control dashboard
-        run: node --test control/dashboard.test.cjs control/card-queue.test.cjs tools/tests/argentum-catalog.test.cjs
+        run: node --test control/dashboard.test.cjs control/card-queue.test.cjs control/review-auth-browser.test.cjs tools/tests/argentum-catalog.test.cjs
       - name: Generate deck scanner JSON from reviewed tool and current integration data
         shell: bash
         run: |
