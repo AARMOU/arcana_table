@@ -9,7 +9,10 @@ const PWA = "https://aarmou.github.io";
 const W = "https://arcana-review.example.workers.dev";
 
 // Minimal fake GitHub keeping state, recording every write.
-const CERTIFIED = { name: "independent-certification", status: "completed", conclusion: "success", head_sha: SHA };
+const CERTIFIED = { name: "Arcana independent certification", status: "completed", conclusion: "success", head_sha: SHA,
+  app: {slug:'github-actions',id:15368},
+  output: {title:'Resurrection Orb: independent rules scenarios passed',
+    summary:'4 trusted-main JUnit scenarios passed against the exact current Copilot PR commit'} };
 function fakeGitHub({ head = SHA, checks = [{ name: "toolkit", status: "completed", conclusion: "success" }, CERTIFIED], reviews = [],
   author = "Copilot", prState = "open", draft = false,
   files = ["android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt",
@@ -230,4 +233,23 @@ test("a draft, audit, engine blocker, or card without executable tests cannot be
   }
   const gh = fakeGitHub({ files: [] });
   assert.equal((await decision(gh, { pr: 360, sha: SHA, decision: "request-fix", note: "This is a blocker, not a card" })).status, 200);
+});
+
+test("fake certificate names/apps cannot cause owner approval, even with green CI", async () => {
+  const toolkit={name:'toolkit',status:'completed',conclusion:'success'};
+  const invalid=[
+    {...CERTIFIED,name:'totally-independent-certification'},
+    {...CERTIFIED,app:{slug:'github-actions',id:111}},
+    {...CERTIFIED,app:{slug:'other',id:15368}},
+    {...CERTIFIED,output:{title:'Fake independent cert',summary:'fake tests'}},
+    {...CERTIFIED,head_sha:'b'.repeat(40)}
+  ];
+  for(const cert of invalid){
+    const gh=fakeGitHub({checks:[toolkit,cert]});
+    const r=await decision(gh,{pr:360,sha:SHA,decision:'approve'});
+    assert.deepEqual([r.status,r.body.error],[422,'not-certified']);
+    assert.equal(gh.writes.length,0);
+  }
+  const legitimate=fakeGitHub({checks:[toolkit,CERTIFIED]});
+  assert.equal((await decision(legitimate,{pr:360,sha:SHA,decision:'approve'})).status,200);
 });
