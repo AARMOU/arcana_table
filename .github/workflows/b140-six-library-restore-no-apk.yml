@@ -63,10 +63,11 @@ jobs:
         run: |
           ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
           git diff --exit-code -- app/src/main/assets/argentum/custom-cards.index.tsv app/src/main/assets/argentum/custom-cards.jsonl
-      - name: Six existing positive/negative Argentum scenarios
+      - name: Six restored-card scenarios plus Azlask integration blocker diagnostic
         working-directory: android
         run: |
           ./gradlew --no-daemon --max-workers=2 :custom-cards:test \
+            --tests 'com.arcanatable.customcards.AzlaskTheSwellingScourgeScenarioTest' \
             --tests 'com.arcanatable.customcards.BlackMarketConnectionsScenarioTest' \
             --tests 'com.arcanatable.customcards.CommissarSeverinaRaineScenarioTest' \
             --tests 'com.arcanatable.customcards.JaheiraFriendOfTheForestScenarioTest' \
