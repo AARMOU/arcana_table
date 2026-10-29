@@ -88,7 +88,8 @@ jobs:
           echo "Mirror test fixture SHA: $actual"
           echo "Engine source SHA: $(git rev-parse HEAD)"
           git diff --name-only
-          test "$(git diff --name-only | grep -v -x "$fixture" | wc -l)" -eq 0
+          unexpected=$(git diff --name-only | grep -v -x "$fixture" || true)
+          test -z "$unexpected"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
