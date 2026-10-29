@@ -1527,8 +1527,14 @@
    ]
   },
   "Effects.CreateDelayedTrigger": {
-   "count": 2,
+   "count": 3,
    "examples": [
+    {
+     "card": "Resurrection Orb",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ResurrectionOrb.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ResurrectionOrbScenarioTest.kt"
+    },
     {
      "card": "Frenetic Sliver",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/FreneticSliver.kt",
@@ -2474,7 +2480,7 @@
    ]
   },
   "Effects.Move": {
-   "count": 9,
+   "count": 10,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -2501,16 +2507,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ContinueQuestionScenarioTest.kt"
     },
     {
+     "card": "Resurrection Orb",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ResurrectionOrb.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ResurrectionOrbScenarioTest.kt"
+    },
+    {
      "card": "Poxwalkers",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Poxwalkers.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PoxwalkersScenarioTest.kt"
-    },
-    {
-     "card": "Nurgle's Rot",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/NurglesRot.kt",
-     "lines": 42,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/NurglesRotScenarioTest.kt"
     }
    ]
   },
@@ -3303,7 +3309,7 @@
    ]
   },
   "Keyword.LIFELINK": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Flayed One",
@@ -3330,16 +3336,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VenomcrawlerScenarioTest.kt"
     },
     {
+     "card": "Resurrection Orb",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ResurrectionOrb.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ResurrectionOrbScenarioTest.kt"
+    },
+    {
      "card": "Tallyman of Nurgle",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TallymanOfNurgle.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TallymanOfNurgleScenarioTest.kt"
-    },
-    {
-     "card": "Leonardo, the Balance",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/LeonardoTheBalance.kt",
-     "lines": 58,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LeonardoTheBalanceScenarioTest.kt"
     }
    ]
   },
@@ -3911,8 +3917,14 @@
    ]
   },
   "Triggers.attached.dies": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Resurrection Orb",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ResurrectionOrb.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ResurrectionOrbScenarioTest.kt"
+    },
     {
      "card": "Nurgle's Rot",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/NurglesRot.kt",
@@ -4397,7 +4409,7 @@
    ]
   },
   "equipAbility()": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Bone Sabres",
@@ -4410,6 +4422,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfLightAndShadow.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfLightAndShadowScenarioTest.kt"
+    },
+    {
+     "card": "Resurrection Orb",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ResurrectionOrb.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ResurrectionOrbScenarioTest.kt"
     },
     {
      "card": "Sword of Fire and Ice",
@@ -4428,12 +4446,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfFeastAndFamine.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfFeastAndFamineScenarioTest.kt"
-    },
-    {
-     "card": "Sword of War and Peace",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfWarAndPeace.kt",
-     "lines": 43,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfWarAndPeaceScenarioTest.kt"
     }
    ]
   },
@@ -4728,7 +4740,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 56,
+   "count": 57,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -4769,7 +4781,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 131,
+   "count": 132,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5472,7 +5484,7 @@
    ]
   },
   "Step.END": {
-   "count": 11,
+   "count": 12,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -5485,6 +5497,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CloakwoodHermit.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CloakwoodHermitScenarioTest.kt"
+    },
+    {
+     "card": "Resurrection Orb",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ResurrectionOrb.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ResurrectionOrbScenarioTest.kt"
     },
     {
      "card": "Gargoyle Flock",
@@ -5503,12 +5521,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SneakAttack.kt",
      "lines": 44,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SneakAttackScenarioTest.kt"
-    },
-    {
-     "card": "Kratos, God of War",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KratosGodOfWar.kt",
-     "lines": 46,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KratosGodOfWarScenarioTest.kt"
     }
    ]
   },
@@ -5942,7 +5954,7 @@
    ]
   },
   "GrantKeyword": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Winged Hive Tyrant",
@@ -6412,7 +6424,7 @@
    ]
   },
   "EffectTarget.TriggeringEntity": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Bone Sabres",
@@ -6425,6 +6437,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GenestealerLocus.kt",
      "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GenestealerLocusScenarioTest.kt"
+    },
+    {
+     "card": "Resurrection Orb",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ResurrectionOrb.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ResurrectionOrbScenarioTest.kt"
     },
     {
      "card": "Iron Man, Bleeding Edge",
@@ -6443,23 +6461,23 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MilesTailsPrower.kt",
      "lines": 43,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MilesTailsProwerScenarioTest.kt"
-    },
-    {
-     "card": "Displaced Dinosaurs",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DisplacedDinosaurs.kt",
-     "lines": 51,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DisplacedDinosaursScenarioTest.kt"
     }
    ]
   },
   "Filters.EquippedCreature": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Sword of Light and Shadow",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfLightAndShadow.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfLightAndShadowScenarioTest.kt"
+    },
+    {
+     "card": "Resurrection Orb",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ResurrectionOrb.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ResurrectionOrbScenarioTest.kt"
     },
     {
      "card": "Sword of Fire and Ice",
@@ -6484,12 +6502,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfWarAndPeace.kt",
      "lines": 43,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfWarAndPeaceScenarioTest.kt"
-    },
-    {
-     "card": "Sword of Body and Mind",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfBodyAndMind.kt",
-     "lines": 51,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfBodyAndMindScenarioTest.kt"
     }
    ]
   },
