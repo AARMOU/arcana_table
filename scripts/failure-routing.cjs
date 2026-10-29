@@ -96,17 +96,22 @@ async function routeFailure({ github, context, authorize = observeOnly }) {
   return {state:allowed?'repair-requested':'observed-only',pr:pr.number, reason: decision.reason};
 }
 
-// Scheduled backfill: records failures whose router run was dropped from the queue.
-// Observation only; never requests a repair.
-async function reconcileFailures({ github, context, now = Date.now(), windowMs = 6 * 60 * 60 * 1000 }) {
+// Scheduled backfill also revisits capacity/billing-denied failures when repairs are enabled.
+// Never more than one paid request per tick, with the same exact-head/admission guards.
+// Default remains observation-only for callers that do not supply an authorizer.
+async function reconcileFailures({ github, context, authorize = observeOnly,
+  now = Date.now(), windowMs = 24 * 60 * 60 * 1000 }) {
   const { owner, repo } = context.repo;
   const since = new Date(now - windowMs).toISOString();
   const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo,
     { owner, repo, status: 'failure', created: '>=' + since, per_page: 100 });
   const results = [];
+  let requested = 0;
   for (const run of runs.filter(r => WORKFLOWS.has(r.name))) {
     const ctx = { repo: context.repo, payload: { repository: context.payload.repository, workflow_run: run } };
-    const r = await routeFailure({ github, context: ctx, authorize: observeOnly });
+    const r = await routeFailure({ github, context: ctx,
+      authorize: requested < 1 ? authorize : observeOnly });
+    if (r.state === 'repair-requested') requested++;
     results.push({ run: run.id, state: r.state });
   }
   return results;
