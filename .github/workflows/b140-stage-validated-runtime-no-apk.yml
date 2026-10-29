@@ -1,0 +1,129 @@
+name: B140 stage validated rules runtime in DRAFT branch (NO APK)
+on:
+  push:
+    branches: [gpt/b140-combined-registry-azlask-proof-20261029]
+    paths: [.github/workflows/b140-stage-validated-runtime-no-apk.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: write
+concurrency:
+  group: b140-validated-runtime-staging
+  cancel-in-progress: false
+jobs:
+  stage-exact-verified-bundle:
+    if: github.ref == 'refs/heads/gpt/b140-combined-registry-azlask-proof-20261029'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Fail closed on changed B140, candidate source, or staging scope
+        shell: bash
+        run: |
+          set -euo pipefail
+          base=310f7dd6a7f1829aa90955af02c2cd48fb8d1a61
+          proof=b7f8dc9ab1d783293564a4863d9eb49c999bf64b
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git ls-remote origin refs/heads/gpt/b140-combined-registry-azlask-proof-20261029 | cut -f1)" = "$GITHUB_SHA"
+          test "$(git ls-remote origin refs/heads/gpt/b140-card-request-test-apk-20261028 | cut -f1)" = "$base"
+          git merge-base --is-ancestor "$base" HEAD
+          git merge-base --is-ancestor "$proof" HEAD
+          git diff --check "$proof" HEAD
+          python3 - <<'PY'
+          import subprocess
+          changed=set(subprocess.check_output(
+              ['git','diff','--name-only','b7f8dc9ab1d783293564a4863d9eb49c999bf64b','HEAD'],text=True).splitlines())
+          expected={'.github/workflows/b140-stage-validated-runtime-no-apk.yml',
+                    '.github/workflows/b140-registry-azlask-combined-no-apk.yml'}
+          assert changed==expected,(changed,expected)
+          print('PASS: only the isolated staging workflow and combined-proof allowlist changed')
+          PY
+      - uses: actions/download-artifact@v4
+        with:
+          name: b140-validated-rules-runtime-b7f8dc9ab1d783293564a4863d9eb49c999bf64b
+          run-id: 40873629949
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/b140-validated-runtime
+      - name: Independently verify exact artifact, retained dependencies and patch hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          (cd "$RUNNER_TEMP/b140-validated-runtime" && sha256sum -c SHA256SUMS)
+          python3 - <<'PY'
+          import hashlib,json,os,struct,zipfile
+          from pathlib import Path
+          root=Path(os.environ['GITHUB_WORKSPACE'])
+          bundle=Path(os.environ['RUNNER_TEMP'])/'b140-validated-runtime'
+          expected={
+              'SHA256SUMS','android/app/libs/argentum-rules-engine.jar',
+              'engine-upgrade/build140/runtime-manifest.json',
+              'engine-upgrade/patch-report.json','engine-source.txt'}
+          found={str(p.relative_to(bundle)) for p in bundle.rglob('*') if p.is_file()}
+          assert found==expected,(found,expected)
+          previous=json.loads((root/'engine-upgrade/build140/runtime-manifest.json').read_text())
+          current=json.loads((bundle/'engine-upgrade/build140/runtime-manifest.json').read_text())
+          assert current['upstream']==previous['upstream']=='61e71e586b100faa661f86cac827ac3c3bbb5a78'
+          assert current['builtBy']['run']=='40873629949'
+          assert current['builtBy']['sourceCommit']=='b7f8dc9ab1d783293564a4863d9eb49c999bf64b'
+          assert current['builtBy']['modules']==['rules-engine']
+          assert set(current['jars'])==set(previous['jars'])
+          assert current['retainedRuntime']['jars']=={
+              k:v for k,v in previous['jars'].items() if k!='argentum-rules-engine.jar'}
+          for name,digest in current['jars'].items():
+              if name=='argentum-rules-engine.jar': continue
+              assert digest==previous['jars'][name]
+              assert hashlib.sha256((root/'android/app/libs'/name).read_bytes()).hexdigest()==digest
+          for path,entry in previous['patches'].items():
+              assert current['patches'][path]==entry,(path,entry)
+          for path,entry in current['patches'].items():
+              assert hashlib.sha256((root/path).read_bytes()).hexdigest()==entry['sha256'],path
+          old=root/'android/app/libs/argentum-rules-engine.jar'
+          new=bundle/'android/app/libs/argentum-rules-engine.jar'
+          digest=lambda p: hashlib.sha256(p.read_bytes()).hexdigest()
+          assert digest(old)==previous['jars']['argentum-rules-engine.jar']
+          assert digest(old)=='d370af1c2a7888787b9550f36348439f9f10dc4ff981c0d9550789077d0484d7'
+          assert digest(new)==current['jars']['argentum-rules-engine.jar']
+          assert digest(new)=='efeb8b51e9902562c5026e0f58e8622c870a72f1af358522c66eacd4d5918309'
+          with zipfile.ZipFile(new) as jar:
+              versions=[struct.unpack('>H',jar.read(n)[6:8])[0]
+                        for n in jar.namelist() if n.endswith('.class')]
+              assert versions and max(versions)<=61
+              assert 'com/wingedsheep/engine/core/GameAction.class' in jar.namelist()
+          print('PASS: SHA256SUMS, exact CI source/run, pinned patches, SDK/tooling/AI unchanged, Java 17 compatible')
+          PY
+      - name: Stage only the rules JAR and manifest on existing DRAFT PR
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "$RUNNER_TEMP/b140-validated-runtime/android/app/libs/argentum-rules-engine.jar" android/app/libs/argentum-rules-engine.jar
+          cp "$RUNNER_TEMP/b140-validated-runtime/engine-upgrade/build140/runtime-manifest.json" engine-upgrade/build140/runtime-manifest.json
+          python3 - <<'PY'
+          import subprocess
+          changed=set(subprocess.check_output(['git','diff','--name-only'],text=True).splitlines())
+          expected={'android/app/libs/argentum-rules-engine.jar',
+                    'engine-upgrade/build140/runtime-manifest.json'}
+          assert changed==expected,(changed,expected)
+          print('PASS: only rules runtime and provenance manifest changed')
+          PY
+          git add -f android/app/libs/argentum-rules-engine.jar
+          git add engine-upgrade/build140/runtime-manifest.json
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          test "$(git ls-remote origin refs/heads/gpt/b140-combined-registry-azlask-proof-20261029 | cut -f1)" = "$GITHUB_SHA"
+          git commit -m 'test(B140): stage exact hash-verified Azlask rules runtime on draft only'
+          git push origin HEAD:refs/heads/gpt/b140-combined-registry-azlask-proof-20261029
+          test "$(git ls-remote origin refs/heads/gpt/b140-combined-registry-azlask-proof-20261029 | cut -f1)" = "$(git rev-parse HEAD)"
+      - name: Dispatch ordinary exact-branch Development CI and Cardkit (NO APK)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch=gpt/b140-combined-registry-azlask-proof-20261029
+          gh api -X POST "repos/$GITHUB_REPOSITORY/actions/workflows/arcana-development-ci.yml/dispatches" -f ref="$branch"
+          gh api -X POST "repos/$GITHUB_REPOSITORY/actions/workflows/cardkit.yml/dispatches" -f ref="$branch"
+          echo 'Ordinary CI dispatched against staged draft branch; results must be checked at exact resulting HEAD.'

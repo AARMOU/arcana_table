@@ -39,6 +39,7 @@ jobs:
           actual=set(Path('/tmp/combined-paths').read_text().splitlines())
           allowed={
             '.github/workflows/b140-registry-azlask-combined-no-apk.yml',
+            '.github/workflows/b140-stage-validated-runtime-no-apk.yml',
             '.github/workflows/b140-six-library-restore-no-apk.yml',
             '.github/workflows/b140-azlask-trigger-color-no-apk.yml',
             'engine-upgrade/build140/apply_engine.sh',
