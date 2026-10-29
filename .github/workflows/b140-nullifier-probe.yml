@@ -61,12 +61,12 @@ jobs:
       matrix:
         include:
           - label: b140-control
-            ref: 310f7dd6a7f1829aa90955af02c2cd48fb8d1a61
+            ref: 10b6b8a9bc89a31cf24850a284970ccbbf45efd9
           # Independent JVM/workspace replay of the *same* B140 source, test fixture,
           # seed and shuffled deck. Different results between these two controls
           # demonstrate nondeterminism without attributing it to Nullifier.
           - label: b140-control-replay
-            ref: 310f7dd6a7f1829aa90955af02c2cd48fb8d1a61
+            ref: 10b6b8a9bc89a31cf24850a284970ccbbf45efd9
           - label: nullifier-candidate
             ref: ${{ github.sha }}
     steps:
@@ -79,8 +79,8 @@ jobs:
           git rev-parse HEAD
           git diff --exit-code
       - name: Use the same diagnostic-only AI mirror test on both engine sources
-        # The historical B140 test has no per-turn life trace. Without this overlay
-        # a failing B140 control cannot distinguish a long game from stalled combat.
+        # The integrated B140 fixture already has deterministic engine seeds and
+        # strict per-action state replay. Overlay the same exact fixture on controls.
         # Only the test fixture is overlaid: B140 runtime/cards/assets stay untouched.
         run: |
           set -euo pipefail
