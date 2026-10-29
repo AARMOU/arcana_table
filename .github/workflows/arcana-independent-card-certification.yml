@@ -1,6 +1,6 @@
 name: Arcana Independent Card Certification
-# Trusted-main verification of a Copilot card PR. No card-worker token, paid agent,
-# merge permission, release permission, or Cloudflare credentials are used.
+# Shared verifier. The trusted-main registry selects a verified JUnit suite for
+# each card; unregistered cards are never silently certified. No paid agents.
 on:
   workflow_run:
     workflows:
@@ -12,7 +12,7 @@ permissions: {}
 
 jobs:
   gate:
-    name: Find exact-head eligible card
+    name: Match trusted current-head card and registered suite
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -23,38 +23,43 @@ jobs:
       eligible: ${{ steps.inspect.outputs.eligible }}
       pr: ${{ steps.inspect.outputs.pr }}
       sha: ${{ steps.inspect.outputs.sha }}
+      key: ${{ steps.inspect.outputs.key }}
     steps:
-      - name: Match trusted unit and all prerequisite checks
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Match current PR, trusted queue unit, required CI, and suite registry
         id: inspect
         uses: actions/github-script@v7
         with:
           script: |
-            const run = context.payload.workflow_run;
-            if (run.event !== 'pull_request' || run.conclusion !== 'success') return;
+            const P = require('./certification/policy.cjs');
+            const manifest = P.readManifest('./certification/suites.json');
             const owner = context.repo.owner, repo = context.repo.repo;
-            const prs = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', per_page: 100 });
-            const pr = prs.find(p =>
-              p.head.sha === run.head_sha &&
-              String(p.user?.login || '').toLowerCase() === 'copilot' &&
-              p.base.ref === 'gpt/arcana-integration-next' &&
-              p.title === 'Implement Resurrection Orb' &&
-              /Fixes #408\b/.test(p.body || ''));
-            if (!pr) return;
-            const unit = await github.rest.issues.get({ owner, repo, issue_number: 408 });
-            if (unit.data.state !== 'open' || !unit.data.title.startsWith('[Arcana Queue] Resurrection Orb')) return;
-            const runs = await github.paginate(github.rest.checks.listForRef,
-              { owner, repo, ref: pr.head.sha, per_page: 100 });
-            const green = name => runs.some(c => c.name === name && c.head_sha === pr.head.sha &&
-              c.status === 'completed' && c.conclusion === 'success');
-            // Cardkit and Android are prerequisites, not certification. The independent
-            // trust-owned scenario suite below is required in addition to both.
-            if (!['toolkit', 'scaffold', 'cards-and-android'].every(green)) return;
-            core.setOutput('eligible', 'true');
-            core.setOutput('pr', String(pr.number));
-            core.setOutput('sha', pr.head.sha);
+            const full = owner + '/' + repo;
+            const run = context.payload.workflow_run;
+            if (!P.workflowEventEligible(run, full)) return;
+            const prs = await github.paginate(github.rest.pulls.list,
+              { owner, repo, state:'open', per_page:100 });
+            // If two PRs claim the same exact head, do not guess ownership.
+            const matches = prs.filter(p => p.head.sha === run.head_sha);
+            if (matches.length !== 1) return;
+            const pr = matches[0];
+            const n = P.issueFromBody(pr.body);
+            if (!n || !manifest.suites.some(s => s.issue === n)) return;
+            const issue = (await github.rest.issues.get({owner,repo,issue_number:n})).data;
+            const checks = await github.paginate(github.rest.checks.listForRef,
+              {owner,repo,ref:pr.head.sha,per_page:100});
+            const suite = P.candidate(manifest,{pr,issue,sha:run.head_sha,checks,repository:full});
+            if (!suite) return;
+            core.setOutput('eligible','true');
+            core.setOutput('pr',String(pr.number));
+            core.setOutput('sha',run.head_sha);
+            core.setOutput('key',suite.key);
 
   independent-scenarios:
-    name: Execute trusted Resurrection Orb behavior scenarios
+    name: Execute registered independent rules scenarios
     needs: gate
     if: needs.gate.outputs.eligible == 'true'
     runs-on: ubuntu-latest
@@ -62,25 +67,26 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Checkout exact Copilot candidate without write credentials
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: ${{ needs.gate.outputs.sha }}
           path: candidate
           persist-credentials: false
-      - name: Checkout independent tests from trusted default branch
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           ref: main
           path: trusted
           persist-credentials: false
-      - name: Inject immutable trusted-side tests (never use PR-supplied certification tests)
+      - name: Inject only main-approved JUnit scenarios
+        id: suite
         shell: bash
+        env:
+          SUITE_KEY: ${{ needs.gate.outputs.key }}
         run: |
           set -euo pipefail
-          cp trusted/certification/ResurrectionOrbIndependentCertificationTest.kt \
-            candidate/android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ResurrectionOrbIndependentCertificationTest.kt
-          test -s candidate/android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ResurrectionOrbIndependentCertificationTest.kt
+          python3 trusted/certification/runner.py prepare \
+            --manifest trusted/certification/suites.json --key "$SUITE_KEY" \
+            --trusted trusted --candidate candidate --github-output "$GITHUB_OUTPUT"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -88,74 +94,65 @@ jobs:
       - uses: android-actions/setup-android@v3
         with:
           packages: platform-tools
-      - name: Install the same SDK used by standard Android CI
-        run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
-      - name: Run the independent suite against the exact PR commit
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Exercise pinned engine against the trusted scenarios
         working-directory: candidate/android
-        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests com.arcanatable.customcards.ResurrectionOrbIndependentCertificationTest
-      - name: Confirm independent JUnit cases really executed
-        shell: bash
+        env:
+          TEST_CLASS: ${{ steps.suite.outputs.testClass }}
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests "$TEST_CLASS"
+      - name: Confirm every independently registered scenario really passed
+        env:
+          SUITE_KEY: ${{ needs.gate.outputs.key }}
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import xml.etree.ElementTree as ET
-          files = list(Path('candidate/android/custom-cards/build/test-results/test').glob('TEST-*ResurrectionOrbIndependentCertificationTest.xml'))
-          if len(files) != 1:
-              raise SystemExit(f'Expected exactly one independent test result, got {len(files)}')
-          root = ET.parse(files[0]).getroot()
-          count = int(root.attrib.get('tests', 0))
-          if count != 4 or any(int(root.attrib.get(x, 0)) for x in ('failures', 'errors', 'skipped')):
-              raise SystemExit(f'Independent suite not fully passed: {root.attrib}')
-          print(f'{count} independent rules scenarios passed')
-          PY
+          python3 trusted/certification/runner.py verify \
+            --manifest trusted/certification/suites.json --key "$SUITE_KEY" --candidate candidate
 
   publish:
-    name: Publish exact-commit certification
+    name: Publish exact-head independent certification
     needs: [gate, independent-scenarios]
     if: always() && needs.gate.outputs.eligible == 'true'
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       checks: write
       pull-requests: read
       issues: read
     steps:
-      - name: Record independently executed result; never claim green CI alone certifies a card
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+      - name: Recheck live head and publish independently performed result
         uses: actions/github-script@v7
         env:
           EXPECTED_PR: ${{ needs.gate.outputs.pr }}
           EXPECTED_SHA: ${{ needs.gate.outputs.sha }}
+          EXPECTED_KEY: ${{ needs.gate.outputs.key }}
           SCENARIOS_RESULT: ${{ needs.independent-scenarios.result }}
         with:
           script: |
+            const P = require('./certification/policy.cjs');
+            const manifest = P.readManifest('./certification/suites.json');
             const owner = context.repo.owner, repo = context.repo.repo;
             const number = Number(process.env.EXPECTED_PR), sha = process.env.EXPECTED_SHA;
-            const pr = (await github.rest.pulls.get({ owner, repo, pull_number: number })).data;
-            // A new Copilot commit must get an entirely fresh independent run.
-            if (pr.state !== 'open' || pr.head.sha !== sha ||
-                String(pr.user?.login || '').toLowerCase() !== 'copilot' ||
-                pr.base.ref !== 'gpt/arcana-integration-next' || pr.title !== 'Implement Resurrection Orb' ||
-                !/Fixes #408\b/.test(pr.body || '')) return;
-            const unit = (await github.rest.issues.get({ owner, repo, issue_number: 408 })).data;
-            if (unit.state !== 'open' || !unit.title.startsWith('[Arcana Queue] Resurrection Orb')) return;
-            const runs = await github.paginate(github.rest.checks.listForRef, { owner, repo, ref: sha, per_page: 100 });
-            const prerequisites = ['toolkit', 'scaffold', 'cards-and-android'];
-            const green = name => runs.some(c => c.name === name && c.head_sha === sha &&
-              c.status === 'completed' && c.conclusion === 'success');
-            const ok = process.env.SCENARIOS_RESULT === 'success' && prerequisites.every(green);
-            const name = 'Arcana independent certification';
-            const output = {
-              title: ok ? 'Resurrection Orb — independent scenarios passed' : 'Resurrection Orb — certification blocked',
-              summary: ok ?
-                'Independent, trusted-main JUnit scenarios executed against this exact card PR commit. Prerequisite Cardkit and Android checks are green. This is card-specific behavior evidence, not APK/release approval.' :
-                'Independent behavior scenarios did not succeed or prerequisite CI is not green on this exact commit. Approval must remain blocked.'
-            };
-            const previous = runs.find(c => c.name === name && c.head_sha === sha &&
-              c.app?.slug === 'github-actions');
+            const pr = (await github.rest.pulls.get({owner,repo,pull_number:number})).data;
+            const n = P.issueFromBody(pr.body);
+            if (!n || !manifest.suites.some(s => s.issue === n)) return;
+            const issue = (await github.rest.issues.get({owner,repo,issue_number:n})).data;
+            const checks = await github.paginate(github.rest.checks.listForRef,
+              {owner,repo,ref:sha,per_page:100});
+            const suite = P.candidate(manifest,{pr,issue,sha,checks,repository:owner+'/'+repo});
+            if (!suite || suite.key !== process.env.EXPECTED_KEY) return;
+            const ok = process.env.SCENARIOS_RESULT === 'success';
+            const output = P.certOutput(suite,ok);
+            const previous = checks.find(c => c.name === P.CHECK_NAME &&
+              c.head_sha === sha && c.app?.slug === 'github-actions');
             if (previous) {
-              await github.rest.checks.update({ owner, repo, check_run_id: previous.id,
-                status: 'completed', conclusion: ok ? 'success' : 'failure', output });
+              await github.rest.checks.update({owner,repo,check_run_id:previous.id,
+                status:'completed',conclusion:ok?'success':'failure',output});
             } else {
-              await github.rest.checks.create({ owner, repo, name, head_sha: sha,
-                status: 'completed', conclusion: ok ? 'success' : 'failure', output });
+              await github.rest.checks.create({owner,repo,head_sha:sha,
+                name:P.CHECK_NAME,status:'completed',
+                conclusion:ok?'success':'failure',output});
             }
-            core.info('Published ' + (ok ? 'success' : 'failure') + ' on exact head ' + sha);
+            core.info('Independent certification: '+suite.name+' '+(ok?'PASS':'FAIL')+' @ '+sha);
