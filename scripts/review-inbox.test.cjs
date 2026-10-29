@@ -5,15 +5,15 @@ const R = require('./review-inbox.cjs');
 const S = require('./control-status.cjs');
 
 const pr = (extra = {}) => ({ number: 360, title: 'Implement Celestine, the Living Saint', body: '- Fixes #358',
-  head: { sha: 'abc' }, base: { repo: { full_name: 'AARMOU/arcana_table' } }, user: { login: 'Copilot' }, ...extra });
-const run = (name, conclusion, status = 'completed', head_sha = 'abc') => ({ name, status, conclusion, head_sha });
-const certRun = (conclusion='success', head_sha='abc') => ({
+  head: { sha: 'a'.repeat(40) }, base: { repo: { full_name: 'AARMOU/arcana_table' } }, user: { login: 'Copilot' }, ...extra });
+const run = (name, conclusion, status = 'completed', head_sha = 'a'.repeat(40)) => ({ name, status, conclusion, head_sha });
+const certRun = (conclusion='success', head_sha='a'.repeat(40)) => ({
   name: 'Arcana independent certification', head_sha, status: 'completed', conclusion,
   app: { slug: 'github-actions', id: 15368 },
   output: { title: 'Resurrection Orb: independent rules scenarios passed',
     summary: '4 trusted-main JUnit scenarios passed against the exact current Copilot PR commit' }
 });
-const review = (state, commit_id = 'abc', login = 'AARMOU') => ({ state, commit_id, user: { login } });
+const review = (state, commit_id = 'a'.repeat(40), login = 'AARMOU') => ({ state, commit_id, user: { login } });
 const cardFiles = ['android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt',
   'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineScenarioTest.kt'];
 
@@ -32,7 +32,7 @@ test('states: running, failed, awaiting review, approved and changes requested',
 test('only the owner\'s review of the CURRENT head counts', () => {
   const green = [run('toolkit', 'success')];
   assert.equal(R.classify(pr(), green, [review('APPROVED', 'old-sha')]).state, 'awaiting-review');
-  assert.equal(R.classify(pr(), green, [review('APPROVED', 'abc', 'stranger')]).state, 'awaiting-review');
+  assert.equal(R.classify(pr(), green, [review('APPROVED', 'a'.repeat(40), 'stranger')]).state, 'awaiting-review');
   // Check runs from an older head are ignored.
   assert.equal(R.classify(pr(), [run('toolkit', 'failure', 'completed', 'old')]).state, 'checks-running');
 });
