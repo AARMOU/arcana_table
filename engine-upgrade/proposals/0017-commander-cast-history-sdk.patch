@@ -1,0 +1,183 @@
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/scripting/values/DynamicAmount.kt
+@@ -1145,6 +1145,17 @@
+         override val description: String =
+             "the number of colors in ${player.possessive} commanders' color identity"
+     }
++
++    /**
++     * Successful casts of the chosen player's designated commanders from the command zone.
++     * Reads the same persistent per-card counter as commander tax (CR 903.8); partners sum.
++     * Casts from hand/exile, copies, and rejected actions do not increment that counter.
++     */
++    @SerialName("CommanderCastsFromCommandZone")
++    @Serializable
++    data class CommanderCastsFromCommandZone(val player: Player = Player.You) : DynamicAmount {
++        override val description: String = "the number of times ${player.possessive} commanders were cast from the command zone this game"
++    }
+ 
+     /**
+      * Reference to a stored variable by name.
+diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
+--- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
++++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt
+@@ -460,6 +460,10 @@
+      */
+     fun commanderColorIdentityCount(player: Player = Player.You): DynamicAmount =
+         DynamicAmount.CommanderColorIdentityCount(player)
++
++    /** Sum of committed command-zone casts of [player]'s designated commanders this game. */
++    fun commanderCastsFromCommandZone(player: Player = Player.You): DynamicAmount =
++        DynamicAmount.CommanderCastsFromCommandZone(player)
+ 
+     fun creaturesYouControl(): DynamicAmount =
+         battlefield(Player.You, GameObjectFilter.Creature).count()
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/DynamicAmountEvaluator.kt
+@@ -20,6 +20,7 @@
+ import com.wingedsheep.engine.state.components.battlefield.GrantsStationUsingToughnessComponent
+ import com.wingedsheep.engine.state.components.battlefield.LastKnownPermanentComponent
+ import com.wingedsheep.engine.state.components.identity.CardComponent
++import com.wingedsheep.engine.state.components.identity.CommanderComponent
+ import com.wingedsheep.engine.state.components.identity.ControllerComponent
+ import com.wingedsheep.engine.state.components.identity.FaceDownComponent
+ import com.wingedsheep.engine.state.components.identity.LifeTotalComponent
+@@ -29,6 +30,7 @@
+ import com.wingedsheep.engine.state.components.player.PlayerCountersRemovedThisTurnComponent
+ import com.wingedsheep.engine.state.components.identity.RoomComponent
+ import com.wingedsheep.engine.state.components.identity.ToxicComponent
++import com.wingedsheep.engine.state.components.identity.TokenComponent
+ import com.wingedsheep.engine.state.components.stack.SpellOnStackComponent
+ import com.wingedsheep.sdk.core.CounterType
+ import com.wingedsheep.sdk.core.Keyword
+@@ -183,6 +185,7 @@
+         DynamicAmount.CraftedMaterialsTotalPower,
+         DynamicAmount.CreaturesThatCrewedOrSaddledThisTurn,
+         is DynamicAmount.CommanderColorIdentityCount,
++        is DynamicAmount.CommanderCastsFromCommandZone,
+         is DynamicAmount.DevotionTo,
+         is DynamicAmount.DistinctCardTypesInCollections,
+         is DynamicAmount.DistinctColorsManaSpent,
+@@ -588,6 +591,19 @@
+                     ?: return 0
+                 predicates.commanderColorIdentity(state, playerId)?.size ?: 0
+             }
++
++            // The same per-card history used by commander tax, including Partner commanders.
++            // CommanderComponent is tied to the original entity across zone changes. Token
++            // copies are not designated commanders (CR 903.3), even if copied components exist.
++            is DynamicAmount.CommanderCastsFromCommandZone -> {
++                val owners = resolveUnifiedPlayerIds(state, amount.player, context, projectedState).toSet()
++                state.entities.values.sumOf { container ->
++                    val commander = container.get<CommanderComponent>()
++                    if (commander != null && commander.ownerId in owners &&
++                        container.get<TokenComponent>() == null
++                    ) commander.castsFromCommandZone else 0
++                }
++            }
+ 
+             // Devotion (CR 700.5): the number of mana symbols of the named colors among the mana
+             // costs of permanents the player controls. Hybrid ({W/U}), monocolored hybrid ({2/B}),
+diff --git a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
+--- a/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
++++ b/ai/src/main/kotlin/com/wingedsheep/ai/engine/knowledge/AmountSign.kt
+@@ -90,6 +90,7 @@
+             is DynamicAmount.CastX, is DynamicAmount.CastChoice, is DynamicAmount.TotalManaSpent,
+             is DynamicAmount.ManaSpentOnX, is DynamicAmount.ManaSpentFromSubtype, is DynamicAmount.ManaOfColorSpent,
+             is DynamicAmount.SnowManaSpent, is DynamicAmount.DistinctColorsManaSpent, is DynamicAmount.DevotionTo, is DynamicAmount.CommanderColorIdentityCount,
++            is DynamicAmount.CommanderCastsFromCommandZone,
+             is DynamicAmount.StoredCardManaValue, is DynamicAmount.DistinctEntitiesInCollections,
+             is DynamicAmount.DistinctCardTypesInCollections, is DynamicAmount.ManaValueSumOfCollection,
+             is DynamicAmount.PlayerCount, is DynamicAmount.CountPlayersWith, is DynamicAmount.GraveyardRelativeCount,
+diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
+--- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
++++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/handlers/effects/composite/CreateDelayedTriggerExecutor.kt
+@@ -352,6 +352,7 @@
+         DynamicAmount.CraftedMaterialsTotalPower,
+         DynamicAmount.CreaturesThatCrewedOrSaddledThisTurn,
+         is DynamicAmount.CommanderColorIdentityCount,
++        is DynamicAmount.CommanderCastsFromCommandZone,
+         is DynamicAmount.DevotionTo,
+         is DynamicAmount.DistinctColorsManaSpent,
+         is DynamicAmount.EntityProperty,
+diff --git a/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/CommanderCastHistoryAmountTest.kt b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/CommanderCastHistoryAmountTest.kt
+new file mode 100644
+--- /dev/null
++++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/mana/CommanderCastHistoryAmountTest.kt
+@@ -0,0 +1,74 @@
++package com.wingedsheep.engine.mana
++
++import com.wingedsheep.engine.handlers.EffectContext
++import com.wingedsheep.engine.handlers.PredicateEvaluator
++import com.wingedsheep.engine.state.ComponentContainer
++import com.wingedsheep.engine.state.GameState
++import com.wingedsheep.engine.state.ZoneKey
++import com.wingedsheep.engine.state.components.identity.CommanderComponent
++import com.wingedsheep.engine.state.components.identity.TokenComponent
++import com.wingedsheep.sdk.core.Zone
++import com.wingedsheep.sdk.dsl.DynamicAmounts
++import com.wingedsheep.sdk.model.EntityId
++import io.kotest.core.spec.style.FunSpec
++import io.kotest.matchers.shouldBe
++
++/** Read-only commander history primitive. Actual cast-commit bookkeeping is tested by CommanderTaxTest. */
++class CommanderCastHistoryAmountTest : FunSpec({
++    val players = List(4) { EntityId.generate() }
++    val amounts = PredicateEvaluator(cardRegistry = null).amounts
++    val history = DynamicAmounts.commanderCastsFromCommandZone()
++
++    fun emptyState(): GameState {
++        var state = GameState().copy(turnOrder = players)
++        for (player in players) state = state.withEntity(player, ComponentContainer.EMPTY)
++        return state
++    }
++
++    fun withCommander(
++        state: GameState,
++        owner: EntityId,
++        casts: Int,
++        zone: Zone = Zone.COMMAND,
++        token: Boolean = false,
++    ): GameState {
++        val id = EntityId.generate()
++        val container = if (token) {
++            ComponentContainer.of(CommanderComponent(owner, casts), TokenComponent)
++        } else {
++            ComponentContainer.of(CommanderComponent(owner, casts))
++        }
++        return state.withEntity(id, container).addToZone(ZoneKey(owner, zone), id)
++    }
++
++    fun read(state: GameState, player: EntityId): Int =
++        amounts.evaluate(state, history, EffectContext(sourceId = null, controllerId = player))
++
++    test("zero, first, second and third command-zone cast history reads the committed count") {
++        for (casts in 0..3) {
++            val state = withCommander(emptyState(), players[0], casts)
++            read(state, players[0]) shouldBe casts
++        }
++    }
++
++    test("partner commanders sum, but other players and other seats do not leak") {
++        var state = withCommander(emptyState(), players[0], 2)
++        state = withCommander(state, players[0], 3, Zone.HAND)
++        state = withCommander(state, players[1], 4, Zone.EXILE)
++        state = withCommander(state, players[2], 1, Zone.GRAVEYARD)
++        read(state, players[0]) shouldBe 5
++        read(state, players[1]) shouldBe 4
++        read(state, players[2]) shouldBe 1
++        read(state, players[3]) shouldBe 0
++    }
++
++    test("zone changes do not reset the history and token copies are not commanders") {
++        var state = withCommander(emptyState(), players[0], 3, Zone.GRAVEYARD)
++        state = withCommander(state, players[0], 8, Zone.BATTLEFIELD, token = true)
++        read(state, players[0]) shouldBe 3
++    }
++
++    test("no commander history yields zero rather than a color-identity count") {
++        read(emptyState(), players[0]) shouldBe 0
++    }
++})
