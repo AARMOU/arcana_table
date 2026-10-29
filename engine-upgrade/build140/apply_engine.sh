@@ -33,6 +33,12 @@ for p in "${ELDRAZI[@]}"; do
   git -C argentum-engine apply "$ROOT/$p"
 done
 
+# B140 Azlask compatibility: narrow, fail-closed HasExactlyColors trigger matcher.
+# Apply after the pinned mandatory/Temple series, before compiling runtime jars.
+MATCHER_PATCH=engine-upgrade/build140/patches/0003-azlask-exact-colors-trigger.patch
+git -C argentum-engine apply --check "$ROOT/$MATCHER_PATCH"
+git -C argentum-engine apply "$ROOT/$MATCHER_PATCH"
+
 DEST=argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios
 SPECS=(engine-upgrade/eldrazi-temple/engine-tests/*.kt engine-upgrade/corrupted-crossroads/engine-tests/*.kt)
 for spec in "${SPECS[@]}"; do
@@ -59,7 +65,7 @@ print("mandatory series:", r["status"])
 for p in r["patches"]:
     print(f"  {p['patch']}: {p['status']}")
 PY
-  for p in argentum-patches/*.patch "${ELDRAZI[@]}"; do echo "sha256 $(sha256sum "$p")"; done
+  for p in argentum-patches/*.patch "${ELDRAZI[@]}" "$MATCHER_PATCH"; do echo "sha256 $(sha256sum "$p")"; done
   echo "engine specs added: $(for s in "${SPECS[@]}"; do basename "$s"; done | tr '\n' ' ')"
   echo "all six required engine symbols present"
 } | tee engine-source.txt
