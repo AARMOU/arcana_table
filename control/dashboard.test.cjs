@@ -381,7 +381,7 @@ test('review recheck refuses untrusted source comments and does not mislabel sta
   const out={review:{data:{kind:'review',checkedAt:'2026-10-29T05:22:00Z'}}};
   await refresh(out,{id:123,user:{login:'attacker',type:'User'}});
   assert.equal(calls,0);
-  assert.match(script,/text\\('quickVerifyCount',reviewCountLabel\\(r\\)\\)/);
+  assert.ok(script.includes("text('quickVerifyCount',reviewCountLabel(r));"));
   assert.ok(!script.includes("'— stale'"));
   assert.ok(!/method:\s*['"](?:POST|PUT|PATCH|DELETE)/.test(src));
 });
