@@ -8,13 +8,15 @@ const pr = (extra = {}) => ({ number: 360, title: 'Implement Celestine, the Livi
   head: { sha: 'abc' }, base: { repo: { full_name: 'AARMOU/arcana_table' } }, user: { login: 'Copilot' }, ...extra });
 const run = (name, conclusion, status = 'completed', head_sha = 'abc') => ({ name, status, conclusion, head_sha });
 const review = (state, commit_id = 'abc', login = 'AARMOU') => ({ state, commit_id, user: { login } });
+const cardFiles = ['android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt',
+  'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineScenarioTest.kt'];
 
 test('states: running, failed, awaiting review, approved and changes requested', () => {
   assert.equal(R.classify(pr(), []).state, 'checks-running');
   assert.equal(R.classify(pr(), [run('toolkit', null, 'in_progress')]).state, 'checks-running');
   assert.equal(R.classify(pr(), [run('toolkit', 'success'), run('cards-and-android', 'failure')]).state, 'checks-failed');
   const green = [run('toolkit', 'success'), run('cards-and-android', 'success'), run('publish-oracle-cache', 'skipped')];
-  const row = R.classify(pr(), green);
+  const row = R.classify(pr(), green, [], '', cardFiles);
   assert.deepEqual([row.state, row.card, row.issue, row.url], ['awaiting-review', 'Celestine, the Living Saint', 358,
     'https://github.com/AARMOU/arcana_table/pull/360/files']);
   assert.equal(R.classify(pr(), green, [review('APPROVED')]).state, 'approved');
@@ -31,11 +33,12 @@ test('only the owner\'s review of the CURRENT head counts', () => {
 
 test('payload puts cards needing the owner first and counts the badge', () => {
   const p = R.inboxPayload([
-    { pr: 1, state: 'checks-running' }, { pr: 2, state: 'awaiting-review' }, { pr: 3, state: 'approved' }, { pr: 4, state: 'awaiting-review' },
+    { pr: 1, state: 'checks-running' }, { pr: 2, state: 'certified', certification: 'certified', kind: 'card', hasTest: true, draft: false },
+    { pr: 3, state: 'approved' }, { pr: 4, state: 'certified', certification: 'certified', kind: 'card', hasTest: true, draft: false },
   ], new Date('2026-10-28T17:00:00Z'));
   assert.equal(p.awaitingReview, 2);
   assert.deepEqual(p.items.map(i => i.pr), [2, 4, 1, 3]);
-  assert.match(R.inboxSummary({ ...p, items: p.items.map(i => ({ ...i, card: 'X' })) })[0], /2 need owner attention of 4/);
+  assert.match(R.inboxSummary({ ...p, items: p.items.map(i => ({ ...i, card: 'X' })) })[0], /2 verified card implementation/);
 });
 
 test('published as the public #78 review status the app can read without a token', () => {
@@ -50,9 +53,9 @@ test('buildReviewInbox reads only Copilot PRs and never writes', async () => {
   const github = {
     paginate: async (fn, args) => { calls.push(fn.name || 'paginate'); return fn === github.rest.pulls.list
       ? [pr(), pr({ number: 9, user: { login: 'AARMOU' } }), pr({ number: 330, body: 'Fixes #173' }), pr({ number: 331, body: 'no link' })]
-      : [review('APPROVED')]; },
+      : fn === github.rest.pulls.listFiles ? cardFiles.map(filename => ({ filename })) : [review('APPROVED')]; },
     rest: {
-      pulls: { list: async function list() { return { data: [
+      pulls: { listFiles: function listFiles() {}, list: async function list() { return { data: [
         { number: 340, title: 'Implement Old Card', body: 'Fixes #300', user: { login: 'Copilot' }, merged_at: '2026-10-27T10:00:00Z', merge_commit_sha: 'm'.repeat(40) },
         { number: 341, title: 'Implement Ancient', body: 'Fixes #301', user: { login: 'Copilot' }, merged_at: '2026-10-01T10:00:00Z' },
         { number: 342, title: 'Closed unmerged', body: 'Fixes #302', user: { login: 'Copilot' }, merged_at: null }] }; }, listReviews: function listReviews() {} },
@@ -74,7 +77,8 @@ test('certification is only an explicit certification check, never plain CI', ()
   assert.deepEqual([certified.state, certified.certification], ['certified', 'certified']);
   const failedCert = R.classify(pr(), [...green, run('card-certification', 'failure')]);
   assert.deepEqual([failedCert.state, failedCert.certification], ['checks-failed', 'failed']);
-  assert.equal(R.inboxPayload([certified, R.classify(pr({ number: 1 }), green)]).awaitingReview, 2);
+  assert.equal(R.inboxPayload([R.classify(pr(), [...green, run('Arcana card certification', 'success')], [], '', cardFiles),
+    R.classify(pr({ number: 1 }), green, [], '', cardFiles)]).awaitingReview, 1);
 });
 
 test('details carry abilities, check links, problems and stale-review warnings', () => {
@@ -85,7 +89,7 @@ test('details carry abilities, check links, problems and stale-review warnings',
     [review('APPROVED', 'old-sha')], unitBody);
   assert.deepEqual(row.abilities, ['Celestine, the Living Saint: Flying, lifelink; at end step, return creature card with MV <= life gained']);
   assert.deepEqual(row.checkRuns, [{ name: 'cards-and-android', result: 'failure', url: 'https://github.com/AARMOU/arcana_table/runs/1' }]);
-  assert.deepEqual(row.problems, ['Check failed: cards-and-android (failure)', 'New commit since your last review: review again']);
+  assert.deepEqual(row.problems, ['Check failed: cards-and-android (failure)', 'New commit since your last review: review again', 'Changed-file evidence unavailable or incomplete']);
 });
 
 
@@ -95,4 +99,20 @@ test('daily activity is not truncated to the owner review inbox and excludes unm
   assert.equal(p.items.length, 30);
   assert.equal(p.integratedActivity.length, 42);
   assert.equal(p.integratedActivity[0].pr, 500);
+});
+
+test('file evidence separates actual cards from audits and engine blockers and prevents draft approval', () => {
+  const green = [run('toolkit', 'success'), run('Arcana card certification', 'success')];
+  const real = R.classify(pr(), green, [], '', cardFiles);
+  assert.deepEqual([real.kind, real.hasTest, real.readyForOwner], ['card', true, true]);
+  const draft = R.classify(pr({ draft: true }), green, [], '', cardFiles);
+  assert.deepEqual([draft.kind, draft.readyForOwner], ['card', false]);
+  const audit = R.classify(pr({ title: 'Audit Eldrazi Incursion coverage', number: 95 }), green, [], '', []);
+  const blocker = R.classify(pr({ title: 'Hold Ulamog pending engine support', number: 330 }), green, [], '', []);
+  const notes = R.classify(pr({ title: 'Record cast-count blocker', number: 320 }), green, [], '', ['tools/cardkit/data/known-blockers.json']);
+  assert.deepEqual([audit.kind, blocker.kind, notes.kind], ['audit', 'engine', 'engine']);
+  assert.equal(R.inboxPayload([real, draft, audit, blocker, notes]).awaitingReview, 1);
+  assert.equal(R.classify(pr(), green, [], '', null).readyForOwner, false);
+  assert.equal(R.classify(pr(), green, [], '', cardFiles.slice(0, 1)).readyForOwner, false);
+  assert.equal(R.classify(pr(), green, [], '', Array(100).fill(cardFiles[0])).readyForOwner, false);
 });

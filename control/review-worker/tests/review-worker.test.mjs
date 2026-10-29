@@ -11,14 +11,18 @@ const W = "https://arcana-review.example.workers.dev";
 // Minimal fake GitHub keeping state, recording every write.
 const CERTIFIED = { name: "independent-certification", status: "completed", conclusion: "success", head_sha: SHA };
 function fakeGitHub({ head = SHA, checks = [{ name: "toolkit", status: "completed", conclusion: "success" }, CERTIFIED], reviews = [],
-  author = "Copilot", prState = "open", unitTitle = "[Arcana Queue] Celestine — Cardkit SUPPORTED, unclaimed", user = "AARMOU" } = {}) {
+  author = "Copilot", prState = "open", draft = false,
+  files = ["android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt",
+    "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineScenarioTest.kt"],
+  unitTitle = "[Arcana Queue] Celestine — Cardkit SUPPORTED, unclaimed", user = "AARMOU" } = {}) {
   const writes = [];
   const fetchImpl = async (url, init = {}) => {
     const u = String(url); const method = init.method || "GET";
     const ok = (body, status = 200) => new Response(body === null ? null : JSON.stringify(body), { status });
     if (u === "https://github.com/login/oauth/access_token") return ok({ access_token: "gho_owner" });
     if (u === "https://api.github.com/user") return ok({ login: user });
-    if (u.endsWith("/pulls/360") && method === "GET") return ok({ state: prState, user: { login: author }, head: { sha: head }, body: "- Fixes #358" });
+    if (u.endsWith("/pulls/360") && method === "GET") return ok({ state: prState, draft, user: { login: author }, head: { sha: head }, body: "- Fixes #358" });
+    if (u.includes("/pulls/360/files?") && method === "GET") return ok(files.map(filename => ({ filename })));
     if (u.endsWith("/issues/358") && method === "GET") return ok({ state: "open", title: unitTitle });
     if (u.includes("/pulls/360/reviews") && method === "GET") return ok(reviews);
     if (u.includes(`/commits/${SHA}/check-runs`)) return ok({ check_runs: checks });
@@ -207,4 +211,23 @@ test("approval requires independent certification of the exact head; fix request
   }
   const ok = await decision(fakeGitHub({ checks: [toolkit, CERTIFIED] }), { pr: 360, sha: SHA, decision: "approve" });
   assert.equal(ok.status, 200);
+});
+
+test("a draft, audit, engine blocker, or card without executable tests cannot be approved", async () => {
+  const cases = [
+    { draft: true },
+    { files: [] },
+    { files: ["tools/cardkit/data/known-blockers.json"] },
+    { files: ["android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt"] },
+    { files: Array(100).fill("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt") }
+  ];
+  for (const opts of cases) {
+    const gh = fakeGitHub(opts);
+    const response = await decision(gh, { pr: 360, sha: SHA, decision: "approve" });
+    assert.equal(response.status, 422, JSON.stringify(opts).slice(0, 120));
+    assert.ok(["draft-pr", "not-a-verified-card-implementation"].includes(response.body.error));
+    assert.equal(gh.writes.length, 0);
+  }
+  const gh = fakeGitHub({ files: [] });
+  assert.equal((await decision(gh, { pr: 360, sha: SHA, decision: "request-fix", note: "This is a blocker, not a card" })).status, 200);
 });

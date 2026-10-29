@@ -25,6 +25,21 @@ const DECISION_MARKER = '<!-- arcana-owner-decision-v1 -->';
 const unitOf = body => Number((String(body || '').match(/(?:Fixes|Closes|Resolves|Unit:)\s*#(\d+)/i) || [])[1]) || null;
 const cardOf = title => String(title || '').replace(/^\s*(?:\[[^\]]*\]\s*)?(?:Implement|Add)\s+/i, '').trim().slice(0, 120);
 
+// Classify by changed-file evidence, NOT PR title or linked queue unit alone.
+// Missing/incomplete GitHub file evidence fails closed: it never becomes an approval.
+function classifyChangeFiles(files, title = '') {
+  if (!Array.isArray(files) || files.length >= 100) return { kind: 'unknown', hasTest: false, reason: 'Changed-file evidence unavailable or incomplete' };
+  const source = files.some(f => /^android\/custom-cards\/src\/main\/.+\/cards\/[^/]+\.kt$/.test(f));
+  const hasTest = files.some(f => /^android\/custom-cards\/src\/test\/.+Test\.kt$/.test(f));
+  if (source) return { kind: 'card', hasTest, reason: hasTest ? null : 'Executable card scenario test missing' };
+  if (/\b(audit|coverage|inventory|documentation|docs)\b/i.test(title) || (files.length && files.every(f => /^(docs\/|README|\.github\/)/.test(f))))
+    return { kind: 'audit', hasTest: false, reason: 'Audit/documentation, no card implementation' };
+  return { kind: 'engine', hasTest: false, reason: files.length ? 'Engine or blocker changes; no card implementation' : 'No card implementation changes in this PR' };
+}
+const isReadyForOwner = i => i?.kind === 'card' && i.hasTest === true && !i.draft &&
+  i.state === 'certified' && i.certification === 'certified';
+
+
 // The card's own acceptance lines from its [Arcana Queue] unit (what Copilot was asked to implement).
 function abilitiesOf(unitBody) {
   const out = [];
@@ -39,7 +54,8 @@ function abilitiesOf(unitBody) {
 }
 
 // PR -> one inbox row. checkRuns: check runs on the PR head. reviews: the PR's reviews.
-function classify(pr, checkRuns = [], reviews = [], unitBody = '') {
+function classify(pr, checkRuns = [], reviews = [], unitBody = '', files = null) {
+  const change = classifyChangeFiles(files, pr.title);
   const head = pr.head?.sha || '';
   const runs = checkRuns.filter(r => r.head_sha === undefined || r.head_sha === head);
   const checks = Object.fromEntries(runs.map(r => [r.name, r.status === 'completed' ? (r.conclusion || 'unknown') : r.status]));
@@ -64,18 +80,22 @@ function classify(pr, checkRuns = [], reviews = [], unitBody = '') {
     ...(owner.length && !onHead.length ? ['New commit since your last review: review again'] : []),
     ...(last?.state === 'CHANGES_REQUESTED' ? ['You requested a fix on this commit'] : []),
   ].slice(0, 8);
+  if (change.reason) problems.push(change.reason);
+  if (pr.draft && change.kind === 'card') problems.push('Draft PR: not ready for owner approval');
   const decidedHere = last && String(last.body || '').startsWith(DECISION_MARKER) ? 'arcana-control' : last ? 'github' : null;
   return { pr: pr.number, issue: unitOf(pr.body), card: cardOf(pr.title), headSha: head, state, checks, checkRuns: checkRuns2,
-    certification, abilities: abilitiesOf(unitBody), problems, decidedIn: decidedHere, draft: !!pr.draft,
+    certification, abilities: abilitiesOf(unitBody), problems: problems.slice(0, 8), decidedIn: decidedHere, draft: !!pr.draft,
+    ...change, readyForOwner: isReadyForOwner({ ...change, draft: !!pr.draft, state, certification }),
     url: `https://github.com/${pr.base?.repo?.full_name || 'AARMOU/arcana_table'}/pull/${pr.number}/files`,
     updatedAt: pr.updated_at || null };
 }
 
-const ATTENTION = new Set(['awaiting-review', 'certified']);
+// Ready count is strictly actionable, never the number of green/draft/non-card PRs.
 function inboxPayload(items, now = new Date(), integratedActivity = []) {
   const order = { certified: 0, 'awaiting-review': 1, 'checks-failed': 2, 'changes-requested': 3, 'checks-running': 4, approved: 5, integrated: 6 };
-  const sorted = [...items].sort((a, b) => order[a.state] - order[b.state] || a.pr - b.pr).slice(0, MAX_ITEMS);
-  return { checkedAt: now.toISOString(), awaitingReview: sorted.filter(i => ATTENTION.has(i.state)).length, items: sorted,
+  const sorted = [...items].sort((a, b) => Number(isReadyForOwner(b)) - Number(isReadyForOwner(a)) ||
+    Number(b.kind === 'card') - Number(a.kind === 'card') || (order[a.state] ?? 9) - (order[b.state] ?? 9) || a.pr - b.pr).slice(0, MAX_ITEMS);
+  return { checkedAt: now.toISOString(), awaitingReview: sorted.filter(isReadyForOwner).length, items: sorted,
     // Separate from the 30-row review inbox: this timestamped sample powers a conservative daily merge count.
     integratedActivity: integratedActivity.slice(0, 100),
     note: 'Owner approval is card sign-off for integration review only: no merge, build, signing or release follows from it. Checks passing is not rules certification.' };
@@ -83,7 +103,7 @@ function inboxPayload(items, now = new Date(), integratedActivity = []) {
 
 function inboxSummary(p) {
   if (!p.items.length) return ['Card review inbox: no Copilot card PRs open.'];
-  return [`Card review inbox: ${p.awaitingReview} need owner attention of ${p.items.length} Copilot card PR(s).`,
+  return [`Card review inbox: ${p.awaitingReview} verified card implementation(s) ready for owner approval of ${p.items.length} Copilot work PR(s).`,
     ...p.items.map(i => `#${i.pr} ${i.card}: ${i.state}`)];
 }
 
@@ -99,7 +119,12 @@ async function buildReviewInbox({ github, owner, repo, now = new Date() }) {
     if (unit.state !== 'open' || !String(unit.title || '').startsWith('[Arcana Queue]')) continue;
     const checkRuns = (await github.rest.checks.listForRef({ owner, repo, ref: pr.head.sha, per_page: 100 })).data.check_runs || [];
     const reviews = await github.paginate(github.rest.pulls.listReviews, { owner, repo, pull_number: pr.number, per_page: 100 });
-    items.push(classify(pr, checkRuns, reviews, unit.body));
+    let changedFiles = null;
+    try {
+      changedFiles = (await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number: pr.number, per_page: 100 }))
+        .map(f => f.filename);
+    } catch { /* Unknown is not an implementation: fail closed, without dropping the row. */ }
+    items.push(classify(pr, checkRuns, reviews, unit.body, changedFiles));
   }
   // Recently integrated cards (merged Copilot card PRs), so an approval visibly reaches "Integrated".
   const since = now.getTime() - INTEGRATED_DAYS * 864e5;
@@ -107,12 +132,21 @@ async function buildReviewInbox({ github, owner, repo, now = new Date() }) {
   const integratedActivity = [];
   for (const pr of closed) {
     if (!COPILOT.has(String(pr.user?.login || '').toLowerCase()) || !pr.merged_at || Date.parse(pr.merged_at) < since || !unitOf(pr.body)) continue;
+    // Daily card count must also exclude blocker/audit PRs linked to a card unit.
+    let changedFiles = null;
+    try {
+      changedFiles = (await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number: pr.number, per_page: 100 }))
+        .map(f => f.filename);
+    } catch { /* No evidence => not a counted card. */ }
+    const change = classifyChangeFiles(changedFiles, pr.title);
+    if (change.kind !== 'card' || !change.hasTest) continue;
     integratedActivity.push({ pr: pr.number, card: cardOf(pr.title), mergedAt: pr.merged_at });
     items.push({ pr: pr.number, issue: unitOf(pr.body), card: cardOf(pr.title), headSha: pr.merge_commit_sha || pr.head?.sha || '',
       state: 'integrated', checks: {}, checkRuns: [], certification: 'not-run', abilities: [], problems: [], decidedIn: null, draft: false,
+      ...change, readyForOwner: false,
       url: `https://github.com/${pr.base?.repo?.full_name || 'AARMOU/arcana_table'}/pull/${pr.number}`, updatedAt: pr.merged_at });
   }
   return inboxPayload(items, now, integratedActivity);
 }
 
-module.exports = { classify, inboxPayload, inboxSummary, buildReviewInbox, abilitiesOf };
+module.exports = { classify, classifyChangeFiles, isReadyForOwner, inboxPayload, inboxSummary, buildReviewInbox, abilitiesOf };

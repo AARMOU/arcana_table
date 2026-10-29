@@ -55,11 +55,13 @@ function browser({ hash='', localBlocked=false, sessionBlocked=false, authStatus
   };
   vm.runInNewContext(src,sandbox,{filename:'review.js'});
   const item={ pr:360, headSha:'a'.repeat(40), state:'certified', certification:'certified',
-    card:'Test Card',checks:[],checkRuns:[],problems:[],abilities:[] };
+    card:'Test Card',kind:'card',hasTest:true,draft:false,checks:[],checkRuns:[],problems:[],abilities:[] };
   const host = new Element('div');
   const open = () => {
     sandbox.ArcanaReview.render(host,{items:[item]});
-    host.children[0].dispatch('click');
+    const cardRow = items(host).find(x => x.tagName === 'button' && x.handlers.click);
+    assert.ok(cardRow, 'a classified card must have an owner review row');
+    cardRow.dispatch('click');
   };
   const find = text => items(body).find(x=>x.textContent===text);
   const event = name => { for(const cb of listeners[name] || []) cb(); };

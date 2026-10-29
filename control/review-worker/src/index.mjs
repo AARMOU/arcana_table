@@ -119,6 +119,17 @@ export async function decide(api, { pr, sha, decision, note }) {
   if (mine.length && mine[mine.length - 1].state === event)
     return [200, { ok: true, duplicate: true, state: decision === "approve" ? "approved" : "changes-requested", sha }];
   if (decision === "approve") {
+    // The OAuth decision endpoint must enforce the same file-evidence gate as the read-only inbox.
+    // A linked [Arcana Queue] issue or a green check is NOT evidence that a card exists.
+    if (p.body.draft) return [422, { error: "draft-pr" }];
+    const changed = await api(`/pulls/${pr}/files?per_page=100`);
+    if (!changed.ok || !Array.isArray(changed.body)) return [502, { error: "changed-files-unavailable" }];
+    const filenames = changed.body.map(f => f.filename);
+    // Pagination must not silently certify a partial file list.
+    if (filenames.length >= 100) return [422, { error: "not-a-verified-card-implementation" }];
+    const hasCardSource = filenames.some(f => /^android\/custom-cards\/src\/main\/.+\/cards\/[^/]+\.kt$/.test(f));
+    const hasScenarioTest = filenames.some(f => /^android\/custom-cards\/src\/test\/.+Test\.kt$/.test(f));
+    if (!hasCardSource || !hasScenarioTest) return [422, { error: "not-a-verified-card-implementation" }];
     const checks = await api(`/commits/${sha}/check-runs?per_page=100`);
     if (!checks.ok) return [502, { error: "checks-unavailable" }];
     const runs = checks.body?.check_runs || [];
