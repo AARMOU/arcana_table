@@ -113,11 +113,16 @@ const latest = (xs, pred) => xs.filter(pred).reduce((m, x) => Math.max(m, x.at),
 function deriveUnit(unit, now = Date.now(), { lagMs = DEFAULT_BILLING_LAG_HOURS * 3600000 } = {}) {
   const d = deriveState(unit, now);
   const finished = latest(unit.sessions || [], s => s.event === 'finished');
+  const repairAt = latest(unit.ledger || [], r => r.op === 'repair-request');
+  // A running repair is reported as "working" by GitHub, like a new build.
+  // Recover its lane from the trusted repair ledger and most recent session finish.
+  // Interrupted authorizations are never mistaken for repairs.
+  const lane = d.holdsSlot ? (d.reason !== 'interrupted' && repairAt > finished ? 'repair' : 'build') : null;
   const recentlyFinished = !d.holdsSlot && finished > -Infinity && now - finished < lagMs;
   const released = d.holdsSlot && ['pickup-timeout', 'session-stale'].includes(d.reason) &&
     (unit.labels || []).includes(HALTED_LABEL);
-  if (released) return { ...d, holdsSlot: false, reason: 'owner-released', releasedFrom: d.reason, recentlyFinished: false };
-  return { ...d, recentlyFinished };
+  if (released) return { ...d, lane: null, holdsSlot: false, reason: 'owner-released', releasedFrom: d.reason, recentlyFinished: false };
+  return { ...d, lane, recentlyFinished };
 }
 
 function deriveState(unit, now) {
@@ -313,6 +318,15 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
   if (ready.maxUnits === null || active >= ready.maxUnits) {
     const who = holders.map(u => `#${u.number} ${u.state}${u.reason ? ':' + u.reason : ''}`).join(', ');
     return deny(`capacity: ${active} of ${ready.maxUnits} active${who ? ' (' + who + ')' : ''}`);
+  }
+  // With the two-unit mode enabled, reserve one build slot and one repair slot.
+  // Unknown lanes fail closed so legacy/incomplete work cannot double-spend a slot.
+  if (ready.maxUnits === 2) {
+    if (holders.some(u => u.lane !== 'build' && u.lane !== 'repair'))
+      return deny('capacity: existing active unit has unknown lane');
+    const occupied = holders.filter(u => u.lane === (op === 'assign' ? 'build' : 'repair'));
+    if (occupied.length)
+      return deny(`capacity: ${op === 'assign' ? 'builder' : 'repair'} slot occupied by ${occupied.map(u => '#'+u.number).join(', ')}`);
   }
   const pendingRepairs = units.filter(u => u.state === 'repairing').length;
   const recentFinished = units.filter(u => u.recentlyFinished && !u.holdsSlot).length;
