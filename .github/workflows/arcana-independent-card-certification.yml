@@ -102,7 +102,7 @@ jobs:
               raise SystemExit(f'Expected exactly one independent test result, got {len(files)}')
           root = ET.parse(files[0]).getroot()
           count = int(root.attrib.get('tests', 0))
-          if count < 3 or any(int(root.attrib.get(x, 0)) for x in ('failures', 'errors', 'skipped')):
+          if count != 4 or any(int(root.attrib.get(x, 0)) for x in ('failures', 'errors', 'skipped')):
               raise SystemExit(f'Independent suite not fully passed: {root.attrib}')
           print(f'{count} independent rules scenarios passed')
           PY
