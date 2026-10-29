@@ -17,6 +17,7 @@ class SporocystScenarioTest {
         val sporocyst = d.putCardInHand(p, "Sporocyst")
         val initialHandSize = d.zoneNames(p, Zone.HAND).size
         d.putCardOnTopOfLibrary(p, "Command Tower")
+        d.putCardOnTopOfLibrary(p, "Command Tower")
         d.putCardOnTopOfLibrary(p, "Island")
         d.putCardOnTopOfLibrary(p, "Forest")
         d.giveMana(p, Color.GREEN)
