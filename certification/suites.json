@@ -1,0 +1,19 @@
+{
+  "schema": 1,
+  "base": "gpt/arcana-integration-next",
+  "requiredChecks": [
+    "toolkit",
+    "scaffold",
+    "cards-and-android"
+  ],
+  "suites": [
+    {
+      "key": "resurrection-orb",
+      "name": "Resurrection Orb",
+      "issue": 408,
+      "source": "certification/ResurrectionOrbIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.ResurrectionOrbIndependentCertificationTest",
+      "tests": 4
+    }
+  ]
+}
