@@ -31,7 +31,11 @@ function fake({ units = [unit()], prs = [pr()], reviews = [fixReview()], labeled
 }
 const allow = { allowed: true, attempt: 1, unit: 358, reason: 'ok', record: async () => { allow.recorded = (allow.recorded || 0) + 1; } };
 const deny = { allowed: false, reason: 'budget: 10% reserve reached' };
-const run = (f, decision) => O.routeOwnerFixes({ github: f.github, owner: 'AARMOU', repo: 'arcana_table', runId: 4242, authorizer: async () => decision });
+const run = (f, decision, delivery = {
+  preflight:async()=>({ok:true}),
+  post:async x=>{f.writes.push(['comment',x.issue_number,x.body]);return {ok:true,id:99};},
+}) => O.routeOwnerFixes({ github: f.github, owner: 'AARMOU', repo: 'arcana_table', runId: 4242,
+  authorizer: async () => decision, delivery });
 
 test('admitted fix request asks Copilot once, through the ledger, and consumes the label', async () => {
   allow.recorded = 0;
@@ -75,6 +79,21 @@ test('stale, duplicate, foreign and non-owner requests never reach Copilot', asy
   }
 });
 
+test('owner fix delivery identity check fails closed without repair record',async()=>{
+  allow.recorded=0;const f=fake();
+  const result=await run(f,allow,{preflight:async()=>({ok:false,reason:'owner-delivery-identity-not-owner'}),
+    post:async()=>{throw Error('should not post');}});
+  assert.equal(result[0].state,'observed-only');assert.equal(allow.recorded,0);
+  assert.ok(f.writes.some(w=>w[0]==='comment' && w[1]===360 && !w[2].includes('@copilot')));
+});
+test('uncertain owner delivery reserves only one attempt and reports uncertainty',async()=>{
+  allow.recorded=0;const f=fake();
+  const result=await run(f,allow,{preflight:async()=>({ok:true}),
+    post:async()=>({ok:false,reason:'owner-delivery-post-http-403'})});
+  assert.equal(result[0].state,'delivery-uncertain');assert.equal(allow.recorded,1);
+  assert.deepEqual(f.writes.at(-1),['unlabel',358]);
+  assert.ok(!f.writes.some(w=>w[0]==='comment'));
+});
 test('mentions in the owner note are neutralized; nothing to do without labels', async () => {
   const f = fake({ reviews: [fixReview({ body: O.DECISION_MARKER + '\nsha:' + HEAD + '\nask @someone' })] });
   await run(f, allow);

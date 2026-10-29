@@ -10,7 +10,8 @@ const sha='a'.repeat(40);
 const allow=records=>async()=>({allowed:true,reason:'admitted',attempt:1,unit:67,record:async()=>records.push(1)});
 const deny=reason=>async()=>({allowed:false,reason});
 function fixture({comments=[],run={},pr={},authorize,status,runs}={}) {
-  const calls=[],records=[];
+  const calls=[],records=[],deliveryCalls=[];
+  const delivery={preflight:async()=>({ok:true}),post:async x=>{deliveryCalls.push(x);calls.push(x);return {ok:true,id:543};}};
   const current={number:85,draft:true,state:'open',body:'Unit: #67',head:{ref:'copilot/cards',sha,repo:{id:1}},...pr};
   const api={pulls:{list:'prs',get:async()=>({data:current})},
     issues:{listComments:'comments',createComment:async x=>{if(status)throw {status};calls.push(x);},
@@ -21,7 +22,7 @@ function fixture({comments=[],run={},pr={},authorize,status,runs}={}) {
     steps:[{name:'Scenarios',conclusion:'failure'}]}]};
   const github={rest:api,paginate:async x=>data[x]};
   const context={repo:{owner:'AARMOU',repo:'arcana_table'},payload:{repository:{id:1},workflow_run:workflowRun}};
-  return {calls,records,current,github,context,args:{github,context,authorize:authorize||allow(records)}};
+  return {calls,records,deliveryCalls,current,github,context,args:{github,context,delivery,authorize:authorize||allow(records)}};
 }
 const bot=(body,id=1)=>({id,body,user:{type:'Bot',login:'github-actions[bot]'}});
 
@@ -66,11 +67,31 @@ test('run-id 12 does not collide with run-id 123',async()=>{
 test('observed failure can upgrade in place when admitted',async()=>{
   const x=fixture({comments:[bot(`${OBSERVED}\nworkflow-id:4\nhead-sha:${sha}`,88)]});
   assert.equal((await routeFailure(x.args)).state,'repair-requested');
-  assert.equal(x.calls[0].comment_id,88);
+  assert.equal(x.calls[0].comment_id,undefined); // Owner adds an authorized comment; bot observation stays immutable.
 });
 test('duplicate withheld observations do not spam',async()=>{
   const x=fixture({authorize:deny('budget: unknown'),comments:[bot(`${OBSERVED}\nworkflow-id:4\nhead-sha:${sha}`)]});
   assert.equal((await routeFailure(x.args)).state,'already-observed');assert.equal(x.calls.length,0);
+});
+test('owner-authored delivery deduplicates the same head; other users cannot forge it',async()=>{
+  const own={id:1,user:{login:'AARMOU',type:'User'},author_association:'OWNER',
+    body:`${MARKER}\nworkflow-id:4\nhead-sha:${sha}`};
+  const x=fixture({comments:[own]});
+  assert.equal((await routeFailure(x.args)).state,'already-routed');
+  assert.equal(x.records.length,0);
+  const stranger=fixture({comments:[{...own,user:{login:'mallory'},author_association:'NONE'}]});
+  assert.equal((await routeFailure(stranger.args)).state,'repair-requested');
+});
+test('missing or incorrect delivery identity fails closed before consuming repairs',async()=>{
+  const x=fixture();
+  let invoked=0;
+  x.args.authorize=async()=>{invoked++;return {allowed:true,record:async()=>x.records.push(1)};};
+  x.args.delivery.preflight=async()=>({ok:false,reason:'owner-delivery-identity-not-owner'});
+  const r=await routeFailure(x.args);
+  assert.equal(r.state,'observed-only');
+  assert.equal(invoked,0);assert.equal(x.records.length,0);
+  assert.ok(x.calls[0].body.includes('owner-delivery-identity-not-owner'));
+  assert.ok(!x.calls[0].body.includes('@copilot'));
 });
 test('untrusted user marker does not count as routed',async()=>{
   const x=fixture({comments:[{body:`${MARKER}\nrun-id:12`,user:{type:'User',login:'other'}}]});
@@ -87,10 +108,12 @@ test('non-draft and stale heads are not routed',async()=>{
     const x=fixture({pr});assert.equal((await routeFailure(x.args)).state,'stale-or-unmatched');
   }
 });
-test('permission 403 is reported precisely; the reservation over-counts safely',async()=>{
-  const x=fixture({status:403});assert.deepEqual(await routeFailure(x.args),
-    {state:'permission-blocked',required:'pull-requests: write',pr:85});
-  assert.equal(x.calls.length,0);assert.equal(x.records.length,1);
+test('uncertain owner delivery reserves the attempt but never reports pickup',async()=>{
+  const x=fixture();
+  x.args.delivery.post=async()=>({ok:false,reason:'owner-delivery-post-http-403'});
+  assert.deepEqual(await routeFailure(x.args),
+    {state:'delivery-uncertain',pr:85,reason:'owner-delivery-post-http-403'});
+  assert.equal(x.records.length,1);assert.equal(x.calls.length,0);
 });
 test('reconcile backfills observations only, even when admission would allow',async()=>{
   const x=fixture();const r=await reconcileFailures({github:x.github,context:x.context,now:Date.now()});
@@ -101,9 +124,9 @@ test('reconcile backfills observations only, even when admission would allow',as
 
 test('scheduled backfill upgrades an observation only when admitted',async()=>{
   const x=fixture({comments:[bot(`${OBSERVED}\nworkflow-id:4\nhead-sha:${sha}`,88)]});
-  const r=await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize});
+  const r=await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize,delivery:x.args.delivery});
   assert.deepEqual(r,[{run:12,state:'repair-requested'}]);
-  assert.equal(x.calls.length,1);assert.equal(x.calls[0].comment_id,88);
+  assert.equal(x.calls.length,1);assert.equal(x.calls[0].comment_id,undefined); // New owner-authored comment; old bot observation is retained.
   assert.equal(x.records.length,1);
 });
 test('scheduled backfill caps paid requests at one per tick',async()=>{
@@ -111,14 +134,14 @@ test('scheduled backfill caps paid requests at one per tick',async()=>{
     event:'push',head_branch:'copilot/cards',head_sha:sha,head_repository:{id:1}},
     {id:13,workflow_id:5,name:'Arcana Cardkit',conclusion:'failure',
     event:'push',head_branch:'copilot/cards',head_sha:sha,head_repository:{id:1}}]});
-  const r=await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize});
+  const r=await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize,delivery:x.args.delivery});
   assert.deepEqual(r,[{run:12,state:'repair-requested'},{run:13,state:'observed-only'}]);
   assert.equal(x.records.length,1);
   assert.equal(x.calls.filter(c=>c.body.includes('@copilot')).length,1);
 });
 test('scheduled backfill respects capacity denial without consuming a repair',async()=>{
   const x=fixture({authorize:deny('capacity: 1 of 1 active')});
-  const r=await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize});
+  const r=await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize,delivery:x.args.delivery});
   assert.deepEqual(r,[{run:12,state:'observed-only'}]);
   assert.equal(x.records.length,0);
   assert.equal(x.calls.length,1);
@@ -127,7 +150,7 @@ test('scheduled backfill respects capacity denial without consuming a repair',as
 
 test('scheduled backfill skips stale heads without spending admission work',async()=>{
   const x=fixture({pr:{head:{ref:'copilot/cards',sha:'b'.repeat(40),repo:{id:1}}}});
-  const r=await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize});
+  const r=await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize,delivery:x.args.delivery});
   assert.deepEqual(r,[]);assert.equal(x.records.length,0);assert.equal(x.calls.length,0);
 });
 test('shared capacity denial short-circuits subsequent paid admissions',async()=>{
@@ -137,7 +160,7 @@ test('shared capacity denial short-circuits subsequent paid admissions',async()=
     event:'push',head_branch:'copilot/cards',head_sha:sha,head_repository:{id:1}}]});
   let admissions=0;
   const authorize=async()=>{admissions++;return {allowed:false,reason:'capacity: 1 of 1 active'};};
-  const r=await reconcileFailures({github:x.github,context:x.context,authorize});
+  const r=await reconcileFailures({github:x.github,context:x.context,authorize,delivery:x.args.delivery});
   assert.equal(admissions,1);assert.equal(r.length,2);
   assert.ok(r.every(x=>x.state==='observed-only'));assert.equal(x.records.length,0);
 });

@@ -1,6 +1,7 @@
 'use strict';
 const A = require('./admission.cjs');
 const { loadUnits, unitOf } = require('./units.cjs');
+const { createCopilotDelivery } = require('./copilot-delivery.cjs');
 const MARKER = '<!-- arcana-ci-repair-router-v2 -->';
 const OLD_MARKER = '<!-- arcana-ci-repair-router -->';
 const OBSERVED = '<!-- arcana-ci-failure-observed-v2 -->';
@@ -40,7 +41,7 @@ function createAuthorizer({ github, owner, repo, env, readBudget, now = Date.now
 }
 
 // Trusted default-branch workflow calls this module. Never loads failed-branch code.
-async function routeFailure({ github, context, authorize = observeOnly, openPrs }) {
+async function routeFailure({ github, context, authorize = observeOnly, openPrs, delivery }) {
   const run = context.payload.workflow_run;
   const repoId = context.payload.repository.id;
   if (!run || run.conclusion !== 'failure' || run.event === 'workflow_run' ||
@@ -56,11 +57,21 @@ async function routeFailure({ github, context, authorize = observeOnly, openPrs 
     {owner, repo, issue_number:pr.number, per_page:100});
   const ours = comments.filter(isOurs);
   const fingerprint = `workflow-id:${run.workflow_id}\nhead-sha:${run.head_sha}`;
-  const repairs = ours.filter(c => c.body?.startsWith(MARKER) || c.body?.startsWith(OLD_MARKER));
+  // Owner-delivered comments actually trigger Copilot. Legacy bot requests
+  // remain deduped: never spend again simply to repeat an uncertain handoff.
+  const ownerComment = c => String(c.user?.login || '').toLowerCase() === owner.toLowerCase() &&
+    A.TRUSTED_ASSOCIATIONS.includes(c.author_association);
+  const repairs = comments.filter(c => (isOurs(c) || ownerComment(c)) &&
+    (c.body?.startsWith(MARKER) || c.body?.startsWith(OLD_MARKER)));
   if (repairs.some(c => c.body.includes(fingerprint) ||
       new RegExp(`(?:^|\\n)run-id:${run.id}(?:\\n|$)`).test(c.body))) return {state:'already-routed'};
   const previous = ours.find(c => c.body?.startsWith(OBSERVED) && c.body.includes(fingerprint));
-  const decision = await authorize({ pr, run });
+  // Fail closed before admission/ledger writes if the existing dispatch
+  // credential cannot prove it belongs to the owner.
+  const sender = delivery || createCopilotDelivery({owner,repo,token:null});
+  const proof = authorize === observeOnly ? {ok:true} : await sender.preflight();
+  const decision = proof.ok ? await authorize({pr,run}) :
+    {allowed:false,reason:proof.reason};
   const allowed = decision.allowed === true;
   // A withheld observation is not a repair attempt and can later be upgraded.
   if (!allowed && previous) return {state:'already-observed', reason: decision.reason};
@@ -86,9 +97,18 @@ async function routeFailure({ github, context, authorize = observeOnly, openPrs 
   if (!current.data.draft || current.data.state !== 'open' || current.data.head.sha !== run.head_sha)
     return {state:'stale-or-unmatched'};
   try {
-    if (allowed) await decision.record();
-    if (previous) await github.rest.issues.updateComment({owner,repo,comment_id:previous.id,body});
-    else await github.rest.issues.createComment({owner,repo,issue_number:pr.number,body});
+    if (allowed) {
+      // Reserve before invoking Copilot. If an owner-token POST is uncertain,
+      // the attempt remains consumed, preventing silent repeated spending.
+      await decision.record();
+      const delivered = await sender.post({issue_number:pr.number,body});
+      if (!delivered.ok)
+        return {state:'delivery-uncertain',pr:pr.number,reason:delivered.reason};
+    } else if (previous) {
+      await github.rest.issues.updateComment({owner,repo,comment_id:previous.id,body});
+    } else {
+      await github.rest.issues.createComment({owner,repo,issue_number:pr.number,body});
+    }
   } catch (e) {
     if (e.status === 403) return {state:'permission-blocked', required:'pull-requests: write', pr:pr.number};
     throw e;
@@ -99,7 +119,7 @@ async function routeFailure({ github, context, authorize = observeOnly, openPrs 
 // Scheduled backfill also revisits capacity/billing-denied failures when repairs are enabled.
 // Never more than one paid request per tick, with the same exact-head/admission guards.
 // Default remains observation-only for callers that do not supply an authorizer.
-async function reconcileFailures({ github, context, authorize = observeOnly,
+async function reconcileFailures({ github, context, authorize = observeOnly, delivery,
   now = Date.now(), windowMs = 24 * 60 * 60 * 1000 }) {
   const { owner, repo } = context.repo;
   const since = new Date(now - windowMs).toISOString();
@@ -119,9 +139,9 @@ async function reconcileFailures({ github, context, authorize = observeOnly,
     if (seen.has(fingerprint)) continue;
     seen.add(fingerprint);
     const ctx = { repo: context.repo, payload: { repository: context.payload.repository, workflow_run: run } };
-    const r = await routeFailure({ github, context: ctx, openPrs,
+    const r = await routeFailure({ github, context: ctx, openPrs, delivery,
       authorize: requested < 1 && !admissionBlocked ? authorize : observeOnly });
-    if (r.state === 'repair-requested') requested++;
+    if (r.state === 'repair-requested' || r.state === 'delivery-uncertain') requested++;
     // Capacity and billing are shared gates: don't re-fetch the same admission
     // state for every other PR when no repair could be admitted this tick.
     if (/^(capacity|budget|readiness|configuration):/.test(String(r.reason || '')))
