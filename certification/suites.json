@@ -22,6 +22,38 @@
       "source": "certification/PoxwalkersIndependentCertificationTest.kt",
       "testClass": "com.arcanatable.customcards.PoxwalkersIndependentCertificationTest",
       "tests": 6
+    },
+    {
+      "key": "abstruse-archaic",
+      "name": "Abstruse Archaic",
+      "issue": 343,
+      "source": "certification/AbstruseArchaicIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.AbstruseArchaicIndependentCertificationTest",
+      "tests": 8
+    },
+    {
+      "key": "blood-for-the-blood-god",
+      "name": "Blood for the Blood God!",
+      "issue": 352,
+      "source": "certification/BloodForTheBloodGodIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.BloodForTheBloodGodIndependentCertificationTest",
+      "tests": 7
+    },
+    {
+      "key": "celestine-the-living-saint",
+      "name": "Celestine, the Living Saint",
+      "issue": 358,
+      "source": "certification/CelestineTheLivingSaintIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.CelestineTheLivingSaintIndependentCertificationTest",
+      "tests": 7
+    },
+    {
+      "key": "darksteel-monolith",
+      "name": "Darksteel Monolith",
+      "issue": 368,
+      "source": "certification/DarksteelMonolithIndependentCertificationTest.kt",
+      "testClass": "com.arcanatable.customcards.DarksteelMonolithIndependentCertificationTest",
+      "tests": 8
     }
   ]
 }

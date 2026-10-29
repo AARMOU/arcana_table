@@ -27,6 +27,22 @@ jobs:
             pr: 407
             issue: 406
             title: Implement Poxwalkers
+          - key: abstruse-archaic
+            pr: 344
+            issue: 343
+            title: Implement Abstruse Archaic
+          - key: blood-for-the-blood-god
+            pr: 353
+            issue: 352
+            title: Implement Blood for the Blood God!
+          - key: celestine-the-living-saint
+            pr: 360
+            issue: 358
+            title: Implement Celestine, the Living Saint
+          - key: darksteel-monolith
+            pr: 370
+            issue: 368
+            title: Add Darksteel Monolith
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,6 +82,7 @@ jobs:
       - name: Inject independent scenarios using the shared trusted runner
         id: suite
         run: |
+          printf '%s\n' '${{ steps.candidate.outputs.sha }}' > candidate-sha.txt
           python3 trusted/certification/runner.py prepare \
             --manifest trusted/certification/suites.json --key "${{ matrix.key }}" \
             --trusted trusted --candidate candidate --github-output "$GITHUB_OUTPUT"
@@ -86,3 +103,11 @@ jobs:
         run: |
           python3 trusted/certification/runner.py verify \
             --manifest trusted/certification/suites.json --key "${{ matrix.key }}" --candidate candidate
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: independent-${{ matrix.key }}-${{ github.event.pull_request.head.sha }}
+          path: |
+            candidate-sha.txt
+            candidate/android/custom-cards/build/test-results/test/TEST-*IndependentCertificationTest.xml
+          if-no-files-found: warn

@@ -18,6 +18,31 @@ Resurrection Orb (#408 / Copilot PR #410) is the initial four-scenario example. 
 
 ## Safeguards and limits
 
+### First four-card batch (#81)
+
+The three new suites were authored from Wizards' release notes and the existing
+`support/` helpers before reading any candidate implementation or candidate tests.
+Candidate metadata and changed filenames were read only to bind queue issues and
+import names. No worker implementation or worker test source was read.
+
+| Card / candidate | Cases | Independent behavior checks |
+| --- | ---: | --- |
+| Abstruse Archaic / #344 | 8 | Casting/vigilance, activated and triggered copies, sacrificed-source information, retargeting, colored/opponent/spell/mana-source rejection, activation costs |
+| Blood for the Blood God! / #353 | 7 | Full cost, discard/draw/damage/exile, both players' creature deaths and tokens, colored-cost floor, noncreature/previous-turn exclusions, countering, four-player damage |
+| Celestine, the Living Saint / #360 | 7 | Casting/flying/lifelink, zero-value targets, gross life gain and exact value boundary, controller/type/turn restrictions, target choice before later life gain |
+| Darksteel Monolith / #370 | 8 | Existing independent suite copied byte-for-byte from #443 at `4d19f738c0aae474b913d6a6fa7a51fd1da50d86` |
+
+Rules sources: [Commander Masters Release Notes](https://magic.wizards.com/en/news/feature/commander-masters-release-notes)
+and [Warhammer 40,000 Release Notes](https://magic.wizards.com/en/news/feature/warhammer-40000-commander-release-notes-2022-09-19).
+The premerge matrix runs each suite on its own live candidate SHA and uploads that
+SHA with raw JUnit XML. This PR's green policy checks alone cannot certify a card.
+
+**Known blocked card:** #443 demonstrated that Monolith cannot grant its free cast
+on an opponent's turn. Its failing scenario is preserved, with no exception in
+the runner or certification policy. Do not approve #370 on ordinary CI alone.
+The reused Monolith suite has the authorship/review history documented in #443;
+it is not claimed as newly blind-authored in this batch.
+
 - The default-branch workflow requires a fresh completed Cardkit/Android event; a completed historical CI run alone won't activate a newly registered suite.
 - Only the trusted manifest's explicit suites unlock approvals. Current matching requires queue-feeder provenance `arcana-auto-queue-v1` and the expected Copilot integration base. Other worker types need an separately designed pathway.
 - No privileged token is available during Gradle execution; only a separated post-test job can publish a check.
