@@ -114,7 +114,7 @@ async function reconcileFailures({ github, context, authorize = observeOnly,
   const results = [], seen = new Set();
   let requested = 0, admissionBlocked = false;
   for (const run of runs.filter(r => WORKFLOWS.has(r.name) &&
-    r.head_repository?.id === repoId && heads.has(run.head_branch + ':' + run.head_sha))) {
+    r.head_repository?.id === repoId && heads.has(r.head_branch + ':' + r.head_sha))) {
     const fingerprint = run.workflow_id + ':' + run.head_sha;
     if (seen.has(fingerprint)) continue;
     seen.add(fingerprint);
