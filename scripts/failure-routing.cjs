@@ -11,6 +11,24 @@ const WORKFLOWS = new Set(['Arcana Development CI', 'Arcana Cardkit',
   'Six-precon worker integration — full custom card regressions']);
 const isOurs = c => c.user?.login === 'github-actions[bot]' && c.user?.type === 'Bot';
 const observeOnly = async () => ({ allowed: false, reason: 'observation only' });
+const DISPATCHER = 'Arcana Card Worker Dispatcher';
+
+// CI can finish before the builder's session-finished event is visible. Revisit
+// withheld failures after dispatcher ticks, even when its builder queue is empty.
+// This runs under the same serialized control group as dispatch and repair.
+async function runRouter({ github, context, env, readBudget, delivery }) {
+  const forcedDry = context.eventName === 'workflow_dispatch' &&
+    String(context.payload?.inputs?.dry_run) !== 'false';
+  const ready = A.readiness(env);
+  if (ready.repair === 'off') return { state: 'repair-off' };
+  const authorize = !forcedDry && ready.repair === 'request' ?
+    createAuthorizer({ github, ...context.repo, env, readBudget }) : observeOnly;
+  if (context.eventName === 'schedule' || context.eventName === 'workflow_dispatch' ||
+      (context.payload?.workflow_run?.name === DISPATCHER &&
+       context.payload.workflow_run.conclusion === 'success'))
+    return reconcileFailures({ github, context, authorize, delivery });
+  return routeFailure({ github, context, authorize, delivery });
+}
 
 // Shared admission for repair requests: readiness, work unit, capacity, ceilings, budget.
 function createAuthorizer({ github, owner, repo, env, readBudget, now = Date.now() }) {
@@ -111,6 +129,10 @@ async function routeFailure({ github, context, authorize = observeOnly, openPrs,
     }
   } catch (e) {
     if (e.status === 403) return {state:'permission-blocked', required:'pull-requests: write', pr:pr.number};
+    // A failed observation POST cannot have invoked Copilot. Keep reconciling
+    // other PRs; never retry the uncertain write in this tick.
+    if (!allowed && e.status >= 500)
+      return {state:'observation-unavailable',pr:pr.number,reason:'github-http-' + e.status};
     throw e;
   }
   return {state:allowed?'repair-requested':'observed-only',pr:pr.number, reason: decision.reason};
@@ -124,7 +146,7 @@ async function reconcileFailures({ github, context, authorize = observeOnly, del
   const { owner, repo } = context.repo;
   const since = new Date(now - windowMs).toISOString();
   const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo,
-    { owner, repo, status: 'failure', created: '>=' + since, per_page: 100 });
+    { owner, repo, created: '>=' + since, per_page: 100 });
   // Pre-filter stale commits and duplicate runs before potentially expensive admission.
   const openPrs = await github.paginate(github.rest.pulls.list,
     { owner, repo, state:'open', per_page:100 });
@@ -133,11 +155,17 @@ async function reconcileFailures({ github, context, authorize = observeOnly, del
     /^(gpt\/|copilot\/)/.test(p.head.ref || '')).map(p => p.head.ref + ':' + p.head.sha));
   const results = [], seen = new Set();
   let requested = 0, admissionBlocked = false;
-  for (const run of runs.filter(r => WORKFLOWS.has(r.name) &&
+  // Read all outcomes: a newer successful/in-progress run supersedes a failure
+  // on the same workflow and head. Never repair an already-cleared failure.
+  const latestRuns = [...runs].sort((a, b) =>
+    (Date.parse(b.run_started_at || b.created_at) || 0) -
+    (Date.parse(a.run_started_at || a.created_at) || 0));
+  for (const run of latestRuns.filter(r => WORKFLOWS.has(r.name) &&
     r.head_repository?.id === repoId && heads.has(r.head_branch + ':' + r.head_sha))) {
     const fingerprint = run.workflow_id + ':' + run.head_sha;
     if (seen.has(fingerprint)) continue;
     seen.add(fingerprint);
+    if (run.conclusion !== 'failure') continue;
     const ctx = { repo: context.repo, payload: { repository: context.payload.repository, workflow_run: run } };
     const r = await routeFailure({ github, context: ctx, openPrs, delivery,
       authorize: requested < 1 && !admissionBlocked ? authorize : observeOnly });
@@ -151,4 +179,5 @@ async function reconcileFailures({ github, context, authorize = observeOnly, del
   return results;
 }
 
-module.exports = {routeFailure, reconcileFailures, createAuthorizer, MARKER, OBSERVED, WORKFLOWS};
+module.exports = {runRouter, routeFailure, reconcileFailures, createAuthorizer, MARKER, OBSERVED, WORKFLOWS};
+

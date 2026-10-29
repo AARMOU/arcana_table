@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {routeFailure,reconcileFailures,createAuthorizer,MARKER,OBSERVED,WORKFLOWS}=require('./failure-routing.cjs');
+const {runRouter,routeFailure,reconcileFailures,createAuthorizer,MARKER,OBSERVED,WORKFLOWS}=require('./failure-routing.cjs');
 test('Cardkit failures are eligible for existing repair routing', () => {
   assert.equal(WORKFLOWS.has('Arcana Cardkit'), true);
 });
@@ -202,3 +202,90 @@ test('authorizer: unlinked PRs and exhausted ceilings are refused',async()=>{
   const d=await createAuthorizer({github:h.github,owner:'o',repo:'r',env,readBudget})({pr:{body:'Unit: #67'},run:{id:3,head_sha:sha}});
   assert.equal(d.allowed,false);
 });
+
+// Reproduce the production ordering: failed CI is observed while the session is
+// running, then the builder finishes without causing another CI completion.
+function handoffFixture() {
+  const comments=[];
+  const x=fixture({comments,pr:{author_association:'NONE',user:{login:'Copilot',type:'Bot'}}});
+  const started={event:'copilot_work_started',created_at:new Date(Date.now()-60000).toISOString()};
+  const sessions=[started];
+  const originalPaginate=x.github.paginate;
+  Object.assign(x.github.rest.issues,{listForRepo:'unit-issues',listEventsForTimeline:'unit-timeline'});
+  x.github.paginate=async(fn,args)=>{
+    if(fn==='unit-issues')return [{number:67,title:'[Arcana Queue] card',labels:[],assignees:[{login:'Copilot'}],author_association:'OWNER'}];
+    if(fn==='unit-timeline')return args.issue_number===85?sessions:[];
+    if(fn==='comments' && args.issue_number===67)return [];
+    return originalPaginate(fn,args);
+  };
+  const routerEnv={...env,ARCANA_MAX_ACTIVE_UNITS:'2'};
+  const run=extra=>runRouter({github:x.github,context:{...x.context,...extra},env:routerEnv,readBudget,delivery:x.args.delivery});
+  return {...x,run,finish:()=>sessions.push({event:'copilot_work_finished',created_at:new Date().toISOString()}),comments};
+}
+test('dispatcher success recovers a CI failure withheld until the builder finished',async()=>{
+  const x=handoffFixture();
+  const first=await x.run({eventName:'workflow_run'});
+  assert.equal(first.state,'observed-only');
+  assert.equal(first.reason,'unit state working');
+  assert.equal(x.deliveryCalls.length,0);
+  x.comments.push(bot(x.calls[0].body));
+  x.finish();
+  const result=await x.run({eventName:'workflow_run',payload:{repository:{id:1},workflow_run:{name:'Arcana Card Worker Dispatcher',conclusion:'success'}}});
+  assert.deepEqual(result,[{run:12,state:'repair-requested'}]);
+  assert.equal(x.deliveryCalls.length,1);
+  const reservation=x.calls.find(c=>c.issue_number===67);
+  assert.match(reservation.body,/op:repair-request/);
+  assert.match(x.deliveryCalls[0].body,/Repair request 1 of 2/);
+  assert.ok(x.calls.indexOf(reservation)<x.calls.indexOf(x.deliveryCalls[0]));
+  // The owner-authored delivery is deduplicated on the next dispatcher tick.
+  x.comments.push({...bot(x.deliveryCalls[0].body),user:{login:'AARMOU',type:'User'},author_association:'OWNER'});
+  assert.deepEqual(await x.run({eventName:'schedule'}),[{run:12,state:'already-routed'}]);
+  assert.equal(x.deliveryCalls.length,1);
+});
+test('manual reconciliation defaults to observation; explicit false still uses admission',async()=>{
+  for(const dry_run of [undefined,'true','false']){
+    const x=handoffFixture();x.finish();
+    const result=await x.run({eventName:'workflow_dispatch',payload:{repository:{id:1},inputs:{dry_run}}});
+    assert.equal(result[0].state,dry_run==='false'?'repair-requested':'observed-only');
+    assert.equal(x.deliveryCalls.length,dry_run==='false'?1:0);
+  }
+});
+test('repair off prevents reconciliation reads and delivery',async()=>{
+  const result=await runRouter({github:{},context:{eventName:'schedule'},env:{ARCANA_REPAIR_MODE:'off'}});
+  assert.deepEqual(result,{state:'repair-off'});
+});
+test('reconciliation ignores failures superseded by a newer success or running attempt',async()=>{
+  for(const conclusion of ['success',null]){
+    const x=fixture();
+    const failed=x.context.payload.workflow_run;
+    x.github.paginate=async fn=>fn==='runs'?[{...failed,id:13,conclusion,created_at:'2026-10-29T02:00:00Z'},
+      {...failed,created_at:'2026-10-29T01:00:00Z'}]:fn==='prs'?[x.current]:[];
+    assert.deepEqual(await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize,delivery:x.args.delivery}),[]);
+    assert.equal(x.records.length,0);assert.equal(x.deliveryCalls.length,0);
+  }
+});
+test('an observation HTTP 502 does not abort another eligible repair in the batch',async()=>{
+  const x=fixture();const failed=x.context.payload.workflow_run;
+  const runs=[failed,{...failed,id:13,workflow_id:5}];
+  const orig=x.github.paginate;
+  x.github.paginate=async(fn,args)=>fn==='runs'?runs:orig(fn,args);
+  x.github.rest.issues.createComment=async()=>{throw {status:502};};
+  let attempts=0;
+  const authorize=async()=>++attempts===1?{allowed:false,reason:'unit state working'}:allow(x.records)();
+  const result=await reconcileFailures({github:x.github,context:x.context,authorize,delivery:x.args.delivery});
+  assert.deepEqual(result,[{run:12,state:'observation-unavailable'},{run:13,state:'repair-requested'}]);
+  assert.equal(x.records.length,1);assert.equal(x.deliveryCalls.length,1);
+});
+test('router workflow revisits failures after dispatcher success and keeps shared serialization',()=>{
+  const fs=require('node:fs');
+  const yaml=fs.readFileSync('.github/workflows/arcana-ci-failure-router.yml','utf8');
+  assert.match(yaml,/workflows:[\s\S]*- Arcana Card Worker Dispatcher/);
+  assert.match(yaml,/cron: '8,23,38,53 \* \* \* \*'/);
+  assert.match(yaml,/group: arcana-copilot-control\n  cancel-in-progress: false/);
+  assert.match(yaml,/runRouter\(\{github,context,env:process.env,readBudget,delivery\}\)/);
+  const blocks=[...yaml.matchAll(/          script: \|\n([\s\S]*?)(?=\n[^ ]|$)/g)];
+  assert.equal(blocks.length,1);
+  const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
+  new AsyncFunction('github','context','core','require',blocks[0][1].replace(/^            /gm,''));
+});
+
