@@ -1,0 +1,154 @@
+name: B140 combined registry and Azlask validation - NO APK
+on:
+  push:
+    branches: [gpt/b140-combined-registry-azlask-proof-20261029]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: b140-registry-azlask-combined-proof
+  cancel-in-progress: true
+jobs:
+  exact-source-combined:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Fail closed on changed B140 or source candidate heads
+        shell: bash
+        run: |
+          set -euo pipefail
+          b140=310f7dd6a7f1829aa90955af02c2cd48fb8d1a61
+          registry=d567a417706659a9bd43516083fd399c2b7e2e10
+          azlask=2af5b58d3cfbbe78752113d21a9ed953680fc40f
+          check_ref() {
+            actual="$(git ls-remote https://github.com/AARMOU/arcana_table.git "refs/heads/$1" | cut -f1)"
+            test "$actual" = "$2" || { echo "::error::$1 moved from $2 to $actual"; exit 1; }
+          }
+          check_ref gpt/b140-card-request-test-apk-20261028 "$b140"
+          check_ref gpt/b140-restore-six-registry-collisions-20261028 "$registry"
+          check_ref gpt/b140-azlask-trigger-color-predicate-20261029 "$azlask"
+          test "$(git rev-parse HEAD^)" = "$b140"
+          git diff --check "$b140" HEAD
+          git diff --name-only "$b140" HEAD > /tmp/combined-paths
+          python3 - <<'PY'
+          from pathlib import Path
+          actual=set(Path('/tmp/combined-paths').read_text().splitlines())
+          allowed={
+            '.github/workflows/b140-registry-azlask-combined-no-apk.yml',
+            '.github/workflows/b140-six-library-restore-no-apk.yml',
+            '.github/workflows/b140-azlask-trigger-color-no-apk.yml',
+            'engine-upgrade/build140/apply_engine.sh',
+            'engine-upgrade/build140/patches/0003-azlask-exact-colors-trigger.patch',
+            'engine-upgrade/build140/test_restored_registry.py',
+            'docs/agents/generated/pattern-index.json',
+            'docs/agents/generated/pattern-index.md',
+            'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt',
+            'android/app/src/main/assets/argentum/custom-cards.index.tsv',
+            'android/app/src/main/assets/argentum/custom-cards.jsonl',
+          }
+          for name in ('BlackMarketConnections','CommissarSeverinaRaine',
+                       'JaheiraFriendOfTheForest','ScurryOak','TataruTaru','WaywardSwordtooth'):
+            allowed.add(f'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/{name}.kt')
+          assert actual==allowed,(sorted(actual-allowed),sorted(allowed-actual))
+          print('PASS: exact 16 source paths + combined no-APK workflow; no app UI/importer or committed JAR changes')
+          PY
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: argentum-engine
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Replay mandatory B140 patches plus Azlask against exact pinned Argentum
+        run: |
+          bash engine-upgrade/build140/apply_engine.sh
+          git -C argentum-engine diff -- rules-engine/src/main/kotlin/com/wingedsheep/engine/event/TriggerMatcher.kt | grep -q HasExactlyColors
+      - name: Run authoritative rules suite and compile temporary rules JAR
+        working-directory: argentum-engine
+        run: |
+          bash ../engine-upgrade/build140/run_gradle.sh combined-rules \
+            ./scripts/gradle-locked --no-daemon --max-workers=2 \
+            -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
+            '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
+            :rules-engine:test :rules-engine:jar
+      - name: Install CI-only rules JAR; never commit or package an APK
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import hashlib,shutil,zipfile,struct
+          dest=Path('android/app/libs/argentum-rules-engine.jar')
+          candidates=[]
+          for p in Path('argentum-engine/rules-engine/build/libs').glob('*.jar'):
+            if 'sources' in p.name or 'javadoc' in p.name: continue
+            with zipfile.ZipFile(p) as z:
+              if 'com/wingedsheep/engine/core/GameAction.class' in z.namelist():
+                candidates.append(p)
+          assert len(candidates)==1,candidates
+          with zipfile.ZipFile(candidates[0]) as z:
+            versions=[struct.unpack('>H',z.read(n)[6:8])[0] for n in z.namelist() if n.endswith('.class')]
+          assert max(versions)<=61,max(versions)
+          before=hashlib.sha256(dest.read_bytes()).hexdigest()
+          shutil.copyfile(candidates[0],dest)
+          print('CI-only rules jar',before,'->',hashlib.sha256(dest.read_bytes()).hexdigest())
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Verify registry parity including negative fixtures
+        run: python3 -m unittest engine-upgrade/build140/test_restored_registry.py -v
+      - name: Re-export card definitions and require byte-for-byte shipped parity
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          git diff --exit-code -- app/src/main/assets/argentum/custom-cards.index.tsv app/src/main/assets/argentum/custom-cards.jsonl
+      - name: Full custom-card and Android debug JUnit suites (no weakened assertions)
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 --continue :custom-cards:test :app:testDebugUnitTest
+      - name: Strict actual JUnit evidence; print every failure
+        if: always()
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from xml.etree import ElementTree as E
+          bad=False
+          for label,folder,minimum in (
+              ('custom',Path('android/custom-cards/build/test-results/test'),680),
+              ('android',Path('android/app/build/test-results/testDebugUnitTest'),430)):
+            files=sorted(folder.glob('TEST-*.xml'))
+            c={k:0 for k in ('tests','failures','errors','skipped')}
+            for f in files:
+              root=E.parse(f).getroot()
+              for k in c: c[k]+=int(root.get(k,'0'))
+              for case in root.iter('testcase'):
+                for kind in ('failure','error'):
+                  for fail in case.findall(kind):
+                    print(f'{label}: {case.get("classname")}.{case.get("name")}: {kind}: {fail.get("message")}')
+            print(f'{label}: XML files={len(files)} counts={c}')
+            if c['tests']<minimum or c['failures'] or c['errors']: bad=True
+          assert not bad,'missing JUnit suites or actual test failures'
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b140-combined-no-apk-junit
+          if-no-files-found: warn
+          path: |
+            engine-source.txt
+            gradle-logs/
+            android/custom-cards/build/test-results/test/TEST-*.xml
+            android/app/build/test-results/testDebugUnitTest/TEST-*.xml
+            argentum-engine/rules-engine/build/test-results/test/TEST-*.xml
