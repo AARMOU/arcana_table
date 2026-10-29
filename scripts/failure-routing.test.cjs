@@ -126,7 +126,7 @@ test('scheduled backfill upgrades an observation only when admitted',async()=>{
   const x=fixture({comments:[bot(`${OBSERVED}\nworkflow-id:4\nhead-sha:${sha}`,88)]});
   const r=await reconcileFailures({github:x.github,context:x.context,authorize:x.args.authorize,delivery:x.args.delivery});
   assert.deepEqual(r,[{run:12,state:'repair-requested'}]);
-  assert.equal(x.calls.length,1);assert.equal(x.calls[0].comment_id,88);
+  assert.equal(x.calls.length,1);assert.equal(x.calls[0].comment_id,undefined); // New owner-authored comment; old bot observation is retained.
   assert.equal(x.records.length,1);
 });
 test('scheduled backfill caps paid requests at one per tick',async()=>{
