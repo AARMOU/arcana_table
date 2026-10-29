@@ -12,14 +12,13 @@
 //   approved          Owner Approved           owner approved THIS commit (a new commit resets it)
 //   changes-requested Changes Requested        owner requested a fix on THIS commit
 //   integrated        Integrated               PR merged into the integration base (last 7 days)
-// Passing CI is never shown as certification: only a check whose name contains "certif" counts, which is
-// the hook for the independent certification gate (#81) once it exists.
+// Passing CI never certifies rules. Require the exact trusted Github Actions\n// check identity and current PR SHA before displaying a card as certified.
 const COPILOT = new Set(['copilot', 'copilot-swe-agent[bot]']);
 const OWNER = 'aarmou';
 const MAX_ITEMS = 30;
 const INTEGRATED_DAYS = 7;
 const GREEN = new Set(['success', 'skipped', 'neutral']);
-const CERT = /certif/i;
+const V = require('./verified-certification.cjs');
 const DECISION_MARKER = '<!-- arcana-owner-decision-v1 -->';
 
 const unitOf = body => Number((String(body || '').match(/(?:Fixes|Closes|Resolves|Unit:)\s*#(\d+)/i) || [])[1]) || null;
@@ -63,9 +62,7 @@ function classify(pr, checkRuns = [], reviews = [], unitBody = '', files = null)
     url: typeof r.html_url === 'string' && r.html_url.startsWith('https://github.com/') ? r.html_url : null }));
   const pending = runs.some(r => r.status !== 'completed');
   const failedRuns = runs.filter(r => r.status === 'completed' && !GREEN.has(r.conclusion));
-  const cert = runs.filter(r => CERT.test(r.name));
-  const certification = !cert.length ? 'not-run' : cert.some(r => r.status !== 'completed') ? 'running'
-    : cert.every(r => r.conclusion === 'success') ? 'certified' : 'failed';
+  const certification = V.certification(runs,head);
   // Only the owner's decision on THIS head counts; a new commit needs a fresh review.
   const owner = reviews.filter(v => String(v.user?.login || '').toLowerCase() === OWNER && ['APPROVED', 'CHANGES_REQUESTED'].includes(v.state));
   const onHead = owner.filter(v => v.commit_id === head);

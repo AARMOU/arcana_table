@@ -5,9 +5,15 @@ const R = require('./review-inbox.cjs');
 const S = require('./control-status.cjs');
 
 const pr = (extra = {}) => ({ number: 360, title: 'Implement Celestine, the Living Saint', body: '- Fixes #358',
-  head: { sha: 'abc' }, base: { repo: { full_name: 'AARMOU/arcana_table' } }, user: { login: 'Copilot' }, ...extra });
-const run = (name, conclusion, status = 'completed', head_sha = 'abc') => ({ name, status, conclusion, head_sha });
-const review = (state, commit_id = 'abc', login = 'AARMOU') => ({ state, commit_id, user: { login } });
+  head: { sha: 'a'.repeat(40) }, base: { repo: { full_name: 'AARMOU/arcana_table' } }, user: { login: 'Copilot' }, ...extra });
+const run = (name, conclusion, status = 'completed', head_sha = 'a'.repeat(40)) => ({ name, status, conclusion, head_sha });
+const certRun = (conclusion='success', head_sha='a'.repeat(40)) => ({
+  name: 'Arcana independent certification', head_sha, status: 'completed', conclusion,
+  app: { slug: 'github-actions', id: 15368 },
+  output: { title: 'Resurrection Orb: independent rules scenarios passed',
+    summary: '4 trusted-main JUnit scenarios passed against the exact current Copilot PR commit' }
+});
+const review = (state, commit_id = 'a'.repeat(40), login = 'AARMOU') => ({ state, commit_id, user: { login } });
 const cardFiles = ['android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt',
   'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineScenarioTest.kt'];
 
@@ -26,7 +32,7 @@ test('states: running, failed, awaiting review, approved and changes requested',
 test('only the owner\'s review of the CURRENT head counts', () => {
   const green = [run('toolkit', 'success')];
   assert.equal(R.classify(pr(), green, [review('APPROVED', 'old-sha')]).state, 'awaiting-review');
-  assert.equal(R.classify(pr(), green, [review('APPROVED', 'abc', 'stranger')]).state, 'awaiting-review');
+  assert.equal(R.classify(pr(), green, [review('APPROVED', 'a'.repeat(40), 'stranger')]).state, 'awaiting-review');
   // Check runs from an older head are ignored.
   assert.equal(R.classify(pr(), [run('toolkit', 'failure', 'completed', 'old')]).state, 'checks-running');
 });
@@ -73,11 +79,11 @@ test('buildReviewInbox reads only Copilot PRs and never writes', async () => {
 test('certification is only an explicit certification check, never plain CI', () => {
   const green = [run('toolkit', 'success'), run('cards-and-android', 'success')];
   assert.deepEqual([R.classify(pr(), green).state, R.classify(pr(), green).certification], ['awaiting-review', 'not-run']);
-  const certified = R.classify(pr(), [...green, run('Arcana card certification', 'success')]);
+  const certified = R.classify(pr(), [...green, certRun()]);
   assert.deepEqual([certified.state, certified.certification], ['certified', 'certified']);
-  const failedCert = R.classify(pr(), [...green, run('card-certification', 'failure')]);
+  const failedCert = R.classify(pr(), [...green, certRun('failure')]);
   assert.deepEqual([failedCert.state, failedCert.certification], ['checks-failed', 'failed']);
-  assert.equal(R.inboxPayload([R.classify(pr(), [...green, run('Arcana card certification', 'success')], [], '', cardFiles),
+  assert.equal(R.inboxPayload([R.classify(pr(), [...green, certRun()], [], '', cardFiles),
     R.classify(pr({ number: 1 }), green, [], '', cardFiles)]).awaitingReview, 1);
 });
 
@@ -102,7 +108,7 @@ test('daily activity is not truncated to the owner review inbox and excludes unm
 });
 
 test('file evidence separates actual cards from audits and engine blockers and prevents draft approval', () => {
-  const green = [run('toolkit', 'success'), run('Arcana card certification', 'success')];
+  const green = [run('toolkit', 'success'), certRun()];
   const real = R.classify(pr(), green, [], '', cardFiles);
   assert.deepEqual([real.kind, real.hasTest, real.readyForOwner], ['card', true, true]);
   const draft = R.classify(pr({ draft: true }), green, [], '', cardFiles);
@@ -115,4 +121,23 @@ test('file evidence separates actual cards from audits and engine blockers and p
   assert.equal(R.classify(pr(), green, [], '', null).readyForOwner, false);
   assert.equal(R.classify(pr(), green, [], '', cardFiles.slice(0, 1)).readyForOwner, false);
   assert.equal(R.classify(pr(), green, [], '', Array(100).fill(cardFiles[0])).readyForOwner, false);
+});
+
+test('look-alike check names or untrusted apps cannot certify the owner review inbox', () => {
+  const green=[run('toolkit','success'),run('cards-and-android','success')];
+  const forged=[
+    {...certRun(),name:'fake-certification'},
+    {...certRun(),app:{slug:'evil-agent',id:99}},
+    {...certRun(),app:{slug:'github-actions',id:22}},
+    {...certRun(),output:{title:'Unverified',summary:'not verified'}},
+    {...certRun(),head_sha:'old'},
+    {...certRun(),name:'Arcana independent certification (2)'},
+  ];
+  for(const c of forged){
+    const row=R.classify(pr(), [...green,c], [],'',cardFiles);
+    assert.equal(row.readyForOwner,false,JSON.stringify(c));
+    assert.notEqual(row.certification,'certified');
+  }
+  const good=R.classify(pr(),[...green,certRun()],[],'',cardFiles);
+  assert.equal(good.readyForOwner,true);
 });

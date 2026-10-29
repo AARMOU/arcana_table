@@ -16,6 +16,7 @@
 
 import { publicGithub } from './public-github.mjs';
 import { authorizationInfo, authorizeUnit } from './authorize.mjs';
+import { certificationStatus } from './verified-certification.mjs';
 
 const REPO = "AARMOU/arcana_table";
 const OWNER = "aarmou";
@@ -135,11 +136,9 @@ export async function decide(api, { pr, sha, decision, note }) {
     const runs = checks.body?.check_runs || [];
     const notGreen = runs.filter(r => r.status !== "completed" || !GREEN.has(r.conclusion)).map(r => r.name);
     if (!runs.length || notGreen.length) return [422, { error: "checks-not-green", checks: notGreen.slice(0, 10) }];
-    // Green checks are not rules certification. Require the independent certification check(s)
-    // (name contains "certif", same rule as scripts/review-inbox.cjs) on THIS exact head.
-    const cert = runs.filter(r => /certif/i.test(String(r.name || "")) && r.head_sha === sha);
-    const certification = !cert.length ? "not-run" : cert.some(r => r.status !== "completed") ? "running"
-      : cert.every(r => r.conclusion === "success") ? "certified" : "failed";
+    // A green ordinary job or look-alike check is never a rules certificate.
+    // Require trusted GitHub Actions app, exact check name/evidence and exact commit.
+    const certification = certificationStatus(runs, sha);
     if (certification !== "certified") return [422, { error: "not-certified", certification }];
   }
   const body = [DECISION_MARKER, `sha:${sha}`, decision === "approve"
