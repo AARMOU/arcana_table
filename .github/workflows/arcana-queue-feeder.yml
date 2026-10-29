@@ -114,6 +114,17 @@ jobs:
             i=$((i+1))
             printf '%s' "$name" > "units/$i.name"
             (cd base && python3 -I tools/cardkit/cardkit.py unit -- "$name") > "units/$i.body" 2> "units/$i.err" || rm -f "units/$i.body"
+            # The trusted feeder can reach Scryfall, while Copilot's isolated coding
+            # sandbox often cannot. Pass the exact offline record Cardkit just used
+            # along with the queue unit; reject units lacking a matching record.
+            # This changes only the issue body, not eligibility or paid dispatch.
+            if [ -f "units/$i.body" ]; then
+              if ! (cd base && python3 -I tools/cardkit/cardkit.py oracle show -- "$name") > "units/$i.oracle" 2> "units/$i.oracle.err" ||
+                 ! node ctl/scripts/oracle-handoff.cjs "units/$i.body" "units/$i.oracle" "$name"; then
+                echo "::warning::No verified offline Oracle handoff for $name; refusing queue unit."
+                rm -f "units/$i.body"
+              fi
+            fi
           done < names.txt
       - id: pick
         name: Assemble suggestions (trusted main code)
