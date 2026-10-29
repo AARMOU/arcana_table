@@ -718,13 +718,19 @@
    ]
   },
   "DynamicAmounts.castX": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Zoanthrope",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Zoanthrope.kt",
      "lines": 27,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ZoanthropeScenarioTest.kt"
+    },
+    {
+     "card": "Sporocyst",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Sporocyst.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SporocystScenarioTest.kt"
     },
     {
      "card": "Suffer the Past",
@@ -2984,13 +2990,19 @@
    ]
   },
   "Keyword.DEFENDER": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Crashing Drawbridge",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CrashingDrawbridge.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CrashingDrawbridgeScenarioTest.kt"
+    },
+    {
+     "card": "Sporocyst",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Sporocyst.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SporocystScenarioTest.kt"
     }
    ]
   },
@@ -4101,7 +4113,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 41,
+   "count": 42,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -4520,7 +4532,7 @@
    ]
   },
   "keywords()": {
-   "count": 88,
+   "count": 89,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4572,7 +4584,7 @@
    ]
   },
   "ravenous()": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Zoanthrope",
@@ -4585,6 +4597,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Aberrant.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AberrantScenarioTest.kt"
+    },
+    {
+     "card": "Sporocyst",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Sporocyst.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SporocystScenarioTest.kt"
     },
     {
      "card": "Tyrant Guard",
@@ -4787,7 +4805,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 132,
+   "count": 133,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5420,7 +5438,7 @@
    ]
   },
   "Patterns.Library.searchLibrary": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Plasmancer",
@@ -5447,16 +5465,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MigrationPathScenarioTest.kt"
     },
     {
+     "card": "Sporocyst",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Sporocyst.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SporocystScenarioTest.kt"
+    },
+    {
      "card": "Homing Sliver",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HomingSliver.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HomingSliverScenarioTest.kt"
-    },
-    {
-     "card": "Space Marine Scout",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SpaceMarineScout.kt",
-     "lines": 48,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SpaceMarineScoutScenarioTest.kt"
     }
    ]
   },
@@ -6663,7 +6681,7 @@
    ]
   },
   "GameObjectFilter.BasicLand": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Plasmancer",
@@ -6682,6 +6700,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MigrationPath.kt",
      "lines": 34,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MigrationPathScenarioTest.kt"
+    },
+    {
+     "card": "Sporocyst",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Sporocyst.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SporocystScenarioTest.kt"
     },
     {
      "card": "Traverse the Outlands",
