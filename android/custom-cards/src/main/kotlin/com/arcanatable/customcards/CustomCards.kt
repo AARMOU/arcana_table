@@ -258,6 +258,7 @@ object CustomCards {
         Entry(CommissarSeverinaRaine, "40K", "Six WotC precons"),
         Entry(BoneSabres, "40K", "Six WotC precons"),
         Entry(Tervigon, "40K", "Six WotC precons"),
+        Entry(Sporocyst, "40K", "Six WotC precons"),
         Entry(CranialPlating, "40K", "Six WotC precons"),
         Entry(Chronomancer, "40K", "Six WotC precons"),
         Entry(RoyalWarden, "40K", "Six WotC precons"),
