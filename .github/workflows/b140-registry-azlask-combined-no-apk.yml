@@ -31,7 +31,7 @@ jobs:
           check_ref gpt/b140-card-request-test-apk-20261028 "$b140"
           check_ref gpt/b140-restore-six-registry-collisions-20261028 "$registry"
           check_ref gpt/b140-azlask-trigger-color-predicate-20261029 "$azlask"
-          test "$(git rev-parse HEAD^)" = "$b140"
+          git merge-base --is-ancestor "$b140" HEAD
           git diff --check "$b140" HEAD
           git diff --name-only "$b140" HEAD > /tmp/combined-paths
           python3 - <<'PY'
@@ -44,6 +44,8 @@ jobs:
             'engine-upgrade/build140/apply_engine.sh',
             'engine-upgrade/build140/patches/0003-azlask-exact-colors-trigger.patch',
             'engine-upgrade/build140/test_restored_registry.py',
+            'engine-upgrade/build140/write_manifest.py',
+            'engine-upgrade/build140/test_runtime_provenance.py',
             'docs/agents/generated/pattern-index.json',
             'docs/agents/generated/pattern-index.md',
             'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt',
@@ -53,9 +55,13 @@ jobs:
           for name in ('BlackMarketConnections','CommissarSeverinaRaine',
                        'JaheiraFriendOfTheForest','ScurryOak','TataruTaru','WaywardSwordtooth'):
             allowed.add(f'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/{name}.kt')
-          assert actual==allowed,(sorted(actual-allowed),sorted(allowed-actual))
-          print('PASS: exact 16 source paths + combined no-APK workflow; no app UI/importer or committed JAR changes')
+          runtime={'android/app/libs/argentum-rules-engine.jar',
+                   'engine-upgrade/build140/runtime-manifest.json'}
+          assert actual in (allowed,allowed|runtime),(sorted(actual-allowed-runtime),sorted(allowed-actual))
+          print('PASS: existing combined repair plus runtime provenance; optional rules JAR/manifest only')
           PY
+      - name: Test rules-only runtime provenance guards
+        run: python3 -m unittest engine-upgrade/build140/test_runtime_provenance.py -v
       - uses: actions/checkout@v4
         with:
           repository: wingedsheep/argentum-engine
@@ -141,6 +147,22 @@ jobs:
             if c['tests']<minimum or c['failures'] or c['errors']: bad=True
           assert not bad,'missing JUnit suites or actual test failures'
           PY
+      - name: Record exact runtime provenance after all rules and Android tests pass
+        run: |
+          python3 engine-upgrade/build140/write_manifest.py --rules-only
+          mkdir -p runtime-bundle
+          cp --parents android/app/libs/argentum-rules-engine.jar \
+            engine-upgrade/build140/runtime-manifest.json \
+            engine-upgrade/patch-report.json engine-source.txt runtime-bundle/
+          cd runtime-bundle
+          sha256sum android/app/libs/argentum-rules-engine.jar \
+            engine-upgrade/build140/runtime-manifest.json \
+            engine-upgrade/patch-report.json engine-source.txt > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: b140-validated-rules-runtime-${{ github.sha }}
+          if-no-files-found: error
+          path: runtime-bundle/
       - uses: actions/upload-artifact@v4
         if: always()
         with:
