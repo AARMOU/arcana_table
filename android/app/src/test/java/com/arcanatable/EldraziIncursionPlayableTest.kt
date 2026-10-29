@@ -86,18 +86,41 @@ class EldraziIncursionPlayableTest {
             var state: GameState = init.state
             var actions = 0
             val started = System.nanoTime()
+            var stepFailure: String? = null
             while (!state.gameOver && state.turnNumber <= 30 && actions < 8_000) {
                 val decision = state.pendingDecision
                 val next = if (decision != null) {
                     val r = processor.process(state, SubmitDecision(decision.playerId, ais.getValue(decision.playerId).respondToDecision(state, decision))).result
-                    if (r.error != null) null else r.state
-                } else state.priorityPlayerId?.let { ais.getValue(it).playPriorityWindow(state, processor) }
+                    if (r.error != null) {
+                        stepFailure = "SubmitDecision rejected: ${r.error}"
+                        null
+                    } else r.state
+                } else {
+                    val priority = state.priorityPlayerId
+                    if (priority == null) {
+                        stepFailure = "No priority player and no pending decision"
+                        null
+                    } else {
+                        ais.getValue(priority).playPriorityWindow(state, processor).also {
+                            if (it == null) stepFailure = "AI priority window returned null for player=$priority"
+                        }
+                    }
+                }
                 actions++
                 state = next ?: break
             }
-            println("[eldrazi-incursion] seed=$seed turn=${state.turnNumber} actions=$actions over=${state.gameOver} " +
-                "winner=${state.winnerId} ms=${(System.nanoTime() - started) / 1_000_000}")
-            assertTrue("seed $seed must finish the AI mirror game; turn=${state.turnNumber}, actions=$actions", state.gameOver)
+            val stopReason = when {
+                state.gameOver -> "game over"
+                state.turnNumber > 30 -> "turn limit"
+                actions >= 8_000 -> "action limit"
+                else -> stepFailure ?: "unknown early exit"
+            }
+            val diagnostic = "seed=$seed turn=${state.turnNumber} actions=$actions over=${state.gameOver} " +
+                "winner=${state.winnerId} priority=${state.priorityPlayerId} " +
+                "pendingDecisionPlayer=${state.pendingDecision?.playerId} stop=$stopReason " +
+                "ms=${(System.nanoTime() - started) / 1_000_000}"
+            println("[eldrazi-incursion] $diagnostic")
+            assertTrue("AI mirror must finish: $diagnostic", state.gameOver)
         }
     }
 }
