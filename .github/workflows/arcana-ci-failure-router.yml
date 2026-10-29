@@ -36,6 +36,8 @@ jobs:
       - uses: actions/github-script@v7
         env:
           COPILOT_BILLING_READ_TOKEN: ${{ secrets.COPILOT_BILLING_READ_TOKEN }}
+          # Owner identity is required for Copilot PR-comment instructions; the bot still writes ledgers.
+          COPILOT_DISPATCH_TOKEN: ${{ secrets.COPILOT_DISPATCH_TOKEN }}
           ARCANA_AI_CREDIT_BUDGET: ${{ vars.ARCANA_AI_CREDIT_BUDGET }}
           ARCANA_AI_CREDIT_RESERVE: ${{ vars.ARCANA_AI_CREDIT_RESERVE }}
           ARCANA_AUTOMATION_READY: ${{ vars.ARCANA_AUTOMATION_READY }}
@@ -50,19 +52,21 @@ jobs:
             const {readBudget}=require('./scripts/billing-monitor.cjs');
             const {routeFailure,reconcileFailures,createAuthorizer}=require('./scripts/failure-routing.cjs');
             const {readiness}=require('./scripts/admission.cjs');
+            const {createCopilotDelivery}=require('./scripts/copilot-delivery.cjs');
+            const {owner,repo}=context.repo;
+            const delivery=createCopilotDelivery({owner,repo,token:process.env.COPILOT_DISPATCH_TOKEN});
             const ready=readiness(process.env);
             if(ready.repair==='off'){core.info('Repair mode off; router disabled.');return;}
             let result;
             if(context.eventName==='schedule'){
-              const {owner,repo}=context.repo;
               const authorize=ready.repair==='request' ?
                 createAuthorizer({github,owner,repo,env:process.env,readBudget}) : undefined;
-              result=await reconcileFailures({github,context,authorize});
+              result=await reconcileFailures({github,context,authorize,delivery});
             }else{
-              const {owner,repo}=context.repo;
               const authorize=createAuthorizer({github,owner,repo,env:process.env,readBudget});
-              result=await routeFailure({github,context,authorize});
+              result=await routeFailure({github,context,authorize,delivery});
             }
             core.info(JSON.stringify(result));
             await core.summary.addHeading('Failure routing evidence').addCodeBlock(JSON.stringify(result)).write();
             if(result.state==='permission-blocked')core.setFailed('PR comment permission missing; no retry issued.');
+            if(result.state==='delivery-uncertain')core.setFailed('Owner-authorized Copilot handoff unconfirmed; repair attempt reserved, never blindly retried.');
