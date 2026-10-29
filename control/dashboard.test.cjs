@@ -381,7 +381,33 @@ test('review recheck refuses untrusted source comments and does not mislabel sta
   const out={review:{data:{kind:'review',checkedAt:'2026-10-29T05:22:00Z'}}};
   await refresh(out,{id:123,user:{login:'attacker',type:'User'}});
   assert.equal(calls,0);
-  assert.match(script,/text\('quickVerifyCount',reviewFresh\?/);
-  assert.ok(script.includes("'— stale'"));
+  assert.match(script,/text\\('quickVerifyCount',reviewCountLabel\\(r\\)\\)/);
+  assert.ok(!script.includes("'— stale'"));
   assert.ok(!/method:\s*['"](?:POST|PUT|PATCH|DELETE)/.test(src));
+});
+
+test('Verify count keeps the last published count after five minutes and labels older snapshots',()=>{
+  const start=script.indexOf('function reviewCountLabel(');
+  const end=script.indexOf('function reviewBadge(',start);
+  assert.ok(start>0&&end>start,'pure count formatter found');
+  const actual=require('./review.js');
+  const ctx=vm.createContext({Date,window:{ArcanaReview:actual}});
+  vm.runInContext(script.slice(start,end)+'\nthis.countLabel=reviewCountLabel;',ctx);
+  const now=Date.parse('2026-10-29T05:52:00Z');
+  const card={pr:407,headSha:'8'.repeat(40),kind:'card',hasTest:true,draft:false,state:'certified',certification:'certified'};
+  const review=(min,items=[card])=>({checkedAt:new Date(now-min*60000).toISOString(),items});
+  assert.equal(ctx.countLabel(review(2),now),'1 ready');
+  assert.equal(ctx.countLabel(review(6),now),'1 ready','5-minute aging does not hide Verify count');
+  assert.equal(ctx.countLabel(review(14),now),'1 ready','normal 15-minute bot cadence');
+  assert.equal(ctx.countLabel(review(16),now),'1 reported · old','older report retains count and visibly qualifies it');
+  assert.equal(ctx.countLabel(review(75),now),'1 reported · old');
+  assert.equal(ctx.countLabel(review(16,[]),now),'0 reported · old');
+  assert.equal(ctx.countLabel(review(6,[{...card,draft:true}]),now),'0 ready');
+  assert.equal(ctx.countLabel(review(6,[{...card,state:'approved'}]),now),'0 ready');
+  assert.equal(ctx.countLabel({checkedAt:'bogus',items:[card]},now),'— unavailable');
+  assert.equal(ctx.countLabel({checkedAt:new Date(now+120000).toISOString(),items:[card]},now),'— unavailable');
+  assert.equal(ctx.countLabel({checkedAt:review(1).checkedAt,items:null},now),'— unavailable');
+  assert.match(script,/text\('quickVerifyCount',reviewCountLabel\(r\)\)/,
+    'owner review callback must update the tile when an owner decision changes its count');
+  assert.doesNotMatch(script,/quickVerifyCount',reviewFresh\?/);
 });
