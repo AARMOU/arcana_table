@@ -9,7 +9,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class UlamogsNullifierScenarioTest {
-    private fun setup() = customScenario(UlamogsNullifier, "Grizzly Bears", "Sol Ring", "Island", "Rest in Peace", "Dark Ritual", "Carnage Tyrant")
+    private fun setup() = customScenario(UlamogsNullifier, "Grizzly Bears", "Sol Ring", "Island", "Rest in Peace", "Dark Ritual", "Carnage Tyrant", "Counterspell")
 
     /** I cast Bears, then flash in Nullifier holding priority; its ETB targets the Bears spell. */
     private fun GameTestDriver.respondToOwnBears(c: Choices): EntityId {
@@ -95,6 +95,59 @@ class UlamogsNullifierScenarioTest {
             .map { it.entityName }.sorted()
         assertEquals("Both cards must be processed as new exile objects",
             listOf("Island", "Sol Ring"), processed)
+    }
+
+    /**
+     * A genuine Counterspell action removes the already targeted spell while
+     * Nullifier's ETB trigger is waiting on the stack. On resolution its sole
+     * target is illegal, so the entire ability must fail to resolve: it may
+     * neither offer processing nor move either opponent-owned exile object.
+     * No test-state zone mutation is used to remove the targeted spell.
+     */
+    @Test fun targetSpellCounteredBeforeNullifierTriggerResolvesDoesNotProcessExiles() {
+        val d = setup()
+        d.putCardInExile(d.player2, "Sol Ring")
+        d.putCardInExile(d.player2, "Island")
+
+        val bears = d.putCardInHand(d.player1, "Grizzly Bears")
+        d.giveMana(d.player1, Color.GREEN)
+        d.giveColorlessMana(d.player1, 1)
+        assertNull(d.castSpell(d.player1, bears).error)
+        val nullifier = d.putCardInHand(d.player1, "Ulamog's Nullifier")
+        d.giveMana(d.player1, Color.BLUE)
+        d.giveMana(d.player1, Color.BLACK)
+        d.giveColorlessMana(d.player1, 2)
+        assertNull(d.castSpell(d.player1, nullifier).error)
+
+        // Resolve only the creature; select the Bears spell as its ETB target.
+        assertNull(d.bothPass().error)
+        assertTrue("Nullifier ETB must request a spell target",
+            d.state.pendingDecision is com.wingedsheep.engine.core.ChooseTargetsDecision)
+        d.decide(Choices(targets = listOf(bears)))
+        assertNull("Target choice must be complete", d.state.pendingDecision)
+        d.assertStackSize(2)
+
+        // Counterspell, not a state fixture, removes Bears from the stack first.
+        val counterspell = d.putCardInHand(d.player1, "Counterspell")
+        d.giveMana(d.player1, Color.BLUE, 2)
+        assertNull(d.castSpellWithTargets(
+            d.player1, counterspell,
+            listOf(com.wingedsheep.engine.state.components.stack.ChosenTarget.Spell(bears)),
+        ).error)
+        d.resolveAll(Choices(yes = true, pick = listOf("Sol Ring", "Island")))
+
+        assertEquals(1, d.permanentsNamed(d.player1, "Ulamog's Nullifier").size)
+        assertTrue("The target spell was countered by Counterspell",
+            d.getGraveyardCardNames(d.player1).contains("Grizzly Bears"))
+        assertEquals("Illegal ETB target must leave opponent exiles untouched",
+            listOf("Island", "Sol Ring"), d.getExileCardNames(d.player2).sorted())
+        assertTrue("An illegal target cannot process either exiled card",
+            d.getGraveyardCardNames(d.player2).isEmpty())
+        val processed = d.events.filterIsInstance<com.wingedsheep.engine.core.ZoneChangeEvent>()
+            .filter { it.ownerId == d.player2 &&
+                it.fromZone == com.wingedsheep.sdk.core.Zone.EXILE }
+        assertTrue("No exile processing may occur when the ETB target is illegal",
+            processed.isEmpty())
     }
 
     @Test fun opponentsSpellCanBeCounteredAfterProcessingTheirExiledCards() {
