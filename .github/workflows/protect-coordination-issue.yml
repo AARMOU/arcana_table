@@ -19,12 +19,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           EVENT_NAME: ${{ github.event_name }}
-          EVENT_PATH: ${{ github.event_path }}
           REPO: ${{ github.repository }}
         run: |
           node <<'NODE'
           const fs = require('node:fs');
-          const event = JSON.parse(fs.readFileSync(process.env.EVENT_PATH, 'utf8'));
+          const event = JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH, 'utf8'));
           if (process.env.EVENT_NAME === 'issues') {
             if (event.issue?.number === 81) {
               console.error('ALERT: permanent coordination issue #81 was closed. Inspect issue timeline and reopen only after owner authorization.');
