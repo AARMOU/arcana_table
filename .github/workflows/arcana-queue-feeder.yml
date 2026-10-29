@@ -196,8 +196,11 @@ jobs:
             if(!r||published.startsWith('failed')){core.setFailed('Queue status not published ('+published+').');return;}
             if(auto.created||auto.pending)await github.rest.actions.createWorkflowDispatch({...context.repo,workflow_id:'arcana-card-dispatcher.yml',ref:'main',inputs:{dry_run:'false'}});
             // Owner card-review inbox for the app (read-only; approving happens on GitHub). Never blocks the feeder.
-            try{const R=require('./scripts/review-inbox.cjs');const inbox=await R.buildReviewInbox({github,...context.repo});
-              core.info('Review inbox: '+await S.publishStatus({github,...context.repo,kind:'review',payload:inbox,summary:R.inboxSummary(inbox)}));}
+            // The dedicated inbox-refresh and integration workflows always rebuild it; here only when stale,
+            // since each rebuild reads every open card PR against the shared hourly API quota.
+            try{if(await S.freshStatus({github,...context.repo,kind:'review',maxAgeMs:5*60*1000}))core.info('Review inbox fresh; rebuild skipped.');
+              else{const R=require('./scripts/review-inbox.cjs');const inbox=await R.buildReviewInbox({github,...context.repo});
+              core.info('Review inbox: '+await S.publishStatus({github,...context.repo,kind:'review',payload:inbox,summary:R.inboxSummary(inbox)}));}}
             catch(e){core.warning('Review inbox not published: '+e.message);}
             // The card picker's deck/library data is built at Pages deploy time; rebuild it when the base moves.
             if(Q.needsSiteRefresh(previous,payload)){
