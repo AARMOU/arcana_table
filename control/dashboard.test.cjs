@@ -148,7 +148,7 @@ test('closed issues are never shown as candidates and verdict age is shown',()=>
   assert.ok(src.includes("if (info.state !== 'open') {"));
   assert.ok(src.includes('row.remove();'));
   assert.ok(src.includes('function render(container, units, checkedAt)'));
-  assert.ok(html.includes("window.ArcanaAuthorize.render($('authorizationList'),w.list||[],d.checkedAt);"));
+  assert.ok(html.includes("window.ArcanaAuthorize.render($('authorizationList'),d.workers?.list||[],d.checkedAt);"));
 });
 test('stale public feed falls back to fresh GitHub without polling',()=>{
   assert.ok(html.includes("if(res.ok&&isStaleFeed(res)){"));
@@ -178,7 +178,7 @@ test('operations hub replaces marketing banner with real owner review and author
     assert.match(html,new RegExp('id="'+id+'"'),id);
   assert.match(script,/ArcanaReview\?\.openNext\?\.\(\)/);
   assert.match(script,/authorizationList/);
-  assert.match(script,/renderOpsWorkers\(d\)/);
+  assert.match(script,/renderOpsWorkers\(workerReport\)/);
   assert.match(script,/renderDailyCards\(r\)/);
   assert.match(fs.readFileSync(path.join(__dirname,'review.js'),'utf8'),/api\.openNext = \(\) =>/);
   // The top-level action cannot send an owner authorization or review by itself.
@@ -219,7 +219,7 @@ test('dispatcher report age is distinct from page freshness and never implies a 
   assert.ok(script.includes('dispatcher reports working (unconfirmed)'));
   assert.ok(script.includes('reported working'));
   assert.ok(script.includes('not live Copilot telemetry'));
-  assert.ok(script.includes('only a dispatcher run can publish a newer report'));
+  assert.ok(script.includes('GitHub worker observer or dispatcher publishes a newer report'));
   const pure = script.split('// WORKER_FRESHNESS_PURE_START')[1]?.split('// WORKER_FRESHNESS_PURE_END')[0];
   assert.ok(pure);
   const ctx=vm.createContext({});
@@ -328,4 +328,11 @@ test('signed-out card authorization falls back to a fresh public GitHub issue wh
   assert.match(source,/cache: 'no-store', headers: \{ Accept:/);
   assert.match(source,/if \(!direct\?\.ok\) throw Error\('Fresh issue state unavailable'\)/);
   assert.match(source,/button\.disabled = true;[\s\S]*Duplicate approval blocked/);
+});
+
+test('fresh independent worker observations never change dispatcher authorization',()=>{
+  assert.ok(script.includes("d.kind==='workers'"));
+  assert.ok(script.includes("Date.parse(observed.checkedAt)>Date.parse(d.checkedAt)"));
+  assert.ok(script.includes("renderOpsWorkers(workerReport)"));
+  assert.ok(script.includes("window.ArcanaAuthorize.render($('authorizationList'),d.workers?.list||[],d.checkedAt)"));
 });
