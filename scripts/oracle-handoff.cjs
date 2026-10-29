@@ -46,7 +46,7 @@ function appendOracle(body, raw, expectedName) {
     'If your Copilot environment cannot reach Scryfall, use the exact JSONL line below to seed ' +
     'tools/cardkit/data/oracle-cache.jsonl in your isolated working checkout, then run Cardkit ' +
     'offline. Do not guess missing card text or weaken acceptance tests. ' +
-    'Only commit cache changes when needed and justified in your reviewed card PR.\n\n' +
+    'Seed the Oracle record into the cache locally only. Do not commit tools/cardkit/data/oracle-cache.jsonl; card PRs that modify files outside the card, its scenario test, registry and generated assets cannot integrate.\n\n' +
     '    ' + jsonl + '\n';
 }
 
