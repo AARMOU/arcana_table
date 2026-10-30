@@ -52,6 +52,9 @@ jobs:
           SESSION_SECRET: ${{ secrets.REVIEW_SESSION_SECRET }}
           # Optional: read-only token for the public status feed (no repository write scopes).
           PUBLIC_READ_TOKEN: ${{ secrets.REVIEW_PUBLIC_READ_TOKEN }}
+          # Optional: this repository only, Actions read/write only. Lets the Worker's timer start
+          # the review inbox refresh and certification backfill workflows on time.
+          ACTIONS_DISPATCH_TOKEN: ${{ secrets.REVIEW_ACTIONS_DISPATCH_TOKEN }}
         run: |
           set -euo pipefail
           npm install --no-save --no-audit --no-fund wrangler@4.69.0
@@ -62,5 +65,10 @@ jobs:
             printf '%s' "$PUBLIC_READ_TOKEN" | npx wrangler secret put GITHUB_PUBLIC_READ_TOKEN --config control/review-worker/wrangler.toml
           else
             echo 'REVIEW_PUBLIC_READ_TOKEN not set: public feed stays anonymous with a 15-minute cache.'
+          fi
+          if [ -n "${ACTIONS_DISPATCH_TOKEN:-}" ]; then
+            printf '%s' "$ACTIONS_DISPATCH_TOKEN" | npx wrangler secret put GITHUB_ACTIONS_DISPATCH_TOKEN --config control/review-worker/wrangler.toml
+          else
+            echo 'REVIEW_ACTIONS_DISPATCH_TOKEN not set: the Worker timer starts nothing; status refresh relies on GitHub schedules.'
           fi
           echo 'Review Worker deployed. Check https://arcana-review.arcanamtg.workers.dev/health'
