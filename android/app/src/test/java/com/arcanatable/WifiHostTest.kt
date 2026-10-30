@@ -69,7 +69,7 @@ class WifiHostTest {
         val atGuest = LinkedBlockingQueue<JSONObject>()
         val hellos = LinkedBlockingQueue<JSONObject>()
         val left = LinkedBlockingQueue<Boolean>()
-        val server = ArgentumLanServer("Host", onGuest = { hellos.put(it) }, onGuestMessage = { atHost.put(it) }, onGuestLeft = { left.put(true) })
+        val server = ArgentumLanServer("Host", onGuest = { hellos.put(it) }, onGuestMessage = { atHost.put(it) }, onGuestLeft = { left.put(true) }, port = 0)
         val guest = ArgentumLanGuest()
         try {
             server.start()
@@ -77,7 +77,7 @@ class WifiHostTest {
             // than any guess, and a failed bind should say why instead of surfacing as a refused connect.
             assertTrue("host is listening (bind error: ${server.bindError})", server.awaitReady(10_000))
             guest.onMessage = { atGuest.put(it) }
-            guest.connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "Guest").put("deck", JSONArray(listOf("Forest"))))
+            guest.connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "Guest").put("deck", JSONArray(listOf("Forest"))), port = server.localPort)
             val hello = hellos.poll(5, TimeUnit.SECONDS)
             assertEquals("Guest", hello?.optString("name"))
             guest.send(JSONObject().put("type", "submitAction").put("n", 1))
@@ -95,8 +95,8 @@ class WifiHostTest {
     @Test fun portAlreadyInUseIsReportedNotSilent() {
         // Something else holds the game port: the host must say so rather than wait forever.
         java.net.ServerSocket().use { holder ->
-            holder.bind(java.net.InetSocketAddress(ArgentumLan.GAME_PORT))
-            val server = ArgentumLanServer("Host", onGuest = {}, onGuestMessage = {}, onGuestLeft = {})
+            holder.bind(java.net.InetSocketAddress(0))
+            val server = ArgentumLanServer("Host", onGuest = {}, onGuestMessage = {}, onGuestLeft = {}, port = holder.localPort)
             try {
                 server.start()
                 assertFalse("not ready while the port is taken", server.awaitReady(10_000))
