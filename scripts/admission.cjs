@@ -19,6 +19,12 @@ const PICKUP_TIMEOUT_MS = 30 * 60 * 1000;
 // A Copilot session that started but never reported finishing for this long is reported as stale.
 // It keeps its slot (it may still be spending) until it finishes or the owner releases it.
 const SESSION_STALE_MS = 3 * 60 * 60 * 1000;
+// A slot held only by a timeout is released automatically this long after the stuck event (no owner label
+// needed). A never-started assignment spends nothing; a session silent this long is treated as dead. Billing
+// still reserves for it through recentlyFinished until the lag window passes.
+const AUTO_RELEASE_MS = 6 * 60 * 60 * 1000;
+// An interrupted attempt (authorizing record with no result) is resolved automatically after this long.
+const INTERRUPT_AUTO_RESOLVE_MS = 60 * 60 * 1000;
 // Billing can report a finished session's credits late. Finished units count as pending liabilities
 // for this long (owner variable ARCANA_BILLING_LAG_HOURS, 0-72; 0 disables).
 const DEFAULT_BILLING_LAG_HOURS = 24;
@@ -123,9 +129,12 @@ function deriveUnit(unit, now = Date.now(), { lagMs = DEFAULT_BILLING_LAG_HOURS 
   // Interrupted authorizations are never mistaken for repairs.
   const lane = d.holdsSlot ? (d.reason !== 'interrupted' && repairAt > finished ? 'repair' : 'build') : null;
   const recentlyFinished = !d.holdsSlot && finished > -Infinity && now - finished < lagMs;
-  const released = d.holdsSlot && ['pickup-timeout', 'session-stale'].includes(d.reason) &&
-    (unit.labels || []).includes(HALTED_LABEL);
-  if (released) return { ...d, lane: null, holdsSlot: false, reason: 'owner-released', releasedFrom: d.reason, recentlyFinished: false };
+  const timedOut = d.holdsSlot && ['pickup-timeout', 'session-stale'].includes(d.reason);
+  if (timedOut && (unit.labels || []).includes(HALTED_LABEL))
+    return { ...d, lane: null, holdsSlot: false, reason: 'owner-released', releasedFrom: d.reason, recentlyFinished: false };
+  // Reserve billing for an auto-released unit as if it had just finished.
+  if (timedOut && Number.isFinite(d.since) && now - d.since > AUTO_RELEASE_MS)
+    return { ...d, lane: null, holdsSlot: false, reason: 'auto-released', releasedFrom: d.reason, recentlyFinished: now - d.since < AUTO_RELEASE_MS + lagMs };
   return { ...d, lane, recentlyFinished };
 }
 
@@ -144,12 +153,12 @@ function deriveState(unit, now) {
   const finished = latest(sessions, s => s.event === 'finished');
   const repairAt = latest(ledger, r => r.op === 'repair-request');
   if (started > -Infinity && started > finished) {
-    return now - started > SESSION_STALE_MS ? { ...base, state: 'halted', reason: 'session-stale', holdsSlot: true }
+    return now - started > SESSION_STALE_MS ? { ...base, state: 'halted', reason: 'session-stale', holdsSlot: true, since: started }
       : { ...base, state: 'working', holdsSlot: true };
   }
   if (repairAt > -Infinity && !(finished > repairAt)) {
     const late = now - repairAt > PICKUP_TIMEOUT_MS && !(started > repairAt);
-    return late ? { ...base, state: 'halted', reason: 'pickup-timeout', holdsSlot: true }
+    return late ? { ...base, state: 'halted', reason: 'pickup-timeout', holdsSlot: true, since: repairAt }
       : { ...base, state: 'repairing', holdsSlot: true };
   }
   const maybePaid = ['confirmed', 'error', 'not-confirmed'];
@@ -159,7 +168,7 @@ function deriveState(unit, now) {
   if (assigned && !(started > -Infinity && (paidAt === -Infinity || started >= paidAt))) {
     // Never picked up. A timed-out pickup keeps its slot until the owner reviews it.
     const late = paidAt > -Infinity ? now - paidAt > PICKUP_TIMEOUT_MS : true;
-    return late ? { ...base, state: 'halted', reason: 'pickup-timeout', holdsSlot: true }
+    return late ? { ...base, state: 'halted', reason: 'pickup-timeout', holdsSlot: true, ...(paidAt > -Infinity ? { since: paidAt } : {}) }
       : { ...base, state: 'pending-pickup', holdsSlot: true };
   }
   if (ledger.some(r => r.op === 'halt') || (unit.labels || []).includes(HALTED_LABEL))
@@ -361,6 +370,6 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
 }
 
 module.exports = { LEDGER, AUTO_QUEUE_MARKER, SUITE_TITLE, SUITE_MARKER, SUITE_BASE, suiteActionable, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
-  SESSION_STALE_MS, DEFAULT_BILLING_LAG_HOURS,
+  SESSION_STALE_MS, AUTO_RELEASE_MS, INTERRUPT_AUTO_RESOLVE_MS, DEFAULT_BILLING_LAG_HOURS,
   readiness, formatLedger, parseLedger, deriveUnit, unitActionable, budgetWithReservations, admit, isBot,
   provenance, trustedCommenter, TRUSTED_ASSOCIATIONS };

@@ -298,3 +298,29 @@ test('a certified card PR integration cannot take is not offered for Verify, wit
   const row = { ...unregistered, state: 'certified', certifiedAt: new Date(now - 30 * 36e5).toISOString() };
   assert.deepEqual(R.stalls({ items: [row] }, now).map(i => i.pr), [row.pr], 'a certified but unintegrable card still stalls');
 });
+
+test('stall report times the GPT engine lane (48h) and the B140 build trigger (72h), with owners', async () => {
+  const now = Date.parse('2026-10-30T12:00:00Z'), h = n => new Date(now - n * 36e5).toISOString();
+  const comments = [];
+  const open = [
+    { number: 50, title: '[Card Work] Nullifier — engine-work', updated_at: h(49) },
+    { number: 51, title: '[Arcana Queue] Foo — Cardkit SUPPORTED, unclaimed', labels: [{ name: 'arcana:engine-gap' }], updated_at: h(60) },
+    { number: 52, title: '[Arcana Queue] Bar — Cardkit SUPPORTED, unclaimed', labels: [{ name: 'arcana:engine-gap' }], updated_at: h(10) },
+    { number: 53, title: '[Arcana Queue] Baz — Cardkit SUPPORTED, unclaimed', labels: [], updated_at: h(99) },
+  ];
+  let release = { tag_name: 'B140', published_at: h(100) }, headDate = h(80);
+  const github = { rest: {
+      issues: { listComments() {}, listForRepo() {}, createComment: async ({ body }) => comments.push({ user: { login: 'github-actions[bot]', type: 'Bot' }, body }) },
+      repos: { getBranch: async () => ({ data: { commit: { sha: 'f'.repeat(40), commit: { committer: { date: headDate } } } } }),
+        getLatestRelease: async () => ({ data: release }) } },
+    paginate: async fn => fn === github.rest.issues.listForRepo ? open : comments };
+  assert.equal(await R.reportStalls({ github, owner: 'o', repo: 'r', payload: { items: [] }, now }), 'posted 0');
+  const body = comments[0].body;
+  assert.match(body, /^stalls: lane#50 lane#51 build@ffffffffffff$/m);
+  assert.match(body, /#50 .*\*\*Owner:\*\* Work GPT \(engine lane\)/);
+  assert.match(body, /B140 `ffffffffff` .*latest: B140.*\*\*Owner:\*\* AARMOU \(build\)/);
+  // A release newer than B140's head clears the build line.
+  release = { tag_name: 'B141', published_at: h(1) };
+  assert.equal(await R.reportStalls({ github, owner: 'o', repo: 'r', payload: { items: [] }, now }), 'posted 0');
+  assert.match(comments[1].body, /^stalls: lane#50 lane#51$/m);
+});

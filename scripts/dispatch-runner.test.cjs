@@ -224,3 +224,27 @@ test('an edited or person-written suite request is never assigned', async () => 
   assert.equal((await run(forged, { ARCANA_DISPATCH_MODE: 'normal' }, { fetchImpl: fetchOk(calls) })).state, 'nothing-eligible');
   assert.equal(calls.length, 0);
 });
+
+test('an interrupted attempt older than an hour is resolved automatically, never retried', async () => {
+  const old = new Date(Date.now() - 2 * 3600e3).toISOString();
+  const f = fake({ issues: [queue(68)], ledger: { 68: [bot(A.formatLedger({ op: 'authorizing', issue: 68, run: '1', at: old }))] } });
+  const calls = [];
+  const r = await run(f, { ARCANA_DISPATCH_MODE: 'normal' }, { fetchImpl: fetchOk(calls) });
+  assert.equal(r.state, 'interruption-resolved'); assert.equal(calls.length, 0);
+  assert.match(f.writes[0][2], /op:resolution\nissue:68\nrun:1\nresult:not-assigned\nreason:owner-label by dispatcher-timeout/);
+  assert.ok(!f.writes.some(w => w[0] === 'removeLabel'));
+  const fresh = fake({ issues: [queue(68)], ledger: { 68: [bot(A.formatLedger({ op: 'authorizing', issue: 68, run: '1', at: new Date().toISOString() }))] } });
+  assert.equal((await run(fresh, { ARCANA_DISPATCH_MODE: 'normal' }, { fetchImpl: fetchOk(calls) })).state, 'interrupted-attempt');
+});
+
+test('engine gap: Copilot finished, commented, no PR -> candidate; otherwise not', () => {
+  const { engineGapCandidates } = require('./dispatch-runner.cjs');
+  const now = Date.now(), u = (over = {}) => ({ prs: [], derived: { state: 'review' }, raw: { title: '[Arcana Queue] X', labels: [],
+    commenters: [{ login: 'Copilot', type: 'Bot' }], sessions: [{ event: 'started', at: now - 3e6 }, { event: 'finished', at: now - 2e6 }], ...over } });
+  assert.equal(engineGapCandidates([u()], now).length, 1);
+  assert.equal(engineGapCandidates([u({ commenters: [] })], now).length, 0, 'no Copilot explanation');
+  assert.equal(engineGapCandidates([{ ...u(), prs: [{ number: 1 }] }], now).length, 0, 'has a PR');
+  assert.equal(engineGapCandidates([u({ labels: ['arcana:engine-gap'] })], now).length, 0, 'already labeled');
+  assert.equal(engineGapCandidates([u({ sessions: [{ event: 'started', at: now - 60e3 }] })], now).length, 0, 'still working');
+  assert.equal(engineGapCandidates([u({ title: '[Arcana Suite] X' })], now).length, 0, 'suites are not cards');
+});

@@ -240,6 +240,25 @@ const STALL_RULES = {
 const ENGINE_STALL_HOURS = 24;
 const isBlockedUpgrade = i => !i.pull_request && i.user?.login === 'github-actions[bot]' && i.user?.type === 'Bot' &&
   /^Weekly Argentum upgrade to [0-9a-f]+/.test(String(i.title || '')) && / \(needs work\)$/.test(String(i.title || ''));
+// GPT engine lane: feeder-opened [Card Work] issues and queue units labeled arcana:engine-gap (Copilot could
+// not implement them). Owner Work GPT, deadline LANE_HOURS from when the work arrived in the lane.
+const LANE_HOURS = 48;
+const inGptLane = i => !i.pull_request && (String(i.title || '').startsWith('[Card Work] ') ||
+  (String(i.title || '').startsWith('[Arcana Queue]') && (i.labels || []).some(l => (l?.name || l) === 'arcana:engine-gap')));
+// Owner build trigger: B140 has changes no published release contains, for longer than BUILD_HOURS.
+const B140_BRANCH = 'gpt/b140-card-request-test-apk-20261028';
+const BUILD_HOURS = 72;
+async function unreleasedBuild({ github, owner, repo, now }) {
+  const head = (await github.rest.repos.getBranch({ owner, repo, branch: B140_BRANCH })).data.commit;
+  let release = null;
+  try { release = (await github.rest.repos.getLatestRelease({ owner, repo })).data; } catch {}
+  const releasedAt = Date.parse(release?.published_at || '');
+  const since = Number.isFinite(releasedAt) ? releasedAt : Date.parse(head.commit?.committer?.date || '');
+  const changedAt = Date.parse(head.commit?.committer?.date || '');
+  if (!(changedAt > (Number.isFinite(releasedAt) ? releasedAt : -Infinity))) return null;
+  const hours = (now - since) / 36e5;
+  return hours >= BUILD_HOURS ? { sha: head.sha, hours, release: release?.tag_name || null } : null;
+}
 function stalls(payload, now = Date.now()) {
   return (payload?.items || []).filter(i => i?.kind === 'card' && STALL_RULES[i.state] && Number.isSafeInteger(i.pr))
     .map(i => ({ ...i, hours: (now - Date.parse((i.state === 'certified' && i.certifiedAt) || (i.state === 'approved' && i.approvedAt) || i.updatedAt || '')) / 36e5 }))
@@ -251,7 +270,13 @@ async function reportStalls({ github, owner, repo, payload, issue = 78, now = Da
   const open = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
   const engine = open.filter(isBlockedUpgrade).map(i => ({ n: i.number, title: i.title, hours: (now - Date.parse(i.created_at || '')) / 36e5 }))
     .filter(e => Number.isFinite(e.hours) && e.hours >= ENGINE_STALL_HOURS).sort((a, b) => a.n - b.n);
-  const keys = [...engine.map(e => 'engine#' + e.n), ...list.map(i => i.pr + '@' + String(i.headSha).slice(0, 12) + ':' + i.state)].join(' ');
+  // Lane age: when the engine-gap label was applied is not in the issue list; the issue's creation (or last
+  // label change, via updated_at as an upper bound) is used, so a lane item is never reported early.
+  const lane = open.filter(inGptLane).map(i => ({ n: i.number, title: i.title, hours: (now - Date.parse(i.updated_at || i.created_at || '')) / 36e5 }))
+    .filter(e => Number.isFinite(e.hours) && e.hours >= LANE_HOURS).sort((a, b) => a.n - b.n).slice(0, 20);
+  let build = null;
+  try { build = await unreleasedBuild({ github, owner, repo, now }); } catch {}
+  const keys = [...engine.map(e => 'engine#' + e.n), ...lane.map(e => 'lane#' + e.n), ...(build ? ['build@' + build.sha.slice(0, 12)] : []), ...list.map(i => i.pr + '@' + String(i.headSha).slice(0, 12) + ':' + i.state)].join(' ');
   const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: issue, per_page: 100 });
   const previous = [...comments].reverse().find(c => c.user?.login === 'github-actions[bot]' && c.user?.type === 'Bot' && String(c.body || '').startsWith(STALL_MARKER));
   const before = String(previous?.body || '').match(/^stalls: (.*)$/m)?.[1] ?? null;
@@ -261,6 +286,10 @@ async function reportStalls({ github, owner, repo, payload, issue = 78, now = Da
       : 'Nothing is stalled.', '',
     ...engine.map(e => `- #${e.n} ${String(e.title).replace(/[@\r\n]/g, ' ').slice(0, 70)}: blocked engine upgrade for ${Math.floor(e.hours)}h. ` +
       '**Owner:** Claude (engine lane). **Next:** fix on a `gpt/argentum-weekly-fix-*` branch per `engine-upgrade/HANDOFF.md`, dry run green, then merge into `gpt/arcana-integration-next`.'),
+    ...lane.map(e => `- #${e.n} ${String(e.title).replace(/[@\r\n]/g, ' ').slice(0, 70)}: in the GPT engine lane with no activity for ${Math.floor(e.hours)}h (deadline ${LANE_HOURS}h). ` +
+      '**Owner:** Work GPT (engine lane). **Next:** add the engine support the card needs on `gpt/arcana-integration-next`, then remove `arcana:engine-gap` (or close the [Card Work] issue) so the card returns to Copilot; or comment why it cannot be done.'),
+    ...(build ? [`- B140 \`${build.sha.slice(0, 10)}\` has integrated changes not in any release${build.release ? ' (latest: ' + build.release + ')' : ''} for ${Math.floor(build.hours)}h (trigger ${BUILD_HOURS}h). ` +
+      '**Owner:** AARMOU (build). **Next:** cut the next numbered build from B140 per the B141 checklist in `docs/stabilization/CONTROL-PLAN.md` and publish it as a GitHub release, which clears this line.'] : []),
     ...list.map(i => `- #${i.pr} ${String(i.card || 'card').replace(/[@\r\n]/g, ' ').slice(0, 60)}: ${STALL_RULES[i.state].text} for ${Math.floor(i.hours)}h. ` +
       (i.shapeProblem ? '**Owner:** card lane (Copilot / Work GPT / Goose). **Next:** complete the PR to the card-only file set'
         : `**Owner:** ${STALL_RULES[i.state].who}. **Next:** ${STALL_RULES[i.state].next}`) +
@@ -270,4 +299,4 @@ async function reportStalls({ github, owner, repo, payload, issue = 78, now = Da
 }
 
 module.exports = { classify, classifyChangeFiles, isReadyForOwner, inboxPayload, inboxSummary, buildReviewInbox, abilitiesOf, alertReady, READY_MARKER,
-  stalls, reportStalls, STALL_MARKER };
+  stalls, reportStalls, STALL_MARKER, inGptLane, unreleasedBuild, LANE_HOURS, BUILD_HOURS };
