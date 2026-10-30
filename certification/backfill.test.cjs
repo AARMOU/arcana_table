@@ -13,13 +13,14 @@ function mock({ prs, checks = {}, runs = {} }) {
   const github = {
     rest: { pulls: { list() {} }, checks: { listForRef() {} },
       actions: { listWorkflowRunsForRepo: async ({ head_sha }) => ({ data: { workflow_runs: runs[head_sha] || [] } }),
-        reRunWorkflow: async ({ run_id }) => { reruns.push(run_id); } } },
+        reRunWorkflow: async ({ run_id }) => { reruns.push(run_id); },
+        reRunWorkflowFailedJobs: async ({ run_id }) => { reruns.push('failed:' + run_id); } } },
     paginate: async (fn, args) => fn === github.rest.pulls.list ? prs : (checks[args.ref] || []),
   };
   return { github, reruns };
 }
-const run = (id, name, head_sha, conclusion = 'success', created_at = '2026-10-29T10:00:00Z') =>
-  ({ id, name, head_sha, conclusion, created_at });
+const run = (id, name, head_sha, conclusion = 'success', created_at = '2026-10-29T10:00:00Z', run_attempt = 1) =>
+  ({ id, name, head_sha, conclusion, created_at, run_attempt });
 
 test('re-runs the newest successful CI of an uncertified card PR, once', async () => {
   const s = manifest.suites[0], pr = prFor(s), h = pr.head.sha;
@@ -46,8 +47,24 @@ test('a look-alike check or no successful CI never triggers a re-run', async () 
   const s = manifest.suites[0], pr = prFor(s), h = pr.head.sha;
   const { github, reruns } = mock({ prs: [pr],
     checks: { [h]: [{ name: P.CHECK_NAME, head_sha: h, conclusion: 'success', app: { slug: 'evil-app' } }] },
-    runs: { [h]: [run(5, 'Arcana Cardkit', h, 'failure')] } });
+    runs: { [h]: [run(5, 'Arcana Cardkit', h, 'failure', undefined, 2)] } });
   const r = await backfill({ github, owner: 'o', repo: 'r', root: __dirname + '/..' });
   assert.deepEqual(reruns, []);
-  assert.equal(r[0].reason, 'no successful CI run on head');
+  assert.equal(r[0].reason, 'CI failed after one retry');
+});
+
+test('failed CI with no green run is retried once, newest first', async () => {
+  const s = manifest.suites[0], pr = prFor(s), h = pr.head.sha;
+  const { github, reruns } = mock({ prs: [pr], runs: { [h]: [run(6, 'Arcana Cardkit', h, 'failure', '2026-10-29T09:00:00Z'),
+    run(7, 'Arcana Development CI', h, 'timed_out', '2026-10-29T11:00:00Z'), run(8, 'Arcana Cardkit', h, 'cancelled', '2026-10-29T12:00:00Z')] } });
+  const r = await backfill({ github, owner: 'o', repo: 'r', root: __dirname + '/..', scheduled: true });
+  assert.deepEqual(reruns, ['failed:7']);
+  assert.equal(r[0].retry, 'failed-jobs');
+});
+
+test('scheduled runs never re-run green CI', async () => {
+  const s = manifest.suites[0], pr = prFor(s), h = pr.head.sha;
+  const { github, reruns } = mock({ prs: [pr], runs: { [h]: [run(9, 'Arcana Cardkit', h)] } });
+  await backfill({ github, owner: 'o', repo: 'r', root: __dirname + '/..', scheduled: true });
+  assert.deepEqual(reruns, []);
 });
