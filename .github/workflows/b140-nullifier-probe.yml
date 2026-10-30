@@ -61,12 +61,12 @@ jobs:
       matrix:
         include:
           - label: b140-control
-            ref: a40935674ce3787388bf79e4106622e08d8252f6
+            ref: dea80c3c44e5b79140fc0a3108ba9d94c20339b1
           # Independent JVM/workspace replay of the *same* B140 source, test fixture,
           # seed and shuffled deck. Different results between these two controls
           # demonstrate nondeterminism without attributing it to Nullifier.
           - label: b140-control-replay
-            ref: a40935674ce3787388bf79e4106622e08d8252f6
+            ref: dea80c3c44e5b79140fc0a3108ba9d94c20339b1
           - label: nullifier-candidate
             ref: ${{ github.sha }}
     steps:
@@ -78,6 +78,17 @@ jobs:
         run: |
           git rev-parse HEAD
           git diff --exit-code
+      - name: Reject stale B140 control refs before interpreting differential
+        if: matrix.label != 'nullifier-candidate'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin gpt/b140-card-request-test-apk-20261028
+          live=$(git rev-parse FETCH_HEAD)
+          pinned=$(git rev-parse HEAD)
+          if [ "$live" != "$pinned" ]; then
+            echo "::error::B140 source advanced ($pinned -> $live); update both controls and rerun."
+            exit 1
+          fi
       - name: Use the same diagnostic-only AI mirror test on both engine sources
         # The integrated B140 fixture already has deterministic engine seeds and
         # strict per-action state replay. Overlay the same exact fixture on controls.
