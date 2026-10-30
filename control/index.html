@@ -50,6 +50,19 @@
     .assignment-links a{border:1px solid var(--line);border-radius:10px;padding:8px 12px;color:var(--teal);font-size:12px;font-weight:730;text-decoration:none}
     .assignment-links a:hover{background:var(--surface2)}
     .assignment-links a[hidden]{display:none}
+    .card-progress{margin-bottom:19px;padding:15px 18px;background:var(--surface);border:1px solid var(--line);border-radius:16px}
+    .card-progress-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.card-progress-head h2{font-size:14px;margin:0;font-weight:750}
+    .card-progress-select{max-width:100%;min-width:0;flex:0 1 340px;background:var(--surface2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit;font-size:13px;min-height:38px}
+    .card-progress-select:focus-visible{outline:2px solid var(--teal);outline-offset:3px}.card-progress-select[hidden],.card-progress-route[hidden],.card-progress-goose[hidden]{display:none}
+    .card-progress-route{position:relative;min-height:72px;margin-top:10px}.card-progress-line,.card-progress-fill{position:absolute;top:23px;left:8.333333%;height:3px;border-radius:2px}
+    .card-progress-line{width:83.333333%;background:var(--line)}.card-progress-fill{width:0;background:var(--teal);transition:width 350ms ease}
+    .card-progress-goose{position:absolute;top:24.5px;left:8.333333%;transform:translate(-50%,-50%);width:24px;height:24px;font-size:22px;line-height:24px;text-align:center;background:transparent;z-index:2;transition:left 350ms ease}
+    .card-progress-stages{position:relative;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));list-style:none;padding:16px 0 0;margin:0}.card-progress-stage{display:flex;flex-direction:column;align-items:center;gap:10px;min-width:0;text-align:center;color:var(--muted);font-size:11px}
+    .card-progress-dot{width:17px;height:17px;display:grid;place-items:center;border-radius:50%;background:var(--line);color:var(--bg)}.card-progress-stage.complete .card-progress-dot{background:var(--teal)}.card-progress-stage.current .card-progress-dot{visibility:hidden}.card-progress-stage.current{color:var(--ink);font-weight:750}
+    .card-progress-stage>span:last-child{max-width:100%;padding:0 2px}
+    .card-progress-status{font-size:12px;margin:3px 0 0;overflow-wrap:anywhere}.card-progress-fresh{font-size:11px;color:var(--muted);margin:5px 0 0;overflow-wrap:anywhere}.card-progress-fresh a{color:var(--teal)}
+    @media(max-width:720px){.card-progress{padding:14px 10px}.card-progress-select{flex-basis:100%;font-size:16px;min-height:44px}}
+    @media(prefers-reduced-motion:reduce){.card-progress-goose,.card-progress-fill{transition:none}}
   </style>
 </head>
 <body>
@@ -79,6 +92,23 @@
       <main class="page" id="main">
         <section id="overview" class="view" aria-labelledby="overviewTitle">
           <div class="page-heading"><div><div class="eyebrow" id="todayLabel">ARCANA TABLE // CONTROL</div><h1 id="overviewTitle">Mission overview<span style="color:var(--teal)">.</span></h1><p>Your development command center, one glance at a time.</p></div><div class="statusline" role="status"><span class="pulse" id="connectionDot"></span><span id="connectionText">Connecting to GitHub…</span></div></div>
+          <section class="card-progress" aria-labelledby="cardProgressTitle">
+            <div class="card-progress-head"><h2 id="cardProgressTitle">Card progress</h2><select class="card-progress-select" id="cardProgressSelect" aria-label="Card to track" hidden></select></div>
+            <div class="card-progress-route" id="cardProgressRoute" hidden>
+              <div class="card-progress-line" aria-hidden="true"></div><div class="card-progress-fill" id="cardProgressFill" aria-hidden="true"></div>
+              <span class="card-progress-goose" id="cardProgressGoose" aria-hidden="true">🪿</span>
+              <ol class="card-progress-stages" aria-label="Card integration stages">
+                <li class="card-progress-stage"><span class="card-progress-dot" aria-hidden="true"></span><span>Code</span></li>
+                <li class="card-progress-stage"><span class="card-progress-dot" aria-hidden="true"></span><span>Tests</span></li>
+                <li class="card-progress-stage"><span class="card-progress-dot" aria-hidden="true"></span><span>Certi<wbr>fied</span></li>
+                <li class="card-progress-stage"><span class="card-progress-dot" aria-hidden="true"></span><span>Ap<wbr>proved</span></li>
+                <li class="card-progress-stage"><span class="card-progress-dot" aria-hidden="true"></span><span>Inte<wbr>grate</span></li>
+                <li class="card-progress-stage"><span class="card-progress-dot" aria-hidden="true"></span><span>App ready</span></li>
+              </ol>
+            </div>
+            <p class="card-progress-status" id="cardProgressStatus" role="status">Checking card progress…</p>
+            <p class="card-progress-fresh" id="cardProgressFresh">App ready means integrated into Android source, ready for an APK build.</p>
+          </section>
           <section class="ops-hub" aria-label="Card operations">
             <div class="ops-header"><div><div class="hero-label">ARCANA CONTROL · OWNER-GATED OPERATIONS</div><h2>Card operations</h2></div><a href="https://github.com/AARMOU/arcana_table/issues/81" target="_blank" rel="noopener noreferrer" class="more-link">Coordination #81 ↗</a></div>
             <div class="ops-grid">
@@ -178,6 +208,85 @@
       const e = (tag, cls, value) => { const node=document.createElement(tag); if(cls) node.className=cls; if(value!==undefined) node.textContent=value; return node; };
       const safelyLink = url => typeof url === 'string' && url.startsWith(ROOT + '/') ? url : ROOT;
       const timeAgo = input => { const time=Date.parse(input); if(!Number.isFinite(time)) return 'time unknown'; const n=Math.max(0,Math.floor((Date.now()-time)/60000)); if(n<1)return 'just now'; if(n<60)return n+'m ago'; if(n<1440)return Math.floor(n/60)+'h ago'; return Math.floor(n/1440)+'d ago'; };
+      // CARD_PROGRESS_PURE_START
+      function cardProgressState(item){
+        const sha=/^[0-9a-f]{40}$/;
+        if(item?.kind!=='card'||!Number.isSafeInteger(item.pr)||item.pr<=0||!sha.test(item.headSha||''))return null;
+        const receipt=item.integration;
+        const matching=receipt?.pr===item.pr&&receipt.sourceSha===item.headSha&&['approved','integrated'].includes(item.state);
+        if(matching&&receipt.status==='integrated'&&sha.test(receipt.destinationSha||'')&&typeof receipt.target==='string'&&receipt.target.length&&Number.isFinite(Date.parse(receipt.at)))
+          return {step:5,label:'App ready · integrated into Android source',url:receipt.runUrl};
+        if(matching&&receipt.status==='blocked')
+          return {step:4,label:'Integration blocked · '+String(receipt.reason||'Inspect destination tests').slice(0,220),url:receipt.runUrl};
+        // A merged PR alone does not prove a forward-port to the Android destination.
+        if(item.state==='integrated')return {step:0,label:'PR merged · Android integration receipt unavailable'};
+        if(item.state==='changes-requested')return {step:0,label:'Changes requested · implementation needs repair'};
+        if(item.certification==='failed')return {step:2,label:'Independent certification failed · rules review needed'};
+        if(item.state==='checks-failed')return {step:1,label:'Tests failed · repair needed'};
+        if(item.certification==='certified'){
+          if(item.state==='approved')return {step:3,label:'Approved · awaiting confirmed integration'};
+          return {step:2,label:'Certified · awaiting owner verification'};
+        }
+        if(item.certification==='running')return {step:2,label:'Independent certification running'};
+        const checks=item.checks||{};
+        const tested=['toolkit','cards-and-android'].every(name=>checks[name]==='success');
+        if(tested)return {step:1,label:'Tests passed · awaiting independent certification'};
+        const results=Object.entries(checks).filter(([name])=>!['suggest','publish','observe','copilot','publish-oracle-cache'].includes(name));
+        if(results.length)return {step:1,label:'Checks pending or incomplete · inspect CI'};
+        return {step:0,label:'Implementation PR · test evidence not yet reported'};
+      }
+      function cardProgressItems(report){
+        const items=Array.isArray(report?.items)?report.items:[];
+        const rank=i=>i.integration?.status==='blocked'&&i.integration.sourceSha===i.headSha?0:i.state==='approved'?1:i.state==='certified'?2:i.state==='integrated'?4:3;
+        return items.filter(i=>cardProgressState(i)).slice().sort((a,b)=>rank(a)-rank(b)||(Date.parse(b.updatedAt)||0)-(Date.parse(a.updatedAt)||0)||b.pr-a.pr);
+      }
+      // CARD_PROGRESS_PURE_END
+      let cardProgressReport=null,cardProgressSelection=null;
+      const cardProgressDecisions=new Map();
+      function renderCardProgress(report){
+        const available=Array.isArray(report?.items);
+        if(available)cardProgressReport=report;
+        const current=cardProgressReport;
+        const items=cardProgressItems(current).map(item=>{
+          const local=cardProgressDecisions.get(item.pr);
+          if(!local)return item;
+          if(local.sha!==item.headSha||Date.parse(current.checkedAt)>local.at){cardProgressDecisions.delete(item.pr);return item;}
+          return {...item,state:local.state};
+        });
+        const select=$('cardProgressSelect');
+        select.replaceChildren();
+        items.forEach(item=>{const option=e('option','',String(item.card||'Card')+' · #'+item.pr);option.value=String(item.pr);select.append(option);});
+        const item=items.find(i=>i.pr===cardProgressSelection)||items[0];
+        select.hidden=!item;
+        $('cardProgressRoute').hidden=!item;
+        if(!item){text('cardProgressStatus',available?'No card implementations in the current review feed.':'Card progress unavailable · waiting for review data.');text('cardProgressFresh','No stage inferred without card evidence.');return;}
+        select.value=String(item.pr);
+        const state=cardProgressState(item);
+        const stages=Array.from($('cardProgressRoute').querySelectorAll('.card-progress-stage'));
+        stages.forEach((stage,i)=>{
+          stage.classList.toggle('complete',i<state.step);stage.classList.toggle('current',i===state.step);
+          if(i===state.step)stage.setAttribute('aria-current','step');else stage.removeAttribute('aria-current');
+          stage.querySelector('.card-progress-dot').textContent=i<state.step?'✓':'';
+        });
+        $('cardProgressGoose').style.left=(100/12+state.step*100/6)+'%';
+        $('cardProgressFill').style.width=(state.step*100/6)+'%';
+        text('cardProgressStatus',state.label);
+        const checked=Date.parse(current.checkedAt||'');
+        const freshness=!available?'Feed unavailable · last recorded status':!Number.isFinite(checked)?'Report time unknown':Date.now()-checked>15*60*1000?'Old snapshot · '+timeAgo(current.checkedAt):'Reported '+timeAgo(current.checkedAt);
+        const fresh=$('cardProgressFresh');fresh.replaceChildren();
+        fresh.append(e('span','',freshness+' · '));
+        const link=e('a','','#'+item.pr+' · '+String(item.headSha).slice(0,7));
+        link.href=safelyLink(state.url||ROOT+'/pull/'+item.pr);link.target='_blank';link.rel='noopener noreferrer';fresh.append(link);
+        if(state.step===5)fresh.append(e('span','',' · Ready for an APK build; no APK implied.'));
+      }
+      function cardReviewChanged(report){
+        for(const item of report.items||[]){
+          if(item.kind==='card'&&['approved','changes-requested'].includes(item.state))
+            cardProgressDecisions.set(item.pr,{sha:item.headSha,state:item.state,at:Date.now()});
+        }
+        reviewBadge(report);renderCardProgress(report);
+      }
+      $('cardProgressSelect').addEventListener('change',()=>{cardProgressSelection=Number($('cardProgressSelect').value);renderCardProgress(cardProgressReport);});
       // DAILY_CARDS_PURE_START
       function dayKeyDenver(input){
         const d=new Date(input);
@@ -527,9 +636,9 @@
         text('quickVerifyCount',reviewCountLabel(r));
         const badge=$('reviewBadge');badge.textContent=n?n+' to verify':'Nothing waiting';badge.className='tag '+(n?'blue':'gray');
         document.title=(n?'('+n+') ':'')+document.title.replace(/^\(\d+\) /,'');try{if(navigator.setAppBadge)(n?navigator.setAppBadge(n):navigator.clearAppBadge()).catch(()=>{});}catch{}}
-      function renderReview(st){const r=st.review?.data;const list=$('reviewList');if(!r||!Array.isArray(r.items))return;list.replaceChildren();reviewBadge(r);renderDailyCards(r);
+      function renderReview(st){const r=st.review?.data;renderCardProgress(r);const list=$('reviewList');if(!r||!Array.isArray(r.items))return;list.replaceChildren();reviewBadge(r);renderDailyCards(r);
         // Phase 2: tap a card for details and Approve / Request Fix (control/review.js); links remain as fallback.
-        if(window.ArcanaReview?.render){window.ArcanaReview.render(list,r,reviewBadge);return;}
+        if(window.ArcanaReview?.render){window.ArcanaReview.render(list,r,cardReviewChanged);return;}
         if(!r.items.length){list.append(e('div','empty','No Copilot work PRs in the review feed.'));return;}
         for(const i of r.items){if(!Number.isSafeInteger(i?.pr))continue;const href=ROOT+'/pull/'+i.pr+'/files';const checks=Object.entries(i.checks||{}).map(([k,v])=>k+' '+v).join(' · ');
           addRow(list,'#'+i.pr+' '+String(i.card||'Work').slice(0,120),(i.kind||'unclassified')+' · '+(checks||'no checks yet')+' · head '+String(i.headSha||'').slice(0,7)+' · '+timeAgo(r.checkedAt),href,window.ArcanaReview?.isReadyForOwner?.(i)?{klass:'success',tag:'blue',label:'Ready'}:{klass:'neutral',tag:'gray',label:'Not ready'});}}
@@ -547,6 +656,7 @@
             controlLastRead=Date.now();controlLastError=null;
           }catch(err){
             controlLastError=String(err?.message||err).slice(0,110);
+            renderCardProgress(null);
             text('readyDetail','Status feed unavailable: '+controlLastError);
             if(!summaryOnly)void fetchCopilotAssignment(null);
           }finally{updateWorkerFreshness();}

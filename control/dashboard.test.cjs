@@ -5,6 +5,50 @@ const vm=require('node:vm');
 const path=require('node:path');
 const html=fs.readFileSync(path.join(__dirname,'index.html'),'utf8');
 const script=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
+const progressSource=script.split('// CARD_PROGRESS_PURE_START')[1]?.split('// CARD_PROGRESS_PURE_END')[0];
+function progressHelpers(){
+  const context=vm.createContext({});
+  vm.runInContext(progressSource,context);
+  return {state:vm.runInContext('cardProgressState',context),items:vm.runInContext('cardProgressItems',context)};
+}
+const progressCard={pr:463,kind:'card',headSha:'a'.repeat(40),hasTest:true,state:'awaiting-review',checks:{toolkit:'success','cards-and-android':'success'},certification:'not-run'};
+test('goose tracker follows certification and exact-head approval, not green CI alone',()=>{
+  const {state}=progressHelpers();
+  assert.equal(state(progressCard).step,1);
+  assert.equal(state({...progressCard,state:'certified',certification:'certified'}).step,2);
+  assert.equal(state({...progressCard,state:'approved',certification:'certified'}).step,3);
+  assert.equal(state({...progressCard,state:'changes-requested',certification:'certified'}).step,0);
+  assert.equal(state({...progressCard,headSha:'b'.repeat(40),state:'checks-running',certification:'not-run',checks:{}}).step,0,'new head never inherits old progress');
+  assert.equal(state({...progressCard,kind:'engine'}),null);
+  assert.equal(state({...progressCard,headSha:'bad'}),null);
+});
+test('only a matching Android receipt reaches app ready; merged PRs and old receipts do not',()=>{
+  const {state}=progressHelpers();
+  const card={...progressCard,state:'approved',certification:'certified'};
+  const receipt={pr:463,sourceSha:card.headSha,status:'integrated',destinationSha:'d'.repeat(40),target:'gpt/b140-card-request-test-apk-20261028',at:'2026-10-29T23:21:11Z'};
+  assert.equal(state({...card,state:'integrated'}).step,0,'a generic merged PR is insufficient');
+  assert.equal(state({...card,integration:receipt}).step,5);
+  assert.equal(state({...card,integration:{...receipt,sourceSha:'b'.repeat(40)}}).step,3);
+  assert.equal(state({...card,integration:{...receipt,pr:465}}).step,3);
+  assert.equal(state({...card,integration:{...receipt,destinationSha:null}}).step,3);
+  const blocked=state({...card,integration:{...receipt,status:'blocked',reason:'custom-and-android failed'}});
+  assert.equal(blocked.step,4);assert.match(blocked.label,/Integration blocked/);
+});
+test('tracker prioritizes pending approved cards and excludes blocker-only rows',()=>{
+  const {items}=progressHelpers();
+  const rows=items({items:[{...progressCard,pr:1,state:'integrated'},{...progressCard,pr:2,kind:'engine'},{...progressCard,pr:3,state:'approved',certification:'certified'},progressCard]});
+  assert.equal(rows[0].pr,3);
+  assert.equal(rows.length,3);
+  assert.equal(items(null).length,0);
+});
+test('compact tracker is near the top, uses transparent goose over current dot, and updates after owner decisions',()=>{
+  assert.ok(html.indexOf('id="cardProgressTitle"')<html.indexOf('<div class="metrics">'));
+  assert.match(html,/\.card-progress-goose\{[^}]*font-size:22px;[^}]*background:transparent/);
+  assert.match(html,/\.card-progress-stage\.current \.card-progress-dot\{visibility:hidden\}/);
+  assert.match(script,/ArcanaReview\.render\(list,r,cardReviewChanged\)/);
+  assert.match(script,/local\.sha!==item\.headSha/);
+  assert.match(script,/Feed unavailable · last recorded status/);
+});
 test('self-contained dashboard exists',()=>{assert.ok(html.startsWith('<!doctype html>'));assert.ok(html.includes('<title>Arcana Control'));assert.ok(script);
   // Only approved same-origin review and owner authorization modules may load; the inline dashboard script stays read-only.
   assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"','<script src="./authorize.js"']);});
@@ -245,7 +289,7 @@ test('periodic status refresh is bounded, read-only, visibility gated and coales
   assert.ok(!script.includes("fetch('/actions/workflows/"));
   assert.ok(!/method:\s*['"](?:POST|PUT|PATCH|DELETE)/.test(script));
   const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
-  assert.ok(sw.includes('arcana-control-shell-v14'));
+  assert.ok(sw.includes('arcana-control-shell-v15'));
 });
 
 test('rate-limited public edge falls back to read-only GitHub with a bounded per-path browser cache',async()=>{
@@ -411,3 +455,4 @@ test('Verify count keeps the last published count after five minutes and labels 
     'owner review callback must update the tile when an owner decision changes its count');
   assert.doesNotMatch(script,/quickVerifyCount',reviewFresh\?/);
 });
+
