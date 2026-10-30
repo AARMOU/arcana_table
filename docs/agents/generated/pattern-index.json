@@ -832,13 +832,19 @@
    ]
   },
   "DynamicAmounts.distinctEntitiesIn": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Suffer the Past",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SufferThePast.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SufferThePastScenarioTest.kt"
+    },
+    {
+     "card": "Malanthrope",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
     }
    ]
   },
@@ -1221,13 +1227,19 @@
    ]
   },
   "Effects.AddDynamicCounters": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Death's Presence",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DeathsPresence.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DeathsPresenceScenarioTest.kt"
+    },
+    {
+     "card": "Malanthrope",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
     },
     {
      "card": "Power Depot",
@@ -2423,7 +2435,7 @@
    ]
   },
   "Effects.MayPay": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Ulalek, Fused Atrocity",
@@ -2436,6 +2448,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/VileRedeemer.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VileRedeemerScenarioTest.kt"
+    },
+    {
+     "card": "Hormagaunt Horde",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HormagauntHorde.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HormagauntHordeScenarioTest.kt"
     },
     {
      "card": "Savai Thundermane",
@@ -2510,7 +2528,7 @@
    ]
   },
   "Effects.Move": {
-   "count": 10,
+   "count": 11,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -2537,16 +2555,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ContinueQuestionScenarioTest.kt"
     },
     {
+     "card": "Hormagaunt Horde",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HormagauntHorde.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HormagauntHordeScenarioTest.kt"
+    },
+    {
      "card": "Resurrection Orb",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ResurrectionOrb.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ResurrectionOrbScenarioTest.kt"
-    },
-    {
-     "card": "Poxwalkers",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Poxwalkers.kt",
-     "lines": 41,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PoxwalkersScenarioTest.kt"
     }
    ]
   },
@@ -2574,7 +2592,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -2726,13 +2744,19 @@
    ]
   },
   "Effects.Sacrifice": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Ulamog's Crusher",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsCrusher.kt",
      "lines": 27,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsCrusherScenarioTest.kt"
+    },
+    {
+     "card": "Lokhust Heavy Destroyer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/LokhustHeavyDestroyer.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LokhustHeavyDestroyerScenarioTest.kt"
     },
     {
      "card": "Eldrazi Monument",
@@ -3204,7 +3228,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 28,
+   "count": 30,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3769,7 +3793,7 @@
  },
  "Triggers": {
   "Triggers.a": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -4142,7 +4166,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 42,
+   "count": 44,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -4561,7 +4585,7 @@
    ]
   },
   "keywords()": {
-   "count": 90,
+   "count": 92,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4613,7 +4637,7 @@
    ]
   },
   "ravenous()": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Zoanthrope",
@@ -4638,6 +4662,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TyrantGuard.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TyrantGuardScenarioTest.kt"
+    },
+    {
+     "card": "Hormagaunt Horde",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HormagauntHorde.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HormagauntHordeScenarioTest.kt"
     },
     {
      "card": "Tervigon",
@@ -4834,7 +4864,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 135,
+   "count": 138,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -4875,7 +4905,7 @@
    ]
   },
   "unearth()": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -4908,10 +4938,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ChronomancerScenarioTest.kt"
     },
     {
-     "card": "Royal Warden",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RoyalWarden.kt",
-     "lines": 39,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RoyalWardenScenarioTest.kt"
+     "card": "Lokhust Heavy Destroyer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/LokhustHeavyDestroyer.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LokhustHeavyDestroyerScenarioTest.kt"
     }
    ]
   }
@@ -5244,7 +5274,7 @@
    ]
   },
   "CounterType.PLUS_ONE_PLUS_ONE": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Bone Sabres",
@@ -6395,7 +6425,7 @@
    ]
   },
   "EffectTarget.PlayerRef": {
-   "count": 22,
+   "count": 23,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -6436,7 +6466,7 @@
    ]
   },
   "EffectTarget.Self": {
-   "count": 32,
+   "count": 34,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -6576,7 +6606,7 @@
    ]
   },
   "GameObjectFilter.Any": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Skittering Cicada",
@@ -6745,7 +6775,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 103,
+   "count": 105,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -6830,7 +6860,7 @@
    ]
   },
   "GameObjectFilter.Land": {
-   "count": 15,
+   "count": 16,
    "examples": [
     {
      "card": "Defile",
@@ -6857,16 +6887,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EndlessAtlasScenarioTest.kt"
     },
     {
+     "card": "Hormagaunt Horde",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HormagauntHorde.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HormagauntHordeScenarioTest.kt"
+    },
+    {
      "card": "Rampaging Brontodon",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RampagingBrontodon.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RampagingBrontodonScenarioTest.kt"
-    },
-    {
-     "card": "Sword of Feast and Famine",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfFeastAndFamine.kt",
-     "lines": 41,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfFeastAndFamineScenarioTest.kt"
     }
    ]
   },
@@ -7105,7 +7135,7 @@
    ]
   },
   "Player.Each": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Sautekh Immortal",
@@ -7198,7 +7228,7 @@
    ]
   },
   "Player.TargetPlayer": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Suffer the Past",
@@ -7211,6 +7241,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/OblivionSower.kt",
      "lines": 48,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/OblivionSowerScenarioTest.kt"
+    },
+    {
+     "card": "Malanthrope",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
     }
    ]
   },
@@ -7660,7 +7696,7 @@
    ]
   },
   "Targets.Player": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Necron Deathmark",
@@ -7685,11 +7721,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimarisEliminator.kt",
      "lines": 45,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimarisEliminatorScenarioTest.kt"
+    },
+    {
+     "card": "Malanthrope",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
+     "lines": 54,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
     }
    ]
   },
   "target(\u2026)": {
-   "count": 69,
+   "count": 70,
    "examples": [
     {
      "card": "Defile",
