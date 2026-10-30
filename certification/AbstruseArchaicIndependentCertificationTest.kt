@@ -44,6 +44,34 @@ class AbstruseArchaicIndependentCertificationTest {
         assertEquals(1, d.stackSize)
     }
 
+    @Test fun copiesOwnColorlessAnnihilatorTrigger() {
+        val d = customScenario(AbstruseArchaic, "Ulamog's Crusher")
+        val p = d.player1
+        val opponent = d.player2
+        val archaic = d.putCreatureOnBattlefield(p, "Abstruse Archaic")
+        val crusher = d.putCreatureOnBattlefield(p, "Ulamog's Crusher")
+        repeat(5) { d.putPermanentOnBattlefield(opponent, "Plains") }
+        d.removeSummoningSickness(archaic)
+        d.removeSummoningSickness(crusher)
+        d.passPriorityUntil(Step.DECLARE_ATTACKERS)
+
+        assertNull(d.declareAttackers(p, listOf(crusher), opponent).error)
+        assertEquals("Annihilator must be on the stack", 1, d.stackSize)
+        val originalTrigger = d.getTopOfStack()!!
+        d.giveColorlessMana(p, 1)
+        val copyAbility = d.cardRegistry.getCard("Abstruse Archaic")!!.script.activatedAbilities.single()
+        assertNull("Own colorless triggered ability must be a legal copy target",
+            d.submit(ActivateAbility(
+                p, archaic, copyAbility.id,
+                targets = listOf(ChosenTarget.Spell(originalTrigger)),
+            )).error)
+        assertTrue("The {T} cost must tap Abstruse Archaic", d.isTapped(archaic))
+        d.resolveAll()
+
+        assertEquals("Original annihilator 2 plus copied annihilator 2 must sacrifice four permanents",
+            1, d.getPermanents(opponent).size)
+    }
+
     @Test fun cannotActivateWithoutAbilityOnStack() {
         val d = customScenario(AbstruseArchaic)
         val p = d.player1
