@@ -790,25 +790,48 @@ class UlamogsNullifierScenarioTest {
         val transformer = com.wingedsheep.engine.view.ClientStateTransformer(
             d.cardRegistry, predicateEvaluator = d.services.predicateEvaluator,
         )
+
+        // Collect failures from EVERY perspective before failing. The original
+        // fail-closed checks remain mandatory; a first-viewer leak must not hide
+        // whether the owner, spectator, or face-up control also misprojects.
+        val violations = mutableListOf<String>()
         for (viewer in listOf(d.player1, d.player2)) {
-            assertTrue("Engine visibility must conceal face-down exile from viewer $viewer",
-                visibility.isCardIdentityHiddenFrom(d.state, hidden, viewer))
             val snapshot = transformer.transform(d.state, viewer)
             val card = snapshot.cards[hidden]
-                ?: throw AssertionError("Face-down exile must have a masked client card for $viewer")
-            assertNotEquals("Snapshot leaked Sol Ring to viewer $viewer", "Sol Ring", card.name)
-            assertEquals("Mana cost leaked to viewer $viewer", "", card.manaCost)
-            assertEquals("Type line leaked to viewer $viewer", "", card.typeLine)
-            assertEquals("Rules text leaked to viewer $viewer", "", card.oracleText)
-            assertNotEquals("Revealed identity leaked to viewer $viewer", "Sol Ring", card.revealedName)
-            assertEquals("Face-up exile must remain public to viewer $viewer",
-                "Island", snapshot.cards[faceUp]?.name)
+            val visibleControl = snapshot.cards[faceUp]
+            val perspective = if (viewer == d.player1) "non-owner" else "owner"
+            val context = "viewer=$perspective id=$viewer hiddenName=${card?.name}" +
+                " faceDown=${card?.isFaceDown} owner=${card?.ownerId}" +
+                " controller=${card?.controllerId} faceUp=${visibleControl?.name}"
+            try {
+                assertTrue("Engine visibility must conceal face-down exile: $context",
+                    visibility.isCardIdentityHiddenFrom(d.state, hidden, viewer))
+                assertEquals("Face-up exile must remain public: $context",
+                    "Island", visibleControl?.name)
+                assertNotNull("Face-down exile must have a masked client card: $context", card)
+                assertTrue("Client must mark hidden exile face-down: $context", card!!.isFaceDown)
+                assertNotEquals("Snapshot leaked Sol Ring: $context", "Sol Ring", card.name)
+                assertEquals("Mana cost leaked: $context", "", card.manaCost)
+                assertEquals("Type line leaked: $context", "", card.typeLine)
+                assertEquals("Rules text leaked: $context", "", card.oracleText)
+                assertNotEquals("Revealed identity leaked: $context", "Sol Ring", card.revealedName)
+            } catch (failure: AssertionError) {
+                violations.add(failure.message ?: "Projection assertion failed: $context")
+            }
         }
         val spectator = transformer.transform(d.state, d.player1, isSpectator = true)
-        assertNotEquals("Spectator must not see face-down exile identity",
-            "Sol Ring", spectator.cards[hidden]?.name)
-        assertEquals("Face-up exile is public to spectators",
-            "Island", spectator.cards[faceUp]?.name)
+        val spectatorHidden = spectator.cards[hidden]
+        val spectatorControl = spectator.cards[faceUp]
+        try {
+            assertNotEquals("Spectator must not see face-down exile identity",
+                "Sol Ring", spectatorHidden?.name)
+            assertEquals("Face-up exile is public to spectators",
+                "Island", spectatorControl?.name)
+        } catch (failure: AssertionError) {
+            violations.add(failure.message ?: "Spectator projection assertion failed")
+        }
+        assertTrue("Face-down exile projection violations: ${violations.joinToString(" | ")}",
+            violations.isEmpty())
     }
 
     @Test fun unchosenFaceDownOpponentExileRemainsMaskedAfterProcessingOtherTwo() {
