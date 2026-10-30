@@ -41,7 +41,8 @@ test('a blocked approved card keeps its label while the next eligible approved c
 });
 test('multiple authorizations withdraw only a permanently invalid approval without spending',()=>{
   const bad=unit(509,[ONE_SHOT]),ready=unit(510,[ONE_SHOT]);
-  const r=selectCandidate([ready,bad],'normal','base',feasible,u=>u.raw.number===509?{ok:false,missing:['cards-or-discovery']}:{ok:true});
+  bad.raw.body='invalid card';
+  const r=selectCandidate([ready,bad],'normal','base',feasible,body=>body==='invalid card'?{ok:false,missing:['cards-or-discovery']}:{ok:true});
   assert.equal(r.candidate,null,'withdrawal never launches a worker in the same run');
   assert.equal(r.clear.unit.raw.number,509);
   const next=selectCandidate([ready],'normal','base',feasible,()=>({ok:true}));
