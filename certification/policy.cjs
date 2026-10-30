@@ -80,14 +80,22 @@ function candidate(manifest, {pr, issue, sha, checks, repository = 'AARMOU/arcan
   const suite = manifest.suites.find(s => s.issue === issueNo &&
     titleNames(pr.title, s.name));
   if (!suite || !issue || issue.number !== suite.issue || issue.state !== 'open' ||
-      issue.title !== '[Arcana Queue] ' + suite.name + ' — Cardkit SUPPORTED, unclaimed' ||
-      !String(issue.body||'').includes('<!-- arcana-auto-queue-v1 -->') ||
-      !String(issue.body||'').includes('source: trusted-main-queue-feeder') ||
+      !(feederUnit(issue, suite.name) || ownerUnit(issue, suite.name)) ||
       !String(issue.body||'').includes('- ' + suite.name) ||
       !currentHeadGreen(checks,sha,manifest.requiredChecks))
     return null;
   return suite;
 }
+// A queue unit emitted by the trusted main feeder: exact title and feeder markers.
+const feederUnit = (issue, name) => issue.title === '[Arcana Queue] ' + name + ' — Cardkit SUPPORTED, unclaimed' &&
+  String(issue.body||'').includes('<!-- arcana-auto-queue-v1 -->') &&
+  String(issue.body||'').includes('source: trusted-main-queue-feeder');
+// A queue unit the owner opened by hand (the dispatcher already trusts these). Owner account and
+// association only; the title must name this card as a whole name, never a longer one.
+const OWNER_LOGIN = 'AARMOU';
+const ownerUnit = (issue, name) => issue.user?.login === OWNER_LOGIN && issue.author_association === 'OWNER' &&
+  String(issue.title||'').startsWith('[Arcana Queue] ' + name) &&
+  /^(?:$|\s|—|-|:)/.test(String(issue.title).slice(('[Arcana Queue] ' + name).length));
 function workflowEventEligible(run, repository) {
   return run?.event === 'pull_request' && run.conclusion === 'success' &&
     SHA.test(String(run.head_sha)) && run.head_repository?.full_name === repository &&

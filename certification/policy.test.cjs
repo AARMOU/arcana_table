@@ -183,3 +183,24 @@ test('GraphQL refusal never pretends to have marked a PR ready', async () => {
     github,owner:'AARMOU',repo:'arcana_table',number:410,sha,certified:true
   }),/did not confirm/);
 });
+
+test('an owner-opened queue unit is accepted; look-alikes and other authors are not', () => {
+  const owned = (o = {}) => issue({ title: '[Arcana Queue] Resurrection Orb', body: '## Cards\n\n- Resurrection Orb',
+    user: { login: 'AARMOU' }, author_association: 'OWNER', ...o });
+  assert.equal(choose({ issue: owned() })?.key, 'resurrection-orb');
+  assert.equal(choose({ issue: owned({ title: '[Arcana Queue] Resurrection Orb — owner-authorized one-shot' }) })?.key, 'resurrection-orb');
+  // Every other gate still applies to owner units.
+  assert.equal(choose({ issue: owned(), sha: 'b'.repeat(40) }), null);
+  assert.equal(choose({ issue: owned({ state: 'closed' }) }), null);
+  assert.equal(choose({ issue: owned({ body: '## Cards\n\n- Something Else' }) }), null);
+  // Not the owner, or not the owner association: rejected without feeder markers.
+  assert.equal(choose({ issue: owned({ user: { login: 'someone' } }) }), null);
+  assert.equal(choose({ issue: owned({ author_association: 'COLLABORATOR' }) }), null);
+  assert.equal(choose({ issue: owned({ user: { login: 'github-actions[bot]' }, author_association: 'NONE' }) }), null);
+  // The title must name this card as a whole name, never a longer one.
+  assert.equal(choose({ issue: owned({ title: '[Arcana Queue] Resurrection Orbital' }) }), null);
+  assert.equal(choose({ issue: owned({ title: '[Card Request] Resurrection Orb' }) }), null);
+  // Feeder units are unchanged.
+  assert.equal(choose()?.key, 'resurrection-orb');
+  assert.equal(choose({ issue: issue({ body: '## Cards\n- Resurrection Orb' }) }), null, 'feeder title without markers is rejected');
+});
