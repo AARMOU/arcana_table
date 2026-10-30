@@ -1,0 +1,8 @@
+{
+  "key": "malanthrope",
+  "name": "Malanthrope",
+  "issue": 386,
+  "source": "certification/MalanthropeIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.MalanthropeIndependentCertificationTest",
+  "tests": 4
+}
