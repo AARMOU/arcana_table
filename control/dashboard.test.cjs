@@ -471,3 +471,17 @@ test('a missing review report or failed status feed marks Verify not current',()
   assert.ok(script.includes("current?'Nothing waiting':'Not current'"));
 });
 
+
+test('a feed with a recent source time is not stale just because the edge says STALE',()=>{
+  const start=script.indexOf('const feedStale=');
+  assert.ok(start>0);
+  const ctx=vm.createContext({Date});
+  vm.runInContext(script.slice(start,script.indexOf(';',script.indexOf('UPDATING',start))+1)+'\nthis.f=feedStale;',ctx);
+  const now=Date.now();
+  assert.equal(ctx.f('live','STALE',now-2*60000),false,'2-minute-old source behind a 60 s edge TTL is current');
+  assert.equal(ctx.f('live','HIT',now-16*60000),true,'over 15 minutes is stale');
+  assert.equal(ctx.f('stale','HIT',now),true,'Worker-declared stale stays stale');
+  assert.equal(ctx.f(null,'UPDATING',NaN),true,'no source time: edge marker decides');
+  assert.equal(ctx.f(null,'HIT',NaN),false);
+  assert.ok(script.includes('if(feedStale(state,cf,source)){staleFeeds++;'));
+});

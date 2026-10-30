@@ -399,7 +399,10 @@
       // started a background refresh at the edge. Ask once more, shortly after, before calling it stale.
       // Source time comes only from the Worker (X-Arcana-Checked-At, or its CORS-safelisted Last-Modified copy).
       const feedCheckedAt=r=>Date.parse(r.headers.get('x-arcana-checked-at')||r.headers.get('last-modified')||'');
-      const isStaleFeed=r=>{const st=r.headers.get('x-arcana-feed'),cf=(r.headers.get('cf-cache-status')||'').toUpperCase(),src=feedCheckedAt(r);return st==='stale'||cf==='STALE'||cf==='UPDATING'||(Number.isFinite(src)&&Date.now()-src>15*60*1000);};
+      // With the read token the edge marks a copy STALE after only 60 s; a known source time decides
+      // instead (stale only past 15 min). The edge marker counts only when no source time is readable.
+      const feedStale=(st,cf,src)=>st==='stale'||(Number.isFinite(src)?Date.now()-src>15*60*1000:cf==='STALE'||cf==='UPDATING');
+      const isStaleFeed=r=>feedStale(r.headers.get('x-arcana-feed'),(r.headers.get('cf-cache-status')||'').toUpperCase(),feedCheckedAt(r));
       // When the shared Cloudflare egress exhausts GitHub's unauthenticated API allowance,
       // retry public GETs from this user's browser (a distinct rate-limit bucket).
       // Bound direct reads to 1 per endpoint per 5 minutes while the edge is limited.
@@ -465,7 +468,7 @@
         const cf=(res.headers.get('cf-cache-status')||'').toUpperCase();
         const source=directAt??feedCheckedAt(res);
         if(Number.isFinite(source))sourceTimes.push(source);
-        if(state==='stale'||cf==='STALE'||cf==='UPDATING'||(Number.isFinite(source)&&Date.now()-source>15*60*1000)){staleFeeds++;staleSources.push(path+' ('+(state||cf||'old timestamp')+(Number.isFinite(source)?', checked '+new Date(source).toLocaleString():'')+')');}
+        if(feedStale(state,cf,source)){staleFeeds++;staleSources.push(path+' ('+(state||cf||'old timestamp')+(Number.isFinite(source)?', checked '+new Date(source).toLocaleString():'')+')');}
         else if(state==='cached'||cf==='HIT')cachedFeeds++;
         return {data:await res.json(),link:res.headers.get('link')||''};
       }
