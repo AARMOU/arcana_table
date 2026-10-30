@@ -45,4 +45,19 @@ tools/cardkit/cardkit classify "<Card Name>" -v
 3. `tools/cardkit/cardkit check` must report 0 errors; `git diff --check` clean.
 4. Draft PR against `gpt/arcana-integration-next`, one commit per card, with the exact commands and results.
 
+## Scope of a card PR
+
+Approved cards are integrated automatically, and integration accepts **only** these files. A PR that
+changes any other file is skipped, even after certification and owner approval:
+
+- `android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/<Val>.kt` (added)
+- `android/custom-cards/src/test/kotlin/com/arcanatable/customcards/<Val>ScenarioTest.kt` (added)
+- `android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt` (modified)
+- the regenerated `android/app/src/main/assets/argentum/custom-cards.jsonl` and `custom-cards.index.tsv`
+- the regenerated `docs/agents/generated/pattern-index.json` and `pattern-index.md`
+
+If adding your card makes a **shared** test fail (for example anything under `tools/cardkit/tests/`),
+do not edit that test in your card PR. Report the failing test and its output in the PR and on the
+issue, and stop; the shared fix lands separately on `gpt/arcana-integration-next`.
+
 Never touch `main`, release/signing, billing or dispatch configuration, or other cards' behavior.
