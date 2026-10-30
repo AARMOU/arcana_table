@@ -838,6 +838,48 @@ class UlamogsNullifierScenarioTest {
             violations.isEmpty())
     }
 
+    /**
+     * A card-specific "may look at" grant in exile must preserve authorized
+     * access without exposing an unrelated hidden exile or a spectator view.
+     * This is the positive companion to the fail-closed owner/privacy cases.
+     * Accept either the full identity or the dedicated revealedName field:
+     * the server is free to render an authorized face-down card as a masked
+     * shell with an explicitly permitted reveal.
+     */
+    @Test fun explicitExileLookGrantIsCardScopedAndNotPublic() {
+        val d = setup()
+        val granted = d.putCardInExile(d.player2, "Sol Ring")
+        val unrelated = d.putCardInExile(d.player2, "Grizzly Bears")
+        d.addComponent(granted, com.wingedsheep.engine.state.components.identity.FaceDownComponent)
+        d.addComponent(unrelated, com.wingedsheep.engine.state.components.identity.FaceDownComponent)
+        d.addComponent(granted,
+            com.wingedsheep.engine.state.components.identity.MayLookAtInExileComponent.to(d.player1))
+
+        val visibility = com.wingedsheep.engine.view.Visibility(
+            d.cardRegistry, conditionEvaluator = d.services.conditionEvaluator,
+        )
+        val transformer = com.wingedsheep.engine.view.ClientStateTransformer(
+            d.cardRegistry, predicateEvaluator = d.services.predicateEvaluator,
+        )
+        assertFalse("Explicit grant must permit the named viewer",
+            visibility.isCardIdentityHiddenFrom(d.state, granted, d.player1))
+        assertTrue("The same viewer cannot inspect unrelated face-down exile",
+            visibility.isCardIdentityHiddenFrom(d.state, unrelated, d.player1))
+        val viewer = transformer.transform(d.state, d.player1)
+        val permitted = viewer.cards[granted] ?: throw AssertionError("Granted card missing")
+        assertTrue("Granted identity must be available to the authorized viewer",
+            permitted.name == "Sol Ring" || permitted.revealedName == "Sol Ring")
+        val other = viewer.cards[unrelated] ?: throw AssertionError("Unrelated exile missing")
+        assertNotEquals("Unrelated hidden card identity leaked", "Grizzly Bears", other.name)
+        assertNotEquals("Unrelated hidden reveal leaked", "Grizzly Bears", other.revealedName)
+        val spectator = transformer.transform(d.state, d.player1, isSpectator = true)
+        for ((cardId, realName) in listOf(granted to "Sol Ring", unrelated to "Grizzly Bears")) {
+            val masked = spectator.cards[cardId] ?: throw AssertionError("Spectator card missing")
+            assertNotEquals("Spectator must not receive an explicit look grant", realName, masked.name)
+            assertNotEquals("Spectator reveal must remain private", realName, masked.revealedName)
+        }
+    }
+
     @Test fun unchosenFaceDownOpponentExileRemainsMaskedAfterProcessingOtherTwo() {
         val d = setup()
         val hidden = d.putCardInExile(d.player2, "Sol Ring")
