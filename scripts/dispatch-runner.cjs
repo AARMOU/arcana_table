@@ -95,9 +95,9 @@ async function resolveInterrupted({ github, owner, repo, unit, runId }) {
   return { issue: n, runs: open, observed, actor };
 }
 
-// One selected owner authorization ALWAYS wins over the ordinary lowest-numbered normal
-// candidate. Without this, a dashboard tap on #379 in normal mode could dispatch #100.
-// Multiple labels fail closed. Feasibility/provenance/billing are checked AFTER selection.
+// Owner-authorized cards have priority over the ordinary lowest-numbered normal
+// candidate. Multiple approvals queue deterministically, one per dispatcher run.
+// Feasibility/provenance/billing/capacity are still checked AFTER selection.
 // The dispatcher's own verdict on a queued unit, from structured checks (never from reason text):
 //   eligible  - assignable now (still subject to CI, capacity and billing admission)
 //   invalid   - the issue itself can never be assigned as written (not a unit, incomplete, no cards)
@@ -133,18 +133,22 @@ function selectCandidate(allUnits, mode, base, feasible, actionable = A.unitActi
     // Withdrawal dispatches nothing else in the same run; blocked/transient deny and keep the label.
     return WITHDRAW.has(verdict(labeled[0]).cls) ? withdraw(labeled[0]) : { candidate: labeled[0], labeled, error: null };
   }
-  // Explicit priority is active in NORMAL mode. Dry-run continues to model ordinary
-  // automatic eligibility without treating a pending owner label as a paid assignment.
-  if (mode === 'normal') {
-    if (labeled.length > 1) return { candidate: null, labeled, error: 'multiple-owner-authorizations' };
-    if (labeled.length === 1) {
-      const cls = verdict(labeled[0]).cls;
-      if (WITHDRAW.has(cls)) return withdraw(labeled[0]);
-      // A temporarily blocked approval keeps its label but does not freeze the queue: ordinary
-      // automatic order continues (the same policy as with no tap) and the approved card is taken
-      // first once Cardkit says it is ready. Everything else keeps the existing priority path.
-      if (cls !== 'blocked') return { candidate: labeled[0], labeled, error: null };
-    }
+  // In normal mode, each owner's authorization is a queued approval, not a demand
+  // for exclusive dispatch. Pick at most one per run and leave all other labels intact.
+  // Use issue number for deterministic priority, regardless of API enumeration order.
+  if (mode === 'normal' && labeled.length) {
+    const ordered = [...labeled].sort((a, b) => a.raw.number - b.raw.number);
+    // Withdraw one permanently ineligible authorization without spending. Others remain
+    // approved for the next run (including if removing this label fails).
+    const obsolete = ordered.find(u => WITHDRAW.has(verdict(u).cls));
+    if (obsolete) return withdraw(obsolete);
+    // A temporarily blocked card must not hold up another authorized, eligible card.
+    const eligible = ordered.find(u => verdict(u).cls === 'eligible');
+    if (eligible) return { candidate: eligible, labeled, error: null };
+    // Preserve fail-closed behavior for unknown/provenance/transient states; only
+    // Cardkit-blocked cards fall back to the ordinary normal-mode queue.
+    const unverified = ordered.find(u => verdict(u).cls !== 'blocked');
+    if (unverified) return { candidate: unverified, labeled, error: null };
   }
   const candidate = allUnits.filter(u => u.derived.state === 'queued' && u.raw.title.startsWith('[Arcana Queue]') &&
     !u.prs.length && u.derived.provenance?.ok && actionable(u.raw.body, base).ok && feasible(u).ok)
