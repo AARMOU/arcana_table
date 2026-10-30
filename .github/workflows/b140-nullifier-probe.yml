@@ -31,7 +31,7 @@ jobs:
         id: nullifier_tests
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.UlamogsNullifierScenarioTest'
-      - name: Summarize and require exactly thirty-six passing scenarios
+      - name: Summarize and require exactly thirty-seven passing scenarios
         # Gradle exits nonzero on a real rules/privacy regression. Still inspect its
         # JUnit XML so the exact failures are visible without weakening the gate.
         if: ${{ !cancelled() && steps.nullifier_tests.outcome != 'skipped' }}
@@ -53,7 +53,7 @@ jobs:
                   out.write(f"### Nullifier exact-head engine acceptance\n\n{stats}\n\n")
                   for name in failed:
                       out.write(f"- FAIL: `{name}`\n")
-          assert stats == {'tests': 36, 'failures': 0, 'errors': 0, 'skipped': 0}, stats
+          assert stats == {'tests': 37, 'failures': 0, 'errors': 0, 'skipped': 0}, stats
           PY
       - uses: actions/upload-artifact@v4
         if: always()

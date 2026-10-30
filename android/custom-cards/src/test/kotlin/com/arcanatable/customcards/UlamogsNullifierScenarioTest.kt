@@ -1097,4 +1097,27 @@ class UlamogsNullifierScenarioTest {
         assertEquals(listOf("Grizzly Bears"), d.getExileCardNames(d.player2))
         assertEquals(listOf("Island", "Sol Ring"), d.getGraveyardCardNames(d.player2).sorted())
     }
+
+    /**
+     * Positive public-zone control for the upstream face-down exile privacy fix.
+     * Exile is public unless a specific card is face-down; masking every exiled
+     * card to repair #492 would be a separate rules and client regression.
+     */
+    @Test fun ordinaryFaceUpExileRemainsPublicToPlayersAndSpectators() {
+        val d = setup()
+        val cardId = d.putCardInExile(d.player2, "Sol Ring")
+        val transformer = com.wingedsheep.engine.view.ClientStateTransformer(
+            d.cardRegistry, predicateEvaluator = d.services.predicateEvaluator,
+        )
+        for ((viewer, spectator) in listOf(
+            d.player1 to false, d.player2 to false, d.player1 to true,
+        )) {
+            val card = transformer.transform(d.state, viewer, isSpectator = spectator)
+                .cards[cardId] ?: throw AssertionError("Face-up exiled card missing")
+            assertFalse("Face-up exile must not be marked face-down", card.isFaceDown)
+            assertEquals("Face-up exile identity must be public", "Sol Ring", card.name)
+            assertEquals("Face-up exile type must be public", "Artifact", card.typeLine)
+            assertEquals("Face-up exile mana cost must be public", "{1}", card.manaCost)
+        }
+    }
 }
