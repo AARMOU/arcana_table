@@ -1,4 +1,4 @@
-// Reliable timer for read-only status workflows. GitHub's own schedule fires only every few
+// Reliable timer for the control-plane workflows. GitHub's own schedule fires only every few
 // hours in practice (the review inbox's */15 ran 4 times in its life), so Control's Verify
 // report went hours old. Cloudflare Cron Triggers fire on time; each one only starts an
 // allowlisted workflow on main. Every gate inside those workflows still applies. Without the
@@ -6,15 +6,20 @@
 const GH_REPO_API = 'https://api.github.com/repos/AARMOU/arcana_table';
 // cron (must match wrangler.toml [triggers]) -> workflows it starts, with their inputs.
 export const SCHEDULE = {
-  '*/15 * * * *': [{ workflow: 'arcana-card-review-inbox-refresh.yml', inputs: {} }],
+  '*/15 * * * *': [{ workflow: 'arcana-card-review-inbox-refresh.yml', inputs: {} },
+    // Its designed */30 pace. Admission, billing, readiness and authorization gates all still
+    // decide inside the dispatcher; with dispatch off or no authorized unit it assigns nothing.
+    { workflow: 'arcana-card-dispatcher.yml', inputs: {}, minutes: [0, 30] }],
   // scheduled: the backfill then only retries failures and never re-runs green CI.
   '41 * * * *': [{ workflow: 'arcana-certification-backfill.yml', inputs: { scheduled: 'true' } }],
 };
 
-export async function runScheduled(cron, { token = '', fetchImpl = fetch } = {}) {
+export async function runScheduled(cron, { token = '', fetchImpl = fetch, scheduledTime = Date.now() } = {}) {
   if (!token) return [{ cron, skipped: 'no-dispatch-token' }];
   const out = [];
-  for (const { workflow, inputs } of SCHEDULE[cron] || []) {
+  const minute = new Date(scheduledTime).getUTCMinutes();
+  for (const { workflow, inputs, minutes } of SCHEDULE[cron] || []) {
+    if (minutes && !minutes.includes(minute)) continue;
     try {
       const r = await fetchImpl(GH_REPO_API + '/actions/workflows/' + workflow + '/dispatches', {
         method: 'POST',

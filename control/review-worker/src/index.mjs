@@ -180,7 +180,7 @@ export async function decide(api, { pr, sha, decision, note }) {
 export default {
   // Cloudflare Cron Triggers (wrangler.toml): start the allowlisted status workflows on time.
   async scheduled(event, env, ctx) {
-    ctx.waitUntil(runScheduled(event.cron, { token: String(env.GITHUB_ACTIONS_DISPATCH_TOKEN || '') })
+    ctx.waitUntil(runScheduled(event.cron, { token: String(env.GITHUB_ACTIONS_DISPATCH_TOKEN || ''), scheduledTime: event.scheduledTime })
       .then(r => console.log(JSON.stringify(r))));
   },
   async fetch(request, env, ctx, fetchImpl = fetch) {
