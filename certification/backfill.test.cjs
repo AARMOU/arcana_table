@@ -68,3 +68,41 @@ test('scheduled runs never re-run green CI', async () => {
   await backfill({ github, owner: 'o', repo: 'r', root: __dirname + '/..', scheduled: true });
   assert.deepEqual(reruns, []);
 });
+
+const { missingSuites, reportMissingSuites, missingBody, MARKER } = require('./backfill.cjs');
+const cardFile = 'android/custom-cards/src/main/kotlin/x/cards/Card.kt';
+function suiteMock({ files = {}, comments = [], link = '' } = {}) {
+  const posted = [];
+  const github = {
+    rest: { pulls: { listFiles() {} }, issues: {
+      listComments: async ({ page }) => ({ headers: { link }, data: page === 1 && link ? [] : comments }),
+      createComment: async ({ body }) => { posted.push(body); } } },
+    paginate: async (fn, args) => files[args.pull_number] || [],
+  };
+  return { github, posted };
+}
+const copilotPr = (number, issue, extra = {}) => ({ number, title: 'Add Card ' + number, body: 'Fixes #' + issue,
+  state: 'open', user: { login: 'Copilot' }, base: { ref: manifest.base }, ...extra });
+
+test('lists Copilot card PRs with card code but no registered suite', async () => {
+  const covered = manifest.suites[0].issue;
+  const prs = [copilotPr(901, 9001), copilotPr(902, covered), copilotPr(903, 9003),
+    copilotPr(904, 9004, { user: { login: 'AARMOU' } }), copilotPr(905, 9005, { base: { ref: 'other' } })];
+  const { github } = suiteMock({ files: { 901: [{ filename: cardFile }], 902: [{ filename: cardFile }],
+    903: [{ filename: 'README.md' }], 904: [{ filename: cardFile }], 905: [{ filename: cardFile }] } });
+  const list = await missingSuites({ github, owner: 'o', repo: 'r', manifest, prs });
+  assert.deepEqual(list.map(m => m.pr), [901]);
+});
+
+test('posts the missing-suite note only when its list changes', async () => {
+  const list = [{ pr: 901, issue: 9001, title: 'Add Card 901' }];
+  const same = suiteMock({ comments: [{ user: { login: 'github-actions[bot]' }, body: missingBody(list) }] });
+  assert.equal((await reportMissingSuites({ github: same.github, owner: 'o', repo: 'r', list })).posted, false);
+  // A look-alike from another account never suppresses the note.
+  const fake = suiteMock({ comments: [{ user: { login: 'someone' }, body: missingBody(list) }], link: '<x?page=9>; rel="last"' });
+  await reportMissingSuites({ github: fake.github, owner: 'o', repo: 'r', list });
+  assert.equal(fake.posted.length, 1);
+  assert.ok(fake.posted[0].startsWith(MARKER) && fake.posted[0].includes('#901'));
+  const none = suiteMock();
+  assert.equal((await reportMissingSuites({ github: none.github, owner: 'o', repo: 'r', list: [] })).posted, false);
+});

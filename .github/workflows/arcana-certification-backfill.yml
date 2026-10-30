@@ -4,7 +4,8 @@ name: Arcana Certification Backfill
 # change on main, re-run the latest successful CI of each open card PR that has a registered
 # suite but no certification check yet; that completion triggers the normal certification
 # workflow. Hourly, it also retries once a card PR's CI that failed with no green run on its
-# head (infrastructure failures). Never certifies, approves, merges or dispatches anything itself.
+# head (infrastructure failures), and lists on #81 card PRs with card code but no registered
+# suite so suite authors pick them up. Never certifies, approves, merges or dispatches anything itself.
 on:
   push:
     branches: [main]
@@ -27,6 +28,8 @@ jobs:
       pull-requests: read
       checks: read
       actions: write
+      # write: posts the missing-suite note on #81, only when its list changes.
+      issues: write
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,6 +39,6 @@ jobs:
         with:
           script: |
             const { backfill } = require('./certification/backfill.cjs');
-            const r = await backfill({ github, ...context.repo, root: '.', scheduled: context.eventName === 'schedule' });
+            const r = await backfill({ github, ...context.repo, root: '.', scheduled: context.eventName === 'schedule', report: true });
             core.info(JSON.stringify(r));
             await core.summary.addHeading('Certification backfill').addCodeBlock(JSON.stringify(r, null, 1)).write();
