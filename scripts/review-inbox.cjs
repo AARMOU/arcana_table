@@ -32,13 +32,22 @@ function classifyChangeFiles(files, title = '') {
   if (!Array.isArray(files) || files.length >= 100) return { kind: 'unknown', hasTest: false, reason: 'Changed-file evidence unavailable or incomplete' };
   const source = files.some(f => /^android\/custom-cards\/src\/main\/.+\/cards\/[^/]+\.kt$/.test(f));
   const hasTest = files.some(f => /^android\/custom-cards\/src\/test\/.+Test\.kt$/.test(f));
-  if (source) return { kind: 'card', hasTest, reason: hasTest ? null : 'Executable card scenario test missing' };
+  if (source) {
+    // Integration takes only the card-only file set with the registration (scripts/card-integration.cjs).
+    // A PR outside it can never land, so it must not be offered for Verify; say exactly why instead.
+    const allowed = f => /^android\/custom-cards\/src\/main\/.+\/cards\/[^/]+\.kt$/.test(f) ||
+      /^android\/custom-cards\/src\/test\/.+ScenarioTest\.kt$/.test(f) || f === I.REGISTRY || I.GENERATED.includes(f);
+    const outside = files.filter(f => !allowed(f));
+    const shapeProblem = !files.includes(I.REGISTRY) ? 'Not integrable: missing CustomCards.kt registration and regenerated card exports (Cardkit Finishing steps)'
+      : outside.length ? 'Not integrable: changes files outside the card-only set: ' + outside.slice(0, 3).join(', ') : null;
+    return { kind: 'card', hasTest, reason: hasTest ? shapeProblem : 'Executable card scenario test missing', ...(shapeProblem ? { shapeProblem } : {}) };
+  }
   if (/\b(audit|coverage|inventory|documentation|docs)\b/i.test(title) || (files.length && files.every(f => /^(docs\/|README|\.github\/)/.test(f))))
     return { kind: 'audit', hasTest: false, reason: 'Audit/documentation, no card implementation' };
   return { kind: 'engine', hasTest: false, reason: files.length ? 'Engine or blocker changes; no card implementation' : 'No card implementation changes in this PR' };
 }
 // Drafts count once certified: the owner's Approve marks the PR ready for review (review Worker).
-const isReadyForOwner = i => i?.kind === 'card' && i.hasTest === true &&
+const isReadyForOwner = i => i?.kind === 'card' && i.hasTest === true && !i.shapeProblem &&
   i.state === 'certified' && i.certification === 'certified';
 
 
@@ -253,7 +262,8 @@ async function reportStalls({ github, owner, repo, payload, issue = 78, now = Da
     ...engine.map(e => `- #${e.n} ${String(e.title).replace(/[@\r\n]/g, ' ').slice(0, 70)}: blocked engine upgrade for ${Math.floor(e.hours)}h. ` +
       '**Owner:** Claude (engine lane). **Next:** fix on a `gpt/argentum-weekly-fix-*` branch per `engine-upgrade/HANDOFF.md`, dry run green, then merge into `gpt/arcana-integration-next`.'),
     ...list.map(i => `- #${i.pr} ${String(i.card || 'card').replace(/[@\r\n]/g, ' ').slice(0, 60)}: ${STALL_RULES[i.state].text} for ${Math.floor(i.hours)}h. ` +
-      `**Owner:** ${STALL_RULES[i.state].who}. **Next:** ${STALL_RULES[i.state].next}` +
+      (i.shapeProblem ? '**Owner:** card lane (Copilot / Work GPT / Goose). **Next:** complete the PR to the card-only file set'
+        : `**Owner:** ${STALL_RULES[i.state].who}. **Next:** ${STALL_RULES[i.state].next}`) +
       (i.problems?.[0] ? ` (${String(i.problems[0]).replace(/[@\r\n]/g, ' ').slice(0, 140)})` : '') + '.')].join('\n');
   await github.rest.issues.createComment({ owner, repo, issue_number: issue, body });
   return 'posted ' + list.length;
