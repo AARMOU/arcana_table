@@ -119,7 +119,30 @@ async function buildReviewInbox({ github, owner, repo, now = new Date() }) {
     const n = unitOf(pr.body);
     if (!n) continue;
     const unit = (await github.rest.issues.get({ owner, repo, issue_number: n })).data;
-    if (unit.state !== 'open' || !String(unit.title || '').startsWith('[Arcana Queue]')) continue;
+    if (!String(unit.title || '').startsWith('[Arcana Queue]')) continue;
+    // An integration automatically closes its queue issue. Keep the verified receipt in
+    // the activity chart instead of dropping it on the very next inbox refresh.
+    // Closed issues without an authoritative, current Android receipt stay excluded.
+    if (unit.state === 'closed') {
+      try {
+        const integration = await I.receiptFor({ github, owner, repo, pr });
+        if (integration?.status === 'integrated' && Number.isFinite(Date.parse(integration.at))) {
+          const card = cardOf(pr.title);
+          if (Date.parse(integration.at) >= now.getTime() - INTEGRATED_DAYS * 864e5)
+            integratedActivity.push({ pr: pr.number, card, mergedAt: integration.at });
+          items.push({
+            pr: pr.number, issue: n, card, headSha: pr.head.sha, state: 'integrated',
+            checks: {}, checkRuns: [{ name: 'Android integration', result: 'success', url: integration.runUrl }],
+            certification: 'certified', abilities: [], problems: [], decidedIn: null,
+            draft: !!pr.draft, kind: 'card', hasTest: true, reason: null, readyForOwner: false,
+            integration, url: `https://github.com/${owner}/${repo}/commit/${integration.destinationSha}`,
+            updatedAt: integration.at,
+          });
+        }
+      } catch { /* Missing or unverified receipt is never counted as a completion. */ }
+      continue;
+    }
+    if (unit.state !== 'open') continue;
     const checkRuns = (await github.rest.checks.listForRef({ owner, repo, ref: pr.head.sha, per_page: 100 })).data.check_runs || [];
     const reviews = await github.paginate(github.rest.pulls.listReviews, { owner, repo, pull_number: pr.number, per_page: 100 });
     let changedFiles = null;
