@@ -56,12 +56,14 @@ class CopperGnomesIndependentCertificationTest {
         d.giveColorlessMana(p, 4)
 
         assertNull(d.activate(p, gnomes).error)
-        // Deliberately request the ineligible card: a correctly filtered choice
-        // cannot select it and instead takes the only eligible artifact.
+        // Deliberately request an ineligible card. A correctly filtered optional
+        // selection may choose the eligible artifact OR choose nothing (minimum 0),
+        // but it must never move the nonartifact creature.
         d.resolveAll(Choices(yes = true, pick = listOf("Grizzly Bears")))
 
         assertTrue(d.getGraveyard(p).contains(gnomes))
-        assertTrue(d.getPermanents(p).contains(ring))
+        assertTrue("Eligible artifact must stay in hand or enter the battlefield",
+            d.findCardsInHand(p, "Sol Ring").contains(ring) || d.getPermanents(p).contains(ring))
         assertTrue("Nonartifact card must remain in hand", d.findCardsInHand(p, "Grizzly Bears").contains(bear))
         assertFalse(d.getPermanents(p).contains(bear))
     }
