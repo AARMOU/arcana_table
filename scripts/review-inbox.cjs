@@ -221,12 +221,16 @@ async function alertReady({ github, owner, repo, payload, issue = 78 }) {
 // never re-post. Read-only apart from that note.
 const STALL_MARKER = '<!-- arcana-stalls-v1 -->';
 const STALL_RULES = {
-  certified: { hours: 24, text: 'certified, waiting for owner Verify' },
-  approved: { hours: 2, text: 'approved, not integrated' },
-  'awaiting-review': { hours: 24, text: 'checks green but not certified (suite missing or certification gate)' },
-  'checks-failed': { hours: 6, text: 'CI red on the current commit' },
-  'checks-running': { hours: 6, text: 'checks still running' },
+  certified: { hours: 24, text: 'certified, waiting for owner Verify', who: 'owner', next: 'Verify in Arcana Control' },
+  approved: { hours: 2, text: 'approved, not integrated', who: 'Claude (automation)', next: 'read the #78 skip report or the integration receipt and fix the cause' },
+  'awaiting-review': { hours: 24, text: 'checks green but not certified (suite missing or certification gate)', who: 'card lane (Work GPT / Goose)', next: 'add the certification suite, or label the queue issue arcana:engine-gap' },
+  'checks-failed': { hours: 6, text: 'CI red on the current commit', who: 'card lane (auto-repair when enabled)', next: 'fix the failing check on the card PR' },
+  'checks-running': { hours: 6, text: 'checks still running', who: 'Claude (automation)', next: 'find the stuck or cancelled run' },
 };
+// A blocked weekly Argentum upgrade issue (bot-opened, "(needs work)") is engine-lane work: Claude owns it.
+const ENGINE_STALL_HOURS = 24;
+const isBlockedUpgrade = i => !i.pull_request && i.user?.login === 'github-actions[bot]' && i.user?.type === 'Bot' &&
+  /^Weekly Argentum upgrade to [0-9a-f]+/.test(String(i.title || '')) && / \(needs work\)$/.test(String(i.title || ''));
 function stalls(payload, now = Date.now()) {
   return (payload?.items || []).filter(i => i?.kind === 'card' && STALL_RULES[i.state] && Number.isSafeInteger(i.pr))
     .map(i => ({ ...i, hours: (now - Date.parse((i.state === 'certified' && i.certifiedAt) || (i.state === 'approved' && i.approvedAt) || i.updatedAt || '')) / 36e5 }))
@@ -235,16 +239,22 @@ function stalls(payload, now = Date.now()) {
 }
 async function reportStalls({ github, owner, repo, payload, issue = 78, now = Date.now() }) {
   const list = stalls(payload, now);
-  const keys = list.map(i => i.pr + '@' + String(i.headSha).slice(0, 12) + ':' + i.state).join(' ');
+  const open = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
+  const engine = open.filter(isBlockedUpgrade).map(i => ({ n: i.number, title: i.title, hours: (now - Date.parse(i.created_at || '')) / 36e5 }))
+    .filter(e => Number.isFinite(e.hours) && e.hours >= ENGINE_STALL_HOURS).sort((a, b) => a.n - b.n);
+  const keys = [...engine.map(e => 'engine#' + e.n), ...list.map(i => i.pr + '@' + String(i.headSha).slice(0, 12) + ':' + i.state)].join(' ');
   const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: issue, per_page: 100 });
   const previous = [...comments].reverse().find(c => c.user?.login === 'github-actions[bot]' && c.user?.type === 'Bot' && String(c.body || '').startsWith(STALL_MARKER));
   const before = String(previous?.body || '').match(/^stalls: (.*)$/m)?.[1] ?? null;
-  if (before === keys || (before === null && !list.length)) return 'unchanged';
-  const body = [STALL_MARKER, 'stalls: ' + keys, '### 🤖 Stalled card PRs (automated)', '',
-    list.length ? 'No activity on these card PRs past the stage limit. Each line names the stage and what to look at.'
-      : 'No card PR is stalled.', '',
-    ...list.map(i => `- #${i.pr} ${String(i.card || 'card').replace(/[@\r\n]/g, ' ').slice(0, 60)}: ${STALL_RULES[i.state].text} for ${Math.floor(i.hours)}h` +
-      (i.problems?.[0] ? ` (${String(i.problems[0]).replace(/[@\r\n]/g, ' ').slice(0, 140)})` : ''))].join('\n');
+  if (before === keys || (before === null && !keys)) return 'unchanged';
+  const body = [STALL_MARKER, 'stalls: ' + keys, '### 🤖 Stalled work (automated)', '',
+    keys ? 'Work stuck past its stage limit. Each line names the stage, who owns the next step, and what it is.'
+      : 'Nothing is stalled.', '',
+    ...engine.map(e => `- #${e.n} ${String(e.title).replace(/[@\r\n]/g, ' ').slice(0, 70)}: blocked engine upgrade for ${Math.floor(e.hours)}h. ` +
+      '**Owner:** Claude (engine lane). **Next:** fix on a `gpt/argentum-weekly-fix-*` branch per `engine-upgrade/HANDOFF.md`, dry run green, then merge into `gpt/arcana-integration-next`.'),
+    ...list.map(i => `- #${i.pr} ${String(i.card || 'card').replace(/[@\r\n]/g, ' ').slice(0, 60)}: ${STALL_RULES[i.state].text} for ${Math.floor(i.hours)}h. ` +
+      `**Owner:** ${STALL_RULES[i.state].who}. **Next:** ${STALL_RULES[i.state].next}` +
+      (i.problems?.[0] ? ` (${String(i.problems[0]).replace(/[@\r\n]/g, ' ').slice(0, 140)})` : '') + '.')].join('\n');
   await github.rest.issues.createComment({ owner, repo, issue_number: issue, body });
   return 'posted ' + list.length;
 }
