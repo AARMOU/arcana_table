@@ -15,6 +15,7 @@
 // Owner work authorization separately uses /v1/authorization + /v1/authorize and never certifies rules.
 
 import { publicGithub } from './public-github.mjs';
+import { runScheduled } from './scheduled.mjs';
 import { authorizationInfo, authorizeUnit } from './authorize.mjs';
 import { certificationStatus } from './verified-certification.mjs';
 
@@ -177,6 +178,11 @@ export async function decide(api, { pr, sha, decision, note }) {
 }
 
 export default {
+  // Cloudflare Cron Triggers (wrangler.toml): start the allowlisted status workflows on time.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runScheduled(event.cron, { token: String(env.GITHUB_ACTIONS_DISPATCH_TOKEN || '') })
+      .then(r => console.log(JSON.stringify(r))));
+  },
   async fetch(request, env, ctx, fetchImpl = fetch) {
     const url = new URL(request.url);
     const origin = request.headers.get("Origin");
