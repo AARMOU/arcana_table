@@ -13,8 +13,8 @@ name. This page explains them.
 |---|---|---|---|
 | `blocked: patch conflict` | issue | `origin/gpt/arcana-integration-next` | engine (Claude; GPT covers) |
 | `blocked: engine build failed` | issue (compiler errors listed) | `origin/bot/argentum-weekly` | engine (Claude; GPT covers) |
-| `(needs work)`: custom-card collision | draft PR from `bot/argentum-weekly` | `origin/bot/argentum-weekly` | cards (GPT) |
-| `(needs work)`: failing test or lost precon slot | draft PR | `origin/bot/argentum-weekly` | whoever owns the failing area |
+| `(needs work)`: custom-card collision | draft PR from `bot/argentum-weekly` | `origin/gpt/arcana-integration-next` | cards (GPT) |
+| `(needs work)`: failing test or lost precon slot | draft PR | `origin/gpt/arcana-integration-next` (the bot branch carries its reconciled override file, which the clean-header test rejects) | whoever owns the failing area |
 
 Work on a branch named `gpt/argentum-weekly-fix-<date>` (or `claude/…`). **Pushing it starts a dry run
 automatically**: the full upgrade, read-only, nothing published. Iterate until that dry run is green

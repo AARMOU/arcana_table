@@ -347,7 +347,9 @@ def handoff(kind, upstream, run_url=""):
                  f"git push -u origin {fix}   # starts a dry run automatically (read-only, publishes nothing)"]
         goal = "the patched engine compiles and the strict audit passes"
     else:
-        start = "origin/bot/argentum-weekly"
+        # the base, not the bot branch: the bot commits its reconciled override file, which the
+        # clean-header test rejects on a fix branch; the dry run re-reconciles against the target
+        start = "origin/gpt/arcana-integration-next"
         steps = [f"git fetch origin && git checkout -b {fix} {start}",
                  "# custom-card collisions are reconciled automatically (weekly.py reconcile keeps every Arcana card",
                  "#   and picks the version in play from its scenario tests); never delete a custom card to fix a run.",
