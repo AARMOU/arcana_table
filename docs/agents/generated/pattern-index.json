@@ -277,13 +277,19 @@
    ]
   },
   "Conditions.YouControl": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Eldrazi Monument",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziMonument.kt",
      "lines": 40,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldraziMonumentScenarioTest.kt"
+    },
+    {
+     "card": "Whisperer of the Wilds",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WhispererOfTheWilds.kt",
+     "lines": 43,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WhispererOfTheWildsScenarioTest.kt"
     },
     {
      "card": "Reflecting Pool",
@@ -594,7 +600,7 @@
    ]
   },
   "Costs.Tap": {
-   "count": 40,
+   "count": 41,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -844,6 +850,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PowerDepot.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PowerDepotScenarioTest.kt"
+    }
+   ]
+  },
+  "DynamicAmounts.lifeGainedThisTurn": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Celestine, the Living Saint",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CelestineTheLivingSaint.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineTheLivingSaintScenarioTest.kt"
     }
    ]
   },
@@ -1226,7 +1243,7 @@
    ]
   },
   "Effects.AddMana": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -1245,6 +1262,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Werebear.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WerebearScenarioTest.kt"
+    },
+    {
+     "card": "Whisperer of the Wilds",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WhispererOfTheWilds.kt",
+     "lines": 43,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WhispererOfTheWildsScenarioTest.kt"
     },
     {
      "card": "Jaheira, Friend of the Forest",
@@ -2596,6 +2619,17 @@
     }
    ]
   },
+  "Effects.PutOntoBattlefield": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Celestine, the Living Saint",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CelestineTheLivingSaint.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineTheLivingSaintScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.ReflexiveTrigger": {
    "count": 1,
    "examples": [
@@ -3164,7 +3198,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3316,7 +3350,7 @@
    ]
   },
   "Keyword.LIFELINK": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Flayed One",
@@ -3349,10 +3383,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ResurrectionOrbScenarioTest.kt"
     },
     {
-     "card": "Tallyman of Nurgle",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TallymanOfNurgle.kt",
-     "lines": 46,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TallymanOfNurgleScenarioTest.kt"
+     "card": "Celestine, the Living Saint",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CelestineTheLivingSaint.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineTheLivingSaintScenarioTest.kt"
     }
    ]
   },
@@ -4252,7 +4286,7 @@
    ]
   },
   "Triggers.you.beginningOf": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -4358,7 +4392,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 57,
+   "count": 58,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4521,7 +4555,7 @@
    ]
   },
   "keywords()": {
-   "count": 89,
+   "count": 90,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4794,7 +4828,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 133,
+   "count": 134,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -4960,7 +4994,7 @@
    ]
   },
   "manaAbility": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5053,7 +5087,7 @@
    ]
   },
   "restrictions": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Sea Gate Wreckage",
@@ -5074,6 +5108,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShrineOfTheForsakenGodsScenarioTest.kt"
     },
     {
+     "card": "Whisperer of the Wilds",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WhispererOfTheWilds.kt",
+     "lines": 43,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WhispererOfTheWildsScenarioTest.kt"
+    },
+    {
      "card": "Sceptre of Eternal Glory",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SceptreOfEternalGlory.kt",
      "lines": 45,
@@ -5084,17 +5124,11 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ReflectingPool.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ReflectingPoolScenarioTest.kt"
-    },
-    {
-     "card": "Raphael, the Muscle",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RaphaelTheMuscle.kt",
-     "lines": 48,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RaphaelTheMuscleScenarioTest.kt"
     }
    ]
   },
   "timing": {
-   "count": 32,
+   "count": 33,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5508,7 +5542,7 @@
    ]
   },
   "Step.END": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -5535,16 +5569,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GargoyleFlockScenarioTest.kt"
     },
     {
+     "card": "Celestine, the Living Saint",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CelestineTheLivingSaint.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineTheLivingSaintScenarioTest.kt"
+    },
+    {
      "card": "Frenetic Sliver",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/FreneticSliver.kt",
      "lines": 44,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/FreneticSliverScenarioTest.kt"
-    },
-    {
-     "card": "Sneak Attack",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SneakAttack.kt",
-     "lines": 44,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SneakAttackScenarioTest.kt"
     }
    ]
   },
@@ -5624,7 +5658,7 @@
    ]
   },
   "TimingRule.ManaAbility": {
-   "count": 29,
+   "count": 30,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -6705,7 +6739,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 100,
+   "count": 102,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -7216,7 +7250,7 @@
    ]
   },
   "Player.You": {
-   "count": 37,
+   "count": 38,
    "examples": [
     {
      "card": "Defile",
@@ -7649,7 +7683,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 68,
+   "count": 69,
    "examples": [
     {
      "card": "Defile",
