@@ -57,6 +57,8 @@ jobs:
             core.info('Ready for owner review: ' + payload.awaitingReview);
             // Mention the owner on #78 only when a card newly becomes ready to Verify.
             core.info('Ready alert: ' + await R.alertReady({github, ...context.repo, payload}));
+            try { core.info('Stalls: ' + await R.reportStalls({github, ...context.repo, payload})); }
+            catch (error) { core.warning('Stall report unavailable: ' + String(error?.message || error).slice(0, 200)); }
             // Explain owner-approved cards that integration skips (e.g. a non-card file in the PR).
             try { core.info('Integration skips: ' + await require('./scripts/card-integration.cjs').reportIntegrationSkips({github, ...context.repo})); }
             catch (error) { core.warning('Integration skip report unavailable: ' + String(error?.message || error).slice(0, 200)); }

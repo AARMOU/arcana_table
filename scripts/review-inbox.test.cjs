@@ -252,3 +252,23 @@ test('owner is mentioned once per newly ready card head, never on unchanged refr
   comments.push({ user: { login: 'someone', type: 'User' }, body: R.READY_MARKER + '\nready: 4@' + 'e'.repeat(40) });
   assert.equal(await go([card(4, 'e')]), 'posted 1');
 });
+
+test('stall report lists card PRs past each stage limit and posts only when the set changes', async () => {
+  const now = Date.parse('2026-10-30T12:00:00Z'), h = n => new Date(now - n * 36e5).toISOString();
+  const item = (pr, state, hours, extra = {}) => ({ pr, card: 'Card ' + pr, headSha: String(pr).repeat(40).slice(0, 40), kind: 'card', state, updatedAt: h(hours), ...extra });
+  const items = [item(1, 'certified', 25), item(2, 'certified', 23), item(8, 'certified', 200, { certifiedAt: h(1) }), item(3, 'approved', 3, { problems: ['Integration blocked: cardkit'] }),
+    item(4, 'checks-failed', 7), item(5, 'integrated', 99), item(6, 'awaiting-review', 30), { ...item(7, 'certified', 99), kind: 'audit' }];
+  assert.deepEqual(R.stalls({ items }, now).map(i => i.pr), [1, 3, 4, 6], 'stage time beats stale PR activity (#8 certified 1h ago)');
+  const comments = [];
+  const github = { rest: { issues: { listComments() {}, createComment: async ({ body }) => comments.push({ user: { login: 'github-actions[bot]', type: 'Bot' }, body }) } },
+    paginate: async () => comments };
+  const go = (its, t = now) => R.reportStalls({ github, owner: 'o', repo: 'r', payload: { items: its }, now: t });
+  assert.equal(await go([]), 'unchanged', 'nothing stalled and nothing posted before: quiet');
+  assert.equal(await go(items), 'posted 4');
+  assert.match(comments[0].body, /#3 Card 3: approved, not integrated for 3h \(Integration blocked: cardkit\)/);
+  assert.equal(await go(items, now + 18e5), 'unchanged', 'ages ticking up never re-post');
+  assert.equal(await go(items, now + 36e5), 'posted 5', 'a PR newly crossing its limit is reported');
+  assert.equal(await go(items.filter(i => i.pr !== 1)), 'posted 3', 'one resolved');
+  assert.equal(await go([]), 'posted 0', 'a cleared list is reported once');
+  assert.equal(await go([]), 'unchanged');
+});
