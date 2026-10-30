@@ -319,7 +319,7 @@
  },
  "Costs": {
   "Costs.Composite": {
-   "count": 28,
+   "count": 29,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -416,7 +416,7 @@
    ]
   },
   "Costs.Mana": {
-   "count": 36,
+   "count": 37,
    "examples": [
     {
      "card": "Deepfathom Skulker",
@@ -600,7 +600,7 @@
    ]
   },
   "Costs.Tap": {
-   "count": 41,
+   "count": 42,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -1525,6 +1525,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IronManBleedingEdge.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/IronManBleedingEdgeScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.CopyTargetSpellOrAbility": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Abstruse Archaic",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AbstruseArchaic.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AbstruseArchaicScenarioTest.kt"
     }
    ]
   },
@@ -3599,7 +3610,7 @@
    ]
   },
   "Keyword.VIGILANCE": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Wilson, Refined Grizzly",
@@ -4455,7 +4466,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 58,
+   "count": 59,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4618,7 +4629,7 @@
    ]
   },
   "keywords()": {
-   "count": 92,
+   "count": 93,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -6639,7 +6650,7 @@
    ]
   },
   "GameObjectFilter.Any": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Skittering Cicada",
@@ -6666,16 +6677,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SufferThePastScenarioTest.kt"
     },
     {
+     "card": "Abstruse Archaic",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AbstruseArchaic.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AbstruseArchaicScenarioTest.kt"
+    },
+    {
      "card": "Brigone, Soldier of Meletis",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BrigoneSoldierOfMeletis.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BrigoneSoldierOfMeletisScenarioTest.kt"
-    },
-    {
-     "card": "Szarekh, the Silent King",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SzarekhTheSilentKing.kt",
-     "lines": 41,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SzarekhTheSilentKingScenarioTest.kt"
     }
    ]
   },
@@ -7365,6 +7376,17 @@
     }
    ]
   },
+  "TargetFilter.ActivatedOrTriggeredAbilityOnStack": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Abstruse Archaic",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AbstruseArchaic.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AbstruseArchaicScenarioTest.kt"
+    }
+   ]
+  },
   "TargetFilter.Artifact": {
    "count": 1,
    "examples": [
@@ -7770,7 +7792,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 71,
+   "count": 72,
    "examples": [
     {
      "card": "Defile",
