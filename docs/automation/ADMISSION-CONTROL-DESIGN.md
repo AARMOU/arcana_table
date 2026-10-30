@@ -238,3 +238,30 @@ immediately before its ledger write and agent-triggering comment (`untrustedConv
 `scripts/failure-routing.cjs`, 2026-10-30), so `ARCANA_REPAIR_MODE=request` is an owner decision rather
 than blocked;
 branch protection on `main` is an owner setting (section 10).
+
+## 16. Certification-suite units (added 2026-10-30)
+
+A card PR cannot be certified until `certification/suites/<key>.json` and its test are on `main`.
+Suite authoring is now an ordinary admitted unit:
+
+- **Request.** `certification/backfill.cjs` (hourly and on certification pushes) calls
+  `certification/suite-requests.cjs` for every open Copilot card PR with card code but no suite whose
+  queue issue is not `arcana:engine-gap`. It opens one issue titled `[Arcana Suite] <card> — …` as
+  `github-actions[bot]`, body starting `<!-- arcana-suite-request-v1 -->` plus `arcana-suite-for-unit:<N>`,
+  with `Card unit:`, `Card PR:`, `Suite key:`, `Base: main` and the feeder's Oracle record. An existing
+  request (open or closed) is never duplicated; units naming several cards or lacking an Oracle record are
+  only reported on #81. Opening a request spends nothing.
+- **Trust.** `provenance()` trusts such an issue exactly like a feeder unit: bot author, marker first,
+  body never edited (`contentWrittenAt`). Comments follow the normal rules. `suiteActionable()` replaces
+  `unitActionable()`; no Cardkit verdict is needed (the card passed Cardkit in its own PR).
+- **Dispatch.** `loadUnits` includes `[Arcana Suite]` issues. In `normal` mode an eligible suite request is
+  picked before card units. `admit()` is unchanged: same ceiling, capacity, lanes (build) and budget.
+  `assignCopilot` uses `base_branch: main` and suite-only instructions (write only the two suite files,
+  strictly from the Oracle record, never read the card PR).
+- **Merge.** `.github/workflows/arcana-suite-automerge.yml` runs on each completed premerge. It merges only
+  when `mergeBlockers()` is empty: green run on the PR's exact head, same repository, Copilot PR on `main`,
+  linked to an open bot suite request, exactly the two requested files (both added), a registration whose
+  key, unit and source match the request, and the scenario job actually ran green. Then it runs the backfill
+  on the new `main` (a `GITHUB_TOKEN` merge starts no push workflow), which re-runs the card PR's CI and so
+  certification. A red premerge goes back to Copilot through normal repair, or stays for a person.
+

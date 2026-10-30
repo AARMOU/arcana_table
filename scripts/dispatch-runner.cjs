@@ -6,6 +6,12 @@ const A = require('./admission.cjs');
 const { loadUnits, isCopilot, contentWrittenAt, approvalOf, commentersOf } = require('./units.cjs');
 const F = require('./feasibility.cjs');
 
+// A certification-suite request (certification/suite-requests.cjs): test-only work on main.
+const isSuite = u => String(u?.raw?.title || '').startsWith(A.SUITE_TITLE);
+const actionableOf = (title, body, base) => String(title || '').startsWith(A.SUITE_TITLE) ? A.suiteActionable(body) : A.unitActionable(body, base);
+// Suites need no Cardkit verdict: the card itself already passed Cardkit in its own PR.
+const SUITE_FEASIBLE = { ok: true, code: null, reason: null, cards: [] };
+
 // Re-reads the issue right before the paid call so an edit, rename, new or edited comment, or a
 // body that no longer passes the readiness rules stops the assignment, even if it happened after
 // admission. Returns provenance() for the fresh state, plus the fresh readiness result.
@@ -24,7 +30,7 @@ async function revalidate({ github, owner, repo, n, fresh, needApproval, approve
       raw.approval = approvalOf(events, await contentWrittenAt(github, owner, repo, n));
     }
     const p = A.provenance(raw, { needApproval, approvers });
-    const act = A.unitActionable(fresh.body, base);
+    const act = actionableOf(fresh.title, fresh.body, base);
     const reasons = [...p.reasons, ...(act.ok ? [] : ['not-actionable-' + act.missing.join('-')])];
     return { ok: reasons.length === 0, reasons, actor: raw.approval?.actor || null };
   } catch { return { ok: false, reasons: ['revalidation-unavailable'] }; }
@@ -32,6 +38,17 @@ async function revalidate({ github, owner, repo, n, fresh, needApproval, approve
 
 const REPORT_ISSUE = 81;
 const INTERRUPT_MARKER = '<!-- arcana-interrupted-attempt-v1 -->';
+
+function suiteInstructions(n) {
+  return [
+    `Follow issue #${n}; it is your complete task: write one independent certification suite.`,
+    'Write it strictly from the Oracle record in the issue. Do NOT open, fetch, diff or read the card pull request or its branch; the suite must be independent of that implementation.',
+    'Add exactly two files and nothing else: the test class and the suite registration named in the issue, in the style of certification/CopperGnomesIndependentCertificationTest.kt and certification/suites/copper-gnomes.json.',
+    'Cover every ability, cost, restriction and a negative case. No placeholders, no weakened or skipped assertions.',
+    `Open one draft pull request against ${A.SUITE_BASE} with "Unit: #${n}" and "Fixes #${n}" in its body. If the card cannot be tested exactly, comment on issue #${n} and do NOT open a pull request.`,
+    'Never merge, and never change workflows, scripts, production, release or signing configuration.',
+  ].join(' ');
+}
 
 function unitInstructions(n, base) {
   return [
@@ -44,14 +61,14 @@ function unitInstructions(n, base) {
   ].join(' ');
 }
 
-async function assignCopilot({ token, owner, repo, issue_number, base, fetchImpl = fetch }) {
+async function assignCopilot({ token, owner, repo, issue_number, base, suite = false, fetchImpl = fetch }) {
   if (!token) return 'error';
   const res = await fetchImpl(`https://api.github.com/repos/${owner}/${repo}/issues/${issue_number}/assignees`, {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ assignees: ['copilot-swe-agent[bot]'], agent_assignment: {
-      target_repo: owner + '/' + repo, base_branch: base,
-      custom_instructions: unitInstructions(issue_number, base),
+      target_repo: owner + '/' + repo, base_branch: suite ? A.SUITE_BASE : base,
+      custom_instructions: suite ? suiteInstructions(issue_number) : unitInstructions(issue_number, base),
       custom_agent: '', model: '' } }),
     signal: AbortSignal.timeout(20000),
   });
@@ -109,12 +126,13 @@ async function resolveInterrupted({ github, owner, repo, unit, runId }) {
 const FEAS_CLASS = { 'no-cards': 'invalid', 'auto-override-prohibited': 'invalid', 'not-ready': 'blocked',
   'override-unauthorized': 'blocked', unavailable: 'transient', stale: 'transient' };
 function verdictOf(u, base, feasible, actionable = A.unitActionable) {
-  if (!u.raw.title.startsWith('[Arcana Queue]')) return { cls: 'invalid', reason: 'not-a-queue-issue' };
+  const suite = isSuite(u);
+  if (!suite && !u.raw.title.startsWith('[Arcana Queue]')) return { cls: 'invalid', reason: 'not-a-queue-issue' };
   if (u.prs.length) return { cls: 'claimed', reason: 'has-open-pr ' + u.prs.map(p => '#' + p.number).join(',') };
   if (!u.derived.provenance?.ok) return { cls: 'provenance', reason: 'untrusted-origin: ' + (u.derived.provenance?.reasons || []).join(',') };
-  const act = actionable(u.raw.body, base);
+  const act = suite ? A.suiteActionable(u.raw.body) : actionable(u.raw.body, base);
   if (!act.ok) return { cls: 'invalid', reason: 'not-actionable: ' + (act.missing || []).join(',') };
-  const feas = feasible(u);
+  const feas = suite ? SUITE_FEASIBLE : feasible(u);
   // An unknown/missing code is treated as blocked: the approval is kept, never discarded.
   if (!feas.ok) return { cls: FEAS_CLASS[feas.code] || 'blocked', reason: 'feasibility: ' + (feas.reason || 'not Copilot-ready') };
   return { cls: 'eligible', reason: null };
@@ -150,9 +168,9 @@ function selectCandidate(allUnits, mode, base, feasible, actionable = A.unitActi
     const unverified = ordered.find(u => verdict(u).cls !== 'blocked');
     if (unverified) return { candidate: unverified, labeled, error: null };
   }
-  const candidate = allUnits.filter(u => u.derived.state === 'queued' && u.raw.title.startsWith('[Arcana Queue]') &&
-    !u.prs.length && u.derived.provenance?.ok && actionable(u.raw.body, base).ok && feasible(u).ok)
-    .sort((a, b) => a.raw.number - b.raw.number)[0];
+  // Suite requests go first: each one unblocks a finished card PR that is waiting for certification.
+  const candidate = allUnits.filter(u => u.derived.state === 'queued' && verdictOf(u, base, feasible, actionable).cls === 'eligible')
+    .sort((a, b) => isSuite(b) - isSuite(a) || a.raw.number - b.raw.number)[0];
   return { candidate, labeled, error: null };
 }
 
@@ -238,10 +256,12 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
 
   const n = candidate.raw.number;
   // authorize-once names its unit explicitly, so the gate denies instead of skipping.
-  const feas = feasible(candidate);
+  const suite = isSuite(candidate);
+  const feas = suite ? SUITE_FEASIBLE : feasible(candidate);
+  const actionable = actionableOf(candidate.raw.title, candidate.raw.body, base);
   report.candidateFeasibility = { issue: n, ok: feas.ok, reason: feas.reason, cards: feas.cards.map(c => ({ name: c.name, readiness: c.readiness, route: c.route, hint: c.hint || null })) };
   // An incomplete unit is denied by admission with its own, more specific reason.
-  if (!feas.ok && A.unitActionable(candidate.raw.body, base).ok) {
+  if (!feas.ok && actionable.ok) {
     await core.summary.addHeading('Feasibility gate').addCodeBlock(JSON.stringify(report.candidateFeasibility)).write();
     return done('denied', { issue: n, reason: 'feasibility: ' + feas.reason });
   }
@@ -256,7 +276,7 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   report.billing = billing;
   const { snapshot } = billing;
   const decision = A.admit({ op: 'assign', unit: { ...candidate.derived, labeled: labeled.includes(candidate),
-    actionable: A.unitActionable(candidate.raw.body, base) },
+    actionable },
     units, labeledCount: labeled.length, ready, snapshot, now: Math.max(now, Date.now()) });
   report.decision = { issue: n, ...decision };
   // Job summaries of a public repository are public: no usage ratio or credit totals.
@@ -284,7 +304,7 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   if (claimed) result = 'not-attempted';
   else if (!origin.ok) { result = 'not-attempted'; reason = 'revalidation ' + origin.reasons.join(' '); }
   else {
-    try { result = await assignCopilot({ token: env.COPILOT_DISPATCH_TOKEN, owner, repo, issue_number: n, base, fetchImpl }); }
+    try { result = await assignCopilot({ token: env.COPILOT_DISPATCH_TOKEN, owner, repo, issue_number: n, base, suite, fetchImpl }); }
     catch { result = 'error'; }
   }
   // 4. Close the record. Missing this step is what the interrupted-attempt check catches.
@@ -294,4 +314,4 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   return done('attempted', { issue: n, result, ...(reason ? { reason } : {}) });
 }
 
-module.exports = { runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
+module.exports = { runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, suiteInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };

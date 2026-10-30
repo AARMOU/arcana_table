@@ -7,6 +7,10 @@ const { decideBudget } = require('./usage-budget-policy.cjs');
 const LEDGER = '<!-- arcana-wu-ledger-v1 -->';
 const AUTO_QUEUE_MARKER = '<!-- arcana-auto-queue-v1 -->';
 const ONE_SHOT_LABEL = 'arcana:authorize-once';
+// Certification-suite requests opened by certification/backfill.cjs (see certification/suite-requests.cjs).
+const SUITE_TITLE = '[Arcana Suite] ';
+const SUITE_MARKER = '<!-- arcana-suite-request-v1 -->';
+const SUITE_BASE = 'main';
 const HALTED_LABEL = 'wu:halted';
 const RESOLVE_LABEL = 'wu:resolve-interrupted';
 const HARD_MAX_UNITS = 2;
@@ -220,6 +224,19 @@ function unitActionable(body, base) {
   return { ok: missing.length === 0, missing };
 }
 
+// A suite request names its card unit, the card PR it certifies, the suite key and the main base.
+function suiteActionable(body) {
+  const text = stripComments(body), missing = [];
+  if (!String(body || '').startsWith(SUITE_MARKER + '\n')) missing.push('suite-marker');
+  if (!/^Card unit: #\d+\s*$/m.test(text)) missing.push('card-unit');
+  if (!/^Card PR: #\d+\s*$/m.test(text)) missing.push('card-pr');
+  if (!/^Suite key: [a-z][a-z0-9]*(?:-[a-z0-9]+)*\s*$/m.test(text)) missing.push('suite-key');
+  if (!/"oracle_text"/.test(text)) missing.push('oracle-record');
+  const line = text.match(/^Base:\s*`?([^`\s]+)`?\s*$/m);
+  if (!line || line[1] !== SUITE_BASE) missing.push('base-' + (line ? 'mismatch' : 'missing'));
+  return { ok: missing.length === 0, missing };
+}
+
 // Who may direct paid work. author_association is computed by GitHub from live repository
 // permissions and cannot be set by issue text. The bots are the dispatcher's own ledger writer
 // and Copilot itself.
@@ -241,9 +258,10 @@ function provenance(raw = {}, { needApproval = false, approvers } = {}) {
   const reasons = [];
   // Bot-created queue units are trusted ONLY when emitted unedited by the main feeder;
   // other bot or public issue submissions cannot authorize paid work.
+  const fromFeeder = String(raw.title || '').startsWith('[Arcana Queue]') && String(raw.body || '').startsWith(AUTO_QUEUE_MARKER + '\n');
+  const fromBackfill = String(raw.title || '').startsWith(SUITE_TITLE) && String(raw.body || '').startsWith(SUITE_MARKER + '\n');
   const trustedAutoQueue = raw.authorLogin === 'github-actions[bot]' && raw.authorType === 'Bot' &&
-    String(raw.title || '').startsWith('[Arcana Queue]') &&
-    String(raw.body || '').startsWith(AUTO_QUEUE_MARKER + '\n') && raw.autoQueueUnedited === true;
+    (fromFeeder || fromBackfill) && raw.autoQueueUnedited === true;
   if (!TRUSTED_ASSOCIATIONS.includes(raw.authorAssociation) && !trustedAutoQueue) reasons.push('author-untrusted');
   if (!Array.isArray(raw.commenters)) reasons.push('comments-unavailable');
   else if (raw.commenters.some(c => !trustedCommenter(c))) reasons.push('untrusted-comments');
@@ -342,7 +360,7 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
     : { allowed: true, reason: 'admitted', budget };
 }
 
-module.exports = { LEDGER, AUTO_QUEUE_MARKER, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
+module.exports = { LEDGER, AUTO_QUEUE_MARKER, SUITE_TITLE, SUITE_MARKER, SUITE_BASE, suiteActionable, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
   SESSION_STALE_MS, DEFAULT_BILLING_LAG_HOURS,
   readiness, formatLedger, parseLedger, deriveUnit, unitActionable, budgetWithReservations, admit, isBot,
   provenance, trustedCommenter, TRUSTED_ASSOCIATIONS };

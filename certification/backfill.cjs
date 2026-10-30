@@ -3,6 +3,7 @@
 // itself still happens in the trusted independent certification workflow.
 const P = require('./policy.cjs');
 const { cardPr } = require('./premerge-plan.cjs');
+const { requestSuites } = require('./suite-requests.cjs');
 
 const TRIGGERS = ['Arcana Cardkit', 'Arcana Development CI'];
 const MAX_RERUNS = 6;
@@ -16,7 +17,8 @@ async function backfill({ github, owner, repo, root = '.', scheduled = false, re
   const out = [];
   if (report) {
     const list = await missingSuites({ github, owner, repo, manifest, prs });
-    out.push({ missingSuites: list.map(m => m.pr), ...(await reportMissingSuites({ github, owner, repo, list })) });
+    await requestSuites({ github, owner, repo, list });
+    out.push({ suiteRequests: list.filter(m => m.request).map(m => ({ pr: m.pr, ...m.request })), missingSuites: list.map(m => m.pr), ...(await reportMissingSuites({ github, owner, repo, list })) });
   }
   for (const suite of manifest.suites) {
     if (out.filter(r => r.rerun).length >= MAX_RERUNS) break;
@@ -51,7 +53,8 @@ async function backfill({ github, owner, repo, root = '.', scheduled = false, re
 }
 
 // A Copilot card PR with card code but no registered suite can never be certified, so it would
-// wait silently. List them (read-only) and route them to the suite authors on #81.
+// wait silently. Each one gets an [Arcana Suite] request (suite-requests.cjs) that the dispatcher
+// assigns; #81 lists them all, so whatever cannot be requested automatically is still visible.
 const COPILOT = new Set(['copilot', 'copilot-swe-agent[bot]']);
 const CARD_SOURCE = /^android\/custom-cards\/src\/main\/.+\/cards\/[^/]+\.kt$/;
 const MARKER = '<!-- arcana-missing-certification-suites-v1 -->';
@@ -72,20 +75,23 @@ async function missingSuites({ github, owner, repo, manifest, prs }) {
     const unit = (await github.rest.issues.get({ owner, repo, issue_number: issue })).data;
     const engineGap = (unit?.labels || []).some(l => (l?.name || l) === ENGINE_GAP_LABEL);
     out.push({ pr: pr.number, issue, title: pr.title, ...(engineGap ? { engineGap: true } : {}) });
+    Object.defineProperty(out[out.length - 1], 'unitBody', { value: String(unit?.body || '') });
   }
   return out.sort((a, b) => a.pr - b.pr);
 }
 
-const line = m => `- #${m.pr} (queue #${m.issue}): ${m.title.replace(/[\r\n]+/g, ' ').slice(0, 100)}`;
+const requestNote = r => !r ? '' : r.issue ? ` — suite request #${r.issue}${r.state === 'closed' ? ' (closed without a merged suite: needs a person)' : ''}` :
+  r.skipped ? ` — not requested automatically: ${r.skipped}` : '';
+const line = m => `- #${m.pr} (queue #${m.issue}): ${m.title.replace(/[\r\n]+/g, ' ').slice(0, 100)}${requestNote(m.request)}`;
 const missingBody = list => {
   const needed = list.filter(m => !m.engineGap), blocked = list.filter(m => m.engineGap);
   return [MARKER, '### 🤖 Certification suites needed (automated, hourly)', '',
   needed.length
-    ? 'These Copilot card PRs contain card code but no registered certification suite, so they cannot be certified, verified or integrated. **Suite authors (Work GPT / Goose):** add `certification/suites/<key>.json` + test, as in #480. The backfill then re-runs CI and certification.'
+    ? 'These Copilot card PRs contain card code but no registered certification suite, so they cannot be certified, verified or integrated yet. Each gets an automatic `[Arcana Suite]` request that the dispatcher assigns to Copilot (admission and budget apply); a green premerge merges the suite and the backfill re-runs certification. **Suite authors (Work GPT / Goose):** only entries marked as not requested or closed need you; add `certification/suites/<key>.json` + test, as in #480.'
     : 'Every open Copilot card PR with card code has a registered certification suite.',
   '', ...needed.map(line),
   ...(blocked.length ? ['', `**Blocked on engine work** (queue issue labeled \`${ENGINE_GAP_LABEL}\`; no suite until the engine supports the card):`, ...blocked.map(line)] : []), '',
-  '_Read-only detection by `certification/backfill.cjs`; posted only when this list changes. No dispatch, labels or paid work._'].join('\n');
+  '_By `certification/backfill.cjs`; posted only when this list changes. It opens suite requests but never assigns or spends; the dispatcher does that._'].join('\n');
 };
 
 // Posts a new note only when the list differs from the latest note on the newest page of #81
