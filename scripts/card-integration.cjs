@@ -49,20 +49,37 @@ function ownerDecision(reviews, sha, policy) {
   const last = meaningful.at(-1);
   return last?.state === 'APPROVED' && last.commit_id === sha ? last : null;
 }
-function sourceEligible(cfg, snapshot) {
-  const {pr,issue,checks,reviews,files} = snapshot;
+// Every reason an approved card PR cannot be integrated. sourceEligible() is exactly "no reasons",
+// so the explanation and the gate can never disagree.
+function integrationBlockers(cfg, snapshot) {
+  const {pr,issue,checks,reviews,files} = snapshot, reasons = [];
   const suite = C.candidate(cfg.manifest,{pr,issue,sha:pr.head?.sha,checks,repository:cfg.policy.repository});
-  if (!cfg.policy.enabled || !suite || pr.draft || !ownerDecision(reviews,pr.head.sha,cfg.policy) ||
-      V.certification(checks,pr.head.sha) !== 'certified') return null;
+  if (!cfg.policy.enabled) reasons.push('integration is disabled by policy');
+  if (!suite) reasons.push('no certification match (registered suite, trusted open queue unit, base branch or required checks)');
+  if (pr.draft) reasons.push('the PR is still a draft');
+  if (!ownerDecision(reviews,pr.head?.sha,cfg.policy)) reasons.push('no owner approval on the current commit');
+  if (V.certification(checks,pr.head?.sha) !== 'certified') reasons.push('not independently certified on the current commit');
   // Pending or failing ancillary checks are not silently discarded.
-  if (checks.some(c => c.head_sha === pr.head.sha && isCardCheck(c) &&
-    (c.status !== 'completed' || !['success','skipped','neutral'].includes(c.conclusion)))) return null;
-  const p = paths(suite), allowed = [p.source,p.scenario,p.registry,...GENERATED];
-  if (!Array.isArray(files) || files.length < 3 || files.length > allowed.length ||
-      files.some(f => !allowed.includes(f.filename) || !['added','modified'].includes(f.status)) ||
-      ![p.source,p.scenario].every(name => files.some(f => f.filename === name && f.status === 'added')) ||
-      !files.some(f => f.filename === p.registry && f.status === 'modified')) return null;
-  return suite;
+  if (checks.some(c => c.head_sha === pr.head?.sha && isCardCheck(c) &&
+    (c.status !== 'completed' || !['success','skipped','neutral'].includes(c.conclusion))))
+    reasons.push('card checks are pending or failing');
+  if (suite) {
+    const p = paths(suite), allowed = [p.source,p.scenario,p.registry,...GENERATED];
+    if (!Array.isArray(files)) reasons.push('changed-file list unavailable');
+    else {
+      const outside = files.filter(f => !allowed.includes(f.filename) || !['added','modified'].includes(f.status));
+      if (outside.length) reasons.push('changes files outside the card-only set: ' + outside.map(f => f.filename + (allowed.includes(f.filename) ? ' (' + f.status + ')' : '')).slice(0, 5).join(', '));
+      if (files.length < 3 || files.length > allowed.length) reasons.push('unexpected number of changed files (' + files.length + ')');
+      const missing = [p.source,p.scenario].filter(name => !files.some(f => f.filename === name && f.status === 'added'));
+      if (missing.length) reasons.push('must add ' + missing.join(' and '));
+      if (!files.some(f => f.filename === p.registry && f.status === 'modified')) reasons.push('must modify ' + p.registry);
+    }
+  }
+  return {suite, reasons};
+}
+function sourceEligible(cfg, snapshot) {
+  const {suite, reasons} = integrationBlockers(cfg, snapshot);
+  return reasons.length ? null : suite;
 }
 async function snapshot(github, owner, repo, number) {
   const pr = (await github.rest.pulls.get({owner,repo,pull_number:number})).data;
@@ -212,5 +229,33 @@ async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,
   }
   return receipt;
 }
+// Owner-approved Copilot card PRs that integration skips without a receipt, with the reasons,
+// posted on #78 only when the list changes. Read-only apart from that one note.
+const SKIP_MARKER = '<!-- arcana-integration-skips-v1 -->';
+async function reportIntegrationSkips({github,owner,repo,root='.',issue=78}) {
+  const cfg = config(root);
+  const prs = await github.paginate(github.rest.pulls.list,{owner,repo,state:'open',per_page:100});
+  const skipped = [];
+  for (const pr of prs.sort((a,b)=>a.number-b.number)) {
+    if (!['copilot','copilot-swe-agent[bot]'].includes(String(pr.user?.login).toLowerCase())) continue;
+    const reviews = await github.paginate(github.rest.pulls.listReviews,{owner,repo,pull_number:pr.number,per_page:100});
+    if (!ownerDecision(reviews,pr.head.sha,cfg.policy)) continue;
+    // A receipt (integrated or blocked) for this commit already explains the outcome.
+    const comments = await github.paginate(github.rest.issues.listComments,{owner,repo,issue_number:pr.number,per_page:100});
+    if (comments.map(parseReceipt).some(r => r?.pr === pr.number && r.sourceSha === pr.head.sha)) continue;
+    const {reasons} = integrationBlockers(cfg, await snapshot(github,owner,repo,pr.number));
+    if (reasons.length) skipped.push({pr:pr.number,sha:pr.head.sha,title:pr.title,reasons});
+    if (skipped.length >= 15) break;
+  }
+  const body = [SKIP_MARKER, '### 🤖 Approved cards that integration is skipping (automated)', '',
+    skipped.length ? 'Each card below has the owner\'s approval on its current commit but cannot be integrated. **Card authors:** fix the reason on the PR; integration retries automatically. No action was taken on these PRs.'
+      : 'No owner-approved card PR is being skipped by integration.', '',
+    ...skipped.map(s => `- #${s.pr} ${String(s.title).replace(/[@\r\n]/g,' ').slice(0,70)} (head ${s.sha.slice(0,7)}): ${s.reasons.join('; ')}`)].join('\n');
+  const comments = await github.paginate(github.rest.issues.listComments,{owner,repo,issue_number:issue,per_page:100});
+  const previous = [...comments].reverse().find(c => c.user?.login === 'github-actions[bot]' && c.user?.type === 'Bot' && String(c.body||'').startsWith(SKIP_MARKER));
+  if (previous?.body === body || (!previous && !skipped.length)) return 'unchanged';
+  await github.rest.issues.createComment({owner,repo,issue_number:issue,body});
+  return 'posted ' + skipped.length;
+}
 module.exports={MARKER,TARGET,REGISTRY,GENERATED,GATES,CONTROL_PATHS,hash,config,validatePolicy,paths,ownerDecision,controlUnchanged,
-  sourceEligible,snapshot,parseReceipt,receiptFor,planNext,validateOutcome,validateReport,receiptBody,publish};
+  integrationBlockers,reportIntegrationSkips,SKIP_MARKER,sourceEligible,snapshot,parseReceipt,receiptFor,planNext,validateOutcome,validateReport,receiptBody,publish};

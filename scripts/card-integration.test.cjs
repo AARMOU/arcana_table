@@ -172,3 +172,38 @@ test('control-plane feeder/observer runs cannot block an approved card; real fai
   s.checks.push({ name: 'coordination-guard', head_sha: source, status: 'completed', conclusion: 'failure' });
   assert.equal(P.sourceEligible(cfg, s), null);
 });
+test('integration blockers name why an approved card is skipped, and match the gate exactly',()=>{
+  assert.deepEqual(P.integrationBlockers(cfg,snapshot()).reasons,[]);
+  const extra=snapshot();extra.files.push({filename:'tools/cardkit/tests/test_cardkit.py',status:'modified'});
+  const r=P.integrationBlockers(cfg,extra).reasons;
+  assert.equal(P.sourceEligible(cfg,extra),null);
+  assert.ok(r.some(x=>x.includes('outside the card-only set: tools/cardkit/tests/test_cardkit.py')),r.join('|'));
+  const draft=snapshot();draft.pr.draft=true;
+  assert.deepEqual(P.integrationBlockers(cfg,draft).reasons,['the PR is still a draft']);
+});
+test('skip report posts approved, receipt-less, ineligible PRs on #78 only when the list changes',async()=>{
+  const snap=snapshot();snap.files.push({filename:'tools/cardkit/tests/test_cardkit.py',status:'modified'});
+  const comments=[];const posted=[];
+  const {github}=githubMock(snap);
+  github.rest.issues.listComments=async({issue_number})=>({data:issue_number===78?comments:[]});
+  github.rest.issues.createComment=async({body})=>{posted.push(body);comments.push({user:{login:'github-actions[bot]',type:'Bot'},body});};
+  const run=()=>P.reportIntegrationSkips({github,owner:'AARMOU',repo:'arcana_table'});
+  assert.equal(await run(),'posted 1');
+  assert.ok(posted[0].startsWith(P.SKIP_MARKER)&&posted[0].includes('#410')&&posted[0].includes('test_cardkit.py'));
+  assert.equal(await run(),'unchanged');
+  // Eligible again (fixed by the author): one "none skipped" note, then quiet.
+  snap.files.pop();
+  assert.equal(await run(),'posted 0');
+  assert.equal(await run(),'unchanged');
+  // An existing receipt (here: integrated) for the current commit already explains the outcome.
+  snap.files.push({filename:'tools/cardkit/tests/test_cardkit.py',status:'modified'});
+  const receipt={user:{id:41898282,login:'github-actions[bot]',type:'Bot'},html_url:'u',body:P.MARKER+'\n```json\n'+JSON.stringify({schema:1,pr:410,
+    sourceSha:source,baseSha:base,target:P.TARGET,status:'integrated',destinationSha:destination,runUrl:'https://github.com/AARMOU/arcana_table/actions/runs/1'})+'\n```'};
+  github.rest.issues.listComments=async({issue_number})=>({data:issue_number===78?comments:[receipt]});
+  assert.equal(await run(),'unchanged','integrated cards are never listed');
+  // Unapproved PRs are never listed.
+  const quiet=githubMock((()=>{const s=snapshot();s.reviews=[];s.files.push({filename:'x.txt',status:'added'});return s;})());
+  quiet.github.rest.issues.listComments=async()=>({data:[]});
+  quiet.github.rest.issues.createComment=async()=>{throw Error('must not post');};
+  assert.equal(await P.reportIntegrationSkips({github:quiet.github,owner:'AARMOU',repo:'arcana_table'}),'unchanged');
+});
