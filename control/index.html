@@ -288,7 +288,9 @@
       let staleFeeds=0,cachedFeeds=0,sourceTimes=[],staleSources=[];
       // A feed served stale (edge stale-while-revalidate, or a copy checked over 15 min ago) has already
       // started a background refresh at the edge. Ask once more, shortly after, before calling it stale.
-      const isStaleFeed=r=>{const st=r.headers.get('x-arcana-feed'),cf=(r.headers.get('cf-cache-status')||'').toUpperCase(),src=Date.parse(r.headers.get('x-arcana-checked-at')||'');return st==='stale'||cf==='STALE'||cf==='UPDATING'||(Number.isFinite(src)&&Date.now()-src>15*60*1000);};
+      // Source time comes only from the Worker (X-Arcana-Checked-At, or its CORS-safelisted Last-Modified copy).
+      const feedCheckedAt=r=>Date.parse(r.headers.get('x-arcana-checked-at')||r.headers.get('last-modified')||'');
+      const isStaleFeed=r=>{const st=r.headers.get('x-arcana-feed'),cf=(r.headers.get('cf-cache-status')||'').toUpperCase(),src=feedCheckedAt(r);return st==='stale'||cf==='STALE'||cf==='UPDATING'||(Number.isFinite(src)&&Date.now()-src>15*60*1000);};
       // When the shared Cloudflare egress exhausts GitHub's unauthenticated API allowance,
       // retry public GETs from this user's browser (a distinct rate-limit bucket).
       // Bound direct reads to 1 per endpoint per 5 minutes while the edge is limited.
@@ -323,7 +325,7 @@
       async function apiRead(path) {
         // Let the browser and native Cloudflare Workers cache honor the published 15-minute TTL.
         // cache:'no-store' bypassed caching and repeatedly exhausted public GitHub API limits.
-        let res;
+        let res,directAt=null;
         try{res=await fetch(PUBLIC_GITHUB+encodeURIComponent(path),{signal:readTimeout()});}
         catch(err){
           const direct=await publicGithubDirect(path);
@@ -337,7 +339,8 @@
           const fresh=await fetch('https://api.github.com/repos/'+REPO+path,{
             cache:'no-store',headers:{'Accept':'application/vnd.github+json'},signal:readTimeout()
           }).catch(()=>null);
-          if(fresh?.ok)res=fresh;
+          // A direct GitHub read is checked now; GitHub's own Last-Modified is not a check time.
+          if(fresh?.ok){res=fresh;directAt=Date.now();}
         }
         if(!res.ok){
           const body=await res.json().catch(()=>({}));
@@ -351,7 +354,7 @@
         }
         const state=res.headers.get('x-arcana-feed');
         const cf=(res.headers.get('cf-cache-status')||'').toUpperCase();
-        const source=Date.parse(res.headers.get('x-arcana-checked-at')||'');
+        const source=directAt??feedCheckedAt(res);
         if(Number.isFinite(source))sourceTimes.push(source);
         if(state==='stale'||cf==='STALE'||cf==='UPDATING'||(Number.isFinite(source)&&Date.now()-source>15*60*1000)){staleFeeds++;staleSources.push(path+' ('+(state||cf||'old timestamp')+(Number.isFinite(source)?', checked '+new Date(source).toLocaleString():'')+')');}
         else if(state==='cached'||cf==='HIT')cachedFeeds++;
@@ -404,7 +407,7 @@
           if(Number.isFinite(checked)&&newer<=checked)return;
           reviewLatest={data,url:comment.html_url};
           out.review=reviewLatest;
-          sourceTimes.push(Date.now());
+          sourceTimes.push(newer);
         }catch{ /* Keep cached snapshot and expose its age; never claim it was verified. */ }
       }
       // REVIEW_FRESHNESS_END

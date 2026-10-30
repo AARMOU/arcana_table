@@ -35,6 +35,8 @@ const headersFor = (state, date, link, ttl) => ({
   'X-Content-Type-Options': 'nosniff',
   'X-Arcana-Feed': state,
   'X-Arcana-Checked-At': date,
+  // CORS-safelisted copy of the source time: readable even if an edge drops the expose list.
+  'Last-Modified': new Date(date).toUTCString(),
   ...(link ? { Link: link } : {}),
 });
 const reply = (body, state, date, link, ttl) => new Response(body, { status: 200, headers: headersFor(state, date, link, ttl) });

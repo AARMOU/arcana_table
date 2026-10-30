@@ -57,6 +57,7 @@ test('native Workers Cache is configured and response uses 15 minute freshness, 
   });
   assert.equal(res.status, 200);
   assert.equal(res.headers.get('X-Arcana-Checked-At'), '2026-10-28T18:00:00.000Z');
+  assert.equal(res.headers.get('Last-Modified'), 'Wed, 28 Oct 2026 18:00:00 GMT');
   const cc = res.headers.get('Cache-Control');
   assert.ok(cc.includes('public, max-age=900'), cc);
   assert.ok(cc.includes('stale-while-revalidate=3600'), cc);

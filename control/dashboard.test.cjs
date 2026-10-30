@@ -153,8 +153,16 @@ test('closed issues are never shown as candidates and verdict age is shown',()=>
 test('stale public feed falls back to fresh GitHub without polling',()=>{
   assert.ok(html.includes("if(res.ok&&isStaleFeed(res)){"));
   assert.ok(html.includes("fetch('https://api.github.com/repos/'+REPO+path"));
-  assert.ok(html.includes("if(fresh?.ok)res=fresh"));
+  assert.ok(html.includes("if(fresh?.ok){res=fresh;directAt=Date.now();}"));
   assert.equal((html.match(/isStaleFeed\(res\)/g)||[]).length,1);
+});
+test('source time survives the stale bypass and a hidden custom header',()=>{
+  // A bypassed read records its own check time; never GitHub's Last-Modified.
+  assert.ok(html.includes("const source=directAt??feedCheckedAt(res);"));
+  assert.ok(html.includes("r.headers.get('x-arcana-checked-at')||r.headers.get('last-modified')"));
+  // Review freshness reports the observer's checkedAt, not the client page-read time.
+  assert.ok(html.includes("sourceTimes.push(newer);"));
+  assert.ok(!html.includes("sourceTimes.push(Date.now())"));
 });
 test('signed-out approval checks GitHub live before showing a button',()=>{
   const auth=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
