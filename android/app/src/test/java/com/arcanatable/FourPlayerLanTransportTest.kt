@@ -34,6 +34,7 @@ class FourPlayerLanTransportTest {
             },
             onGuestMessage = { seat, message -> atHost.put(Received(seat, message)) },
             onGuestLeft = { seat -> left.put(seat) },
+            port = 0,
         )
         val guests = (0..3).map { ArgentumLanGuest() }
         val inbox = (0..3).map { LinkedBlockingQueue<JSONObject>() }
@@ -42,7 +43,7 @@ class FourPlayerLanTransportTest {
             assertTrue("LAN multi-host failed to bind: ${server.bindError}", server.awaitReady(10_000))
             for (i in 0..2) {
                 guests[i].onMessage = { msg -> inbox[i].put(msg) }
-                guests[i].connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "Guest $i"))
+                guests[i].connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "Guest $i"), port = server.localPort)
                 val ack = inbox[i].poll(5, TimeUnit.SECONDS)
                 assertEquals(ids[i].value, ack?.optString("seat"))
                 assertEquals(3 - (i + 1), server.openSeats)
@@ -67,7 +68,7 @@ class FourPlayerLanTransportTest {
             }
             // The 4th *guest* is the 5th phone including the host.
             guests[3].onMessage = { inbox[3].put(it) }
-            guests[3].connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "Too many"))
+            guests[3].connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "Too many"), port = server.localPort)
             val full = inbox[3].poll(5, TimeUnit.SECONDS)
             assertEquals("error", full?.optString("type"))
             assertEquals("WIFI", full?.optString("code"))
@@ -97,6 +98,7 @@ class FourPlayerLanTransportTest {
             },
             onGuestMessage = { _, _ -> },
             onGuestLeft = { left.put(it) },
+            port = 0,
         )
         val bad = ArgentumLanGuest()
         val good = ArgentumLanGuest()
@@ -106,14 +108,14 @@ class FourPlayerLanTransportTest {
             server.start()
             assertTrue(server.awaitReady(10_000))
             bad.onMessage = { rejected.put(it) }
-            bad.connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "bad"))
+            bad.connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "bad"), port = server.localPort)
             assertEquals("Invalid deck", rejected.poll(5, TimeUnit.SECONDS)?.optString("message"))
             val until = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
             while (server.openSeats != 1 && System.nanoTime() < until) Thread.sleep(20)
             assertEquals("bad deck must release its slot", 1, server.openSeats)
             assertNull("unadmitted guest disconnect must not concede anything", left.poll(200, TimeUnit.MILLISECONDS))
             good.onMessage = { accepted.put(it) }
-            good.connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "good"))
+            good.connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "good"), port = server.localPort)
             assertEquals("lanSeat", accepted.poll(5, TimeUnit.SECONDS)?.optString("type"))
         } finally {
             bad.close()
@@ -127,6 +129,7 @@ class FourPlayerLanTransportTest {
             onGuest = { seat, _ -> assertTrue(server.admitGuest(seat)); server.sendTo(seat, JSONObject().put("type", "lanSeat").put("seat", seat.value)) },
             onGuestMessage = { _, _ -> },
             onGuestLeft = { },
+            port = 0,
         )
         val guest = ArgentumLanGuest()
         val inbox = LinkedBlockingQueue<JSONObject>()
@@ -134,7 +137,7 @@ class FourPlayerLanTransportTest {
             server.start()
             assertTrue(server.awaitReady(10_000))
             guest.onMessage = { inbox.put(it) }
-            guest.connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "Ana"))
+            guest.connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "Ana"), port = server.localPort)
             assertEquals(ids[0].value, inbox.poll(5, TimeUnit.SECONDS)?.optString("seat"))
 
             // Ana holds seat 1: it must keep accepting her.
@@ -154,4 +157,34 @@ class FourPlayerLanTransportTest {
             server.close()
         }
     }
+    @Test fun simultaneousHostsUseDistinctPortsAndKeepTheirGuestsSeparate() {
+        val arrived = LinkedBlockingQueue<Int>()
+        val hosts = (0..1).map { index ->
+            ArgentumLanMultiServer("Host $index", ids.take(1),
+                onGuest = { _, _ -> arrived.put(index) }, onGuestMessage = { _, _ -> }, onGuestLeft = {}, port = 0)
+        }
+        val guests = (0..1).map { ArgentumLanGuest() }
+        val messages = (0..1).map { LinkedBlockingQueue<JSONObject>() }
+        try {
+            hosts.forEach { it.start() }
+            hosts.forEach { assertTrue("isolated host must bind: ${it.bindError}", it.awaitReady(10_000)) }
+            assertTrue(hosts.all { it.localPort > 0 })
+            assertFalse(hosts[0].localPort == hosts[1].localPort)
+            hosts.forEachIndexed { i, host ->
+                assertTrue(ArgentumLan.announcement("Host $i", host.localPort).endsWith("|${host.localPort}"))
+                guests[i].onMessage = { messages[i].put(it) }
+                guests[i].connect("127.0.0.1", JSONObject().put("type", "lanHello"), port = host.localPort)
+            }
+            assertEquals(setOf(0, 1), setOf(arrived.poll(5, TimeUnit.SECONDS), arrived.poll(5, TimeUnit.SECONDS)))
+            assertTrue(hosts.all { it.openSeats == 0 })
+            hosts.forEachIndexed { i, host -> host.rejectGuest(ids[0], "Host $i rejection") }
+            messages.forEachIndexed { i, inbox ->
+                assertEquals("Host $i rejection", inbox.poll(5, TimeUnit.SECONDS)?.optString("message"))
+            }
+        } finally {
+            guests.forEach(ArgentumLanGuest::close)
+            hosts.forEach(ArgentumLanMultiServer::close)
+        }
+    }
+
 }
