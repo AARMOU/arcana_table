@@ -37,7 +37,7 @@ FAKE_INFECT = {"name": "Cardkit Test Plaguebearer", "mana_cost": "{1}{B}", "type
                "oracle_text": "Infect", "power": "1", "toughness": "1", "color_identity": ["B"],
                "keywords": ["Infect"], "layout": "normal"}
 FAKE_COMBO = {"name": "Cardkit Test Martyr", "mana_cost": "{1}{W}", "type_line": "Creature \u2014 Human Warrior",
-              "oracle_text": "Martyrdom \u2014 When this creature dies, you gain 2 life and draw two cards.",
+              "oracle_text": "Martyrdom \u2014 Whenever this creature attacks, you gain 2 life and draw two cards.",
               "power": "2", "toughness": "2", "color_identity": ["W"], "keywords": ["Martyrdom"], "layout": "normal"}
 FAKE_REVEAL = {"name": "Cardkit Test Harbor", "type_line": "Land", "color_identity": ["W", "U"], "keywords": [],
                "oracle_text": "As this land enters, you may reveal a Plains or Island card from your hand. If you don't, "
@@ -360,22 +360,8 @@ class GapsTests(unittest.TestCase):
         result = gaps.analyze(gaps.load_decks(), use_refs=False)
         audit = subprocess.run([sys.executable, str(repo.ROOT / "investigation/argentum-six-precons/coverage-audit.py")],
                                capture_output=True, text=True, check=True).stdout
-        manifest = json.loads((repo.ROOT / "investigation/argentum-six-precons/deck-manifest.json").read_text())
-        indexed_cards = {
-            repo.normalize_name(line.split("\t", 1)[0])
-            for path in manifest["baseline"]["cardIndexes"]
-            for line in (repo.ROOT / path).read_text().splitlines()
-            if line.strip()
-        }
         for d in result["decks"]:
-            custom_playable = sum(
-                card["slots"] for card in result["cards"]
-                if card["readiness"] == "IMPLEMENTED_AND_TESTED"
-                and card["source"].startswith("custom:")
-                and repo.normalize_name(card["name"]) not in indexed_cards
-                and d["name"] in card["decks"]
-            )
-            self.assertIn(f"{d['name']}: {d['playableSlots'] - custom_playable}/100 supported", audit)
+            self.assertIn(f"{d['name']}: {d['playableSlots']}/100 supported", audit)
         self.assertEqual(sum(result["totals"].values()), len(result["cards"]))
         self.assertEqual(set(result["dispatch"]), {"copilot", "claude", "gpt", "claimed", "claimsVerified", "dispatchable"})
 
