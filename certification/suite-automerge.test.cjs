@@ -60,3 +60,25 @@ test('mergeSuitePr marks ready and squash-merges the exact head; ignores non-sui
   const r2 = await mergeSuitePr({ github, owner: 'AARMOU', repo: 'arcana_table', run: g.run });
   assert.equal(r2.reason, 'not-a-suite-pr'); assert.deepEqual(calls, []);
 });
+
+test('a refused merge leaves one owner notice with the exact clicks, never a silent stall', async () => {
+  const g = good(); const comments = [];
+  const github = {
+    paginate: async (fn, a) => fn(a),
+    rest: {
+      pulls: { list: () => [g.pr], listFiles: () => g.files },
+      issues: { get: async () => ({ data: g.request }), listComments: () => comments,
+        createComment: async a => comments.push({ user: { login: 'github-actions[bot]' }, body: a.body }) },
+      actions: { listJobsForWorkflowRun: () => g.jobs },
+      repos: { getContent: async () => ({ data: { content: Buffer.from(JSON.stringify(g.suite)).toString('base64') } }) },
+    },
+  };
+  const writer = { graphql: async () => { throw Error('Resource not accessible by integration'); }, rest: { pulls: { merge: async () => {} } } };
+  for (let i = 0; i < 2; i++) {
+    const r = await mergeSuitePr({ github, writer, owner: 'AARMOU', repo: 'arcana_table', run: g.run });
+    assert.equal(r.reason, 'merge-refused');
+  }
+  assert.equal(comments.length, 1);
+  assert.match(comments[0].body, /Ready for review\*\*, then \*\*Squash and merge/);
+  assert.match(comments[0].body, /ARCANA_SUITE_MERGE_TOKEN/);
+});

@@ -284,3 +284,9 @@ Suite authoring is now an ordinary admitted unit:
 - **B140 → numbered build has a trigger.** The same report lists B140 when its head has changes newer than
   the latest GitHub release for 72 h: owner AARMOU, next action the B141 checklist. Publishing the build
   as a release clears it. (Building, signing and releasing stay owner-only.)
+
+**§16 update (2026-10-30):** GitHub refuses `markPullRequestReadyForReview` from the workflow token, so the
+suite auto-merge marks ready and merges with `ARCANA_SUITE_MERGE_TOKEN` if set, else `COPILOT_DISPATCH_TOKEN`.
+If GitHub still refuses, it posts one notice on the suite PR with the owner's two clicks (Ready for review,
+Squash and merge) instead of stalling silently. A red premerge is now routed back to Copilot like card CI
+(`Arcana Card Certification Premerge` is in failure routing's workflow set; repair mode still applies).

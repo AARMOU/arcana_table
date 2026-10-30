@@ -8,6 +8,7 @@ on:
     workflows:
       - Arcana Development CI
       - Arcana Cardkit
+      - Arcana Card Certification Premerge
       - Argentum six-precon isolated worker regression
       - Isolated B131 shared-mechanics compatibility
       - Six-precon worker integration — full custom card regressions

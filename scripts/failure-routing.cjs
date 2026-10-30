@@ -5,7 +5,7 @@ const { createCopilotDelivery } = require('./copilot-delivery.cjs');
 const MARKER = '<!-- arcana-ci-repair-router-v2 -->';
 const OLD_MARKER = '<!-- arcana-ci-repair-router -->';
 const OBSERVED = '<!-- arcana-ci-failure-observed-v2 -->';
-const WORKFLOWS = new Set(['Arcana Development CI', 'Arcana Cardkit',
+const WORKFLOWS = new Set(['Arcana Development CI', 'Arcana Cardkit', 'Arcana Card Certification Premerge',
   'Argentum six-precon isolated worker regression',
   'Isolated B131 shared-mechanics compatibility',
   'Six-precon worker integration — full custom card regressions']);
