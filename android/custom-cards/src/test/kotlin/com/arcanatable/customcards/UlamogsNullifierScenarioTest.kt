@@ -808,6 +808,8 @@ class UlamogsNullifierScenarioTest {
                     visibility.isCardIdentityHiddenFrom(d.state, hidden, viewer))
                 assertEquals("Face-up exile must remain public: $context",
                     "Island", visibleControl?.name)
+                assertFalse("Face-up control must not be face-down: $context",
+                    visibleControl?.isFaceDown == true)
                 assertNotNull("Face-down exile must have a masked client card: $context", card)
                 assertTrue("Client must mark hidden exile face-down: $context", card!!.isFaceDown)
                 assertNotEquals("Snapshot leaked Sol Ring: $context", "Sol Ring", card.name)
@@ -823,8 +825,10 @@ class UlamogsNullifierScenarioTest {
         val spectatorHidden = spectator.cards[hidden]
         val spectatorControl = spectator.cards[faceUp]
         try {
+            assertNotNull("Face-down exile must appear as masked spectator card", spectatorHidden)
+            assertTrue("Spectator must see face-down flag", spectatorHidden!!.isFaceDown)
             assertNotEquals("Spectator must not see face-down exile identity",
-                "Sol Ring", spectatorHidden?.name)
+                "Sol Ring", spectatorHidden.name)
             assertEquals("Face-up exile is public to spectators",
                 "Island", spectatorControl?.name)
         } catch (failure: AssertionError) {
