@@ -14,6 +14,8 @@ Arcana Control's Verify / Approve gate intentionally requires **independent real
 
 **Preferred (conflict-free):** add `certification/suites/<key>.json` containing one suite object (same fields as a `suites.json` entry; the file name must equal its `key`) plus the reviewed test source in `certification/`. Do **not** edit `suites.json` or the premerge workflow: the premerge job builds its matrix from the manifest and runs the suites a PR adds or changes against their open Copilot card PR. After the suite merges, `arcana-certification-backfill.yml` re-runs that card PR's latest successful CI so certification runs without a manual re-run.
 
+**Automatic (default for Copilot card PRs):** the backfill opens an `[Arcana Suite]` request per uncovered card; the dispatcher assigns it to Copilot on `main` under admission; `arcana-suite-automerge.yml` merges the suite after a green premerge. See `docs/automation/ADMISSION-CONTROL-DESIGN.md` §16.
+
 
 Add one **trusted-main** manifest entry (key, exact Magic card name, its queue issue number, independent Kotlin source, JUnit test class, expected number of cases), and a reviewed test source in `certification/`. No new copy of the YAML workflow, Cloudflare Worker, dispatcher, or agent subscription is needed. Reuse support helpers/mechanic scenarios where appropriate; still test the card's own exceptions, timing, ownership, and negative cases. Validation fails on missing or ambiguous suites and unsafe paths. A card without independent test coverage **remains blocked**, not auto-certified.
 

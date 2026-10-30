@@ -186,3 +186,41 @@ test('every queued unit carries the dispatcher verdict even when another unit wa
   assert.equal(byN[70].eligible, false); assert.match(byN[70].skip, /^not-actionable/);
   assert.ok('eligible' in byN[68]);
 });
+
+// Certification-suite requests opened by the backfill (certification/suite-requests.cjs).
+const { suiteRequest } = require('../certification/suite-requests.cjs');
+const ORACLE = '{"name":"Shield Sphere","oracle_text":"Defender\\nWhenever this creature blocks, put a -0/-1 counter on it."}';
+const CREATED = '2026-10-30T19:00:00Z';
+const suiteIssue = (n, body) => { const r = suiteRequest({ pr: 518, issue: 509, name: 'Shield Sphere', oracle: { line: ORACLE } });
+  return { number: n, title: r.title, body: body ?? r.body, labels: [], assignees: [], state: 'open', created_at: CREATED,
+    author_association: 'NONE', user: { login: 'github-actions[bot]', type: 'Bot' } }; };
+const unedited = f => { f.github.graphql = async () => ({ repository: { issue: { createdAt: CREATED, lastEditedAt: null } } }); return f; };
+
+test('normal mode assigns an unedited backfill suite request first, on main, with suite-only instructions', async () => {
+  const f = unedited(fake({ issues: [queue(68), suiteIssue(600)] })); const calls = [];
+  const r = await run(f, { ARCANA_DISPATCH_MODE: 'normal' }, { fetchImpl: fetchOk(calls) });
+  assert.deepEqual(r, { state: 'attempted', issue: 600, result: 'confirmed' });
+  const a = calls[0][1].agent_assignment;
+  assert.equal(a.base_branch, 'main');
+  assert.match(a.custom_instructions, /Do NOT open, fetch, diff or read the card pull request/);
+  assert.match(a.custom_instructions, /Unit: #600/);
+  assert.match(f.writes[0][2], /op:authorizing\nissue:600/);
+});
+
+test('a suite request still goes through admission: an unknown budget denies it', async () => {
+  const f = unedited(fake({ issues: [suiteIssue(600)] })); const calls = [];
+  const r = await runDispatch({ github: f.github, context: ctx, core: core(), env: env({ ARCANA_DISPATCH_MODE: 'normal' }),
+    readBudget: async () => ({ snapshot: null }), fetchImpl: fetchOk(calls) });
+  assert.equal(r.state, 'denied'); assert.match(r.reason, /^budget/);
+  assert.equal(calls.length, 0); assert.deepEqual(f.writes, []);
+});
+
+test('an edited or person-written suite request is never assigned', async () => {
+  const edited = fake({ issues: [suiteIssue(600)] });
+  edited.github.graphql = async () => ({ repository: { issue: { createdAt: CREATED, lastEditedAt: '2026-10-30T19:05:00Z' } } });
+  const calls = [];
+  assert.equal((await run(edited, { ARCANA_DISPATCH_MODE: 'normal' }, { fetchImpl: fetchOk(calls) })).state, 'nothing-eligible');
+  const forged = unedited(fake({ issues: [suiteIssue(601, 'Card unit: #509\nCard PR: #518\nSuite key: x\nBase: main')] }));
+  assert.equal((await run(forged, { ARCANA_DISPATCH_MODE: 'normal' }, { fetchImpl: fetchOk(calls) })).state, 'nothing-eligible');
+  assert.equal(calls.length, 0);
+});

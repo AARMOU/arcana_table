@@ -1,7 +1,7 @@
 'use strict';
 // Loads work units from GitHub for admission control. All I/O lives here so that
 // admission.cjs stays pure. One unit = one queue (or Copilot-assigned) issue plus its PRs.
-const { parseLedger, deriveUnit, provenance, ONE_SHOT_LABEL, LEDGER, isBot } = require('./admission.cjs');
+const { parseLedger, deriveUnit, provenance, ONE_SHOT_LABEL, LEDGER, isBot, SUITE_TITLE } = require('./admission.cjs');
 const { overrideOf } = require('./feasibility.cjs');
 
 // writtenAt = created or last edited, whichever is later. Only the dispatcher's own ledger records
@@ -62,7 +62,7 @@ async function loadUnits({ github, owner, repo, now = Date.now(), approvers, lag
   const open = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
   const prs = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', per_page: 100 });
   const unitIssues = open.filter(i => !i.pull_request &&
-    (String(i.title).startsWith('[Arcana Queue]') || (i.assignees || []).some(isCopilot)));
+    (String(i.title).startsWith('[Arcana Queue]') || String(i.title).startsWith(SUITE_TITLE) || (i.assignees || []).some(isCopilot)));
   const numbers = new Set(unitIssues.map(i => i.number));
   const events = new Map();
   for (const issue of unitIssues) events.set(issue.number, await timeline(github, owner, repo, issue.number));
