@@ -185,3 +185,27 @@ test('control-plane feeder/observer runs do not hold a certified card in checks-
   const real = classify(pr, [...noisy, { name: 'cards-and-android', status: 'in_progress', head_sha: head }], [], '', files);
   assert.equal(real.state, 'checks-running');
 });
+
+test('owner is mentioned once per newly ready card head, never on unchanged refreshes', async () => {
+  const card = (n, h) => ({ pr: n, card: 'Card ' + n, headSha: h.repeat(40), kind: 'card', hasTest: true, draft: false,
+    state: 'certified', certification: 'certified', checks: {} });
+  const comments = [];
+  const github = { rest: { issues: { listComments() {}, createComment: async ({ body }) => {
+    comments.push({ user: { login: 'github-actions[bot]', type: 'Bot' }, body }); } } },
+    paginate: async () => comments };
+  const go = items => R.alertReady({ github, owner: 'o', repo: 'r', payload: { items } });
+  assert.equal(R.isReadyForOwner(card(1, 'a')), true, 'fixture is a ready card');
+  assert.equal(await go([]), 'unchanged');
+  assert.equal(await go([card(1, 'a')]), 'posted 1');
+  assert.match(comments[0].body, /^<!-- arcana-ready-to-verify-v1 -->/);
+  assert.match(comments[0].body, /@AARMOU \*\*1 card ready to Verify\*\*/);
+  assert.equal(await go([card(1, 'a')]), 'unchanged', 'same head is not re-alerted');
+  assert.equal(await go([card(1, 'a'), card(2, 'b')]), 'posted 1', 'only the new card is announced');
+  assert.match(comments[1].body, /#2 Card 2/);
+  assert.doesNotMatch(comments[1].body, /- #1 /);
+  assert.equal(await go([card(1, 'c')]), 'posted 1', 'a new head of the same PR is new');
+  assert.equal(await go([{ ...card(3, 'd'), draft: true }]), 'unchanged', 'not-ready items never alert');
+  // A look-alike from another account never suppresses an alert.
+  comments.push({ user: { login: 'someone', type: 'User' }, body: R.READY_MARKER + '\nready: 4@' + 'e'.repeat(40) });
+  assert.equal(await go([card(4, 'e')]), 'posted 1');
+});

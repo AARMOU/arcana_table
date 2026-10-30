@@ -170,4 +170,23 @@ async function buildReviewInbox({ github, owner, repo, now = new Date() }) {
   return inboxPayload(items, now, integratedActivity);
 }
 
-module.exports = { classify, classifyChangeFiles, isReadyForOwner, inboxPayload, inboxSummary, buildReviewInbox, abilitiesOf };
+// Owner alert on #78 when a card becomes ready to Verify. Only a PR at a head not already in the
+// last alert is new, so refreshes every 15 minutes post nothing until something changes.
+const READY_MARKER = '<!-- arcana-ready-to-verify-v1 -->';
+async function alertReady({ github, owner, repo, payload, issue = 78 }) {
+  const ready = (payload?.items || []).filter(isReadyForOwner).filter(i => Number.isSafeInteger(i.pr) && /^[0-9a-f]{40}$/.test(String(i.headSha)));
+  const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: issue, per_page: 100 });
+  const previous = [...comments].reverse().find(c => c.user?.login === 'github-actions[bot]' && c.user?.type === 'Bot' && String(c.body || '').startsWith(READY_MARKER));
+  const seen = new Set((String(previous?.body || '').match(/^ready: (.*)$/m)?.[1] || '').split(' ').filter(Boolean));
+  const fresh = ready.filter(i => !seen.has(i.pr + '@' + i.headSha));
+  if (!fresh.length) return 'unchanged';
+  const body = [READY_MARKER, 'ready: ' + ready.map(i => i.pr + '@' + i.headSha).join(' '),
+    `@AARMOU **${fresh.length} card${fresh.length > 1 ? 's' : ''} ready to Verify** in Arcana Control:`,
+    fresh.map(i => `- #${i.pr} ${String(i.card || 'card').replace(/[@\r\n]/g, ' ').slice(0, 80)} (head ${i.headSha.slice(0, 7)})`).join('\n'),
+    'Open Control → Verify: https://aarmou.github.io/arcana_table/control/',
+    'Independently certified with green checks; approval and integration still need your tap. No automatic merge or build.'].join('\n\n');
+  await github.rest.issues.createComment({ owner, repo, issue_number: issue, body });
+  return 'posted ' + fresh.length;
+}
+
+module.exports = { classify, classifyChangeFiles, isReadyForOwner, inboxPayload, inboxSummary, buildReviewInbox, abilitiesOf, alertReady, READY_MARKER };

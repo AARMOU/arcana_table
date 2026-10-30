@@ -75,6 +75,7 @@ function suiteMock({ files = {}, comments = [], link = '' } = {}) {
   const posted = [];
   const github = {
     rest: { pulls: { listFiles() {} }, issues: {
+      get: async ({ issue_number }) => ({ data: { number: issue_number, labels: issue_number === 9006 ? [{ name: 'arcana:engine-gap' }] : [] } }),
       listComments: async ({ page }) => ({ headers: { link }, data: page === 1 && link ? [] : comments }),
       createComment: async ({ body }) => { posted.push(body); } } },
     paginate: async (fn, args) => files[args.pull_number] || [],
@@ -105,4 +106,12 @@ test('posts the missing-suite note only when its list changes', async () => {
   assert.ok(fake.posted[0].startsWith(MARKER) && fake.posted[0].includes('#901'));
   const none = suiteMock();
   assert.equal((await reportMissingSuites({ github: none.github, owner: 'o', repo: 'r', list: [] })).posted, false);
+});
+
+test('engine-gap cards are listed apart and never asked for a suite', async () => {
+  const { github } = suiteMock({ files: { 901: [{ filename: cardFile }], 906: [{ filename: cardFile }] } });
+  const list = await missingSuites({ github, owner: 'o', repo: 'r', manifest, prs: [copilotPr(901, 9001), copilotPr(906, 9006)] });
+  assert.deepEqual(list.map(m => [m.pr, !!m.engineGap]), [[901, false], [906, true]]);
+  const body = missingBody(list);
+  assert.ok(body.indexOf('#901') < body.indexOf('Blocked on engine work') && body.indexOf('Blocked on engine work') < body.indexOf('#906'));
 });

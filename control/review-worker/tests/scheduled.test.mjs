@@ -7,7 +7,7 @@ import { runScheduled, SCHEDULE } from '../src/scheduled.mjs';
 test('timer starts only the allowlisted workflows on main, with the token', async () => {
   const calls = [];
   const fetchImpl = async (url, init) => { calls.push({ url, init }); return new Response(null, { status: 204 }); };
-  const r = await runScheduled('*/15 * * * *', { token: 't0k', fetchImpl });
+  const r = await runScheduled('*/15 * * * *', { token: 't0k', fetchImpl, scheduledTime: Date.parse('2026-10-30T05:15:00Z') });
   assert.deepEqual(r, [{ workflow: 'arcana-card-review-inbox-refresh.yml', status: 204 }]);
   assert.equal(calls[0].url, 'https://api.github.com/repos/AARMOU/arcana_table/actions/workflows/arcana-card-review-inbox-refresh.yml/dispatches');
   assert.equal(calls[0].init.method, 'POST');
@@ -32,5 +32,14 @@ test('wrangler crons match the schedule and the Worker exports a scheduled handl
   assert.deepEqual(crons.sort(), Object.keys(SCHEDULE).sort());
   assert.equal(typeof worker.scheduled, 'function');
   for (const jobs of Object.values(SCHEDULE)) for (const j of jobs)
-    assert.match(j.workflow, /^arcana-(card-review-inbox-refresh|certification-backfill)\.yml$/);
+    assert.match(j.workflow, /^arcana-(card-review-inbox-refresh|certification-backfill|card-dispatcher)\.yml$/);
+});
+
+test('the dispatcher runs at :00 and :30 only, never with dry_run overrides', async () => {
+  const seen = [];
+  const fetchImpl = async (url, init) => { seen.push([url.split('/workflows/')[1].split('/')[0], JSON.parse(init.body)]); return new Response(null, { status: 204 }); };
+  for (const m of ['00', '15', '30', '45']) await runScheduled('*/15 * * * *', { token: 't', fetchImpl, scheduledTime: Date.parse(`2026-10-30T05:${m}:00Z`) });
+  assert.deepEqual(seen.filter(([w]) => w === 'arcana-card-dispatcher.yml').length, 2);
+  assert.equal(seen.filter(([w]) => w === 'arcana-card-review-inbox-refresh.yml').length, 4);
+  for (const [, body] of seen) assert.deepEqual(body, { ref: 'main', inputs: {} });
 });
