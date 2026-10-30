@@ -455,7 +455,8 @@ test('Verify count keeps the last published count after five minutes and labels 
   assert.equal(ctx.countLabel(review(75),now),'1 reported · 1h old');
   assert.equal(ctx.countLabel(review(16,[]),now),'Not current · 16m old','an old zero is never shown as a current count');
   assert.equal(ctx.countLabel(review(3000,[]),now),'Not current · 2d old');
-  assert.equal(ctx.countLabel(review(6,[{...card,draft:true}]),now),'0 ready');
+  assert.equal(ctx.countLabel(review(6,[{...card,draft:true}]),now),'1 ready','a certified draft is ready: Approve marks it ready');
+  assert.equal(ctx.countLabel(review(6,[{...card,certification:'not-run'}]),now),'0 ready');
   assert.equal(ctx.countLabel(review(6,[{...card,state:'approved'}]),now),'0 ready');
   assert.equal(ctx.countLabel({checkedAt:'bogus',items:[card]},now),'— unavailable');
   assert.equal(ctx.countLabel({checkedAt:new Date(now+120000).toISOString(),items:[card]},now),'— unavailable');
