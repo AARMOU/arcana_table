@@ -204,6 +204,12 @@ async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,
     await github.rest.issues.createComment({owner,repo,issue_number:plan.pr,body});
     await github.rest.issues.createComment({owner,repo,issue_number:81,body});
   }
+  // The card is done: close its queue request so Control's queue lists only open work.
+  // Best effort; the integration itself already landed.
+  if (receipt.status==='integrated' && snap.issue?.state==='open' && String(snap.issue.title||'').startsWith('[Arcana Queue] ')) {
+    try { await github.rest.issues.update({owner,repo,issue_number:snap.issue.number,state:'closed',state_reason:'completed'}); }
+    catch { /* a later pass or the owner can close it */ }
+  }
   return receipt;
 }
 module.exports={MARKER,TARGET,REGISTRY,GENERATED,GATES,CONTROL_PATHS,hash,config,validatePolicy,paths,ownerDecision,controlUnchanged,

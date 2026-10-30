@@ -33,7 +33,8 @@ function githubMock(snap=snapshot(),{target=base,race=false,comments=[]}={}){
   const github={rest:{
     pulls:{get:async()=>({data:snap.pr}),list:async()=>({data:[snap.pr]}),listReviews:async()=>({data:snap.reviews}),listFiles:async()=>({data:snap.files})},
     checks:{listForRef:async()=>({data:{check_runs:snap.checks}})},
-    issues:{get:async()=>({data:snap.issue}),listComments:async()=>({data:comments}),createComment:async data=>{writes.push(['comment',data]);return {data:{id:1}};}},
+    issues:{get:async()=>({data:snap.issue}),listComments:async()=>({data:comments}),createComment:async data=>{writes.push(['comment',data]);return {data:{id:1}};},
+      update:async data=>{writes.push(['close',data]);return {data:{}};}},
     repos:{compareCommitsWithBasehead:async()=>({data:{status:'ahead'}})},
     git:{getRef:async({ref})=>({data:{object:{sha:ref==='heads/main'?control:target}}}),
       getCommit:async()=>({data:{tree:{sha:'e'.repeat(40)}}}),
@@ -82,7 +83,7 @@ test('failed destination tests publish blocker, with zero target/git writes',asy
   report.gates.find(g=>g.name==='independent').detail='wrong owner';
   const receipt=await P.publish({...common,github,plan:p,report,files:[],expectedSources:{}});
   assert.equal(receipt.status,'blocked');assert.match(receipt.reason,/wrong owner/);
-  assert.deepEqual(writes.map(w=>w[0]),['comment','comment']);
+  assert.deepEqual(writes.map(w=>w[0]),['comment','comment'],'a blocked integration never closes the queue request');
 });
 test('passing integration writes only seven verified files with a non-forced base lease',async()=>{
   const {github,writes}=githubMock();const p=plan();const r=result(p);
@@ -90,6 +91,8 @@ test('passing integration writes only seven verified files with a non-forced bas
   assert.equal(receipt.status,'integrated');assert.equal(receipt.destinationSha,destination);
   assert.deepEqual(writes.find(w=>w[0]==='commit')[1].parents,[base]);
   assert.deepEqual(writes.find(w=>w[0]==='ref')[1],{owner:'AARMOU',repo:'arcana_table',ref:'heads/'+P.TARGET,sha:destination,force:false});
+  assert.deepEqual(writes.find(w=>w[0]==='close')[1],{owner:'AARMOU',repo:'arcana_table',issue_number:408,state:'closed',state_reason:'completed'},
+    'integrated card closes its queue request');
 });
 test('target/base races, source changes, approval revocation and altered reconstructed source cannot merge',async()=>{
   const p=plan();

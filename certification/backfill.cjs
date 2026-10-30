@@ -56,6 +56,8 @@ const COPILOT = new Set(['copilot', 'copilot-swe-agent[bot]']);
 const CARD_SOURCE = /^android\/custom-cards\/src\/main\/.+\/cards\/[^/]+\.kt$/;
 const MARKER = '<!-- arcana-missing-certification-suites-v1 -->';
 const MAX_LISTED = 25;
+// Owner/agents put this on a queue issue whose card needs engine work first; a suite would not help yet.
+const ENGINE_GAP_LABEL = 'arcana:engine-gap';
 
 async function missingSuites({ github, owner, repo, manifest, prs }) {
   const covered = new Set(manifest.suites.map(s => s.issue));
@@ -67,17 +69,24 @@ async function missingSuites({ github, owner, repo, manifest, prs }) {
     if (!issue || covered.has(issue)) continue;
     const files = await github.paginate(github.rest.pulls.listFiles, { owner, repo, pull_number: pr.number, per_page: 100 });
     if (!files.some(f => CARD_SOURCE.test(f.filename))) continue;
-    out.push({ pr: pr.number, issue, title: pr.title });
+    const unit = (await github.rest.issues.get({ owner, repo, issue_number: issue })).data;
+    const engineGap = (unit?.labels || []).some(l => (l?.name || l) === ENGINE_GAP_LABEL);
+    out.push({ pr: pr.number, issue, title: pr.title, ...(engineGap ? { engineGap: true } : {}) });
   }
   return out.sort((a, b) => a.pr - b.pr);
 }
 
-const missingBody = list => [MARKER, '### 🤖 Certification suites needed (automated, hourly)', '',
-  list.length
+const line = m => `- #${m.pr} (queue #${m.issue}): ${m.title.replace(/[\r\n]+/g, ' ').slice(0, 100)}`;
+const missingBody = list => {
+  const needed = list.filter(m => !m.engineGap), blocked = list.filter(m => m.engineGap);
+  return [MARKER, '### 🤖 Certification suites needed (automated, hourly)', '',
+  needed.length
     ? 'These Copilot card PRs contain card code but no registered certification suite, so they cannot be certified, verified or integrated. **Suite authors (Work GPT / Goose):** add `certification/suites/<key>.json` + test, as in #480. The backfill then re-runs CI and certification.'
     : 'Every open Copilot card PR with card code has a registered certification suite.',
-  '', ...list.map(m => `- #${m.pr} (queue #${m.issue}): ${m.title.replace(/[\r\n]+/g, ' ').slice(0, 100)}`), '',
+  '', ...needed.map(line),
+  ...(blocked.length ? ['', `**Blocked on engine work** (queue issue labeled \`${ENGINE_GAP_LABEL}\`; no suite until the engine supports the card):`, ...blocked.map(line)] : []), '',
   '_Read-only detection by `certification/backfill.cjs`; posted only when this list changes. No dispatch, labels or paid work._'].join('\n');
+};
 
 // Posts a new note only when the list differs from the latest note on the newest page of #81
 // (which Control shows); an unchanged list posts nothing.
@@ -93,4 +102,4 @@ async function reportMissingSuites({ github, owner, repo, list, issue = 81 }) {
   return { posted: true };
 }
 
-module.exports = { backfill, missingSuites, missingBody, reportMissingSuites, MAX_RERUNS, MARKER };
+module.exports = { backfill, missingSuites, missingBody, reportMissingSuites, MAX_RERUNS, MARKER, ENGINE_GAP_LABEL };
