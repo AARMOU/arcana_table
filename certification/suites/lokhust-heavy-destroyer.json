@@ -1,0 +1,8 @@
+{
+  "key": "lokhust-heavy-destroyer",
+  "name": "Lokhust Heavy Destroyer",
+  "issue": 384,
+  "source": "certification/LokhustHeavyDestroyerIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.LokhustHeavyDestroyerIndependentCertificationTest",
+  "tests": 2
+}
