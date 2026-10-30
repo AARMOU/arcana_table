@@ -2434,7 +2434,7 @@
    ]
   },
   "Effects.MayPay": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Ulalek, Fused Atrocity",
@@ -2447,6 +2447,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/VileRedeemer.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VileRedeemerScenarioTest.kt"
+    },
+    {
+     "card": "Hormagaunt Horde",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HormagauntHorde.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HormagauntHordeScenarioTest.kt"
     },
     {
      "card": "Savai Thundermane",
@@ -2521,7 +2527,7 @@
    ]
   },
   "Effects.Move": {
-   "count": 10,
+   "count": 11,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -2548,16 +2554,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ContinueQuestionScenarioTest.kt"
     },
     {
+     "card": "Hormagaunt Horde",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HormagauntHorde.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HormagauntHordeScenarioTest.kt"
+    },
+    {
      "card": "Resurrection Orb",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ResurrectionOrb.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ResurrectionOrbScenarioTest.kt"
-    },
-    {
-     "card": "Poxwalkers",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Poxwalkers.kt",
-     "lines": 41,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PoxwalkersScenarioTest.kt"
     }
    ]
   },
@@ -3780,7 +3786,7 @@
  },
  "Triggers": {
   "Triggers.a": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -4624,7 +4630,7 @@
    ]
   },
   "ravenous()": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Zoanthrope",
@@ -4649,6 +4655,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TyrantGuard.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TyrantGuardScenarioTest.kt"
+    },
+    {
+     "card": "Hormagaunt Horde",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HormagauntHorde.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HormagauntHordeScenarioTest.kt"
     },
     {
      "card": "Tervigon",
@@ -4845,7 +4857,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 135,
+   "count": 136,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6447,7 +6459,7 @@
    ]
   },
   "EffectTarget.Self": {
-   "count": 32,
+   "count": 33,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -6841,7 +6853,7 @@
    ]
   },
   "GameObjectFilter.Land": {
-   "count": 15,
+   "count": 16,
    "examples": [
     {
      "card": "Defile",
@@ -6868,16 +6880,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EndlessAtlasScenarioTest.kt"
     },
     {
+     "card": "Hormagaunt Horde",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HormagauntHorde.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HormagauntHordeScenarioTest.kt"
+    },
+    {
      "card": "Rampaging Brontodon",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RampagingBrontodon.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RampagingBrontodonScenarioTest.kt"
-    },
-    {
-     "card": "Sword of Feast and Famine",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfFeastAndFamine.kt",
-     "lines": 41,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfFeastAndFamineScenarioTest.kt"
     }
    ]
   },
