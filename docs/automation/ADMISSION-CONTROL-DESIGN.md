@@ -290,3 +290,36 @@ suite auto-merge marks ready and merges with `ARCANA_SUITE_MERGE_TOKEN` if set, 
 If GitHub still refuses, it posts one notice on the suite PR with the owner's two clicks (Ready for review,
 Squash and merge) instead of stalling silently. A red premerge is now routed back to Copilot like card CI
 (`Arcana Card Certification Premerge` is in failure routing's workflow set; repair mode still applies).
+
+
+## 18. Merged suite completion and billing retention (#526 / #529)
+
+`loadUnits` recovers a suite request's explicitly connected PR even after the PR leaves the
+open-PR list. The durable completion record is read from GitHub on each observation: same-repository
+Copilot PR merged into `main`, exact two added suite files, matching registration at the immutable
+merge commit, and a successful premerge on the exact head whose matching scenario job actually
+executed the shared verification step before the merge. PR text, issue closure and completion
+comments are not proof. No new completion comments or issue-closing writes are necessary.
+
+After the real session started and finished, a validated suite becomes `completed`, independent
+of whether GitHub auto-closed its request. It cannot be assigned or repaired again. A new session
+start, pending repair or interrupted authorization still wins and retains/reclaims capacity.
+A merge never fabricates a session finish. Unavailable GitHub evidence fails the read closed.
+
+Closed bot-authored suite requests remain in the accounting input, so `recentlyFinished` continues
+reserving credits for `ARCANA_BILLING_LAG_HOURS` (24 h default). Closing a request cannot erase its
+liability. The normal billing-lag expiry is unchanged. No capacity setting, admission ceiling,
+paid assignment, owner approval, merge token or auto-merge policy is changed by this reconciliation.
+
+The closed-request read deliberately has no time cutoff: a late session event on its PR need not
+update the issue timestamp. This adds historical suite reads to each existing bounded observer tick;
+API failures stop admission rather than substituting zero liabilities. If suite history grows large,
+compact it only with a durable settled-liability/session reconciliation design, not a timestamp-only
+cutoff that can hide late work. Existing event-refresh throttling and router load reuse still apply.
+
+Validation: regressions cover open/closed requests, duplicate observations, billing lag, late sessions
+and repairs, missing timelines, wrong merge/source/suite/job evidence and forged comments. A read-only
+replay of real #526/#529 at 2026-10-30 19:47 UTC changes baseline `pending-pickup` / slot held / no recent
+liability to patched `completed` / no slot / recent liability, including simulated issue closure.
+The replay uses captured GitHub responses, not live production dispatch. #531's merge-token path
+still requires the next naturally admitted real suite PR; a no-op run does not verify that path.

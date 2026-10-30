@@ -300,7 +300,7 @@ test('one authorizer reads work units once per router invocation, and retries af
   await assert.rejects(authorize({ pr: { body: 'no unit' }, run: { id: 1, head_sha: sha } }), /503/);
   for (let i = 0; i < 3; i++)
     assert.equal((await authorize({ pr: { body: 'no unit' }, run: { id: i, head_sha: sha } })).reason, 'no work unit linked to PR');
-  assert.equal(listCalls, 2);
+  assert.equal(listCalls, 3); // one failed read, then the cached open + closed issue reads
 });
 
 test('authorizer: untrusted review bodies or inline review comments refuse a repair; recheck catches late text',async()=>{
