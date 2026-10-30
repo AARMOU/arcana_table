@@ -77,6 +77,16 @@ function render(container, units, checkedAt) {
     // lag after a label write, so it must never re-enable a previously authorized card.
     // If the live owner check fails, fail closed instead of inviting duplicate approvals.
     (async () => {
+      // Certification-suite requests are dispatched automatically (no owner tap); the authorize endpoint
+      // accepts card units only, so show them as automatic instead of offering a button that is refused.
+      const pub = await fetch(API + '/v1/public/github?path=' + encodeURIComponent('/issues/' + unit.n)).catch(() => null);
+      const pubInfo = pub?.ok ? await pub.json().catch(() => null) : null;
+      if (pubInfo?.number === unit.n && String(pubInfo.title || '').startsWith('[Arcana Suite]')) {
+        link.textContent = '#' + unit.n + ' · ' + String(pubInfo.title).replace(/^\[Arcana Suite\]\s*/, '');
+        button.remove();
+        message.textContent = 'Certification suite · starts automatically, no tap needed' + age;
+        return;
+      }
       const token = session();
       if (token) {
         const live = await call('/v1/authorization?issue=' + unit.n, token, 'GET');
