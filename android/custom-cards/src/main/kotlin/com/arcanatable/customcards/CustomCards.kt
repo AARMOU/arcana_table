@@ -251,6 +251,7 @@ object CustomCards {
         Entry(CanoptekTombSentinel, "40K", "Six WotC precons"),
         Entry(DenyTheWitch, "40K", "Six WotC precons"),
         Entry(HexmarkDestroyer, "40K", "Six WotC precons"),
+        Entry(LokhustHeavyDestroyer, "40K", "Six WotC precons"),
         Entry(TriarchPraetorian, "40K", "Six WotC precons"),
         Entry(RiseOfTheEldrazi, "CMM", "Six WotC precons"),
         Entry(TransmogrifyingWand, "CMM", "Six WotC precons"),
