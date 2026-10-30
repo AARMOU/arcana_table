@@ -5035,19 +5035,13 @@
    ]
   },
   "Duration.EndOfTurn": {
-   "count": 10,
+   "count": 9,
    "examples": [
     {
      "card": "Silence",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Silence.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SilenceScenarioTest.kt"
-    },
-    {
-     "card": "Mawloc",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mawloc.kt",
-     "lines": 34,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MawlocScenarioTest.kt"
     },
     {
      "card": "Rampaging Brontodon",
@@ -5072,6 +5066,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AllosaurusShepherd.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AllosaurusShepherdScenarioTest.kt"
+    },
+    {
+     "card": "Purphoros, God of the Forge",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PurphorosGodOfTheForge.kt",
+     "lines": 57,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PurphorosGodOfTheForgeScenarioTest.kt"
     }
    ]
   },
