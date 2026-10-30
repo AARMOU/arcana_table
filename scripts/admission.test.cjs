@@ -291,3 +291,17 @@ test('ambiguous PR links block admission for the unit', () => {
   const rep = { ...review(67), ambiguousLink: true };
   assert.match(A.admit({ op: 'repair', unit: rep, ready: A.readiness(env()), snapshot: snap(), now: NOW }).reason, /ambiguous/);
 });
+
+test('a slot held only by a timeout is released automatically after AUTO_RELEASE_MS, still reserving billing', () => {
+  const t0 = Date.parse('2026-10-30T00:00:00Z');
+  const ledger = [{ op: 'authorizing', run: '1', at: t0 }, { op: 'attempt-result', run: '1', result: 'confirmed', at: t0 }];
+  const unit = { number: 9, labels: [], assignedToCopilot: true, ledger, sessions: [] };
+  const held = A.deriveUnit(unit, t0 + A.PICKUP_TIMEOUT_MS + 1);
+  assert.equal(held.reason, 'pickup-timeout'); assert.equal(held.holdsSlot, true);
+  const freed = A.deriveUnit(unit, t0 + A.AUTO_RELEASE_MS + 1);
+  assert.equal(freed.reason, 'auto-released'); assert.equal(freed.holdsSlot, false); assert.equal(freed.recentlyFinished, true);
+  const stale = A.deriveUnit({ ...unit, sessions: [{ event: 'started', at: t0 }] }, t0 + A.AUTO_RELEASE_MS + 1);
+  assert.equal(stale.reason, 'auto-released'); assert.equal(stale.releasedFrom, 'session-stale');
+  // An interrupted attempt is never auto-released here; the dispatcher resolves it explicitly.
+  assert.equal(A.deriveUnit({ ...unit, ledger: ledger.slice(0, 1) }, t0 + 99 * A.AUTO_RELEASE_MS).blocksAll, true);
+});

@@ -265,3 +265,22 @@ Suite authoring is now an ordinary admitted unit:
   on the new `main` (a `GITHUB_TOKEN` merge starts no push workflow), which re-runs the card PR's CI and so
   certification. A red premerge goes back to Copilot through normal repair, or stays for a person.
 
+
+## 17. No step waits on an unassigned person (added 2026-10-30, owner: "fix it")
+
+- **Stuck slots release themselves.** A slot held only by `pickup-timeout` or `session-stale` is released
+  `AUTO_RELEASE_MS` (6 h) after the stuck event (`reason: auto-released`). Billing keeps reserving for it via
+  `recentlyFinished` for the lag window. `wu:halted` still releases at once.
+- **Interrupted attempts resolve themselves.** One hour after the `authorizing` record, the dispatcher appends
+  the same append-only `resolution` the owner label would (`by dispatcher-timeout`), with the observed
+  assignment, and dispatches nothing that run. Never a retry; `wu:resolve-interrupted` still works sooner.
+- **`arcana:engine-gap` is applied automatically.** A queue unit whose Copilot session finished, on which
+  Copilot commented, and which has no open PR (Copilot's instructions say to comment instead of opening a PR
+  when the card can't be implemented exactly) is labeled by the dispatcher, with a ledger observation.
+  Known limit: a unit whose card PR was *closed* without merging also has no open PR and could be labeled;
+  removing the label returns it.
+- **The GPT engine lane has an owner and a deadline.** Every 15 min the #78 stall report lists `[Card Work]`
+  issues and `arcana:engine-gap` queue units with no activity for 48 h: owner Work GPT, with the next action.
+- **B140 → numbered build has a trigger.** The same report lists B140 when its head has changes newer than
+  the latest GitHub release for 72 h: owner AARMOU, next action the B141 checklist. Publishing the build
+  as a release clears it. (Building, signing and releasing stay owner-only.)

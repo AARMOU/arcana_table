@@ -92,11 +92,11 @@ async function reportInterrupted({ github, owner, repo, unit, dry }) {
 
 // Owner-authorized, append-only resolution. Records who applied the label and what is observed
 // now; never deletes or edits earlier ledger records, never retries the assignment.
-async function resolveInterrupted({ github, owner, repo, unit, runId }) {
+async function resolveInterrupted({ github, owner, repo, unit, runId, auto = false }) {
   const n = unit.raw.number;
   const events = await github.paginate(github.rest.issues.listEventsForTimeline, { owner, repo, issue_number: n, per_page: 100 });
   const labeled = events.filter(e => e.event === 'labeled' && e.label?.name === A.RESOLVE_LABEL).pop();
-  const actor = String(labeled?.actor?.login || 'unknown').replace(/[^A-Za-z0-9_.\-[\]]/g, '');
+  const actor = auto ? 'dispatcher-timeout' : String(labeled?.actor?.login || 'unknown').replace(/[^A-Za-z0-9_.\-[\]]/g, '');
   const closed = new Set(unit.raw.ledger.filter(r => r.op === 'attempt-result' || r.op === 'resolution').map(r => r.run));
   const open = [...new Set(unit.raw.ledger.filter(r => r.op === 'authorizing' && !closed.has(r.run)).map(r => r.run))];
   const observed = unit.raw.assignedToCopilot ? 'assigned' : 'not-assigned';
@@ -104,12 +104,39 @@ async function resolveInterrupted({ github, owner, repo, unit, runId }) {
     await github.rest.issues.createComment({ owner, repo, issue_number: n, body: A.formatLedger({ op: 'resolution',
       issue: n, run, result: observed, reason: `owner-label by ${actor} in run ${runId}`, at: new Date().toISOString() }) });
   }
-  await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: A.RESOLVE_LABEL });
+  if (unit.raw.labels.includes(A.RESOLVE_LABEL)) await github.rest.issues.removeLabel({ owner, repo, issue_number: n, name: A.RESOLVE_LABEL });
   await github.rest.issues.createComment({ owner, repo, issue_number: REPORT_ISSUE, body: [INTERRUPT_MARKER,
     `resolved issue:${n} runs:${open.join(',')}`,
     `**Interrupted attempt on #${n} resolved** (label applied by ${actor}). Observed: Copilot ${observed === 'assigned' ? 'IS' : 'is NOT'} assigned.`,
     'Original ledger records are preserved. The unit\'s assignment remains used; no retry was made.'].join('\n\n') });
   return { issue: n, runs: open, observed, actor };
+}
+
+// A card unit whose Copilot session finished, that has no PR and on which Copilot commented, is a card
+// Copilot reported it cannot implement exactly (unitInstructions tells it to comment instead of opening a
+// PR). Label it arcana:engine-gap so it leaves the suite path and enters the GPT engine lane, which the #78
+// stall report times. Never spends; a ledger observation records why.
+const ENGINE_GAP_LABEL = 'arcana:engine-gap';
+const ENGINE_GAP_GRACE_MS = 30 * 60 * 1000;
+function engineGapCandidates(units, now = Date.now()) {
+  return units.filter(u => String(u.raw.title).startsWith('[Arcana Queue]') && u.derived.state === 'review' && !u.prs.length &&
+    !u.raw.labels.includes(ENGINE_GAP_LABEL) && (u.raw.commenters || []).some(c => isCopilot(c)) && (() => {
+      const at = s => Math.max(-Infinity, ...(u.raw.sessions || []).filter(x => x.event === s).map(x => x.at));
+      const fin = at('finished');
+      return fin > at('started') && now - fin > ENGINE_GAP_GRACE_MS;
+    })());
+}
+async function labelEngineGaps({ github, owner, repo, units, runId, now }) {
+  const out = [];
+  for (const u of engineGapCandidates(units, now).slice(0, 5)) {
+    try {
+      await github.rest.issues.addLabels({ owner, repo, issue_number: u.raw.number, labels: [ENGINE_GAP_LABEL] });
+      await github.rest.issues.createComment({ owner, repo, issue_number: u.raw.number, body: A.formatLedger({ op: 'observation',
+        issue: u.raw.number, run: runId, reason: 'labeled arcana:engine-gap: Copilot finished, commented, and opened no PR', at: new Date().toISOString() }) });
+      out.push(u.raw.number);
+    } catch { /* retried on the next run */ }
+  }
+  return out;
 }
 
 // Owner-authorized cards have priority over the ordinary lowest-numbered normal
@@ -191,12 +218,17 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   const data = await loadUnits({ github, owner, repo, now, approvers, lagMs: ready.billingLagMs });
   const units = data.units.map(u => u.derived);
   report.units = units;
+  if (!dry) report.engineGaps = await labelEngineGaps({ github, owner, repo, units: data.units, runId: String(context.runId), now: Math.max(now, Date.now()) });
   const interrupted = data.units.filter(u => u.derived.blocksAll);
   if (interrupted.length) {
     const resolved = [];
     for (const u of interrupted) {
-      if (!dry && u.raw.labels.includes(A.RESOLVE_LABEL)) {
-        resolved.push(await resolveInterrupted({ github, owner, repo, unit: u, runId: String(context.runId) }));
+      // Resolved by the owner's label, or automatically once the attempt is an hour old. Resolution only
+      // records what is observed; it never retries, so the unit's one assignment stays used either way.
+      const since = Math.max(...u.raw.ledger.filter(r => r.op === 'authorizing').map(r => r.at));
+      const auto = Number.isFinite(since) && Math.max(now, Date.now()) - since > A.INTERRUPT_AUTO_RESOLVE_MS;
+      if (!dry && (u.raw.labels.includes(A.RESOLVE_LABEL) || auto)) {
+        resolved.push(await resolveInterrupted({ github, owner, repo, unit: u, runId: String(context.runId), auto: !u.raw.labels.includes(A.RESOLVE_LABEL) }));
       } else await reportInterrupted({ github, owner, repo, unit: u, dry });
     }
     // Never dispatch in the same run that resolved or reported an interruption.
@@ -314,4 +346,4 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   return done('attempted', { issue: n, result, ...(reason ? { reason } : {}) });
 }
 
-module.exports = { runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, suiteInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
+module.exports = { engineGapCandidates, labelEngineGaps, ENGINE_GAP_LABEL, runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, suiteInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
