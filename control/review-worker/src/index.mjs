@@ -146,7 +146,6 @@ export async function decide(api, { pr, sha, decision, note }) {
   if (decision === "approve") {
     // The OAuth decision endpoint must enforce the same file-evidence gate as the read-only inbox.
     // A linked [Arcana Queue] issue or a green check is NOT evidence that a card exists.
-    if (p.body.draft) return [422, { error: "draft-pr" }];
     const changed = await api(`/pulls/${pr}/files?per_page=100`);
     if (!changed.ok || !Array.isArray(changed.body)) return [502, { error: "changed-files-unavailable" }];
     const filenames = changed.body.map(f => f.filename);
@@ -164,6 +163,17 @@ export async function decide(api, { pr, sha, decision, note }) {
     // Require trusted GitHub Actions app, exact check name/evidence and exact commit.
     const certification = certificationStatus(runs, sha);
     if (certification !== "certified") return [422, { error: "not-certified", certification }];
+    // Certification only reaches Copilot's own drafts, and the workflow token cannot mark them ready.
+    // Every gate above has passed for this exact head, so the owner's own session does it here;
+    // integration only considers non-draft PRs. If GitHub refuses, nothing is approved.
+    if (p.body.draft) {
+      if (typeof p.body.node_id !== "string" || !p.body.node_id) return [422, { error: "draft-pr" }];
+      const ready = await api("https://api.github.com/graphql", { method: "POST", body: JSON.stringify({
+        query: "mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { pullRequest { isDraft } } }",
+        variables: { id: p.body.node_id } }) });
+      if (!ready.ok || ready.body?.errors || ready.body?.data?.markPullRequestReadyForReview?.pullRequest?.isDraft !== false)
+        return [502, { error: "ready-for-review-failed" }];
+    }
   }
   const body = [DECISION_MARKER, `sha:${sha}`, decision === "approve"
     ? "**Owner verified this card** (Arcana Control). Sign-off for integration review only: not a merge, build, signing or release approval."

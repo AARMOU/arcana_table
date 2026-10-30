@@ -18,7 +18,7 @@ function fakeGitHub({ head = SHA, checks = [{ name: "toolkit", status: "complete
   files = ["android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt",
     "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineScenarioTest.kt"],
   unitTitle = "[Arcana Queue] Celestine — Cardkit SUPPORTED, unclaimed", user = "AARMOU",
-  prError = null } = {}) {
+  prError = null, readyRefused = false } = {}) {
   const writes = [];
   const fetchImpl = async (url, init = {}) => {
     const u = String(url); const method = init.method || "GET";
@@ -28,7 +28,9 @@ function fakeGitHub({ head = SHA, checks = [{ name: "toolkit", status: "complete
     if (u.endsWith("/pulls/360") && method === "GET" && prError) return new Response(
       JSON.stringify({message:prError.message||"GitHub rejected the request"}),
       {status:prError.status,headers:prError.headers||{}});
-    if (u.endsWith("/pulls/360") && method === "GET") return ok({ state: prState, draft, user: { login: author }, head: { sha: head }, body: "- Fixes #358" });
+    if (u.endsWith("/pulls/360") && method === "GET") return ok({ state: prState, draft, node_id: "PR_node360", user: { login: author }, head: { sha: head }, body: "- Fixes #358" });
+    if (u === "https://api.github.com/graphql" && method === "POST") { const b = JSON.parse(init.body); writes.push(["ready", b.variables]);
+      return readyRefused ? ok({ errors: [{ message: "Resource not accessible" }] }) : ok({ data: { markPullRequestReadyForReview: { pullRequest: { isDraft: false } } } }); }
     if (u.includes("/pulls/360/files?") && method === "GET") return ok(files.map(filename => ({ filename })));
     if (u.endsWith("/issues/358") && method === "GET") return ok({ state: "open", title: unitTitle });
     if (u.includes("/pulls/360/reviews") && method === "GET") return ok(reviews);
@@ -220,9 +222,25 @@ test("approval requires independent certification of the exact head; fix request
   assert.equal(ok.status, 200);
 });
 
-test("a draft, audit, engine blocker, or card without executable tests cannot be approved", async () => {
+test("a certified draft is marked ready with the owner's session, then approved", async () => {
+  const gh = fakeGitHub({ draft: true });
+  const r = await decision(gh, { pr: 360, sha: SHA, decision: "approve" });
+  assert.equal(r.status, 200);
+  assert.deepEqual(gh.writes.map(w => w[0]), ["ready", "review"], "ready only after every gate, before the review");
+  assert.deepEqual(gh.writes[0][1], { id: "PR_node360" });
+  const refused = fakeGitHub({ draft: true, readyRefused: true });
+  const f = await decision(refused, { pr: 360, sha: SHA, decision: "approve" });
+  assert.deepEqual([f.status, f.body.error], [502, "ready-for-review-failed"]);
+  assert.deepEqual(refused.writes.map(w => w[0]), ["ready"], "no approval when GitHub refuses the ready transition");
+  // A draft that fails any gate is never marked ready.
+  const uncertified = fakeGitHub({ draft: true, checks: [{ name: "toolkit", status: "completed", conclusion: "success" }] });
+  assert.equal((await decision(uncertified, { pr: 360, sha: SHA, decision: "approve" })).status, 422);
+  assert.equal(uncertified.writes.length, 0);
+});
+
+test("an audit, engine blocker, or card without executable tests cannot be approved", async () => {
   const cases = [
-    { draft: true },
+    { draft: true, files: [] },
     { files: [] },
     { files: ["tools/cardkit/data/known-blockers.json"] },
     { files: ["android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt"] },

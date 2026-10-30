@@ -16,7 +16,8 @@ const SHA = /^[0-9a-f]{40}$/;
 
 const sessionFromHash = hash => { const m = String(hash || '').match(/(?:^#|&)review-session=([^&]+)/); return m ? decodeURIComponent(m[1]) : null; };
 // A linked work unit is insufficient evidence that this PR implements a card.
-const isReadyForOwner = i => !!i && i.kind === 'card' && i.hasTest === true && i.draft === false &&
+// A certified Copilot draft is ready: approving marks it ready for review with the owner's session.
+const isReadyForOwner = i => !!i && i.kind === 'card' && i.hasTest === true &&
   i.state === 'certified' && i.certification === 'certified';
 const canDecide = i => !!i && i.kind === 'card' && i.state !== 'integrated' && SHA.test(String(i.headSha || '')) && Number.isSafeInteger(i.pr);
 // Approval needs independent rules certification on this head, not just green checks. The Worker
@@ -24,7 +25,6 @@ const canDecide = i => !!i && i.kind === 'card' && i.state !== 'integrated' && S
 const canApprove = i => canDecide(i) && isReadyForOwner(i);
 const approveBlocked = i => canApprove(i) ? null
   : !canDecide(i) ? 'This is not a verified card implementation. Review its GitHub PR as engineering or audit work.'
-    : i.draft ? 'This PR is still a draft; it is not ready for owner approval.'
       : !i.hasTest ? 'Executable card scenario tests are missing. You can still request a fix.'
         : 'Approval needs independent certification of this exact commit (' + (CERT[i.certification || 'not-run'] || i.certification) + '). You can still request a fix.';
 function decisionMessage(status, body) {
@@ -47,6 +47,7 @@ function decisionMessage(status, body) {
   if (status === 409 && body?.error === 'stale-commit') return { ok: false, stale: true, text: 'A newer commit arrived. Nothing was recorded. Refresh and review the new commit.' };
   if (status === 422 && body?.error === 'not-certified') return { ok: false, text: 'Cannot approve: this exact commit has not passed independent certification (' + (body.certification || 'not-run') + '). You can still request a fix.' };
   if (status === 422 && body?.error === 'checks-not-green') return { ok: false, text: 'Cannot approve: checks are not all passing (' + (body.checks || []).join(', ') + '). You can still request a fix.' };
+  if (status === 502 && body?.error === 'ready-for-review-failed') return { ok: false, text: 'GitHub would not mark this draft ready for review, so no approval was recorded. Try again; if it repeats, mark it ready on GitHub.' };
   if (status === 422 && body?.error === 'draft-pr') return { ok: false, text: 'This PR is still a draft. No approval was recorded.' };
   if (status === 422 && body?.error === 'not-a-verified-card-implementation') return { ok: false, text: 'No verified card source and executable test were found. No approval was recorded.' };
   if (status === 400 && body?.error === 'describe-the-fix') return { ok: false, text: 'Describe what needs fixing.' };

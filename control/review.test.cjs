@@ -30,7 +30,8 @@ test('only reviewable cards can be decided; approve needs independent certificat
   }
   assert.equal(R.canDecide(item('integrated')), false);
   assert.equal(R.canDecide({ pr: 360, headSha: 'short', state: 'awaiting-review' }), false);
-  assert.equal(R.canApprove({ ...item('certified', 'certified'), draft: true }), false);
+  assert.equal(R.canApprove({ ...item('certified', 'certified'), draft: true }), true, 'Approve marks a certified draft ready');
+  assert.equal(R.canApprove({ ...item('checks-running', 'not-run'), draft: true }), false);
   assert.equal(R.canApprove({ ...item('certified', 'certified'), hasTest: false }), false);
   assert.equal(R.canApprove({ ...item('certified', 'certified'), kind: 'audit' }), false);
   assert.equal(R.canDecide({ ...item('certified', 'certified'), kind: 'engine' }), false);
@@ -47,6 +48,7 @@ test('decision outcomes: success, duplicate, auth failure, stale commit, failed 
   assert.match(R.decisionMessage(422, { error: 'checks-not-green', checks: ['cards-and-android'] }).text, /cards-and-android/);
   assert.equal(R.decisionMessage(0, null).ok, false);
   assert.match(R.decisionMessage(422, { error: 'draft-pr' }).text, /draft/);
+  assert.match(R.decisionMessage(502, { error: 'ready-for-review-failed' }).text, /no approval was recorded/);
   assert.match(R.decisionMessage(422, { error: 'not-a-verified-card-implementation' }).text, /No verified card source/);
 });
 

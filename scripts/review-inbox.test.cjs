@@ -107,17 +107,20 @@ test('daily activity is not truncated to the owner review inbox and excludes unm
   assert.equal(p.integratedActivity[0].pr, 500);
 });
 
-test('file evidence separates actual cards from audits and engine blockers and prevents draft approval', () => {
+test('file evidence separates actual cards from audits and engine blockers; certified drafts are ready', () => {
   const green = [run('toolkit', 'success'), certRun()];
   const real = R.classify(pr(), green, [], '', cardFiles);
   assert.deepEqual([real.kind, real.hasTest, real.readyForOwner], ['card', true, true]);
   const draft = R.classify(pr({ draft: true }), green, [], '', cardFiles);
-  assert.deepEqual([draft.kind, draft.readyForOwner], ['card', false]);
+  assert.deepEqual([draft.kind, draft.readyForOwner], ['card', true], 'certified draft is ready: Approve marks it ready');
+  assert.doesNotMatch(draft.problems.join(' '), /Draft PR/);
+  const uncertifiedDraft = R.classify(pr({ draft: true }), [run('toolkit', 'success')], [], '', cardFiles);
+  assert.equal(uncertifiedDraft.readyForOwner, false);
   const audit = R.classify(pr({ title: 'Audit Eldrazi Incursion coverage', number: 95 }), green, [], '', []);
   const blocker = R.classify(pr({ title: 'Hold Ulamog pending engine support', number: 330 }), green, [], '', []);
   const notes = R.classify(pr({ title: 'Record cast-count blocker', number: 320 }), green, [], '', ['tools/cardkit/data/known-blockers.json']);
   assert.deepEqual([audit.kind, blocker.kind, notes.kind], ['audit', 'engine', 'engine']);
-  assert.equal(R.inboxPayload([real, draft, audit, blocker, notes]).awaitingReview, 1);
+  assert.equal(R.inboxPayload([real, draft, uncertifiedDraft, audit, blocker, notes]).awaitingReview, 2);
   assert.equal(R.classify(pr(), green, [], '', null).readyForOwner, false);
   assert.equal(R.classify(pr(), green, [], '', cardFiles.slice(0, 1)).readyForOwner, false);
   assert.equal(R.classify(pr(), green, [], '', Array(100).fill(cardFiles[0])).readyForOwner, false);
@@ -204,7 +207,7 @@ test('owner is mentioned once per newly ready card head, never on unchanged refr
   assert.match(comments[1].body, /#2 Card 2/);
   assert.doesNotMatch(comments[1].body, /- #1 /);
   assert.equal(await go([card(1, 'c')]), 'posted 1', 'a new head of the same PR is new');
-  assert.equal(await go([{ ...card(3, 'd'), draft: true }]), 'unchanged', 'not-ready items never alert');
+  assert.equal(await go([{ ...card(3, 'd'), state: 'checks-running' }]), 'unchanged', 'not-ready items never alert');
   // A look-alike from another account never suppresses an alert.
   comments.push({ user: { login: 'someone', type: 'User' }, body: R.READY_MARKER + '\nready: 4@' + 'e'.repeat(40) });
   assert.equal(await go([card(4, 'e')]), 'posted 1');

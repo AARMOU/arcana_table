@@ -37,7 +37,8 @@ function classifyChangeFiles(files, title = '') {
     return { kind: 'audit', hasTest: false, reason: 'Audit/documentation, no card implementation' };
   return { kind: 'engine', hasTest: false, reason: files.length ? 'Engine or blocker changes; no card implementation' : 'No card implementation changes in this PR' };
 }
-const isReadyForOwner = i => i?.kind === 'card' && i.hasTest === true && !i.draft &&
+// Drafts count once certified: the owner's Approve marks the PR ready for review (review Worker).
+const isReadyForOwner = i => i?.kind === 'card' && i.hasTest === true &&
   i.state === 'certified' && i.certification === 'certified';
 
 
@@ -80,7 +81,7 @@ function classify(pr, checkRuns = [], reviews = [], unitBody = '', files = null)
     ...(last?.state === 'CHANGES_REQUESTED' ? ['You requested a fix on this commit'] : []),
   ].slice(0, 8);
   if (change.reason) problems.push(change.reason);
-  if (pr.draft && change.kind === 'card') problems.push('Draft PR: not ready for owner approval');
+  if (pr.draft && change.kind === 'card' && state !== 'certified') problems.push('Draft PR: not ready for owner approval');
   const decidedHere = last && String(last.body || '').startsWith(DECISION_MARKER) ? 'arcana-control' : last ? 'github' : null;
   return { pr: pr.number, issue: unitOf(pr.body), card: cardOf(pr.title), headSha: head, state, checks, checkRuns: checkRuns2,
     certification, abilities: abilitiesOf(unitBody), problems: problems.slice(0, 8), decidedIn: decidedHere, draft: !!pr.draft,
