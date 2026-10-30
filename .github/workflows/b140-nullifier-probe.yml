@@ -61,12 +61,12 @@ jobs:
       matrix:
         include:
           - label: b140-control
-            ref: dea80c3c44e5b79140fc0a3108ba9d94c20339b1
+            ref: 6fe2760cecdef27e6ab5b45748e853865243e802
           # Independent JVM/workspace replay of the *same* B140 source, test fixture,
           # seed and shuffled deck. Different results between these two controls
           # demonstrate nondeterminism without attributing it to Nullifier.
           - label: b140-control-replay
-            ref: dea80c3c44e5b79140fc0a3108ba9d94c20339b1
+            ref: 6fe2760cecdef27e6ab5b45748e853865243e802
           - label: nullifier-candidate
             ref: ${{ github.sha }}
     steps:
@@ -87,6 +87,19 @@ jobs:
           pinned=$(git rev-parse HEAD)
           if [ "$live" != "$pinned" ]; then
             echo "::error::B140 source advanced ($pinned -> $live); update both controls and rerun."
+            exit 1
+          fi
+      - name: Reject candidate missing any current B140 source integrations
+        if: matrix.label == 'nullifier-candidate'
+        run: |
+          set -euo pipefail
+          # Shallow fetch both exact histories. A missing ancestor fails closed;
+          # a candidate cannot be compared against newer B140 as if integrated.
+          git fetch --no-tags --depth=150 origin "${{ github.sha }}"
+          git fetch --no-tags --depth=150 origin gpt/b140-card-request-test-apk-20261028
+          live=$(git rev-parse FETCH_HEAD)
+          if ! git merge-base --is-ancestor "$live" HEAD; then
+            echo "::error::Nullifier candidate does not include current B140 source $live. Merge-forward and regenerate Cardkit patterns before interpreting the AI comparison."
             exit 1
           fi
       - name: Use the same diagnostic-only AI mirror test on both engine sources
