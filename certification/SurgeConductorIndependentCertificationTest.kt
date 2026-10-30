@@ -17,7 +17,7 @@ class SurgeConductorIndependentCertificationTest {
 
     @Test
     fun anotherControlledNontokenArtifactProliferatesEachSelectedCounterKind() {
-        val d = customScenario(SurgeConductor, "Sol Ring")
+        val d = customScenario(SurgeConductor, "Sol Ring", "Grizzly Bears")
         val p = d.player1
         val conductor = d.putCreatureOnBattlefield(p, "Surge Conductor")
         val selected = d.putCreatureOnBattlefield(p, "Grizzly Bears")
@@ -71,7 +71,7 @@ class SurgeConductorIndependentCertificationTest {
 
     @Test
     fun itsOwnEntryDoesNotTriggerForAnotherArtifactEntering() {
-        val d = customScenario(SurgeConductor, "Sol Ring")
+        val d = customScenario(SurgeConductor, "Sol Ring", "Grizzly Bears")
         val p = d.player1
         d.putPermanentOnBattlefield(p, "Sol Ring")
         val target = d.putCreatureOnBattlefield(p, "Grizzly Bears")
@@ -106,7 +106,7 @@ class SurgeConductorIndependentCertificationTest {
 
     @Test
     fun artifactTokenEnteringDoesNotProliferate() {
-        val d = customScenario(SurgeConductor, "Servo Exhibition")
+        val d = customScenario(SurgeConductor, "Servo Exhibition", "Grizzly Bears")
         val p = d.player1
         d.putCreatureOnBattlefield(p, "Surge Conductor")
         val target = d.putCreatureOnBattlefield(p, "Grizzly Bears")
@@ -124,7 +124,7 @@ class SurgeConductorIndependentCertificationTest {
 
     @Test
     fun artifactEnteringUnderAnOpponentsControlDoesNotProliferate() {
-        val d = customScenario(SurgeConductor, "Sol Ring")
+        val d = customScenario(SurgeConductor, "Sol Ring", "Grizzly Bears")
         val p = d.player1
         val opponent = d.player2
         d.putCreatureOnBattlefield(p, "Surge Conductor")
