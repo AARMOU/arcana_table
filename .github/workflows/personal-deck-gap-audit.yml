@@ -15,7 +15,7 @@ permissions:
 # A moved source branch fails closed instead of silently reporting unapproved/stale coverage.
 env:
   ARCANA_DECK_AUDIT_SOURCE_REF: gpt/b140-card-request-test-apk-20261028
-  ARCANA_DECK_AUDIT_SOURCE_SHA: b42ec894419f50c7b96a114944af06df8e33d98e
+  ARCANA_DECK_AUDIT_SOURCE_SHA: 3df12c94be3692e586f4f687bf5d6bafbb97c358
 jobs:
   test:
     if: github.event_name == 'pull_request'
