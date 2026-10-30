@@ -191,7 +191,7 @@ function summarizeUnits(units = []) {
     running: (counts.working || 0) + (counts.repairing || 0),
     pendingPickup: counts['pending-pickup'] || 0,
     queued: counts.queued || 0,
-    completed: counts.review || 0,
+    completed: (counts.review || 0) + (counts.completed || 0),
     blocked: counts.halted || 0,
     holdingSlots: units.filter(u => u.holdsSlot).map(u => u.number),
     list: units.slice(0, MAX_UNITS_LISTED).map(u => ({ n: u.number, state: u.state, reason: u.reason || null, holdsSlot: !!u.holdsSlot,

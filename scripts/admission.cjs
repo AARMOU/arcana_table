@@ -173,6 +173,11 @@ function deriveState(unit, now) {
   }
   if (ledger.some(r => r.op === 'halt') || (unit.labels || []).includes(HALTED_LABEL))
     return { ...base, state: 'halted', reason: 'owner-review', holdsSlot: false };
+  // Completion never substitutes for observed session events. The active/repair/
+  // pending/interrupted checks above always win, including a late post-merge start.
+  if (unit.suiteCompletion && assigned) return { ...base, state: 'completed', holdsSlot: false };
+  // Closed suite requests remain in accounting, but cannot be assigned or repaired.
+  if (unit.closed) return { ...base, state: 'halted', reason: 'closed-unit', holdsSlot: false };
   if (assigned) return { ...base, state: 'review', holdsSlot: false };
   // Authorization used but no assignment happened (claim changed, or resolved as not assigned).
   if (assignments) return { ...base, state: 'halted', reason: 'assignment-consumed', holdsSlot: false };
