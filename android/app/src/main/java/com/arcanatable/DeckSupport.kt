@@ -1,5 +1,6 @@
 package com.arcanatable
 
+import com.arcanatable.engine.OfflineCardLibrary
 import java.io.InputStream
 import java.util.Locale
 
@@ -96,14 +97,16 @@ data class DeckSupportReport(val entries: List<EntrySupport>) {
     }
 }
 
-class SupportedCardCatalog(cards: List<SupportedCard>) {
+class SupportedCardCatalog(cards: List<SupportedCard>, overrides: Set<String> = emptySet()) {
     private val byLower: Map<String, SupportedCard>
     private val playable: List<SupportedCard>
 
     init {
         val map = LinkedHashMap<String, SupportedCard>()
-        // Argentum first, so its definition wins over a custom card of the same name.
-        cards.sortedBy { it.custom }.forEach { card -> map.putIfAbsent(card.name.lowercase(Locale.ROOT), card) }
+        // Argentum first, so its definition wins over a custom card of the same name, except for names in
+        // custom-overrides.txt (lowercase), where the game plays Arcana's card, as OfflineCardLibrary does.
+        cards.sortedBy { it.custom != (it.name.lowercase(Locale.ROOT) in overrides) }
+            .forEach { card -> map.putIfAbsent(card.name.lowercase(Locale.ROOT), card) }
         byLower = map
         playable = map.values.filter { it.kind != "token" }.sortedBy { it.name.lowercase(Locale.ROOT) }
     }
@@ -199,7 +202,9 @@ class SupportedCardCatalog(cards: List<SupportedCard>) {
                     }
                 } ?: if (!custom) error("Argentum card library is missing from this build.") else Unit
             }
-            return SupportedCardCatalog(cards)
+            val overrides = open("argentum/${OfflineCardLibrary.OVERRIDES}")?.bufferedReader()
+                ?.useLines(OfflineCardLibrary::parseOverrides).orEmpty()
+            return SupportedCardCatalog(cards, overrides)
         }
 
         internal fun parseLibraryLine(line: String, custom: Boolean, kind: String): SupportedCard? {

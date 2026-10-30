@@ -169,7 +169,7 @@ class WeeklyHandoff(unittest.TestCase):
     def test_handoff_notes_name_the_right_starting_point(self):
         for kind, start in (("conflict", "origin/gpt/arcana-integration-next"),
                             ("build_failed", "origin/bot/argentum-weekly"),
-                            ("needs_work", "origin/bot/argentum-weekly")):
+                            ("needs_work", "origin/gpt/arcana-integration-next")):
             self.weekly("handoff", kind, self.target)
             notes = (self.repo / "engine-upgrade/weekly/handoff.md").read_text()
             self.assertIn(start, notes)
