@@ -188,7 +188,7 @@ def cmd_check(a) -> int:
         data = check.write_baseline()
         print(f"Wrote {repo.rel(check.BASELINE)}: {len(data['untested'])} untested, {len(data['unregistered'])} unregistered")
         return 0
-    errors, warnings = check.run(strict_oracle=a.strict_oracle)
+    errors, warnings = check.run(strict_oracle=a.strict_oracle, finished=frozenset(a.finished or ()))
     for w in warnings:
         print(f"warning: {w}")
     for e in errors:
@@ -307,6 +307,8 @@ def main(argv: list[str] | None = None) -> int:
     s = sub.add_parser("check", help="card PR rules (CI)")
     s.add_argument("--strict-oracle", action="store_true", help="treat Oracle drift as errors")
     s.add_argument("--write-baseline", action="store_true", help=argparse.SUPPRESS)
+    s.add_argument("--finished", nargs="*", metavar="PATH",
+                   help="card files a PR adds or changes (repo-relative): each must be finished and registered")
     s.set_defaults(func=cmd_check)
 
     s = sub.add_parser("blocker", help="record an engine gap for a card")
