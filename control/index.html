@@ -52,8 +52,19 @@
     .assignment-links a[hidden]{display:none}
     .card-progress{margin-bottom:19px;padding:15px 18px;background:var(--surface);border:1px solid var(--line);border-radius:16px}
     .card-progress-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.card-progress-head h2{font-size:14px;margin:0;font-weight:750}
-    .card-progress-select{max-width:100%;min-width:0;flex:0 1 340px;background:var(--surface2);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:inherit;font-size:13px;min-height:38px}
-    .card-progress-select:focus-visible{outline:2px solid var(--teal);outline-offset:3px}.card-progress-select[hidden],.card-progress-route[hidden],.card-progress-goose[hidden]{display:none}
+    .card-progress-summary{font-size:11px;color:var(--muted)}
+    .card-picker{margin-top:11px}.card-picker-tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+    .card-picker-tab{font:inherit;font-size:12px;font-weight:700;color:var(--muted);border:1px solid var(--line);background:var(--surface2);border-radius:9px;min-height:38px;cursor:pointer}
+    .card-picker-tab[aria-pressed="true"]{border-color:var(--teal);color:var(--ink);background:var(--surface)}
+    .card-picker-tab:focus-visible,.card-picker-choice:focus-visible,.card-picker-search:focus-visible{outline:2px solid var(--teal);outline-offset:2px}
+    .card-picker-search{display:block;width:100%;box-sizing:border-box;margin-top:9px;padding:10px 12px;min-height:42px;font:inherit;font-size:16px;color:var(--ink);background:var(--surface2);border:1px solid var(--line);border-radius:9px}
+    .card-picker-search[hidden],.card-progress-route[hidden],.card-progress-goose[hidden]{display:none}
+    .card-picker-list{display:grid;gap:6px;margin-top:9px}
+    .card-picker-choice{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;text-align:left;cursor:pointer;padding:10px 12px;background:var(--surface2);color:var(--ink);font:inherit;border:1px solid var(--line);border-radius:10px}
+    .card-picker-choice[aria-pressed="true"]{border-color:var(--teal)}
+    .card-picker-copy{display:grid;gap:3px;min-width:0}.card-picker-name{font-size:13px;font-weight:730;overflow-wrap:anywhere}
+    .card-picker-status{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+    .card-picker-mark{flex:none;font-size:15px;color:var(--teal)}.card-picker-hint{font-size:11px;color:var(--muted);margin:8px 0 0}
     .card-progress-route{position:relative;min-height:72px;margin-top:10px}.card-progress-line,.card-progress-fill{position:absolute;top:23px;left:8.333333%;height:3px;border-radius:2px}
     .card-progress-line{width:83.333333%;background:var(--line)}.card-progress-fill{width:0;background:var(--teal);transition:width 350ms ease}
     .card-progress-goose{position:absolute;top:24.5px;left:8.333333%;transform:translate(-50%,-50%);width:24px;height:24px;font-size:22px;line-height:24px;text-align:center;background:transparent;z-index:2;transition:left 350ms ease}
@@ -61,7 +72,7 @@
     .card-progress-dot{width:17px;height:17px;display:grid;place-items:center;border-radius:50%;background:var(--line);color:var(--bg)}.card-progress-stage.complete .card-progress-dot{background:var(--teal)}.card-progress-stage.current .card-progress-dot{visibility:hidden}.card-progress-stage.current{color:var(--ink);font-weight:750}
     .card-progress-stage>span:last-child{max-width:100%;padding:0 2px}
     .card-progress-status{font-size:12px;margin:3px 0 0;overflow-wrap:anywhere}.card-progress-fresh{font-size:11px;color:var(--muted);margin:5px 0 0;overflow-wrap:anywhere}.card-progress-fresh a{color:var(--teal)}
-    @media(max-width:720px){.card-progress{padding:14px 10px}.card-progress-select{flex-basis:100%;font-size:16px;min-height:44px}}
+    @media(max-width:720px){.card-progress{padding:14px 10px}.card-progress-head{align-items:baseline}}
     @media(prefers-reduced-motion:reduce){.card-progress-goose,.card-progress-fill{transition:none}}
   </style>
 </head>
@@ -93,7 +104,17 @@
         <section id="overview" class="view" aria-labelledby="overviewTitle">
           <div class="page-heading"><div><div class="eyebrow" id="todayLabel">ARCANA TABLE // CONTROL</div><h1 id="overviewTitle">Mission overview<span style="color:var(--teal)">.</span></h1><p>Your development command center, one glance at a time.</p></div><div class="statusline" role="status"><span class="pulse" id="connectionDot"></span><span id="connectionText">Connecting to GitHub…</span></div></div>
           <section class="card-progress" aria-labelledby="cardProgressTitle">
-            <div class="card-progress-head"><h2 id="cardProgressTitle">Card progress</h2><select class="card-progress-select" id="cardProgressSelect" aria-label="Card to track" hidden></select></div>
+            <div class="card-progress-head"><h2 id="cardProgressTitle">Card progress</h2><span class="card-progress-summary" id="cardProgressSummary">Recent card work</span></div>
+            <div class="card-picker" id="cardPicker">
+              <div class="card-picker-tabs" role="group" aria-label="Filter cards to track">
+                <button type="button" class="card-picker-tab" data-progress-filter="active" aria-pressed="true">Active</button>
+                <button type="button" class="card-picker-tab" data-progress-filter="completed" aria-pressed="false">Completed</button>
+                <button type="button" class="card-picker-tab" data-progress-filter="all" aria-pressed="false">Find any</button>
+              </div>
+              <input class="card-picker-search" type="search" id="cardProgressSearch" aria-label="Search card name or PR number" placeholder="Search card name or PR #" autocomplete="off" hidden>
+              <div class="card-picker-list" id="cardProgressList" role="group" aria-label="Choose a card to track"></div>
+              <p class="card-picker-hint" id="cardProgressHint" role="status">Showing recent unfinished cards only.</p>
+            </div>
             <div class="card-progress-route" id="cardProgressRoute" hidden>
               <div class="card-progress-line" aria-hidden="true"></div><div class="card-progress-fill" id="cardProgressFill" aria-hidden="true"></div>
               <span class="card-progress-goose" id="cardProgressGoose" aria-hidden="true">🪿</span>
@@ -240,28 +261,71 @@
         const rank=i=>i.integration?.status==='blocked'&&i.integration.sourceSha===i.headSha?0:i.state==='approved'?1:i.state==='certified'?2:i.state==='integrated'?4:3;
         return items.filter(i=>cardProgressState(i)).slice().sort((a,b)=>rank(a)-rank(b)||(Date.parse(b.updatedAt)||0)-(Date.parse(a.updatedAt)||0)||b.pr-a.pr);
       }
+      function cardProgressCategory(item,checkedAt){
+        const status=cardProgressState(item);
+        if(!status)return null;
+        if(status.step===5)return 'completed';
+        // A merged PR without an exact Android receipt is not evidence of app readiness.
+        if(item.state==='integrated')return 'older';
+        const updated=Date.parse(item.updatedAt||''),checked=Date.parse(checkedAt||'');
+        if(!Number.isFinite(updated)||!Number.isFinite(checked)||updated>checked+60000||checked-updated>72*60*60*1000)return 'older';
+        return 'active';
+      }
+      function cardProgressChoices(report,mode,query=''){
+        const items=cardProgressItems(report);
+        if(mode==='active'||mode==='completed')
+          return items.filter(item=>cardProgressCategory(item,report?.checkedAt)===mode);
+        const term=String(query||'').trim().toLowerCase().replace(/^#/,'');
+        return items.filter(item=>String(item.card||'').toLowerCase().includes(term)||String(item.pr).includes(term));
+      }
       // CARD_PROGRESS_PURE_END
-      let cardProgressReport=null,cardProgressSelection=null;
+      let cardProgressReport=null,cardProgressSelection=null,cardProgressFilter='active',cardProgressQuery='';
       const cardProgressDecisions=new Map();
       function renderCardProgress(report){
         const available=Array.isArray(report?.items);
         if(available)cardProgressReport=report;
-        const current=cardProgressReport;
-        const items=cardProgressItems(current).map(item=>{
+        const saved=cardProgressReport;
+        const items=cardProgressItems(saved).map(item=>{
           const local=cardProgressDecisions.get(item.pr);
           if(!local)return item;
-          if(local.sha!==item.headSha||Date.parse(current.checkedAt)>local.at){cardProgressDecisions.delete(item.pr);return item;}
+          if(local.sha!==item.headSha||Date.parse(saved.checkedAt)>local.at){cardProgressDecisions.delete(item.pr);return item;}
           return {...item,state:local.state};
         });
-        const select=$('cardProgressSelect');
-        select.replaceChildren();
-        items.forEach(item=>{const option=e('option','',String(item.card||'Card')+' · #'+item.pr);option.value=String(item.pr);select.append(option);});
-        const item=items.find(i=>i.pr===cardProgressSelection)||items[0];
-        select.hidden=!item;
-        $('cardProgressRoute').hidden=!item;
-        if(!item){text('cardProgressStatus',available?'No card implementations in the current review feed.':'Card progress unavailable · waiting for review data.');text('cardProgressFresh','No stage inferred without card evidence.');return;}
-        select.value=String(item.pr);
-        const state=cardProgressState(item);
+        const current={checkedAt:saved?.checkedAt,items};
+        const choices=cardProgressChoices(current,cardProgressFilter,cardProgressQuery);
+        const shown=choices.slice(0,6);
+        const selected=shown.find(i=>i.pr===cardProgressSelection)||shown[0];
+        const search=$('cardProgressSearch');
+        search.hidden=cardProgressFilter!=='all';
+        document.querySelectorAll('[data-progress-filter]').forEach(button=>{
+          button.setAttribute('aria-pressed',String(button.dataset.progressFilter===cardProgressFilter));
+        });
+        const titles={active:'Active',completed:'Completed',all:'Matching'};
+        text('cardProgressSummary',titles[cardProgressFilter]+' · '+choices.length);
+        const list=$('cardProgressList');list.replaceChildren();
+        for(const item of shown){
+          const state=cardProgressState(item);
+          const button=e('button','card-picker-choice');
+          button.type='button';button.dataset.cardPr=String(item.pr);
+          button.setAttribute('aria-pressed',String(item.pr===selected?.pr));
+          const copy=e('span','card-picker-copy');
+          copy.append(e('span','card-picker-name',String(item.card||'Card')+' · #'+item.pr),
+            e('span','card-picker-status',state.label.split(' · ')[0]));
+          button.append(copy,e('span','card-picker-mark',item.pr===selected?.pr?'●':'○'));
+          list.append(button);
+        }
+        const hint=cardProgressFilter==='active'?'No recent unfinished cards. Use Find any to inspect older work.':
+          cardProgressFilter==='completed'?'No confirmed app-ready cards in this report.':'No matching cards. Try a name or PR number.';
+        text('cardProgressHint',choices.length>6?'Showing 6 of '+choices.length+' · use Find any to search by name or PR.':
+          choices.length?'Showing '+choices.length+' card'+(choices.length===1?'':'s')+'.':hint);
+        $('cardProgressRoute').hidden=!selected;
+        if(!selected){
+          text('cardProgressStatus',available?hint:'Card progress unavailable · waiting for review data.');
+          text('cardProgressFresh',available?'Report checked '+timeAgo(saved.checkedAt):'No stage inferred without card evidence.');
+          return;
+        }
+        cardProgressSelection=selected.pr;
+        const state=cardProgressState(selected);
         const stages=Array.from($('cardProgressRoute').querySelectorAll('.card-progress-stage'));
         stages.forEach((stage,i)=>{
           stage.classList.toggle('complete',i<state.step);stage.classList.toggle('current',i===state.step);
@@ -271,12 +335,12 @@
         $('cardProgressGoose').style.left=(100/12+state.step*100/6)+'%';
         $('cardProgressFill').style.width=(state.step*100/6)+'%';
         text('cardProgressStatus',state.label);
-        const checked=Date.parse(current.checkedAt||'');
-        const freshness=!available?'Feed unavailable · last recorded status':!Number.isFinite(checked)?'Report time unknown':Date.now()-checked>15*60*1000?'Old snapshot · '+timeAgo(current.checkedAt):'Reported '+timeAgo(current.checkedAt);
+        const checked=Date.parse(saved.checkedAt||'');
+        const freshness=!available?'Feed unavailable · last recorded status':!Number.isFinite(checked)?'Report time unknown':Date.now()-checked>15*60*1000?'Old snapshot · '+timeAgo(saved.checkedAt):'Reported '+timeAgo(saved.checkedAt);
         const fresh=$('cardProgressFresh');fresh.replaceChildren();
         fresh.append(e('span','',freshness+' · '));
-        const link=e('a','','#'+item.pr+' · '+String(item.headSha).slice(0,7));
-        link.href=safelyLink(state.url||ROOT+'/pull/'+item.pr);link.target='_blank';link.rel='noopener noreferrer';fresh.append(link);
+        const link=e('a','','#'+selected.pr+' · '+String(selected.headSha).slice(0,7));
+        link.href=safelyLink(state.url||ROOT+'/pull/'+selected.pr);link.target='_blank';link.rel='noopener noreferrer';fresh.append(link);
         if(state.step===5)fresh.append(e('span','',' · Ready for an APK build; no APK implied.'));
       }
       function cardReviewChanged(report){
@@ -286,7 +350,22 @@
         }
         reviewBadge(report);renderCardProgress(report);
       }
-      $('cardProgressSelect').addEventListener('change',()=>{cardProgressSelection=Number($('cardProgressSelect').value);renderCardProgress(cardProgressReport);});
+      document.querySelectorAll('[data-progress-filter]').forEach(button=>button.addEventListener('click',()=>{
+        cardProgressFilter=button.dataset.progressFilter;
+        cardProgressQuery='';$('cardProgressSearch').value='';
+        renderCardProgress(cardProgressReport);
+        if(cardProgressFilter==='all')$('cardProgressSearch').focus();
+      }));
+      $('cardProgressSearch').addEventListener('input',()=>{
+        cardProgressQuery=$('cardProgressSearch').value;
+        renderCardProgress(cardProgressReport);
+      });
+      $('cardProgressList').addEventListener('click',event=>{
+        const button=event.target.closest('button[data-card-pr]');
+        if(!button)return;
+        cardProgressSelection=Number(button.dataset.cardPr);
+        renderCardProgress(cardProgressReport);
+      });
       // DAILY_CARDS_PURE_START
       function dayKeyDenver(input){
         const d=new Date(input);

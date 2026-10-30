@@ -41,6 +41,39 @@ test('tracker prioritizes pending approved cards and excludes blocker-only rows'
   assert.equal(rows.length,3);
   assert.equal(items(null).length,0);
 });
+test('goose picker shows recent unfinished cards, separates verified completed receipts, and searches old cards',()=>{
+  const {items}=progressHelpers();
+  const ctx=vm.createContext({});
+  vm.runInContext(progressSource,ctx);
+  const category=vm.runInContext('cardProgressCategory',ctx),choices=vm.runInContext('cardProgressChoices',ctx);
+  const checkedAt='2026-10-30T16:00:00Z',newAt='2026-10-30T15:45:00Z',oldAt='2026-10-20T15:45:00Z';
+  const approved={...progressCard,pr:344,card:'Abstruse Archaic',state:'approved',certification:'certified',updatedAt:newAt};
+  const blocked={...progressCard,pr:416,card:'Sister Repentia',state:'approved',certification:'certified',updatedAt:newAt,
+    integration:{pr:416,sourceSha:progressCard.headSha,status:'blocked',reason:'cardkit failed'}};
+  const finished={...progressCard,pr:405,card:'Mawloc',state:'integrated',updatedAt:newAt,integration:{
+    pr:405,sourceSha:progressCard.headSha,status:'integrated',destinationSha:'f'.repeat(40),
+    target:'gpt/b140-card-request-test-apk-20261028',at:newAt}};
+  const historical={...progressCard,pr:85,card:'Matter Reshaper and Scaretiller',updatedAt:oldAt};
+  const withoutReceipt={...progressCard,pr:77,card:'Old integrated PR',state:'integrated',updatedAt:newAt};
+  const report={checkedAt,items:[historical,withoutReceipt,finished,approved,blocked]};
+  assert.deepEqual(Array.from(choices(report,'active'),x=>x.pr),[416,344]);
+  assert.deepEqual(Array.from(choices(report,'completed'),x=>x.pr),[405]);
+  assert.deepEqual(Array.from(choices(report,'all','#85'),x=>x.pr),[85]);
+  assert.equal(category(withoutReceipt,checkedAt),'older','unverified merge is not app-ready');
+  assert.equal(category({...finished,integration:{...finished.integration,sourceSha:'z'.repeat(40)}},checkedAt),'older');
+  assert.equal(items(null).length,0);
+});
+test('mobile goose picker uses bounded inline choices instead of a giant native select',()=>{
+  assert.match(html,/data-progress-filter="active"/);
+  assert.match(html,/data-progress-filter="completed"/);
+  assert.match(html,/data-progress-filter="all"/);
+  assert.match(html,/type="search" id="cardProgressSearch"/);
+  assert.match(script,/choices\.slice\(0,6\)/);
+  assert.match(script,/cardProgressChoices\(current,cardProgressFilter,cardProgressQuery\)/);
+  assert.match(script,/cardProgressSelection=Number\(button\.dataset\.cardPr\)/);
+  assert.doesNotMatch(html,/id="cardProgressSelect"/);
+  assert.match(html,/class="card-progress-goose"/);
+});
 test('compact tracker is near the top, uses transparent goose over current dot, and updates after owner decisions',()=>{
   assert.ok(html.indexOf('id="cardProgressTitle"')<html.indexOf('<div class="metrics">'));
   assert.match(html,/\.card-progress-goose\{[^}]*font-size:22px;[^}]*background:transparent/);
@@ -297,7 +330,7 @@ test('periodic status refresh is bounded, read-only, visibility gated and coales
   assert.ok(!script.includes("fetch('/actions/workflows/"));
   assert.ok(!/method:\s*['"](?:POST|PUT|PATCH|DELETE)/.test(script));
   const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
-  assert.ok(sw.includes('arcana-control-shell-v15'));
+  assert.ok(sw.includes('arcana-control-shell-v16'));
 });
 
 test('rate-limited public edge falls back to read-only GitHub with a bounded per-path browser cache',async()=>{
