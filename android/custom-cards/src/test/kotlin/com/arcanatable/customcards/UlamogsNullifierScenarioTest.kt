@@ -693,4 +693,62 @@ class UlamogsNullifierScenarioTest {
         assertTrue("Declining may not move either exiled object", processed.isEmpty())
     }
 
+
+    /**
+     * A face-down card in exile has no baseline identity access even for its
+     * owner (CR 708.5). Exercise Nullifier's REAL pending selection and the
+     * pinned engine's player-facing DecisionMasker, not a fabricated decision.
+     * The test driver selects by privileged internal name; that is not UI data.
+     */
+    @Test fun faceDownOpponentExileIsMaskedInActualProcessorChoiceAndStillProcesses() {
+        val d = setup()
+        val hidden = d.putCardInExile(d.player2, "Sol Ring")
+        d.addComponent(hidden, com.wingedsheep.engine.state.components.identity.FaceDownComponent)
+        d.putCardInExile(d.player2, "Island")
+
+        val bears = d.putCardInHand(d.player1, "Grizzly Bears")
+        d.giveMana(d.player1, Color.GREEN)
+        d.giveColorlessMana(d.player1, 1)
+        assertNull(d.castSpell(d.player1, bears).error)
+        val nullifier = d.putCardInHand(d.player1, "Ulamog's Nullifier")
+        d.giveMana(d.player1, Color.BLUE)
+        d.giveMana(d.player1, Color.BLACK)
+        d.giveColorlessMana(d.player1, 2)
+        assertNull(d.castSpell(d.player1, nullifier).error)
+
+        assertNull(d.bothPass().error)
+        assertTrue(d.state.pendingDecision is com.wingedsheep.engine.core.ChooseTargetsDecision)
+        d.decide(Choices(targets = listOf(bears)))
+        assertNull(d.bothPass().error)
+        assertTrue("Processing is optional", d.state.pendingDecision is com.wingedsheep.engine.core.YesNoDecision)
+        d.decide(Choices(yes = true))
+        val choice = d.state.pendingDecision as? com.wingedsheep.engine.core.SelectCardsDecision
+            ?: throw AssertionError("Nullifier must offer a real two-card selection")
+        assertTrue("The hidden opponent-owned card must be eligible", hidden in choice.options)
+
+        val visibility = com.wingedsheep.engine.view.Visibility(
+            d.cardRegistry, conditionEvaluator = d.services.conditionEvaluator,
+        )
+        val masker = com.wingedsheep.engine.view.DecisionMasker(visibility)
+        for (viewer in listOf(d.player1, d.player2)) {
+            assertTrue("Face-down exile is hidden even from its owner",
+                visibility.isCardIdentityHiddenFrom(d.state, hidden, viewer))
+            val masked = masker.maskFor(choice, d.state, viewer)
+                as com.wingedsheep.engine.core.SelectCardsDecision
+            val info = masked.cardInfo?.get(hidden)
+                ?: throw AssertionError("Selection must have masked card metadata")
+            assertNotEquals("Selection must not reveal a face-down card's name",
+                "Sol Ring", info.name)
+            assertEquals("Selection must not reveal hidden mana cost", "", info.manaCost)
+        }
+
+        // The driver uses engine-internal names only to submit selected entity IDs.
+        d.decide(Choices(pick = listOf("Sol Ring", "Island")))
+        d.resolveAll()
+        assertTrue("Processing two opponent-owned cards must counter Bears",
+            d.permanentsNamed(d.player1, "Grizzly Bears").isEmpty())
+        assertTrue(d.getExileCardNames(d.player2).isEmpty())
+        assertEquals(listOf("Island", "Sol Ring"), d.getGraveyardCardNames(d.player2).sorted())
+    }
+
 }
