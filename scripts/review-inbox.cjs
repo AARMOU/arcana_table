@@ -85,6 +85,9 @@ function classify(pr, checkRuns = [], reviews = [], unitBody = '', files = null)
   const decidedHere = last && String(last.body || '').startsWith(DECISION_MARKER) ? 'arcana-control' : last ? 'github' : null;
   return { pr: pr.number, issue: unitOf(pr.body), card: cardOf(pr.title), headSha: head, state, checks, checkRuns: checkRuns2,
     certification, abilities: abilitiesOf(unitBody), problems: problems.slice(0, 8), decidedIn: decidedHere, draft: !!pr.draft,
+    // When the current stage began, for the stall report (a PR's updated_at ignores checks and reviews).
+    certifiedAt: certification === 'certified' ? (runs.find(r => r.name === 'Arcana independent certification' && r.conclusion === 'success')?.completed_at || null) : null,
+    approvedAt: last?.state === 'APPROVED' ? (last.submitted_at || null) : null,
     ...change, readyForOwner: isReadyForOwner({ ...change, draft: !!pr.draft, state, certification }),
     url: `https://github.com/${pr.base?.repo?.full_name || 'AARMOU/arcana_table'}/pull/${pr.number}/files`,
     updatedAt: pr.updated_at || null };
@@ -213,8 +216,8 @@ async function alertReady({ github, owner, repo, payload, issue = 78 }) {
   return 'posted ' + fresh.length;
 }
 
-// Stall report on #78: card PRs stuck in one stage past a limit, measured from the PR's last
-// activity. Posted only when the set of stalled PR@head:stage keys changes, so ages ticking up
+// Stall report on #78: card PRs stuck in one stage past a limit, measured from when the stage
+// began (certification or approval time) or else the PR's last activity. Posted only when the set of stalled PR@head:stage keys changes, so ages ticking up
 // never re-post. Read-only apart from that note.
 const STALL_MARKER = '<!-- arcana-stalls-v1 -->';
 const STALL_RULES = {
@@ -226,7 +229,7 @@ const STALL_RULES = {
 };
 function stalls(payload, now = Date.now()) {
   return (payload?.items || []).filter(i => i?.kind === 'card' && STALL_RULES[i.state] && Number.isSafeInteger(i.pr))
-    .map(i => ({ ...i, hours: (now - Date.parse(i.updatedAt || '')) / 36e5 }))
+    .map(i => ({ ...i, hours: (now - Date.parse((i.state === 'certified' && i.certifiedAt) || (i.state === 'approved' && i.approvedAt) || i.updatedAt || '')) / 36e5 }))
     .filter(i => Number.isFinite(i.hours) && i.hours >= STALL_RULES[i.state].hours)
     .sort((a, b) => a.pr - b.pr).slice(0, 20);
 }
@@ -240,7 +243,7 @@ async function reportStalls({ github, owner, repo, payload, issue = 78, now = Da
   const body = [STALL_MARKER, 'stalls: ' + keys, '### 🤖 Stalled card PRs (automated)', '',
     list.length ? 'No activity on these card PRs past the stage limit. Each line names the stage and what to look at.'
       : 'No card PR is stalled.', '',
-    ...list.map(i => `- #${i.pr} ${String(i.card || 'card').replace(/[@\r\n]/g, ' ').slice(0, 60)}: ${STALL_RULES[i.state].text}, ${Math.floor(i.hours)}h without activity` +
+    ...list.map(i => `- #${i.pr} ${String(i.card || 'card').replace(/[@\r\n]/g, ' ').slice(0, 60)}: ${STALL_RULES[i.state].text} for ${Math.floor(i.hours)}h` +
       (i.problems?.[0] ? ` (${String(i.problems[0]).replace(/[@\r\n]/g, ' ').slice(0, 140)})` : ''))].join('\n');
   await github.rest.issues.createComment({ owner, repo, issue_number: issue, body });
   return 'posted ' + list.length;
