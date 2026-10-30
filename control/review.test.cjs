@@ -75,7 +75,8 @@ test('owner sign-in button is actually hidden by dashboard CSS after authenticat
 test('dashboard loads it, the shell caches it and Pages publishes it', () => {
   const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
   assert.ok(html.includes('<script src="./review.js" defer></script>'));
-  assert.ok(html.includes('window.ArcanaReview.render(list,r,reviewBadge)'));
+  assert.ok(html.includes('window.ArcanaReview.render(list,r,cardReviewChanged)'));
   assert.ok(fs.readFileSync(path.join(__dirname, 'sw.js'), 'utf8').includes("'./review.js'"));
   assert.ok(fs.readFileSync(path.join(__dirname, '../.github/workflows/pages.yml'), 'utf8').includes('cp control/review.js _site/control/review.js'));
 });
+
