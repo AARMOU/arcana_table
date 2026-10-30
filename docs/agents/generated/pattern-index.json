@@ -307,13 +307,19 @@
  },
  "Costs": {
   "Costs.Composite": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TendoIceBridge.kt",
      "lines": 25,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TendoIceBridgeScenarioTest.kt"
+    },
+    {
+     "card": "Copper Gnomes",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CopperGnomes.kt",
+     "lines": 26,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CopperGnomesScenarioTest.kt"
     },
     {
      "card": "Geier Reach Sanitarium",
@@ -338,12 +344,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/QuicksilverAmulet.kt",
      "lines": 33,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/QuicksilverAmuletScenarioTest.kt"
-    },
-    {
-     "card": "Sea Gate Wreckage",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SeaGateWreckage.kt",
-     "lines": 33,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SeaGateWreckageScenarioTest.kt"
     }
    ]
   },
@@ -404,8 +404,14 @@
    ]
   },
   "Costs.Mana": {
-   "count": 35,
+   "count": 36,
    "examples": [
+    {
+     "card": "Copper Gnomes",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CopperGnomes.kt",
+     "lines": 26,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CopperGnomesScenarioTest.kt"
+    },
     {
      "card": "Deepfathom Skulker",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DeepfathomSkulker.kt",
@@ -435,12 +441,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Bearscape.kt",
      "lines": 33,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BearscapeScenarioTest.kt"
-    },
-    {
-     "card": "Quicksilver Amulet",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/QuicksilverAmulet.kt",
-     "lines": 33,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/QuicksilverAmuletScenarioTest.kt"
     }
    ]
   },
@@ -541,8 +541,14 @@
    ]
   },
   "Costs.SacrificeSelf": {
-   "count": 6,
+   "count": 7,
    "examples": [
+    {
+     "card": "Copper Gnomes",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CopperGnomes.kt",
+     "lines": 26,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CopperGnomesScenarioTest.kt"
+    },
     {
      "card": "Tyrant Guard",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TyrantGuard.kt",
@@ -572,12 +578,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TectonicEdge.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TectonicEdgeScenarioTest.kt"
-    },
-    {
-     "card": "Warping Wail",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WarpingWail.kt",
-     "lines": 64,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WarpingWailScenarioTest.kt"
     }
    ]
   },
@@ -2231,8 +2231,14 @@
    ]
   },
   "Effects.May": {
-   "count": 8,
+   "count": 9,
    "examples": [
+    {
+     "card": "Copper Gnomes",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CopperGnomes.kt",
+     "lines": 26,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CopperGnomesScenarioTest.kt"
+    },
     {
      "card": "Dinosaur Egg",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DinosaurEgg.kt",
@@ -2262,12 +2268,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TataruTaru.kt",
      "lines": 48,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TataruTaruScenarioTest.kt"
-    },
-    {
-     "card": "Primal Amulet",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
-     "lines": 71,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimalAmuletScenarioTest.kt"
     }
    ]
   },
@@ -4131,7 +4131,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 54,
+   "count": 55,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4144,6 +4144,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TendoIceBridge.kt",
      "lines": 25,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TendoIceBridgeScenarioTest.kt"
+    },
+    {
+     "card": "Copper Gnomes",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CopperGnomes.kt",
+     "lines": 26,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CopperGnomesScenarioTest.kt"
     },
     {
      "card": "Deepfathom Skulker",
@@ -4162,12 +4168,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SliverQueen.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SliverQueenScenarioTest.kt"
-    },
-    {
-     "card": "Yavimaya Hollow",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/YavimayaHollow.kt",
-     "lines": 32,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/YavimayaHollowScenarioTest.kt"
     }
    ]
   },
@@ -5123,6 +5123,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShorikaiGenesisEngine.kt",
      "lines": 45,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShorikaiGenesisEngineScenarioTest.kt"
+    }
+   ]
+  },
+  "Patterns.Hand.putFromHand": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Copper Gnomes",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CopperGnomes.kt",
+     "lines": 26,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CopperGnomesScenarioTest.kt"
     }
    ]
   },
@@ -6225,8 +6236,14 @@
    ]
   },
   "GameObjectFilter.Artifact": {
-   "count": 18,
+   "count": 19,
    "examples": [
+    {
+     "card": "Copper Gnomes",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CopperGnomes.kt",
+     "lines": 26,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CopperGnomesScenarioTest.kt"
+    },
     {
      "card": "Skorpekh Destroyer",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SkorpekhDestroyer.kt",
@@ -6256,12 +6273,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CranialPlating.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CranialPlatingScenarioTest.kt"
-    },
-    {
-     "card": "Iron Man, Bleeding Edge",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IronManBleedingEdge.kt",
-     "lines": 41,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/IronManBleedingEdgeScenarioTest.kt"
     }
    ]
   },
