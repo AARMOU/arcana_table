@@ -213,4 +213,38 @@ async function alertReady({ github, owner, repo, payload, issue = 78 }) {
   return 'posted ' + fresh.length;
 }
 
-module.exports = { classify, classifyChangeFiles, isReadyForOwner, inboxPayload, inboxSummary, buildReviewInbox, abilitiesOf, alertReady, READY_MARKER };
+// Stall report on #78: card PRs stuck in one stage past a limit, measured from the PR's last
+// activity. Posted only when the set of stalled PR@head:stage keys changes, so ages ticking up
+// never re-post. Read-only apart from that note.
+const STALL_MARKER = '<!-- arcana-stalls-v1 -->';
+const STALL_RULES = {
+  certified: { hours: 24, text: 'certified, waiting for owner Verify' },
+  approved: { hours: 2, text: 'approved, not integrated' },
+  'awaiting-review': { hours: 24, text: 'checks green but not certified (suite missing or certification gate)' },
+  'checks-failed': { hours: 6, text: 'CI red on the current commit' },
+  'checks-running': { hours: 6, text: 'checks still running' },
+};
+function stalls(payload, now = Date.now()) {
+  return (payload?.items || []).filter(i => i?.kind === 'card' && STALL_RULES[i.state] && Number.isSafeInteger(i.pr))
+    .map(i => ({ ...i, hours: (now - Date.parse(i.updatedAt || '')) / 36e5 }))
+    .filter(i => Number.isFinite(i.hours) && i.hours >= STALL_RULES[i.state].hours)
+    .sort((a, b) => a.pr - b.pr).slice(0, 20);
+}
+async function reportStalls({ github, owner, repo, payload, issue = 78, now = Date.now() }) {
+  const list = stalls(payload, now);
+  const keys = list.map(i => i.pr + '@' + String(i.headSha).slice(0, 12) + ':' + i.state).join(' ');
+  const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: issue, per_page: 100 });
+  const previous = [...comments].reverse().find(c => c.user?.login === 'github-actions[bot]' && c.user?.type === 'Bot' && String(c.body || '').startsWith(STALL_MARKER));
+  const before = String(previous?.body || '').match(/^stalls: (.*)$/m)?.[1] ?? null;
+  if (before === keys || (before === null && !list.length)) return 'unchanged';
+  const body = [STALL_MARKER, 'stalls: ' + keys, '### 🤖 Stalled card PRs (automated)', '',
+    list.length ? 'No activity on these card PRs past the stage limit. Each line names the stage and what to look at.'
+      : 'No card PR is stalled.', '',
+    ...list.map(i => `- #${i.pr} ${String(i.card || 'card').replace(/[@\r\n]/g, ' ').slice(0, 60)}: ${STALL_RULES[i.state].text}, ${Math.floor(i.hours)}h without activity` +
+      (i.problems?.[0] ? ` (${String(i.problems[0]).replace(/[@\r\n]/g, ' ').slice(0, 140)})` : ''))].join('\n');
+  await github.rest.issues.createComment({ owner, repo, issue_number: issue, body });
+  return 'posted ' + list.length;
+}
+
+module.exports = { classify, classifyChangeFiles, isReadyForOwner, inboxPayload, inboxSummary, buildReviewInbox, abilitiesOf, alertReady, READY_MARKER,
+  stalls, reportStalls, STALL_MARKER };
