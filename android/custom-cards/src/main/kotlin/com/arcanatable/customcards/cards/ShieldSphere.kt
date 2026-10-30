@@ -4,6 +4,7 @@ import com.wingedsheep.sdk.core.CounterType
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.model.Rarity
+import com.wingedsheep.sdk.scripting.targets.EffectTarget
 
 val ShieldSphere = card("Shield Sphere") {
     manaCost = "{0}"
