@@ -1,0 +1,144 @@
+name: Corrupted Crossroads card candidate (temporary source-built runtime)
+# Build and test #178 on an isolated runner only. Never commit runtime jars,
+# export files, Android builds, or change any production/release flag.
+on:
+  push:
+    branches: [gpt/corrupted-crossroads-exact-devoid-20261025]
+    paths:
+      - 'engine-upgrade/corrupted-crossroads/**'
+      - '.github/workflows/corrupted-crossroads-card-candidate.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: corruptedcrossroads-card-candidate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  card-source-scenarios:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          repository: wingedsheep/argentum-engine
+          ref: 61e71e586b100faa661f86cac827ac3c3bbb5a78
+          path: argentum-engine
+          persist-credentials: false
+      - name: Apply pinned exact Devoid mana restriction source patch
+        run: |
+          set -euo pipefail
+          python3 engine-upgrade/audit_patches.py
+          git -C argentum-engine apply --check "$GITHUB_WORKSPACE/engine-upgrade/corrupted-crossroads/patches/0001-devoid-spell-mana.patch"
+          git -C argentum-engine apply "$GITHUB_WORKSPACE/engine-upgrade/corrupted-crossroads/patches/0001-devoid-spell-mana.patch"
+          cp engine-upgrade/corrupted-crossroads/engine-tests/CorruptedCrossroadsDevoidRestrictionTest.kt argentum-engine/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/
+          git -C argentum-engine diff --check
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Recheck exact mana restrictions in real engine
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :rules-engine:test --tests 'com.wingedsheep.engine.scenarios.CorruptedCrossroadsDevoidRestrictionTest'
+      - name: Build candidate runtime JARs in this throwaway workspace
+        working-directory: argentum-engine
+        run: |
+          ./scripts/gradle-locked --no-daemon --max-workers=2 -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar
+      - name: Use only temporary SDK/runtime jars for Android custom-card tests
+        run: |
+          python3 - <<'PY'
+          import hashlib, shutil, struct, zipfile
+          from pathlib import Path
+          libs = Path("android/app/libs")
+          markers = {"mtg-sdk": "com/wingedsheep/sdk/model/CardDefinition.class",
+                     "mtg-sdk-tooling": "com/wingedsheep/sdk/tooling/CardLoader.class",
+                     "rules-engine": "com/wingedsheep/engine/core/GameAction.class",
+                     "ai": "com/wingedsheep/ai/engine/AIPlayer.class"}
+          for module, ident in markers.items():
+              jars = [p for p in Path(f"argentum-engine/{module}/build/libs").glob("*.jar")
+                      if "sources" not in p.name and "javadoc" not in p.name and ident in zipfile.ZipFile(p).namelist()]
+              assert len(jars) == 1, (module, jars)
+              dest = libs / f"argentum-{module}.jar"
+              shutil.copyfile(jars[0], dest)  # runner only; no git staging/commit/push
+              with zipfile.ZipFile(dest) as z:
+                  versions = [struct.unpack(">H", z.read(n)[6:8])[0] for n in z.namelist() if n.endswith(".class")]
+              assert max(versions) <= 61, (dest, max(versions))
+              print(f"temporary {dest.name}: {hashlib.sha256(dest.read_bytes()).hexdigest()}")
+          PY
+      - name: Inject unshipped candidate card and register it in runner only
+        run: |
+          set -euo pipefail
+          dest=android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CorruptedCrossroads.kt
+          test ! -e "$dest"
+          cp engine-upgrade/corrupted-crossroads/candidate/CorruptedCrossroads.kt "$dest"
+          cp engine-upgrade/corrupted-crossroads/candidate/CorruptedCrossroadsScenarioTest.kt android/custom-cards/src/test/kotlin/com/arcanatable/customcards/
+          python3 - <<'PY'
+          from pathlib import Path
+          path = Path("android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt")
+          content = path.read_text()
+          needle = "val entries: List<Entry> = listOf(\n"
+          assert content.count(needle) == 1
+          path.write_text(content.replace(needle, needle + '        Entry(CorruptedCrossroads, "M3C", "Six WotC precons"),\n', 1))
+          PY
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Export candidate definitions (uncommitted and not shipped)
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          grep -F '"name":"Corrupted Crossroads"' app/src/main/assets/argentum/custom-cards.jsonl > /dev/null
+      - name: Run executable card scenarios against patched temporary runtime
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.CorruptedCrossroadsScenarioTest'
+      - name: Verify deterministic candidate export in runner
+        working-directory: android
+        run: |
+          set -euo pipefail
+          sha256sum app/src/main/assets/argentum/custom-cards.jsonl app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/crossroads-first.sha
+          ./gradlew --no-daemon --max-workers=2 :custom-cards:exportCards
+          sha256sum app/src/main/assets/argentum/custom-cards.jsonl app/src/main/assets/argentum/custom-cards.index.tsv > /tmp/crossroads-second.sha
+          diff -u /tmp/crossroads-first.sha /tmp/crossroads-second.sha
+      - name: Count actual engine and card test XML
+        if: always()
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          suites = {
+              "engine": ("argentum-engine", "CorruptedCrossroadsDevoidRestrictionTest", 6),
+              "android": ("android/custom-cards", "CorruptedCrossroadsScenarioTest", 6),
+          }
+          total = 0
+          for name, (root, class_name, minimum) in suites.items():
+              matches = list(Path(root).glob(f"**/build/test-results/**/TEST-*{class_name}.xml"))
+              assert len(matches) == 1, f"{name}: expected exactly one {class_name} XML, got {matches}"
+              elem = ET.parse(matches[0]).getroot()
+              counts = {key: int(elem.get(key, 0)) for key in ("tests", "failures", "errors", "skipped")}
+              print(f"{name} {class_name}: {counts} from {matches[0]}")
+              assert counts["tests"] >= minimum, f"{name}: required at least {minimum} executed tests"
+              assert counts["failures"] == counts["errors"] == counts["skipped"] == 0, (
+                  f"{name}: no failing, errored or skipped tests allowed"
+              )
+              total += counts["tests"]
+          print(f"Corrupted Crossroads exact engine + Android scenarios: {total} tests, all passed")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: crossroads-source-card-test-evidence
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            engine-upgrade/patch-report.json
+            argentum-engine/rules-engine/build/test-results/test/TEST-*CorruptedCrossroads*.xml
+            android/custom-cards/build/test-results/test/TEST-*CorruptedCrossroads*.xml
