@@ -38,6 +38,15 @@ jobs:
           ref: gpt/arcana-integration-next
           path: integration-source
           persist-credentials: false
+      - name: Check out B140 card indexes (data only)
+        # Approved cards are integrated into B140 and never merge back into the card branch, so a card
+        # counts as present when either branch indexes it; otherwise integrated cards show as missing.
+        uses: actions/checkout@v4
+        with:
+          ref: gpt/b140-card-request-test-apk-20261028
+          path: b140-source
+          persist-credentials: false
+          sparse-checkout: android/app/src/main/assets/argentum
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - name: Validate control dashboard
@@ -47,6 +56,10 @@ jobs:
         run: |
           set -euo pipefail
           SOURCE_SHA="$(git -C integration-source rev-parse HEAD)"
+          B140_SHA="$(git -C b140-source rev-parse HEAD)"
+          idx=android/app/src/main/assets/argentum/custom-cards.index.tsv
+          cat "b140-source/$idx" >> "integration-source/$idx"
+          echo "Card indexes: gpt/arcana-integration-next@$SOURCE_SHA + B140 custom cards @$B140_SHA"
           mkdir -p _site/control
           node tools/deck-gap-audit.cjs --root integration-source --source-ref "gpt/arcana-integration-next@$SOURCE_SHA" --json _site/control/card-gaps.json --markdown /tmp/arcana-card-gaps.md
           node tools/argentum-catalog.cjs --root integration-source --source-ref "gpt/arcana-integration-next@$SOURCE_SHA" --json _site/control/argentum-catalog.json
