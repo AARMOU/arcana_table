@@ -37,7 +37,7 @@ FAKE_INFECT = {"name": "Cardkit Test Plaguebearer", "mana_cost": "{1}{B}", "type
                "oracle_text": "Infect", "power": "1", "toughness": "1", "color_identity": ["B"],
                "keywords": ["Infect"], "layout": "normal"}
 FAKE_COMBO = {"name": "Cardkit Test Martyr", "mana_cost": "{1}{W}", "type_line": "Creature \u2014 Human Warrior",
-              "oracle_text": "Martyrdom \u2014 Whenever this creature attacks, you gain 2 life and draw two cards.",
+              "oracle_text": "Martyrdom \u2014 When this creature dies, you gain 2 life and draw two cards.",
               "power": "2", "toughness": "2", "color_identity": ["W"], "keywords": ["Martyrdom"], "layout": "normal"}
 FAKE_REVEAL = {"name": "Cardkit Test Harbor", "type_line": "Land", "color_identity": ["W", "U"], "keywords": [],
                "oracle_text": "As this land enters, you may reveal a Plains or Island card from your hand. If you don't, "
