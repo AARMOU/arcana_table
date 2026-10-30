@@ -771,6 +771,46 @@ class UlamogsNullifierScenarioTest {
      * the two OTHER opponent-owned cards are processed. This covers the
      * negative privacy/zone branch of the real SelectCardsDecision.
      */
+    /**
+     * Isolates the client-snapshot face-down exile visibility contract from
+     * Nullifier, stack resolution, and pending decisions. Both player views and
+     * a spectator must be masked; an ordinary face-up exile stays public.
+     *
+     * This is a fail-closed regression for the shared engine projection. Do not
+     * "fix" it by changing Nullifier's choice metadata or hiding Android UI.
+     */
+    @Test fun faceDownExileSnapshotIsMaskedWithoutNullifier() {
+        val d = setup()
+        val hidden = d.putCardInExile(d.player2, "Sol Ring")
+        d.addComponent(hidden, com.wingedsheep.engine.state.components.identity.FaceDownComponent)
+        val faceUp = d.putCardInExile(d.player2, "Island")
+        val visibility = com.wingedsheep.engine.view.Visibility(
+            d.cardRegistry, conditionEvaluator = d.services.conditionEvaluator,
+        )
+        val transformer = com.wingedsheep.engine.view.ClientStateTransformer(
+            d.cardRegistry, predicateEvaluator = d.services.predicateEvaluator,
+        )
+        for (viewer in listOf(d.player1, d.player2)) {
+            assertTrue("Engine visibility must conceal face-down exile from viewer $viewer",
+                visibility.isCardIdentityHiddenFrom(d.state, hidden, viewer))
+            val snapshot = transformer.transform(d.state, viewer)
+            val card = snapshot.cards[hidden]
+                ?: throw AssertionError("Face-down exile must have a masked client card for $viewer")
+            assertNotEquals("Snapshot leaked Sol Ring to viewer $viewer", "Sol Ring", card.name)
+            assertEquals("Mana cost leaked to viewer $viewer", "", card.manaCost)
+            assertEquals("Type line leaked to viewer $viewer", "", card.typeLine)
+            assertEquals("Rules text leaked to viewer $viewer", "", card.oracleText)
+            assertNotEquals("Revealed identity leaked to viewer $viewer", "Sol Ring", card.revealedName)
+            assertEquals("Face-up exile must remain public to viewer $viewer",
+                "Island", snapshot.cards[faceUp]?.name)
+        }
+        val spectator = transformer.transform(d.state, d.player1, isSpectator = true)
+        assertNotEquals("Spectator must not see face-down exile identity",
+            "Sol Ring", spectator.cards[hidden]?.name)
+        assertEquals("Face-up exile is public to spectators",
+            "Island", spectator.cards[faceUp]?.name)
+    }
+
     @Test fun unchosenFaceDownOpponentExileRemainsMaskedAfterProcessingOtherTwo() {
         val d = setup()
         val hidden = d.putCardInExile(d.player2, "Sol Ring")
