@@ -2030,6 +2030,17 @@
     }
    ]
   },
+  "Effects.Fight": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Mawloc",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mawloc.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MawlocScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.FlipCoin": {
    "count": 1,
    "examples": [
@@ -2390,6 +2401,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SufferThePast.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SufferThePastScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.MarkExileOnDeath": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Mawloc",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mawloc.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MawlocScenarioTest.kt"
     }
    ]
   },
@@ -4166,7 +4188,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 44,
+   "count": 45,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -4637,13 +4659,19 @@
    ]
   },
   "ravenous()": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Zoanthrope",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Zoanthrope.kt",
      "lines": 27,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ZoanthropeScenarioTest.kt"
+    },
+    {
+     "card": "Mawloc",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mawloc.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MawlocScenarioTest.kt"
     },
     {
      "card": "Aberrant",
@@ -4668,12 +4696,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HormagauntHorde.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HormagauntHordeScenarioTest.kt"
-    },
-    {
-     "card": "Tervigon",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Tervigon.kt",
-     "lines": 40,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TervigonScenarioTest.kt"
     }
    ]
   },
@@ -4864,7 +4886,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 138,
+   "count": 139,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6466,7 +6488,7 @@
    ]
   },
   "EffectTarget.Self": {
-   "count": 34,
+   "count": 35,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -6499,10 +6521,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimarisChaplainScenarioTest.kt"
     },
     {
-     "card": "Skorpekh Destroyer",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SkorpekhDestroyer.kt",
-     "lines": 35,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SkorpekhDestroyerScenarioTest.kt"
+     "card": "Mawloc",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mawloc.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MawlocScenarioTest.kt"
     }
    ]
   },
@@ -7442,8 +7464,14 @@
    ]
   },
   "TargetFilter.CreatureOpponentControls": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Mawloc",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mawloc.kt",
+     "lines": 34,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MawlocScenarioTest.kt"
+    },
     {
      "card": "Constricting Sliver",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ConstrictingSliver.kt",
@@ -7731,7 +7759,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 70,
+   "count": 71,
    "examples": [
     {
      "card": "Defile",

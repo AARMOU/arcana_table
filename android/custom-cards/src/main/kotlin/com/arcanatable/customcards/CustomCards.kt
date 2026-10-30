@@ -240,6 +240,7 @@ object CustomCards {
         Entry(FlayedOne, "40K", "Six WotC precons"),
         Entry(SicarianInfiltrator, "40K", "Six WotC precons"),
         Entry(Aberrant, "40K", "Six WotC precons"),
+        Entry(Mawloc, "40K", "Six WotC precons"),
         Entry(MandateOfAbaddon, "40K", "Six WotC precons"),
         Entry(PrimarisEliminator, "40K", "Six WotC precons"),
         Entry(DeathsPresence, "40K", "Six WotC precons"),
