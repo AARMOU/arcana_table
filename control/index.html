@@ -632,14 +632,21 @@
         if(!Array.isArray(r?.items)||!Number.isFinite(checked)||checked>now+60000||
            typeof window.ArcanaReview?.isReadyForOwner!=='function')return '— unavailable';
         const n=r.items.filter(window.ArcanaReview.isReadyForOwner).length;
-        return now-checked>15*60*1000?n+' reported · old':n+' ready';
+        if(now-checked<=REVIEW_CURRENT_MS)return n+' ready';
+        // An old report is not a confirmed current count: never show a bare zero.
+        const m=Math.floor((now-checked)/60000),age=m<60?m+'m':m<1440?Math.floor(m/60)+'h':Math.floor(m/1440)+'d';
+        return (n?n+' reported · ':'Not current · ')+age+' old';
       }
+      const REVIEW_CURRENT_MS=15*60*1000;
+      const reviewCurrent=r=>{const c=Date.parse(r?.checkedAt||'');return Number.isFinite(c)&&c<=Date.now()+60000&&Date.now()-c<=REVIEW_CURRENT_MS;};
+      // Report missing or the status feed failed: say so instead of keeping a count that looks current.
+      function reviewUnavailable(){text('quickVerifyCount','— unavailable');const badge=$('reviewBadge');badge.textContent='Not current';badge.className='tag amber';}
       function reviewBadge(r){const n=Array.isArray(r?.items)&&window.ArcanaReview?.isReadyForOwner?
         r.items.filter(window.ArcanaReview.isReadyForOwner).length:0;
         text('quickVerifyCount',reviewCountLabel(r));
-        const badge=$('reviewBadge');badge.textContent=n?n+' to verify':'Nothing waiting';badge.className='tag '+(n?'blue':'gray');
+        const badge=$('reviewBadge'),current=reviewCurrent(r);badge.textContent=n?n+' to verify'+(current?'':' · not current'):current?'Nothing waiting':'Not current';badge.className='tag '+(n?'blue':current?'gray':'amber');
         document.title=(n?'('+n+') ':'')+document.title.replace(/^\(\d+\) /,'');try{if(navigator.setAppBadge)(n?navigator.setAppBadge(n):navigator.clearAppBadge()).catch(()=>{});}catch{}}
-      function renderReview(st){const r=st.review?.data;renderCardProgress(r);const list=$('reviewList');if(!r||!Array.isArray(r.items))return;list.replaceChildren();reviewBadge(r);renderDailyCards(r);
+      function renderReview(st){const r=st.review?.data;renderCardProgress(r);const list=$('reviewList');if(!r||!Array.isArray(r.items)){reviewUnavailable();return;}list.replaceChildren();reviewBadge(r);renderDailyCards(r);
         // Phase 2: tap a card for details and Approve / Request Fix (control/review.js); links remain as fallback.
         if(window.ArcanaReview?.render){window.ArcanaReview.render(list,r,cardReviewChanged);return;}
         if(!r.items.length){list.append(e('div','empty','No Copilot work PRs in the review feed.'));return;}
@@ -659,7 +666,7 @@
             controlLastRead=Date.now();controlLastError=null;
           }catch(err){
             controlLastError=String(err?.message||err).slice(0,110);
-            renderCardProgress(null);
+            renderCardProgress(null);reviewUnavailable();
             text('readyDetail','Status feed unavailable: '+controlLastError);
             if(!summaryOnly)void fetchCopilotAssignment(null);
           }finally{updateWorkerFreshness();}

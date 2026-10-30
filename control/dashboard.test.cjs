@@ -440,20 +440,21 @@ test('review recheck refuses untrusted source comments and does not mislabel sta
 
 test('Verify count keeps the last published count after five minutes and labels older snapshots',()=>{
   const start=script.indexOf('function reviewCountLabel(');
-  const end=script.indexOf('function reviewBadge(',start);
+  const end=script.indexOf('const REVIEW_CURRENT_MS',start);
   assert.ok(start>0&&end>start,'pure count formatter found');
   const actual=require('./review.js');
   const ctx=vm.createContext({Date,window:{ArcanaReview:actual}});
-  vm.runInContext(script.slice(start,end)+'\nthis.countLabel=reviewCountLabel;',ctx);
+  vm.runInContext(script.slice(start,end)+'\nconst REVIEW_CURRENT_MS=15*60*1000;this.countLabel=reviewCountLabel;',ctx);
   const now=Date.parse('2026-10-29T05:52:00Z');
   const card={pr:407,headSha:'8'.repeat(40),kind:'card',hasTest:true,draft:false,state:'certified',certification:'certified'};
   const review=(min,items=[card])=>({checkedAt:new Date(now-min*60000).toISOString(),items});
   assert.equal(ctx.countLabel(review(2),now),'1 ready');
   assert.equal(ctx.countLabel(review(6),now),'1 ready','5-minute aging does not hide Verify count');
   assert.equal(ctx.countLabel(review(14),now),'1 ready','normal 15-minute bot cadence');
-  assert.equal(ctx.countLabel(review(16),now),'1 reported · old','older report retains count and visibly qualifies it');
-  assert.equal(ctx.countLabel(review(75),now),'1 reported · old');
-  assert.equal(ctx.countLabel(review(16,[]),now),'0 reported · old');
+  assert.equal(ctx.countLabel(review(16),now),'1 reported · 16m old','older report retains count and visibly qualifies it');
+  assert.equal(ctx.countLabel(review(75),now),'1 reported · 1h old');
+  assert.equal(ctx.countLabel(review(16,[]),now),'Not current · 16m old','an old zero is never shown as a current count');
+  assert.equal(ctx.countLabel(review(3000,[]),now),'Not current · 2d old');
   assert.equal(ctx.countLabel(review(6,[{...card,draft:true}]),now),'0 ready');
   assert.equal(ctx.countLabel(review(6,[{...card,state:'approved'}]),now),'0 ready');
   assert.equal(ctx.countLabel({checkedAt:'bogus',items:[card]},now),'— unavailable');
@@ -462,5 +463,11 @@ test('Verify count keeps the last published count after five minutes and labels 
   assert.match(script,/text\('quickVerifyCount',reviewCountLabel\(r\)\)/,
     'owner review callback must update the tile when an owner decision changes its count');
   assert.doesNotMatch(script,/quickVerifyCount',reviewFresh\?/);
+});
+
+test('a missing review report or failed status feed marks Verify not current',()=>{
+  assert.ok(script.includes("if(!r||!Array.isArray(r.items)){reviewUnavailable();return;}"));
+  assert.ok(script.includes("renderCardProgress(null);reviewUnavailable();"));
+  assert.ok(script.includes("current?'Nothing waiting':'Not current'"));
 });
 
