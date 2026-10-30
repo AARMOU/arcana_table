@@ -194,3 +194,13 @@ test('unavailable GitHub session or merge evidence fails the entire admission re
     const f = mergedSuite(); change(f.data); await assert.rejects(f.load, /Unverified connected suite PR/);
   }
 });
+
+
+test('every workflow using the shared unit loader can read its completion-run evidence', () => {
+  const fs = require('node:fs');
+  for (const name of ['arcana-card-dispatcher', 'arcana-ci-failure-router', 'arcana-worker-status-observer']) {
+    const yml = fs.readFileSync(`.github/workflows/${name}.yml`, 'utf8');
+    const permissions = yml.match(/^permissions:\n((?:[ \t]+.*\n)+)/m)?.[1] || '';
+    assert.match(permissions, /^  actions: read(?: |$)/m, name);
+  }
+});

@@ -16,6 +16,7 @@ on:
     types: [opened, closed, reopened]
   workflow_dispatch:
 permissions:
+  actions: read # verify exact-head suite completion evidence through loadUnits
   contents: read
   issues: write # edit only the observer's bot status comment on issue #78
   pull-requests: read
