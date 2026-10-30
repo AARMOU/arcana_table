@@ -765,4 +765,68 @@ class UlamogsNullifierScenarioTest {
         assertEquals(listOf("Island", "Sol Ring"), d.getGraveyardCardNames(d.player2).sorted())
     }
 
+
+    /**
+     * A nonselected face-down exile must stay in exile and remain hidden after
+     * the two OTHER opponent-owned cards are processed. This covers the
+     * negative privacy/zone branch of the real SelectCardsDecision.
+     */
+    @Test fun unchosenFaceDownOpponentExileRemainsMaskedAfterProcessingOtherTwo() {
+        val d = setup()
+        val hidden = d.putCardInExile(d.player2, "Sol Ring")
+        d.addComponent(hidden, com.wingedsheep.engine.state.components.identity.FaceDownComponent)
+        d.putCardInExile(d.player2, "Island")
+        d.putCardInExile(d.player2, "Grizzly Bears")
+
+        val bears = d.putCardInHand(d.player1, "Grizzly Bears")
+        d.giveMana(d.player1, Color.GREEN)
+        d.giveColorlessMana(d.player1, 1)
+        assertNull(d.castSpell(d.player1, bears).error)
+        val nullifier = d.putCardInHand(d.player1, "Ulamog's Nullifier")
+        d.giveMana(d.player1, Color.BLUE)
+        d.giveMana(d.player1, Color.BLACK)
+        d.giveColorlessMana(d.player1, 2)
+        assertNull(d.castSpell(d.player1, nullifier).error)
+
+        assertNull(d.bothPass().error)
+        assertTrue(d.state.pendingDecision is com.wingedsheep.engine.core.ChooseTargetsDecision)
+        d.decide(Choices(targets = listOf(bears)))
+        assertNull(d.bothPass().error)
+        assertTrue(d.state.pendingDecision is com.wingedsheep.engine.core.YesNoDecision)
+        d.decide(Choices(yes = true))
+        repeat(3) {
+            if (d.state.pendingDecision == null && d.state.stack.isNotEmpty()) {
+                assertNull(d.bothPass().error)
+            }
+        }
+        val choice = d.state.pendingDecision as? com.wingedsheep.engine.core.SelectCardsDecision
+            ?: throw AssertionError("Three eligible exiles must require a real selection")
+        assertTrue(hidden in choice.options)
+        val visibility = com.wingedsheep.engine.view.Visibility(
+            d.cardRegistry, conditionEvaluator = d.services.conditionEvaluator,
+        )
+        val masker = com.wingedsheep.engine.view.DecisionMasker(visibility)
+        for (viewer in listOf(d.player1, d.player2)) {
+            val masked = masker.maskFor(choice, d.state, viewer)
+                as com.wingedsheep.engine.core.SelectCardsDecision
+            val info = masked.cardInfo?.get(hidden)
+                ?: throw AssertionError("Hidden card must have player-facing masked metadata")
+            assertNotEquals("Sol Ring", info.name)
+            assertEquals("", info.manaCost)
+        }
+
+        // Deliberately choose the two face-up cards; leave the face-down one.
+        d.decide(Choices(pick = listOf("Island", "Grizzly Bears")))
+        d.resolveAll()
+        assertTrue("The targeted spell must be countered after processing two cards",
+            d.permanentsNamed(d.player1, "Grizzly Bears").isEmpty())
+        assertTrue("The unchosen hidden entity must remain in exile",
+            d.getExile(d.player2).contains(hidden))
+        assertEquals(listOf("Sol Ring"), d.getExileCardNames(d.player2))
+        assertEquals(listOf("Grizzly Bears", "Island"), d.getGraveyardCardNames(d.player2).sorted())
+        for (viewer in listOf(d.player1, d.player2)) {
+            assertTrue("Unchosen face-down exile must remain hidden after processing",
+                visibility.isCardIdentityHiddenFrom(d.state, hidden, viewer))
+        }
+    }
 }
