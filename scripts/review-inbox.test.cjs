@@ -170,6 +170,46 @@ test('verified Android receipts distinguish integrated cards and destination blo
   assert.equal(payload.integratedActivity.length,0);
 });
 
+test('auto-closed queue issues preserve only authenticated Android integration history', async () => {
+  const I = require('./card-integration.cjs');
+  const when = '2026-10-30T12:53:31Z';
+  const receipt = {schema:1, pr:360, sourceSha:'a'.repeat(40), baseSha:'b'.repeat(40),
+    target:I.TARGET, status:'integrated', destinationSha:'d'.repeat(40), at:when,
+    runUrl:'https://github.com/AARMOU/arcana_table/actions/runs/41056966638'};
+  let author = {id:41898282, login:'github-actions[bot]'};
+  let ancestry = 'ahead';
+  const github = {rest:{
+    pulls:{list:async ({state})=>({data:state==='open'?[pr()]:[]})},
+    issues:{
+      get:async()=>({data:{state:'closed',title:'[Arcana Queue] Celestine, the Living Saint — Cardkit SUPPORTED, unclaimed'}}),
+      listComments:async()=>({data:[{user:author,body:I.receiptBody(receipt)}]})
+    },
+    git:{getRef:async()=>({data:{object:{sha:'e'.repeat(40)}}})},
+    repos:{compareCommitsWithBasehead:async()=>({data:{status:ancestry}})}
+  }, paginate:async(fn,args)=>(await fn(args)).data};
+  const get=now=>R.buildReviewInbox({github,owner:'AARMOU',repo:'arcana_table',now:new Date(now)});
+  const live=await get('2026-10-30T13:00:00Z');
+  assert.deepEqual(live.integratedActivity,[{pr:360,card:'Celestine, the Living Saint',mergedAt:when}]);
+  assert.equal(live.items[0].state,'integrated');
+  assert.equal(live.items[0].readyForOwner,false);
+  assert.equal(live.items[0].integration.destinationSha,'d'.repeat(40));
+  // Only a trusted GitHub Actions integration receipt with a live destination ancestor counts.
+  author={id:12345,login:'someone'};
+  const forged=await get('2026-10-30T13:00:00Z');
+  assert.deepEqual(forged.integratedActivity,[]);
+  assert.deepEqual(forged.items,[]);
+  author={id:41898282,login:'github-actions[bot]'};
+  ancestry='diverged';
+  const invalid=await get('2026-10-30T13:00:00Z');
+  assert.deepEqual(invalid.integratedActivity,[]);
+  assert.deepEqual(invalid.items,[]);
+  ancestry='ahead';
+  // The seven-day graph rolls by calendar window; historical cards stay marked integrated.
+  const old=await get('2026-11-09T13:00:00Z');
+  assert.deepEqual(old.integratedActivity,[]);
+  assert.equal(old.items[0].state,'integrated');
+});
+
 test('control-plane feeder/observer runs do not hold a certified card in checks-running', () => {
   const { classify } = require('./review-inbox.cjs');
   const head = 'b'.repeat(40);
