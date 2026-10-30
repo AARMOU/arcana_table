@@ -55,4 +55,6 @@ jobs:
               kind:'review',payload,summary:R.inboxSummary(payload)});
             core.info('Review inbox published: ' + result);
             core.info('Ready for owner review: ' + payload.awaitingReview);
+            // Mention the owner on #78 only when a card newly becomes ready to Verify.
+            core.info('Ready alert: ' + await R.alertReady({github, ...context.repo, payload}));
             if (result.startsWith('failed')) core.setFailed('Review inbox status publication failed: ' + result);
