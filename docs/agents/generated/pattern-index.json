@@ -1944,7 +1944,7 @@
    ]
   },
   "Effects.DrawCards": {
-   "count": 32,
+   "count": 33,
    "examples": [
     {
      "card": "Ugin's Insight",
@@ -1957,6 +1957,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HornOfGreed.kt",
      "lines": 28,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HornOfGreedScenarioTest.kt"
+    },
+    {
+     "card": "Sister Repentia",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SisterRepentia.kt",
+     "lines": 29,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SisterRepentiaScenarioTest.kt"
     },
     {
      "card": "Deepfathom Skulker",
@@ -1975,12 +1981,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BredForTheHunt.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BredForTheHuntScenarioTest.kt"
-    },
-    {
-     "card": "Geier Reach Sanitarium",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GeierReachSanitarium.kt",
-     "lines": 32,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GeierReachSanitariumScenarioTest.kt"
     }
    ]
   },
@@ -2157,7 +2157,7 @@
    ]
   },
   "Effects.GainLife": {
-   "count": 10,
+   "count": 11,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -2170,6 +2170,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/VerdantSunsAvatar.kt",
      "lines": 27,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VerdantSunsAvatarScenarioTest.kt"
+    },
+    {
+     "card": "Sister Repentia",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SisterRepentia.kt",
+     "lines": 29,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SisterRepentiaScenarioTest.kt"
     },
     {
      "card": "Sword of Light and Shadow",
@@ -2188,12 +2194,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SufferThePast.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SufferThePastScenarioTest.kt"
-    },
-    {
-     "card": "Savai Thundermane",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SavaiThundermane.kt",
-     "lines": 41,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SavaiThundermaneScenarioTest.kt"
     }
    ]
   },
@@ -3790,6 +3790,17 @@
     }
    ]
   },
+  "KeywordAbility.miracle": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Sister Repentia",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SisterRepentia.kt",
+     "lines": 29,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SisterRepentiaScenarioTest.kt"
+    }
+   ]
+  },
   "KeywordAbility.modular": {
    "count": 1,
    "examples": [
@@ -4176,13 +4187,19 @@
    ]
   },
   "Triggers.self.dies": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Dinosaur Egg",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DinosaurEgg.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DinosaurEggScenarioTest.kt"
+    },
+    {
+     "card": "Sister Repentia",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SisterRepentia.kt",
+     "lines": 29,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SisterRepentiaScenarioTest.kt"
     },
     {
      "card": "Power Depot",
@@ -4577,7 +4594,7 @@
    ]
   },
   "keywordAbility()": {
-   "count": 22,
+   "count": 23,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4610,10 +4627,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WilsonRefinedGrizzlyScenarioTest.kt"
     },
     {
-     "card": "Stonecoil Serpent",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/StonecoilSerpent.kt",
-     "lines": 31,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/StonecoilSerpentScenarioTest.kt"
+     "card": "Sister Repentia",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SisterRepentia.kt",
+     "lines": 29,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SisterRepentiaScenarioTest.kt"
     }
    ]
   },
@@ -4897,7 +4914,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 139,
+   "count": 140,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
