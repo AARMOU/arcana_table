@@ -135,6 +135,7 @@ object CustomCards {
         Entry(WakeningSunsAvatar, "XLN", "Velociramptor Beefcake 9/26"),
         // Requested follow-up cards: dinosaur deck and Mabel deck.
         Entry(PantlazaSunFavored, "LCC", "Velociramptor Beefcake 9/26"),
+        Entry(VerdantSunsAvatar, "LCC", "Velociramptor Beefcake 9/26"),
         Entry(AkromasWill, "CMR", "Velociramptor Beefcake 9/26"),
         Entry(ChandrasIgnition, "ORI", "Velociramptor Beefcake 9/26"),
         Entry(SavageOrder, "REX", "Velociramptor Beefcake 9/26"),
