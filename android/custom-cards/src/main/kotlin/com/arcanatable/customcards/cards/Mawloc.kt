@@ -20,7 +20,7 @@ val Mawloc = card("Mawloc") {
         trigger = Triggers.self.enters()
         val foe = target(TargetFilter.CreatureOpponentControls, optional = true)
         effect = Effects.Fight(EffectTarget.Self, foe) then
-            Effects.MarkExileOnDeath(foe, Duration.EndOfTurn)
+            Effects.MarkExileOnDeath(foe)
         description = "When this creature enters, it fights up to one target creature an opponent controls. If that creature would die this turn, exile it instead."
     }
 
