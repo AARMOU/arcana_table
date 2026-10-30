@@ -33,7 +33,7 @@ test('reject malformed or placeholder card quantities',()=>{
 test('scheduled #321 coverage uses an owner-confirmed build pin and fails closed on branch drift',()=>{
  const workflow=fs.readFileSync(path.resolve(__dirname,'../../.github/workflows/personal-deck-gap-audit.yml'),'utf8');
  assert.match(workflow,/ARCANA_DECK_AUDIT_SOURCE_REF:\s+gpt\/b140-card-request-test-apk-20261028/);
- assert.match(workflow,/ARCANA_DECK_AUDIT_SOURCE_SHA:\s+310f7dd6a7f1829aa90955af02c2cd48fb8d1a61/);
+ assert.match(workflow,/ARCANA_DECK_AUDIT_SOURCE_SHA:\s+a40935674ce3787388bf79e4106622e08d8252f6/);
  assert.match(workflow,/ref:\s+\$\{\{ env\.ARCANA_DECK_AUDIT_SOURCE_SHA \}\}/);
  assert.match(workflow,/git ls-remote https:\/\/github\.com\/AARMOU\/arcana_table\.git/);
  assert.match(workflow,/\[ "\$REMOTE_SHA" != "\$SRC_SHA" \]/);
