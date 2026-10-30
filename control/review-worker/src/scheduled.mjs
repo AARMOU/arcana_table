@@ -9,7 +9,10 @@ export const SCHEDULE = {
   '*/15 * * * *': [{ workflow: 'arcana-card-review-inbox-refresh.yml', inputs: {} },
     // Its designed */30 pace. Admission, billing, readiness and authorization gates all still
     // decide inside the dispatcher; with dispatch off or no authorized unit it assigns nothing.
-    { workflow: 'arcana-card-dispatcher.yml', inputs: {}, minutes: [0, 30] }],
+    { workflow: 'arcana-card-dispatcher.yml', inputs: {}, minutes: [0, 30] },
+    // Just before each dispatcher slot, so a newly opened queue issue is picked up on the next one.
+    // The feeder opens at most one issue and never while one is already waiting (idempotent).
+    { workflow: 'arcana-queue-feeder.yml', inputs: {}, minutes: [15, 45] }],
   // scheduled: the backfill then only retries failures and never re-runs green CI.
   '41 * * * *': [{ workflow: 'arcana-certification-backfill.yml', inputs: { scheduled: 'true' } }],
 };

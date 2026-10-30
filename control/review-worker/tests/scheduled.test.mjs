@@ -32,14 +32,15 @@ test('wrangler crons match the schedule and the Worker exports a scheduled handl
   assert.deepEqual(crons.sort(), Object.keys(SCHEDULE).sort());
   assert.equal(typeof worker.scheduled, 'function');
   for (const jobs of Object.values(SCHEDULE)) for (const j of jobs)
-    assert.match(j.workflow, /^arcana-(card-review-inbox-refresh|certification-backfill|card-dispatcher)\.yml$/);
+    assert.match(j.workflow, /^arcana-(card-review-inbox-refresh|certification-backfill|card-dispatcher|queue-feeder)\.yml$/);
 });
 
-test('the dispatcher runs at :00 and :30 only, never with dry_run overrides', async () => {
+test('the dispatcher runs at :00 and :30 and the feeder at :15 and :45, never with input overrides', async () => {
   const seen = [];
   const fetchImpl = async (url, init) => { seen.push([url.split('/workflows/')[1].split('/')[0], JSON.parse(init.body)]); return new Response(null, { status: 204 }); };
   for (const m of ['00', '15', '30', '45']) await runScheduled('*/15 * * * *', { token: 't', fetchImpl, scheduledTime: Date.parse(`2026-10-30T05:${m}:00Z`) });
   assert.deepEqual(seen.filter(([w]) => w === 'arcana-card-dispatcher.yml').length, 2);
   assert.equal(seen.filter(([w]) => w === 'arcana-card-review-inbox-refresh.yml').length, 4);
+  assert.deepEqual(seen.filter(([w]) => w === 'arcana-queue-feeder.yml').length, 2, 'feeder at :15 and :45, before each dispatcher slot');
   for (const [, body] of seen) assert.deepEqual(body, { ref: 'main', inputs: {} });
 });
