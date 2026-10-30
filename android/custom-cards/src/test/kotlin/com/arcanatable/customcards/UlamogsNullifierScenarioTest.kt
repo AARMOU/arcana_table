@@ -722,8 +722,18 @@ class UlamogsNullifierScenarioTest {
         assertNull(d.bothPass().error)
         assertTrue("Processing is optional", d.state.pendingDecision is com.wingedsheep.engine.core.YesNoDecision)
         d.decide(Choices(yes = true))
+        // Some continuations resume on the next stack priority cycle.
+        repeat(3) {
+            if (d.state.pendingDecision == null && d.state.stack.isNotEmpty()) {
+                assertNull(d.bothPass().error)
+            }
+        }
         val choice = d.state.pendingDecision as? com.wingedsheep.engine.core.SelectCardsDecision
-            ?: throw AssertionError("Nullifier must offer a real two-card selection")
+            ?: throw AssertionError(
+                "Nullifier must offer a real two-card selection; pending=" +
+                    d.state.pendingDecision + " stack=" + d.getStackSpellNames() +
+                    " opponentExile=" + d.getExileCardNames(d.player2)
+            )
         assertTrue("The hidden opponent-owned card must be eligible", hidden in choice.options)
 
         val visibility = com.wingedsheep.engine.view.Visibility(
