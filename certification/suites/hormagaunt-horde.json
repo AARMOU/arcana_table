@@ -1,0 +1,8 @@
+{
+  "key": "hormagaunt-horde",
+  "name": "Hormagaunt Horde",
+  "issue": 378,
+  "source": "certification/HormagauntHordeIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.HormagauntHordeIndependentCertificationTest",
+  "tests": 3
+}
