@@ -519,3 +519,45 @@ test('a feed with a recent source time is not stale just because the edge says S
   assert.equal(ctx.f(null,'HIT',NaN),false);
   assert.ok(script.includes('if(feedStale(state,cf,source)){staleFeeds++;'));
 });
+
+test('worker visibility bypasses old edge status using only a verified bot comment, and never rolls back',async()=>{
+  const pure=script.split('// WORKER_DIRECT_FRESHNESS_START')[1]?.split('// WORKER_DIRECT_FRESHNESS_END')[0];
+  assert.ok(pure,'isolated worker freshness code');
+  assert.ok(script.includes("if(d.kind==='workers')trustedWorkers=c;"),'only a parsed bot status comment supplies the worker ID');
+  assert.ok(script.includes('refreshWorkerSnapshot(out,trustedWorkers)'),'worker refresh is called on status reads');
+  let calls=0;
+  const old=new Date(Date.now()-7*60*1000).toISOString(),recent=new Date().toISOString();
+  const make=checkedAt=>({kind:'workers',checkedAt,workers:{running:checkedAt===recent?1:0,queued:1,list:[{n:509,state:checkedAt===recent?'working':'queued'}]}});
+  const comment={id:6488466493,user:{login:'github-actions[bot]',type:'Bot'},body:JSON.stringify(make(recent)),html_url:'https://github.com/AARMOU/arcana_table/issues/78#issuecomment-6488466493'};
+  const ctx={REPO:'AARMOU/arcana_table',sourceTimes:[],readTimeout:()=>undefined,
+    isBotComment:c=>c?.user?.login==='github-actions[bot]'&&c?.user?.type==='Bot',
+    parseStatus:JSON.parse,fetch:async(url,opts)=>{calls++;assert.match(url,/\/issues\/comments\/6488466493$/);assert.equal(opts.cache,'no-store');return {ok:true,json:async()=>comment};}};
+  vm.createContext(ctx);vm.runInContext(pure,ctx);
+  const refresh=vm.runInContext('refreshWorkerSnapshot',ctx);
+  const out={workers:{data:make(old)}};
+  await refresh(out,comment);
+  assert.equal(out.workers.data.workers.running,1);
+  assert.equal(out.workers.data.workers.list[0].n,509);
+  assert.equal(calls,1);
+  const oldAgain={workers:{data:make(old)}};
+  await refresh(oldAgain,comment);
+  assert.equal(oldAgain.workers.data.checkedAt,recent,'cached old feed cannot roll back a verified newer worker report');
+  assert.equal(calls,1,'bounded direct refresh does not make a second API request');
+});
+test('worker visibility uses bounded, trust-checked read-only refresh',async()=>{
+  const pure=script.split('// WORKER_DIRECT_FRESHNESS_START')[1]?.split('// WORKER_DIRECT_FRESHNESS_END')[0];
+  const old=new Date(Date.now()-10*60*1000).toISOString();
+  let calls=0;
+  const fake={id:321,user:{login:'other-user',type:'User'},body:'{}'};
+  const ctx={REPO:'AARMOU/arcana_table',sourceTimes:[],readTimeout:()=>undefined,
+    isBotComment:c=>c?.user?.login==='github-actions[bot]'&&c?.user?.type==='Bot',
+    parseStatus:JSON.parse,fetch:async()=>{calls++;return {ok:true,json:async()=>fake};}};
+  vm.createContext(ctx);vm.runInContext(pure,ctx);
+  const refresh=vm.runInContext('refreshWorkerSnapshot',ctx);
+  await refresh({workers:{data:{kind:'workers',checkedAt:old,workers:{running:0}}}},fake);
+  assert.equal(calls,0,'untrusted comment never triggers a direct GitHub read');
+  const valid={...fake,user:{login:'github-actions[bot]',type:'Bot'}};
+  await refresh({workers:{data:{kind:'workers',checkedAt:old,workers:{running:0}}}},valid);
+  await refresh({workers:{data:{kind:'workers',checkedAt:old,workers:{running:0}}}},valid);
+  assert.equal(calls,1,'one request per 5-minute window, even on invalid return data');
+});
