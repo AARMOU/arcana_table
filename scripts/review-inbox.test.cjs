@@ -15,7 +15,8 @@ const certRun = (conclusion='success', head_sha='a'.repeat(40)) => ({
 });
 const review = (state, commit_id = 'a'.repeat(40), login = 'AARMOU') => ({ state, commit_id, user: { login } });
 const cardFiles = ['android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Celestine.kt',
-  'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineScenarioTest.kt'];
+  'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineScenarioTest.kt',
+  'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt'];
 
 test('states: running, failed, awaiting review, approved and changes requested', () => {
   assert.equal(R.classify(pr(), []).state, 'checks-running');
@@ -219,7 +220,8 @@ test('control-plane feeder/observer runs do not hold a certified card in checks-
       summary: '7 trusted-main JUnit scenarios passed against the exact current Copilot PR commit' } };
   const green = ['toolkit', 'scaffold', 'cards-and-android'].map(name => ({ name, status: 'completed', conclusion: 'success', head_sha: head }));
   const files = ['android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CelestineTheLivingSaint.kt',
-    'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineTheLivingSaintScenarioTest.kt'];
+    'android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestineTheLivingSaintScenarioTest.kt',
+    'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt'];
   const noisy = [...green, cert, { name: 'suggest', status: 'in_progress', head_sha: head },
     { name: 'publish', status: 'completed', conclusion: 'failure', head_sha: head }];
   const row = classify(pr, noisy, [], '', files);
@@ -281,4 +283,18 @@ test('stall report lists card PRs past each stage limit and posts only when the 
   assert.match(comments.at(-1).body, /^stalls: engine#312$/m);
   assert.match(comments.at(-1).body, /#312 Weekly Argentum upgrade to 621552754f \(needs work\): blocked engine upgrade for 72h\. \*\*Owner:\*\* Claude \(engine lane\)/);
   assert.equal(await go([]), 'unchanged');
+});
+
+test('a certified card PR integration cannot take is not offered for Verify, with the reason', () => {
+  const green = [run('toolkit', 'success'), certRun()];
+  const unregistered = R.classify(pr(), green, [], '', cardFiles.filter(f => !f.endsWith('CustomCards.kt')));
+  assert.equal(unregistered.readyForOwner, false);
+  assert.match(unregistered.reason, /missing CustomCards\.kt registration/);
+  const extra = R.classify(pr(), green, [], '', [...cardFiles, 'tools/cardkit/tests/test_cardkit.py']);
+  assert.equal(extra.readyForOwner, false);
+  assert.match(extra.reason, /outside the card-only set: tools\/cardkit\/tests\/test_cardkit\.py/);
+  assert.equal(R.classify(pr(), green, [], '', cardFiles).readyForOwner, true, 'a complete card PR is still ready');
+  const now = Date.now();
+  const row = { ...unregistered, state: 'certified', certifiedAt: new Date(now - 30 * 36e5).toISOString() };
+  assert.deepEqual(R.stalls({ items: [row] }, now).map(i => i.pr), [row.pr], 'a certified but unintegrable card still stalls');
 });

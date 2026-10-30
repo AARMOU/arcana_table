@@ -17,7 +17,7 @@ const SHA = /^[0-9a-f]{40}$/;
 const sessionFromHash = hash => { const m = String(hash || '').match(/(?:^#|&)review-session=([^&]+)/); return m ? decodeURIComponent(m[1]) : null; };
 // A linked work unit is insufficient evidence that this PR implements a card.
 // A certified Copilot draft is ready: approving marks it ready for review with the owner's session.
-const isReadyForOwner = i => !!i && i.kind === 'card' && i.hasTest === true &&
+const isReadyForOwner = i => !!i && i.kind === 'card' && i.hasTest === true && !i.shapeProblem &&
   i.state === 'certified' && i.certification === 'certified';
 const canDecide = i => !!i && i.kind === 'card' && i.state !== 'integrated' && SHA.test(String(i.headSha || '')) && Number.isSafeInteger(i.pr);
 // Approval needs independent rules certification on this head, not just green checks. The Worker
@@ -26,6 +26,7 @@ const canApprove = i => canDecide(i) && isReadyForOwner(i);
 const approveBlocked = i => canApprove(i) ? null
   : !canDecide(i) ? 'This is not a verified card implementation. Review its GitHub PR as engineering or audit work.'
       : !i.hasTest ? 'Executable card scenario tests are missing. You can still request a fix.'
+        : i.shapeProblem ? String(i.shapeProblem) + '. The card lane must fix the PR first; you can still request a fix.'
         : 'Approval needs independent certification of this exact commit (' + (CERT[i.certification || 'not-run'] || i.certification) + '). You can still request a fix.';
 function decisionMessage(status, body) {
   if (status === 200 && body?.duplicate) return { ok: true, text: 'Already recorded for this commit.' };
