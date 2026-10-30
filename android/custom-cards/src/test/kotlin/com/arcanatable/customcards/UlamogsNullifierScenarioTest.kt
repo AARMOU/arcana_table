@@ -952,4 +952,43 @@ class UlamogsNullifierScenarioTest {
                 visibility.isCardIdentityHiddenFrom(d.state, hidden, viewer))
         }
     }
+
+    /**
+     * Positive non-exile control for engine blocker #492: a face-down permanent
+     * on the battlefield is different from a face-down card in exile (CR 708.5).
+     * Its controller may inspect its printed identity; other players and
+     * spectators must not. This projection-only fixture deliberately does not
+     * claim to test casting a real morph spell.
+     *
+     * Any engine-side exile masking fix must preserve this battlefield rule.
+     */
+    @Test fun faceDownBattlefieldControllerStillSeesOwnCard() {
+        val d = setup()
+        val permanent = d.putCreatureOnBattlefield(d.player1, "Grizzly Bears")
+        d.addComponent(permanent, com.wingedsheep.engine.state.components.identity.FaceDownComponent)
+        val transformer = com.wingedsheep.engine.view.ClientStateTransformer(
+            d.cardRegistry, predicateEvaluator = d.services.predicateEvaluator,
+        )
+
+        val controller = transformer.transform(d.state, d.player1).cards[permanent]
+            ?: throw AssertionError("Controller battlefield card missing")
+        assertTrue("Controller sees face-down status", controller.isFaceDown)
+        assertEquals("Controller may inspect their own face-down permanent",
+            "Grizzly Bears", controller.name)
+
+        val opponent = transformer.transform(d.state, d.player2).cards[permanent]
+            ?: throw AssertionError("Opponent battlefield card missing")
+        assertTrue("Opponent sees face-down status", opponent.isFaceDown)
+        assertNotEquals("Opponent cannot inspect printed identity",
+            "Grizzly Bears", opponent.name)
+        assertEquals("Opponent cannot inspect mana cost", "", opponent.manaCost)
+        assertEquals("Opponent cannot inspect Oracle text", "", opponent.oracleText)
+
+        val spectator = transformer.transform(d.state, d.player1, isSpectator = true)
+            .cards[permanent] ?: throw AssertionError("Spectator battlefield card missing")
+        assertTrue("Spectator sees face-down status", spectator.isFaceDown)
+        assertNotEquals("Spectator cannot inspect printed identity",
+            "Grizzly Bears", spectator.name)
+        assertEquals("Spectator cannot inspect Oracle text", "", spectator.oracleText)
+    }
 }
