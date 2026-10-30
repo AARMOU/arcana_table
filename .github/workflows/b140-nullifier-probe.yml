@@ -28,18 +28,31 @@ jobs:
       - name: Verify generated Cardkit pattern index is current
         run: tools/cardkit/cardkit patterns --check
       - name: Execute B140 registered Nullifier engine regressions
+        id: nullifier_tests
         working-directory: android
         run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.UlamogsNullifierScenarioTest'
-      - name: Require exactly thirty-five executed, no skipped or failing scenarios
+      - name: Summarize and require exactly thirty-five passing scenarios
+        # Gradle exits nonzero on a real rules/privacy regression. Still inspect its
+        # JUnit XML so the exact failures are visible without weakening the gate.
+        if: ${{ !cancelled() && steps.nullifier_tests.outcome != 'skipped' }}
         run: |
           python3 - <<'PY'
+          import os
           from pathlib import Path
           import xml.etree.ElementTree as ET
           report = Path('android/custom-cards/build/test-results/test/TEST-com.arcanatable.customcards.UlamogsNullifierScenarioTest.xml')
           assert report.is_file(), f'Missing JUnit XML: {report}'
           root = ET.parse(report).getroot()
           stats = {key: int(root.get(key, '0')) for key in ('tests', 'failures', 'errors', 'skipped')}
-          print(stats)
+          failed = [case.get('name', '<unnamed>') for case in root.findall('testcase')
+                    if case.find('failure') is not None or case.find('error') is not None]
+          print(f'Nullifier exact-head JUnit: {stats}; failing scenarios: {failed}')
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as out:
+                  out.write(f"### Nullifier exact-head engine acceptance\\n\\n{stats}\\n\\n")
+                  for name in failed:
+                      out.write(f"- FAIL: \`{name}\`\\n")
           assert stats == {'tests': 35, 'failures': 0, 'errors': 0, 'skipped': 0}, stats
           PY
       - uses: actions/upload-artifact@v4
