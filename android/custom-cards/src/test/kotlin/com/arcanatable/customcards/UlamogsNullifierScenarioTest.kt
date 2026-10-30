@@ -1024,4 +1024,77 @@ class UlamogsNullifierScenarioTest {
             "Grizzly Bears", spectator.name)
         assertEquals("Spectator cannot inspect Oracle text", "", spectator.oracleText)
     }
+
+    /**
+     * A real Nullifier two-card choice must honor a card-scoped exile look grant
+     * without exposing an unrelated face-down card to the grantee, owner, or
+     * spectator. This tests DecisionMasker, not the separate CardProjector bug.
+     */
+    @Test fun exileLookGrantIsCardScopedDuringActualNullifierSelection() {
+        val d = setup()
+        val granted = d.putCardInExile(d.player2, "Sol Ring")
+        val unrelated = d.putCardInExile(d.player2, "Grizzly Bears")
+        d.putCardInExile(d.player2, "Island")
+        d.addComponent(granted, com.wingedsheep.engine.state.components.identity.FaceDownComponent)
+        d.addComponent(unrelated, com.wingedsheep.engine.state.components.identity.FaceDownComponent)
+        d.addComponent(granted,
+            com.wingedsheep.engine.state.components.identity.MayLookAtInExileComponent.to(d.player1))
+
+        val bears = d.putCardInHand(d.player1, "Grizzly Bears")
+        d.giveMana(d.player1, Color.GREEN)
+        d.giveColorlessMana(d.player1, 1)
+        assertNull(d.castSpell(d.player1, bears).error)
+        val nullifier = d.putCardInHand(d.player1, "Ulamog's Nullifier")
+        d.giveMana(d.player1, Color.BLUE)
+        d.giveMana(d.player1, Color.BLACK)
+        d.giveColorlessMana(d.player1, 2)
+        assertNull(d.castSpell(d.player1, nullifier).error)
+        assertNull(d.bothPass().error)
+        assertTrue(d.state.pendingDecision is com.wingedsheep.engine.core.ChooseTargetsDecision)
+        d.decide(Choices(targets = listOf(bears)))
+        assertNull(d.bothPass().error)
+        assertTrue(d.state.pendingDecision is com.wingedsheep.engine.core.YesNoDecision)
+        d.decide(Choices(yes = true))
+        repeat(3) {
+            if (d.state.pendingDecision == null && d.state.stack.isNotEmpty()) {
+                assertNull(d.bothPass().error)
+            }
+        }
+        val choice = d.state.pendingDecision as? com.wingedsheep.engine.core.SelectCardsDecision
+            ?: throw AssertionError("Nullifier must present a real two-card selection")
+        assertTrue(granted in choice.options)
+        assertTrue(unrelated in choice.options)
+        val visibility = com.wingedsheep.engine.view.Visibility(
+            d.cardRegistry, conditionEvaluator = d.services.conditionEvaluator)
+        val masker = com.wingedsheep.engine.view.DecisionMasker(visibility)
+        assertFalse("Grant must authorize its named viewer",
+            visibility.isCardIdentityHiddenFrom(d.state, granted, d.player1))
+        assertTrue("Unrelated hidden exile stays concealed",
+            visibility.isCardIdentityHiddenFrom(d.state, unrelated, d.player1))
+        val permitted = masker.maskFor(choice, d.state, d.player1)
+            as com.wingedsheep.engine.core.SelectCardsDecision
+        assertEquals("Granted card identity must be available in picker",
+            "Sol Ring", permitted.cardInfo?.get(granted)?.name)
+        assertNotEquals("Grant must not expose unrelated face-down exile",
+            "Grizzly Bears", permitted.cardInfo?.get(unrelated)?.name)
+        val owner = masker.maskFor(choice, d.state, d.player2)
+            as com.wingedsheep.engine.core.SelectCardsDecision
+        assertNotEquals("Owner has no implicit right to inspect face-down exile",
+            "Sol Ring", owner.cardInfo?.get(granted)?.name)
+        assertNotEquals("Owner cannot inspect unrelated hidden exile",
+            "Grizzly Bears", owner.cardInfo?.get(unrelated)?.name)
+        val spectator = masker.maskFor(choice, d.state, d.player1, isSpectator = true)
+            as com.wingedsheep.engine.core.SelectCardsDecision
+        assertNotEquals("Spectator must not inherit controller's look grant",
+            "Sol Ring", spectator.cardInfo?.get(granted)?.name)
+        assertNotEquals("Spectator cannot inspect unrelated hidden exile",
+            "Grizzly Bears", spectator.cardInfo?.get(unrelated)?.name)
+
+        d.decide(Choices(pick = listOf("Sol Ring", "Island")))
+        d.resolveAll()
+        assertTrue("Two processed exiles must counter the targeted spell",
+            d.permanentsNamed(d.player1, "Grizzly Bears").isEmpty())
+        assertEquals(listOf("Grizzly Bears"), d.getExileCardNames(d.player2))
+        assertEquals(listOf("Island", "Sol Ring"), d.getGraveyardCardNames(d.player2).sorted())
+    }
 }
