@@ -1,0 +1,8 @@
+{
+  "key": "copper-gnomes",
+  "name": "Copper Gnomes",
+  "issue": 508,
+  "source": "certification/CopperGnomesIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.CopperGnomesIndependentCertificationTest",
+  "tests": 7
+}
