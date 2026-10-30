@@ -6,7 +6,6 @@ import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.model.Rarity
 import com.wingedsheep.sdk.scripting.GameObjectFilter
 
-// CARDKIT-SCAFFOLD: awaiting real-engine scenario test verification before registration.
 val Psychomancer = card("Psychomancer") {
     manaCost = "{1}{B}"
     colorIdentity = "B"

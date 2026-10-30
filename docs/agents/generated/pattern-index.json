@@ -1989,7 +1989,7 @@
    ]
   },
   "Effects.GainLife": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -2022,10 +2022,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SavaiThundermaneScenarioTest.kt"
     },
     {
-     "card": "Sword of War and Peace",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfWarAndPeace.kt",
-     "lines": 43,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfWarAndPeaceScenarioTest.kt"
+     "card": "Psychomancer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Psychomancer.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PsychomancerScenarioTest.kt"
     }
    ]
   },
@@ -2184,7 +2184,7 @@
    ]
   },
   "Effects.LoseLife": {
-   "count": 10,
+   "count": 11,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -2977,7 +2977,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3594,7 +3594,7 @@
    ]
   },
   "Triggers.another": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Sanguinary Priest",
@@ -3720,8 +3720,14 @@
    ]
   },
   "Triggers.or": {
-   "count": 3,
+   "count": 4,
    "examples": [
+    {
+     "card": "Psychomancer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Psychomancer.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PsychomancerScenarioTest.kt"
+    },
     {
      "card": "Smuggler's Copter",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SmugglersCopter.kt",
@@ -3858,13 +3864,19 @@
    ]
   },
   "Triggers.self.dies": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Dinosaur Egg",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DinosaurEgg.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DinosaurEggScenarioTest.kt"
+    },
+    {
+     "card": "Psychomancer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Psychomancer.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PsychomancerScenarioTest.kt"
     },
     {
      "card": "Power Depot",
@@ -4002,13 +4014,19 @@
    ]
   },
   "Triggers.self.leaves": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Constricting Sliver",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ConstrictingSliver.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ConstrictingSliverScenarioTest.kt"
+    },
+    {
+     "card": "Psychomancer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Psychomancer.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PsychomancerScenarioTest.kt"
     },
     {
      "card": "Bronzebeak Foragers",
@@ -4288,7 +4306,7 @@
    ]
   },
   "keywords()": {
-   "count": 78,
+   "count": 79,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4533,7 +4551,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6219,7 +6237,7 @@
    ]
   },
   "GameObjectFilter.Artifact": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Skorpekh Destroyer",
@@ -7181,13 +7199,19 @@
    ]
   },
   "Targets.Opponent": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Keeper of Secrets",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KeeperOfSecrets.kt",
      "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KeeperOfSecretsScenarioTest.kt"
+    },
+    {
+     "card": "Psychomancer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Psychomancer.kt",
+     "lines": 42,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PsychomancerScenarioTest.kt"
     },
     {
      "card": "Oblivion Sower",
@@ -7233,7 +7257,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 62,
+   "count": 63,
    "examples": [
     {
      "card": "Defile",
