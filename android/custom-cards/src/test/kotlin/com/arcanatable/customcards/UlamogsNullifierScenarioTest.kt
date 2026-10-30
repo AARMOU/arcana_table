@@ -817,6 +817,12 @@ class UlamogsNullifierScenarioTest {
                 assertEquals("Type line leaked: $context", "", card.typeLine)
                 assertEquals("Rules text leaked: $context", "", card.oracleText)
                 assertNotEquals("Revealed identity leaked: $context", "Sol Ring", card.revealedName)
+                assertNull("Revealed art URI leaked: $context", card.revealedImageUri)
+                assertTrue("Printed card types leaked: $context", card.cardTypes.isEmpty())
+                assertTrue("Printed colors leaked: $context", card.colors.isEmpty())
+                assertTrue("Printed keywords leaked: $context", card.keywords.isEmpty())
+                assertNull("Printed power leaked: $context", card.power)
+                assertNull("Printed toughness leaked: $context", card.toughness)
             } catch (failure: AssertionError) {
                 violations.add(failure.message ?: "Projection assertion failed: $context")
             }
@@ -829,6 +835,7 @@ class UlamogsNullifierScenarioTest {
             assertTrue("Spectator must see face-down flag", spectatorHidden!!.isFaceDown)
             assertNotEquals("Spectator must not see face-down exile identity",
                 "Sol Ring", spectatorHidden.name)
+            assertNull("Spectator must not receive hidden art URI", spectatorHidden.revealedImageUri)
             assertEquals("Face-up exile is public to spectators",
                 "Island", spectatorControl?.name)
         } catch (failure: AssertionError) {
@@ -880,12 +887,15 @@ class UlamogsNullifierScenarioTest {
         val other = viewer.cards[unrelated] ?: throw AssertionError("Unrelated exile missing")
         assertNotEquals("Unrelated hidden card identity leaked", "Grizzly Bears", other.name)
         assertNotEquals("Unrelated hidden reveal leaked", "Grizzly Bears", other.revealedName)
+        assertNull("Unrelated hidden art URI leaked", other.revealedImageUri)
         val ownerOnlyToOpponent = viewer.cards[ownerGranted]
             ?: throw AssertionError("Owner-granted exile missing from opponent snapshot")
         assertNotEquals("Owner-only exile grant leaked to opponent",
             "Island", ownerOnlyToOpponent.name)
         assertNotEquals("Owner-only exile reveal leaked to opponent",
             "Island", ownerOnlyToOpponent.revealedName)
+        assertNull("Owner-only exile art URI leaked to opponent",
+            ownerOnlyToOpponent.revealedImageUri)
         val ownerView = transformer.transform(d.state, d.player2)
         val ownerOnly = ownerView.cards[ownerGranted]
             ?: throw AssertionError("Owner-granted exile missing from owner snapshot")
@@ -896,6 +906,8 @@ class UlamogsNullifierScenarioTest {
             val masked = spectator.cards[cardId] ?: throw AssertionError("Spectator card missing")
             assertNotEquals("Spectator must not receive an explicit look grant", realName, masked.name)
             assertNotEquals("Spectator reveal must remain private", realName, masked.revealedName)
+            assertNull("Spectator must not receive any hidden art URI",
+                masked.revealedImageUri)
         }
     }
 
@@ -955,6 +967,8 @@ class UlamogsNullifierScenarioTest {
             assertEquals("Client snapshot must mask mana cost", "", snapshotCard.manaCost)
             assertEquals("Client snapshot must mask type line", "", snapshotCard.typeLine)
             assertEquals("Client snapshot must mask rules text", "", snapshotCard.oracleText)
+            assertNull("Client snapshot must mask hidden art URI",
+                snapshotCard.revealedImageUri)
         }
 
         // Deliberately choose the two face-up cards; leave the face-down one.
