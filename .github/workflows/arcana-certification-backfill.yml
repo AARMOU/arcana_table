@@ -3,12 +3,15 @@ name: Arcana Certification Backfill
 # merges after that CI would otherwise wait for a manual re-run. After any certification
 # change on main, re-run the latest successful CI of each open card PR that has a registered
 # suite but no certification check yet; that completion triggers the normal certification
-# workflow. Never certifies, approves, merges or dispatches anything itself.
+# workflow. Hourly, it also retries once a card PR's CI that failed with no green run on its
+# head (infrastructure failures). Never certifies, approves, merges or dispatches anything itself.
 on:
   push:
     branches: [main]
     paths:
       - 'certification/**'
+  schedule:
+    - cron: '41 * * * *'
   workflow_dispatch:
 permissions:
   contents: read
@@ -33,6 +36,6 @@ jobs:
         with:
           script: |
             const { backfill } = require('./certification/backfill.cjs');
-            const r = await backfill({ github, ...context.repo, root: '.' });
+            const r = await backfill({ github, ...context.repo, root: '.', scheduled: context.eventName === 'schedule' });
             core.info(JSON.stringify(r));
             await core.summary.addHeading('Certification backfill').addCodeBlock(JSON.stringify(r, null, 1)).write();
