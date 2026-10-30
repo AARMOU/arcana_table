@@ -31,6 +31,8 @@ jobs:
       pull-requests: read
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # a PR's merge commit and its base parent, for the finished-card rule
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -38,7 +40,16 @@ jobs:
       - name: Unit tests (real card definitions, registry, assets, SDK index)
         run: python3 -m unittest discover -s tools/cardkit/tests -v
       - name: Card PR rules
-        run: tools/cardkit/cardkit check
+        run: |
+          # a PR's own card files must be finished and registered; a red check routes the repair back to the
+          # PR's agent (failure routing) instead of reaching the owner's Verify unfinished
+          finished=()
+          if [ "${{ github.event_name }}" = pull_request ]; then
+            mapfile -t finished < <(git diff --name-only --diff-filter=AM HEAD^1 HEAD -- \
+              'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/*.kt')
+          fi
+          echo "PR card files: ${finished[*]:-none}"
+          tools/cardkit/cardkit check --finished "${finished[@]}"
       - name: Generated docs are current
         run: |
           tools/cardkit/cardkit sdk-index --check

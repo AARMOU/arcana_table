@@ -441,6 +441,25 @@ class CheckTests(unittest.TestCase):
         self.assertEqual(errors, [])
 
 
+    @with_fake_oracle
+    def test_card_pr_cannot_leave_its_card_unfinished(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            scaffold.create("Cardkit Test Scout", Path(tmp), Path(tmp), online=False)
+            path = Path(tmp) / "CardkitTestScout.kt"
+            real = repo.card_sources()
+            sources = real + tuple(repo.parse_card_file(path))
+            with mock.patch.object(repo, "card_sources", lambda: sources), \
+                    mock.patch.object(repo, "rel", lambda p: str(p)):
+                errors, _ = check.run(finished=frozenset({str(path)}))
+                self.assertTrue(any("leaves it a scaffold" in e for e in errors), errors)
+                path.write_text(path.read_text(encoding="utf-8").replace(repo.SCAFFOLD_MARK, "")
+                                .replace(repo.TODO_MARK, ""), encoding="utf-8")
+                done = real + tuple(repo.parse_card_file(path))
+                with mock.patch.object(repo, "card_sources", lambda: done):
+                    errors, _ = check.run(finished=frozenset({str(path)}))
+                self.assertTrue(any("does not register it" in e for e in errors), errors)
+
+
 class DocsTests(unittest.TestCase):
     def test_agent_docs_reference_only_real_api_and_code(self):
         self.assertEqual(docs_check.run(), [])

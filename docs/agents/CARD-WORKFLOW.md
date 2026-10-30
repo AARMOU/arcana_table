@@ -86,7 +86,7 @@ tools/cardkit/cardkit newcard "Card Name"            # or --offline to use only 
 Creates `cards/<Val>.kt` (name, cost, identity, type line, stats, verbatim Oracle text, metadata, plain
 keywords already proven by tested cards) and `<Val>ScenarioTest.kt` that **fails on purpose**. Each rules
 line becomes a `CARDKIT-TODO` with its closest references. A scaffold is not an implementation:
-`cardkit check` errors if a scaffold is registered or its failing test is left in place.
+`cardkit check` errors if a scaffold is registered or its failing test is left in place. On a pull request, CI also runs `cardkit check --finished <the PR's card files>`: a card the PR adds or changes must be finished and registered, so an unfinished card fails CI and goes back to its agent instead of reaching review.
 
 ## 4. Implement
 

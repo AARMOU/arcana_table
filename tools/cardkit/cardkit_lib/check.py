@@ -6,6 +6,8 @@ Errors (exit 1):
   - a card file defines a card that is not registered (unless baselined, still a scaffold, or now shipped
     by Argentum's library)
   - duplicate custom card names, or a registry entry whose val has no definition
+  - with --finished: a card file the PR adds or changes is still a scaffold or is not registered (a card PR
+    must ship the finished card, not leave it for the reviewer)
 Warnings:
   - a custom card whose name now exists in the Argentum library (the library version wins in the app)
   - a cached Oracle record disagrees with a definition's cost / type line / stats / Oracle text
@@ -31,7 +33,7 @@ def _norm_text(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip().casefold()
 
 
-def run(strict_oracle: bool = False) -> tuple[list[str], list[str]]:
+def run(strict_oracle: bool = False, finished: frozenset[str] = frozenset()) -> tuple[list[str], list[str]]:
     errors: list[str] = []
     warnings: list[str] = []
     base = _baseline()
@@ -66,6 +68,14 @@ def run(strict_oracle: bool = False) -> tuple[list[str], list[str]]:
         elif not c.is_scaffold and c.val not in base["unregistered"]:
             errors.append(f"{c.name}: defined in {where} but not registered in CustomCards.kt "
                           f"(register it, or mark it with {repo.SCAFFOLD_MARK} while unfinished)")
+
+        if where in finished:
+            if c.is_scaffold:
+                errors.append(f"{c.name}: this PR changes {where} but leaves it a scaffold ({repo.SCAFFOLD_MARK}/"
+                              f"{repo.TODO_MARK}); finish the card (Cardkit Finishing steps)")
+            elif c.val not in registered and repo.library_index().get(repo.normalize_name(c.name)) != "card":
+                errors.append(f"{c.name}: this PR changes {where} but does not register it in CustomCards.kt "
+                              f"(and regenerate the card exports: Cardkit Finishing steps)")
 
         if repo.library_index().get(repo.normalize_name(c.name)) == "card" and c.val in registered:
             warnings.append(f"{c.name}: Argentum's library now has this card; the app uses the library version")
