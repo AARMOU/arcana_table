@@ -24,7 +24,8 @@ concurrency:
 jobs:
   cards-and-android:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # Fail stalled Android tests promptly; a hanging card PR must not block certification for 90 minutes.
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - name: Reject Android-incompatible regex patterns before build
