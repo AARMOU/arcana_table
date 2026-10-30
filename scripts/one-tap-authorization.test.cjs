@@ -17,9 +17,41 @@ test('normal mode retains ordinary automatic queue when no specific owner author
   const r=selectCandidate([unit(300),unit(250)],'normal','base',feasible,()=>({ok:true}));
   assert.equal(r.candidate.raw.number,250);
 });
-test('multiple labels fail closed instead of silently dispatching a different card',()=>{
-  const r=selectCandidate([unit(100,[ONE_SHOT]),unit(200,[ONE_SHOT])],'normal','base',feasible,()=>({ok:true}));
-  assert.equal(r.candidate,null);assert.equal(r.error,'multiple-owner-authorizations');
+test('normal mode queues multiple explicit approvals, one at a time, ahead of ordinary work',()=>{
+  const older=unit(100),shield=unit(509,[ONE_SHOT]),surge=unit(510,[ONE_SHOT]);
+  const r=selectCandidate([surge,older,shield],'normal','base',feasible,()=>({ok:true}));
+  assert.equal(r.error,null);
+  assert.equal(r.candidate.raw.number,509,'lowest approved issue number wins regardless of API order');
+  assert.deepEqual(r.labeled.map(u=>u.raw.number).sort((a,b)=>a-b),[509,510],'both authorizations remain represented');
+  const next=selectCandidate([older,surge,unit(509)],'normal','base',feasible,()=>({ok:true}));
+  assert.equal(next.candidate.raw.number,510,'second approval wins after first is consumed');
+  assert.ok(next.labeled.includes(surge),'remaining owner approval is not consumed early');
+});
+test('multiple labels remain forbidden in strict authorize-once mode',()=>{
+  const r=selectCandidate([unit(100,[ONE_SHOT]),unit(200,[ONE_SHOT])],'authorize-once','base',feasible,()=>({ok:true}));
+  assert.equal(r.candidate,null);assert.equal(r.error,'authorize-once-needs-exactly-one-label');
+});
+test('a blocked approved card keeps its label while the next eligible approved card runs',()=>{
+  const blocked=unit(509,[ONE_SHOT]),ready=unit(510,[ONE_SHOT]);
+  const verdict=u=>u.raw.number===509?blockedFeas():feasible();
+  const r=selectCandidate([unit(100),blocked,ready],'normal','base',verdict,()=>({ok:true}));
+  assert.equal(r.candidate.raw.number,510);
+  assert.equal(r.clear,undefined);
+  assert.ok(r.labeled.includes(blocked),'the blocked approval is preserved');
+});
+test('multiple authorizations withdraw only a permanently invalid approval without spending',()=>{
+  const bad=unit(509,[ONE_SHOT]),ready=unit(510,[ONE_SHOT]);
+  const r=selectCandidate([ready,bad],'normal','base',feasible,u=>u.raw.number===509?{ok:false,missing:['cards-or-discovery']}:{ok:true});
+  assert.equal(r.candidate,null,'withdrawal never launches a worker in the same run');
+  assert.equal(r.clear.unit.raw.number,509);
+  const next=selectCandidate([ready],'normal','base',feasible,()=>({ok:true}));
+  assert.equal(next.candidate.raw.number,510,'the other approved card remains available');
+});
+test('inconclusive approved card denies instead of silently falling back to unapproved work',()=>{
+  const flaky=unit(509,[ONE_SHOT]);
+  const r=selectCandidate([unit(100),flaky],'normal','base',()=>({ok:false,code:'stale',reason:'feasibility stale'}),()=>({ok:true}));
+  assert.equal(r.candidate.raw.number,509,'admission must deny pending exact checks');
+  assert.equal(r.clear,undefined,'do not lose the approval');
 });
 test('one-shot mode demands an exact label and never falls back',()=>{
   const r=selectCandidate([unit(100)],'authorize-once','base',feasible,()=>({ok:true}));
