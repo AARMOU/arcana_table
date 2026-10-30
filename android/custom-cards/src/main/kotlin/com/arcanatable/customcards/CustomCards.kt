@@ -95,6 +95,7 @@ object CustomCards {
         // android/docs/CUSTOM_CARDS_HANDOFF.md rather than being approximated silently.
         Entry(AbstruseArchaic, "CMM", POOL),
         Entry(ConstrictingSliver, "CMM", POOL),
+        Entry(CopperGnomes, "USG", POOL),
         Entry(AllosaurusShepherd, "2X2", POOL),
         Entry(BarretAvalancheLeader, "FIC", POOL),
         Entry(KratosGodOfWar, "SLD", POOL),
@@ -189,6 +190,7 @@ object CustomCards {
         Entry(WingedHiveTyrant, "40K", "Six WotC precons"),
         Entry(TallymanOfNurgle, "40K", "Six WotC precons"),
         Entry(NecronDeathmark, "40K", "Six WotC precons"),
+        Entry(Psychomancer, "40K", "Six WotC precons"),
         Entry(SeaGateWreckage, "CMM", "Six WotC precons"),
         Entry(BeaconOfUnrest, "40K", "Six WotC precons"),
         Entry(GeierReachSanitarium, "CMM", "Six WotC precons"),
