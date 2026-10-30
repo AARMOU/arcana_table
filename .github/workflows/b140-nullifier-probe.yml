@@ -50,9 +50,9 @@ jobs:
           summary = os.environ.get('GITHUB_STEP_SUMMARY')
           if summary:
               with open(summary, 'a', encoding='utf-8') as out:
-                  out.write(f"### Nullifier exact-head engine acceptance\\n\\n{stats}\\n\\n")
+                  out.write(f"### Nullifier exact-head engine acceptance\n\n{stats}\n\n")
                   for name in failed:
-                      out.write(f"- FAIL: \`{name}\`\\n")
+                      out.write(f"- FAIL: `{name}`\n")
           assert stats == {'tests': 35, 'failures': 0, 'errors': 0, 'skipped': 0}, stats
           PY
       - uses: actions/upload-artifact@v4
