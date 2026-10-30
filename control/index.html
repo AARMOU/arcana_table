@@ -602,7 +602,56 @@
         }catch{ /* Keep cached snapshot and expose its age; never claim it was verified. */ }
       }
       // REVIEW_FRESHNESS_END
-      async function fetchStatus(){const first=await api('/issues/78/comments?per_page=100&page=1');let comments=first.data;const last=first.link.match(/<[^>]*[?&]page=(\d+)[^>]*>;\s*rel="last"/);if(last&&Number(last[1])>1){comments=comments.concat((await api('/issues/78/comments?per_page=100&page='+Number(last[1]))).data);}const out={};let trustedReview=null;for(const c of comments){if(!isBotComment(c))continue;const d=parseStatus(c.body);if(d){out[d.kind]={data:d,url:c.html_url};if(d.kind==='review')trustedReview=c;}}await refreshReviewSnapshot(out,trustedReview);return out;}
+      // WORKER_DIRECT_FRESHNESS_START
+      // The public edge caches status for up to 15 minutes. Refresh ONLY the existing
+      // bot-authored #78 workers comment when its source timestamp is older than 2 minutes.
+      // Bound direct GitHub reads to one attempt per 5 minutes per open page, including
+      // failures; never issue a write, start a worker, or trust arbitrary comment authors.
+      const WORKERS_DIRECT_AFTER_MS=2*60*1000,WORKERS_DIRECT_RETRY_MS=5*60*1000;
+      let workerLastDirectAttempt=0,workerLatest=null;
+      async function refreshWorkerSnapshot(out,trustedComment){
+        if(workerLatest&&(!out.workers||Date.parse(workerLatest.data.checkedAt)>Date.parse(out.workers.data?.checkedAt||'')))
+          out.workers=workerLatest; // a cached edge read may never roll back a newer verified worker report
+        const checked=Date.parse(out.workers?.data?.checkedAt||'');
+        if(Number.isFinite(checked)&&Date.now()-checked<WORKERS_DIRECT_AFTER_MS)return;
+        if(!Number.isSafeInteger(trustedComment?.id)||trustedComment.id<=0||!isBotComment(trustedComment))return;
+        if(workerLastDirectAttempt&&Date.now()-workerLastDirectAttempt<WORKERS_DIRECT_RETRY_MS)return;
+        workerLastDirectAttempt=Date.now();
+        try{
+          const res=await fetch('https://api.github.com/repos/'+REPO+'/issues/comments/'+trustedComment.id,{
+            cache:'no-store',headers:{'Accept':'application/vnd.github+json'},signal:readTimeout()
+          });
+          if(!res.ok)return;
+          const comment=await res.json();
+          if(comment?.id!==trustedComment.id||!isBotComment(comment))return;
+          const data=parseStatus(comment.body),newer=Date.parse(data?.checkedAt||'');
+          if(data?.kind!=='workers'||!data.workers||!Number.isFinite(newer)||newer>Date.now()+60000)return;
+          if(Number.isFinite(checked)&&newer<=checked)return;
+          workerLatest={data,url:comment.html_url};
+          out.workers=workerLatest;
+          sourceTimes.push(newer);
+        }catch{ /* Keep previous verified status and its source timestamp visible. */ }
+      }
+      // WORKER_DIRECT_FRESHNESS_END
+      async function fetchStatus(){
+        const first=await api('/issues/78/comments?per_page=100&page=1');
+        let comments=first.data;
+        const last=first.link.match(/<[^>]*[?&]page=(\d+)[^>]*>;\s*rel="last"/);
+        if(last&&Number(last[1])>1)
+          comments=comments.concat((await api('/issues/78/comments?per_page=100&page='+Number(last[1]))).data);
+        const out={};let trustedReview=null,trustedWorkers=null;
+        for(const c of comments){
+          if(!isBotComment(c))continue;
+          const d=parseStatus(c.body);
+          if(d){
+            out[d.kind]={data:d,url:c.html_url};
+            if(d.kind==='review')trustedReview=c;
+            if(d.kind==='workers')trustedWorkers=c;
+          }
+        }
+        await Promise.all([refreshReviewSnapshot(out,trustedReview),refreshWorkerSnapshot(out,trustedWorkers)]);
+        return out;
+      }
       const num=x=>Number.isFinite(x)?(Math.round(x*10)/10).toLocaleString():'—';
       const pct=x=>Number.isFinite(x)?Math.round(x*100)+'%':'—';
       const levelColor=l=>({normal:'var(--green)',warn:'var(--amber)',slow:'var(--amber)',paused:'var(--red)',unknown:'var(--red)'}[l]||'var(--muted)');
