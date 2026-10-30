@@ -42,7 +42,7 @@ object ArgentumLan {
             ?.hostAddress.orEmpty()
     }.getOrDefault("")
 
-    fun announcement(name: String) = "$TAG|${name.replace('|', ' ').take(32)}|$GAME_PORT"
+    fun announcement(name: String, port: Int = GAME_PORT) = "$TAG|${name.replace('|', ' ').take(32)}|$port"
 
     /** A host found on the network: its address and the name its player gave. */
     data class FoundHost(val address: String, val name: String)
@@ -151,6 +151,7 @@ class ArgentumLanServer(
     private val onGuest: (hello: JSONObject) -> Unit,
     private val onGuestMessage: (JSONObject) -> Unit,
     private val onGuestLeft: () -> Unit,
+    private val port: Int = ArgentumLan.GAME_PORT,
 ) : ArgentumHostLink {
     private val running = AtomicBoolean(false)
     @Volatile private var server: ServerSocket? = null
@@ -162,6 +163,9 @@ class ArgentumLanServer(
     /** Why the game port couldn't be opened (e.g. already in use), or null. Set before [awaitReady] returns. */
     @Volatile var bindError: Throwable? = null
         private set
+
+    /** Actual bound port; passing zero selects a free port for isolated socket tests. */
+    val localPort: Int get() = server?.localPort ?: -1
 
     /**
      * Waits until the host is accepting guests. True once the game port is bound and listening;
@@ -175,7 +179,7 @@ class ArgentumLanServer(
         Thread({
             try {
                 val socketServer = try {
-                    ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(ArgentumLan.GAME_PORT)) }
+                    ServerSocket().apply { reuseAddress = true; bind(InetSocketAddress(port)) }
                         .also { server = it }
                 } catch (e: Exception) {
                     bindError = e
@@ -207,9 +211,9 @@ class ArgentumLanServer(
             runCatching {
                 DatagramSocket().use { socket ->
                     socket.broadcast = true
-                    val payload = ArgentumLan.announcement(hostName).toByteArray()
                     while (running.get()) {
-                        if (!helloSeen) runCatching {
+                        if (!helloSeen && localPort > 0) runCatching {
+                            val payload = ArgentumLan.announcement(hostName, localPort).toByteArray()
                             socket.send(DatagramPacket(payload, payload.size, InetAddress.getByName("255.255.255.255"), ArgentumLan.DISCOVERY_PORT))
                         }
                         Thread.sleep(1_000)
@@ -236,9 +240,9 @@ class ArgentumLanGuest : ArgentumGuestLink {
     @Volatile private var link: LanLink? = null
 
     /** Connects to the host at [address] and sends [hello]. Blocking; call off the main thread. */
-    fun connect(address: String, hello: JSONObject) {
+    fun connect(address: String, hello: JSONObject, port: Int = ArgentumLan.GAME_PORT) {
         val socket = Socket()
-        socket.connect(InetSocketAddress(address.trim(), ArgentumLan.GAME_PORT), 8_000)
+        socket.connect(InetSocketAddress(address.trim(), port), 8_000)
         socket.keepAlive = true
         socket.tcpNoDelay = true
         val newLink = LanLink(socket, onMessage = { onMessage(it) }, onClosed = { onClosed() })
@@ -264,6 +268,7 @@ class ArgentumLanMultiServer(
     private val onGuest: (com.wingedsheep.sdk.model.EntityId, JSONObject) -> Unit,
     private val onGuestMessage: (com.wingedsheep.sdk.model.EntityId, JSONObject) -> Unit,
     private val onGuestLeft: (com.wingedsheep.sdk.model.EntityId) -> Unit,
+    private val port: Int = ArgentumLan.GAME_PORT,
 ) : ArgentumHostLink {
     init {
         val valid = setOf(
@@ -289,6 +294,9 @@ class ArgentumLanMultiServer(
     @Volatile var bindError: Throwable? = null
         private set
 
+    /** Actual bound port; passing zero selects a free port for isolated socket tests. */
+    val localPort: Int get() = server?.localPort ?: -1
+
     fun awaitReady(timeoutMs: Long): Boolean =
         bound.await(timeoutMs, TimeUnit.MILLISECONDS) && bindError == null && server != null
 
@@ -301,7 +309,7 @@ class ArgentumLanMultiServer(
                 val listener = try {
                     ServerSocket().apply {
                         reuseAddress = true
-                        bind(InetSocketAddress(ArgentumLan.GAME_PORT))
+                        bind(InetSocketAddress(port))
                     }.also { server = it }
                 } catch (error: Exception) {
                     bindError = error
@@ -366,9 +374,9 @@ class ArgentumLanMultiServer(
                     announcements.broadcast = true
                     while (running.get()) {
                         val vacant = openSeats
-                        if (vacant > 0) {
+                        if (vacant > 0 && localPort > 0) {
                             // Optional fourth discovery field; legacy clients ignore it.
-                            val bytes = (ArgentumLan.announcement(hostName) + "|$vacant").toByteArray()
+                            val bytes = (ArgentumLan.announcement(hostName, localPort) + "|$vacant").toByteArray()
                             runCatching {
                                 announcements.send(DatagramPacket(bytes, bytes.size,
                                     InetAddress.getByName("255.255.255.255"), ArgentumLan.DISCOVERY_PORT))
