@@ -232,7 +232,9 @@ and reads its comments, so every paid path now requires that all of it comes fro
 - **Repairs:** the unit, the PR author (Copilot, or a trusted person) and every PR comment must be trusted.
 
 Known limits: direct `@copilot` mentions by people bypass the dispatcher entirely (process rule: GPT and
-Claude never post them); a comment *deleted* after approval can't be detected through the REST API; PR
-review comments are not yet checked on the repair path, and the repair gate is not re-run right before its
-agent-triggering comment, so `ARCANA_REPAIR_MODE` stays `off`/`observe` until a follow-up PR covers both;
+Claude never post them); a comment *deleted* after approval can't be detected through the REST API. The repair path checks the
+whole PR conversation (issue comments, review bodies and inline review comments) and re-runs that check
+immediately before its ledger write and agent-triggering comment (`untrustedConversation` in
+`scripts/failure-routing.cjs`, 2026-10-30), so `ARCANA_REPAIR_MODE=request` is an owner decision rather
+than blocked;
 branch protection on `main` is an owner setting (section 10).

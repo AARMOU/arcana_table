@@ -31,6 +31,27 @@ async function runRouter({ github, context, env, readBudget, delivery }) {
 }
 
 // Shared admission for repair requests: readiness, work unit, capacity, ceilings, budget.
+// A repair worker reads the whole PR conversation: issue comments, review bodies and inline review
+// comments. Every author must be trusted; any read failure fails closed. Returns a reason or null.
+async function untrustedConversation({ github, owner, repo, pr }) {
+  if (!A.TRUSTED_ASSOCIATIONS.includes(pr.author_association) && !A.trustedCommenter({ login: pr.user?.login, type: pr.user?.type }))
+    return 'untrusted-origin: pr-author-untrusted';
+  const author = x => ({ association: x.author_association, login: x.user?.login, type: x.user?.type });
+  let comments, reviews, reviewComments;
+  try {
+    [comments, reviews, reviewComments] = await Promise.all([
+      github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: pr.number, per_page: 100 }),
+      github.paginate(github.rest.pulls.listReviews, { owner, repo, pull_number: pr.number, per_page: 100 }),
+      github.paginate(github.rest.pulls.listReviewComments, { owner, repo, pull_number: pr.number, per_page: 100 })]);
+  } catch { return 'untrusted-origin: pr-conversation-unavailable'; }
+  if (![comments, reviews, reviewComments].every(Array.isArray)) return 'untrusted-origin: pr-conversation-unavailable';
+  if (comments.some(c => !A.trustedCommenter(author(c)))) return 'untrusted-origin: untrusted-pr-comments';
+  // A review with no body adds no text, but its inline comments are checked below.
+  if (reviews.some(r => String(r.body || '').trim() && !A.trustedCommenter(author(r)))) return 'untrusted-origin: untrusted-pr-reviews';
+  if (reviewComments.some(c => !A.trustedCommenter(author(c)))) return 'untrusted-origin: untrusted-pr-review-comments';
+  return null;
+}
+
 function createAuthorizer({ github, owner, repo, env, readBudget, now = Date.now() }) {
   // One router invocation reconciles many failures; loadUnits costs ~100 API calls against the
   // shared hourly quota. Units are read once per invocation: after any admitted repair the
@@ -45,18 +66,15 @@ function createAuthorizer({ github, owner, repo, env, readBudget, now = Date.now
     const unit = data.units.find(u => u.raw.number === n);
     if (!unit) return { allowed: false, reason: 'no work unit linked to PR' };
     // A repair worker also reads the PR conversation: it must come from trusted people too.
-    let prComments;
-    try { prComments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: pr.number, per_page: 100 }); }
-    catch { return { allowed: false, reason: 'untrusted-origin: pr-comments-unavailable' }; }
-    if (!A.TRUSTED_ASSOCIATIONS.includes(pr.author_association) && !A.trustedCommenter({ login: pr.user?.login, type: pr.user?.type }))
-      return { allowed: false, reason: 'untrusted-origin: pr-author-untrusted' };
-    if (prComments.some(c => !A.trustedCommenter({ association: c.author_association, login: c.user?.login, type: c.user?.type })))
-      return { allowed: false, reason: 'untrusted-origin: untrusted-pr-comments' };
+    const untrusted = await untrustedConversation({ github, owner, repo, pr });
+    if (untrusted) return { allowed: false, reason: untrusted };
     const { snapshot } = await readBudget(env);
     // Evaluate after the billing read: a fresh measurement must not look like it came from the future.
     const d = A.admit({ op: 'repair', unit: unit.derived, units: data.units.map(u => u.derived), ready, snapshot, now: Math.max(now, Date.now()) });
     if (!d.allowed) return { allowed: false, reason: d.reason };
     return { allowed: true, reason: d.reason, attempt: unit.derived.repairs + 1, unit: n,
+      // Re-run right before the ledger write and the Copilot trigger: text added after admission counts.
+      recheck: () => untrustedConversation({ github, owner, repo, pr }),
       // Reserve before posting: a failed post over-counts (safe), never under-counts.
       record: () => github.rest.issues.createComment({ owner, repo, issue_number: n,
         body: A.formatLedger({ op: 'repair-request', issue: n, run: String(run.id), sha: run.head_sha, at: new Date().toISOString() }) }) };
@@ -121,6 +139,10 @@ async function routeFailure({ github, context, authorize = observeOnly, openPrs,
     return {state:'stale-or-unmatched'};
   try {
     if (allowed) {
+      // Last trust check, immediately before anything is spent. Nothing is recorded or sent on refusal;
+      // the next reconcile pass observes the failure instead.
+      const late = typeof decision.recheck === 'function' ? await decision.recheck() : 'untrusted-origin: recheck-missing';
+      if (late) return {state:'withheld-at-trigger',pr:pr.number,reason:late};
       // Reserve before invoking Copilot. If an owner-token POST is uncertain,
       // the attempt remains consumed, preventing silent repeated spending.
       await decision.record();
@@ -184,5 +206,5 @@ async function reconcileFailures({ github, context, authorize = observeOnly, del
   return results;
 }
 
-module.exports = {runRouter, routeFailure, reconcileFailures, createAuthorizer, MARKER, OBSERVED, WORKFLOWS};
+module.exports = { untrustedConversation,runRouter, routeFailure, reconcileFailures, createAuthorizer, MARKER, OBSERVED, WORKFLOWS};
 
