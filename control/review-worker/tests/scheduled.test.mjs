@@ -7,7 +7,7 @@ import { runScheduled, SCHEDULE } from '../src/scheduled.mjs';
 test('timer starts only the allowlisted workflows on main, with the token', async () => {
   const calls = [];
   const fetchImpl = async (url, init) => { calls.push({ url, init }); return new Response(null, { status: 204 }); };
-  const r = await runScheduled('*/15 * * * *', { token: 't0k', fetchImpl, scheduledTime: Date.parse('2026-10-30T05:15:00Z') });
+  const r = await runScheduled('*/15 * * * *', { token: 't0k', fetchImpl, scheduledTime: Date.parse('2026-10-30T05:10:00Z') });
   assert.deepEqual(r, [{ workflow: 'arcana-card-review-inbox-refresh.yml', status: 204 }]);
   assert.equal(calls[0].url, 'https://api.github.com/repos/AARMOU/arcana_table/actions/workflows/arcana-card-review-inbox-refresh.yml/dispatches');
   assert.equal(calls[0].init.method, 'POST');
