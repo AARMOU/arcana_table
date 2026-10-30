@@ -72,3 +72,20 @@ Card throughput is set by the slowest stage of `queue → Copilot implements →
 1. **Suite authoring as an authorized, budget-capped step (biggest win).** When the #484 detector flags a card PR with code but no suite, it creates a *suite unit* that goes through the same one-tap authorization and billing admission as card work. A worker **different from the implementer** writes `certification/suites/<key>.json` + test, so certification stays independent. Owner decisions first: which worker (Work GPT, or a separate Copilot session limited to test files) and the budget cap. Then one supervised trial card. Estimate: ~3–5 h over 1–2 sessions; the trial waits on real Copilot and CI time.
 2. **Raise parallelism once suites keep up.** Move from `ARCANA_DISPATCH_MODE=authorize-once` + `ARCANA_MAX_ACTIVE_UNITS=1` to `normal` with a hard budget cap and 2–3 active units. More than that cannot help while suites are the slowest stage. These are owner settings, changed only after item 1 has worked on a few cards.
 3. **Throughput in Control.** Cards per day per stage, so the next bottleneck is visible without manual investigation. Estimate: ~1–2 h.
+
+## Engine versions and numbered builds — 2026-10-30
+
+Three separate events. Only the last one reaches a device.
+
+**1. Upstream changes** (Argentum moves almost daily). Visibility only: one note on #78, edited in place, shows upstream `HEAD` and how far the adopted engine and B140's pin are behind (`scripts/engine-watch.cjs`). Nothing is built, tested or merged because upstream moved.
+
+**2. Arcana adopts an engine version** (`argentum-weekly-upgrade.yml`: scheduled Mondays with Mon/Tue retries, or a manual run). The candidate must be fully green before it merges into `gpt/arcana-integration-next`: patches rebased and audited, imported cards resolve, every custom card on that branch compiles and passes its scenarios (collisions reconciled into `custom-overrides.txt`), app test suite, test APK, agent docs and Cardkit SDK current. A report-only step also scenario-tests **B140's entire custom-card set** on the candidate and appends a per-card table to the upgrade report; it never blocks the merge. A red run opens a `(needs work)` issue. That is **Claude's engine lane by default**, followed through to a green dry run (fix on the base via a `gpt/argentum-weekly-fix-*` branch; the dry run regenerates the candidate), and the #78 stall report flags it after 24 h.
+
+**3. Arcana cuts a numbered Android build (B141 and later).** Owner-scheduled; never to chase upstream. All gates in order:
+1. **Pick the engine:** an adopted version from step 2 whose upgrade run was green **and** whose B140 compatibility section shows every B140 card passing. Record the upstream SHA and the Arcana base SHA.
+2. **Cut the branch** from the chosen Arcana base (the card branch at that adoption), bringing over B140's integrated cards. No card may be dropped; any that fail are fixed first (card lane), never weakened or skipped.
+3. **Agree everywhere:** engine JARs, `engine-upgrade/preview-config.json` pin, Cardkit SDK index and agent docs, and `integration/policy.json` (`target`, `targetSeed`, engine-pin hashes) all name the same engine and branch. Re-point dependent pins (e.g. deck-gap audit #393, branch-only probes such as #357).
+4. **Full suites green on the exact head:** custom-card scenarios (every card), app unit tests (debug and release-exclusion), test APK build, and integration's destination tests against the new target.
+5. **Owner device test** on the debug APK, then an **explicit owner release decision**. Signing and distribution only with separate owner authorization.
+
+If any gate is red: stop, report exact failures on #81, and fix. Never move the target or loosen a gate to get green.
