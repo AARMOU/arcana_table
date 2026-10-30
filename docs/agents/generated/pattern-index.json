@@ -7150,6 +7150,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DeployToTheFrontScenarioTest.kt"
     },
     {
+     "card": "Lokhust Heavy Destroyer",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/LokhustHeavyDestroyer.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LokhustHeavyDestroyerScenarioTest.kt"
+    },
+    {
      "card": "Blood for the Blood God!",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BloodForTheBloodGod.kt",
      "lines": 41,
@@ -7166,12 +7172,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CommissarSeverinaRaine.kt",
      "lines": 44,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CommissarSeverinaRaineScenarioTest.kt"
-    },
-    {
-     "card": "Tallyman of Nurgle",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TallymanOfNurgle.kt",
-     "lines": 46,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TallymanOfNurgleScenarioTest.kt"
     }
    ]
   },
