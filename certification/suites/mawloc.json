@@ -1,0 +1,8 @@
+{
+  "key": "mawloc",
+  "name": "Mawloc",
+  "issue": 397,
+  "source": "certification/MawlocIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.MawlocIndependentCertificationTest",
+  "tests": 7
+}
