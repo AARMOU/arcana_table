@@ -806,6 +806,12 @@ class UlamogsNullifierScenarioTest {
             d.cardRegistry, conditionEvaluator = d.services.conditionEvaluator,
         )
         val masker = com.wingedsheep.engine.view.DecisionMasker(visibility)
+        // Check the actual server snapshot projection as well as the pending
+        // decision metadata: the Android card picker resolves IDs through this
+        // snapshot, so masking only SelectCardsDecision.cardInfo is insufficient.
+        val stateTransformer = com.wingedsheep.engine.view.ClientStateTransformer(
+            d.cardRegistry, predicateEvaluator = d.services.predicateEvaluator,
+        )
         for (viewer in listOf(d.player1, d.player2)) {
             val masked = masker.maskFor(choice, d.state, viewer)
                 as com.wingedsheep.engine.core.SelectCardsDecision
@@ -813,6 +819,14 @@ class UlamogsNullifierScenarioTest {
                 ?: throw AssertionError("Hidden card must have player-facing masked metadata")
             assertNotEquals("Sol Ring", info.name)
             assertEquals("", info.manaCost)
+
+            val snapshotCard = stateTransformer.transform(d.state, viewer).cards[hidden]
+                ?: throw AssertionError("Hidden exile must be represented in the client snapshot")
+            assertNotEquals("Client snapshot must not reveal hidden card identity",
+                "Sol Ring", snapshotCard.name)
+            assertEquals("Client snapshot must mask mana cost", "", snapshotCard.manaCost)
+            assertEquals("Client snapshot must mask type line", "", snapshotCard.typeLine)
+            assertEquals("Client snapshot must mask rules text", "", snapshotCard.oracleText)
         }
 
         // Deliberately choose the two face-up cards; leave the face-down one.
