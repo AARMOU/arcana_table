@@ -705,6 +705,9 @@ class UlamogsNullifierScenarioTest {
         val hidden = d.putCardInExile(d.player2, "Sol Ring")
         d.addComponent(hidden, com.wingedsheep.engine.state.components.identity.FaceDownComponent)
         d.putCardInExile(d.player2, "Island")
+        // With exactly two eligible exiles, Argentum selects both automatically.
+        // A third eligible card is required to exercise a real choice/DecisionMasker.
+        d.putCardInExile(d.player2, "Grizzly Bears")
 
         val bears = d.putCardInHand(d.player1, "Grizzly Bears")
         d.giveMana(d.player1, Color.GREEN)
@@ -757,7 +760,8 @@ class UlamogsNullifierScenarioTest {
         d.resolveAll()
         assertTrue("Processing two opponent-owned cards must counter Bears",
             d.permanentsNamed(d.player1, "Grizzly Bears").isEmpty())
-        assertTrue(d.getExileCardNames(d.player2).isEmpty())
+        assertEquals("Unchosen third exile must remain", listOf("Grizzly Bears"),
+            d.getExileCardNames(d.player2))
         assertEquals(listOf("Island", "Sol Ring"), d.getGraveyardCardNames(d.player2).sorted())
     }
 
