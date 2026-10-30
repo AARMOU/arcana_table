@@ -260,15 +260,25 @@ test('stall report lists card PRs past each stage limit and posts only when the 
     item(4, 'checks-failed', 7), item(5, 'integrated', 99), item(6, 'awaiting-review', 30), { ...item(7, 'certified', 99), kind: 'audit' }];
   assert.deepEqual(R.stalls({ items }, now).map(i => i.pr), [1, 3, 4, 6], 'stage time beats stale PR activity (#8 certified 1h ago)');
   const comments = [];
-  const github = { rest: { issues: { listComments() {}, createComment: async ({ body }) => comments.push({ user: { login: 'github-actions[bot]', type: 'Bot' }, body }) } },
-    paginate: async () => comments };
+  let openIssues = [];
+  const github = { rest: { issues: { listComments() {}, listForRepo() {}, createComment: async ({ body }) => comments.push({ user: { login: 'github-actions[bot]', type: 'Bot' }, body }) } },
+    paginate: async fn => fn === github.rest.issues.listForRepo ? openIssues : comments };
   const go = (its, t = now) => R.reportStalls({ github, owner: 'o', repo: 'r', payload: { items: its }, now: t });
   assert.equal(await go([]), 'unchanged', 'nothing stalled and nothing posted before: quiet');
   assert.equal(await go(items), 'posted 4');
-  assert.match(comments[0].body, /#3 Card 3: approved, not integrated for 3h \(Integration blocked: cardkit\)/);
+  assert.match(comments[0].body, /#3 Card 3: approved, not integrated for 3h\. \*\*Owner:\*\* Claude \(automation\)\. \*\*Next:\*\* .* \(Integration blocked: cardkit\)\./);
   assert.equal(await go(items, now + 18e5), 'unchanged', 'ages ticking up never re-post');
   assert.equal(await go(items, now + 36e5), 'posted 5', 'a PR newly crossing its limit is reported');
   assert.equal(await go(items.filter(i => i.pr !== 1)), 'posted 3', 'one resolved');
   assert.equal(await go([]), 'posted 0', 'a cleared list is reported once');
+  assert.equal(await go([]), 'unchanged');
+  // A bot-opened blocked weekly upgrade older than 24h is listed with Claude as owner; a fresh one is not.
+  const bot = { login: 'github-actions[bot]', type: 'Bot' };
+  openIssues = [{ number: 312, title: 'Weekly Argentum upgrade to 621552754f (needs work)', user: bot, created_at: h(72) },
+    { number: 313, title: 'Weekly Argentum upgrade to 7777777777 (needs work)', user: bot, created_at: h(2) },
+    { number: 314, title: 'Weekly Argentum upgrade to 8888888888 (needs work)', user: { login: 'someone', type: 'User' }, created_at: h(99) }];
+  assert.equal(await go([]), 'posted 0');
+  assert.match(comments.at(-1).body, /^stalls: engine#312$/m);
+  assert.match(comments.at(-1).body, /#312 Weekly Argentum upgrade to 621552754f \(needs work\): blocked engine upgrade for 72h\. \*\*Owner:\*\* Claude \(engine lane\)/);
   assert.equal(await go([]), 'unchanged');
 });
