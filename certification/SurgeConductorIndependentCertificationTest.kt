@@ -17,11 +17,11 @@ class SurgeConductorIndependentCertificationTest {
 
     @Test
     fun anotherControlledNontokenArtifactProliferatesEachSelectedCounterKind() {
-        val d = customScenario(SurgeConductor, "Sol Ring", "Grizzly Bears")
+        val d = customScenario(SurgeConductor, "Sol Ring", "Grizzly Bears", "Giant Spider")
         val p = d.player1
         val conductor = d.putCreatureOnBattlefield(p, "Surge Conductor")
         val selected = d.putCreatureOnBattlefield(p, "Grizzly Bears")
-        val unselected = d.putCreatureOnBattlefield(p, "Grizzly Bears")
+        val unselected = d.putCreatureOnBattlefield(p, "Giant Spider")
         d.addComponent(selected, CountersComponent(mapOf(
             CounterType.PLUS_ONE_PLUS_ONE to 1,
             CounterType.CHARGE to 2,
@@ -32,7 +32,7 @@ class SurgeConductorIndependentCertificationTest {
 
         assertNull(d.castSpell(p, ring).error)
         assertEquals(1, d.counterCount(selected, CounterType.PLUS_ONE_PLUS_ONE))
-        d.resolveAll(Choices(targets = listOf(selected)))
+        d.resolveAll(Choices(pick = listOf("Grizzly Bears")))
 
         assertTrue(d.getPermanents(p).contains(conductor))
         assertEquals(2, d.counterCount(selected, CounterType.PLUS_ONE_PLUS_ONE))
@@ -106,19 +106,20 @@ class SurgeConductorIndependentCertificationTest {
 
     @Test
     fun artifactTokenEnteringDoesNotProliferate() {
-        val d = customScenario(SurgeConductor, "Servo Exhibition", "Grizzly Bears")
+        val d = customScenario(SurgeConductor, "Big Score", "Grizzly Bears")
         val p = d.player1
         d.putCreatureOnBattlefield(p, "Surge Conductor")
         val target = d.putCreatureOnBattlefield(p, "Grizzly Bears")
         d.addComponent(target, CountersComponent(mapOf(CounterType.PLUS_ONE_PLUS_ONE to 1)))
-        val exhibition = d.putCardInHand(p, "Servo Exhibition")
-        d.giveMana(p, Color.WHITE)
-        d.giveColorlessMana(p, 1)
+        val exhibition = d.putCardInHand(p, "Big Score")
+        d.putCardInHand(p, "Grizzly Bears")
+        d.giveMana(p, Color.RED)
+        d.giveColorlessMana(p, 3)
 
         assertNull(d.castSpell(p, exhibition).error)
-        d.resolveAll(Choices(targets = listOf(target)))
+        d.resolveAll(Choices(pick = listOf("Grizzly Bears")))
 
-        assertEquals(2, d.permanentsNamed(p, "Servo").size)
+        assertEquals(2, d.permanentsNamed(p, "Treasure").size)
         assertEquals(1, d.counterCount(target, CounterType.PLUS_ONE_PLUS_ONE))
     }
 
