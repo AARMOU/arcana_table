@@ -1127,7 +1127,7 @@
     {
      "card": "Shield Sphere",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShieldSphere.kt",
-     "lines": 30,
+     "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShieldSphereScenarioTest.kt"
     },
     {
@@ -2815,7 +2815,7 @@
     {
      "card": "Shield Sphere",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShieldSphere.kt",
-     "lines": 30,
+     "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShieldSphereScenarioTest.kt"
     },
     {
@@ -3823,7 +3823,7 @@
     {
      "card": "Shield Sphere",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShieldSphere.kt",
-     "lines": 30,
+     "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShieldSphereScenarioTest.kt"
     },
     {
@@ -4955,7 +4955,7 @@
     {
      "card": "Shield Sphere",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShieldSphere.kt",
-     "lines": 30,
+     "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShieldSphereScenarioTest.kt"
     }
    ]
@@ -6076,16 +6076,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CompySwarmScenarioTest.kt"
     },
     {
+     "card": "Shield Sphere",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShieldSphere.kt",
+     "lines": 29,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShieldSphereScenarioTest.kt"
+    },
+    {
      "card": "Skittering Cicada",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SkitteringCicada.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SkitteringCicadaScenarioTest.kt"
-    },
-    {
-     "card": "Shield Sphere",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShieldSphere.kt",
-     "lines": 30,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShieldSphereScenarioTest.kt"
     },
     {
      "card": "Venomcrawler",

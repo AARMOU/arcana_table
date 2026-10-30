@@ -13,7 +13,6 @@ val ShieldSphere = card("Shield Sphere") {
     toughness = 6
     oracleText = "Defender\nWhenever this creature blocks, put a -0/-1 counter on it."
     keywords(Keyword.DEFENDER)
-    keywords(Keyword.DEFENDER)
 
     triggeredAbility {
         trigger = Triggers.self.blocks()
