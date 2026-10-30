@@ -1,6 +1,17 @@
 # Stabilization control plan — 2026-10-23
 
-Control issue: https://github.com/AARMOU/arcana_table/issues/81. All work is isolated. No merges, main/production changes, APK release or signing changes are authorized.
+> **Historical snapshot (status as of 2026-10-30).** The sections from *Verified baseline and backup*
+> through *Six-deck measurement and resumption gate* record the 2026-10-23 stabilization and are **not
+> current instructions**. Since then the owner has enabled automation and authorized automation merges
+> and Worker deploys. The dispatcher runs with live AI-credit billing gates (50% warn / 75% slow /
+> 90% pause), currently in `ARCANA_DISPATCH_MODE=normal`; certified cards reach B140 through owner
+> Verify and approved-card integration. Do **not** act on this file's 2026-10-23 instructions to keep
+> `ARCANA_AUTOMATION_READY` unset or to disable the dispatcher. Current state and decisions live on
+> [#81](https://github.com/AARMOU/arcana_table/issues/81) and in the repository variables; the last
+> section, *Card flow backlog*, is current. APK release, signing and production changes still need
+> explicit owner authorization.
+
+Control issue: https://github.com/AARMOU/arcana_table/issues/81. As of 2026-10-23: all work is isolated. No merges, main/production changes, APK release or signing changes were authorized at that time.
 
 ## Verified baseline and backup
 
