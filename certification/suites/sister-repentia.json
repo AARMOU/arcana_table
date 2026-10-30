@@ -1,0 +1,8 @@
+{
+  "key": "sister-repentia",
+  "name": "Sister Repentia",
+  "issue": 411,
+  "source": "certification/SisterRepentiaIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.SisterRepentiaIndependentCertificationTest",
+  "tests": 3
+}
