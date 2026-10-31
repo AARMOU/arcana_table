@@ -17,7 +17,7 @@ export class GooseBudget extends DurableObject<BudgetEnv> {
     if (input.body?.max_output_tokens !== 256 || input.reserve < minimum || input.body?.store !== false || input.body?.tools?.length !== 0)
       return Response.json({error:'request-budget-mismatch'}, {status:400});
     const cap = Number(this.env.GOOSEGETA_DAILY_TOKENS);
-    if (!Number.isSafeInteger(cap) || cap < 1 || cap > 1000000 || !Number.isSafeInteger(input.reserve) || input.reserve < 1)
+    if (!Number.isSafeInteger(cap) || cap < 1 || cap > 9000000 || !Number.isSafeInteger(input.reserve) || input.reserve < 1)
       return Response.json({error:'budget-config'}, {status:503});
     // Luna's published standard rate is <= $0.50 per million tokens in either direction.
     // Count a conservative UTF-8-bytes-plus-buffer reservation for EACH provider attempt.
