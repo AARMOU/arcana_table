@@ -137,6 +137,8 @@ class PhyrexianTriniformIndependentCertificationTest {
         assertTrue(d.projected.hasType(copy, "ARTIFACT"))
         assertTrue(d.projected.hasType(copy, "CREATURE"))
 
+        d.passPriorityUntil(Step.DECLARE_ATTACKERS)
+        assertNull(d.declareAttackers(p, listOf(copy), opponent).error)
         d.passPriorityUntil(Step.POSTCOMBAT_MAIN)
         assertEquals(20, d.getLifeTotal(p))
         assertEquals(11, d.getLifeTotal(opponent))
