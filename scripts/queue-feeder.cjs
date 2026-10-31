@@ -1,4 +1,5 @@
 'use strict';
+const { oracleSnapshot } = require('./oracle-handoff.cjs');
 // Cardkit-backed Copilot queue feeder (issue #81).
 // Produces suggestions; in owner's existing normal auto mode it may create ONE unedited
 // Actions-bot issue. Paid assignment is still exclusively the separate guarded dispatcher.
@@ -67,9 +68,10 @@ function requestedDeck(openIssues = [], demand = []) {
 // ---- Public app demand (owner decision 2026-10-28: "public demand only") --------------------------
 // The app's "Request missing cards" button goes to the card-request Worker, which keeps one comment per
 // card on #321 (written with the owner's token, so the comments are OWNER-authored) carrying an opt-in
-// request count. Any player can press that button, so demand is a VOTE ONLY: it reorders cards Cardkit
-// already says Copilot can do. It never creates a [Card Work] issue, never routes to GPT, never jumps
-// ahead of the owner's own requests and never bypasses any dispatcher gate.
+// request count. Any player can press that button. Owner decision 2026-10-30 ("any card submitted by myself
+// or the app to be weighted and prioritized"): demand reorders Copilot-ready cards AND, ranked by votes after
+// every owner request, opens [Card Work] review items for cards Cardkit cannot clear yet. It never jumps ahead
+// of the owner's own requests, never authorizes spending and never bypasses any dispatcher gate.
 const DEMAND_ISSUE = 321;
 const DEMAND_MARKER = '<!-- arcana-card-request-v1 -->';
 const MAX_DEMAND_CLASSIFIED = 50;
@@ -117,8 +119,8 @@ const OUTCOME_TEXT = {
   implemented: 'Already in the game (Cardkit: implemented). No work needed.',
   claimed: 'Already being worked on',
   queued: 'Already queued; duplicate Copilot work not permitted.',
-  'engine-work': 'Needs engine work before Copilot can implement it; routed to GPT (no Copilot credits).',
-  'needs-review': 'Needs rules review before Copilot can implement it; routed to GPT (no Copilot credits).',
+  'engine-work': 'Needs engine work before Copilot can implement it; opened as prioritized engineering work.',
+  'needs-review': 'Needs rules review before Copilot can implement it; opened as prioritized review work.',
   unclassified: 'Cardkit could not classify this card in this pass; do not dispatch.',
 };
 function outcomeOf(v) {
@@ -157,12 +159,26 @@ function candidates({ gaps, requestedGaps = null, openIssues = [], demand = [], 
     return { ...r, outcome, reason, readiness: v?.readiness || null, route: v?.route || null, hint: v?.hint || null,
       cardkitReasons: v?.reasons || [] };
   });
-  // Cards that need GPT before Copilot can take them. Only from a verified classification.
-  const workRequests = blockedRequests.filter(r => r.outcome === 'engine-work' || r.outcome === 'needs-review');
+  // Cards that need an engineer before Copilot can take them. Only from a verified classification.
+  // Priority: owner requests (more separate request issues first, then oldest), then app demand by votes.
+  const blocked = r => r.outcome === 'engine-work' || r.outcome === 'needs-review';
+  const ownerWork = blockedRequests.filter(blocked).map((r, i) => ({ ...r, source: 'owner', requests: ownerCounts.get(F.normName(r.name)) || 1, i }))
+    .sort((a, b) => b.requests - a.requests || a.i - b.i).map(({ i, ...r }) => r);
+  const ownerNames = new Set(selected.map(r => F.normName(r.name)));
+  const appWork = demand.filter(d => !ownerNames.has(F.normName(d.name)) && !ready.has(F.normName(d.name)) && !isQueued(d.name))
+    .slice(0, MAX_DEMAND_CLASSIFIED).map(d => {
+      const v = verdicts.get(F.normName(d.name));
+      const outcome = outcomeOf(v);
+      return { name: v?.name || d.name, issue: DEMAND_ISSUE, source: 'app', votes: d.votes, outcome, reason: OUTCOME_TEXT[outcome],
+        readiness: v?.readiness || null, route: v?.route || null, hint: v?.hint || null, cardkitReasons: v?.reasons || [] };
+    }).filter(blocked);
+  const workRequests = [...ownerWork, ...appWork];
+  const appResolved = demand.filter(d => ready.has(F.normName(d.name)) || isQueued(d.name) ||
+    ['implemented', 'claimed'].includes(outcomeOf(verdicts.get(F.normName(d.name))))).map(d => d.name);
   // Owner-requested cards that no longer need GPT (now Copilot-ready, queued, claimed or implemented).
   const resolvedRequests = selected.filter(r => ready.has(F.normName(r.name)) ||
     ['implemented', 'claimed', 'queued'].includes(blockedRequests.find(b => b.name === r.name && b.issue === r.issue)?.outcome))
-    .map(r => r.name);
+    .map(r => r.name).concat(appResolved);
   // Cards in open queue issues that Cardkit positively says Copilot cannot take now (claimed,
   // implemented, blocked or needing review). The dispatcher will skip such an issue forever, so it
   // must not hold the single "waiting" slot of the automatic queue (see chooseAutoQueue).
@@ -327,14 +343,20 @@ function cardWorkTitle(r) {
 function cardWorkBody(r, { runId, baseSha, base }) {
   const oracleMissing = (r.cardkitReasons || []).some(x => /no cached oracle record/i.test(x));
   return [CARD_WORK_MARKER,
-    '<!-- source: trusted-main-queue-feeder; run:' + runId + '; base-sha:' + baseSha + '; owner-request:#' + r.issue + ' -->',
+    '<!-- source: trusted-main-queue-feeder; run:' + runId + '; base-sha:' + baseSha + '; ' + (r.source === 'app' ? 'app-request:#' : 'owner-request:#') + r.issue +
+      '; priority:' + priorityScore(r) + ' -->',
     '## Card', '- ' + r.name, '',
     '## Why Copilot cannot take it yet',
     'Cardkit on `' + base + '` @ `' + baseSha + '`: **' + (r.readiness || 'UNKNOWN') + '**' +
       (r.route ? ', suggested route `' + r.route + '`' : '') + (r.hint ? ', hint `' + r.hint + '`' : '') + '.',
     ...(r.cardkitReasons || []).map(x => '- ' + x), '',
-    '## Owner request', 'Selected by the owner in #' + r.issue + '. That request stays open; do not close or edit it.', '',
-    '## Task (GPT)',
+    ...(r.source === 'app'
+      ? ['## App request', 'Requested in the app: **' + r.votes + '** opt-in vote(s) on #' + DEMAND_ISSUE + '. Priority after every owner request.', '']
+      : ['## Owner request', 'Selected by the owner in #' + r.issue + '. That request stays open; do not close or edit it.', '']),
+    ...oracleSection(r),
+    '## Priority', '`' + priorityLabel(r) + '`, score ' + priorityScore(r) + ' (owner requests first, then app votes). Any engineer takes the highest-scored open item: ' +
+      'comment `CLAIM` here first. Unclaimed items are started automatically (see `' + LANE_LABEL(r) + '`).', '',
+    '## Task (any engineer)',
     oracleMissing
       ? '1. Cardkit has no Oracle record for this card. Refresh the Oracle cache on an isolated branch (`tools/cardkit/cardkit oracle fetch`) and re-classify.'
       : '1. Reproduce the Cardkit verdict on the current integration base (`tools/cardkit/cardkit classify --verbose -- "' + r.name + '"`).',
@@ -342,25 +364,51 @@ function cardWorkBody(r, { runId, baseSha, base }) {
       ? '2. Identify the exact missing engine primitive(s). Implement them in the engine (never as app-side workarounds), with positive and negative scenario tests, or record a verified blocker (`cardkit blocker`) and explain on #81 why it cannot be done now.'
       : '2. Review each unmatched rules line. Either show existing primitives cover it (with real scenario tests) or identify the missing engine primitive and treat it as engine work.',
     '3. Group the work: other requested cards blocked by the same primitive should be unlocked by the same change.',
-    '4. Open a draft PR only. The owner approves before anything is merged into the integration base.', '',
+    '4. For a rules review, the deliverable is a `reviewedLines` entry in `tools/cardkit/data/verified-support.json` (exact line, primitives, references, bound by `oracleHash`/`runtimeHash`/`baseSha`; see PR #546) or a `tools/cardkit/data/known-blockers.json` entry for a real engine gap. Open a PR against the integration base with only that change.', '',
     '## Hand-back to Copilot',
     'Done when Cardkit classifies this card `SUPPORTED` with route `copilot` on the integration base (or the card is implemented). The queue feeder then closes this issue and queues the card for Copilot automatically. Implementing the card itself here is optional, not required.', '',
     '## Rules', 'No Copilot assignment, no paid agents, no merges, releases, signing or deployment from this issue. Coordinate on #81.', ''].join('\n');
 }
 
+// Priority: every owner request outranks every app request; within owner, more separate request issues;
+// within app, more votes. Exposed as a label and a sortable score so any engineer or automation takes the top item.
+const PRIORITY_OWNER = 'priority:owner';
+const PRIORITY_APP = 'priority:app';
+const priorityLabel = r => r.source === 'app' ? PRIORITY_APP : PRIORITY_OWNER;
+const priorityScore = r => r.source === 'app' ? Math.min(999, Number(r.votes) || 1) : 1000 + Math.min(999, Number(r.requests) || 1);
+const LANE_LABEL = r => r.outcome === 'engine-work' ? 'lane:engine' : 'lane:review';
+const cardWorkLabels = r => [priorityLabel(r), LANE_LABEL(r)];
+
+// The exact Scryfall record the trusted feeder classified (validated again here). An engineer or Copilot
+// session that cannot reach Scryfall reviews from this; an item without one is never auto-started.
+function oracleSection(r) {
+  let jsonl = null;
+  try { jsonl = r.oracle ? oracleSnapshot(r.oracle, r.name) : null; } catch { jsonl = null; }
+  return jsonl ? ['## Offline Oracle record (trusted feeder snapshot)', '', '    ' + jsonl, ''] : [];
+}
+const hasOracle = i => /^ {4}\{.*"oracle_text"/m.test(String(i.body || ''));
+const SUPERSEDED_PREFIX = '[Card Work superseded] ';
+const MAX_SUPERSEDE_PER_PASS = 2;
+
 // Pure decision: which card-work issue to open and which to close in this pass.
 function planCardWork(payload, botIssues = []) {
-  if (!payload?.ok || !payload.requestedClassified) return { create: null, close: [], reason: 'requested-cards-not-classified' };
+  if (!payload?.ok || !payload.requestedClassified) return { create: null, close: [], supersede: [], reason: 'requested-cards-not-classified' };
   const existing = botIssues.filter(isCardWork);
   const openWork = existing.filter(i => i.state === 'open');
   const resolved = new Set((payload.resolvedRequests || []).map(F.normName));
   const close = openWork.filter(i => resolved.has(F.normName(cardWorkName(i)))).slice(0, MAX_CLOSE_PER_PASS)
     .map(i => ({ issue: i.number, name: cardWorkName(i) }));
-  // One issue per card, ever: an existing open OR closed card-work issue means GPT already had it.
+  // Legacy items opened without an Oracle record or priority cannot be auto-started: retire them (renamed, so
+  // they no longer count as card work) and the next pass reopens the card with record, priority and labels.
+  const withOracle = new Map((payload.workRequests || []).filter(r => r.oracle).map(r => [F.normName(r.name), r]));
+  const supersede = openWork.filter(i => !hasOracle(i) && withOracle.has(F.normName(cardWorkName(i))) &&
+    !close.some(c => c.issue === i.number)).slice(0, MAX_SUPERSEDE_PER_PASS).map(i => ({ issue: i.number, name: cardWorkName(i) }));
+  // One issue per card, ever: an existing open OR closed card-work issue means an engineer already had it.
   const seen = new Set(existing.map(i => F.normName(cardWorkName(i))));
   const create = openWork.length - close.length >= MAX_OPEN_CARD_WORK ? null :
-    (payload.workRequests || []).find(r => !seen.has(F.normName(r.name)) && Number.isSafeInteger(r.issue)) || null;
-  return { create, close, reason: create ? null : openWork.length >= MAX_OPEN_CARD_WORK ? 'card-work-limit-reached' : 'no-new-card-work' };
+    [...(payload.workRequests || [])].sort((a, b) => priorityScore(b) - priorityScore(a))
+      .find(r => !seen.has(F.normName(r.name)) && Number.isSafeInteger(r.issue)) || null;
+  return { create, close, supersede, reason: create ? null : openWork.length >= MAX_OPEN_CARD_WORK ? 'card-work-limit-reached' : 'no-new-card-work' };
 }
 
 async function syncCardWork({ github, owner, repo, payload, runId, enabled }) {
@@ -378,10 +426,19 @@ async function syncCardWork({ github, owner, repo, payload, runId, enabled }) {
     await github.rest.issues.update({ owner, repo, issue_number: c.issue, state: 'closed', state_reason: 'completed' });
     out.closed.push(c);
   }
+  out.superseded = [];
+  for (const c of plan.supersede || []) {
+    await github.rest.issues.createComment({ owner, repo, issue_number: c.issue, body: [CARD_WORK_MARKER,
+      'Superseded (run ' + runId + '): **' + c.name + '** is reopened as a new card-work item that carries the trusted Oracle record, ' +
+      'priority and lane labels, so it can be started automatically. Continue any work there.'].join('\n') });
+    await github.rest.issues.update({ owner, repo, issue_number: c.issue, state: 'closed', state_reason: 'not_planned',
+      title: SUPERSEDED_PREFIX + c.name });
+    out.superseded.push(c);
+  }
   if (plan.create) {
     const r = plan.create;
     const issue = (await github.rest.issues.create({ owner, repo, title: cardWorkTitle(r),
-      body: cardWorkBody(r, { runId, baseSha: payload.baseSha, base: payload.base }) })).data;
+      body: cardWorkBody(r, { runId, baseSha: payload.baseSha, base: payload.base }), labels: cardWorkLabels(r) })).data;
     out.created = { issue: issue.number, name: r.name, outcome: r.outcome };
   }
   return out;
@@ -396,4 +453,4 @@ function needsSiteRefresh(previous, payload) {
 
 module.exports = { candidates, ownerSelections, ownerRequestCounts, requestedDeck, publicDemand, DEMAND_ISSUE, outcomeOf, newIssueUrl, queuePayload, queueSummary,
   chooseAutoQueue, createNextAutoQueue, planCardWork, syncCardWork, cardWorkTitle, cardWorkBody, needsSiteRefresh,
-  CARD_WORK_MARKER };
+  CARD_WORK_MARKER, CARD_WORK_PREFIX, SUPERSEDED_PREFIX, hasOracle, priorityScore, priorityLabel, cardWorkLabels, isCardWork };
