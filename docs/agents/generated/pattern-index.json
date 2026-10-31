@@ -319,7 +319,7 @@
  },
  "Costs": {
   "Costs.Composite": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -531,13 +531,19 @@
    ]
   },
   "Costs.SacrificeAnother": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Chronomancer",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Chronomancer.kt",
      "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ChronomancerScenarioTest.kt"
+    },
+    {
+     "card": "Illuminor Szeras",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IlluminorSzeras.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/IlluminorSzerasScenarioTest.kt"
     },
     {
      "card": "Commissar Severina Raine",
@@ -600,7 +606,7 @@
    ]
   },
   "Costs.Tap": {
-   "count": 42,
+   "count": 43,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -954,6 +960,17 @@
     }
    ]
   },
+  "DynamicAmounts.sacrificedManaValue": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Illuminor Szeras",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IlluminorSzeras.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/IlluminorSzerasScenarioTest.kt"
+    }
+   ]
+  },
   "DynamicAmounts.sourceManaValue": {
    "count": 1,
    "examples": [
@@ -1272,13 +1289,19 @@
    ]
   },
   "Effects.AddMana": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Desert of the Glorified",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DesertOfTheGlorified.kt",
      "lines": 20,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DesertOfTheGlorifiedScenarioTest.kt"
+    },
+    {
+     "card": "Illuminor Szeras",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IlluminorSzeras.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/IlluminorSzerasScenarioTest.kt"
     },
     {
      "card": "Sunken Ruins",
@@ -1303,12 +1326,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/JaheiraFriendOfTheForest.kt",
      "lines": 45,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/JaheiraFriendOfTheForestScenarioTest.kt"
-    },
-    {
-     "card": "Celestial Colonnade",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CelestialColonnade.kt",
-     "lines": 59,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestialColonnadeScenarioTest.kt"
     }
    ]
   },
@@ -4524,7 +4541,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 60,
+   "count": 61,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5132,7 +5149,7 @@
    ]
   },
   "manaAbility": {
-   "count": 28,
+   "count": 29,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5266,7 +5283,7 @@
    ]
   },
   "timing": {
-   "count": 33,
+   "count": 34,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5818,7 +5835,7 @@
    ]
   },
   "TimingRule.ManaAbility": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -6932,7 +6949,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 105,
+   "count": 106,
    "examples": [
     {
      "card": "Their Name Is Death",
