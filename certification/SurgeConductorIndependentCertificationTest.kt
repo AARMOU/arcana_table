@@ -2,12 +2,15 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.SurgeConductor
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.CastSpell
+import com.wingedsheep.engine.core.PaymentStrategy
 import com.wingedsheep.engine.state.components.battlefield.CountersComponent
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.CounterType
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
 import com.wingedsheep.sdk.model.EntityId
+import com.wingedsheep.sdk.scripting.AdditionalCostPayment
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -112,12 +115,21 @@ class SurgeConductorIndependentCertificationTest {
         val target = d.putCreatureOnBattlefield(p, "Grizzly Bears")
         d.addComponent(target, CountersComponent(mapOf(CounterType.PLUS_ONE_PLUS_ONE to 1)))
         val exhibition = d.putCardInHand(p, "Big Score")
-        d.putCardInHand(p, "Grizzly Bears")
+        val fodder = d.putCardInHand(p, "Grizzly Bears")
         d.giveMana(p, Color.RED)
         d.giveColorlessMana(p, 3)
 
-        assertNull(d.castSpell(p, exhibition).error)
-        d.resolveAll(Choices(pick = listOf("Grizzly Bears")))
+        // Big Score's discard is an additional cost: it is paid while casting, not chosen on resolution.
+        val cast = d.submit(
+            CastSpell(
+                playerId = p,
+                cardId = exhibition,
+                additionalCostPayment = AdditionalCostPayment(discardedCards = listOf(fodder)),
+                paymentStrategy = PaymentStrategy.FromPool,
+            ),
+        )
+        assertNull(cast.error)
+        d.resolveAll()
 
         assertEquals(2, d.permanentsNamed(p, "Treasure").size)
         assertEquals(1, d.counterCount(target, CounterType.PLUS_ONE_PLUS_ONE))
