@@ -150,6 +150,7 @@ test('workerd: unsolicited turn honk survives a failed GPT chat reply without mu
   const h=await setup('GCHAT3',['friend']);
   const {status}=await summon('GCHAT3',h,{chatMode:'ruthless',model:false});await outgoing(h,'lanHello');
   assert.equal(status.model,'off','guest starts free');
+  assert.equal(status.modelOffReason,'not-opted-in');
   const switched=await control('GCHAT3',{action:'chat',sessionId:status.sessionId,chatMode:'ruthless',model:true});
   assert.equal(switched.status,200,"the owner's existing Apply chat can explicitly opt in mid-match");
   assert.equal((await switched.json()).model,'opted in');

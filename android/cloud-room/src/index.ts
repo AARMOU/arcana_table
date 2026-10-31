@@ -12,7 +12,7 @@ export { GooseBudget };
 type SafeFallback = { epoch: number; version: number; interactionEpoch: string; action: Record<string,unknown>; started: number; stateKey: string; actionKey: string };
 type Rejection = { category: string; eligible: boolean; used: boolean; waiting: boolean; deadline?: number; epoch: number; stateKey: string | null; actionKey: string | null; hostLink: string };
 type AwaitingAction = { epoch: number; version: number; type: string; stateKey?: string; actionKey?: string };
-type GooseSession = Omit<ReturnType<typeof freshSession>, "reason" | "rejection" | "awaiting"> & { awaiting: AwaitingAction | null; rejection: Rejection | null; reason: string | null; chatMode: string; lastChatId?: number; lastChatMs?: number; lastBanterTurn?: number; chatCount?: number; chatPending?: boolean; chatFallbacks?: number; lastChatSource?: string; recoveries?: number; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string; fallback?: SafeFallback };
+type GooseSession = Omit<ReturnType<typeof freshSession>, "reason" | "rejection" | "awaiting"> & { awaiting: AwaitingAction | null; rejection: Rejection | null; reason: string | null; modelOffReason?: string; chatMode: string; lastChatId?: number; lastChatMs?: number; lastBanterTurn?: number; chatCount?: number; chatPending?: boolean; chatFallbacks?: number; lastChatSource?: string; recoveries?: number; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string; fallback?: SafeFallback };
 interface Env extends BudgetEnv {
   GOOSEGETA_ENABLED?: string;
   GOOSEGETA_CONTROL_KEY?: string;
@@ -119,6 +119,7 @@ export class GameRoom extends DurableObject<Env> {
         // alarm delivers it exactly once if the request was interrupted.
         if (g.inFlight) {
           g.model = false;
+          g.modelOffReason = 'interrupted-model';
           g.reason = 'interrupted-model-free-fallback';
           if (!g.fallback) { g.status = 'needs attention'; g.reason = 'interrupted-model-missing-fallback'; }
         }
@@ -196,6 +197,7 @@ export class GameRoom extends DurableObject<Env> {
       const fallback = g.fallback;
       delete g.inFlight; delete g.fallback;
       g.model = false;
+      g.modelOffReason = 'model-timeout';
       if (g.status === 'playing' && !g.detached && this.room?.seats[0].online &&
           g.epoch === fallback.epoch && !g.awaiting) {
         g.reason = 'model-timeout-free-fallback';
@@ -602,7 +604,7 @@ export class GameRoom extends DurableObject<Env> {
       // Only enable from an originally free session; never revive a model that a
       // budget/provider/interrupted failure deliberately disabled for safety.
       if (input.model === true && !g.model) {
-        if (g.reason === 'model-paused-free-fallback' ||
+        if (g.modelOffReason !== 'not-opted-in' || g.reason === 'model-paused-free-fallback' ||
             g.reason === 'interrupted-model-free-fallback' ||
             g.reason === 'interrupted-model-missing-fallback')
           return json({error:'model-previously-paused'},409);
@@ -662,7 +664,7 @@ export class GameRoom extends DurableObject<Env> {
     if (input.model === true && (this.env.GOOSEGETA_OPENAI_ENABLED !== 'true' || !this.env.GOOSE_BUDGET))
       return json({error:'model-disabled'},403);
     const session = Object.assign(freshSession(crypto.randomUUID(), invite.seat, deck.id, Date.now()),
-      {model:input.model === true, requestId:input.requestId, usedInvite:hash, chatMode:this.otherPeople() ? 'muted' : chatSettings(input.chatMode)});
+      {model:input.model === true, modelOffReason:input.model === true ? undefined : 'not-opted-in', requestId:input.requestId, usedInvite:hash, chatMode:this.otherPeople() ? 'muted' : chatSettings(input.chatMode)});
     this.room.goose = session;
     delete this.room.invite; // single use, reserved before any delivery
     seat.online = true; seat.claimed = true; seat.name = 'GOOSEGETA';
@@ -788,6 +790,7 @@ export class GameRoom extends DurableObject<Env> {
           if (!g.inFlight && !g.model) return; // watchdog has already resolved it
           delete g.inFlight; delete g.fallback;
           g.model = false;
+          g.modelOffReason = 'provider-or-budget';
           g.reason = 'model-paused-free-fallback';
           await this.save();
         }
