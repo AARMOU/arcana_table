@@ -226,21 +226,21 @@ test('editing an old engineer confirmation does not move it into a new attempt',
   assert.equal(e.at,Date.parse(created));
 });
 
-test('answeringPrs recovers only closed Copilot PRs that explicitly answer the item', () => {
-  const { answeringPrs } = require('./units.cjs');
-  const xref = (number, body, extra = {}) => ({ event: 'cross-referenced', source: { issue: { number, body, state: 'closed',
-    pull_request: {}, user: { login: 'Copilot' }, repository: { full_name: 'o/r' }, ...extra } } });
-  const events = [
-    xref(10, 'Unit: #5'),
-    xref(11, 'Fixes #5'),
-    xref(12, 'Fixes #5 and closes #6'),                    // ambiguous
-    xref(13, 'Unit: #6\nFixes #5'),                         // explicit Unit wins
-    xref(14, 'Unit: #5', { user: { login: 'someone' } }),   // not Copilot
-    xref(15, 'Unit: #5', { state: 'open' }),                // open PRs are linked the normal way
-    xref(16, 'Unit: #5', { pull_request: undefined }),      // an issue, not a PR
-    xref(17, 'Unit: #5', { repository: { full_name: 'x/y' } }),
-    { event: 'labeled' },
-  ];
-  assert.deepEqual(answeringPrs(events, 5, 'o/r'), [11, 10]);
-  assert.deepEqual(answeringPrs([], 5, 'o/r'), []);
+test('answeringPrs recovers only closed Copilot PRs that explicitly answer the item, re-read from the API', async () => {
+  const { answeringPrs, answerCandidates } = require('./units.cjs');
+  const repo = { full_name: 'o/r' };
+  const pr = (number, body, extra = {}) => ({ number, body, state: 'closed', user: { login: 'Copilot' }, base: { repo }, head: { repo }, ...extra });
+  const prs = { 10: pr(10, 'Unit: #5'), 11: pr(11, 'Fixes #5'), 12: pr(12, 'Fixes #5 and closes #6'), 13: pr(13, 'Unit: #6\nFixes #5'),
+    14: pr(14, 'Unit: #5', { user: { login: 'someone' } }), 15: pr(15, 'Unit: #5', { state: 'open' }),
+    17: pr(17, 'Unit: #5', { head: { repo: { full_name: 'x/y' } } }), 18: pr(18, 'Unit: #5') };
+  const github = { rest: { pulls: { get: async ({ pull_number }) => {
+    if (!prs[pull_number]) throw Object.assign(Error('Not Found'), { status: 404 });
+    return { data: prs[pull_number] };
+  } } } };
+  // Thin payloads (no body/user/state) as some tokens see them: candidates are still found and re-read.
+  const xref = number => ({ event: 'cross-referenced', source: { issue: { number } } });
+  const events = [10, 11, 12, 13, 14, 15, 16, 17].map(xref).concat([{ event: 'connected', subject: { type: 'pull_request', number: 18 } }, { event: 'labeled' }]);
+  assert.deepEqual(answerCandidates(events), [18, 17, 16, 15, 14, 13, 12, 11, 10]);
+  assert.deepEqual(await answeringPrs({ github, owner: 'o', repo: 'r', events, n: 5, max: 3 }), [18, 11]);
+  assert.deepEqual(await answeringPrs({ github, owner: 'o', repo: 'r', events: [], n: 5 }), []);
 });

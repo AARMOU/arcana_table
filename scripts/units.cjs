@@ -74,19 +74,35 @@ function connectedPrs(events) {
 }
 
 // Closed Copilot PRs in this repository that explicitly answer item n ("Unit: #n", or exactly one closing
-// reference), from the item's cross-reference events. Newest first.
-function answeringPrs(events, n, repository) {
+// reference). Candidates come from the item's timeline (cross-references and development links), but every
+// candidate is re-read with pulls.get: timeline payloads differ by token (the dispatcher's fine-grained read token
+// did not expose what the owner token does), so they are never trusted for author, state or body. Newest first.
+const answers = (body, n) => {
+  const text = String(body || '');
+  const explicit = text.match(/^Unit:\s*#(\d+)\s*$/m);
+  const refs = [...new Set([...text.matchAll(/\b(?:fix(?:e[sd])?|close[sd]?|resolve[sd]?)\s+#(\d+)\b/gi)].map(m => Number(m[1])))];
+  return explicit ? Number(explicit[1]) === n : refs.length === 1 && refs[0] === n;
+};
+function answerCandidates(events) {
   const out = [];
   for (const e of events || []) {
-    const pr = e.event === 'cross-referenced' ? e.source?.issue : null;
-    if (!pr?.pull_request || !isCopilot(pr.user) || pr.state !== 'closed' || out.includes(pr.number)) continue;
-    if (pr.repository?.full_name && pr.repository.full_name !== repository) continue;
-    const body = String(pr.body || '');
-    const explicit = body.match(/^Unit:\s*#(\d+)\s*$/m);
-    const refs = [...new Set([...body.matchAll(/\b(?:fix(?:e[sd])?|close[sd]?|resolve[sd]?)\s+#(\d+)\b/gi)].map(m => Number(m[1])))];
-    if (explicit ? Number(explicit[1]) === n : refs.length === 1 && refs[0] === n) out.push(pr.number);
+    const k = e.event === 'cross-referenced' ? e.source?.issue?.number
+      : ['connected', 'disconnected'].includes(e.event) && e.subject?.type === 'pull_request' ? e.subject.number : null;
+    if (Number.isSafeInteger(k) && !out.includes(k)) out.push(k);
   }
   return out.reverse();
+}
+async function answeringPrs({ github, owner, repo, events, n, max = 3 }) {
+  const found = [];
+  for (const k of answerCandidates(events).slice(0, 8)) {
+    if (found.length >= max) break;
+    let pr;
+    try { pr = (await github.rest.pulls.get({ owner, repo, pull_number: k })).data; } catch { continue; }  // an issue, or unreadable
+    if (pr.number !== k || !isCopilot(pr.user) || pr.state !== 'closed' || pr.base?.repo?.full_name !== owner + '/' + repo ||
+        pr.head?.repo?.full_name !== owner + '/' + repo || !answers(pr.body, n)) continue;
+    found.push(k);
+  }
+  return found;
 }
 
 // Only repository-authored suite requests are retained after closure. Do not use a time
@@ -199,7 +215,7 @@ async function loadUnits({ github, owner, repo, now = Date.now(), approvers, lag
     // 6 h auto-release (2026-10-31: #589, #596 blocked 9 eligible builds). Recover the session record from the
     // Copilot PR that explicitly answers this item. Sessions only: a closed PR never claims the unit.
     if (isCardWork(issue) && !linked.length && (issue.assignees || []).some(isCopilot))
-      for (const pr of answeringPrs(events.get(issue.number), issue.number, owner + '/' + repo).slice(0, 3))
+      for (const pr of await answeringPrs({ github, owner, repo, events: events.get(issue.number), n: issue.number }))
         sessions.push(...sessionsOf(await timeline(github, owner, repo, pr)));
     for (const pr of linked) {
       sessions.push(...sessionsOf(await timeline(github, owner, repo, pr.number)));
@@ -231,4 +247,4 @@ async function loadUnits({ github, owner, repo, now = Date.now(), approvers, lag
   return { units, prsByUnit, numbers };
 }
 
-module.exports = { answeringPrs, unitOf, loadUnits, isCopilot, contentWrittenAt, approvalOf, commentersOf, sessionsOf, engineEvidenceOf, claimedAtOf, isCardWork };
+module.exports = { answeringPrs, answerCandidates, unitOf, loadUnits, isCopilot, contentWrittenAt, approvalOf, commentersOf, sessionsOf, engineEvidenceOf, claimedAtOf, isCardWork };
