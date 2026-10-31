@@ -47,6 +47,8 @@ jobs:
           key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
           restore-keys: gh-etag-v1-
       - uses: actions/github-script@v7
+        env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
         with:
           script: |
             try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }

@@ -51,6 +51,7 @@ jobs:
           restore-keys: gh-etag-v1-
       - uses: actions/github-script@v7
         env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
           COPILOT_BILLING_READ_TOKEN: ${{ secrets.COPILOT_BILLING_READ_TOKEN }}
           # Owner identity is required for Copilot PR-comment instructions; the bot still writes ledgers.
           COPILOT_DISPATCH_TOKEN: ${{ secrets.COPILOT_DISPATCH_TOKEN }}

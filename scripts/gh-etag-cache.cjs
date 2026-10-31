@@ -7,6 +7,11 @@
 // limit, so each GET is sent with the ETag last seen for that exact URL; on 304 the cached body is returned.
 // The data is exactly what GitHub would have returned (it confirmed it is unchanged), so no logic changes.
 //
+// GitHub's ETags are specific to the token, and GITHUB_TOKEN is new for every job, so cross-run 304s need
+// a stable token. When ARCANA_READ_TOKEN (a fine-grained, read-only token) is set, GETs are sent with it:
+// reads then use that token's own hourly budget instead of the shared GITHUB_TOKEN one, and its stable
+// ETags make repeat reads free. Writes always keep the workflow's GITHUB_TOKEN and its permissions.
+//
 // The store is a gzip JSON file restored/saved with actions/cache by the workflow
 // (.gh-etag-cache/cache.json.gz). Missing or corrupt cache = plain requests. Only GETs are touched.
 const fs = require('node:fs');
@@ -31,24 +36,48 @@ function keyOf(endpoint) {
   return endpoint.url + '|' + String(h.accept || '') + '|' + String(h['x-github-api-version'] || '');
 }
 
-function install(github, { file = DEFAULT_FILE, core = null, now = () => Date.now(), saveOnExit = true } = {}) {
+// Endpoint options carry the main client's request hook (options.request.hook); handing that to the
+// reader would re-enter this wrapper. Drop it (and any job-token header) so the reader uses its own auth.
+function forReader(options) {
+  const { request: req, ...rest } = options;
+  const headers = { ...(rest.headers || {}) };
+  delete headers.authorization;
+  const out = { ...rest, headers };
+  if (req) { const { hook, ...other } = req; out.request = other; }
+  return out;
+}
+
+function install(github, { file = DEFAULT_FILE, core = null, now = () => Date.now(), saveOnExit = true,
+  readToken = process.env.ARCANA_READ_TOKEN, reader = null } = {}) {
   if (!github?.hook?.wrap || !github?.request?.endpoint?.parse) return null;
   if (github.__arcanaEtagCache) return github.__arcanaEtagCache;
+  if (!reader && readToken && typeof github.constructor === 'function') reader = new github.constructor({ auth: readToken });
+  // ETags from different tokens never match: keep the two stores apart.
+  const scope = reader ? 'read|' : 'job|';
   const previous = load(file);
   const touched = {};
-  const stats = { hits: 0, misses: 0, uncached: 0 };
+  const stats = { hits: 0, misses: 0, uncached: 0, fallback: 0, readToken: !!reader };
   github.hook.wrap('request', async (request, options) => {
     const method = String(options.method || 'GET').toUpperCase();
     const headers = options.headers || {};
     if (method !== 'GET' || headers['if-none-match'] || headers['If-None-Match']) { stats.uncached++; return request(options); }
     let key;
-    try { key = keyOf(github.request.endpoint.parse(options)); } catch { stats.uncached++; return request(options); }
+    try { key = scope + keyOf(github.request.endpoint.parse(options)); } catch { stats.uncached++; return request(options); }
     const hit = touched[key] || previous[key];
     // before-after-hook binds this same options object for every wrapped hook (auth included), so the
     // header must be set on it in place; passing a new object to request() would be ignored.
     if (hit?.etag) options.headers = Object.assign(options.headers || {}, { 'if-none-match': hit.etag });
     try {
-      const res = await request(options);
+      let res;
+      if (reader) {
+        try { res = await reader.request(forReader(options)); } catch (error) {
+          // The read token lacks access (or hit its own limit): this request uses the job token as before.
+          if (![401, 403, 404].includes(Number(error?.status))) throw error;
+          stats.fallback++;
+          if (options.headers) delete options.headers['if-none-match'];
+          return request(options);
+        }
+      } else res = await request(options);
       stats.misses++;
       const etag = res?.headers?.etag;
       if (etag && res.status === 200) {
@@ -75,7 +104,7 @@ function install(github, { file = DEFAULT_FILE, core = null, now = () => Date.no
         .sort((a, b) => Number(b[1].at) - Number(a[1].at)).slice(0, MAX_ENTRIES);
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, zlib.gzipSync(JSON.stringify({ v: 1, entries: Object.fromEntries(entries) })));
-      if (core) (core.notice || core.info)(`GitHub API ETag cache: ${stats.hits} not-modified (free), ${stats.misses} fetched, ${stats.uncached} uncached; ${entries.length} entries saved.`);
+      if (core) (core.notice || core.info)(`GitHub API ETag cache: ${stats.hits} not-modified (free), ${stats.misses} fetched, ${stats.uncached} uncached, ${stats.fallback} job-token fallbacks; ${entries.length} entries saved; reads via ${stats.readToken ? 'ARCANA_READ_TOKEN' : 'GITHUB_TOKEN'}.`);
     } catch (error) {
       if (core) core.warning('GitHub API ETag cache not saved: ' + String(error?.message || error).slice(0, 200));
     }
