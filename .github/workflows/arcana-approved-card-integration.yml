@@ -8,8 +8,8 @@ on:
       - integration/**
       - scripts/card-integration.cjs
       - .github/workflows/arcana-approved-card-integration.yml
-  schedule:
-    - cron: '*/15 * * * *'
+  # No own schedule: the review inbox refreshes every 15 minutes and this runs on each completion.
+  # A separate cron doubled the ~150-call plan scan against the 1,000/hour GITHUB_TOKEN quota.
   workflow_run:
     workflows: ['Arcana Card Review Inbox Refresh']
     types: [completed]
