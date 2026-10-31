@@ -187,6 +187,7 @@ object CustomCards {
         Entry(BeaconOfUnrest, "40K", "Six WotC precons"),
         Entry(GeierReachSanitarium, "CMM", "Six WotC precons"),
         Entry(DeployToTheFront, "40K", "Six WotC precons"),
+        Entry(ResurrectionOrb, "40K", "Six WotC precons"),
         Entry(SpawningBed, "M3C", "Six WotC precons"),
         Entry(MageRingNetwork, "CMM", "Six WotC precons"),
         Entry(UginsInsight, "BFZ", "Six WotC precons"),
