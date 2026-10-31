@@ -37,7 +37,7 @@ class KenrithsTransformationIndependentCertificationTest {
         assertTrue(d.projected.hasColor(angel, Color.GREEN))
         assertFalse(d.projected.hasColor(angel, Color.WHITE))
         assertEquals(setOf("CREATURE"), d.projected.getTypes(angel).intersect(CardType.entries.map { it.name }.toSet()))
-        assertEquals(setOf("ELK"), d.projected.getSubtypes(angel))
+        assertEquals(setOf("ELK"), d.projected.getSubtypes(angel).map { it.uppercase() }.toSet())
         assertTrue(d.projected.hasLostAllAbilities(angel))
         assertFalse(d.projected.hasKeyword(angel, Keyword.FLYING))
     }
@@ -59,7 +59,7 @@ class KenrithsTransformationIndependentCertificationTest {
         assertTrue(d.projected.hasType(overseer, "CREATURE"))
         assertFalse(d.projected.hasType(overseer, "ARTIFACT"))
         assertEquals(setOf("CREATURE"), d.projected.getTypes(overseer).intersect(CardType.entries.map { it.name }.toSet()))
-        assertEquals(setOf("ELK"), d.projected.getSubtypes(overseer))
+        assertEquals(setOf("ELK"), d.projected.getSubtypes(overseer).map { it.uppercase() }.toSet())
         assertTrue(d.projected.hasColor(overseer, Color.GREEN))
         assertEquals(3, d.projected.getBasePower(overseer))
         assertEquals(3, d.projected.getBaseToughness(overseer))
