@@ -2687,6 +2687,17 @@
     }
    ]
   },
+  "Effects.Proliferate": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Surge Conductor",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SurgeConductor.kt",
+     "lines": 26,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SurgeConductorScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.PutOntoBattlefield": {
    "count": 1,
    "examples": [
@@ -3934,8 +3945,14 @@
    ]
   },
   "Triggers.another": {
-   "count": 9,
+   "count": 10,
    "examples": [
+    {
+     "card": "Surge Conductor",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SurgeConductor.kt",
+     "lines": 26,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SurgeConductorScenarioTest.kt"
+    },
     {
      "card": "Sanguinary Priest",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SanguinaryPriest.kt",
@@ -3965,12 +3982,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/VenomEddieBrock.kt",
      "lines": 39,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VenomEddieBrockScenarioTest.kt"
-    },
-    {
-     "card": "Rampaging Ferocidon",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RampagingFerocidon.kt",
-     "lines": 41,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RampagingFerocidonScenarioTest.kt"
     }
    ]
   },
@@ -4955,7 +4966,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 142,
+   "count": 143,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6760,13 +6771,19 @@
    ]
   },
   "GameObjectFilter.Artifact": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Copper Gnomes",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CopperGnomes.kt",
      "lines": 26,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CopperGnomesScenarioTest.kt"
+    },
+    {
+     "card": "Surge Conductor",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SurgeConductor.kt",
+     "lines": 26,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SurgeConductorScenarioTest.kt"
     },
     {
      "card": "Skorpekh Destroyer",
@@ -6791,12 +6808,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BagEndBanquet.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BagEndBanquetScenarioTest.kt"
-    },
-    {
-     "card": "Cranial Plating",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CranialPlating.kt",
-     "lines": 41,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CranialPlatingScenarioTest.kt"
     }
    ]
   },
