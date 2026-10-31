@@ -1,7 +1,7 @@
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
 const source=fs.readFileSync(__dirname+'/goosegeta.js','utf8');
 function harness(responses,hash='',hasToken=true){
- const nodes=new Map();for(const id of ['gooseForm','gooseCode','gooseInvite','gooseModel','gooseChat','gooseDeck','gooseStatus','gooseDismiss','gooseSummon','gooseRefresh','gooseApplyChat'])
+ const nodes=new Map();for(const id of ['gooseForm','gooseCode','gooseInvite','gooseModel','gooseChat','gooseDeck','gooseStatus','gooseDismiss','gooseSummon','gooseRefresh','gooseApplyChat','gooseRecover'])
  nodes.set(id,{value:id==='gooseChat'?'muted':id==='gooseDeck'?'goosegeta-glue':'',checked:false,disabled:false,textContent:'',handlers:{},addEventListener(k,f){this.handlers[k]=f;}});
  const stores=new Map(hasToken?[['arcana-review-session-v1','FAKE-OWNER-SESSION']]:[]);const calls=[];let uuid=0;
  const window={location:{hash,pathname:'/control/',search:'',href:''},localStorage:{getItem:k=>stores.get(k),removeItem:k=>stores.delete(k)},sessionStorage:{getItem:()=>null,removeItem(){}}};
@@ -20,4 +20,27 @@ test('uncertain network submission retains idempotency key and expired owner cre
  const h=harness([{status:503,data:{error:'room-unavailable'}},{status:200,data:{status:'joining',sessionId:'s'}},{status:401,data:{}}]);h.nodes.get('gooseCode').value='GOOSE1';h.nodes.get('gooseInvite').value='private';
  await h.click('gooseForm');await h.click('gooseForm');assert.equal(JSON.parse(h.calls[0].body).requestId,JSON.parse(h.calls[1].body).requestId);
  await h.click('gooseRefresh');assert.equal(h.stores.size,0);await h.click('gooseForm');assert.equal(h.calls.length,3);assert.match(h.window.location.href,/auth\/login/);
+});
+
+test('explicit owner retry goes through authorized existing proxy, without new invite or paid mode',async()=>{
+ const h=harness([
+  {status:200,data:{status:'needs attention',sessionId:'s',model:'off',reason:'unsupported-decision-or-action:decision-SelectCardsDecision',chatMode:'ruthless'}},
+  {status:200,data:{status:'needs attention',sessionId:'s',model:'off',reason:'unsupported-decision-or-action:decision-SelectCardsDecision',chatMode:'ruthless'}},
+  {status:200,data:{status:'playing',sessionId:'s',model:'off',chatMode:'ruthless'}},
+ ]);
+ h.nodes.get('gooseCode').value='GOOSE1';
+ h.nodes.get('gooseChat').value='ruthless';
+ await h.click('gooseRefresh');
+ assert.equal(h.nodes.get('gooseRecover').disabled,false);
+ await h.click('gooseRecover');
+ const body=JSON.parse(h.calls[1].body);
+ assert.equal(body.action,'chat','existing owner proxy accepts the verb');
+ assert.equal(body.chatMode,'recover','reserved explicit recovery route');
+ assert.equal(body.model,false,'no paid model re-enable');
+ assert.equal(body.sessionId,'s');
+ assert.equal(h.nodes.get('gooseChat').value,'ruthless');
+ assert.equal(h.nodes.get('gooseRecover').disabled,true,'no automatic retries');
+ await h.click('gooseRefresh');
+ assert.equal(h.nodes.get('gooseRecover').disabled,true);
+ assert.equal(h.calls.length,3);
 });
