@@ -1990,7 +1990,7 @@
    ]
   },
   "Effects.DrawCards": {
-   "count": 34,
+   "count": 35,
    "examples": [
     {
      "card": "Ugin's Insight",
@@ -2151,13 +2151,19 @@
    ]
   },
   "Effects.ForEachPlayer": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Geier Reach Sanitarium",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GeierReachSanitarium.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GeierReachSanitariumScenarioTest.kt"
+    },
+    {
+     "card": "Acolyte Hybrid",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AcolyteHybrid.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AcolyteHybridScenarioTest.kt"
     },
     {
      "card": "Great Unclean One",
@@ -2671,7 +2677,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -4169,7 +4175,7 @@
    ]
   },
   "Triggers.self.attacks": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -5029,7 +5035,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 145,
+   "count": 146,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -7570,7 +7576,7 @@
    ]
   },
   "TargetFilter.Artifact": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Hull Breach",
@@ -7583,6 +7589,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KillMaimBurn.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KillMaimBurnScenarioTest.kt"
+    },
+    {
+     "card": "Acolyte Hybrid",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AcolyteHybrid.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AcolyteHybridScenarioTest.kt"
     }
    ]
   },
@@ -8004,7 +8016,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 76,
+   "count": 77,
    "examples": [
     {
      "card": "Defile",
@@ -8082,6 +8094,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DismantlingWave.kt",
      "lines": 44,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DismantlingWaveScenarioTest.kt"
+    }
+   ]
+  },
+  "Player.ControllerOf": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Acolyte Hybrid",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AcolyteHybrid.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AcolyteHybridScenarioTest.kt"
     }
    ]
   }

@@ -74,12 +74,12 @@ jobs:
       matrix:
         include:
           - label: b140-control
-            ref: 2ed446ccd5741ca637d6af96ef13fe91ce71b837
+            ref: aec7f70e75c85c76ad6426cffb067df6b9e4a5fb
           # Independent JVM/workspace replay of the *same* B140 source, test fixture,
           # seed and shuffled deck. Different results between these two controls
           # demonstrate nondeterminism without attributing it to Nullifier.
           - label: b140-control-replay
-            ref: 2ed446ccd5741ca637d6af96ef13fe91ce71b837
+            ref: aec7f70e75c85c76ad6426cffb067df6b9e4a5fb
           - label: nullifier-candidate
             ref: ${{ github.sha }}
     steps:
