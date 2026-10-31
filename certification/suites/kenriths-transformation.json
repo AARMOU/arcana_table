@@ -1,0 +1,8 @@
+{
+  "key": "kenriths-transformation",
+  "name": "Kenrith's Transformation",
+  "issue": 539,
+  "source": "certification/KenrithsTransformationIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.KenrithsTransformationIndependentCertificationTest",
+  "tests": 5
+}
