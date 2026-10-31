@@ -250,6 +250,27 @@ def cmd_review(a) -> int:
     return 0 if v["readiness"] == "SUPPORTED" else 1
 
 
+def cmd_restamp(a) -> int:
+    """After an engine upgrade: re-bind each still-valid review to the new runtime (see readiness.restamp_review)."""
+    previous = json.loads(Path(a.previous_sdk).read_text(encoding="utf-8"))
+    old_vocab, new_vocab = sdk.vocabulary(previous), sdk.vocabulary()
+    runtime = readiness.review_runtime_hash()
+    path = repo.DATA_DIR / "verified-support.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    counts = {}
+    for name, entry in data.get("cards", {}).items():
+        if "reviewedLines" not in entry:
+            continue
+        result = readiness.restamp_review(entry, oracle.cached(name), old_vocab, new_vocab, runtime)
+        counts[result.split(":")[0]] = counts.get(result.split(":")[0], 0) + 1
+        if result not in ("current", "restamped"):
+            print(f"  stale: {name}: {result}")
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    readiness.verified_support.cache_clear()
+    print("restamp: " + ", ".join(f"{k} {v}" for k, v in sorted(counts.items())) if counts else "restamp: no reviews")
+    return 0
+
+
 def cmd_oracle(a) -> int:
     if a.action == "show":
         for n in a.names:
@@ -365,6 +386,9 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--verified-by", required=True, help="who reviewed, how, and when")
     s.add_argument("--oracle-jsonl", help="trusted Oracle record (one JSON line) to seed the cache first")
     s.set_defaults(func=cmd_review)
+    s = sub.add_parser("restamp", help="engine upgrade: carry still-valid reviews onto the new runtime")
+    s.add_argument("--previous-sdk", required=True, help="the previous engine's docs/agents/generated/sdk-api.json")
+    s.set_defaults(func=cmd_restamp)
 
     s = sub.add_parser("oracle", help="Scryfall cache")
     s.add_argument("action", choices=["fetch", "show"])
