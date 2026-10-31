@@ -120,4 +120,42 @@ test('spent paid canary falls back to an offered legal action without freezing t
   } finally {socket.close();}
 });
 
+
+// Owner-authorized repeated paid decisions still have one permanent account-wide
+// safety ceiling; all network responses below are stubbed, so API spend is zero.
+test('ongoing GPT-6 play allows multiple calls, then respects durable lifetime allowance',async()=>{
+  const options=[{id:'0',action:{type:'PassPriority',playerId:'offline-ai'}}];
+  const {body,reserve}=modelRequest('gpt-6-luna',{type:'stateUpdate',state:{turnNumber:2,phase:'MAIN'}},options);
+  const totalCap=reserve*2+10;
+  let calls=0;
+  const ongoing = new Miniflare(convertV4MiniflareOptions({
+    name:'rooms-ongoing',host:'127.0.0.1',port:0,modules:true,
+    scriptPath:code,compatibilityDate:'2026-10-01',
+    durableObjects:{ROOMS:{className:'GameRoom',useSQLite:true},GOOSE_BUDGET:{className:'GooseBudget',useSQLite:true}},
+    bindings:{GOOSEGETA_ENABLED:'true',GOOSEGETA_OPENAI_ENABLED:'true',
+      OPENAI_API_KEY:'LOCAL-FIXTURE-KEY',GOOSEGETA_CANARY_ONE_SHOT:'false',
+      GOOSEGETA_MODEL:'gpt-6-luna',GOOSEGETA_GAME_TOKENS:'1000000',
+      GOOSEGETA_DAILY_TOKENS:'1000000',GOOSEGETA_TOTAL_TOKENS:String(totalCap),
+      GOOSEGETA_CONTROL_KEY:'LOCAL-TEST-CONTROL-KEY-32-CHARACTERS'},
+    outboundService:async()=>{
+      calls++;
+      return LocalResponse.json({status:'completed',output:[{type:'message',
+        content:[{type:'output_text',text:'{"candidateId":"0"}'}]}],usage:{total_tokens:45}});
+    }
+  }));
+  await ongoing.ready;
+  try {
+    const ns=await ongoing.getDurableObjectNamespace('GOOSE_BUDGET');
+    const stub=ns.get(ns.idFromName('account-daily'));
+    const request=()=>stub.fetch('http://budget/decide',{method:'POST',body:JSON.stringify({body,reserve,options})});
+    assert.equal((await request()).status,200);
+    assert.equal((await request()).status,200,'second real-model attempt is allowed');
+    assert.equal((await request()).status,429,'lifetime reserve ceiling blocks a third attempt');
+    assert.equal(calls,2);
+    await ongoing.unsafeEvictDurableObject('rooms-ongoing','GooseBudget',{name:'account-daily'});
+    assert.equal((await request()).status,429,'same cap after Durable Object eviction');
+    assert.equal(calls,2);
+  } finally {await ongoing.dispose();}
+});
+
 test.after(async()=>{await mf.dispose();});
