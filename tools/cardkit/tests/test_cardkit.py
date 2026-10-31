@@ -256,7 +256,7 @@ class ReadinessTests(unittest.TestCase):
         self.assertIn("landsWithSubtype(Subtype.FOREST)", entry["reviewedLines"][0]["primitives"][0])
         original = oracle.cached("Dungrove Elder")
         for changed_text in (
-            original["oracle_text"].replace("Forests you control", "lands you control"),
+            original["oracle_text"].replace("Forests you control", "Forests target opponent controls"),
             original["oracle_text"].replace("Forests you control", "Forests all players control"),
         ):
             with mock.patch.object(oracle, "cached", return_value={**original, "oracle_text": changed_text}):
