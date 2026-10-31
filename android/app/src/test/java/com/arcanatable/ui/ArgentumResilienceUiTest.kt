@@ -33,7 +33,7 @@ import org.robolectric.annotation.GraphicsMode
 /**
  * Offline UI tests of the real app against [FakeArgentumServer] (recorded Argentum payloads).
  * Covers: startup connection failure, needs-handling decision fallback, malformed data,
- * pause-not-reconnect while backgrounded, explicit resume, foreground auto-reconnect,
+ * pause-not-reconnect while backgrounded, automatic return-from-Control resume, foreground auto-reconnect,
  * and the searchable diagnostic log.
  */
 @RunWith(RobolectricTestRunner::class)
@@ -156,19 +156,16 @@ class ArgentumResilienceUiTest {
         UiTestSupport.awaitReal(rule, 15_000, "paused status recorded") { diagnostics().contains("connection status: paused") }
         Thread.sleep(4_000); UiTestSupport.settle(rule, 500)
         assertEquals("no automatic reconnect while backgrounded", connectionsBefore, fake.connections.get())
+        // Returning from Control must recover the PAUSED session without a tap.
         scenario.moveToState(Lifecycle.State.RESUMED)
-        UiTestSupport.settle(rule, 1_000)
-        Thread.sleep(2_000); UiTestSupport.settle(rule, 500)
-        assertEquals("returning to the app does not reconnect by itself", connectionsBefore, fake.connections.get())
-        assertTrue("strip explains the pause", shown("PAUSED"))
-        assertTrue(shown("RESUME", substring = false))
-        shot(scenario, "04-paused-after-background")
-
-        // Player chooses Resume -> reconnect with token -> Argentum pushes the game back.
-        rule.onAllNodesWithText("RESUME", substring = false)[0].performSemanticsAction(SemanticsActions.OnClick)
-        UiTestSupport.awaitReal(rule, 15_000, "resumed connection") { fake.connections.get() > connectionsBefore && connectedShown() }
-        assertTrue("reconnect presented the saved session token", fake.received.last { it.optString("type") == "connect" }.has("token"))
-        shot(scenario, "05-resumed")
+        UiTestSupport.awaitReal(rule, 15_000, "automatically reconnected after returning to Arcana") {
+            fake.connections.get() > connectionsBefore && connectedShown()
+        }
+        assertTrue("automatic reconnect must reuse the saved seat/session token",
+            fake.received.last { it.optString("type") == "connect" }.has("token"))
+        assertTrue("foreground recovery should be logged",
+            diagnostics().contains("Returning to Arcana: reconnecting paused Argentum session"))
+        shot(scenario, "04-auto-resumed-after-background")
 
         // Foreground drop: reliability path reconnects automatically.
         val afterResume = fake.connections.get()
