@@ -9,7 +9,7 @@ import { GooseBudget, type BudgetEnv } from './goose-budget';
 export { GooseBudget };
 
 type SafeFallback = { epoch: number; version: number; interactionEpoch: string; action: Record<string,unknown>; started: number };
-type GooseSession = Omit<ReturnType<typeof freshSession>, "reason"> & { reason: string | null; chatMode: string; lastChatId?: number; lastChatMs?: number; lastBanterTurn?: number; chatCount?: number; chatPending?: boolean; chatFallbacks?: number; lastChatSource?: string; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string; fallback?: SafeFallback };
+type GooseSession = Omit<ReturnType<typeof freshSession>, "reason"> & { reason: string | null; chatMode: string; lastChatId?: number; lastChatMs?: number; lastBanterTurn?: number; chatCount?: number; chatPending?: boolean; chatFallbacks?: number; lastChatSource?: string; recoveries?: number; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string; fallback?: SafeFallback };
 interface Env extends BudgetEnv {
   GOOSEGETA_ENABLED?: string;
   GOOSEGETA_CONTROL_KEY?: string;
@@ -602,6 +602,24 @@ export class GameRoom extends DurableObject<Env> {
       // muting chat is separate from playing legal actions.
       g.chatMode = this.otherPeople() ? 'muted' : chatSettings(input.chatMode);
       await this.save(); return json(publicStatus(g));
+    }
+    if (input.action === 'recover') {
+      // Explicit owner-only recovery of an unsupported decision. Ask the *existing*
+      // Android host for a NEW authoritative snapshot; never invent a card, skip
+      // a choice, or replay a stale action. Maximum twice per session.
+      const g = this.room.goose;
+      if (!g || g.id !== input.sessionId || g.status === 'stopped')
+        return json({error:'session-mismatch'},409);
+      if (g.status !== 'needs attention' || typeof g.reason !== 'string' ||
+          !g.reason.startsWith('unsupported-decision-or-action') ||
+          g.failures || !g.accepted || g.detached || g.inFlight ||
+          g.expires <= Date.now() || !this.room.seats[0]?.online)
+        return json({error:'decision-not-recoverable'},409);
+      if ((g.recoveries ?? 0) >= 2) return json({error:'recover-limit'},409);
+      g.recoveries = (g.recoveries ?? 0) + 1;
+      await this.save(); // count attempt first, including in cases of disconnect or DO restart
+      await this.sendGoose({type:'requestResync'});
+      return json(publicStatus(g)); // host has not yet certified any legal action
     }
     if (input.action === 'dismiss') {
       // A stale browser cannot dismiss a newer game.
