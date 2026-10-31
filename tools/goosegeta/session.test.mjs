@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { candidates, freshSession, receive, publicStatus } from './session.mjs';
+import { candidates, freshSession, receive, publicStatus, unsupportedReason } from './session.mjs';
 import { modelRequest, modelDecision } from './model.mjs';
 const me='offline-ai';
 const state=(extra={})=>({type:'stateUpdate',interactive:true,interactionEpoch:'offline-2',stateVersion:2,
@@ -46,4 +46,40 @@ test('provider fixture is validated; fabricated ids, refusal and incomplete resp
   await assert.rejects(modelDecision('test-key',body,options,reply('{"candidateId":"0","action":"evil"}')),/schema/);
   await assert.rejects(modelDecision('test-key',body,options,reply('{}','incomplete')),/incomplete/);
   await assert.rejects(modelDecision('test-key',body,options,async()=>new Response('',{status:429})),/unavailable/);
+});
+
+test('Control reports safe unsupported decision/action category, never target or private card IDs',()=>{
+  const badDecision=state({pendingDecision:{
+    type:'ChooseCardsDecision',id:'private-123',playerId:me,options:['top-secret-card-name']
+  }});
+  assert.equal(unsupportedReason(badDecision),'unsupported-decision-or-action:decision-ChooseCardsDecision');
+  const badOptions=state({legalActions:[
+    {action:{type:'ActivateAbility',playerId:me,cardId:'hidden-card'}},
+    {action:{type:'DeclareAttackers',playerId:me}},
+    {action:{type:'ActivateAbility',playerId:me}}
+  ]});
+  assert.equal(unsupportedReason(badOptions),'unsupported-decision-or-action:actions-ActivateAbility,DeclareAttackers');
+  assert.ok(!unsupportedReason(badDecision).includes('private'));
+  assert.ok(!unsupportedReason(badOptions).includes('hidden-card'));
+  assert.equal(unsupportedReason(state({pendingDecision:{type:'<unsafe-token>'}})),
+    'unsupported-decision-or-action:decision-unknown');
+});
+test('accepted receipt retains version until later host snapshot; no double counting',()=>{
+  const g=freshSession('id',1,'deck',100);
+  receive(g,{type:'lanSeat',strictDeck:true},101);
+  receive(g,state({interactionEpoch:'offline-10',stateVersion:10}),102);
+  g.awaiting={epoch:10,version:10,type:'PassPriority'};
+  receive(g,{type:'actionReceipt',accepted:true,interactionEpoch:'offline-10'},103);
+  assert.equal(g.receipts,1);
+  assert.equal(g.transitions,0);
+  assert.equal(g.acceptedVersion,10);
+  receive(g,state({interactionEpoch:'offline-11',stateVersion:11}),104);
+  assert.equal(g.transitions,1);
+  assert.equal(g.acceptedVersion,null);
+  receive(g,state({interactionEpoch:'offline-11',stateVersion:11}),105);
+  assert.equal(g.transitions,1);
+  g.awaiting={epoch:11,version:11,type:'PassPriority'};
+  receive(g,state({interactionEpoch:'offline-12',stateVersion:12}),106);
+  assert.equal(g.transitions,2);
+  assert.equal(g.receipts,1,'snapshots do not prove host acceptance');
 });

@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 
 import { chatSettings, chatTrigger, cannedBanter, chatRequest } from '../../../tools/goosegeta/banter.mjs';
-import { candidates, freshSession, receive, publicStatus } from '../../../tools/goosegeta/session.mjs';
+import { candidates, freshSession, receive, publicStatus, unsupportedReason } from '../../../tools/goosegeta/session.mjs';
 import { modelRequest } from '../../../tools/goosegeta/model.mjs';
 import manifest from './goose-decks.json';
 import { pack, unpack } from './goose-wire.mjs';
@@ -683,7 +683,7 @@ export class GameRoom extends DurableObject<Env> {
       if (!options.length) {
         // The host also sends interactive snapshots to seats without priority. Waiting is normal.
         if (!packet.pendingDecision && (!Array.isArray(packet.legalActions) || packet.legalActions.length === 0)) return;
-        g.reason = 'unsupported-decision-or-action'; g.status = 'needs attention'; await this.save(); return;
+        g.reason = unsupportedReason(packet); g.status = 'needs attention'; await this.save(); return;
       }
       g.reason = null;
       const epoch = g.epoch; let selected = options[0];

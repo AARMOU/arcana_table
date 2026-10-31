@@ -47,10 +47,21 @@ export function candidates(packet, playerId) {
   }
   return out;
 }
+/** Public-only diagnostic category: no card/target IDs or private game payload. */
+export function unsupportedReason(packet) {
+  const valid = type => typeof type === 'string' && /^[A-Za-z][A-Za-z0-9]{0,47}$/.test(type);
+  const d = packet?.pendingDecision;
+  if (d != null) return 'unsupported-decision-or-action:decision-' +
+    (valid(d.type) ? d.type : 'unknown');
+  const offered = Array.isArray(packet?.legalActions) ? packet.legalActions : [];
+  const types = [...new Set(offered.map(x => x?.action?.type).filter(valid))].slice(0, 3);
+  return 'unsupported-decision-or-action:actions-' + (types.join(',') || 'none');
+}
+
 export function freshSession(id, seat, deckId, now) {
   return { id, seat, deckId, link: id, seq: 0, hostLink: '', hostSeq: 0, epoch: -1,
     status: 'joining', reason: null, receipts: 0, accepted: false, ready: false, actions: 0, failures: 0, reservedTokens: 0,
-    expires: now + 4 * 60 * 60 * 1000, awaiting: null, lastTurn: null, transitions: 0 };
+    expires: now + 4 * 60 * 60 * 1000, awaiting: null, lastTurn: null, transitions: 0, acceptedVersion: null };
 }
 export function receive(session, packet, now) {
   if (session.expires <= now || ['stopped','error'].includes(session.status)) return null;
@@ -63,7 +74,11 @@ export function receive(session, packet, now) {
   }
   if (packet.type === 'actionReceipt') {
     if (session.awaiting && packet.accepted === true && packet.interactionEpoch === 'offline-'+session.awaiting.epoch) {
-      session.receipts++; session.awaiting = null;
+      session.receipts++;
+      // The receipt arrives BEFORE the next host snapshot. Retain its version so
+      // Control can count real subsequent updates rather than showing zero forever.
+      session.acceptedVersion = session.awaiting.version;
+      session.awaiting = null;
     }
     return null;
   }
@@ -90,7 +105,13 @@ export function receive(session, packet, now) {
   const epoch = /^offline-(\d+)$/.exec(String(packet.interactionEpoch));
   if (!epoch || !Number.isSafeInteger(Number(epoch[1])) || Number(epoch[1]) <= session.epoch) return null;
   session.epoch = Number(epoch[1]);
-  if (session.awaiting && packet.stateVersion > session.awaiting.version) {
+  if (Number.isSafeInteger(session.acceptedVersion) && packet.stateVersion > session.acceptedVersion) {
+    session.transitions++;
+    session.acceptedVersion = null;
+    session.awaiting = null;
+  } else if (session.awaiting && packet.stateVersion > session.awaiting.version) {
+    // A new host snapshot also proves progress even when an older APK did not
+    // send actionReceipt. This does not claim the action was accepted.
     session.transitions++;
     session.awaiting = null;
   }
