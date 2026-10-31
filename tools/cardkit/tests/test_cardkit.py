@@ -237,7 +237,7 @@ class ReadinessTests(unittest.TestCase):
 
     def test_reviewed_line_makes_card_supported_only_for_exact_wording(self):
         v = readiness.classify("Ancient Stone Idol")
-        self.assertEqual((v["readiness"], v["route"], v.get("reviewed")), ("SUPPORTED", "copilot", True), v["reasons"])
+        self.assertEqual((v["readiness"], v["route"], bool(v.get("verifiedSupport"))), ("SUPPORTED", "copilot", True), v["reasons"])
         entry = dict(readiness.verified_support()[repo.normalize_name("Ancient Stone Idol")])
         entry["reviewedLines"] = [{"line": "When this creature dies, create a 6/6 token.", "primitives": ["x"]}]
         with mock.patch.object(readiness, "verified_support", return_value={repo.normalize_name("Ancient Stone Idol"): entry}):
