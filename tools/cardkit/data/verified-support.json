@@ -307,6 +307,41 @@
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
+    },
+    "Armory Automaton": {
+      "summary": "Triggers.or combines self-enters and self-attacks; Effects.May supplies the resolution choice. Super-Soldier Serum uses zero-or-more Equipment targets and processes each with ForEachTarget and AttachTargetEquipmentToCreature. Shagrat confirms Equipment need not be controlled by this source and attachment does not change control.",
+      "verifiedBy": "Copilot, source inspection 2026-10-31 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2026/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/msh/cards/SuperSoldierSerum.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/ltr/cards/ShagratLootBearer.kt",
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SpittingDilophosaurus.kt",
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RoccoCabarettiCaterer.kt",
+        "docs/agents/argentum-upstream/card-sdk-language-reference.md"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Whenever this creature enters or attacks, you may attach any number of target Equipment to it.",
+          "primitives": [
+            "Triggers.or",
+            "Triggers.self.enters",
+            "Triggers.self.attacks",
+            "Effects.May",
+            "TargetObject(unlimited=true)",
+            "Effects.ForEachTarget",
+            "Effects.AttachTargetEquipmentToCreature"
+          ]
+        }
+      ],
+      "baseSha": "45c62f77393a34105469deb5436785375ffe17c9",
+      "oracleHash": "eda0d6c9d963e00f38ce698ec35a378bb0ca05c474131c3b8dc10352cb49bdb8",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
     }
   }
 }
