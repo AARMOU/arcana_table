@@ -444,6 +444,31 @@
           "check": "Oracle unchanged; no named SDK member removed by the upgrade"
         }
       ]
+    },
+    "Whiptongue Hydra": {
+      "summary": "ETB: Triggers.self.enters() + Effects.DestroyAll(GameObjectFilter.Creature.withKeyword(Keyword.FLYING), storeDestroyedAs = collection) then Effects.AddDynamicCounters(PLUS_ONE_PLUS_ONE, collection.count, Self), as in Bane of Progress; Squall and Plummet show the flying filter",
+      "verifiedBy": "Copilot, source inspection 2026-10-31 (pinned Argentum engine c1c04ca3265c61df913af6db65460ad4ce409614)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/c13/cards/BaneOfProgress.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/1993-1999/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/s99/cards/Squall.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/arc/cards/Plummet.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "When this creature enters, destroy all creatures with flying. Put a +1/+1 counter on this creature for each creature destroyed this way.",
+          "primitives": [
+            "Triggers.self.enters",
+            "GameObjectFilter.Creature.withKeyword(Keyword.FLYING)",
+            "Effects.DestroyAll(GameObjectFilter",
+            "storeDestroyedAs)",
+            "Effects.Pipeline.runStoringCollection",
+            "Effects.AddDynamicCounters"
+          ]
+        }
+      ],
+      "baseSha": "853ce781efa03bbeff90d2f8a799b6d1c98a1069",
+      "oracleHash": "11bcaf4f9413e1ae76bc0df32df97ff574a6e817d02567ed48d7cf2c6e087606",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
     }
   }
 }
