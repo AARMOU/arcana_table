@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { Miniflare, convertV4MiniflareOptions, Response as LocalResponse } from 'miniflare';
 import { modelRequest } from '../../../tools/goosegeta/model.mjs';
+import { pack, unpack } from '../src/goose-wire.mjs';
 
 const code = new URL('../.local/one-shot-worker.mjs', import.meta.url).pathname;
 await build({
@@ -53,4 +54,70 @@ test('durable one-shot budget permits exactly one paid attempt across racing cal
   assert.equal(after.status,429);
   assert.equal(providerCalls,1);
 });
+
+test('spent paid canary falls back to an offered legal action without freezing the host game',async()=>{
+  const res=await mf.dispatchFetch('http://local/room/FALL01',{headers:{Upgrade:'websocket'}});
+  assert.equal(res.status,101);
+  const socket=res.webSocket,queue=[],waiters=[];
+  socket.addEventListener('message',e=>{
+    const p=JSON.parse(e.data);
+    const at=waiters.findIndex(w=>w.test(p));
+    if(at<0)queue.push(p);else waiters.splice(at,1)[0].resolve(p);
+  });
+  socket.accept();
+  const wait=(test,ms=5000)=>{
+    const at=queue.findIndex(test);
+    if(at>=0)return Promise.resolve(queue.splice(at,1)[0]);
+    return new Promise((resolve,reject)=>{
+      const w={test,resolve:p=>{clearTimeout(timer);resolve(p);}};
+      const timer=setTimeout(()=>{const idx=waiters.indexOf(w);if(idx>=0)waiters.splice(idx,1);reject(Error('host-packet-timeout'));},ms);
+      waiters.push(w);
+    });
+  };
+  const outbound=async kind=>{
+    while(true){
+      const message=await wait(p=>p.type==='relay');
+      const packet=await unpack(message.data);
+      if(packet.type===kind)return packet;
+    }
+  };
+  try {
+    socket.send(JSON.stringify({type:'create',code:'FALL01',password:'arcana-argentum-FALL01',name:'Host'}));
+    await wait(p=>p.type==='welcome');
+    socket.send(JSON.stringify({type:'relaySeats',kinds:['friend']}));
+    await wait(p=>p.type==='relay-seats-ack');
+    socket.send(JSON.stringify({type:'goosegetaInvite',seat:1,requestId:'fixture-invite'}));
+    const invite=await wait(p=>p.type==='goosegeta-invite');
+    assert.ok(invite.capability);
+    const summoned=await mf.dispatchFetch('http://local/internal/goosegeta/FALL01',{
+      method:'POST',headers:{Authorization:'Bearer LOCAL-TEST-CONTROL-KEY-32-CHARACTERS'},
+      body:JSON.stringify({action:'summon',capability:invite.capability,requestId:crypto.randomUUID(),deckId:'goosegeta-glue',model:true})
+    });
+    assert.equal(summoned.status,200);
+    await outbound('lanHello');
+    const send=async(seq,packet)=>socket.send(JSON.stringify({type:'relay',to:1,seq,data:await pack({...packet,_relayLink:'host-link'})}));
+    await send(1,{type:'lanSeat',strictDeck:true});
+    assert.equal((await outbound('lanReady')).ready,true);
+    const offered=[
+      {action:{type:'PlayLand',playerId:'offline-ai',cardId:'fixture-land'},isAffordable:true},
+      {action:{type:'PassPriority',playerId:'offline-ai'},isAffordable:true}
+    ];
+    await send(2,{type:'stateUpdate',interactive:true,stateVersion:90,interactionEpoch:'offline-90',
+      legalActions:offered,state:{turnNumber:4,phase:'MAIN',cards:{}}});
+    const move=await outbound('submitAction');
+    assert.ok(offered.some(x=>JSON.stringify(x.action)===JSON.stringify(move.action)),
+      'fallback must be a host-offered action');
+    assert.equal(move.interactionEpoch,'offline-90');
+    const status=await mf.dispatchFetch('http://local/internal/goosegeta/FALL01',{
+      headers:{Authorization:'Bearer LOCAL-TEST-CONTROL-KEY-32-CHARACTERS'}
+    });
+    const state=await status.json();
+    assert.equal(state.status,'playing','provider budget exhaustion must not freeze session');
+    assert.equal(state.model,'off','only one paid model attempt permitted');
+    assert.equal(state.reason,'model-paused-free-fallback');
+    assert.equal(state.actionsSubmitted,1);
+    assert.equal(providerCalls,1,'never contact paid provider again');
+  } finally {socket.close();}
+});
+
 test.after(async()=>{await mf.dispose();});
