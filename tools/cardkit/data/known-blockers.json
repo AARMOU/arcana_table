@@ -6,16 +6,6 @@
       "source": "#134 / #135 / #141 Priority B",
       "verified": false
     },
-    "Fortified Village": {
-      "reason": "as-enters reveal-from-hand replacement",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Furycalm Snarl": {
-      "reason": "as-enters reveal-from-hand replacement",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
     "Alms Collector": {
       "reason": "replace only the extra cards of a multi-card draw and redistribute them",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
@@ -67,6 +57,11 @@
       "verified": false,
       "recheck": "Pinned upstream Emiel the Blessed implements exile-then-return with Effects.Move(…, Zone.EXILE) then Effects.Move(…, Zone.BATTLEFIELD), so the exile-and-return half appears available now; reproduce before relying on this entry or deleting it."
     },
+    "Ezuri's Predation": {
+      "reason": "The pinned SDK has no primitive to pair each created token with a distinct creature from the iterated opponents' group for the required fights: Effects.CreateToken exposes created tokens as a collection, while Effects.Fight requires two explicit EffectTargets and no zip/captured-pair mapping is available.",
+      "source": "AARMOU/arcana_table#596; pinned Argentum 7fb073337e4389cfabe2ebf4c6416633a7fc63d2 SDK/API review plus source inspection of Ayula, Queen Among Bears and Longstalk Brawl (explicit fighter targets)",
+      "verified": true
+    },
     "Determined Iteration": {
       "reason": "cannot give the populated token haste and schedule its sacrifice",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
@@ -116,6 +111,16 @@
       "reason": "reveal-or-pay additional cost",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
+    },
+    "Chiss-Goria, Forge Tyrant": {
+      "reason": "Missing a cast-permission-scoped affinity rider: GrantMayPlayFromExile can permit casting artifact spells from the exiled group, but its onPlayRider is a post-cast trigger; GrantNextSpellAffinity applies to the next matching spell from any zone and cannot restrict affinity to a spell cast through that permission. The required cast-time cost discount cannot be expressed exactly.",
+      "source": "AARMOU/arcana_table#582; inspected pinned Ulamog.kt, JeskasWill.kt, ChandraHopesBeacon.kt, DonAndRaphHardScience.kt, DonAndRaphHardScienceTest.kt, and docs/agents/argentum-upstream/card-sdk-language-reference.md sections on GrantMayPlayFromExile and GrantNextSpellAffinity.",
+      "verified": false
+    },
+    "Treasure Nabber": {
+      "reason": "no trigger for 'whenever an opponent taps an artifact for mana': EventPattern.LandTappedForMana / Triggers.*.tapsLandForMana only cover lands, tappedForMana() is SELF/ATTACHED only, and taps(filter) is not mana-specific",
+      "source": "AARMOU/arcana_table#589",
+      "verified": false
     }
   },
   "keywords": {
@@ -141,13 +146,6 @@
     }
   },
   "patterns": [
-    {
-      "name": "as-enters reveal from hand",
-      "regex": "as ~ enters, you may reveal an? .* card from your hand",
-      "reason": "as-enters reveal-from-hand replacement",
-      "source": "#141 Priority C (Port Town); CUSTOM_CARDS_HANDOFF.md (Fortified Village, Furycalm Snarl)",
-      "verified": false
-    },
     {
       "name": "lose and can't have hexproof/shroud",
       "regex": "lose hexproof and shroud and can't have hexproof or shroud",

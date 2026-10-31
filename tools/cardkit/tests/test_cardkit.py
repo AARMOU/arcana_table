@@ -165,6 +165,18 @@ class PatternTests(unittest.TestCase):
         self.assertTrue(patterns.write(check=True), "run `tools/cardkit/cardkit patterns`")
 
 
+# Test-only blocker fixture: the reveal-from-hand pattern itself was retired once the engine implemented it
+# (Port Town, Snarls), but the pattern mechanism must still block every card with matching wording.
+_REVEAL_PATTERN = {"name": "as-enters reveal from hand", "regex": "as ~ enters, you may reveal an? .* card from your hand",
+                   "reason": "as-enters reveal-from-hand replacement", "source": "#141 (test fixture)", "verified": False}
+
+
+def _with_reveal_pattern():
+    real = readiness.blockers()
+    return mock.patch.object(readiness, "blockers", return_value={**real, "patterns": [*real.get("patterns", []), _REVEAL_PATTERN]})
+
+
+
 class ReadinessTests(unittest.TestCase):
     def test_registered_tested_custom_card(self):
         v = readiness.classify("Space Marine Scout")
@@ -180,7 +192,8 @@ class ReadinessTests(unittest.TestCase):
     @with_fake_oracle
     def test_recorded_engine_gap_routes_to_claude(self):
         # Never use a real upstream card as a permanent engine-blocker fixture.
-        v = readiness.classify("Cardkit Test Harbor")
+        with _with_reveal_pattern():
+            v = readiness.classify("Cardkit Test Harbor")
         self.assertEqual(v["readiness"], "ENGINE_BLOCKED")
         self.assertEqual(v["route"], "claude")
         self.assertIn("#141", " ".join(v["reasons"]))
@@ -218,7 +231,8 @@ class ReadinessTests(unittest.TestCase):
 
     @with_fake_oracle
     def test_blocked_mechanic_blocks_every_card_with_that_wording(self):
-        v = readiness.classify("Cardkit Test Harbor")
+        with _with_reveal_pattern():
+            v = readiness.classify("Cardkit Test Harbor")
         self.assertEqual(v["readiness"], "ENGINE_BLOCKED", v["reasons"])
         self.assertIn("as-enters reveal", " ".join(v["reasons"]))
 

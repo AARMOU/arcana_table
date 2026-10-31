@@ -308,6 +308,70 @@
         }
       ]
     },
+    "Armory Automaton": {
+      "summary": "Triggers.or combines self-enters and self-attacks; Effects.May supplies the resolution choice. Super-Soldier Serum uses zero-or-more Equipment targets and processes each with ForEachTarget and AttachTargetEquipmentToCreature. Shagrat confirms Equipment need not be controlled by this source and attachment does not change control.",
+      "verifiedBy": "Copilot, source inspection 2026-10-31 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2026/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/msh/cards/SuperSoldierSerum.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/ltr/cards/ShagratLootBearer.kt",
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SpittingDilophosaurus.kt",
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RoccoCabarettiCaterer.kt",
+        "docs/agents/argentum-upstream/card-sdk-language-reference.md"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Whenever this creature enters or attacks, you may attach any number of target Equipment to it.",
+          "primitives": [
+            "Triggers.or",
+            "Triggers.self.enters",
+            "Triggers.self.attacks",
+            "Effects.May",
+            "TargetObject(unlimited=true)",
+            "Effects.ForEachTarget",
+            "Effects.AttachTargetEquipmentToCreature"
+          ]
+        }
+      ],
+      "baseSha": "45c62f77393a34105469deb5436785375ffe17c9",
+      "oracleHash": "eda0d6c9d963e00f38ce698ec35a378bb0ca05c474131c3b8dc10352cb49bdb8",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
+    "Dragon's Rage Channeler": {
+      "summary": "Conditions.Delirium with four distinct card types gates conditional stat and keyword abilities in The Swarmweaver; MustAttack is Battle-Mad Ronin's attacks-each-combat ability.",
+      "verifiedBy": "Copilot, source inspection 2026-10-31 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/dsk/cards/TheSwarmweaver.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2003-2007/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/chk/cards/BattleMadRonin.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Delirium — As long as there are four or more card types among cards in your graveyard, this creature gets +2/+2, has flying, and attacks each combat if able.",
+          "primitives": [
+            "Conditions.Delirium()",
+            "ModifyStats",
+            "GrantKeyword(Keyword.FLYING)",
+            "MustAttack()"
+          ]
+        }
+      ],
+      "baseSha": "e26b0ef62fc510ede821afe09ab2fb26b271eb56",
+      "oracleHash": "aacbe1c9180ea8d934acf8f40798f64452bfc981a84c42b8492ff2273de444d2",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
     "Whiptongue Hydra": {
       "summary": "ETB: Triggers.self.enters() + Effects.DestroyAll(GameObjectFilter.Creature.withKeyword(Keyword.FLYING), storeDestroyedAs = collection) then Effects.AddDynamicCounters(PLUS_ONE_PLUS_ONE, collection.count, Self), as in Bane of Progress; Squall and Plummet show the flying filter",
       "verifiedBy": "Copilot, source inspection 2026-10-31 (pinned Argentum engine c1c04ca3265c61df913af6db65460ad4ce409614)",
