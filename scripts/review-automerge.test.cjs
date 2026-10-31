@@ -57,3 +57,12 @@ test('an engine-blocker decision for this card also merges', () => {
   assert.ok(M.mergeBlockers(args({ files: f, contents: { 'tools/cardkit/data/known-blockers.json': { base: JSON.stringify(kbBase), head: JSON.stringify(pattern) } } }))
     .includes('blocker-not-exactly-this-card'));
 });
+
+test('review PRs link to their card-work item by Unit line or a single closing reference', () => {
+  const { unitOf } = require('./review-automerge.cjs');
+  assert.equal(unitOf('Unit: #599\nFixes #599'), 599);
+  assert.equal(unitOf('Summary...\n\nFixes #600'), 600);
+  assert.equal(unitOf('Closes #615.'), 615);
+  assert.equal(unitOf('Fixes #1 and fixes #2'), null);
+  assert.equal(unitOf('see #600'), null);
+});

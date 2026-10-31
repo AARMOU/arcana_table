@@ -173,11 +173,14 @@ function candidates({ gaps, requestedGaps = null, openIssues = [], demand = [], 
         readiness: v?.readiness || null, route: v?.route || null, hint: v?.hint || null, cardkitReasons: v?.reasons || [] };
     }).filter(blocked);
   const workRequests = [...ownerWork, ...appWork];
+  // 'claimed' does NOT resolve card work: the review session's own PR claims the card, and closing the item then
+  // stranded the review (auto-merge requires the open item; 2026-10-31 #596/#600/#615 closed minutes after their
+  // review PRs opened). The item closes once Cardkit says ready, or the card is queued or implemented.
   const appResolved = demand.filter(d => ready.has(F.normName(d.name)) || isQueued(d.name) ||
-    ['implemented', 'claimed'].includes(outcomeOf(verdicts.get(F.normName(d.name))))).map(d => d.name);
-  // Owner-requested cards that no longer need GPT (now Copilot-ready, queued, claimed or implemented).
+    outcomeOf(verdicts.get(F.normName(d.name))) === 'implemented').map(d => d.name);
+  // Owner-requested cards that no longer need card work (now Copilot-ready, queued or implemented).
   const resolvedRequests = selected.filter(r => ready.has(F.normName(r.name)) ||
-    ['implemented', 'claimed', 'queued'].includes(blockedRequests.find(b => b.name === r.name && b.issue === r.issue)?.outcome))
+    ['implemented', 'queued'].includes(blockedRequests.find(b => b.name === r.name && b.issue === r.issue)?.outcome))
     .map(r => r.name).concat(appResolved);
   // Cards in open queue issues that Cardkit positively says Copilot cannot take now (claimed,
   // implemented, blocked or needing review). The dispatcher will skip such an issue forever, so it

@@ -71,7 +71,8 @@ test('each blocked request gets a precise outcome; only engine and review cards 
   assert.equal(by['Broodlord'].outcome, 'needs-review');
   assert.equal(by['Eldrazi Temple'].outcome, 'engine-work');
   assert.deepEqual(r.workRequests.map(w => w.name).sort(), ['Broodlord', 'Eldrazi Temple', 'Ulalek, Fused Atrocity']);
-  assert.deepEqual(r.resolvedRequests.sort(), ['Abstruse Archaic', 'Sol Ring']);
+  // Claimed is not resolved: the claim is often the review session's own PR, which needs its open item to merge.
+  assert.deepEqual(r.resolvedRequests.sort(), ['Sol Ring']);
   // None of them becomes a Copilot unit.
   assert.deepEqual(r.names, ['Celestine, the Living Saint']);
   const p = Q.queuePayload({ result: r, units: [], base: BASE, baseSha: SHA });
