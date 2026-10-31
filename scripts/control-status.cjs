@@ -164,6 +164,7 @@ function ciAction(state, result, report) {
   const failed = runs.find(r => r.status === 'completed' && r.conclusion && r.conclusion !== 'success' && r.conclusion !== 'action_required');
   const manual = `run "Arcana Development CI" manually (Run workflow) on ${base}`;
   if (running) return `Wait: Arcana Development CI run ${running.id} for ${base}@${sha} is still ${running.status}.`;
+  if (report?.ciStarted === true && !runs.length) return `Wait: no CI run existed for ${base}@${sha}; the dispatcher started Arcana Development CI automatically.`;
   if (waiting) return `Owner: Arcana Development CI run ${waiting.id} for ${base}@${sha} is waiting for approval (action_required, started by an automation token). Approve it, or ${manual}.`;
   if (failed) return `Fix CI: Arcana Development CI run ${failed.id} for ${base}@${sha} concluded ${failed.conclusion}.`;
   return `Owner: no Arcana Development CI run exists for ${base}@${sha} (pushes made with GITHUB_TOKEN do not start CI). ${manual[0].toUpperCase() + manual.slice(1)}.`;
