@@ -247,6 +247,35 @@ class ReadinessTests(unittest.TestCase):
         with mock.patch.object(readiness, "verified_support", return_value={repo.normalize_name("Ancient Stone Idol"): entry}):
             self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "NEEDS_REVIEW")  # no primitives named
 
+    def test_yeva_flash_permission_review_is_scope_bound_and_fails_closed(self):
+        # #624: source readiness is NOT proof of playable Yeva.
+        verdict = readiness.classify("Yeva, Nature's Herald")
+        self.assertEqual((verdict["readiness"], verdict["route"]), ("SUPPORTED", "copilot"), verdict["reasons"])
+        entry = readiness.verified_support()[repo.normalize_name("Yeva, Nature's Herald")]
+        self.assertEqual(len(entry["reviewedLines"]), 1)
+        primitives = " ".join(entry["reviewedLines"][0]["primitives"])
+        self.assertIn("GrantFlashToSpellType", primitives)
+        self.assertIn("GreenCreature", primitives)
+        self.assertIn("controllerOnly = true", primitives)
+        original = oracle.cached("Yeva, Nature's Herald")
+        for altered in (
+            original["oracle_text"].replace("green creature spells", "green spells"),
+            original["oracle_text"].replace("green creature spells", "blue creature spells"),
+            original["oracle_text"].replace("You may cast", "Your opponents may cast"),
+            original["oracle_text"].replace("as though they had flash", "only during your turn"),
+        ):
+            changed = {**original, "oracle_text": altered}
+            self.assertFalse(readiness.review_is_current(entry, changed))
+            with mock.patch.object(oracle, "cached", return_value=changed):
+                # Another independently matching wording may still be SUPPORTED;
+                # the *Yeva-specific review* must never authorize changed Oracle text.
+                self.assertFalse(readiness.classify("Yeva, Nature's Herald").get("verifiedSupport"))
+        with mock.patch.object(readiness, "review_runtime_hash", return_value="0" * 64):
+            self.assertFalse(readiness.review_is_current(entry, original))
+            self.assertFalse(readiness.classify("Yeva, Nature's Herald").get("verifiedSupport"))
+        with mock.patch.object(oracle, "cached", return_value=None):
+            self.assertEqual(readiness.classify("Yeva, Nature's Herald")["readiness"], "NEEDS_REVIEW")
+
     def test_review_binding_rejects_numeric_cost_or_unreviewed_line_changes(self):
         import copy
         original = oracle.cached("Ancient Stone Idol")
