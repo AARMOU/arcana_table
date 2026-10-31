@@ -246,6 +246,26 @@ class ReadinessTests(unittest.TestCase):
         with mock.patch.object(readiness, "verified_support", return_value={repo.normalize_name("Ancient Stone Idol"): entry}):
             self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "NEEDS_REVIEW")  # no primitives named
 
+    def test_dungrove_elder_forest_count_review_fails_closed_on_drift(self):
+        # App request #321 / work unit #592: source readiness is NOT gameplay certification.
+        v = readiness.classify("Dungrove Elder")
+        self.assertEqual((v["readiness"], v["route"], v.get("reviewed")),
+                         ("SUPPORTED", "copilot", True), v["reasons"])
+        entry = readiness.verified_support()[repo.normalize_name("Dungrove Elder")]
+        self.assertEqual(len(entry["reviewedLines"]), 1)
+        self.assertIn("landsWithSubtype(Subtype.FOREST)", entry["reviewedLines"][0]["primitives"][0])
+        original = oracle.cached("Dungrove Elder")
+        for changed_text in (
+            original["oracle_text"].replace("Forests you control", "lands you control"),
+            original["oracle_text"].replace("Forests you control", "Forests all players control"),
+        ):
+            with mock.patch.object(oracle, "cached", return_value={**original, "oracle_text": changed_text}):
+                self.assertEqual(readiness.classify("Dungrove Elder")["readiness"], "NEEDS_REVIEW")
+        with mock.patch.object(readiness, "review_runtime_hash", return_value="0" * 64):
+            self.assertEqual(readiness.classify("Dungrove Elder")["readiness"], "NEEDS_REVIEW")
+        with mock.patch.object(oracle, "cached", return_value=None):
+            self.assertEqual(readiness.classify("Dungrove Elder")["readiness"], "NEEDS_REVIEW")
+
     def test_review_binding_rejects_numeric_cost_or_unreviewed_line_changes(self):
         import copy
         original = oracle.cached("Ancient Stone Idol")
