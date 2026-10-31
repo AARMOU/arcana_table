@@ -659,7 +659,7 @@
  },
  "DynamicAmounts": {
   "DynamicAmounts.battlefield": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Defile",
@@ -1019,6 +1019,17 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BronzebeakForagersScenarioTest.kt"
     }
    ]
+  },
+  "DynamicAmounts.zone": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Tangleweave Armor",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TangleweaveArmor.kt",
+     "lines": 58,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TangleweaveArmorScenarioTest.kt"
+    }
+   ]
   }
  },
  "Effects": {
@@ -1255,6 +1266,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AllosaurusShepherd.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AllosaurusShepherdScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.AttachEquipment": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Tangleweave Armor",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TangleweaveArmor.kt",
+     "lines": 58,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TangleweaveArmorScenarioTest.kt"
     }
    ]
   },
@@ -1533,7 +1555,7 @@
    ]
   },
   "Effects.CreateToken": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -3887,7 +3909,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 40,
+   "count": 41,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -4189,7 +4211,7 @@
    ]
   },
   "equipAbility()": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Bone Sabres",
@@ -4498,7 +4520,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 52,
+   "count": 53,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -4539,7 +4561,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5650,13 +5672,19 @@
    ]
   },
   "GrantDynamicStats": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Cranial Plating",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CranialPlating.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CranialPlatingScenarioTest.kt"
+    },
+    {
+     "card": "Tangleweave Armor",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TangleweaveArmor.kt",
+     "lines": 58,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TangleweaveArmorScenarioTest.kt"
     }
    ]
   },
@@ -6002,6 +6030,17 @@
     }
    ]
   },
+  "EffectTarget.PipelineTarget": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Tangleweave Armor",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TangleweaveArmor.kt",
+     "lines": 58,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TangleweaveArmorScenarioTest.kt"
+    }
+   ]
+  },
   "EffectTarget.PlayerRef": {
    "count": 21,
    "examples": [
@@ -6143,7 +6182,7 @@
    ]
   },
   "Filters.EquippedCreature": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Sword of Light and Shadow",
@@ -6184,7 +6223,7 @@
    ]
   },
   "GameObjectFilter.Any": {
-   "count": 9,
+   "count": 10,
    "examples": [
     {
      "card": "Skittering Cicada",
@@ -6690,7 +6729,7 @@
    ]
   },
   "Player.Each": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Sautekh Immortal",
@@ -6721,6 +6760,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TallymanOfNurgle.kt",
      "lines": 46,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TallymanOfNurgleScenarioTest.kt"
+    },
+    {
+     "card": "Tangleweave Armor",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TangleweaveArmor.kt",
+     "lines": 58,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TangleweaveArmorScenarioTest.kt"
     }
    ]
   },
@@ -6835,7 +6880,7 @@
    ]
   },
   "Player.You": {
-   "count": 33,
+   "count": 34,
    "examples": [
     {
      "card": "Defile",

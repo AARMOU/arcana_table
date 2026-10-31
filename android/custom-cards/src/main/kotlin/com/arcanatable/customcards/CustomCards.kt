@@ -141,6 +141,7 @@ object CustomCards {
         Entry(BronzebeakForagers, "LCC", "Velociramptor Beefcake 9/26"),
         Entry(DismantlingWave, "C20", "Mabel deck"),
         Entry(FatalPush, "AER", POOL),
+        Entry(TangleweaveArmor, "FDC", POOL),
         Entry(DinosaurEgg, "LCC", "Velociramptor Beefcake 9/26"),
         Entry(ZacamaPrimalCalamity, "RIX", "Velociramptor Beefcake 9/26"),
         Entry(BrigoneSoldierOfMeletis, "J25", "Mabel deck"),
