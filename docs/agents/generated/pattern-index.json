@@ -1116,13 +1116,19 @@
    ]
   },
   "Effects.AddCounters": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Bone Sabres",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BoneSabres.kt",
      "lines": 27,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BoneSabresScenarioTest.kt"
+    },
+    {
+     "card": "Shield Sphere",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShieldSphere.kt",
+     "lines": 30,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShieldSphereScenarioTest.kt"
     },
     {
      "card": "Venomcrawler",
@@ -1147,12 +1153,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/VenomEddieBrock.kt",
      "lines": 39,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VenomEddieBrockScenarioTest.kt"
-    },
-    {
-     "card": "Brigone, Soldier of Meletis",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BrigoneSoldierOfMeletis.kt",
-     "lines": 41,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BrigoneSoldierOfMeletisScenarioTest.kt"
     }
    ]
   },
@@ -2810,8 +2810,14 @@
    ]
   },
   "Keyword.DEFENDER": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Shield Sphere",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShieldSphere.kt",
+     "lines": 30,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShieldSphereScenarioTest.kt"
+    },
     {
      "card": "Crashing Drawbridge",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CrashingDrawbridge.kt",
@@ -3812,8 +3818,14 @@
    ]
   },
   "Triggers.self.blocks": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Shield Sphere",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShieldSphere.kt",
+     "lines": 30,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShieldSphereScenarioTest.kt"
+    },
     {
      "card": "Smuggler's Copter",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SmugglersCopter.kt",
@@ -4294,7 +4306,7 @@
    ]
   },
   "keywords()": {
-   "count": 78,
+   "count": 79,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4539,7 +4551,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -4934,6 +4946,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SpittingDilophosaurus.kt",
      "lines": 47,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SpittingDilophosaurusScenarioTest.kt"
+    }
+   ]
+  },
+  "CounterType.MINUS_ZERO_MINUS_ONE": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Shield Sphere",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShieldSphere.kt",
+     "lines": 30,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShieldSphereScenarioTest.kt"
     }
    ]
   },
@@ -6044,7 +6067,7 @@
    ]
   },
   "EffectTarget.Self": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -6057,6 +6080,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SkitteringCicada.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SkitteringCicadaScenarioTest.kt"
+    },
+    {
+     "card": "Shield Sphere",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShieldSphere.kt",
+     "lines": 30,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShieldSphereScenarioTest.kt"
     },
     {
      "card": "Venomcrawler",
@@ -6075,12 +6104,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimarisChaplain.kt",
      "lines": 33,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimarisChaplainScenarioTest.kt"
-    },
-    {
-     "card": "Skorpekh Destroyer",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SkorpekhDestroyer.kt",
-     "lines": 35,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SkorpekhDestroyerScenarioTest.kt"
     }
    ]
   },
