@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { requestAllHandsCheckIn, checkInStatus, MARKER } from '../src/team-checkin.mjs';
+import worker, { sealSession } from '../src/index.mjs';
 const NOW = Date.parse('2026-10-31T05:30:00.000Z');
 const issue = { number: 81, comments: 102 };
 const owner = { login: 'AARMOU' };
@@ -70,4 +71,45 @@ test('uncertain GitHub write does not pretend the request was delivered', async 
   const m = mock([], { write: { ok:false, status:502, body:null } });
   const [status, out] = await requestAllHandsCheckIn(m.api, NOW);
   assert.equal(status, 502); assert.equal(out.error, 'post-unconfirmed');
+});
+test('team-checkin HTTP route gates both methods before GitHub access and writes only the coordination comment', async () => {
+  const env = { GITHUB_OAUTH_CLIENT_ID: 'id', GITHUB_OAUTH_CLIENT_SECRET: 'secret', SESSION_SECRET: 's'.repeat(40) };
+  const expiry = Math.floor(Date.now() / 1000);
+  const token = await sealSession(env.SESSION_SECRET, { t: 'owner-oauth', login: 'AARMOU', exp: expiry + 600 });
+  const nonOwner = await sealSession(env.SESSION_SECRET, { t: 'other-oauth', login: 'other', exp: expiry + 600 });
+  const expired = await sealSession(env.SESSION_SECRET, { t: 'owner-oauth', login: 'AARMOU', exp: expiry - 1 });
+  const request = (method, session = token, origin = 'https://aarmou.github.io') => new Request('https://review.example/v1/team-checkin', {
+    method, headers: { Origin: origin, Authorization: 'Bearer ' + session }, ...(method === 'POST' ? { body: '{}' } : {})
+  });
+  const calls = [];
+  const fetchImpl = async (url, options = {}) => {
+    calls.push({ url, ...options });
+    assert.equal(options.headers.Authorization, 'Bearer owner-oauth');
+    const path = String(url).replace('https://api.github.com/repos/AARMOU/arcana_table', '');
+    let body;
+    if (path === '/issues/81') body = { number: 81, comments: 0 };
+    else if (path === '/issues/81/comments?per_page=100&page=1') body = [];
+    else if (path === '/issues/81/comments' && options.method === 'POST') {
+      assert.match(JSON.parse(options.body).body, /status-only coordination/);
+      body = { id: 12345, html_url: 'https://github.com/AARMOU/arcana_table/issues/81#issuecomment-12345' };
+    } else assert.fail('unexpected GitHub endpoint: ' + path);
+    return Response.json(body);
+  };
+  for (const method of ['GET', 'POST']) {
+    for (const session of ['tampered', nonOwner, expired])
+      assert.equal((await worker.fetch(request(method, session), env, {}, fetchImpl)).status, 401);
+    assert.equal((await worker.fetch(request(method, token, 'https://other.example'), env, {}, fetchImpl)).status, 403);
+  }
+  assert.equal((await worker.fetch(request('DELETE'), env, {}, fetchImpl)).status, 405);
+  assert.equal(calls.length, 0, 'refused requests never access GitHub');
+  for (const method of ['GET', 'POST']) {
+    const result = await worker.fetch(request(method), env, {}, fetchImpl);
+    assert.equal(result.status, 200);
+    assert.equal(result.headers.get('Cache-Control'), 'no-store');
+    assert.equal(result.headers.get('Access-Control-Allow-Origin'), 'https://aarmou.github.io');
+    assert.ok(!JSON.stringify(await result.json()).includes('owner-oauth'));
+  }
+  assert.equal(calls.filter(c => c.method === 'POST').length, 1);
+  assert.equal((await worker.fetch(request('OPTIONS'), env, {}, fetchImpl)).status, 204);
+  assert.equal((await worker.fetch(request('OPTIONS', token, 'https://other.example'), env, {}, fetchImpl)).status, 403);
 });

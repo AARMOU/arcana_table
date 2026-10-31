@@ -19,6 +19,14 @@
     }
     return null;
   }
+  function forgetRejectedSession(token) {
+    for (const kind of ['localStorage', 'sessionStorage']) {
+      try {
+        // A different tab or sign-in may already have replaced this token.
+        if (window[kind]?.getItem(KEY) === token) window[kind].removeItem(KEY);
+      } catch {}
+    }
+  }
   async function call(method) {
     const token = session();
     if (!token) return { status: 401, data: null };
@@ -28,6 +36,7 @@
         ...(method === 'POST' ? { 'Content-Type': 'application/json' } : {})
       }, ...(method === 'POST' ? { body: '{}' } : {})
     });
+    if (response.status === 401) forgetRejectedSession(token);
     return { status: response.status, data: await response.json().catch(() => null) };
   }
   function render(info) {
