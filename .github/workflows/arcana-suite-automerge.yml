@@ -37,7 +37,8 @@ jobs:
         with:
           script: |
             const { mergeSuitePr } = require('./certification/suite-automerge.cjs');
-            const writer = process.env.MERGE_TOKEN ? getOctokit(process.env.MERGE_TOKEN) : github;
+            // github-script v7 exposes no getOctokit; build a second client from the same Octokit class.
+            const writer = process.env.MERGE_TOKEN ? new github.constructor({ auth: process.env.MERGE_TOKEN }) : github;
             const r = await mergeSuitePr({ github, writer, ...context.repo, run: context.payload.workflow_run, core });
             core.info(JSON.stringify(r));
             await core.summary.addHeading('Suite auto-merge').addCodeBlock(JSON.stringify(r, null, 1)).write();
