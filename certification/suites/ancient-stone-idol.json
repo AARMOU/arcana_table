@@ -1,0 +1,8 @@
+{
+  "key": "ancient-stone-idol",
+  "name": "Ancient Stone Idol",
+  "issue": 551,
+  "source": "certification/AncientStoneIdolIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.AncientStoneIdolIndependentCertificationTest",
+  "tests": 8
+}
