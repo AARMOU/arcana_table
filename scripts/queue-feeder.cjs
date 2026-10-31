@@ -134,6 +134,7 @@ function outcomeOf(v) {
 
 // gaps: Cardkit `gaps --claims-from-github` JSON for the six precons. requestedGaps: the same for the
 // owner's selected cards (optional). openIssues: open issues (REST shape).
+const MAX_PRECON_WORK = 150;
 function candidates({ gaps, requestedGaps = null, openIssues = [], demand = [], max = 5 }) {
   if (!verifiedGaps(gaps))
     return { ok: false, reason: 'Cardkit could not verify open-PR claims; no suggestions (fail closed).', names: [], alreadyQueued: [] };
@@ -172,7 +173,19 @@ function candidates({ gaps, requestedGaps = null, openIssues = [], demand = [], 
       return { name: v?.name || d.name, issue: DEMAND_ISSUE, source: 'app', votes: d.votes, outcome, reason: OUTCOME_TEXT[outcome],
         readiness: v?.readiness || null, route: v?.route || null, hint: v?.hint || null, cardkitReasons: v?.reasons || [] };
     }).filter(blocked);
-  const workRequests = [...ownerWork, ...appWork];
+  // Owner 2026-10-31 ("option 2"): when requests run dry, the six precons' remaining gaps also get card work,
+  // ranked below every owner request and app vote. Cards with a recorded, verified engine blocker are left out
+  // (a review session would only re-confirm it); unrecorded possible gaps and rules reviews are included.
+  const requestedNames = new Set([...ownerNames, ...demand.map(d => F.normName(d.name))]);
+  const preconWork = (Array.isArray(gaps.cards) ? gaps.cards : [])
+    .filter(c => c && typeof c.name === 'string' && !requestedNames.has(F.normName(c.name)) && !ready.has(F.normName(c.name)) && !isQueued(c.name))
+    .map(c => {
+      const v = verdicts.get(F.normName(c.name));
+      const outcome = outcomeOf(v);
+      return { name: v?.name || c.name, issue: null, source: 'precon', outcome, reason: OUTCOME_TEXT[outcome],
+        readiness: v?.readiness || null, route: v?.route || null, hint: v?.hint || null, cardkitReasons: v?.reasons || [] };
+    }).filter(r => blocked(r) && r.readiness !== 'ENGINE_BLOCKED').slice(0, MAX_PRECON_WORK);
+  const workRequests = [...ownerWork, ...appWork, ...preconWork];
   // 'claimed' does NOT resolve card work: the review session's own PR claims the card, and closing the item then
   // stranded the review (auto-merge requires the open item; 2026-10-31 #596/#600/#615 closed minutes after their
   // review PRs opened). The item closes once Cardkit says ready, or the card is queued or implemented.
@@ -357,14 +370,16 @@ function cardWorkTitle(r) {
 function cardWorkBody(r, { runId, baseSha, base }) {
   const oracleMissing = (r.cardkitReasons || []).some(x => /no cached oracle record/i.test(x));
   return [CARD_WORK_MARKER,
-    '<!-- source: trusted-main-queue-feeder; run:' + runId + '; base-sha:' + baseSha + '; ' + (r.source === 'app' ? 'app-request:#' : 'owner-request:#') + r.issue +
+    '<!-- source: trusted-main-queue-feeder; run:' + runId + '; base-sha:' + baseSha + '; ' + (r.source === 'precon' ? 'precon-gap:six-precons' : (r.source === 'app' ? 'app-request:#' : 'owner-request:#') + r.issue) +
       '; priority:' + priorityScore(r) + ' -->',
     '## Card', '- ' + r.name, '',
     '## Why Copilot cannot take it yet',
     'Cardkit on `' + base + '` @ `' + baseSha + '`: **' + (r.readiness || 'UNKNOWN') + '**' +
       (r.route ? ', suggested route `' + r.route + '`' : '') + (r.hint ? ', hint `' + r.hint + '`' : '') + '.',
     ...(r.cardkitReasons || []).map(x => '- ' + x), '',
-    ...(r.source === 'app'
+    ...(r.source === 'precon'
+      ? ['## Precon gap', 'Missing from the six official precons (Cardkit gaps). Lowest priority: after every owner request and app vote.', '']
+      : r.source === 'app'
       ? ['## App request', 'Requested in the app: **' + r.votes + '** opt-in vote(s) on #' + DEMAND_ISSUE + '. Priority after every owner request.', '']
       : ['## Owner request', 'Selected by the owner in #' + r.issue + '. That request stays open; do not close or edit it.', '']),
     ...oracleSection(r),
@@ -388,8 +403,10 @@ function cardWorkBody(r, { runId, baseSha, base }) {
 // within app, more votes. Exposed as a label and a sortable score so any engineer or automation takes the top item.
 const PRIORITY_OWNER = 'priority:owner';
 const PRIORITY_APP = 'priority:app';
-const priorityLabel = r => r.source === 'app' ? PRIORITY_APP : PRIORITY_OWNER;
-const priorityScore = r => r.source === 'app' ? Math.min(999, Number(r.votes) || 1) : 1000 + Math.min(999, Number(r.requests) || 1);
+const PRIORITY_PRECON = 'priority:precon';
+const priorityLabel = r => r.source === 'precon' ? PRIORITY_PRECON : r.source === 'app' ? PRIORITY_APP : PRIORITY_OWNER;
+// Owner requests (>= 1001) > app votes (1-999) > precon gaps (0).
+const priorityScore = r => r.source === 'precon' ? 0 : r.source === 'app' ? Math.min(999, Number(r.votes) || 1) : 1000 + Math.min(999, Number(r.requests) || 1);
 const LANE_LABEL = r => r.outcome === 'engine-work' ? 'lane:engine' : 'lane:review';
 const cardWorkLabels = r => [priorityLabel(r), LANE_LABEL(r)];
 
@@ -421,7 +438,7 @@ function planCardWork(payload, botIssues = []) {
   const seen = new Set(existing.map(i => F.normName(cardWorkName(i))));
   const create = openWork.length - close.length >= MAX_OPEN_CARD_WORK ? null :
     [...(payload.workRequests || [])].sort((a, b) => priorityScore(b) - priorityScore(a))
-      .find(r => !seen.has(F.normName(r.name)) && Number.isSafeInteger(r.issue)) || null;
+      .find(r => !seen.has(F.normName(r.name)) && (Number.isSafeInteger(r.issue) || r.source === 'precon')) || null;
   return { create, close, supersede, reason: create ? null : openWork.length >= MAX_OPEN_CARD_WORK ? 'card-work-limit-reached' : 'no-new-card-work' };
 }
 
@@ -467,4 +484,4 @@ function needsSiteRefresh(previous, payload) {
 
 module.exports = { candidates, ownerSelections, ownerRequestCounts, requestedDeck, publicDemand, DEMAND_ISSUE, outcomeOf, newIssueUrl, queuePayload, queueSummary,
   chooseAutoQueue, createNextAutoQueue, planCardWork, syncCardWork, cardWorkTitle, cardWorkBody, needsSiteRefresh,
-  CARD_WORK_MARKER, CARD_WORK_PREFIX, SUPERSEDED_PREFIX, hasOracle, priorityScore, priorityLabel, cardWorkLabels, isCardWork };
+  CARD_WORK_MARKER, CARD_WORK_PREFIX, SUPERSEDED_PREFIX, hasOracle, priorityScore, priorityLabel, cardWorkLabels, isCardWork, MAX_PRECON_WORK };

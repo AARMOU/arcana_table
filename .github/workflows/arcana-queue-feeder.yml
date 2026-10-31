@@ -142,7 +142,7 @@ jobs:
         run: |
           set -uo pipefail
           mkdir -p work
-          node -e "const r=require('./pick.json');const Q=require('./ctl/scripts/queue-feeder.cjs');(r.workRequests||[]).slice().sort((a,b)=>Q.priorityScore(b)-Q.priorityScore(a)).slice(0,12).forEach((w,i)=>require('fs').writeFileSync('work/'+i+'.name',w.name));"
+          node -e "const r=require('./pick.json');const Q=require('./ctl/scripts/queue-feeder.cjs');(r.workRequests||[]).slice().sort((a,b)=>Q.priorityScore(b)-Q.priorityScore(a)).slice(0,150).forEach((w,i)=>require('fs').writeFileSync('work/'+i+'.name',w.name));"
           for f in work/*.name; do
             [ -f "$f" ] || continue
             k="${f%.name}"; name="$(cat "$f")"
