@@ -1,0 +1,8 @@
+{
+  "key": "whiptongue-hydra",
+  "name": "Whiptongue Hydra",
+  "issue": 691,
+  "source": "certification/WhiptongueHydraIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.WhiptongueHydraIndependentCertificationTest",
+  "tests": 5
+}
