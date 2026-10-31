@@ -101,6 +101,7 @@ async function passwordDigest(password: string): Promise<string> {
 
 export class GameRoom extends DurableObject<Env> {
   private room: RoomRecord | null = null;
+  private gooseOut: Promise<void> = Promise.resolve();
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
@@ -598,8 +599,18 @@ export class GameRoom extends DurableObject<Env> {
     return json(publicStatus(session)); // 'joining', never falsely claim Android accepted.
   }
 
-  private async sendGoose(packet: Record<string,unknown>): Promise<void> {
-    const g = this.room?.goose; if (!g || g.status === 'stopped') return;
+  private sendGoose(packet: Record<string,unknown>): Promise<void> {
+    const sessionId = this.room?.goose?.id;
+    // Compression and model/chat continuations can finish out of order. Host RelayInbox
+    // accepts increasing sequence numbers only, so serialize reservation AND emission.
+    const operation = this.gooseOut.then(() => this.deliverGoose(packet, sessionId));
+    this.gooseOut = operation.catch(() => {});
+    return operation;
+  }
+
+  private async deliverGoose(packet: Record<string,unknown>, sessionId?: string): Promise<void> {
+    const g = this.room?.goose;
+    if (!g || g.id !== sessionId || g.status === 'stopped' || g.detached || g.expires <= Date.now()) return;
     const seq = ++g.seq;
     await this.save(); // reserve sequence before emission, including across restart
     const data = await pack({...packet,_relayLink:g.link});
