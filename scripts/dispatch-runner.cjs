@@ -17,6 +17,27 @@ const actionableOf = (title, body, base) => String(title || '').startsWith(A.SUI
 // Owner 2026-10-31: cards must move without requiring a specific engineer; the old 2 h grace was dead time
 // overnight, so a short window remains only to let an active engineer CLAIM first.
 const DEV_CI_WORKFLOW = 'arcana-development-ci.yml';
+// Paths Development CI does not build or test (workflows, control scripts, docs, upgrade tooling, Cardkit review
+// data). If everything since the base's last green CI is inside these, the base is as good as that green run.
+// Anything else (android/, argentum-patches/, certification/, tools/ code, build files) waits for fresh CI.
+const NON_BUILD = /^(?:\.github\/|scripts\/|docs\/|control\/|engine-upgrade\/|tools\/cardkit\/data\/)|^[^/]+\.md$/;
+
+// Every merge into the base used to pause all new assignments for a full CI run (~25 min), even for changes CI
+// never looks at. Two calls: the base branch's recent green runs, then the diff from the newest one to the head.
+async function ciEquivalent({ github, owner, repo, base, baseSha }) {
+  try {
+    const runs = (await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: DEV_CI_WORKFLOW, branch: base,
+      status: 'success', per_page: 20 })).data.workflow_runs || [];
+    const green = runs.filter(r => r.name === 'Arcana Development CI' && r.conclusion === 'success' && /^[a-f0-9]{40}$/.test(r.head_sha || ''))
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
+    if (!green || green.head_sha === baseSha) return null;
+    const cmp = (await github.rest.repos.compareCommitsWithBasehead({ owner, repo, basehead: green.head_sha + '...' + baseSha })).data;
+    const files = (cmp.files || []).map(f => f.filename);
+    if (cmp.status !== 'ahead' || !files.length || files.length >= 300 || !Number.isSafeInteger(cmp.ahead_by) || cmp.ahead_by > 50) return null;
+    if (!files.every(f => NON_BUILD.test(f) && !f.includes('..'))) return null;
+    return { greenSha: green.head_sha, run: green.id, files: files.length };
+  } catch { return null; }
+}
 const REVIEW_GRACE_MS = 15 * 60 * 1000;
 const REVIEW_CLAIM_MS = 24 * 60 * 60 * 1000;
 const reviewPriority = u => Number((String(u?.raw?.body || '').match(/priority:(\d{1,4})/) || [])[1]) || 0;
@@ -301,7 +322,10 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   report.base = { branch: base, sha: baseSha };
   const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo,
     { owner, repo, head_sha: baseSha, status: 'success', per_page: 100 });
-  if (!runs.some(r => r.head_sha === baseSha && r.name === 'Arcana Development CI' && r.conclusion === 'success')) {
+  const exact = runs.some(r => r.head_sha === baseSha && r.name === 'Arcana Development CI' && r.conclusion === 'success');
+  const equivalent = exact ? null : await ciEquivalent({ github, owner, repo, base, baseSha });
+  if (equivalent) report.ciEquivalent = equivalent;
+  if (!exact && !equivalent) {
     // Say what GitHub actually has for this commit (e.g. a run waiting for approval), not just "no".
     let ciRuns = [];
     try {
@@ -418,4 +442,4 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   return done('attempted', { issue: n, result, ...(reason ? { reason } : {}) });
 }
 
-module.exports = { engineGapCandidates, labelEngineGaps, ENGINE_GAP_LABEL, zeroDeliveryCandidates, labelDiagnosis, DIAGNOSIS_LABEL, runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, suiteInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
+module.exports = { ciEquivalent, NON_BUILD, engineGapCandidates, labelEngineGaps, ENGINE_GAP_LABEL, zeroDeliveryCandidates, labelDiagnosis, DIAGNOSIS_LABEL, runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, suiteInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
