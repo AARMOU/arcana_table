@@ -38,7 +38,16 @@ export function candidates(packet, playerId) {
   const offered = Array.isArray(packet.legalActions) ? packet.legalActions : [];
   // Preserve deterministic preference as the first candidate for provider failure.
   const preferred = selectAction(packet);
-  if (preferred && preferred.action.playerId === playerId && (!d || ['PlayLand','CastSpell'].includes(preferred.action.type))) addOffered(preferred.action);
+  // selectAction already constructs legally shaped combat declarations from host
+  // validAttackers/attackTargets and mandatoryBlockerAssignments. The remote
+  // candidate adapter must not discard them: combat snapshots otherwise pause
+  // forever with unsupported-decision-or-action despite a safe declaration.
+  // A PlayCardDecision can still ONLY wrap a land or spell.
+  if (preferred && preferred.action.playerId === playerId &&
+      (!d || ['PlayLand','CastSpell'].includes(preferred.action.type)) &&
+      (!['DeclareAttackers','DeclareBlockers'].includes(preferred.action.type) ||
+        offered.some(info => info?.action?.type === preferred.action.type &&
+          info.action.playerId === playerId))) addOffered(preferred.action);
   for (const info of offered.slice(0, 128)) {
     const a = info?.action;
     if (a?.playerId !== playerId || !simple(info) || info.requiresTargets || info.targetRequirements?.length) continue;
