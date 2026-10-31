@@ -237,6 +237,27 @@
       "baseSha": "e26b0ef62fc510ede821afe09ab2fb26b271eb56",
       "oracleHash": "1ad0a0b730d67f8dbe88d6614d8196a41b055db8c91adf84a5bc4e637f6f7235",
       "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Yeva, Nature's Herald": {
+      "summary": "Yeva's persistent cast-timing permission is expressible by the same pinned SDK static GrantFlashToSpellType used and scenario-tested in Skittering Cicada. GameObjectFilter.GreenCreature restricts eligible spells to green creatures, and controllerOnly=true prevents opponents gaining the permission. Keyword.FLASH covers Yeva itself. Source review authorizes candidate authoring only; gameplay certification must verify colored/multicolored green creatures, green noncreatures, non-green creatures, opponents, off-turn priority and permission expiry on source leaving.",
+      "verifiedBy": "Goose, pinned Arcana SDK and Skittering Cicada source/scenario inspection 2026-10-31",
+      "references": [
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SkitteringCicada.kt",
+        "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SkitteringCicadaScenarioTest.kt",
+        "docs/agents/generated/sdk-api.md"
+      ],
+      "reviewedLines": [
+        {
+          "line": "You may cast green creature spells as though they had flash.",
+          "primitives": [
+            "staticAbility { ability = GrantFlashToSpellType(GameObjectFilter.GreenCreature, controllerOnly = true) }",
+            "Keyword.FLASH (for Yeva's own Flash)"
+          ]
+        }
+      ],
+      "baseSha": "997d860091f8a439db6a7c7016dbacbd66319e71",
+      "oracleHash": "e090e5d2a3c908722f151607c107efcbc68eed93125aa4570f43e1ddd394d943",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
     }
   }
 }
