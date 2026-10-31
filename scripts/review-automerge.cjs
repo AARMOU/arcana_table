@@ -12,7 +12,15 @@ const COPILOT = new Set(['copilot', 'copilot-swe-agent[bot]']);
 const DATA = 'tools/cardkit/data/';
 const ALLOWED = new Set([DATA + 'verified-support.json', DATA + 'known-blockers.json', DATA + 'oracle-cache.jsonl']);
 const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
-const unitOf = body => Number((String(body || '').match(/^Unit: #(\d+)\s*$/m) || [])[1]) || null;
+// The card-work item a review PR answers: an explicit 'Unit: #N' line, else exactly one closing reference
+// ('Fixes/Closes/Resolves #N'; Copilot often writes only that). Every other merge gate still applies.
+const unitOf = body => {
+  const text = String(body || '');
+  const explicit = Number((text.match(/^Unit: #(\d+)\s*$/m) || [])[1]);
+  if (explicit) return explicit;
+  const refs = [...new Set([...text.matchAll(/\b(?:fix(?:e[sd])?|close[sd]?|resolve[sd]?)\s+#(\d+)\b/gi)].map(m => Number(m[1])))];
+  return refs.length === 1 ? refs[0] : null;
+};
 
 function cardOf(issueBody) {
   const section = (String(issueBody || '').split(/^## Card\s*$/m)[1] || '').split(/^## /m)[0];
@@ -113,4 +121,4 @@ async function mergeReviewPr({ github, writer = github, owner, repo, run, base, 
   return { merged: true, pr: pr.number, item: n, card: cardOf(issue.body) };
 }
 
-module.exports = { mergeBlockers, mergeReviewPr, cardOf, oracleOf, CARDKIT };
+module.exports = { mergeBlockers, mergeReviewPr, cardOf, oracleOf, unitOf, CARDKIT };
