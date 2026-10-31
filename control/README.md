@@ -2,6 +2,14 @@
 
 The dashboard displays **public read-only status** for `AARMOU/arcana_table`, with a single **owner-only card-work authorization** action through the existing encrypted OAuth session and separate Cloudflare Worker. Designed for an Android Fold and ordinary phone browsers. No GitHub tokens or billing secrets are shipped in the PWA.
 
+## All Hands — Check In (owner only)
+
+The Overview action beside Verify and Do It uses the existing encrypted GitHub OAuth owner session. Its `POST /v1/team-checkin` endpoint adds **one coordination-only owner comment on issue #81**, requesting separate status reports from Goosegeta, Claude, and Boneknuckles/GPT Work. The service checks the most recent #81 comments first and reuses a request from the last 30 minutes to prevent accidental spam.
+
+The dashboard `GET /v1/team-checkin` shows the latest request and only properly keyed, trusted-author **self-reported** acknowledgments. It cannot prove agent presence or wake a closed ChatGPT/Claude session. Missing reports remain unconfirmed. Errors fail closed; if an HTTP write is uncertain, inspect #81 before retrying. Neither endpoint launches paid agents, edits billing, grants card authorization, merges, deploys or releases anything.
+
+Deployment sequencing: merge requires peer review and green exact-head checks. The Pages site then publishes the new UI; the independent Cloudflare review Worker must be deployed **only with separate owner approval**. Until both are deployed, the button is not live.
+
 ## One-tap work authorization (owner only)
 
 On the Overview screen, queued, genuine [Arcana Queue] issue units have an **I agree. Do it** button. You sign in once with the existing GitHub owner OAuth flow. The button asks the review Worker for the live issue and then, only if it is unchanged and genuinely actionable, posts one scoped label \`arcana:authorize-once\` to **that exact issue**. Duplicate clicks are idempotent. Non-owner requests, stale issues, untrusted submitters, invalid work units, already-assigned cards and conflicting outstanding authorizations fail closed.
