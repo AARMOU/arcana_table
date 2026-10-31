@@ -121,6 +121,11 @@
       "reason": "reveal-or-pay additional cost",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
+    },
+    "Chiss-Goria, Forge Tyrant": {
+      "reason": "Missing a cast-permission-scoped affinity rider: GrantMayPlayFromExile can permit casting artifact spells from the exiled group, but its onPlayRider is a post-cast trigger; GrantNextSpellAffinity applies to the next matching spell from any zone and cannot restrict affinity to a spell cast through that permission. The required cast-time cost discount cannot be expressed exactly.",
+      "source": "AARMOU/arcana_table#582; inspected pinned Ulamog.kt, JeskasWill.kt, ChandraHopesBeacon.kt, DonAndRaphHardScience.kt, DonAndRaphHardScienceTest.kt, and docs/agents/argentum-upstream/card-sdk-language-reference.md sections on GrantMayPlayFromExile and GrantNextSpellAffinity.",
+      "verified": false
     }
   },
   "keywords": {
