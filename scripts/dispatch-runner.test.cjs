@@ -111,7 +111,15 @@ test('no CI run at all for the base head: the dispatcher starts Development CI o
   assert.equal(none.dispatches.length, 1);
   assert.equal(none.dispatches[0].workflow_id, 'arcana-development-ci.yml');
   assert.equal(none.dispatches[0].ref, env().ARCANA_INTEGRATION_BASE);
-  for (const run of [{ status: 'in_progress', conclusion: null }, { status: 'completed', conclusion: 'failure' }, { status: 'completed', conclusion: 'action_required' }]) {
+  // Only approval-waiting runs: start one dispatch run (it needs no approval), but never a second.
+  const waiting = fake({ ci: false, otherCiRuns: [{ id: 8, head_sha: BASE_SHA, name: 'Arcana Development CI', event: 'pull_request', status: 'completed', conclusion: 'action_required' }] });
+  const w = await runDispatch({ github: waiting.github, context: ctx, core: core(), env: env(), readBudget: async () => ({}) });
+  assert.equal(w.ciStarted, true); assert.equal(waiting.dispatches.length, 1);
+  const again = fake({ ci: false, otherCiRuns: [{ id: 8, head_sha: BASE_SHA, name: 'Arcana Development CI', event: 'pull_request', status: 'completed', conclusion: 'action_required' },
+    { id: 9, head_sha: BASE_SHA, name: 'Arcana Development CI', event: 'workflow_dispatch', status: 'completed', conclusion: 'action_required' }] });
+  await runDispatch({ github: again.github, context: ctx, core: core(), env: env(), readBudget: async () => ({}) });
+  assert.equal(again.dispatches.length, 0);
+  for (const run of [{ status: 'in_progress', conclusion: null }, { status: 'completed', conclusion: 'failure' }]) {
     const f = fake({ ci: false, otherCiRuns: [{ id: 9, head_sha: BASE_SHA, name: 'Arcana Development CI', ...run }] });
     const r2 = await runDispatch({ github: f.github, context: ctx, core: core(), env: env(), readBudget: async () => ({}) });
     assert.equal(r2.state, 'ci-not-ready'); assert.equal(f.dispatches.length, 0, JSON.stringify(run));
