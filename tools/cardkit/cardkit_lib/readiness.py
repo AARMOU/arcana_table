@@ -15,6 +15,7 @@ blocked requires a recorded source; everything else that is unsure is NEEDS_REVI
 from __future__ import annotations
 
 import json
+import hashlib
 import re
 from functools import lru_cache
 
@@ -78,11 +79,40 @@ def verified_support() -> dict:
 
 
 def _reviewed_lines(entry: dict | None) -> set:
-    """Normalized Oracle lines an engineer reviewed (verified-support.json `reviewedLines[].line`)."""
+    """Literal reviewed rules, preserving amounts, costs, colors and ability words."""
     if not entry:
         return set()
-    return {text.normalize_line(r["line"]) for r in entry.get("reviewedLines", [])
-            if isinstance(r, dict) and r.get("line") and r.get("primitives")}
+    return {r["line"].strip() for r in entry.get("reviewedLines", [])
+            if isinstance(r, dict) and isinstance(r.get("line"), str) and r["line"].strip()
+            and isinstance(r.get("primitives"), list) and r["primitives"]
+            and all(isinstance(p, str) and p.strip() for p in r["primitives"])}
+
+
+def review_oracle_hash(card: dict) -> str:
+    """Bind the entire rules record, not only the line with a weak text match."""
+    fields = ("name", "mana_cost", "type_line", "oracle_text", "power", "toughness",
+              "loyalty", "defense", "colors", "color_identity", "keywords", "layout", "faces")
+    raw = json.dumps({k: card[k] for k in fields if k in card}, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+
+@lru_cache(maxsize=1)
+def review_runtime_hash() -> str | None:
+    """Invalidate reviews when the adopted engine/SDK changes, without invalidating
+    them on every unrelated card commit. The evidence's exact base stays auditable."""
+    jars = ("argentum-ai.jar", "argentum-mtg-sdk-tooling.jar", "argentum-mtg-sdk.jar", "argentum-rules-engine.jar")
+    try:
+        hashes = {name: hashlib.sha256((repo.LIBS / name).read_bytes()).hexdigest() for name in jars}
+    except OSError:
+        return None
+    return hashlib.sha256(json.dumps(hashes, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def review_is_current(entry: dict, card: dict) -> bool:
+    return (bool(re.fullmatch(r"[a-f0-9]{40}", str(entry.get("baseSha", ""))))
+            and bool(entry.get("verifiedBy")) and bool(entry.get("references"))
+            and entry.get("oracleHash") == review_oracle_hash(card)
+            and entry.get("runtimeHash") is not None and entry["runtimeHash"] == review_runtime_hash())
 
 
 def _blocked_keyword(keyword: str) -> dict | None:
@@ -220,6 +250,8 @@ def classify(name: str, use_refs: bool = True) -> dict:
                 gap = True
     variants = [l for l in result["lines"] if l["kind"] == "rules" and l.get("differences")]
     verified = verified_support().get(repo.normalize_name(name))
+    if verified and "reviewedLines" in verified and not review_is_current(verified, card):
+        verified = None
     if not unknown and card.get("layout") not in MULTI_FACE and worst >= SUPPORTED_SCORE and not result["reasons"]:
         if variants and not verified:
             result.update(readiness="NEEDS_REVIEW", route="gpt", reviewHint="near-variant")
@@ -240,7 +272,7 @@ def classify(name: str, use_refs: bool = True) -> dict:
     weak = [l["text"] for l in result["lines"] if l["kind"] == "rules" and l["score"] < SUPPORTED_SCORE]
     reviewed = _reviewed_lines(verified)
     if (use_refs and weak and reviewed and not unknown and card.get("layout") not in MULTI_FACE and not result["reasons"]
-            and all(text.normalize_line(l) in reviewed for l in weak)):
+            and all(l.strip() in reviewed for l in weak)):
         # An engineer checked each weak line against engine source and named the primitive. The entry is bound to
         # the exact Oracle wording: if Scryfall's text changes, the line no longer matches and review is needed again.
         result.update(readiness="SUPPORTED", route="copilot", verifiedSupport=verified, reviewed=True)
