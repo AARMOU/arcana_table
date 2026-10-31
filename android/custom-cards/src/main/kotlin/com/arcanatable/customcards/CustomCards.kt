@@ -268,6 +268,7 @@ object CustomCards {
         Entry(Zoanthrope, "40K", "Six WotC precons"),
         // Backported, isolated distinct precon batches: PRs #74, #76, #77, #84 and #85.
         Entry(HormagauntHorde, "40K", "Six WotC precons"),
+        Entry(CollectiveEffort, "MSC", "Six WotC precons"),
         Entry(ArcoFlagellant, "40K", "Six WotC precons"),
         Entry(UltramarinesHonourGuard, "40K", "Six WotC precons"),
         Entry(CommissarSeverinaRaine, "40K", "Six WotC precons"),
