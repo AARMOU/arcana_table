@@ -116,6 +116,7 @@ object CustomCards {
         Entry(ViolentOutburst, "ARB", POOL),
         Entry(EleshNornGrandCenobite, "NPH", POOL),
         Entry(RampagingFerocidon, "XLN", POOL),
+        Entry(KnucklesTheEchidna, "SLD", POOL),
         Entry(SpittingDilophosaurus, "REX", POOL),
         Entry(DescendantsPath, "TLE", POOL),
         Entry(CloudExSoldier, "FIC", POOL),
@@ -186,6 +187,7 @@ object CustomCards {
         Entry(GuildlessCommons, "CMR", "Six WotC precons"),
         Entry(TendoIceBridge, "BOK", "Six WotC precons"),
         Entry(HullBreach, "PLS", "Six WotC precons"),
+        Entry(KillMaimBurn, "40K", "Six WotC precons"),
         Entry(AtalanJackal, "40K", "Six WotC precons"),
         Entry(WingedHiveTyrant, "40K", "Six WotC precons"),
         Entry(TallymanOfNurgle, "40K", "Six WotC precons"),
@@ -280,6 +282,7 @@ object CustomCards {
         Entry(MatterReshaper, "OGW", "Six WotC precons"),
         Entry(Scaretiller, "ELD", "Six WotC precons"),
         Entry(GoliathTruck, "40K", "Six WotC precons"),
+        Entry(IlluminorSzeras, "40K", "Six WotC precons"),
         Entry(EldraziConscription, "M3C", "Six WotC precons"),
         // Eldrazi Incursion.
         Entry(EldraziDisplacer, "OGW", "Eldrazi Incursion"),
