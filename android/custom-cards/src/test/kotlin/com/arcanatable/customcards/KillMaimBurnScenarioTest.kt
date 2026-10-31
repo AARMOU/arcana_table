@@ -3,8 +3,8 @@ package com.arcanatable.customcards
 import com.arcanatable.customcards.cards.KillMaimBurn
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.CastSpell
-import com.wingedsheep.engine.core.ChooseModeDecision
-import com.wingedsheep.engine.core.ModesChosenResponse
+import com.wingedsheep.engine.core.ChooseOptionDecision
+import com.wingedsheep.engine.core.OptionChosenResponse
 import com.wingedsheep.engine.core.PaymentStrategy
 import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
@@ -113,14 +113,19 @@ class KillMaimBurnScenarioTest {
     }
 
     @Test
-    fun choosingNoModesIsNotAllowed() {
-        val d = customScenario(KillMaimBurn)
+    fun modeSelectionCannotFinishBeforeOneModeIsChosen() {
+        val d = customScenario(KillMaimBurn, "Sol Ring", "Grizzly Bears")
+        d.putPermanentOnBattlefield(d.player2, "Sol Ring")
+        d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
         giveMana(d)
 
         assertNull(cast(d, emptyList(), emptyList()).error)
-        val decision = d.pendingDecision as? ChooseModeDecision ?: error("Expected mode selection")
-        assertEquals(1, decision.minModes)
-        assertEquals(3, decision.maxModes)
-        assertNotNull(d.submitDecision(d.player1, ModesChosenResponse(decision.id, emptyList())).error)
+        val decision = d.pendingDecision as? ChooseOptionDecision ?: error("Expected mode selection")
+        assertEquals(3, decision.options.size)
+        assertFalse(decision.options.contains("Done"))
+
+        assertNull(d.submitDecision(d.player1, OptionChosenResponse(decision.id, 0)).error)
+        val afterOneMode = d.pendingDecision as? ChooseOptionDecision ?: error("Expected another mode choice")
+        assertTrue(afterOneMode.options.contains("Done"))
     }
 }
