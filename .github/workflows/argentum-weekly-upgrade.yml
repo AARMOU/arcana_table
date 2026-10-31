@@ -460,7 +460,7 @@ jobs:
                      'engine-upgrade/preview-config.json', 'android/app/libs/argentum-',
                      'android/app/src/main/assets/argentum/', 'docs/agents/generated/sdk-api.',
                      'docs/agents/argentum-upstream/', 'AGENTS.md', 'docs/agents/CARD-WORKFLOW.md',
-                     'tools/cardkit/cardkit_lib/repo.py')
+                     'tools/cardkit/cardkit_lib/repo.py', 'tools/cardkit/data/verified-support.json')
           text = open(sys.argv[1], 'rb').read().decode('utf-8', 'replace')
           headers = re.findall(r'^diff --git .*$', text, re.M)
           pairs = [re.fullmatch(r'diff --git a/(\S+) b/(\S+)', h) for h in headers]
