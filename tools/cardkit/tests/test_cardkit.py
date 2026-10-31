@@ -274,6 +274,25 @@ class ReadinessTests(unittest.TestCase):
             for r in entry.get("reviewedLines", []):
                 self.assertTrue(r.get("line") and r.get("primitives"), name)
 
+
+    def test_review_command_binds_hashes_and_supports_only_exact_lines(self):
+        path = repo.DATA_DIR / "verified-support.json"
+        saved = path.read_text(encoding="utf-8")
+        try:
+            weak = [l["text"] for l in readiness.classify("Termagant Swarm")["lines"] if l["kind"] == "rules" and l["score"] < readiness.SUPPORTED_SCORE]
+            args = ["review", "Termagant Swarm", "--line", weak[0], "--primitives", "Triggers.self.dies,Effects.CreateToken",
+                    "--reference", "upstream x", "--summary", "s", "--verified-by", "test"]
+            out = subprocess.run([sys.executable, "-I", str(repo.TOOL_DIR / "cardkit.py"), *args], capture_output=True, text=True)
+            self.assertEqual(out.returncode, 0, out.stdout + out.stderr)
+            entry = json.loads(path.read_text(encoding="utf-8"))["cards"]["Termagant Swarm"]
+            self.assertRegex(entry["oracleHash"], r"^[a-f0-9]{64}$")
+            self.assertRegex(entry["baseSha"], r"^[a-f0-9]{40}$")
+            bad = subprocess.run([sys.executable, "-I", str(repo.TOOL_DIR / "cardkit.py"), *args[:3], "not the line", *args[4:]],
+                                 capture_output=True, text=True)
+            self.assertEqual(bad.returncode, 1, "a line that is not the card's exact wording never makes it SUPPORTED")
+        finally:
+            path.write_text(saved, encoding="utf-8")
+
     @with_fake_oracle
     def test_unmatched_line_is_review_with_gap_hint(self):
         v = readiness.classify("Cardkit Test Oddity")
