@@ -264,10 +264,15 @@ class ReadinessTests(unittest.TestCase):
             original["oracle_text"].replace("You may cast", "Your opponents may cast"),
             original["oracle_text"].replace("as though they had flash", "only during your turn"),
         ):
-            with mock.patch.object(oracle, "cached", return_value={**original, "oracle_text": altered}):
-                self.assertEqual(readiness.classify("Yeva, Nature's Herald")["readiness"], "NEEDS_REVIEW")
+            changed = {**original, "oracle_text": altered}
+            self.assertFalse(readiness.review_is_current(entry, changed))
+            with mock.patch.object(oracle, "cached", return_value=changed):
+                # Another independently matching wording may still be SUPPORTED;
+                # the *Yeva-specific review* must never authorize changed Oracle text.
+                self.assertFalse(readiness.classify("Yeva, Nature's Herald").get("verifiedSupport"))
         with mock.patch.object(readiness, "review_runtime_hash", return_value="0" * 64):
-            self.assertEqual(readiness.classify("Yeva, Nature's Herald")["readiness"], "NEEDS_REVIEW")
+            self.assertFalse(readiness.review_is_current(entry, original))
+            self.assertFalse(readiness.classify("Yeva, Nature's Herald").get("verifiedSupport"))
         with mock.patch.object(oracle, "cached", return_value=None):
             self.assertEqual(readiness.classify("Yeva, Nature's Herald")["readiness"], "NEEDS_REVIEW")
 
