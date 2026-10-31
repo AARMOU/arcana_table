@@ -1,0 +1,104 @@
+name: Goosegeta one-shot GPT-6 canary deployment (isolated only)
+# Owner approved isolated one-call metered test; no production rooms/control/pages/APK or further purchases.
+on:
+  push:
+    branches: [gpt/summon-goosegeta-approved-test-20261031]
+    paths: ['.github/workflows/goosegeta-one-shot-deploy.yml']
+permissions:
+  contents: read
+concurrency:
+  group: goosegeta-isolated-model-canary-deploy
+  cancel-in-progress: false
+jobs:
+  deploy-isolated-once:
+    if: github.repository == 'AARMOU/arcana_table' && github.ref == 'refs/heads/gpt/summon-goosegeta-approved-test-20261031'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    concurrency:
+      group: goosegeta-isolated-room-writer
+      cancel-in-progress: false
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 9e66aa689e2224eefde38374fa33f510750a3186
+          path: cloud-source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Inspect exact one-shot code and execute real workerd tests (no API)
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C cloud-source rev-parse HEAD)" = 9e66aa689e2224eefde38374fa33f510750a3186
+          grep -q "goosegeta-ever-used-canary-v1" cloud-source/android/cloud-room/src/goose-budget.ts
+          npm --prefix cloud-source/android/cloud-room ci --ignore-scripts --no-audit --no-fund
+          npm --prefix cloud-source/android/cloud-room run typecheck
+          node --test cloud-source/tools/goosegeta/paid-model-preflight.test.mjs cloud-source/tools/goosegeta/session.test.mjs
+          node --test cloud-source/android/cloud-room/scripts/goosegeta.one-shot.test.mjs
+          node --test cloud-source/android/cloud-room/scripts/goosegeta.local.test.mjs
+      - name: Select ONLY isolated test Worker and check encrypted API/control secret names
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('cloud-source/android/cloud-room/wrangler.toml')
+          s=p.read_text()
+          assert s.count('name = "arcana-table-rooms"') == 1
+          assert 'GOOSEGETA_OPENAI_ENABLED = "false"' in s
+          p.write_text(s.replace('name = "arcana-table-rooms"','name = "arcana-table-rooms-goosegeta-test"',1))
+          PY
+          test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID"
+          wrangler=cloud-source/android/cloud-room/node_modules/.bin/wrangler
+          "$wrangler" secret list --config cloud-source/android/cloud-room/wrangler.toml --format json > /tmp/goose-secrets.json
+          node - <<'JS'
+          const fs=require('node:fs');
+          const raw=JSON.parse(fs.readFileSync('/tmp/goose-secrets.json','utf8'));
+          const names=new Set(raw.map(x=>x.name));
+          for (const name of ['OPENAI_API_KEY','GOOSEGETA_CONTROL_KEY']) if(!names.has(name)) throw Error('Required secret absent: '+name);
+          console.log('Both encrypted secret NAMES verified, values never read or logged.');
+          JS
+      - name: Enable only isolated GPT-6 Luna ONE-SHOT canary, bounded across restarts/days
+        shell: bash
+        run: |
+          set -euo pipefail
+          wrangler=cloud-source/android/cloud-room/node_modules/.bin/wrangler
+          "$wrangler" deploy --config cloud-source/android/cloud-room/wrangler.toml \
+            --var GOOSEGETA_ENABLED:true \
+            --var GOOSEGETA_OPENAI_ENABLED:true \
+            --var GOOSEGETA_CANARY_ONE_SHOT:true \
+            --var GOOSEGETA_MODEL:gpt-6-luna \
+            --var GOOSEGETA_GAME_TOKENS:24000 \
+            --var GOOSEGETA_DAILY_TOKENS:24000
+      - name: Check live isolated endpoint and deny unauthorized access without invoking model
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          const origin='https://arcana-table-rooms-goosegeta-test.arcanamtg.workers.dev';
+          const health=await fetch(origin+'/health');assert.equal(health.status,200);
+          const denied=await fetch(origin+'/internal/goosegeta/GOOSE1',{method:'POST'});
+          assert.equal(denied.status,403);
+          console.log('PASS isolated health and owner-only gate. No paid provider request made by deployment.');
+          JS
+      - name: Fail closed by disabling paid flag on failed post-deploy smoke
+        if: failure()
+        shell: bash
+        run: |
+          wrangler=cloud-source/android/cloud-room/node_modules/.bin/wrangler
+          if test -x "$wrangler" && grep -q 'arcana-table-rooms-goosegeta-test' cloud-source/android/cloud-room/wrangler.toml; then
+            "$wrangler" deploy --config cloud-source/android/cloud-room/wrangler.toml \
+              --var GOOSEGETA_ENABLED:true \
+              --var GOOSEGETA_OPENAI_ENABLED:false \
+              --var GOOSEGETA_CANARY_ONE_SHOT:true \
+              --var GOOSEGETA_MODEL:gpt-6-luna \
+              --var GOOSEGETA_GAME_TOKENS:24000 \
+              --var GOOSEGETA_DAILY_TOKENS:24000 || true
+          fi
