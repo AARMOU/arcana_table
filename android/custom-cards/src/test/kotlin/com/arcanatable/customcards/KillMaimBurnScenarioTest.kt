@@ -3,6 +3,8 @@ package com.arcanatable.customcards
 import com.arcanatable.customcards.cards.KillMaimBurn
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.CastSpell
+import com.wingedsheep.engine.core.ChooseModeDecision
+import com.wingedsheep.engine.core.ModesChosenResponse
 import com.wingedsheep.engine.core.PaymentStrategy
 import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
@@ -115,6 +117,10 @@ class KillMaimBurnScenarioTest {
         val d = customScenario(KillMaimBurn)
         giveMana(d)
 
-        assertNotNull(cast(d, emptyList(), emptyList()).error)
+        assertNull(cast(d, emptyList(), emptyList()).error)
+        val decision = d.pendingDecision as? ChooseModeDecision ?: error("Expected mode selection")
+        assertEquals(1, decision.minModes)
+        assertEquals(3, decision.maxModes)
+        assertNotNull(d.submitDecision(d.player1, ModesChosenResponse(decision.id, emptyList())).error)
     }
 }
