@@ -155,6 +155,14 @@ internal fun shouldKeepMultiplayerConnectionGuard(
     argentumEnabled: Boolean,
 ): Boolean = legacyHost || legacyClient || cloudClient || multiTransport || argentumEnabled
 
+/** Only a suspended remote game is eligible for automatic app-switch recovery. */
+internal fun shouldResumePausedArgentumOnForeground(
+    foreground: Boolean,
+    gameEnabled: Boolean,
+    offline: Boolean,
+    status: ArgentumConnectionStatus,
+): Boolean = foreground && gameEnabled && !offline && status == ArgentumConnectionStatus.PAUSED
+
 /** All of the main screen's effects (LaunchedEffect / SideEffect / DisposableEffect). */
 @Composable
 internal fun TableController.TableEffects(darkMode: Boolean) {
@@ -268,6 +276,20 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
     LaunchedEffect(argentumStatus, argentumEnabled) {
         if (argentumEnabled) recordDiagnostic("Argentum connection status: ${argentumStatus.name.lowercase()}")
     }
+    // Argentum deliberately pauses retries when Android backgrounds the app. The old
+    // lifecycle never resumed PAUSED on foreground, forcing a manual RESUME after Control.
+    // Use the existing session token and the socket's retryNow() path; do not start a new
+    // match, change seats or retry a deliberately replaced/ended session.
+    LaunchedEffect(appInForeground, argentumStatus, argentumEnabled, argentumOffline) {
+        if (shouldResumePausedArgentumOnForeground(
+                appInForeground, argentumEnabled, argentumOffline, argentumStatus
+            )
+        ) {
+            recordDiagnostic("Returning to Arcana: reconnecting paused Argentum session", DiagnosticCategory.CONNECTION)
+            argentumSocket.retryNow()
+        }
+    }
+
     LaunchedEffect(argentumQueue) {
         for (incoming in argentumQueue) {
             // A late update from a game you already left must not overwrite your table and deck.
