@@ -51,7 +51,7 @@ An operation is allowed only if the master switch is `true` **and** its own mode
 
 Capacity counts **work units**, not GitHub objects (§4). A unit occupies one slot while it is `pending-pickup`, `working`, or `repairing`. Its issue, assignment, PR and repair comments all count as that **one** slot.
 
-- `ARCANA_MAX_ACTIVE_UNITS` (owner variable, default `1`, hard ceiling `2` in code).
+- `ARCANA_MAX_ACTIVE_UNITS` (owner variable, default `1`, hard ceiling `3` in code). It is the owner's **ceiling**; effective capacity scales with budget level: `normal` → ceiling, `warn` → at most 2, `slow` → 1, `paused`/`unknown` → 0. Slots fill only when an eligible build or repair exists, so 1–3 workers run depending on load. With 2+ slots, builds and repairs each take at most capacity−1, so neither lane starves the other (owner request 2026-10-30).
 - A unit stays `pending-pickup` from assignment until a `copilot_work_started` event appears, or until a pickup timeout (default 30 min). A unit that never starts is marked `halted` and reported in #81; it is **not** silently freed or reassigned.
 
 ### 3.3 Budget — *can this work finish within the allowance?*
