@@ -249,6 +249,14 @@ internal fun TableController.TableMainLayout() {
                                 DropdownMenuItem(text = { Text("MTG rules") }, modifier = Modifier.tutorialTarget("menu-mtg-rules"), onClick = { run { topMenuExpanded = false; topMenuSection = null; rulesOpen = true } })
                             }
                             "game" -> {
+                                // Access the existing room during a running Internet Commander
+                                // match without navigating away or reopening the waiting lobby.
+                                if (argentumEnabled && wifiRole in setOf("online-host", "online-guest"))
+                                    DropdownMenuItem(text = { Text("Lobby") }, onClick = {
+                                        topMenuExpanded = false
+                                        topMenuSection = null
+                                        activeGameLobbyOpen = true
+                                    })
                                 if (argentumOffline && !tutorialPracticeActive && wifiRole == null && argentumSnapshot != null && !gameEndedOnline)
                                     DropdownMenuItem(text = { Text("Save full offline game") }, onClick = {
                                         topMenuExpanded = false
