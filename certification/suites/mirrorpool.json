@@ -1,0 +1,8 @@
+{
+  "key": "mirrorpool",
+  "name": "Mirrorpool",
+  "issue": 587,
+  "source": "certification/MirrorpoolIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.MirrorpoolIndependentCertificationTest",
+  "tests": 9
+}
