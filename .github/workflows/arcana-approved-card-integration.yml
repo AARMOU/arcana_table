@@ -73,6 +73,17 @@ jobs:
           RETRY_BLOCKED: ${{ inputs.retry_blocked == true }}
         with:
           script: |
+            // Runs on every Review Inbox Refresh completion. When that run's review job was skipped (a
+            // certification that published nothing), nothing integration reads has changed: skip the
+            // ~150-call plan scan. One call; the inbox's own 15-minute schedule always rebuilds.
+            if (context.eventName === 'workflow_run') {
+              const jobs = (await github.rest.actions.listJobsForWorkflowRun({...context.repo,
+                run_id: context.payload.workflow_run.id, per_page: 100})).data.jobs || [];
+              if (!jobs.some(j => j.name === 'Publish independently verified card review status' && j.conclusion === 'success')) {
+                core.summary.addRaw('Inbox refresh did not rebuild; integration plan skipped to conserve API quota.').write();
+                return;
+              }
+            }
             const P = require('./scripts/card-integration.cjs');
             const fs = require('node:fs');
             const controlSha = require('node:child_process').execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
