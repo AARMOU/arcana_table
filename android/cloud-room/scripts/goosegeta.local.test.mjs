@@ -133,7 +133,7 @@ test('workerd: stalled provider cannot freeze a legal guest turn; watchdog emits
     {action:{type:'PassPriority',playerId:'offline-ai'},isAffordable:true}
   ];
   await game(h,update(220,options),2);
-  await started;
+  await Promise.race([started,new Promise((_,reject)=>setTimeout(()=>reject(Error('watchdog-provider-never-started')),3500))]);
   // A provider call is deliberately held forever; only the Cloudflare DO alarm
   // can advance the host turn. This uses intercepted provider traffic, never API.
   const originalWait=h.wait;
