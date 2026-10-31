@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parent.parent
 ENGINE = ROOT / "argentum-engine"
 PATCHES = ROOT / "argentum-patches"
 REPORT = ROOT / "engine-upgrade" / "patch-report.json"
-TARGET = "61e71e586b100faa661f86cac827ac3c3bbb5a78"
+TARGET = "7fb073337e4389cfabe2ebf4c6416633a7fc63d2"
 MANDATORY = [
     "0001-android-regex.patch",
     "0002-engine-trial-build.patch",
@@ -57,6 +57,8 @@ def main() -> int:
     }
     for patch_name in MANDATORY:
         patch = forward_ports.get(patch_name, PATCHES / patch_name)
+        if not patch.is_file():  # weekly.py folds forward ports back into the refreshed series
+            patch = PATCHES / patch_name
         if not patch.is_file():
             outcome = "missing"
             diagnostics = "Patch file not found"

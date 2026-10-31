@@ -1,0 +1,214 @@
+{
+  "_about": "Engineer-reviewed support decisions. reviewedLines preserve literal rules wording and name implemented primitives. Each reviewed entry records the exact evidence base SHA and hashes of the full Oracle rules record and adopted runtime/SDK JARs. A rules or runtime change invalidates the decision; unrelated card commits do not. Source review authorizes candidate implementation only, never certification or integration.",
+  "cards": {
+    "Eldrazi Displacer": {
+      "summary": "exile-then-return is Effects.Move(→EXILE) then Effects.Move(→BATTLEFIELD) (upstream Emiel the Blessed); Effects.Move takes a tapped flag (sdk-api.md, card-sdk-language-reference 'tapped = true'); {C} in an activation cost is ordinary mana",
+      "verifiedBy": "Claude, source inspection 2026-10-24",
+      "references": [
+        "upstream mtg-sets/2017-2022/.../jmp/cards/EmielTheBlessed.kt"
+      ]
+    },
+    "Forsaken Monument": {
+      "summary": "AdditionalManaOnSourceTap(sourceFilter, whenProducing = TappedForManaType.COLORLESS) takes any GameObjectFilter, so Permanent.youControl() replaces Ultima's Land.youControl(); colorless filter is GameObjectFilter.Any.withCardPredicate(CardPredicate.IsColorless) (tested custom Skittering Cicada)",
+      "verifiedBy": "Claude, source inspection 2026-10-24",
+      "references": [
+        "upstream mtg-sets/2025/.../fin/cards/UltimaOriginOfOblivion.kt",
+        "android/custom-cards/.../cards/SkitteringCicada.kt"
+      ]
+    },
+    "Abstruse Archaic": {
+      "summary": "TargetFilter.ActivatedOrTriggeredAbilityOnStack.youControl().abilitySourceMatches(filter) takes any GameObjectFilter (Echo uses Creature; reference lists Artifact too); colorless via CardPredicate.IsColorless; mana abilities are untargetable by construction",
+      "verifiedBy": "Claude, source inspection 2026-10-24",
+      "references": [
+        "upstream mtg-sets/2026/.../msh/cards/EchoPerceptiveProdigy.kt"
+      ]
+    },
+    "Darksteel Monolith": {
+      "summary": "MayCastWithoutPayingManaCost(controllerOnly, spellFilter, oncePerTurn, fromZones) — Warped Space uses oncePerTurn + fromZones={EXILE}; here spellFilter = colorless (CardPredicate.IsColorless), fromZones = {HAND}. Paying {0} rather than the mana cost is the same alternative cost",
+      "verifiedBy": "Claude, source inspection 2026-10-24",
+      "references": [
+        "upstream mtg-sets/2024/.../dsk/cards/CharredFoyerWarpedSpace.kt",
+        "docs/agents/argentum-upstream/sdk-index.md MayCastWithoutPayingManaCost"
+      ]
+    },
+    "Ancient Stone Idol": {
+      "summary": "Dies trigger: Triggers.self.dies() + Effects.CreateToken(power=6, toughness=12, creatureTypes={Construct}, keywords={TRAMPLE}, artifactToken=true); same shape as Thopter Mechanic with different stats/keyword",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/bro/cards/ThopterMechanic.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "When this creature dies, create a 6/12 colorless Construct artifact creature token with trample.",
+          "primitives": [
+            "Triggers.self.dies",
+            "Effects.CreateToken(artifactToken = true)"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "0430c73af957c16936fca2d0150fb3cedb2af824a2d983103948dc3175f5e3d0",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Marneus Calgar": {
+      "summary": "Activated {6}: Effects.CreateToken(count=2, power=2, toughness=2, colors={WHITE}, creatureTypes={Astartes, Warrior}, keywords={VIGILANCE}); Call the Cavalry's effect as an activated ability",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/dom/cards/CallTheCavalry.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Chapter Master — {6}: Create two 2/2 white Astartes Warrior creature tokens with vigilance.",
+          "primitives": [
+            "activatedAbility",
+            "Effects.CreateToken(count = 2)"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "9ea1226afa0d32a700ed917f61a5956ec023cf43fec5ebb15e451dc8b843a756",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Thunderhawk Gunship": {
+      "summary": "ETB: Triggers.self.enters() + Effects.CreateToken(count=2, 2/2, WHITE, {Astartes, Warrior}, {VIGILANCE}); Soul of Migration's trigger with Call the Cavalry's token",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mh2/cards/SoulOfMigration.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/dom/cards/CallTheCavalry.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "When this Vehicle enters, create two 2/2 white Astartes Warrior creature tokens with vigilance.",
+          "primitives": [
+            "Triggers.self.enters",
+            "Effects.CreateToken(count = 2)"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "8f141c4009468cca3f2009b2579a7cc201c49723bd3807d55846eff8005e1533",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Be'lakor, the Dark Master": {
+      "summary": "Triggers.another(GameObjectFilter.Creature.withSubtype(Demon).youControl()).enters() (Champion of the Path) + Effects.DealDamage(DynamicAmounts.triggeringPower(), target(Targets.Any), damageSource = EffectTarget.TriggeringEntity) (Warstorm Surge)",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2026/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/ecl/cards/ChampionOfThePath.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/m12/cards/WarstormSurge.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Lord of Torment — Whenever another Demon you control enters, it deals damage equal to its power to any target.",
+          "primitives": [
+            "Triggers.another(...withSubtype...youControl()).enters",
+            "DynamicAmounts.triggeringPower",
+            "damageSource = EffectTarget.TriggeringEntity"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "7202ea2cbdfd23153efa3a4047f006bcf930b740c1d276650ec0df0b83354223",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Kill! Maim! Burn!": {
+      "summary": "Mode: target(Targets.Player) + Effects.DealDamage(3, t); Flame Jet uses Targets.PlayerOrPlaneswalker, Requisition Raid shows Targets.Player; choose-one-or-more modal already matched",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/1993-1999/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/uds/cards/FlameJet.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/otj/cards/RequisitionRaid.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "• Kill! Maim! Burn! deals 3 damage to target player.",
+          "primitives": [
+            "Targets.Player",
+            "Effects.DealDamage"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "777a9ade22c6399ce0713e47535efa8540d314cf619c5041dd6616d8f7b8f610",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Collective Effort": {
+      "summary": "Mode is Requisition Raid's third mode verbatim: target(Targets.Player) + Effects.ForEachInGroup(GroupFilter(GameObjectFilter.Creature.targetPlayerControls(player)), AddCounters(+1/+1, 1, IterationEntity)); Escalate and the other modes matched",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/otj/cards/RequisitionRaid.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "• Put a +1/+1 counter on each creature target player controls.",
+          "primitives": [
+            "Effects.ForEachInGroup",
+            "GameObjectFilter.Creature.targetPlayerControls"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "743804b71a860717671e47f3ee7b3579e702ae928f0462312d8c50498a8dc2a2",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Mirrorpool": {
+      "summary": "Activated {4}{C}, {T}, sacrifice this land: Effects.CreateTokenCopyOfTarget(target(TargetFilter.CreatureYouControl)) (Self-Reflection), with the same tap+sacrifice-self land cost shape as its matched spell-copy line",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/lci/cards/SelfReflection.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "{4}{C}, {T}, Sacrifice this land: Create a token that's a copy of target creature you control.",
+          "primitives": [
+            "Effects.CreateTokenCopyOfTarget",
+            "TargetFilter.CreatureYouControl"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "a18679acde76a50e29fb69802a28a3addec8baeec5b49ee6e15803fec93d8b30",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Illuminor Szeras": {
+      "summary": "Mana ability: Costs.Composite(Costs.Tap, Costs.SacrificeAnother(GameObjectFilter.Creature)) (Bolg's Company) + Effects.AddMana(BLACK, DynamicAmounts.manaValueOf(EffectTarget.SacrificedAsCost(0))) (Priest of Yawgmoth). Scenario test must assert X = sacrificed creature's mana value with SacrificeAnother",
+      "verifiedBy": "Claude, source inspection 2026-10-30 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2026/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/hob/cards/BolgsCompany.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/1993-1999/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/atq/cards/PriestOfYawgmoth.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Secrets of the Soul — {T}, Sacrifice another creature: Add an amount of {B} equal to the sacrificed creature's mana value.",
+          "primitives": [
+            "Costs.SacrificeAnother",
+            "DynamicAmounts.manaValueOf(EffectTarget.SacrificedAsCost(0))"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "20532c4d8ba4db7eb8e67ef214b505642d28245c301151341dc31dee8cfccb14",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Knuckles the Echidna": {
+      "summary": "Treasure Hunter is an ability word (no rules meaning, CR 207.2c); 'Treasure' in Scryfall keywords is the token type, created by Effects.CreateTreasure (Professional Face-Breaker, 1.00 match). The win line is an upkeep intervening-if trigger: Inventors' Fair's YouControlAtLeast(N, Artifact) condition with Simic Ascendancy's WinGame effect.",
+      "verifiedBy": "Claude, 2026-10-31: read pinned upstream sources of Inventors' Fair, Simic Ascendancy and Professional Face-Breaker; all members present in docs/agents/generated/sdk-api.md",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/kld/cards/InventorsFair.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/blc/cards/SimicAscendancy.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Treasure Hunter — At the beginning of your upkeep, if you control thirty or more artifacts, you win the game.",
+          "primitives": [
+            "Triggers.you.beginningOf(Step.UPKEEP)",
+            "interveningIf=Conditions.YouControlAtLeast(30",
+            "GameObjectFilter.Artifact)",
+            "Effects.WinGame(EffectTarget.Controller)"
+          ]
+        }
+      ],
+      "baseSha": "f27e2c6caf19296dd83e871b690dadcd89bfe04c",
+      "oracleHash": "62ed74687ea9a962573a422fb6e7721af53c3fe2510b2ee1c0955f1225ba6152",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    }
+  }
+}

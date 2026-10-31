@@ -7,6 +7,7 @@ import com.wingedsheep.engine.registry.CardRegistry
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -69,19 +70,40 @@ class WifiHostTest {
         val hellos = LinkedBlockingQueue<JSONObject>()
         val left = LinkedBlockingQueue<Boolean>()
         val server = ArgentumLanServer("Host", onGuest = { hellos.put(it) }, onGuestMessage = { atHost.put(it) }, onGuestLeft = { left.put(true) })
-        server.start()
-        Thread.sleep(300)
         val guest = ArgentumLanGuest()
-        guest.onMessage = { atGuest.put(it) }
-        guest.connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "Guest").put("deck", JSONArray(listOf("Forest"))))
-        val hello = hellos.poll(5, TimeUnit.SECONDS)
-        assertEquals("Guest", hello?.optString("name"))
-        guest.send(JSONObject().put("type", "submitAction").put("n", 1))
-        assertEquals(1, atHost.poll(5, TimeUnit.SECONDS)?.optInt("n"))
-        server.send(JSONObject().put("type", "stateUpdate").put("n", 2))
-        assertEquals(2, atGuest.poll(5, TimeUnit.SECONDS)?.optInt("n"))
-        guest.close()
-        assertEquals(true, left.poll(5, TimeUnit.SECONDS))
-        server.close()
+        try {
+            server.start()
+            // Wait for the listening socket itself, not a fixed sleep: a slow runner can take longer
+            // than any guess, and a failed bind should say why instead of surfacing as a refused connect.
+            assertTrue("host is listening (bind error: ${server.bindError})", server.awaitReady(10_000))
+            guest.onMessage = { atGuest.put(it) }
+            guest.connect("127.0.0.1", JSONObject().put("type", "lanHello").put("name", "Guest").put("deck", JSONArray(listOf("Forest"))))
+            val hello = hellos.poll(5, TimeUnit.SECONDS)
+            assertEquals("Guest", hello?.optString("name"))
+            guest.send(JSONObject().put("type", "submitAction").put("n", 1))
+            assertEquals(1, atHost.poll(5, TimeUnit.SECONDS)?.optInt("n"))
+            server.send(JSONObject().put("type", "stateUpdate").put("n", 2))
+            assertEquals(2, atGuest.poll(5, TimeUnit.SECONDS)?.optInt("n"))
+            guest.close()
+            assertEquals(true, left.poll(5, TimeUnit.SECONDS))
+        } finally {
+            guest.close()
+            server.close()
+        }
+    }
+
+    @Test fun portAlreadyInUseIsReportedNotSilent() {
+        // Something else holds the game port: the host must say so rather than wait forever.
+        java.net.ServerSocket().use { holder ->
+            holder.bind(java.net.InetSocketAddress(ArgentumLan.GAME_PORT))
+            val server = ArgentumLanServer("Host", onGuest = {}, onGuestMessage = {}, onGuestLeft = {})
+            try {
+                server.start()
+                assertFalse("not ready while the port is taken", server.awaitReady(10_000))
+                assertTrue("bind failure recorded: ${server.bindError}", server.bindError is java.net.BindException)
+            } finally {
+                server.close()
+            }
+        }
     }
 }

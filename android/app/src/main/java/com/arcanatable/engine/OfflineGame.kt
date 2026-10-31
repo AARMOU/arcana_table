@@ -14,8 +14,10 @@ import kotlin.random.Random
  * lands always come along because cards create and fetch them by name.
  *
  * Arcana's own custom cards (custom-cards.jsonl, written in Argentum's card language for cards
- * Argentum doesn't have yet) sit beside it. Argentum's version of a card always wins: a custom card is
- * only used when the library has no card of that name.
+ * Argentum doesn't have yet) sit beside it and are never deleted when Argentum catches up. When both
+ * have a card, Argentum's version is played, unless the card is listed in custom-overrides.txt: the
+ * weekly upgrade puts a card there when Argentum's version fails Arcana's scenario tests for it, so
+ * Arcana's tested version keeps being played.
  */
 class OfflineCardLibrary(private val open: (String) -> InputStream?, forcedBase: String? = null) {
     fun portalOnly(): OfflineCardLibrary = OfflineCardLibrary(open, "por-cards")
@@ -35,9 +37,16 @@ class OfflineCardLibrary(private val open: (String) -> InputStream?, forcedBase:
 
     /** Custom cards (only with the full library; Portal duels stay Portal). */
     private val customIndex: List<Pair<String, String>> by lazy { if (isFullLibrary) readIndex(CUSTOM).orEmpty() else emptyList() }
-    private val customByLower: Map<String, String> by lazy {
-        customIndex.map { it.first }.filter { it.lowercase() !in byLower }.associateBy { it.lowercase() }
+    /** Custom cards that take precedence over Argentum's card of the same name (lowercase). */
+    private val overrides: Set<String> by lazy {
+        if (!isFullLibrary) emptySet()
+        else open("argentum/$OVERRIDES")?.bufferedReader()?.useLines(::parseOverrides).orEmpty()
     }
+    private val customByLower: Map<String, String> by lazy {
+        customIndex.map { it.first }.filter { it.lowercase() !in byLower || it.lowercase() in overrides }.associateBy { it.lowercase() }
+    }
+    /** Argentum has this card, but Arcana's version is played instead. */
+    private fun overridden(lower: String): Boolean = lower in overrides && lower in customByLower
 
     val size: Int get() = index.size
 
@@ -55,7 +64,7 @@ class OfflineCardLibrary(private val open: (String) -> InputStream?, forcedBase:
     }
 
     /** True when [name] is played with Arcana's custom version rather than Argentum's. */
-    fun isCustom(name: String): Boolean = canonical(name)?.lowercase()?.let { it in customByLower && it !in byLower } == true
+    fun isCustom(name: String): Boolean = canonical(name)?.lowercase()?.let { it in customByLower && (it !in byLower || overridden(it)) } == true
 
     /** Every card in the library (only sensible for the small Portal library). */
     fun loadAll(): List<CardDefinition> = open("argentum/$base.jsonl")!!.bufferedReader().useLines { lines ->
@@ -69,14 +78,14 @@ class OfflineCardLibrary(private val open: (String) -> InputStream?, forcedBase:
         open("argentum/$base.jsonl")!!.bufferedReader().useLines { lines ->
             lines.filter(String::isNotBlank).forEachIndexed { i, line ->
                 val (name, kind) = index.getOrNull(i) ?: return@forEachIndexed
-                if (kind != "card" || name in wanted) out += CardLoader.fromJsonPreservingIds(line)
+                if (kind != "card" || (name in wanted && !overridden(name.lowercase()))) out += CardLoader.fromJsonPreservingIds(line)
             }
         }
-        val customWanted = wanted.filter { it.lowercase() in customByLower }.toSet()
+        val customWanted = wanted.map(String::lowercase).filter { it in customByLower && (it !in byLower || overridden(it)) }.toSet()
         if (customWanted.isNotEmpty()) open("argentum/$CUSTOM.jsonl")?.bufferedReader()?.useLines { lines ->
             lines.filter(String::isNotBlank).forEachIndexed { i, line ->
                 val name = customIndex.getOrNull(i)?.first ?: return@forEachIndexed
-                if (name in customWanted) out += CardLoader.fromJsonPreservingIds(line)
+                if (name.lowercase() in customWanted) out += CardLoader.fromJsonPreservingIds(line)
             }
         }
         return out
@@ -84,6 +93,11 @@ class OfflineCardLibrary(private val open: (String) -> InputStream?, forcedBase:
 
     companion object {
         const val CUSTOM = "custom-cards"
+        const val OVERRIDES = "custom-overrides.txt"
+
+        /** One card name per line; blank lines and `#` comments ignored. Lowercase. */
+        fun parseOverrides(lines: Sequence<String>): Set<String> =
+            lines.map { it.substringBefore('#').trim() }.filter(String::isNotEmpty).map(String::lowercase).toSet()
     }
 }
 

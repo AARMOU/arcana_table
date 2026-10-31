@@ -92,6 +92,9 @@ fun ArcanaHomeScreen(
     offlineResumeAvailable: Boolean = false,
     onResumeOffline: () -> Unit = {},
     onDiscardOffline: () -> Unit = {},
+    /** Debug builds only; always empty in release, so the card never renders there. */
+    testScenarios: List<TestScenario> = emptyList(),
+    onTestScenario: (TestScenario) -> Unit = {},
     onPlay: () -> Unit,
     onChangeDeck: () -> Unit,
     onImport: () -> Unit,
@@ -110,6 +113,7 @@ fun ArcanaHomeScreen(
                     Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = SoftWhite)
                 }
             }
+            DevBuildGooseBanner()
             if (resumeAvailable) Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Panel).padding(14.dp).testTag("resume-card")
             ) {
@@ -143,7 +147,7 @@ fun ArcanaHomeScreen(
                 Column(mod) {
                     Text("YOUR DECK", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 1.4.sp, modifier = Modifier.padding(bottom = 6.dp))
                     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).border(1.dp, PanelLight, RoundedCornerShape(20.dp)).background(Panel).testTag("home-deck")) {
-                        Box(Modifier.fillMaxWidth().height(if (short) 120.dp else if (wide) 280.dp else 230.dp).background(Color(0xFF22302C))) {
+                        Box(Modifier.fillMaxWidth().height(if (short) (if (BuildConfig.DEBUG) 70.dp else 120.dp) else if (wide) (if (BuildConfig.DEBUG) 175.dp else 280.dp) else (if (BuildConfig.DEBUG) 120.dp else 230.dp)).background(Color(0xFF22302C))) {
                             if (commanderArt != null) CardArt(commanderArt, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, fallbackName = deck?.commander)
                             Column(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Color(0xB3101615)).padding(horizontal = 16.dp, vertical = 10.dp)) {
                                 Text(deck?.commander?.let { "COMMANDER · ${it.uppercase()}" } ?: if (deck == null) "NO DECK YET" else "NO COMMANDER", color = TurnColors.You, fontSize = 12.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -182,6 +186,24 @@ fun ArcanaHomeScreen(
                 playButton()
             }
             Spacer(Modifier.height(8.dp))
+            // Below PLAY, so the debug card never pushes it off a short or narrow screen.
+            if (testScenarios.isNotEmpty() && !argentumActive) Column(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Panel)
+                    .padding(14.dp).testTag("test-scenarios-card")
+            ) {
+                Text("TEST SCENARIOS · DEBUG BUILD", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                Text("Start an offline game vs the AI from a ready board. The engine plays it normally from there.",
+                    color = Muted, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
+                testScenarios.forEach { scenario ->
+                    OutlinedButton(onClick = { onTestScenario(scenario) }, enabled = !working,
+                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 48.dp).testTag("test-scenario-${scenario.id}")) {
+                        Column(Modifier.fillMaxWidth()) {
+                            Text(scenario.title, color = SoftWhite, fontWeight = FontWeight.Bold)
+                            Text(scenario.description, color = Muted, fontSize = 11.sp)
+                        }
+                    }
+                }
+            }
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Spacer(Modifier.weight(1f))
                 Text("Build ${BuildConfig.VERSION_CODE} · Based on Build ${BuildConfig.BASE_BUILD}", color = Muted, fontSize = 12.sp)
@@ -281,7 +303,7 @@ private fun DeckChip(label: String, selected: Boolean, onClick: () -> Unit) {
 /** Pick from precons, Arcana decks, Argentum EDHREC decks, and then your other decks. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit) {
+fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckChoice) -> Unit, onImport: () -> Unit, onDismiss: () -> Unit, onDeckBuilder: (() -> Unit)? = null) {
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Panel) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 24.dp)) {
             Text("Choose your deck", color = SoftWhite, fontSize = 22.sp, fontWeight = FontWeight.Black)
@@ -309,6 +331,12 @@ fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick: (DeckCho
                 }
             }
             OutlinedButton(onClick = onImport, modifier = Modifier.fillMaxWidth().padding(top = 16.dp).heightIn(min = 52.dp)) { Text("Import a new deck", color = SoftWhite, fontWeight = FontWeight.Bold) }
+            // Developer builds only (DeckBuilderFlag): search the library and build or edit decks.
+            onDeckBuilder?.let { open ->
+                OutlinedButton(onClick = open, modifier = Modifier.fillMaxWidth().padding(top = 8.dp).heightIn(min = 52.dp).testTag("open-deck-builder")) {
+                    Text("Deck builder · developer preview", color = Mint, fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }

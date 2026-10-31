@@ -1,0 +1,3 @@
+# Python bytecode (the weekly upgrade builds its candidate from the checkout)
+__pycache__/
+*.pyc
