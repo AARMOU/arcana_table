@@ -695,7 +695,7 @@ export class GameRoom extends DurableObject<Env> {
           if (this.room?.goose !== g || g.detached || g.epoch !== epoch ||
               g.status !== 'playing' || g.expires <= Date.now() || !this.room.seats[0].online ||
               (g.inFlight && g.inFlight !== String(epoch))) return;
-          if (!g.inFlight) return; // watchdog or another request already resolved it
+          if (!g.inFlight && !g.model) return; // watchdog has already resolved it
           delete g.inFlight; delete g.fallback;
           g.model = false;
           g.reason = 'model-paused-free-fallback';
