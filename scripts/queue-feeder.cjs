@@ -1,4 +1,5 @@
 'use strict';
+const { oracleSnapshot } = require('./oracle-handoff.cjs');
 // Cardkit-backed Copilot queue feeder (issue #81).
 // Produces suggestions; in owner's existing normal auto mode it may create ONE unedited
 // Actions-bot issue. Paid assignment is still exclusively the separate guarded dispatcher.
@@ -118,8 +119,8 @@ const OUTCOME_TEXT = {
   implemented: 'Already in the game (Cardkit: implemented). No work needed.',
   claimed: 'Already being worked on',
   queued: 'Already queued; duplicate Copilot work not permitted.',
-  'engine-work': 'Needs engine work before Copilot can implement it; routed to GPT (no Copilot credits).',
-  'needs-review': 'Needs rules review before Copilot can implement it; routed to GPT (no Copilot credits).',
+  'engine-work': 'Needs engine work before Copilot can implement it; opened as prioritized engineering work.',
+  'needs-review': 'Needs rules review before Copilot can implement it; opened as prioritized review work.',
   unclassified: 'Cardkit could not classify this card in this pass; do not dispatch.',
 };
 function outcomeOf(v) {
@@ -352,6 +353,7 @@ function cardWorkBody(r, { runId, baseSha, base }) {
     ...(r.source === 'app'
       ? ['## App request', 'Requested in the app: **' + r.votes + '** opt-in vote(s) on #' + DEMAND_ISSUE + '. Priority after every owner request.', '']
       : ['## Owner request', 'Selected by the owner in #' + r.issue + '. That request stays open; do not close or edit it.', '']),
+    ...oracleSection(r),
     '## Priority', '`' + priorityLabel(r) + '`, score ' + priorityScore(r) + ' (owner requests first, then app votes). Any engineer takes the highest-scored open item: ' +
       'comment `CLAIM` here first. Unclaimed items are started automatically (see `' + LANE_LABEL(r) + '`).', '',
     '## Task (any engineer)',
@@ -377,20 +379,36 @@ const priorityScore = r => r.source === 'app' ? Math.min(999, Number(r.votes) ||
 const LANE_LABEL = r => r.outcome === 'engine-work' ? 'lane:engine' : 'lane:review';
 const cardWorkLabels = r => [priorityLabel(r), LANE_LABEL(r)];
 
+// The exact Scryfall record the trusted feeder classified (validated again here). An engineer or Copilot
+// session that cannot reach Scryfall reviews from this; an item without one is never auto-started.
+function oracleSection(r) {
+  let jsonl = null;
+  try { jsonl = r.oracle ? oracleSnapshot(r.oracle, r.name) : null; } catch { jsonl = null; }
+  return jsonl ? ['## Offline Oracle record (trusted feeder snapshot)', '', '    ' + jsonl, ''] : [];
+}
+const hasOracle = i => /^ {4}\{.*"oracle_text"/m.test(String(i.body || ''));
+const SUPERSEDED_PREFIX = '[Card Work superseded] ';
+const MAX_SUPERSEDE_PER_PASS = 2;
+
 // Pure decision: which card-work issue to open and which to close in this pass.
 function planCardWork(payload, botIssues = []) {
-  if (!payload?.ok || !payload.requestedClassified) return { create: null, close: [], reason: 'requested-cards-not-classified' };
+  if (!payload?.ok || !payload.requestedClassified) return { create: null, close: [], supersede: [], reason: 'requested-cards-not-classified' };
   const existing = botIssues.filter(isCardWork);
   const openWork = existing.filter(i => i.state === 'open');
   const resolved = new Set((payload.resolvedRequests || []).map(F.normName));
   const close = openWork.filter(i => resolved.has(F.normName(cardWorkName(i)))).slice(0, MAX_CLOSE_PER_PASS)
     .map(i => ({ issue: i.number, name: cardWorkName(i) }));
-  // One issue per card, ever: an existing open OR closed card-work issue means GPT already had it.
+  // Legacy items opened without an Oracle record or priority cannot be auto-started: retire them (renamed, so
+  // they no longer count as card work) and the next pass reopens the card with record, priority and labels.
+  const withOracle = new Map((payload.workRequests || []).filter(r => r.oracle).map(r => [F.normName(r.name), r]));
+  const supersede = openWork.filter(i => !hasOracle(i) && withOracle.has(F.normName(cardWorkName(i))) &&
+    !close.some(c => c.issue === i.number)).slice(0, MAX_SUPERSEDE_PER_PASS).map(i => ({ issue: i.number, name: cardWorkName(i) }));
+  // One issue per card, ever: an existing open OR closed card-work issue means an engineer already had it.
   const seen = new Set(existing.map(i => F.normName(cardWorkName(i))));
   const create = openWork.length - close.length >= MAX_OPEN_CARD_WORK ? null :
     [...(payload.workRequests || [])].sort((a, b) => priorityScore(b) - priorityScore(a))
       .find(r => !seen.has(F.normName(r.name)) && Number.isSafeInteger(r.issue)) || null;
-  return { create, close, reason: create ? null : openWork.length >= MAX_OPEN_CARD_WORK ? 'card-work-limit-reached' : 'no-new-card-work' };
+  return { create, close, supersede, reason: create ? null : openWork.length >= MAX_OPEN_CARD_WORK ? 'card-work-limit-reached' : 'no-new-card-work' };
 }
 
 async function syncCardWork({ github, owner, repo, payload, runId, enabled }) {
@@ -407,6 +425,15 @@ async function syncCardWork({ github, owner, repo, payload, runId, enabled }) {
       'Handing it back to the automatic Copilot queue; every dispatcher gate (Cardkit, CI, billing reserve, capacity) still applies.'].join('\n') });
     await github.rest.issues.update({ owner, repo, issue_number: c.issue, state: 'closed', state_reason: 'completed' });
     out.closed.push(c);
+  }
+  out.superseded = [];
+  for (const c of plan.supersede || []) {
+    await github.rest.issues.createComment({ owner, repo, issue_number: c.issue, body: [CARD_WORK_MARKER,
+      'Superseded (run ' + runId + '): **' + c.name + '** is reopened as a new card-work item that carries the trusted Oracle record, ' +
+      'priority and lane labels, so it can be started automatically. Continue any work there.'].join('\n') });
+    await github.rest.issues.update({ owner, repo, issue_number: c.issue, state: 'closed', state_reason: 'not_planned',
+      title: SUPERSEDED_PREFIX + c.name });
+    out.superseded.push(c);
   }
   if (plan.create) {
     const r = plan.create;
@@ -426,4 +453,4 @@ function needsSiteRefresh(previous, payload) {
 
 module.exports = { candidates, ownerSelections, ownerRequestCounts, requestedDeck, publicDemand, DEMAND_ISSUE, outcomeOf, newIssueUrl, queuePayload, queueSummary,
   chooseAutoQueue, createNextAutoQueue, planCardWork, syncCardWork, cardWorkTitle, cardWorkBody, needsSiteRefresh,
-  CARD_WORK_MARKER, CARD_WORK_PREFIX, priorityScore, priorityLabel, cardWorkLabels, isCardWork };
+  CARD_WORK_MARKER, CARD_WORK_PREFIX, SUPERSEDED_PREFIX, hasOracle, priorityScore, priorityLabel, cardWorkLabels, isCardWork };

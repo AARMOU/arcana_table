@@ -8,9 +8,20 @@ const F = require('./feasibility.cjs');
 
 // A certification-suite request (certification/suite-requests.cjs): test-only work on main.
 const isSuite = u => String(u?.raw?.title || '').startsWith(A.SUITE_TITLE);
-const actionableOf = (title, body, base) => String(title || '').startsWith(A.SUITE_TITLE) ? A.suiteActionable(body) : A.unitActionable(body, base);
+const isReview = u => String(u?.raw?.title || '').startsWith(A.CARD_WORK_TITLE) && String(u?.raw?.body || '').startsWith(A.CARD_WORK_MARKER + '\n');
+const actionableOf = (title, body, base) => String(title || '').startsWith(A.SUITE_TITLE) ? A.suiteActionable(body)
+  : String(title || '').startsWith(A.CARD_WORK_TITLE) ? A.reviewActionable(body) : A.unitActionable(body, base);
+// A card-work item is offered to engineers first: Copilot starts it only after REVIEW_GRACE_MS with no engineer
+// CLAIM in the last REVIEW_CLAIM_MS. Highest priority (owner requests, then app votes) first.
+const REVIEW_GRACE_MS = 2 * 60 * 60 * 1000;
+const REVIEW_CLAIM_MS = 24 * 60 * 60 * 1000;
+const reviewPriority = u => Number((String(u?.raw?.body || '').match(/priority:(\d{1,4})/) || [])[1]) || 0;
+const kindOf = u => isSuite(u) ? 'suite' : isReview(u) ? 'review' : 'card';
 // Suites need no Cardkit verdict: the card itself already passed Cardkit in its own PR.
 const SUITE_FEASIBLE = { ok: true, code: null, reason: null, cards: [] };
+// Reviews exist because Cardkit cannot clear the card yet; the session's output is a review record, not the card.
+const REVIEW_FEASIBLE = SUITE_FEASIBLE;
+const feasOf = (u, feasible) => isSuite(u) || isReview(u) ? SUITE_FEASIBLE : feasible(u);
 
 // Re-reads the issue right before the paid call so an edit, rename, new or edited comment, or a
 // body that no longer passes the readiness rules stops the assignment, even if it happened after
@@ -50,6 +61,17 @@ function suiteInstructions(n) {
   ].join(' ');
 }
 
+function reviewInstructions(n, base) {
+  return [
+    `Follow issue #${n}; it is your complete task: decide whether the one card it names can be built from existing engine primitives.`,
+    'Use only the Offline Oracle record in the issue as the card text (seed it into tools/cardkit/data/oracle-cache.jsonl with `tools/cardkit/cardkit oracle` only if needed locally).',
+    'Run `tools/cardkit/cardkit classify --verbose -- "<card>"`. For every rules line it reports below 0.88, find an implemented upstream or custom card using the same engine primitive and read its source.',
+    'If every such line is covered, record it with `tools/cardkit/cardkit review` (exact line, primitives, references) and commit tools/cardkit/data/verified-support.json plus the card\'s line in tools/cardkit/data/oracle-cache.jsonl, exactly as the issue record. If a primitive is genuinely missing, record it with `tools/cardkit/cardkit blocker` instead.',
+    'Change no other file: no card code, tests, workflows or scripts. Never guess: if you cannot decide, comment on the issue and do NOT open a pull request.',
+    `Open one draft pull request against ${base} with "Unit: #${n}" in its body. Never merge.`,
+  ].join(' ');
+}
+
 function unitInstructions(n, base) {
   return [
     `Follow the procedure and acceptance criteria in issue #${n}; it is your complete task.`,
@@ -61,14 +83,15 @@ function unitInstructions(n, base) {
   ].join(' ');
 }
 
-async function assignCopilot({ token, owner, repo, issue_number, base, suite = false, fetchImpl = fetch }) {
+async function assignCopilot({ token, owner, repo, issue_number, base, suite = false, kind = suite ? 'suite' : 'card', fetchImpl = fetch }) {
   if (!token) return 'error';
   const res = await fetchImpl(`https://api.github.com/repos/${owner}/${repo}/issues/${issue_number}/assignees`, {
     method: 'POST',
     headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json' },
     body: JSON.stringify({ assignees: ['copilot-swe-agent[bot]'], agent_assignment: {
-      target_repo: owner + '/' + repo, base_branch: suite ? A.SUITE_BASE : base,
-      custom_instructions: suite ? suiteInstructions(issue_number) : unitInstructions(issue_number, base),
+      target_repo: owner + '/' + repo, base_branch: kind === 'suite' ? A.SUITE_BASE : base,
+      custom_instructions: kind === 'suite' ? suiteInstructions(issue_number) : kind === 'review' ? reviewInstructions(issue_number, base)
+        : unitInstructions(issue_number, base),
       custom_agent: '', model: '' } }),
     signal: AbortSignal.timeout(20000),
   });
@@ -175,13 +198,18 @@ async function labelEngineGaps({ github, owner, repo, units, runId, now }) {
 const FEAS_CLASS = { 'no-cards': 'invalid', 'auto-override-prohibited': 'invalid', 'not-ready': 'blocked',
   'override-unauthorized': 'blocked', unavailable: 'transient', stale: 'transient' };
 function verdictOf(u, base, feasible, actionable = A.unitActionable) {
-  const suite = isSuite(u);
-  if (!suite && !u.raw.title.startsWith('[Arcana Queue]')) return { cls: 'invalid', reason: 'not-a-queue-issue' };
+  const suite = isSuite(u), review = isReview(u);
+  if (!suite && !review && !u.raw.title.startsWith('[Arcana Queue]')) return { cls: 'invalid', reason: 'not-a-queue-issue' };
   if (u.prs.length) return { cls: 'claimed', reason: 'has-open-pr ' + u.prs.map(p => '#' + p.number).join(',') };
   if (!u.derived.provenance?.ok) return { cls: 'provenance', reason: 'untrusted-origin: ' + (u.derived.provenance?.reasons || []).join(',') };
-  const act = suite ? A.suiteActionable(u.raw.body) : actionable(u.raw.body, base);
+  const act = suite ? A.suiteActionable(u.raw.body) : review ? A.reviewActionable(u.raw.body) : actionable(u.raw.body, base);
   if (!act.ok) return { cls: 'invalid', reason: 'not-actionable: ' + (act.missing || []).join(',') };
-  const feas = suite ? SUITE_FEASIBLE : feasible(u);
+  const feas = feasOf(u, feasible);
+  if (review) {
+    const now = Date.now();
+    if (Number.isFinite(u.raw.claimedAt) && now - u.raw.claimedAt < REVIEW_CLAIM_MS) return { cls: 'engineer-claimed', reason: 'engineer claimed within 24h' };
+    if (!Number.isFinite(u.raw.createdAt) || now - u.raw.createdAt < REVIEW_GRACE_MS) return { cls: 'waiting', reason: 'offered to engineers for 2h first' };
+  }
   // An unknown/missing code is treated as blocked: the approval is kept, never discarded.
   if (!feas.ok) return { cls: FEAS_CLASS[feas.code] || 'blocked', reason: 'feasibility: ' + (feas.reason || 'not Copilot-ready') };
   return { cls: 'eligible', reason: null };
@@ -191,6 +219,7 @@ const skipReason = (u, base, feasible, actionable) => verdictOf(u, base, feasibl
 // work already exists. Blocked, transient and provenance verdicts keep the owner's approval.
 const WITHDRAW = new Set(['invalid', 'claimed']);
 
+const RANK = { suite: 0, card: 1, review: 2 };
 function selectCandidate(allUnits, mode, base, feasible, actionable = A.unitActionable) {
   const labeled = allUnits.filter(u => u.raw.labels.includes(A.ONE_SHOT_LABEL));
   const verdict = u => u.derived.state === 'queued' ? verdictOf(u, base, feasible, actionable) : { cls: 'other', reason: null };
@@ -217,9 +246,10 @@ function selectCandidate(allUnits, mode, base, feasible, actionable = A.unitActi
     const unverified = ordered.find(u => verdict(u).cls !== 'blocked');
     if (unverified) return { candidate: unverified, labeled, error: null };
   }
-  // Suite requests go first: each one unblocks a finished card PR that is waiting for certification.
+  // Suite requests go first (each unblocks a finished card PR), then card builds, then reviews by priority
+  // (a review only produces future build supply).
   const candidate = allUnits.filter(u => u.derived.state === 'queued' && verdictOf(u, base, feasible, actionable).cls === 'eligible')
-    .sort((a, b) => isSuite(b) - isSuite(a) || a.raw.number - b.raw.number)[0];
+    .sort((a, b) => RANK[kindOf(a)] - RANK[kindOf(b)] || reviewPriority(b) - reviewPriority(a) || a.raw.number - b.raw.number)[0];
   return { candidate, labeled, error: null };
 }
 
@@ -314,7 +344,8 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   const n = candidate.raw.number;
   // authorize-once names its unit explicitly, so the gate denies instead of skipping.
   const suite = isSuite(candidate);
-  const feas = suite ? SUITE_FEASIBLE : feasible(candidate);
+  const kind = kindOf(candidate);
+  const feas = feasOf(candidate, feasible);
   const actionable = actionableOf(candidate.raw.title, candidate.raw.body, base);
   report.candidateFeasibility = { issue: n, ok: feas.ok, reason: feas.reason, cards: feas.cards.map(c => ({ name: c.name, readiness: c.readiness, route: c.route, hint: c.hint || null })) };
   // An incomplete unit is denied by admission with its own, more specific reason.
@@ -361,7 +392,7 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   if (claimed) result = 'not-attempted';
   else if (!origin.ok) { result = 'not-attempted'; reason = 'revalidation ' + origin.reasons.join(' '); }
   else {
-    try { result = await assignCopilot({ token: env.COPILOT_DISPATCH_TOKEN, owner, repo, issue_number: n, base, suite, fetchImpl }); }
+    try { result = await assignCopilot({ token: env.COPILOT_DISPATCH_TOKEN, owner, repo, issue_number: n, base, suite, kind, fetchImpl }); }
     catch { result = 'error'; }
   }
   // 4. Close the record. Missing this step is what the interrupted-attempt check catches.

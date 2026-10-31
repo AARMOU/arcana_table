@@ -1,7 +1,7 @@
 'use strict';
 // Loads work units from GitHub for admission control. All I/O lives here so that
 // admission.cjs stays pure. One unit = one queue (or Copilot-assigned) issue plus its PRs.
-const { parseLedger, deriveUnit, provenance, ONE_SHOT_LABEL, LEDGER, isBot, SUITE_TITLE, SUITE_MARKER, SUITE_BASE } = require('./admission.cjs');
+const { parseLedger, deriveUnit, provenance, ONE_SHOT_LABEL, LEDGER, isBot, SUITE_TITLE, SUITE_MARKER, SUITE_BASE, CARD_WORK_TITLE, CARD_WORK_MARKER } = require('./admission.cjs');
 const { overrideOf } = require('./feasibility.cjs');
 
 // writtenAt = created or last edited, whichever is later. Only the dispatcher's own ledger records
@@ -75,6 +75,15 @@ function connectedPrs(events) {
 
 // Only repository-authored suite requests are retained after closure. Do not use a time
 // cutoff: a PR can emit a late session start/finish without updating its closed issue.
+const isCardWork = i => !i.pull_request && isBot(i) &&
+  String(i.title || '').startsWith(CARD_WORK_TITLE) && String(i.body || '').startsWith(CARD_WORK_MARKER + '\n');
+// An engineer's claim on a card-work item: a trusted person's comment whose first word is CLAIM.
+const CLAIM_RE = /^\s*\**\s*CLAIM\b/i;
+function claimedAtOf(comments = []) {
+  const at = comments.filter(c => c.user?.type === 'User' && ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(c.author_association) &&
+    CLAIM_RE.test(String(c.body || ''))).map(c => Date.parse(c.created_at)).filter(Number.isFinite);
+  return at.length ? Math.max(...at) : null;
+}
 const isSuiteRequest = i => !i.pull_request && isBot(i) &&
   String(i.title || '').startsWith(SUITE_TITLE) && String(i.body || '').startsWith(SUITE_MARKER + '\n');
 const field = (body, name) => (String(body || '').match(new RegExp('^' + name + ': (\\S+)\\s*$', 'm')) || [])[1];
@@ -125,7 +134,7 @@ async function loadUnits({ github, owner, repo, now = Date.now(), approvers, lag
     { owner, repo, state: 'closed', creator: 'github-actions[bot]', per_page: 100 });
   const prs = await github.paginate(github.rest.pulls.list, { owner, repo, state: 'open', per_page: 100 });
   const unitIssues = open.filter(i => !i.pull_request &&
-    (String(i.title).startsWith('[Arcana Queue]') || String(i.title).startsWith(SUITE_TITLE) || (i.assignees || []).some(isCopilot)));
+    (String(i.title).startsWith('[Arcana Queue]') || String(i.title).startsWith(SUITE_TITLE) || isCardWork(i) || (i.assignees || []).some(isCopilot)));
   const seen = new Set(unitIssues.map(i => i.number));
   for (const issue of closed.filter(isSuiteRequest)) if (!seen.has(issue.number)) {
     seen.add(issue.number); unitIssues.push(issue);
@@ -183,6 +192,8 @@ async function loadUnits({ github, owner, repo, now = Date.now(), approvers, lag
       authorAssociation: issue.author_association, authorLogin: issue.user?.login,
       authorType: issue.user?.type, commenters: commentersOf(comments) };
     raw.engineGapEvidence = engineEvidenceOf(comments, owner, repo);
+    raw.createdAt = Date.parse(issue.created_at);
+    raw.claimedAt = claimedAtOf(comments);
     if (raw.authorLogin === 'github-actions[bot]' && raw.authorType === 'Bot') {
       // Comment and assignment timestamps do not constitute body edits.
       const writtenAt = await contentWrittenAt(github, owner, repo, issue.number);
@@ -197,4 +208,4 @@ async function loadUnits({ github, owner, repo, now = Date.now(), approvers, lag
   return { units, prsByUnit, numbers };
 }
 
-module.exports = { unitOf, loadUnits, isCopilot, contentWrittenAt, approvalOf, commentersOf, sessionsOf, engineEvidenceOf };
+module.exports = { unitOf, loadUnits, isCopilot, contentWrittenAt, approvalOf, commentersOf, sessionsOf, engineEvidenceOf, claimedAtOf, isCardWork };

@@ -126,6 +126,19 @@ jobs:
               fi
             fi
           done < names.txt
+      - name: Offline Oracle records for prioritized card work (trusted cache, read-only)
+        run: |
+          set -uo pipefail
+          mkdir -p work
+          node -e "const r=require('./pick.json');const Q=require('./ctl/scripts/queue-feeder.cjs');(r.workRequests||[]).slice().sort((a,b)=>Q.priorityScore(b)-Q.priorityScore(a)).slice(0,12).forEach((w,i)=>require('fs').writeFileSync('work/'+i+'.name',w.name));"
+          for f in work/*.name; do
+            [ -f "$f" ] || continue
+            k="${f%.name}"; name="$(cat "$f")"
+            (cd base && python3 -I tools/cardkit/cardkit.py oracle show -- "$name") > "$k.raw" 2>/dev/null || rm -f "$k.raw"
+            if [ -f "$k.raw" ] && ! node -e "const {oracleSnapshot}=require('./ctl/scripts/oracle-handoff.cjs');const fs=require('fs');fs.writeFileSync(process.argv[2],oracleSnapshot(fs.readFileSync(process.argv[1],'utf8'),process.argv[3]))" "$k.raw" "$k.jsonl" "$name"; then
+              echo "::warning::No verified Oracle record for card work $name; it will not be auto-started."
+            fi
+          done
       - id: pick
         name: Assemble suggestions (trusted main code)
         uses: actions/github-script@v7
@@ -135,7 +148,9 @@ jobs:
             const units=fs.readdirSync('units').filter(f=>f.endsWith('.name')).sort((a,b)=>parseInt(a)-parseInt(b)).map(f=>{
               const k=f.slice(0,-5),body=fs.existsSync('units/'+k+'.body')?fs.readFileSync('units/'+k+'.body','utf8'):null;
               return {name:fs.readFileSync('units/'+f,'utf8'),body,error:body?null:(fs.readFileSync('units/'+k+'.err','utf8').split('\n')[0]||'refused')};});
-            fs.writeFileSync('feeder-result.json',JSON.stringify({...r,units,baseSha:fs.readFileSync('base-sha.txt','utf8').trim()}));
+            const oracleFor=new Map((fs.existsSync('work')?fs.readdirSync('work'):[]).filter(f=>f.endsWith('.jsonl')).map(f=>[fs.readFileSync('work/'+f.slice(0,-6)+'.name','utf8'),fs.readFileSync('work/'+f,'utf8')]));
+            const workRequests=(r.workRequests||[]).map(w=>oracleFor.has(w.name)?{...w,oracle:oracleFor.get(w.name)}:w);
+            fs.writeFileSync('feeder-result.json',JSON.stringify({...r,workRequests,units,baseSha:fs.readFileSync('base-sha.txt','utf8').trim()}));
       - name: Upload feeder result for publishing
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
@@ -185,9 +200,11 @@ jobs:
             const previous=await S.previousStatus({github,...context.repo,kind:'queue'});
             const auto=await Q.createNextAutoQueue({github,...context.repo,payload,runId:context.runId,enabled});
             payload.autoQueue=auto;
-            // Blocked owner requests -> one [Card Work] issue for GPT; resolved ones handed back. Never paid.
+            // Blocked owner/app requests -> one prioritized [Card Work] item per pass; resolved ones handed back. Never paid here.
             try{payload.cardWork=await Q.syncCardWork({github,...context.repo,payload,runId:context.runId,enabled});}
             catch(e){payload.cardWork={reason:'card-work-sync-failed'};core.warning('Card work sync failed: '+e.message);}
+            // Oracle records live in the card-work issues; keep the status comment small.
+            payload.workRequests=(payload.workRequests||[]).map(({oracle,...w})=>({...w,oracle:!!oracle}));
             // Stay well under GitHub's 65,536-character comment limit.
             while(S.formatStatus('queue',payload,Q.queueSummary(payload)).length>60000&&payload.suggestions.length)payload={...payload,suggestions:payload.suggestions.slice(0,-1)};
             const published=await S.publishStatus({github,...context.repo,kind:'queue',payload,summary:Q.queueSummary(payload)});
