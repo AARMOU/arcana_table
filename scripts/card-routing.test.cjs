@@ -98,17 +98,24 @@ test('a waiting queue issue Copilot cannot take no longer freezes the automatic 
   assert.equal(Q.chooseAutoQueue(p, [stuckIssue, fine]).pendingIssue, 301);
 });
 
-test('a card whose earlier trusted queue issue closed without landing is held, not paid for again', () => {
+test('a card whose earlier trusted queue issue closed without landing is retried once, then held', () => {
   const r = Q.candidates({ gaps: PRECONS, openIssues: [] });
   const p = Q.queuePayload({ result: r, units: [{ name: 'Celestine, the Living Saint', body: unitBody('Celestine, the Living Saint') }], base: BASE, baseSha: SHA });
   const closedBot = { number: 340, user: BOT, author_association: 'NONE', state: 'closed',
     title: '[Arcana Queue] Celestine, the Living Saint — Cardkit SUPPORTED, unclaimed', body: A.AUTO_QUEUE_MARKER + '\n' + unitBody('Celestine, the Living Saint') };
-  const held = Q.chooseAutoQueue(p, [], [closedBot]);
+  // One closed attempt (e.g. closed on a blocker that was fixed since): one automatic retry, naming it.
+  const retry = Q.chooseAutoQueue(p, [], [closedBot]);
+  assert.equal(retry.suggestion.name, 'Celestine, the Living Saint');
+  assert.equal(retry.retryOf, 340);
+  assert.deepEqual(retry.held, []);
+  // Two closed attempts: held for the owner, never paid for a third time automatically.
+  const held = Q.chooseAutoQueue(p, [], [closedBot, { ...closedBot, number: 360 }]);
   assert.equal(held.suggestion, undefined);
-  assert.deepEqual(held.held, [{ name: 'Celestine, the Living Saint', issue: 340 }]);
+  assert.deepEqual(held.held, [{ name: 'Celestine, the Living Saint', issue: 360 }]);
   // An outsider's closed lookalike cannot block a card.
   const outsider = { ...closedBot, user: { login: 'x', type: 'User' }, body: unitBody('Celestine, the Living Saint') };
-  assert.equal(Q.chooseAutoQueue(p, [], [outsider]).suggestion.name, 'Celestine, the Living Saint');
+  const o = Q.chooseAutoQueue(p, [], [outsider, { ...outsider, number: 361 }]);
+  assert.equal(o.suggestion.name, 'Celestine, the Living Saint'); assert.equal(o.retryOf, undefined);
 });
 
 const workPayload = (requests, resolved = []) => ({ ok: true, requestedClassified: true, base: BASE, baseSha: SHA,
