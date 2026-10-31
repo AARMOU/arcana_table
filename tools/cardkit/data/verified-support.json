@@ -209,6 +209,38 @@
       "baseSha": "f27e2c6caf19296dd83e871b690dadcd89bfe04c",
       "oracleHash": "62ed74687ea9a962573a422fb6e7721af53c3fe2510b2ee1c0955f1225ba6152",
       "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Hellkite Tyrant": {
+      "summary": "Combat-damage recipient is captured by Triggers.self.dealsCombatDamage(Recipient.AnyPlayer); GroupFilter(Artifact.controlledByTriggeringPlayer()) selects only that damaged player's artifacts, and GainControl(Duration.Permanent) changes their controller without a turn limit. The upkeep win is an intervening-if trigger (checked at trigger and resolution) with YouControlAtLeast(20, Artifact) and WinGame. Four-player recipient isolation and 19/20-artifact boundary must be tested on implementation.",
+      "verifiedBy": "Goose, pinned SDK/source inspection 2026-10-31 (Argentum 7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/wwk/cards/HammerOfRuin.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/kld/cards/InventorsFair.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/blc/cards/SimicAscendancy.kt",
+        "docs/agents/generated/sdk-api.md"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Whenever this creature deals combat damage to a player, gain control of all artifacts that player controls.",
+          "primitives": [
+            "Triggers.self.dealsCombatDamage(Recipient.AnyPlayer)",
+            "GameObjectFilter.Artifact.controlledByTriggeringPlayer",
+            "Effects.ForEachInGroup",
+            "Effects.GainControl(Duration.Permanent)"
+          ]
+        },
+        {
+          "line": "At the beginning of your upkeep, if you control twenty or more artifacts, you win the game.",
+          "primitives": [
+            "Triggers.you.beginningOf(Step.UPKEEP)",
+            "interveningIf = Conditions.YouControlAtLeast(20, GameObjectFilter.Artifact)",
+            "Effects.WinGame"
+          ]
+        }
+      ],
+      "baseSha": "e26b0ef62fc510ede821afe09ab2fb26b271eb56",
+      "oracleHash": "7a26a5d6685d5aa302756f1e14213d5d1f95998e95f0fdedaa4dc4ac71106df0",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
     }
   }
 }
