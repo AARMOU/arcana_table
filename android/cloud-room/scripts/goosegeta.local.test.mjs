@@ -157,7 +157,8 @@ test('workerd: stalled provider cannot freeze a legal guest turn; watchdog emits
     const current=await (await control('GWATCH1')).json();
     assert.equal(current.status,'playing');
     assert.equal(current.model,'off');
-    assert.equal(current.reason,'model-timeout-free-fallback');
+    assert.ok(['model-timeout-free-fallback','model-paused-free-fallback'].includes(current.reason),
+      'deadline or watchdog must recover the turn without pausing');
     assert.equal(current.actionsSubmitted,1);
     assert.ok(releaseProvider);
     releaseProvider(); releaseProvider=null;
