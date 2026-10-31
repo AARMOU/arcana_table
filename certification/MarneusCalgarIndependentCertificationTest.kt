@@ -5,9 +5,12 @@ package com.arcanatable.customcards
 // Chapter Master — {6}: Create two 2/2 white Astartes Warrior creature tokens with vigilance.
 import com.arcanatable.customcards.cards.MarneusCalgar
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.CastSpell
+import com.wingedsheep.engine.core.PaymentStrategy
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
+import com.wingedsheep.sdk.scripting.AdditionalCostPayment
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -67,7 +70,8 @@ class MarneusCalgarIndependentCertificationTest {
         tokens.forEach { token ->
             assertEquals(2, d.projected.getPower(token))
             assertEquals(2, d.projected.getToughness(token))
-            assertEquals(setOf(Color.WHITE), d.projected.getColors(token))
+            assertEquals(1, d.projected.getColors(token).size)
+            assertTrue(d.projected.hasColor(token, Color.WHITE))
             assertTrue(d.projected.hasSubtype(token, "ASTARTES"))
             assertTrue(d.projected.hasSubtype(token, "WARRIOR"))
             assertTrue(d.projected.hasKeyword(token, Keyword.VIGILANCE))
@@ -104,20 +108,26 @@ class MarneusCalgarIndependentCertificationTest {
 
     @Test
     fun tokensEnteringUnderAnOpponentsControlDoNotTriggerMasterTactician() {
-        val d = customScenario(MarneusCalgar, "Raise the Alarm")
+        val d = customScenario(MarneusCalgar, "Big Score", "Grizzly Bears")
         val player = d.player1
         val opponent = d.player2
         d.putCreatureOnBattlefield(player, "Marneus Calgar")
         val handBefore = d.getHandSize(player)
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
-        val raiseTheAlarm = d.putCardInHand(opponent, "Raise the Alarm")
-        d.giveMana(opponent, Color.WHITE)
-        d.giveColorlessMana(opponent, 1)
+        val bigScore = d.putCardInHand(opponent, "Big Score")
+        val fodder = d.putCardInHand(opponent, "Grizzly Bears")
+        d.giveMana(opponent, Color.RED)
+        d.giveColorlessMana(opponent, 3)
 
-        assertNull(d.castSpell(opponent, raiseTheAlarm).error)
+        assertNull(d.submit(CastSpell(
+            playerId = opponent,
+            cardId = bigScore,
+            additionalCostPayment = AdditionalCostPayment(discardedCards = listOf(fodder)),
+            paymentStrategy = PaymentStrategy.FromPool,
+        )).error)
         d.resolveAll()
 
-        assertEquals(2, d.permanentsNamed(opponent, "Soldier").size)
+        assertEquals(2, d.permanentsNamed(opponent, "Treasure").size)
         assertEquals("Only tokens controlled by Marneus's controller trigger the ability",
             handBefore, d.getHandSize(player))
     }
@@ -127,8 +137,8 @@ class MarneusCalgarIndependentCertificationTest {
         val d = customScenario(MarneusCalgar, "Grizzly Bears")
         val player = d.player1
         d.putCreatureOnBattlefield(player, "Marneus Calgar")
-        val handBefore = d.getHandSize(player)
         val bear = d.putCardInHand(player, "Grizzly Bears")
+        val handBeforeCast = d.getHandSize(player)
         d.giveMana(player, Color.GREEN)
         d.giveColorlessMana(player, 1)
 
@@ -137,6 +147,6 @@ class MarneusCalgarIndependentCertificationTest {
 
         assertTrue(d.permanentsNamed(player, "Grizzly Bears").isNotEmpty())
         assertEquals("A nontoken creature entering is not a token event",
-            handBefore - 1, d.getHandSize(player))
+            handBeforeCast - 1, d.getHandSize(player))
     }
 }
