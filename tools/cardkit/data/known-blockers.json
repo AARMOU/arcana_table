@@ -1,25 +1,10 @@
 {
   "_about": "Engine gaps recorded by earlier verified work. cardkit marks matching cards ENGINE_BLOCKED and routes them to Claude. Add an entry only with a source (issue, PR, doc) that reproduced the gap on the pinned engine; remove it when the primitive lands. 'verified': false = reported by a worker but not yet independently reproduced. 'patterns' match normalized rules text (card name → ~, numbers → n) so every card that needs the same missing primitive is classified the same way.",
   "cards": {
-    "Acolyte Hybrid": {
-      "reason": "needs the outcome of one specific Destroy (did it destroy that artifact?) to give its controller a draw; no effect-local destroy result",
-      "source": "#137 / #138 / #141 Priority A",
-      "verified": false
-    },
     "Arcane Lighthouse": {
       "reason": "until end of turn, opponents' creatures lose hexproof and shroud AND can't have either; only hexproof suppression exists",
       "source": "#134 / #135 / #141 Priority B",
       "verified": false
-    },
-    "Fortified Village": {
-      "reason": "as-enters reveal-from-hand replacement",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Furycalm Snarl": {
-      "reason": "as-enters reveal-from-hand replacement",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
     },
     "Alms Collector": {
       "reason": "replace only the extra cards of a multi-card draw and redistribute them",
@@ -71,6 +56,11 @@
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": false,
       "recheck": "Pinned upstream Emiel the Blessed implements exile-then-return with Effects.Move(…, Zone.EXILE) then Effects.Move(…, Zone.BATTLEFIELD), so the exile-and-return half appears available now; reproduce before relying on this entry or deleting it."
+    },
+    "Ezuri's Predation": {
+      "reason": "The pinned SDK has no primitive to pair each created token with a distinct creature from the iterated opponents' group for the required fights: Effects.CreateToken exposes created tokens as a collection, while Effects.Fight requires two explicit EffectTargets and no zip/captured-pair mapping is available.",
+      "source": "AARMOU/arcana_table#596; pinned Argentum 7fb073337e4389cfabe2ebf4c6416633a7fc63d2 SDK/API review plus source inspection of Ayula, Queen Among Bears and Longstalk Brawl (explicit fighter targets)",
+      "verified": true
     },
     "Determined Iteration": {
       "reason": "cannot give the populated token haste and schedule its sacrifice",
@@ -147,24 +137,10 @@
   },
   "patterns": [
     {
-      "name": "as-enters reveal from hand",
-      "regex": "as ~ enters, you may reveal an? .* card from your hand",
-      "reason": "as-enters reveal-from-hand replacement",
-      "source": "#141 Priority C (Port Town); CUSTOM_CARDS_HANDOFF.md (Fortified Village, Furycalm Snarl)",
-      "verified": false
-    },
-    {
       "name": "lose and can't have hexproof/shroud",
       "regex": "lose hexproof and shroud and can't have hexproof or shroud",
       "reason": "duration effect that removes hexproof/shroud and prevents gaining them",
       "source": "#141 Priority B (Arcane Lighthouse)",
-      "verified": false
-    },
-    {
-      "name": "outcome of a specific destroy",
-      "regex": "if (that|the) [^.]* (is|was) destroyed this way|if [^.]* destroyed this way, its controller",
-      "reason": "branching on whether one particular Destroy actually destroyed its target",
-      "source": "#141 Priority A (Acolyte Hybrid)",
       "verified": false
     }
   ]

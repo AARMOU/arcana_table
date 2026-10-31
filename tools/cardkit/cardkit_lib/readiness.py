@@ -115,6 +115,37 @@ def review_is_current(entry: dict, card: dict) -> bool:
             and entry.get("runtimeHash") is not None and entry["runtimeHash"] == review_runtime_hash())
 
 
+_TOKEN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+def restamp_review(entry: dict, card: dict | None, old_vocab: set, new_vocab: set, runtime: str | None) -> str:
+    """Engine upgrade: carry a review onto the new runtime only if nothing it relied on changed.
+    Returns 'current', 'restamped' (entry updated in place) or a reason it stays stale (the card then
+    needs a fresh review, which the feeder opens automatically). A review stays bound to the exact Oracle
+    record; a named SDK member that existed in the previous engine's index and is gone from the new one
+    means the engine changed under it. Tokens in neither index (parameter names, literals) are ignored."""
+    if not card:
+        return "no-oracle-record"
+    if not runtime:
+        return "no-runtime"
+    if review_is_current(entry, card):
+        return "current"
+    if entry.get("oracleHash") != review_oracle_hash(card):
+        return "oracle-changed"
+    if not (re.fullmatch(r"[a-f0-9]{40}", str(entry.get("baseSha", ""))) and entry.get("verifiedBy") and entry.get("references")
+            and isinstance(entry.get("runtimeHash"), str)):
+        return "incomplete-review"
+    removed = sorted({t for r in entry.get("reviewedLines", []) if isinstance(r, dict) for p in r.get("primitives", [])
+                      for t in _TOKEN.findall(str(p)) if (k := re.sub(r"[^a-z0-9]", "", t.casefold())) in old_vocab
+                      and k not in new_vocab})
+    if removed:
+        return "sdk-members-removed: " + ", ".join(removed)
+    entry.setdefault("restamps", []).append({"fromRuntimeHash": entry["runtimeHash"], "toRuntimeHash": runtime,
+                                             "check": "Oracle unchanged; no named SDK member removed by the upgrade"})
+    entry["runtimeHash"] = runtime
+    return "restamped"
+
+
 def _blocked_keyword(keyword: str) -> dict | None:
     kws = {k.casefold(): v for k, v in blockers().get("keywords", {}).items()}
     return kws.get(keyword.casefold())
