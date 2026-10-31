@@ -60,10 +60,17 @@ jobs:
         with:
           ref: main
           persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - name: Build exact-head review inbox and update issue 78
         uses: actions/github-script@v7
         with:
           script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const R = require('./scripts/review-inbox.cjs');
             const S = require('./scripts/control-status.cjs');
             const payload = await R.buildReviewInbox({github, ...context.repo});
@@ -81,3 +88,9 @@ jobs:
             try { core.info('Integration skips: ' + await require('./scripts/card-integration.cjs').reportIntegrationSkips({github, ...context.repo})); }
             catch (error) { core.warning('Integration skip report unavailable: ' + String(error?.message || error).slice(0, 200)); }
             if (result.startsWith('failed')) core.setFailed('Review inbox status publication failed: ' + result);
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}

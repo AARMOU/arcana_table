@@ -29,6 +29,12 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - id: merge
         uses: actions/github-script@v7
         env:
@@ -36,6 +42,7 @@ jobs:
           MERGE_TOKEN: ${{ secrets.ARCANA_SUITE_MERGE_TOKEN || secrets.COPILOT_DISPATCH_TOKEN }}
         with:
           script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const { mergeSuitePr } = require('./certification/suite-automerge.cjs');
             // github-script v7 exposes no getOctokit; build a second client from the same Octokit class.
             const writer = process.env.MERGE_TOKEN ? new github.constructor({ auth: process.env.MERGE_TOKEN }) : github;
@@ -54,6 +61,13 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const { backfill } = require('./fresh/certification/backfill.cjs');
             const r = await backfill({ github, ...context.repo, root: './fresh', scheduled: false, report: true });
             core.info(JSON.stringify(r));
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}

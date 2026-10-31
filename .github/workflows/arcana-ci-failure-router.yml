@@ -43,6 +43,12 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - uses: actions/github-script@v7
         env:
           COPILOT_BILLING_READ_TOKEN: ${{ secrets.COPILOT_BILLING_READ_TOKEN }}
@@ -59,6 +65,7 @@ jobs:
           ARCANA_BILLING_LAG_HOURS: ${{ vars.ARCANA_BILLING_LAG_HOURS }}
         with:
           script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const {readBudget}=require('./scripts/billing-monitor.cjs');
             const {runRouter}=require('./scripts/failure-routing.cjs');
             const {createCopilotDelivery}=require('./scripts/copilot-delivery.cjs');
@@ -71,4 +78,10 @@ jobs:
             if(outcomes.some(r=>r.state==='permission-blocked'))core.setFailed('PR comment permission missing; no retry issued.');
             if(outcomes.some(r=>r.state==='delivery-uncertain'))core.setFailed('Owner-authenticated Copilot handoff unconfirmed; attempt reserved; owner review required.');
             if(outcomes.some(r=>r.state==='observation-unavailable'))core.setFailed('GitHub observation write unavailable; other PRs were still reconciled; no write retried.');
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
 

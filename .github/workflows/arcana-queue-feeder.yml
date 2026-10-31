@@ -56,10 +56,17 @@ jobs:
           ref: ${{ vars.ARCANA_INTEGRATION_BASE }}
           path: base
           persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - name: List owner-selected cards (trusted main code)
         uses: actions/github-script@v7
         with:
           script: |
+            try { require('./ctl/scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const {requestedDeck,publicDemand,DEMAND_ISSUE}=require('./ctl/scripts/queue-feeder.cjs');
             const openIssues=await github.paginate(github.rest.issues.listForRepo,{...context.repo,state:'open',per_page:100});
             // Public app demand (#321): votes only. Read failures just mean no reordering this pass.
@@ -93,6 +100,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            try { require('./ctl/scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const fs=require('fs');const {candidates}=require('./ctl/scripts/queue-feeder.cjs');
             const max=Math.min(5,Math.max(1,Number(context.payload.inputs?.max||3)||3));
             const openIssues=await github.paginate(github.rest.issues.listForRepo,{...context.repo,state:'open',per_page:100});
@@ -144,6 +152,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            try { require('./ctl/scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const fs=require('fs');const r=JSON.parse(fs.readFileSync('pick.json','utf8'));
             const units=fs.readdirSync('units').filter(f=>f.endsWith('.name')).sort((a,b)=>parseInt(a)-parseInt(b)).map(f=>{
               const k=f.slice(0,-5),body=fs.existsSync('units/'+k+'.body')?fs.readFileSync('units/'+k+'.body','utf8'):null;
@@ -158,6 +167,12 @@ jobs:
           path: feeder-result.json
           if-no-files-found: error
           retention-days: 1
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
   publish:
     needs: suggest
     if: >-
@@ -185,6 +200,12 @@ jobs:
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: arcana-queue-feeder-result
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - uses: actions/github-script@v7
         env:
           ARCANA_INTEGRATION_BASE: ${{ vars.ARCANA_INTEGRATION_BASE }}
@@ -192,6 +213,7 @@ jobs:
           ARCANA_DISPATCH_MODE: ${{ vars.ARCANA_DISPATCH_MODE }}
         with:
           script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const Q=require('./scripts/queue-feeder.cjs');const S=require('./scripts/control-status.cjs');
             let r=null;try{r=JSON.parse(require('fs').readFileSync('feeder-result.json','utf8'));}catch(e){core.warning('Feeder result unavailable: '+e.message);}
             const result=r||{ok:false,reason:'feeder job produced no result (see the suggest job)'};
@@ -224,3 +246,9 @@ jobs:
               try{await github.rest.actions.createWorkflowDispatch({...context.repo,workflow_id:'pages.yml',ref:'main'});core.info('Integration base moved; control site refresh requested.');}
               catch(e){core.warning('Control site refresh not requested: '+e.message);}
             }
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
