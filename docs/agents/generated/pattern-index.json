@@ -305,6 +305,17 @@
     }
    ]
   },
+  "Conditions.YouControlAtLeast": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Knuckles the Echidna",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KnucklesTheEchidna.kt",
+     "lines": 35,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KnucklesTheEchidnaScenarioTest.kt"
+    }
+   ]
+  },
   "Conditions.YouHaveCitysBlessing": {
    "count": 1,
    "examples": [
@@ -1786,8 +1797,14 @@
    ]
   },
   "Effects.CreateTreasure": {
-   "count": 4,
+   "count": 5,
    "examples": [
+    {
+     "card": "Knuckles the Echidna",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KnucklesTheEchidna.kt",
+     "lines": 35,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KnucklesTheEchidnaScenarioTest.kt"
+    },
     {
      "card": "Black Market Connections",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BlackMarketConnections.kt",
@@ -3018,6 +3035,17 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RewindScenarioTest.kt"
     }
    ]
+  },
+  "Effects.WinGame": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Knuckles the Echidna",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KnucklesTheEchidna.kt",
+     "lines": 35,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KnucklesTheEchidnaScenarioTest.kt"
+    }
+   ]
   }
  },
  "Keyword": {
@@ -3179,7 +3207,7 @@
    ]
   },
   "Keyword.DOUBLE_STRIKE": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -3192,6 +3220,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DeathleaperTerrorWeapon.kt",
      "lines": 31,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DeathleaperTerrorWeaponScenarioTest.kt"
+    },
+    {
+     "card": "Knuckles the Echidna",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KnucklesTheEchidna.kt",
+     "lines": 35,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KnucklesTheEchidnaScenarioTest.kt"
     },
     {
      "card": "Kratos, God of War",
@@ -3347,7 +3381,7 @@
    ]
   },
   "Keyword.HASTE": {
-   "count": 13,
+   "count": 14,
    "examples": [
     {
      "card": "Winged Hive Tyrant",
@@ -3380,10 +3414,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DeathleaperTerrorWeaponScenarioTest.kt"
     },
     {
-     "card": "Keeper of Secrets",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KeeperOfSecrets.kt",
-     "lines": 36,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KeeperOfSecretsScenarioTest.kt"
+     "card": "Knuckles the Echidna",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KnucklesTheEchidna.kt",
+     "lines": 35,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KnucklesTheEchidnaScenarioTest.kt"
     }
    ]
   },
@@ -3603,7 +3637,7 @@
    ]
   },
   "Keyword.TRAMPLE": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Atalan Jackal",
@@ -4093,6 +4127,17 @@
     }
    ]
   },
+  "Triggers.oneOrMore": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Knuckles the Echidna",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KnucklesTheEchidna.kt",
+     "lines": 35,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KnucklesTheEchidnaScenarioTest.kt"
+    }
+   ]
+  },
   "Triggers.or": {
    "count": 4,
    "examples": [
@@ -4435,7 +4480,7 @@
    ]
   },
   "Triggers.you.beginningOf": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -4468,10 +4513,10 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/InversionBehemothScenarioTest.kt"
     },
     {
-     "card": "Eldrazi Monument",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/EldraziMonument.kt",
-     "lines": 40,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EldraziMonumentScenarioTest.kt"
+     "card": "Knuckles the Echidna",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KnucklesTheEchidna.kt",
+     "lines": 35,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KnucklesTheEchidnaScenarioTest.kt"
     }
    ]
   },
@@ -4704,7 +4749,7 @@
    ]
   },
   "keywords()": {
-   "count": 95,
+   "count": 96,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4983,7 +5028,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 144,
+   "count": 145,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5108,7 +5153,7 @@
    ]
   },
   "interveningIf": {
-   "count": 13,
+   "count": 14,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -5129,6 +5174,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WakeningSunsAvatarScenarioTest.kt"
     },
     {
+     "card": "Knuckles the Echidna",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KnucklesTheEchidna.kt",
+     "lines": 35,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KnucklesTheEchidnaScenarioTest.kt"
+    },
+    {
      "card": "Gargoyle Flock",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GargoyleFlock.kt",
      "lines": 40,
@@ -5139,12 +5190,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Lictor.kt",
      "lines": 40,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LictorScenarioTest.kt"
-    },
-    {
-     "card": "Michelangelo, the Heart",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MichelangeloTheHeart.kt",
-     "lines": 41,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MichelangeloTheHeartScenarioTest.kt"
     }
    ]
   },
@@ -5794,13 +5839,19 @@
    ]
   },
   "Step.UPKEEP": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Awakening Zone",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AwakeningZone.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AwakeningZoneScenarioTest.kt"
+    },
+    {
+     "card": "Knuckles the Echidna",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KnucklesTheEchidna.kt",
+     "lines": 35,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KnucklesTheEchidnaScenarioTest.kt"
     },
     {
      "card": "Eldrazi Monument",
@@ -5825,12 +5876,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DefenseOfTheHeart.kt",
      "lines": 49,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DefenseOfTheHeartScenarioTest.kt"
-    },
-    {
-     "card": "Descendants' Path",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DescendantsPath.kt",
-     "lines": 90,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DescendantsPathScenarioTest.kt"
     }
    ]
   },
@@ -6821,7 +6866,7 @@
    ]
   },
   "GameObjectFilter.Artifact": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Copper Gnomes",
@@ -6834,6 +6879,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SurgeConductor.kt",
      "lines": 26,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SurgeConductorScenarioTest.kt"
+    },
+    {
+     "card": "Knuckles the Echidna",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KnucklesTheEchidna.kt",
+     "lines": 35,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KnucklesTheEchidnaScenarioTest.kt"
     },
     {
      "card": "Skorpekh Destroyer",
@@ -6852,12 +6903,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CanoptekSpyder.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CanoptekSpyderScenarioTest.kt"
-    },
-    {
-     "card": "Bag End Banquet",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BagEndBanquet.kt",
-     "lines": 41,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BagEndBanquetScenarioTest.kt"
     }
    ]
   },
@@ -6949,7 +6994,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 106,
+   "count": 107,
    "examples": [
     {
      "card": "Their Name Is Death",
