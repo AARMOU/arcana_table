@@ -1,0 +1,121 @@
+name: Arcana Review Refresh
+# Gets finished Copilot review PRs ([Card Work] items) to auto-merge without a person or a paid session: re-applies a
+# conflicted or out-of-date review's single-card Cardkit decision onto the current integration base (restamped onto
+# the adopted engine by Cardkit's own upgrade check), or re-runs Cardkit on one that is already current and green.
+# One PR per pass; Arcana Review Auto-merge still does every merge, with all of its checks. See
+# scripts/review-refresh.cjs and scripts/review_refresh.py.
+on:
+  workflow_run:
+    # A merge conflicts the other open reviews: refresh the next one straight away.
+    workflows: [Arcana Review Auto-merge]
+    types: [completed]
+  schedule:
+    - cron: '14,44 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: arcana-review-refresh
+  cancel-in-progress: false
+jobs:
+  refresh:
+    if: vars.ARCANA_INTEGRATION_BASE != '' && vars.ARCANA_REVIEW_REFRESH != 'off'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
+      - name: Choose one review PR
+        id: plan
+        uses: actions/github-script@v7
+        env:
+          ARCANA_READ_TOKEN: ${{ secrets.ARCANA_READ_TOKEN }}
+          ARCANA_INTEGRATION_BASE: ${{ vars.ARCANA_INTEGRATION_BASE }}
+        with:
+          script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
+            const R = require('./scripts/review-refresh.cjs');
+            const { owner, repo } = context.repo;
+            const base = process.env.ARCANA_INTEGRATION_BASE;
+            const baseSha = (await github.rest.repos.getBranch({ owner, repo, branch: base })).data.commit.sha;
+            const records = await R.gather({ github, owner, repo, base, baseSha });
+            const p = R.plan(records, baseSha);
+            core.info(JSON.stringify(p));
+            await core.summary.addHeading('Review refresh plan').addCodeBlock(JSON.stringify({ baseSha, ...p }, null, 1)).write();
+            core.setOutput('action', p.action || '');
+            if (!p.action) return;
+            const r = records.find(x => x.pr.number === p.pr);
+            core.setOutput('pr', String(p.pr));
+            core.setOutput('run', String(p.run || ''));
+            core.setOutput('head_ref', r.pr.head.ref);
+            core.setOutput('head_sha', r.pr.head.sha);
+            core.setOutput('base_sha', baseSha);
+            if (p.action === 'rebuild') await R.prepare({ github, owner, repo, pr: r.pr, issue: r.issue, dir: process.env.RUNNER_TEMP + '/refresh' });
+      - name: Re-run Cardkit so auto-merge sees the reopened item
+        if: steps.plan.outputs.action == 'rerun'
+        env:
+          # Person token: a re-run started with GITHUB_TOKEN would not trigger Arcana Review Auto-merge.
+          GH_TOKEN: ${{ secrets.ARCANA_SUITE_MERGE_TOKEN || secrets.COPILOT_DISPATCH_TOKEN }}
+          RUN: ${{ steps.plan.outputs.run }}
+        run: gh api -X POST "repos/${{ github.repository }}/actions/runs/$RUN/rerun"
+      - name: Check out the integration base
+        if: steps.plan.outputs.action == 'rebuild'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.plan.outputs.base_sha }}
+          path: base
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Re-apply the review on the base and push it to the PR branch
+        if: steps.plan.outputs.action == 'rebuild'
+        env:
+          TOKEN: ${{ secrets.ARCANA_SUITE_MERGE_TOKEN || secrets.COPILOT_DISPATCH_TOKEN }}
+          PR: ${{ steps.plan.outputs.pr }}
+          HEAD_REF: ${{ steps.plan.outputs.head_ref }}
+          HEAD_SHA: ${{ steps.plan.outputs.head_sha }}
+          BASE_SHA: ${{ steps.plan.outputs.base_sha }}
+        run: |
+          set -euo pipefail
+          [ -n "$TOKEN" ] || { echo "::error::No person token: a push with GITHUB_TOKEN would not start Arcana Cardkit."; exit 1; }
+          dir="$RUNNER_TEMP/refresh"
+          prev=(); [ -f "$dir/previous-sdk.json" ] && prev=(--previous-sdk "$dir/previous-sdk.json")
+          set +e
+          out=$(python3 scripts/review_refresh.py --base-dir base --card "$(cat "$dir/card")" --oracle "$dir/oracle.json" \
+            --pr-files "$dir/files" "${prev[@]}"); rc=$?
+          set -e
+          echo "$out"; echo "### PR #$PR: $out" >> "$GITHUB_STEP_SUMMARY"
+          if [ $rc -ne 0 ]; then echo "::warning title=Review refresh refused #$PR::$out"; exit 0; fi
+          cd base
+          git add tools/cardkit/data
+          if git diff --cached --quiet; then echo "::notice::#$PR: the decision is already on the base; nothing to push."; exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          tree=$(git write-tree)
+          git -c "http.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)" \
+            fetch -q --depth 1 origin "$HEAD_SHA"
+          msg=$(printf 'Refresh review onto %s\n\nRe-applies this PR'"'"'s single-card Cardkit decision on the current integration base\n(scripts/review_refresh.py); Arcana Review Auto-merge validates it again.\n\n%s base=%s\n' \
+            "${BASE_SHA:0:8}" "Arcana-Review-Refresh:" "$BASE_SHA")
+          commit=$(git commit-tree "$tree" -p "$HEAD_SHA" -p "$BASE_SHA" -m "$msg")
+          # Fast-forward only: if Copilot pushed meanwhile, this is refused and the next pass starts over.
+          git -c "http.extraheader=AUTHORIZATION: basic $(printf 'x-access-token:%s' "$TOKEN" | base64 -w0)" \
+            push origin "$commit:refs/heads/$HEAD_REF"
+          echo "::notice title=Review refreshed::#$PR -> $commit on $BASE_SHA"
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
