@@ -17,9 +17,36 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Certification runs after every Cardkit/Development CI completion on any PR. Only a run that published a
+  # result can change the inbox; a full rebuild reads every open card PR (~150 calls) against the shared
+  # 1,000/hour GITHUB_TOKEN quota. A separate gate job lets Approved Card Integration (which runs on this
+  # workflow's completion) see whether the review job really ran, and skip its own ~150-call plan if not.
+  gate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      actions: read
+    outputs:
+      rebuild: ${{ steps.gate.outputs.rebuild }}
+    steps:
+      - id: gate
+        uses: actions/github-script@v7
+        with:
+          script: |
+            let rebuild = true;
+            if (context.eventName === 'workflow_run') {
+              const jobs = (await github.rest.actions.listJobsForWorkflowRun({...context.repo,
+                run_id: context.payload.workflow_run.id, per_page: 100})).data.jobs || [];
+              rebuild = jobs.some(j => j.name.startsWith('Publish exact-head') && j.conclusion && j.conclusion !== 'skipped');
+              if (!rebuild) core.info('Certification run published nothing; inbox rebuild skipped.');
+            }
+            core.setOutput('rebuild', rebuild ? 'true' : 'false');
+
   review:
     name: Publish independently verified card review status
-    if: github.ref == 'refs/heads/main'
+    needs: gate
+    if: needs.gate.outputs.rebuild == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     permissions:
@@ -37,17 +64,6 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            // Certification runs after every Cardkit/Development CI completion on any PR. Only a run
-            // that published a result can change the inbox; a full rebuild reads every open card PR
-            // (~150 calls) against the shared hourly API quota, so skip the rest.
-            if (context.eventName === 'workflow_run') {
-              const jobs = (await github.rest.actions.listJobsForWorkflowRun({...context.repo,
-                run_id: context.payload.workflow_run.id, per_page: 100})).data.jobs || [];
-              if (!jobs.some(j => j.name.startsWith('Publish exact-head') && j.conclusion && j.conclusion !== 'skipped')) {
-                core.info('Certification run published nothing; inbox rebuild skipped.');
-                return;
-              }
-            }
             const R = require('./scripts/review-inbox.cjs');
             const S = require('./scripts/control-status.cjs');
             const payload = await R.buildReviewInbox({github, ...context.repo});
