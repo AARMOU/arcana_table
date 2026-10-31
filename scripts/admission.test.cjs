@@ -319,14 +319,14 @@ test('dynamic capacity: up to 3 workers, lanes never take every slot, budget sca
   assert.match(A.admit({ op: 'repair', unit: review(66), units: [repairing(61), repairing(62)], ready: three, snapshot: normal, now: NOW }).reason, /repair slot occupied/);
   assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [repairing(61), repairing(62)], ready: three, snapshot: normal, now: NOW }).allowed, true);
   assert.match(A.admit({ op: 'assign', unit: queued(68), units: [working(1), working(2), repairing(61)], ready: three, snapshot: normal, now: NOW }).reason, /capacity: 3 of 3/);
-  // warn (50-75%) scales to 2: one build + one repair.
-  const warn = snap(900);
+  // warn (50-75%) keeps the full ceiling: two builds + one repair.
+  const warn = snap(800);
   assert.equal(A.budgetWithReservations({ snapshot: warn, active: 0, pendingRepairs: 0, candidate: 'assign', ready: three, now: NOW }).level, 'warn');
-  assert.match(A.admit({ op: 'assign', unit: queued(68), units: [working(1)], ready: three, snapshot: warn, now: NOW }).reason, /builder slot occupied by #1/);
-  assert.match(A.admit({ op: 'repair', unit: review(66), units: [working(1), repairing(61)], ready: three, snapshot: warn, now: NOW }).reason, /scaled to 2 of 3 for budget warn/);
+  assert.equal(A.admit({ op: 'assign', unit: queued(68), units: [working(1)], ready: three, snapshot: warn, now: NOW }).allowed, true);
+  assert.equal(A.admit({ op: 'repair', unit: review(66), units: [working(1), working(2)], ready: three, snapshot: warn, now: NOW }).allowed, true);
   // slow keeps the existing one-at-a-time rule.
   assert.match(A.admit({ op: 'assign', unit: queued(68), units: [working(1)], ready: three, snapshot: snap(1150), now: NOW }).reason, /slow/);
   assert.equal(A.scaledCapacity(3, 'normal'), 3); assert.equal(A.scaledCapacity(2, 'normal'), 2);
-  assert.equal(A.scaledCapacity(3, 'warn'), 2); assert.equal(A.scaledCapacity(3, 'slow'), 1);
+  assert.equal(A.scaledCapacity(3, 'warn'), 3); assert.equal(A.scaledCapacity(3, 'slow'), 1);
   assert.equal(A.scaledCapacity(3, 'paused'), 0); assert.equal(A.scaledCapacity(3, 'unknown'), 0);
 });
