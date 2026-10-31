@@ -22,6 +22,13 @@ const DEFAULT_FILE = path.join('.gh-etag-cache', 'cache.json.gz');
 const MAX_ENTRIES = 4000;
 const MAX_AGE_MS = 3 * 864e5;
 const MAX_BODY_BYTES = 2 * 1024 * 1024;
+// Only endpoints whose 304s proved reliable are cached: issues, pull requests and their comments, timelines,
+// reviews and files. Actions run/job lists, check runs, statuses, branches, refs and commits change state in
+// place and GitHub answered 304 with stale data for them (2026-10-31 16:23Z: the dispatcher saw no CI run for a
+// base head that had three successful ones, idled and started a duplicate). Those are always fetched fresh
+// (still through the read token, so they stay off the shared quota).
+const CACHEABLE = /^https:\/\/api\.github\.com\/repos\/[^/]+\/[^/]+\/(?:issues|pulls)(?:[/?]|$)/;
+const cacheable = url => CACHEABLE.test(url) && !/\/(?:check-runs|check-suites|status(?:es)?)(?:[/?]|$)/.test(url);
 
 function load(file) {
   try {
@@ -61,8 +68,17 @@ function install(github, { file = DEFAULT_FILE, core = null, now = () => Date.no
     const method = String(options.method || 'GET').toUpperCase();
     const headers = options.headers || {};
     if (method !== 'GET' || headers['if-none-match'] || headers['If-None-Match']) { stats.uncached++; return request(options); }
-    let key;
-    try { key = scope + keyOf(github.request.endpoint.parse(options)); } catch { stats.uncached++; return request(options); }
+    let key, parsed;
+    try { parsed = github.request.endpoint.parse(options); key = scope + keyOf(parsed); } catch { stats.uncached++; return request(options); }
+    if (!cacheable(parsed.url)) {
+      stats.uncached++;
+      if (!reader) return request(options);
+      try { return await reader.request(forReader(options)); } catch (error) {
+        if (![401, 403, 404].includes(Number(error?.status))) throw error;
+        stats.fallback++;
+        return request(options);
+      }
+    }
     const hit = touched[key] || previous[key];
     // before-after-hook binds this same options object for every wrapped hook (auth included), so the
     // header must be set on it in place; passing a new object to request() would be ignored.
@@ -115,4 +131,4 @@ function install(github, { file = DEFAULT_FILE, core = null, now = () => Date.no
   return api;
 }
 
-module.exports = { install, load, keyOf, DEFAULT_FILE };
+module.exports = { install, load, keyOf, cacheable, DEFAULT_FILE };
