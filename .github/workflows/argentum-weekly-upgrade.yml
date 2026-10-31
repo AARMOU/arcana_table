@@ -176,8 +176,15 @@ jobs:
             echo "::error title=Agent docs: $1::$(tail -5 "$RUNNER_TEMP/docs.log" | tr '\n' ' ' | cut -c1-900)"
             exit 1
           }
+          # Keep the previous engine's SDK index: reviews are re-bound only if no SDK member they name was removed.
+          cp docs/agents/generated/sdk-api.json "$RUNNER_TEMP/sdk-api.previous.json"
           python3 engine-upgrade/weekly.py docs argentum-engine 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "weekly.py docs"
           tools/cardkit/cardkit sdk-index 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "cardkit sdk-index"
+          # Reviews are bound to the engine JAR hash: carry the still-valid ones onto the new runtime
+          # (stale ones return to automatic card work). Older bases without the command skip it.
+          if tools/cardkit/cardkit restamp --help >/dev/null 2>&1; then
+            tools/cardkit/cardkit restamp --previous-sdk "$RUNNER_TEMP/sdk-api.previous.json" 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "cardkit restamp"
+          fi
           tools/cardkit/cardkit docs-check 2>&1 | tee "$RUNNER_TEMP/docs.log" || fail "cardkit docs-check"
           python3 -m unittest discover -s tools/cardkit/tests 2>&1 | tee "$RUNNER_TEMP/docs.log" || {
             grep -E '^(FAIL|ERROR):' "$RUNNER_TEMP/docs.log" | head -5 | while IFS= read -r l; do echo "::error title=Cardkit test::$l"; done
@@ -381,7 +388,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/candidate"
           git add -A argentum-patches engine-upgrade android/app/libs android/app/src/main/assets/argentum \
             docs/agents/generated/sdk-api.md docs/agents/generated/sdk-api.json docs/agents/argentum-upstream \
-            AGENTS.md docs/agents/CARD-WORKFLOW.md tools/cardkit/cardkit_lib/repo.py
+            AGENTS.md docs/agents/CARD-WORKFLOW.md tools/cardkit/cardkit_lib/repo.py tools/cardkit/data/verified-support.json
           git reset -q -- engine-upgrade/weekly engine-upgrade/patch-report.json
           git reset -q -- ':(glob)**/__pycache__/**'
           git diff --cached --binary > "$RUNNER_TEMP/candidate/candidate.patch"
