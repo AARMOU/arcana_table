@@ -341,7 +341,7 @@ test('periodic status refresh is bounded, read-only, visibility gated and coales
   assert.ok(!script.includes("fetch('/actions/workflows/"));
   assert.ok(!/method:\s*['"](?:POST|PUT|PATCH|DELETE)/.test(script));
   const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
-  assert.ok(sw.includes('arcana-control-shell-v16'));
+  assert.ok(sw.includes('arcana-control-shell-v17'));
 });
 
 test('rate-limited public edge falls back to read-only GitHub with a bounded per-path browser cache',async()=>{
