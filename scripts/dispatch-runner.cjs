@@ -14,6 +14,7 @@ const actionableOf = (title, body, base) => String(title || '').startsWith(A.SUI
   : String(title || '').startsWith(A.CARD_WORK_TITLE) ? A.reviewActionable(body) : A.unitActionable(body, base);
 // A card-work item is offered to engineers first: Copilot starts it only after REVIEW_GRACE_MS with no engineer
 // CLAIM in the last REVIEW_CLAIM_MS. Highest priority (owner requests, then app votes) first.
+const DEV_CI_WORKFLOW = 'arcana-development-ci.yml';
 const REVIEW_GRACE_MS = 2 * 60 * 60 * 1000;
 const REVIEW_CLAIM_MS = 24 * 60 * 60 * 1000;
 const reviewPriority = u => Number((String(u?.raw?.body || '').match(/priority:(\d{1,4})/) || [])[1]) || 0;
@@ -307,7 +308,16 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
         .slice(0, 5).map(r => ({ id: r.id, event: r.event, status: r.status, conclusion: r.conclusion }));
     } catch { ciRuns = null; }
     report.ciRuns = ciRuns;
-    return done('ci-not-ready', { base, baseSha });
+    // Merges made with an app/workflow token do not start CI, which used to stall every slot until someone ran
+    // it by hand. When the base head has NO Development CI run at all, start one (workflow_dispatch is allowed
+    // for GITHUB_TOKEN). Any existing run - queued, running or failed - is left alone: no loops, no retries.
+    if (!dry && Array.isArray(ciRuns) && ciRuns.length === 0) {
+      try {
+        await github.rest.actions.createWorkflowDispatch({ owner, repo, workflow_id: DEV_CI_WORKFLOW, ref: base });
+        report.ciStarted = true;
+      } catch (e) { report.ciStarted = false; core.warning('Could not start Arcana Development CI: ' + String(e?.message || e).slice(0, 200)); }
+    }
+    return done('ci-not-ready', { base, baseSha, ciStarted: report.ciStarted ?? null });
   }
 
   // Engine feasibility (Cardkit on this exact base SHA). Missing or stale verdicts fail closed.

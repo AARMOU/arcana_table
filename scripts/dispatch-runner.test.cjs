@@ -15,10 +15,10 @@ const ago = m => new Date(Date.now() - m * 60000).toISOString();
 // Default history: issue written 60 min ago, one-shot label applied by the owner 10 min ago.
 const labeledEvent = (m = 10) => ({ event: 'labeled', created_at: ago(m), label: { name: A.ONE_SHOT_LABEL }, actor: { login: 'AARMOU' } });
 
-function fake({ issues = [queue(68, [A.ONE_SHOT_LABEL])], ledger = {}, ci = true, removeFails = false, freshAssignees = [], report81 = [],
+function fake({ issues = [queue(68, [A.ONE_SHOT_LABEL])], ledger = {}, ci = true, otherCiRuns = [], removeFails = false, freshAssignees = [], report81 = [],
   timeline = n => (issues.find(i => i.number === n)?.labels || []).some(l => l.name === A.ONE_SHOT_LABEL) ? [labeledEvent()] : [],
   editedAt = () => ago(60), freshAssociation = 'OWNER' } = {}) {
-  const writes = [];
+  const writes = [], dispatches = [];
   const comments = n => n === 81 ? report81 : (ledger[n] || []);
   let graphqlCalls = 0;
   const github = {
@@ -33,10 +33,12 @@ function fake({ issues = [queue(68, [A.ONE_SHOT_LABEL])], ledger = {}, ci = true
       },
       pulls: { list: () => [] },
       repos: { getBranch: async () => ({ data: { commit: { sha: BASE_SHA } } }) },
-      actions: { listWorkflowRunsForRepo: () => ci ? [{ head_sha: BASE_SHA, name: 'Arcana Development CI', conclusion: 'success' }] : [] },
+      actions: { listWorkflowRunsForRepo: a => ci ? [{ head_sha: BASE_SHA, name: 'Arcana Development CI', conclusion: 'success' }]
+        : a.status === 'success' ? [] : otherCiRuns,
+        createWorkflowDispatch: async a => { dispatches.push(a); } },
     },
   };
-  return { github, writes };
+  return { github, writes, dispatches };
 }
 const ctx = { repo: { owner: 'AARMOU', repo: 'arcana_table' }, runId: 555 };
 const env = x => ({ ARCANA_AUTOMATION_READY: 'true', ARCANA_DISPATCH_MODE: 'authorize-once', ARCANA_REPAIR_MODE: 'off', ARCANA_INTEGRATION_BASE: BASE, COPILOT_DISPATCH_TOKEN: 't',
@@ -100,6 +102,23 @@ test('missing exact-base CI blocks before any budget read or write', async () =>
   const f = fake({ ci: false }); let budgetReads = 0;
   const r = await runDispatch({ github: f.github, context: ctx, core: core(), env: env(), readBudget: async () => { budgetReads++; return {}; } });
   assert.equal(r.state, 'ci-not-ready'); assert.equal(budgetReads, 0); assert.equal(f.writes.length, 0);
+});
+
+test('no CI run at all for the base head: the dispatcher starts Development CI once (never for an existing run)', async () => {
+  const none = fake({ ci: false });
+  const r = await runDispatch({ github: none.github, context: ctx, core: core(), env: env(), readBudget: async () => ({}) });
+  assert.equal(r.state, 'ci-not-ready'); assert.equal(r.ciStarted, true);
+  assert.equal(none.dispatches.length, 1);
+  assert.equal(none.dispatches[0].workflow_id, 'arcana-development-ci.yml');
+  assert.equal(none.dispatches[0].ref, env().ARCANA_INTEGRATION_BASE);
+  for (const run of [{ status: 'in_progress', conclusion: null }, { status: 'completed', conclusion: 'failure' }, { status: 'completed', conclusion: 'action_required' }]) {
+    const f = fake({ ci: false, otherCiRuns: [{ id: 9, head_sha: BASE_SHA, name: 'Arcana Development CI', ...run }] });
+    const r2 = await runDispatch({ github: f.github, context: ctx, core: core(), env: env(), readBudget: async () => ({}) });
+    assert.equal(r2.state, 'ci-not-ready'); assert.equal(f.dispatches.length, 0, JSON.stringify(run));
+  }
+  const dry = fake({ ci: false });
+  await runDispatch({ github: dry.github, context: ctx, core: core(), env: env({ ARCANA_DISPATCH_MODE: 'dry-run', ARCANA_AUTOMATION_READY: '' }), readBudget: async () => ({}) });
+  assert.equal(dry.dispatches.length, 0);
 });
 
 test('claim changed after authorization is recorded as not attempted', async () => {
