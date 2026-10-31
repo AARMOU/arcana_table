@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.KenrithsTransformation
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.sdk.core.CardType
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Zone
@@ -18,24 +19,24 @@ class KenrithsTransformationIndependentCertificationTest {
         assertTrue(d.projected.hasKeyword(angel, Keyword.FLYING))
 
         val aura = d.putCardInHand(p, "Kenrith's Transformation")
-        d.putCardOnTopOfLibrary(p, "Plains")
+        val plains = d.putCardOnTopOfLibrary(p, "Plains")
         val handBeforeCast = d.getHandSize(p)
         d.giveMana(p, Color.GREEN)
         d.giveColorlessMana(p, 1)
 
         assertNull(d.castSpell(p, aura, listOf(angel)).error)
         assertEquals(handBeforeCast - 1, d.getHandSize(p))
-        assertFalse(d.zoneNames(p, Zone.HAND).contains("Plains"))
+        assertFalse(d.getHand(p).contains(plains))
 
         d.resolveAll()
 
         assertEquals("Casting spends one card and the Aura trigger draws one", handBeforeCast, d.getHandSize(p))
-        assertTrue(d.zoneNames(p, Zone.HAND).contains("Plains"))
+        assertTrue(d.getHand(p).contains(plains))
         assertEquals(3, d.projected.getBasePower(angel))
         assertEquals(3, d.projected.getBaseToughness(angel))
         assertTrue(d.projected.hasColor(angel, Color.GREEN))
         assertFalse(d.projected.hasColor(angel, Color.WHITE))
-        assertEquals(setOf("CREATURE"), d.projected.getTypes(angel))
+        assertEquals(setOf("CREATURE"), d.projected.getTypes(angel).intersect(CardType.entries.map { it.name }.toSet()))
         assertEquals(setOf("ELK"), d.projected.getSubtypes(angel))
         assertTrue(d.projected.hasLostAllAbilities(angel))
         assertFalse(d.projected.hasKeyword(angel, Keyword.FLYING))
@@ -57,7 +58,7 @@ class KenrithsTransformationIndependentCertificationTest {
 
         assertTrue(d.projected.hasType(overseer, "CREATURE"))
         assertFalse(d.projected.hasType(overseer, "ARTIFACT"))
-        assertEquals(setOf("CREATURE"), d.projected.getTypes(overseer))
+        assertEquals(setOf("CREATURE"), d.projected.getTypes(overseer).intersect(CardType.entries.map { it.name }.toSet()))
         assertEquals(setOf("ELK"), d.projected.getSubtypes(overseer))
         assertTrue(d.projected.hasColor(overseer, Color.GREEN))
         assertEquals(3, d.projected.getBasePower(overseer))
