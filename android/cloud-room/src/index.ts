@@ -674,7 +674,7 @@ export class GameRoom extends DurableObject<Env> {
         try {
           const limit = Number(this.env.GOOSEGETA_GAME_TOKENS);
           const {body,reserve} = modelRequest(this.env.GOOSEGETA_MODEL,packet,options);
-          if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000000 || g.reservedTokens+reserve > limit) throw Error('game-budget');
+          if (!Number.isSafeInteger(limit) || limit < 1 || limit > 9000000 || g.reservedTokens+reserve > limit) throw Error('game-budget');
           g.reservedTokens += reserve; g.inFlight = String(epoch);
           // One fallback action is derived exclusively from the Android host's
           // offered candidates; no guessed target, illegal spell or hidden data.
@@ -737,7 +737,7 @@ export class GameRoom extends DurableObject<Env> {
       if (g.model) {
         const {body,reserve} = chatRequest(this.env.GOOSEGETA_MODEL, mode, trigger);
         const limit = Number(this.env.GOOSEGETA_GAME_TOKENS);
-        if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000000 || g.reservedTokens+reserve > limit) throw Error('game-budget');
+        if (!Number.isSafeInteger(limit) || limit < 1 || limit > 9000000 || g.reservedTokens+reserve > limit) throw Error('game-budget');
         g.reservedTokens += reserve;
         await this.save();
         const result = await this.env.GOOSE_BUDGET!.get(this.env.GOOSE_BUDGET!.idFromName('account-daily')).fetch('https://budget/decide',
