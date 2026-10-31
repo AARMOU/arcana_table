@@ -79,6 +79,34 @@ class LanConnectionServiceGuardTest {
         )
     }
 
+    @Test fun foregroundRecoveryOnlyForPausedRemoteArgentumGame() {
+        assertTrue(shouldResumePausedArgentumOnForeground(
+            true, true, false, ArgentumConnectionStatus.PAUSED))
+        assertFalse(shouldResumePausedArgentumOnForeground(
+            false, true, false, ArgentumConnectionStatus.PAUSED))
+        assertFalse(shouldResumePausedArgentumOnForeground(
+            true, false, false, ArgentumConnectionStatus.PAUSED))
+        assertFalse(shouldResumePausedArgentumOnForeground(
+            true, true, true, ArgentumConnectionStatus.PAUSED))
+        for (status in listOf(
+            ArgentumConnectionStatus.CONNECTED,
+            ArgentumConnectionStatus.CONNECTING,
+            ArgentumConnectionStatus.DISCONNECTED,
+            ArgentumConnectionStatus.REPLACED,
+        )) {
+            assertFalse(shouldResumePausedArgentumOnForeground(true, true, false, status))
+        }
+    }
+
+    @Test fun foregroundRecoveryEffectUsesSocketRetryAndNotNewSession() {
+        val branch = effects.substringAfter(
+            "LaunchedEffect(appInForeground, argentumStatus, argentumEnabled, argentumOffline)"
+        ).substringBefore("LaunchedEffect(argentumQueue)")
+        assertTrue(branch.contains("shouldResumePausedArgentumOnForeground("))
+        assertTrue(branch.contains("argentumSocket.retryNow()"))
+        assertFalse(branch.contains("argentumSocket.connect("))
+    }
+
     @Test fun guardStopsOnlyAfterLastGameEndsOrScreenActuallyDisposes() {
         val activeGuard = effects.substringAfter(
             "LaunchedEffect(keepGameConnectionActive)"
