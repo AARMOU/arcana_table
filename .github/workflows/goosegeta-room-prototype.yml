@@ -1,0 +1,63 @@
+name: Summon Goosegeta isolated checks (NO APK)
+on:
+  push:
+    branches:
+      - gpt/goosegeta-room-client-20261031
+      - gpt/summon-goosegeta-cloud-20261031
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  node-prototype:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check
+        run: |
+          node --check tools/goosegeta/logic.mjs
+          node --check tools/goosegeta/room-bot.mjs
+          node --check tools/goosegeta/room-bot.test.mjs
+          node --check tools/goosegeta/room-wire.test.mjs
+      - name: Run actual Node regression tests
+        run: node --test tools/goosegeta/*.test.mjs
+      - name: Verify guest decks against the actual packaged indexes
+        run: node tools/goosegeta/build-decks.mjs --check
+      - name: Install pinned Cloudflare local tools
+        working-directory: android/cloud-room
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Typecheck and run real local workerd tests (provider stub only)
+        run: |
+          npm --prefix android/cloud-room run typecheck
+          node --test android/cloud-room/scripts/goosegeta.local.test.mjs
+  android-source-no-apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Compile Android source and run strict deck, chat and relay tests (NO APK)
+        working-directory: android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
+            --tests 'com.arcanatable.GoosegetaStrictDeckTest' \
+            --tests 'com.arcanatable.ArgentumRoomChatTest' \
+            --tests 'com.arcanatable.MultiplayerLobby*Test' \
+            --tests 'com.arcanatable.RelayInboxTest'
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: summon-goosegeta-android-junit-no-apk
+          path: android/app/build/test-results/testDebugUnitTest/

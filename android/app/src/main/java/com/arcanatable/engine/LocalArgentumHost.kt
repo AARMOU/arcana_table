@@ -379,6 +379,10 @@ class LocalArgentumHost(
         applyUndoPolicy(processed.undoPolicy, action, current, from)
         state = result.state
         events += result.events
+        // Receipt is sent only after the real processor accepted and committed the action.
+        // It contains no hand, targets or card names and is ignored by older clients.
+        emitTo(from, JSONObject().put("type", "actionReceipt").put("accepted", true)
+            .put("interactionEpoch", epoch).put("actionType", message.getJSONObject("action").optString("type")))
         queueShockOffers(events)
         drive(events)
         sendState(events)

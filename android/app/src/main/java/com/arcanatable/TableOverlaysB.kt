@@ -928,10 +928,10 @@ internal fun TableController.TableOverlaysB() {
                 onDraft = { chatDraft = it }, onDismiss = { run { chatOpen = false } }, onSend = { run {
             val text = chatDraft.trim()
             if (text.isNotEmpty()) {
-                val speaker = if (onlineMode) localSeat else activePlayer
-                chatMessages = chatMessages + ChatMessage(players[speaker.coerceIn(players.indices)].name, text, formatClock(elapsedGameSeconds))
-                logAction(speaker, "sent a chat message")
-                chatDraft = ""
+                if (sendTableChat(text)) {
+                    logAction(if (onlineMode) localSeat else activePlayer, "sent a chat message")
+                    chatDraft = ""
+                } else message = "Chat was not sent. Check the room connection or shorten the message."
             }
                 } }
             )

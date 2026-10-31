@@ -1,6 +1,20 @@
 import { DurableObject } from "cloudflare:workers";
 
-interface Env {
+import { chatSettings, chatTrigger, cannedBanter, chatRequest } from '../../../tools/goosegeta/banter.mjs';
+import { candidates, freshSession, receive, publicStatus } from '../../../tools/goosegeta/session.mjs';
+import { modelRequest } from '../../../tools/goosegeta/model.mjs';
+import manifest from './goose-decks.json';
+import { pack, unpack } from './goose-wire.mjs';
+import { GooseBudget, type BudgetEnv } from './goose-budget';
+export { GooseBudget };
+
+type GooseSession = Omit<ReturnType<typeof freshSession>, "reason"> & { reason: string | null; chatMode: string; lastChatId?: number; lastChatMs?: number; chatCount?: number; chatPending?: boolean; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string };
+interface Env extends BudgetEnv {
+  GOOSEGETA_ENABLED?: string;
+  GOOSEGETA_CONTROL_KEY?: string;
+  GOOSEGETA_MODEL?: string;
+  GOOSEGETA_GAME_TOKENS?: string;
+  GOOSE_BUDGET?: DurableObjectNamespace<GooseBudget>;
   ROOMS: DurableObjectNamespace<GameRoom>;
 }
 
@@ -15,6 +29,8 @@ interface RoomRecord {
   state: RoomState;
   seats: Array<{ name: string; token: string; online: boolean; isComputer?: boolean; claimed?: boolean }>;
   relayMode?: boolean;
+  invite?: { hash: string; seat: number; expires: number };
+  goose?: GooseSession;
 }
 
 const json = (value: unknown, status = 200) => new Response(JSON.stringify(value), {
@@ -30,6 +46,14 @@ function roomCode(raw: string): string | null {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+    if (/^\/internal\/goosegeta\/[A-Za-z0-9]{6,8}$/.test(url.pathname)) {
+      // This route is usable only by the separately owner-authenticated Control Worker.
+      const key = env.GOOSEGETA_CONTROL_KEY;
+      if (env.GOOSEGETA_ENABLED !== 'true' || !key || key.length < 32 || request.headers.get('Authorization') !== 'Bearer ' + key)
+        return json({error:'goosegeta-disabled-or-unauthorized'}, 403);
+      const code = url.pathname.split('/').at(-1)!.toUpperCase();
+      return env.ROOMS.get(env.ROOMS.idFromName(code)).fetch(request);
+    }
     if (url.pathname === "/health") return json({ ok: true, service: "arcana-table-rooms", protocol: 1, relay: 1 });
     const match = url.pathname.match(/^\/room\/([A-Za-z0-9]{6,8})$/);
     if (!match) return json({ error: "Use /health or /room/{roomCode}." }, 404);
@@ -80,9 +104,11 @@ export class GameRoom extends DurableObject<Env> {
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
+    this.ctx.blockConcurrencyWhile(async () => { this.room = await this.ctx.storage.get<RoomRecord>(ROOM_KEY) ?? null; });
   }
 
   async fetch(request: Request): Promise<Response> {
+    if (new URL(request.url).pathname.startsWith('/internal/goosegeta/')) return this.controlGoose(request);
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") return json({ error: "WebSocket required." }, 426);
     const pair = new WebSocketPair();
     const client = pair[0];
@@ -103,6 +129,7 @@ export class GameRoom extends DurableObject<Env> {
     try { packet = JSON.parse(message) as Record<string, unknown>; }
     catch { this.send(socket, { type: "rejected", reason: "Message was not valid JSON." }); return; }
 
+    if (!packet || typeof packet !== 'object' || Array.isArray(packet)) { this.send(socket, {type:'rejected',reason:'Invalid packet.'}); return; }
     const attachment = (socket.deserializeAttachment() ?? { seat: -1, code: "", authenticated: false }) as { seat: number; code: string; authenticated: boolean };
     if (!attachment.authenticated) {
       await this.join(socket, packet, attachment.code);
@@ -119,7 +146,9 @@ export class GameRoom extends DurableObject<Env> {
         if (this.room.relayMode) this.send(socket, { type: "rejected", reason: "Snapshots are forbidden in directed Argentum rooms." });
         else await this.acceptSnapshot(seat, String(packet.payload ?? ""));
         break;
-      case "relay": this.directRelay(socket, seat, packet); break;
+      case "relay": await this.directRelay(socket, seat, packet); break;
+      case "goosegetaInvite": await this.inviteGoose(socket, seat, packet); break;
+      case "goosegetaMute": if (seat === 0 && this.room.goose) { this.room.goose.chatMode = 'muted'; await this.save(); } break;
       case "relayKick": this.kickRelayGuest(socket, seat, packet); break;
       case "relaySeats": await this.configureRelaySeats(socket, seat, packet); break;
       case "ready": this.setReady(socket, seat, packet); break;
@@ -133,6 +162,11 @@ export class GameRoom extends DurableObject<Env> {
   async webSocketError(socket: WebSocket): Promise<void> { await this.handleDisconnect(socket); }
 
   async alarm(): Promise<void> {
+    if (this.room?.goose && this.room.goose.expires <= Date.now()) {
+      await this.stopGoose();
+      return;
+    }
+    for (const socket of this.ctx.getWebSockets()) try { socket.close(4001, 'room expired'); } catch { /* closed */ }
     this.room = null;
     await this.ctx.storage.deleteAll();
   }
@@ -196,6 +230,7 @@ export class GameRoom extends DurableObject<Env> {
     if (seat < 0 || seat >= MAX_PLAYERS) { this.send(socket, { type: "rejected", reason: "This room already has four players." }); return; }
     while (this.room.seats.length <= seat) this.room.seats.push({ name: `PLAYER ${this.room.seats.length + 1}`, token: crypto.randomUUID(), online: false });
     const existing = this.room.seats[seat];
+    if (this.room.goose && seat !== this.room.goose.seat) this.room.goose.chatMode = 'muted';
     existing.name = name;
     existing.online = true;
     if (this.room.relayMode) existing.claimed = true;
@@ -211,7 +246,7 @@ export class GameRoom extends DurableObject<Env> {
   private async attach(socket: WebSocket, seat: number): Promise<void> {
     if (!this.room) return;
     socket.serializeAttachment({ seat, authenticated: true });
-    this.send(socket, { type: "welcome", seat, relay: 1, seatToken: this.room.seats[seat]?.token });
+    this.send(socket, { type: "welcome", seat, relay: 1, seatToken: this.room!.seats[seat]?.token });
     this.send(socket, { type: "state", payload: this.privateState(this.room.state, seat) });
   }
 
@@ -220,7 +255,7 @@ export class GameRoom extends DurableObject<Env> {
    * host, and only the host can send a hidden, masked engine view to a guest.
    * This packet is never written to Durable Object storage or room snapshots.
    */
-  private directRelay(socket: WebSocket, from: number, packet: Record<string, unknown>): void {
+  private async directRelay(socket: WebSocket, from: number, packet: Record<string, unknown>): Promise<void> {
     if (!this.room) return;
     const to = packet.to;
     const seq = packet.seq;
@@ -232,6 +267,10 @@ export class GameRoom extends DurableObject<Env> {
       this.send(socket, { type: "rejected", reason: "Invalid relay destination or data." });
       return;
     }
+    if (from === 0 && this.room.goose && this.room.goose.seat === to && this.room.goose.status !== 'stopped') {
+      await this.relayToGoose(Number(seq), data as string);
+      return;
+    }
     this.sendToSeat(Number(to), { type: "relay", from, seq, data });
   }
 
@@ -241,6 +280,10 @@ export class GameRoom extends DurableObject<Env> {
     if (!this.room || from !== 0 || !Number.isInteger(seat) ||
         Number(seat) < 1 || Number(seat) >= MAX_PLAYERS) {
       this.send(socket, { type: "rejected", reason: "Only the host may reject a guest." });
+      return;
+    }
+    if (this.room.goose && this.room.goose.seat === seat && !this.room.goose.detached) {
+      void this.stopGoose();
       return;
     }
     for (const peer of this.ctx.getWebSockets()) {
@@ -402,6 +445,7 @@ export class GameRoom extends DurableObject<Env> {
   }
 
   private async leave(socket: WebSocket, seat: number): Promise<void> {
+    socket.serializeAttachment({seat:-1,authenticated:false});
     await this.setOffline(seat);
     this.send(socket, { type: "left" });
     try { socket.close(1000, "left room"); } catch { /* already closed */ }
@@ -415,6 +459,7 @@ export class GameRoom extends DurableObject<Env> {
 
   private async setOffline(seat: number): Promise<void> {
     if (!this.room || !this.room.seats[seat] || !this.room.seats[seat].online) return;
+    if (seat === 0 && this.room.goose && this.room.goose.status !== 'stopped') await this.stopGoose();
     this.room.seats[seat].online = false;
     if (this.room.state.players[seat]) this.room.state.players[seat].isOnline = false;
     this.room.state.readyPlayers = this.room.state.readyPlayers.filter((item) => item !== seat);
@@ -479,9 +524,179 @@ export class GameRoom extends DurableObject<Env> {
     try { socket.send(JSON.stringify(packet)); } catch { /* disconnect handler will clean up */ }
   }
 
+  private async inviteGoose(socket: WebSocket, seat: number, packet: Record<string, unknown>): Promise<void> {
+    const target = Number(packet.seat);
+    const candidate = this.room?.seats[target];
+    if (this.env.GOOSEGETA_ENABLED !== 'true' || seat !== 0 || !this.room?.relayMode ||
+        !Number.isInteger(target) || target < 1 || target > 3 || !candidate ||
+        candidate.online || candidate.claimed || candidate.isComputer ||
+        (this.room.goose && this.room.goose.status !== 'stopped')) {
+      this.send(socket, {type:'goosegeta-invite',requestId:packet.requestId,error:'Choose an empty Friend seat; cloud guest may be disabled.'}); return;
+    }
+    const capability = crypto.randomUUID() + crypto.randomUUID();
+    this.room.invite = {hash:await passwordDigest(capability), seat:target, expires:Date.now()+120000};
+    await this.save();
+    this.send(socket, {type:'goosegeta-invite',requestId:packet.requestId,capability,seat:target,expires:this.room.invite.expires});
+  }
+
+  private async controlGoose(request: Request): Promise<Response> {
+    const key = this.env.GOOSEGETA_CONTROL_KEY;
+    if (this.env.GOOSEGETA_ENABLED !== 'true' || !key || key.length < 32 || request.headers.get('Authorization') !== 'Bearer '+key)
+      return json({error:'disabled-or-unauthorized'},403);
+    if (!this.room?.relayMode) return json({error:'no-directed-room'},409);
+    if (request.method === 'GET') return json(publicStatus(this.room.goose));
+    if (request.method !== 'POST') return json({error:'use-post'},405);
+    const raw = await request.text(); if (raw.length > 2048) return json({error:'too-large'},413);
+    let input: Record<string,unknown>;
+    try { input = JSON.parse(raw); } catch { return json({error:'bad-json'},400); }
+    if (!input || Array.isArray(input) || typeof input !== 'object') return json({error:'bad-json'},400);
+    if (input.action === 'chat') {
+      const g = this.room.goose;
+      if (!g || g.id !== input.sessionId || g.status === 'stopped') return json({error:'session-mismatch'},409);
+      g.chatMode = this.otherPeople() ? 'muted' : chatSettings(input.chatMode);
+      await this.save(); return json(publicStatus(g));
+    }
+    if (input.action === 'dismiss') {
+      // A stale browser cannot dismiss a newer game.
+      if (!this.room.goose || input.sessionId !== this.room.goose.id) return json({error:'session-mismatch'},409);
+      await this.stopGoose(); return json(publicStatus(this.room.goose));
+    }
+    if (input.action !== 'summon' || typeof input.capability !== 'string' || input.capability.length > 100 ||
+        typeof input.requestId !== 'string' || !/^[a-zA-Z0-9-]{16,80}$/.test(input.requestId)) return json({error:'bad-request'},400);
+    const hash = await passwordDigest(input.capability);
+    const existing = this.room.goose;
+    if (existing?.requestId === input.requestId && existing.usedInvite === hash) return json(publicStatus(existing));
+    if (existing && existing.status !== 'stopped') return json({error:'guest-already-active'},409);
+    const invite = this.room.invite;
+    if (!invite || invite.hash !== hash || invite.expires <= Date.now() || !this.room.seats[0].online)
+      return json({error:'host-invite-required'},403);
+    const seat = this.room.seats[invite.seat];
+    if (!seat || seat.online || seat.claimed || seat.isComputer) return json({error:'seat-unavailable'},409);
+    const deck = manifest.decks.find(d => d.id === input.deckId);
+    if (!deck) return json({error:'unknown-deck'},400);
+    // Runtime index is build-checked, but ANDROID performs final authoritative registry/deck validation.
+    const validated = deck;
+    if (input.model === true && (this.env.GOOSEGETA_OPENAI_ENABLED !== 'true' || !this.env.GOOSE_BUDGET))
+      return json({error:'model-disabled'},403);
+    const session = Object.assign(freshSession(crypto.randomUUID(), invite.seat, deck.id, Date.now()),
+      {model:input.model === true, requestId:input.requestId, usedInvite:hash, chatMode:this.otherPeople() ? 'muted' : chatSettings(input.chatMode)});
+    this.room.goose = session;
+    delete this.room.invite; // single use, reserved before any delivery
+    seat.online = true; seat.claimed = true; seat.name = 'GOOSEGETA';
+    this.room.state.players[session.seat] = {name:'GOOSEGETA',isOnline:true,deckLoaded:false};
+    await this.save(); this.broadcastState();
+    await this.sendGoose({type:'lanHello',name:'GOOSEGETA',commander:validated.commander,deck:validated.cards,strictDeck:true});
+    return json(publicStatus(session)); // 'joining', never falsely claim Android accepted.
+  }
+
+  private async sendGoose(packet: Record<string,unknown>): Promise<void> {
+    const g = this.room?.goose; if (!g || g.status === 'stopped') return;
+    const seq = ++g.seq;
+    await this.save(); // reserve sequence before emission, including across restart
+    const data = await pack({...packet,_relayLink:g.link});
+    if (this.room?.goose?.id !== g.id || g.status === 'stopped') return;
+    this.sendToSeat(0,{type:'relay',from:g.seat,seq,data});
+  }
+
+  private async relayToGoose(seq: number, data: string): Promise<void> {
+    const g = this.room?.goose; if (!g || g.status === 'stopped') return;
+    if (g.expires <= Date.now()) { await this.stopGoose(); return; }
+    try {
+      const packet = await unpack(data);
+      if (typeof packet._relayLink !== 'string' || !packet._relayLink) throw Error('host-link');
+      if (g.hostLink && g.hostLink !== packet._relayLink) {
+        g.reason = 'host-process-restarted';g.status = 'needs attention'; await this.save(); return; // host process restart needs a fresh invite/game
+      }
+      if (seq <= g.hostSeq) return;
+      g.hostLink = packet._relayLink; g.hostSeq = seq;
+      delete packet._relayLink;
+      const trigger = chatTrigger(g, packet, Date.now());
+      // Sideband work can await a provider concurrently; it cannot select or mutate an engine action.
+      if (trigger && packet.type === 'gameOver') await this.banter(g, trigger);
+      else if (trigger) this.ctx.waitUntil(this.banter(g, trigger));
+      if (packet.type === 'arcanaChat') { await this.save(); return; }
+      const oldEpoch = g.epoch;
+      const reply = receive(g,packet,Date.now());
+      if (g.status === 'stopped') { await this.stopGoose(); return; }
+      await this.save();
+      if (reply) await this.sendGoose(reply);
+      if (packet.type !== 'stateUpdate' || g.epoch === oldEpoch || g.status !== 'playing' || g.failures) return;
+      const playerId = g.seat === 1 ? 'offline-ai' : 'offline-ai-'+g.seat;
+      const options = candidates(packet,playerId);
+      if (!options.length) { g.reason = 'unsupported-decision-or-action'; g.status = 'needs attention'; await this.save(); return; }
+      const epoch = g.epoch; let selected = options[0];
+      if (g.model) {
+        try {
+          const limit = Number(this.env.GOOSEGETA_GAME_TOKENS);
+          const {body,reserve} = modelRequest(this.env.GOOSEGETA_MODEL,packet,options);
+          if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000000 || g.reservedTokens+reserve > limit) throw Error('game-budget');
+          g.reservedTokens += reserve;
+          await this.save();
+          const result = await this.env.GOOSE_BUDGET!.get(this.env.GOOSE_BUDGET!.idFromName('account-daily')).fetch('https://budget/decide',
+            {method:'POST',body:JSON.stringify({body,reserve,options})});
+          if (!result.ok) throw Error('model-paused');
+          const answer = await result.json() as {candidateId:string};
+          selected = options.find(o => o.id === answer.candidateId)!;
+          if (!selected) throw Error('model-output');
+        } catch { g.model = false; g.failures++; g.reason = 'model-paused-or-budget-limit'; g.status = 'needs attention'; await this.save(); return; }
+      }
+      // Dismiss, newer state, host departure or expiry during an async model call invalidates result.
+      if (this.room?.goose !== g || g.epoch !== epoch || g.status !== 'playing' || g.expires <= Date.now() || !this.room.seats[0].online) return;
+      g.actions++;
+      g.awaiting = {epoch,version:packet.stateVersion,type:selected.action.type} as any;
+      await this.sendGoose({type:'submitAction',action:selected.action,interactionEpoch:packet.interactionEpoch});
+    } catch { if (this.room?.goose === g && g.status !== 'stopped') { g.status = 'needs attention'; await this.save(); } }
+  }
+
+  private otherPeople(): boolean {
+    return this.room?.seats.some((seat,index) => index > 0 && index !== this.room?.goose?.seat && !seat.isComputer && (seat.online || seat.claimed)) ?? true;
+  }
+
+  private async banter(g: GooseSession, trigger: {kind:string;text:string}): Promise<void> {
+    if (g.chatMode === 'muted' || g.chatPending || g.status === 'stopped') return;
+    g.chatPending = true; g.lastChatMs = Date.now(); g.chatCount = (g.chatCount ?? 0)+1;
+    const mode = g.chatMode;
+    await this.save();
+    let text = cannedBanter(mode,trigger,g.chatCount);
+    try {
+      if (g.model) {
+        const {body,reserve} = chatRequest(this.env.GOOSEGETA_MODEL, mode, trigger);
+        const limit = Number(this.env.GOOSEGETA_GAME_TOKENS);
+        if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000000 || g.reservedTokens+reserve > limit) throw Error('game-budget');
+        g.reservedTokens += reserve;
+        await this.save();
+        const result = await this.env.GOOSE_BUDGET!.get(this.env.GOOSE_BUDGET!.idFromName('account-daily')).fetch('https://budget/decide',
+          {method:'POST',body:JSON.stringify({kind:'chat',body,reserve})});
+        if (!result.ok) throw Error('chat-paused');
+        text = (await result.json() as {text:string}).text;
+        if (typeof text !== 'string' || text.length > 300) throw Error('chat-output');
+      }
+      if (this.room?.goose === g && !g.detached && g.chatMode === mode && !this.otherPeople() && g.expires > Date.now())
+        await this.sendGoose({type:'arcanaChatSend',text}); // no author/seat fields: Android assigns identity and echoes
+    } catch { g.chatMode = 'muted'; g.reason = 'chat-paused-or-budget-limit'; }
+    finally { g.chatPending = false; if (this.room?.goose === g) await this.save(); }
+  }
+
+  private async stopGoose(): Promise<void> {
+    const room = this.room, g = room?.goose; if (!room || !g || g.detached) return;
+    g.detached = true;
+    g.status = 'stopped'; delete room.invite;
+    const seat = room.seats[g.seat];
+    // Keep private seat claimed until host's existing guestLeft/remove flow rotates it.
+    if (seat) { seat.online = false; seat.claimed = true; }
+    if (room.state.players[g.seat]) room.state.players[g.seat].isOnline = false;
+    room.state.readyPlayers = room.state.readyPlayers.filter(s => s !== g.seat);
+    const seq = ++g.seq;
+    await this.save();
+    const data = await pack({type:'arcanaBye',_relayLink:g.link});
+    this.sendToSeat(0,{type:'relay',from:g.seat,seq,data});
+    this.broadcastState();
+  }
+
   private async save(): Promise<void> {
     if (!this.room) return;
     await this.ctx.storage.put(ROOM_KEY, this.room);
-    await this.ctx.storage.setAlarm(Date.now() + ROOM_TTL_MS);
+    await this.ctx.storage.setAlarm(this.room.goose && this.room.goose.status !== 'stopped'
+      ? Math.min(this.room.goose.expires, Date.now() + ROOM_TTL_MS) : Date.now() + ROOM_TTL_MS);
   }
 }

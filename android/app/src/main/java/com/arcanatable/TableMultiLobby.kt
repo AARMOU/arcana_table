@@ -44,6 +44,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -138,6 +139,24 @@ internal fun TableController.MultiplayerLobbyScreen() {
                         hosting -> WifiAddressCard(wifiWaitingAddress, context)
                         online -> onlineCodeInput.takeIf { it.isNotBlank() }?.let {
                             Text("ROOM CODE · $it", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+
+                    // Experimental host approval only. Gameplay/Control still require separately approved deployments.
+                    if (BuildConfig.DEBUG && hosting && online) {
+                        val empty = seats.indexOfFirst { it.kind == "waiting" }
+                        if (empty > 0) OutlinedButton(onClick = {
+                            val host = wifiServer as? ArgentumCloudMultiHost
+                            if (host?.inviteGoose(empty) { capability, error -> scope.launch {
+                                if (wifiServer !== host) return@launch
+                                if (capability == null) message = error ?: "Invitation unavailable."
+                                else {
+                                    val url = "https://aarmou.github.io/arcana_table/control/#goose-invite=${host.code}.$capability"
+                                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+                                }
+                            } != true) message = "Wait for the room connection, then try again."
+                        }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                            Text("INVITE GOOSEGETA · TEST", color = Mint, fontWeight = FontWeight.Bold)
                         }
                     }
 

@@ -9,3 +9,16 @@ class_name = "GameRoom"
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["GameRoom"]
+
+# Dormant until separately authorized and configured.
+[vars]
+GOOSEGETA_ENABLED = "false"
+GOOSEGETA_OPENAI_ENABLED = "false"
+
+[[durable_objects.bindings]]
+name = "GOOSE_BUDGET"
+class_name = "GooseBudget"
+
+[[migrations]]
+tag = "v2-goose-budget"
+new_sqlite_classes = ["GooseBudget"]

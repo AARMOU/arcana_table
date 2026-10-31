@@ -207,8 +207,8 @@ internal fun TableController.TableMainLayout() {
                     DropdownMenuItem(text = { Text(if (turnTimerVisible) "Hide turn timer display" else "Show turn timer display") }, onClick = { turnTimerVisible = !turnTimerVisible; timerMenuOpen = false })
                 }
             }
-            // Argentum does not relay Arcana chat, so the chat entry point is hidden during Argentum games.
-            if (!argentumEnabled) Box(Modifier) {
+            // Sideband room chat works with Argentum over Wi-Fi and the directed online relay.
+            Box(Modifier) {
                 IconButton(onClick = { run { chatOpen = true; unreadChatCount = 0 } }, modifier = Modifier.size(44.dp)) {
                     Icon(Icons.Filled.Chat, "Open chat${if (unreadChatCount > 0) ", $unreadChatCount unread" else ""}", tint = if (unreadChatCount > 0) CounterGold else SoftWhite)
                 }

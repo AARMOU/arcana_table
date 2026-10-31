@@ -39,6 +39,28 @@ internal class ArgentumDirectedLink(
     var onPeerBack: (Int) -> Unit = {}
     var onPeerLeft: (Int) -> Unit = {}
 
+    @Volatile private var gooseInvite: Pair<String, (String?, String?) -> Unit>? = null
+
+    /** A one-use host approval for an empty Friend seat; never expose a reconnect token. */
+    fun muteGoose(): Boolean = isHost && ready && sendPacket(JSONObject().put("type", "goosegetaMute"))
+
+    @Synchronized fun inviteGoose(seat: Int, done: (String?, String?) -> Unit): Boolean {
+        if (!isHost || !ready || seat !in 1..3 || gooseInvite != null) return false
+        val id = java.util.UUID.randomUUID().toString()
+        gooseInvite = id to done
+        if (!sendPacket(JSONObject().put("type", "goosegetaInvite").put("seat", seat).put("requestId", id))) {
+            gooseInvite = null
+            return false
+        }
+        timer.schedule({
+            val pending = synchronized(this) {
+                gooseInvite?.takeIf { it.first == id }?.also { gooseInvite = null }
+            }
+            pending?.second?.invoke(null, "Cloud invitation unavailable. Check the approved test service and retry.")
+        }, 5, TimeUnit.SECONDS)
+        return true
+    }
+
     private val ended = AtomicBoolean(false)
     private val firstWelcome = AtomicBoolean(false)
     @Volatile private var socket: WebSocket? = null
@@ -98,6 +120,13 @@ internal class ArgentumDirectedLink(
 
     private fun handle(packet: JSONObject) {
         when (packet.optString("type")) {
+            "goosegeta-invite" -> {
+                val pending = synchronized(this) {
+                    gooseInvite?.takeIf { it.first == packet.optString("requestId") }?.also { gooseInvite = null }
+                } ?: return
+                val capability = packet.optString("capability").takeIf { it.length in 64..100 }
+                pending.second(capability, if (capability == null) packet.optString("error", "Invitation unavailable.") else null)
+            }
             "welcome" -> {
                 if (packet.optInt("relay") != 1) {
                     close()
@@ -372,6 +401,8 @@ internal class ArgentumCloudMultiHost(
         link.onClosed = { onFailed("The host could not reconnect to the online room.") }
     }
 
+    fun inviteGoose(seat: Int, done: (String?, String?) -> Unit): Boolean = link.inviteGoose(seat, done)
+    fun muteGoose(): Boolean = link.muteGoose()
     fun start() = link.connect()
     fun sendTo(id: EntityId, message: JSONObject): Boolean = seatNumber(id)?.let {
         if (friendKinds.getOrNull(it - 1) == "friend") link.sendTo(it, message) else false

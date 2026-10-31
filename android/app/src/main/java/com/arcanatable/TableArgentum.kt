@@ -307,6 +307,10 @@ internal fun TableController.togglePassToMyTurn() {
 // e.g. gameStarted + mulliganDecision arriving in one frame lost the first message.)
 internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
     argentumInbound = incoming
+    if (incoming.optString("type") == ArgentumRoomChat.DELIVERY) {
+        if (argentumEnabled && wifiRole in setOf("guest", "online-guest")) receiveRoomChat(incoming)
+        return // Sideband chat must never enter Argentum game-state handling.
+    }
     if (argentumEndPreviousRequested && incoming.optString("type") in setOf("connected", "reconnected")) {
         argentumEndPreviousRequested = false
         if (incoming.optString("context") == "game") argentumSocket.concede()

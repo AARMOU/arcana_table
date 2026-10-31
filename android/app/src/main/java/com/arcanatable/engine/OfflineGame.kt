@@ -179,15 +179,25 @@ object OfflineGameSetup {
      * host's [registry]; unsupported cards are left out and filled with basics, as offline. Null with
      * a reason when it can't be played (no commander, or this phone lacks the full library).
      */
-    fun lanSeat(library: OfflineCardLibrary, registry: CardRegistry, playerName: String, deckNames: List<String>, commander: String?): Pair<LocalSeat?, List<String>> {
+    fun lanSeat(library: OfflineCardLibrary, registry: CardRegistry, playerName: String, deckNames: List<String>, commander: String?, strict: Boolean = false): Pair<LocalSeat?, List<String>> {
         if (!library.isFullLibrary) return null to listOf("This build only has the Portal cards, so Wi-Fi games can't run.")
         val cmd = commander?.let(library::canonical) ?: return null to listOf(if (commander == null) "$playerName needs a Commander deck for Wi-Fi play." else "Argentum doesn't have $playerName's commander ($commander).")
         val list = argentumLibraryList(deckNames, cmd)
         val supported = list.mapNotNull(library::canonical)
         val missing = list.filter { library.canonical(it) == null }.distinct()
+        if (strict && (deckNames.size != 99 || supported.size != 99 || missing.isNotEmpty() ||
+                    deckNames.any { it.equals(cmd, ignoreCase = true) }))
+            return null to listOf("Goosegeta's exact 100-card deck is not supported by this host. No cards were replaced.")
         val toLoad = (supported + cmd).toSet().filter { registry.getCard(it) == null }.toSet()
         if (toLoad.isNotEmpty()) registry.register(library.load(toLoad))
         val identity = registry.getCard(cmd)?.colorIdentity.orEmpty()
+        if (strict) {
+            val repeatable = BASICS.values.toSet() + setOf("Wastes", "Hare Apparent")
+            if (registry.getCard(cmd) == null || supported.any { name ->
+                    registry.getCard(name)?.let { !identity.containsAll(it.colorIdentity) } ?: true
+                } || supported.groupingBy { it }.eachCount().any { (name, count) -> count > 1 && name !in repeatable })
+                return null to listOf("Goosegeta's exact deck fails host registry, color identity or singleton validation.")
+        }
         val basics = identity.mapNotNull(BASICS::get).ifEmpty { listOf("Wastes").filter { registry.getCard(it) != null }.ifEmpty { listOf("Plains") } }
         basics.filter { registry.getCard(it) == null }.toSet().takeIf { it.isNotEmpty() }?.let { registry.register(library.load(it)) }
         val filled = if (supported.size >= 99) supported.take(99) else supported + List(99 - supported.size) { basics[it % basics.size] }

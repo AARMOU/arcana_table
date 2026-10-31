@@ -33,6 +33,7 @@ internal fun TableController.startMultiWifiHost() {
     val friends = (1 until count).filter(wifiMultiFriendSlots::contains)
     if (friends.isEmpty()) { message = "Choose at least one friend seat."; return }
     recordDiagnostic("Multiplayer lobby host requested: Wi-Fi; seats=$count; friendSeats=${friends.size}", DiagnosticCategory.ACTION)
+    resetRoomChat()
     wifiMultiConfigOpen = false
     offlineStarting = true
     scope.launch {
@@ -63,7 +64,9 @@ internal fun TableController.startMultiWifiHost() {
                 onGuestMessage = { id, packet ->
                     if (packet.optString("type") == "lanReady") scope.launch {
                         if (wifiServer === server) markMultiGuestReady(room, id, packet.optBoolean("ready"))
-                    } else argentumSocket.runningLocalHost?.receive(packet, id)
+                    } else if (packet.optString("type") == ArgentumRoomChat.REQUEST) scope.launch {
+                        if (wifiServer === server) receiveRoomChatFromGuest(id, packet)
+                    } else if (packet.optString("type") != ArgentumRoomChat.DELIVERY) argentumSocket.runningLocalHost?.receive(packet, id)
                 },
                 onGuestLeft = { id -> scope.launch {
                     if (wifiServer === server) {
@@ -200,6 +203,7 @@ internal fun TableController.startMultiOnlineHost() {
     val friends = (1 until count).filter(wifiMultiFriendSlots::contains)
     if (friends.isEmpty()) { message = "Choose at least one friend seat."; return }
     recordDiagnostic("Multiplayer lobby host requested: internet; seats=$count; friendSeats=${friends.size}", DiagnosticCategory.ACTION)
+    resetRoomChat()
     wifiMultiConfigOpen = false
     offlineStarting = true
     scope.launch {
@@ -224,7 +228,9 @@ internal fun TableController.startMultiOnlineHost() {
                 onGuestMessage = { id, packet ->
                     if (packet.optString("type") == "lanReady") scope.launch {
                         if (wifiServer === host) markMultiGuestReady(room, id, packet.optBoolean("ready"))
-                    } else argentumSocket.runningLocalHost?.receive(packet, id)
+                    } else if (packet.optString("type") == ArgentumRoomChat.REQUEST) scope.launch {
+                        if (wifiServer === host) receiveRoomChatFromGuest(id, packet)
+                    } else if (packet.optString("type") != ArgentumRoomChat.DELIVERY) argentumSocket.runningLocalHost?.receive(packet, id)
                 },
                 onGuestLeft = { id -> scope.launch {
                     if (wifiServer === host) {
@@ -291,7 +297,7 @@ private suspend fun TableController.acceptMultiOnlineGuest(
     val commander = hello.optString("commander").takeUnless { it.isBlank() || it == "null" }
     val (seat, notes) = withContext(Dispatchers.IO) {
         com.arcanatable.engine.OfflineGameSetup.lanSeat(
-            offlineLibrary(), registry, guestName, cards, commander)
+            offlineLibrary(), registry, guestName, cards, commander, strict = hello.optBoolean("strictDeck"))
     }
     if (wifiServer !== host || wifiMultiLobby !== room) return
     if (seat == null || !room.seatGuestAt(id, seat)) {
@@ -301,7 +307,7 @@ private suspend fun TableController.acceptMultiOnlineGuest(
         return
     }
     host.sendTo(id, JSONObject().put("type", "lanSeat")
-        .put("seat", id.value).put("name", seat.name))
+        .put("seat", id.value).put("name", seat.name).put("strictDeck", hello.optBoolean("strictDeck")))
     notes.forEach { host.sendTo(id, JSONObject().put("type", "error")
         .put("code", "WIFI_NOTE").put("message", it)) }
     publishMultiLobby()
@@ -362,6 +368,7 @@ internal fun TableController.joinMultiOnlineGame(code: String) {
     val clean = ArgentumCloudLink.cleanCode(code)
     if (wifiConnecting || argentumEnabled || clean.length !in 6..8) return
     recordDiagnostic("Multiplayer lobby join requested: internet", DiagnosticCategory.ACTION)
+    resetRoomChat()
     wifiConnecting = true
     val (names, commander) = activeDeckCards()
     if (commander == null) {
@@ -450,6 +457,7 @@ internal fun TableController.joinWifiGame(address: String) {
     wifiConnecting = true
     argentumLastError = null
     recordDiagnostic("Wi-Fi: joining requested", DiagnosticCategory.ACTION)
+    resetRoomChat()
     scope.launch {
         val guest = ArgentumLanGuest()
         try {
