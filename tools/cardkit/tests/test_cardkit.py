@@ -237,7 +237,7 @@ class ReadinessTests(unittest.TestCase):
 
     def test_reviewed_line_makes_card_supported_only_for_exact_wording(self):
         v = readiness.classify("Ancient Stone Idol")
-        self.assertEqual((v["readiness"], v["route"], bool(v.get("verifiedSupport"))), ("SUPPORTED", "copilot", True), v["reasons"])
+        self.assertEqual((v["readiness"], v["route"], v.get("reviewed")), ("SUPPORTED", "copilot", True), v["reasons"])
         entry = dict(readiness.verified_support()[repo.normalize_name("Ancient Stone Idol")])
         entry["reviewedLines"] = [{"line": "When this creature dies, create a 6/6 token.", "primitives": ["x"]}]
         with mock.patch.object(readiness, "verified_support", return_value={repo.normalize_name("Ancient Stone Idol"): entry}):
@@ -249,7 +249,7 @@ class ReadinessTests(unittest.TestCase):
     def test_dungrove_elder_forest_count_review_fails_closed_on_drift(self):
         # App request #321 / work unit #592: source readiness is NOT gameplay certification.
         v = readiness.classify("Dungrove Elder")
-        self.assertEqual((v["readiness"], v["route"], v.get("reviewed")),
+        self.assertEqual((v["readiness"], v["route"], bool(v.get("verifiedSupport"))),
                          ("SUPPORTED", "copilot", True), v["reasons"])
         entry = readiness.verified_support()[repo.normalize_name("Dungrove Elder")]
         self.assertEqual(len(entry["reviewedLines"]), 1)
