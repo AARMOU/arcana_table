@@ -1,0 +1,8 @@
+{
+  "key": "tangleweave-armor",
+  "name": "Tangleweave Armor",
+  "issue": 689,
+  "source": "certification/TangleweaveArmorIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.TangleweaveArmorIndependentCertificationTest",
+  "tests": 5
+}
