@@ -1,0 +1,29 @@
+name: Goosegeta test CI cleanup (stop stale hung simulations)
+on:
+  push:
+    branches: [gpt/goosegeta-one-shot-canary-20261031]
+    paths: ['.github/workflows/goosegeta-cleanup-stale-ci.yml']
+permissions:
+  actions: write
+  contents: read
+jobs:
+  stop-stale-no-network-races:
+    if: github.repository == 'AARMOU/arcana_table'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 3
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Cancel only five superseded simulator runs, never live deployments
+        shell: bash
+        run: |
+          set -euo pipefail
+          for id in 41232815190 41232875117 41232883249 41232999265 41233100233; do
+            status="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id" --jq '.status')"
+            if test "$status" = "in_progress" || test "$status" = "queued" || test "$status" = "pending"; then
+              gh api -X POST "repos/$GITHUB_REPOSITORY/actions/runs/$id/cancel" >/dev/null
+              echo "Stopped superseded no-network race run $id"
+            else
+              echo "Run $id already $status"
+            fi
+          done
