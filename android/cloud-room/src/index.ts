@@ -580,7 +580,12 @@ export class GameRoom extends DurableObject<Env> {
     let input: Record<string,unknown>;
     try { input = JSON.parse(raw); } catch { return json({error:'bad-json'},400); }
     if (!input || Array.isArray(input) || typeof input !== 'object') return json({error:'bad-json'},400);
-    if (input.action === 'chat') {
+    // The existing authenticated Control proxy permits the 'chat' verb and forwards
+    // chatMode. The reserved 'recover' value is an explicit recovery command, NOT a
+    // chat setting. It leaves both chat consent and paid-model selection unchanged.
+    const requestRecovery = input.action === 'recover' ||
+      (input.action === 'chat' && input.chatMode === 'recover');
+    if (input.action === 'chat' && !requestRecovery) {
       const g = this.room.goose;
       if (!g || g.id !== input.sessionId || g.status === 'stopped') return json({error:'session-mismatch'},409);
       // The existing Control checkbox explicitly requests paid-model opt-in on Apply
@@ -603,7 +608,7 @@ export class GameRoom extends DurableObject<Env> {
       g.chatMode = this.otherPeople() ? 'muted' : chatSettings(input.chatMode);
       await this.save(); return json(publicStatus(g));
     }
-    if (input.action === 'recover') {
+    if (requestRecovery) {
       // Explicit owner-only recovery of an unsupported decision. Ask the *existing*
       // Android host for a NEW authoritative snapshot; never invent a card, skip
       // a choice, or replay a stale action. Maximum twice per session.
