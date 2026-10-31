@@ -99,7 +99,7 @@ jobs:
           BASE=d7d4017e9dc0e4896f49d50342e437fc998f4970
           git merge-base --is-ancestor "$BASE" HEAD
           git diff --name-only "$BASE" HEAD | sort > /tmp/handoff-paths
-          printf '%s\n' '.github/workflows/goosegeta-room-prototype.yml' 'android/app/src/main/java/com/arcanatable/TableController.kt' 'android/app/src/main/java/com/arcanatable/TableEffects.kt' 'android/app/src/test/java/com/arcanatable/LanConnectionServiceGuardTest.kt' 'android/app/src/test/java/com/arcanatable/ui/ArgentumResilienceUiTest.kt' | sort > /tmp/allowed-paths
+          printf '%s\n' '.github/workflows/goosegeta-room-prototype.yml' 'android/app/build.gradle.kts' 'android/app/src/main/java/com/arcanatable/TableController.kt' 'android/app/src/main/java/com/arcanatable/TableEffects.kt' 'android/app/src/test/java/com/arcanatable/LanConnectionServiceGuardTest.kt' 'android/app/src/test/java/com/arcanatable/ui/ArgentumResilienceUiTest.kt' | sort > /tmp/allowed-paths
           diff -u /tmp/allowed-paths /tmp/handoff-paths
           for part in argentum-ai.jar argentum-mtg-sdk-tooling.jar argentum-mtg-sdk.jar argentum-rules-engine.jar; do
             p="android/app/libs/$part"
@@ -129,6 +129,24 @@ jobs:
           file.write_text(src.replace(old,new))
           print('Test-only endpoint confirmed; no source branch modification')
           PY
+      - name: Prefetch Robolectric Android 14 jar with Maven checksum for real reconnect UI test
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Robolectric's runtime MavenArtifactFetcher uses its own HTTP stack, not Gradle.
+          # Pin and verify the exact SDK 34 framework jar in a runner-local test-only dir.
+          version=14-robolectric-10818077-i7
+          jar="android-all-instrumented-${version}.jar"
+          url="https://repo.maven.apache.org/maven2/org/robolectric/android-all-instrumented/${version}/${jar}"
+          dest="$RUNNER_TEMP/arcana-robolectric"
+          mkdir -p "$dest"
+          curl --fail --location --retry 2 --connect-timeout 10 --max-time 240 --silent --show-error "$url" -o "$dest/$jar"
+          curl --fail --location --retry 2 --connect-timeout 10 --max-time 60 --silent --show-error "$url.sha1" -o "$dest/$jar.sha1"
+          expected="$(cut -c1-40 "$dest/$jar.sha1")"
+          actual="$(sha1sum "$dest/$jar" | awk '{print $1}')"
+          test -s "$dest/$jar"
+          test "$actual" = "$expected"
+          echo 'PASS: exact Robolectric SDK 34 instrumented jar verified against Maven checksum'
       - name: Run lifecycle guard regression and assemble isolated Android APK
         shell: bash
         working-directory: android
@@ -137,6 +155,7 @@ jobs:
           ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
             --tests 'com.arcanatable.LanConnectionServiceGuardTest' \
             --tests 'com.arcanatable.ui.ArgentumResilienceUiTest.unsupportedDecisionMalformedDataBackgroundPauseAndResume' \
+            -Parcana.robolectricJarDir="$RUNNER_TEMP/arcana-robolectric" \
             -Parcana.debugApplicationIdSuffix=.goosegetahandoff
           ./gradlew --no-daemon --max-workers=2 :app:assembleDebug \
             -Parcana.debugApplicationIdSuffix=.goosegetahandoff \
