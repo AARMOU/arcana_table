@@ -9,7 +9,7 @@ import { GooseBudget, type BudgetEnv } from './goose-budget';
 export { GooseBudget };
 
 type SafeFallback = { epoch: number; version: number; interactionEpoch: string; action: Record<string,unknown>; started: number };
-type GooseSession = Omit<ReturnType<typeof freshSession>, "reason"> & { reason: string | null; chatMode: string; lastChatId?: number; lastChatMs?: number; chatCount?: number; chatPending?: boolean; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string; fallback?: SafeFallback };
+type GooseSession = Omit<ReturnType<typeof freshSession>, "reason"> & { reason: string | null; chatMode: string; lastChatId?: number; lastChatMs?: number; lastBanterTurn?: number; chatCount?: number; chatPending?: boolean; chatFallbacks?: number; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string; fallback?: SafeFallback };
 interface Env extends BudgetEnv {
   GOOSEGETA_ENABLED?: string;
   GOOSEGETA_CONTROL_KEY?: string;
@@ -119,7 +119,7 @@ export class GameRoom extends DurableObject<Env> {
           g.reason = 'interrupted-model-free-fallback';
           if (!g.fallback) { g.status = 'needs attention'; g.reason = 'interrupted-model-missing-fallback'; }
         }
-        if (g.chatPending) { g.chatPending = false; g.chatMode = 'muted'; }
+        if (g.chatPending) { g.chatPending = false; /* Preserve owner's consent across a chat-only interruption. */ }
         await this.save();
       }
     });
@@ -727,9 +727,10 @@ export class GameRoom extends DurableObject<Env> {
     return this.room?.seats.some((seat,index) => index > 0 && index !== this.room?.goose?.seat && !seat.isComputer && (seat.online || seat.claimed)) ?? true;
   }
 
-  private async banter(g: GooseSession, trigger: {kind:string;text:string}): Promise<void> {
+  private async banter(g: GooseSession, trigger: {kind:string;text:string;turn?:number}): Promise<void> {
     if (g.chatMode === 'muted' || g.chatPending || g.status === 'stopped') return;
     g.chatPending = true; g.lastChatMs = Date.now(); g.chatCount = (g.chatCount ?? 0)+1;
+    if (trigger.kind === 'turn' && 'turn' in trigger && Number.isSafeInteger(trigger.turn)) g.lastBanterTurn = trigger.turn;
     const mode = g.chatMode;
     await this.save();
     let text = cannedBanter(mode,trigger,g.chatCount);
@@ -746,10 +747,15 @@ export class GameRoom extends DurableObject<Env> {
         text = (await result.json() as {text:string}).text;
         if (typeof text !== 'string' || text.length > 300) throw Error('chat-output');
       }
+    } catch {
+      // Paid chat is optional. On model errors, retain explicit chat consent and
+      // deliver the already-selected free taunt instead of silently muting forever.
+      g.chatFallbacks = (g.chatFallbacks ?? 0) + 1;
+    }
+    try {
       if (this.room?.goose === g && !g.detached && g.chatMode === mode && !this.otherPeople() && g.expires > Date.now())
-        await this.sendGoose({type:'arcanaChatSend',text}); // no author/seat fields: Android assigns identity and echoes
-    } catch { g.chatMode = 'muted'; g.reason = 'chat-paused-or-budget-limit'; }
-    finally { g.chatPending = false; if (this.room?.goose === g) await this.save(); }
+        await this.sendGoose({type:'arcanaChatSend',text}); // Android assigns author/seat, then echoes.
+    } finally { g.chatPending = false; if (this.room?.goose === g) await this.save(); }
   }
 
   private async stopGoose(): Promise<void> {

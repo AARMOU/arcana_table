@@ -28,3 +28,22 @@ test('gloats and salt derive only from host-confirmed casts and outcomes',()=>{
   assert.equal(chatTrigger(g,{type:'gameOver',reason:'OPPONENT_LOST'},20000).kind,'win');
   assert.match(cannedBanter('ruthless',{kind:'salt'},0),/HONK/);
 });
+
+test('fresh state updates prompt one taunt per turn; land receipts produce table talk',()=>{
+  const g=session();
+  const update=turn=>({type:'stateUpdate',interactive:true,state:{turnNumber:turn}});
+  assert.equal(chatTrigger(g,update(3),20000).kind,'turn');
+  g.lastBanterTurn=3;
+  assert.equal(chatTrigger(g,update(3),20000),null);
+  assert.equal(chatTrigger(g,{type:'actionReceipt',accepted:true,actionType:'PlayLand'},20000).kind,'develop');
+  assert.equal(chatTrigger(g,update(4),35000).turn,4);
+  assert.match(cannedBanter('ruthless',{kind:'turn'},0),/HONK/);
+  assert.match(cannedBanter('ruthless',{kind:'develop'},0),/HONK/);
+});
+test('GPT-6 Luna chat requests reserve usable output and never need reasoning',()=>{
+  const {body}=chatRequest('gpt-6-luna','ruthless',{kind:'turn',text:'Host-confirmed turn 3'});
+  assert.deepEqual(body.reasoning,{effort:'none'});
+  assert.equal(body.max_output_tokens,256);
+  assert.deepEqual(body.tools,[]);
+  assert.equal(body.store,false);
+});

@@ -115,6 +115,22 @@ test('workerd: authenticated chat echo, free ruthless HONK, duplicate suppressio
   assert.equal((await(await control('GCHAT1')).json()).chatMode,'muted');
   await control('GCHAT1',{action:'dismiss',sessionId:status.sessionId});await outgoing(h,'arcanaBye');
 });
+test('workerd: unsolicited turn honk survives a failed GPT chat reply without muting or stopping moves',async()=>{
+  const h=await setup('GCHAT3',['friend']);
+  const {status}=await summon('GCHAT3',h,{chatMode:'ruthless',model:true});await outgoing(h,'lanHello');
+  await game(h,{type:'lanSeat',strictDeck:true},1);await outgoing(h,'lanReady');
+  // Only one host-legal action => no strategic provider call. Chat provider fixture
+  // deliberately returns a decision JSON instead of chat JSON, proving free fallback.
+  await game(h,{...update(301),state:{turnNumber:1,cards:{}}},2);
+  const outputs=[await outgoing(h,'arcanaChatSend'),await outgoing(h,'submitAction')];
+  assert.match(outputs[0].text,/HONK/);
+  assert.equal(outputs[1].interactionEpoch,'offline-301');
+  const state=await (await control('GCHAT3')).json();
+  assert.equal(state.chatMode,'ruthless','chat inference failure cannot revoke explicit consent');
+  assert.equal(state.model,'opted in');
+  assert.equal(state.status,'playing');
+  await control('GCHAT3',{action:'dismiss',sessionId:status.sessionId});await outgoing(h,'arcanaBye');
+});
 test('workerd: a later human arrival revokes multiplayer banter consent',async()=>{
   const h=await setup('GCHAT2',['friend','friend']);const {status}=await summon('GCHAT2',h,{chatMode:'ruthless'});await outgoing(h,'lanHello');
   const other=await connect('GCHAT2','Second human',false);assert.equal(other.hello.seat,2);
