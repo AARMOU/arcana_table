@@ -107,3 +107,11 @@ test('host-rejected retry eligibility comes from the authenticated server, never
  await h.click('gooseRecover');assert.equal(JSON.parse(h.calls[2].body).action,'recover');
  assert.equal(h.nodes.get('gooseRecover').disabled,true);
 });
+
+test('scripted fallback and retained model-off reason are honest even after a host rejection',async()=>{
+ const h=harness([{status:200,data:{sessionId:'s',status:'needs attention',model:'off',
+ chatMode:'ruthless',banter:'fallback',reason:'host-rejected:stale-epoch',modelOffReason:'provider-or-budget'}}]);
+ h.nodes.get('gooseCode').value='GOOSE1';await h.click('gooseRefresh');
+ const shown=h.nodes.get('gooseStatus').textContent;
+ assert.match(shown,/scripted fallback/);assert.match(shown,/provider-or-budget/);assert.match(shown,/host-rejected/);
+});

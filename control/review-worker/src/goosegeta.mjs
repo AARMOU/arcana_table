@@ -23,7 +23,7 @@ export async function goosegeta(request, env) {
     // No upstream body, hand, capability or credentials may enter public UI/logs.
     if (!response.ok) return [response.status,{error:/^[a-z-]{1,80}$/.test(data.error) ? data.error:'room-unavailable'}];
     const out = {};
-    for (const key of ['sessionId','seat','deckId','status','actionsSubmitted','actionsAccepted','reason','chatMode','banter','observedTransitions','lastTurn','awaitingHost','reservedTokens','model','rejectionCategory','recoveryAvailable'])
+    for (const key of ['sessionId','seat','deckId','status','actionsSubmitted','actionsAccepted','reason','chatMode','banter','observedTransitions','lastTurn','awaitingHost','reservedTokens','model','rejectionCategory','recoveryAvailable','modelOffReason'])
       if (['string','number','boolean'].includes(typeof data[key]) || data[key] === null) out[key] = data[key];
     return [200,out];
   } catch { return [503,{error:'room-unavailable'}]; }

@@ -37,7 +37,8 @@
     $('gooseStatus').textContent = (data.status || 'unknown') + ' · model ' + (data.model || 'off') +
       (data.sessionId ? ' · moves sent '+(data.actionsSubmitted||0)+' · host accepted '+(data.actionsAccepted||0)+' · later host updates '+(data.observedTransitions||0)+
       ' · reserved tokens '+(data.reservedTokens||0) : '') +
-      ' · chat '+(data.chatMode||'muted')+' ('+(data.banter||'canned')+')' + (data.reason?' · '+data.reason:'') +
+      ' · chat '+(data.chatMode||'muted')+' ('+(data.model !== 'opted in' || ['fallback','canned'].includes(data.banter) ? 'scripted fallback' : data.banter || 'model-ready')+')' + (data.reason?' · '+data.reason:'') +
+      (data.modelOffReason ? ' · last model-off reason '+data.modelOffReason : '') +
       (data.awaitingHost ? ' · waiting for host response' : '');
   }
   async function call(action) {
