@@ -187,6 +187,182 @@
       "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
       "oracleHash": "20532c4d8ba4db7eb8e67ef214b505642d28245c301151341dc31dee8cfccb14",
       "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Tomb Fortress": {
+      "summary": "Costs.Composite(Mana, Tap, ExileSelf) and TimingRule.SorcerySpeed are listed in adopted sdk-api.md; use Pipeline mill(4), then gather FromZone(GRAVEYARD, You, Creature), gate after milling with Conditions.GraveyardContains(GameObjectFilter.Creature), chooseExactly(1), and move to battlefield. It does not target: select after milling, and never offer a decline when a creature is available. Broodheart Engine supplies the activation/timing shape; Ashcoat supplies post-mill graveyard collection/selection. Tests must cover a creature milled by this activation, no creatures, and instant-speed rejection.",
+      "verifiedBy": "GPT Work, pinned source and adopted SDK inspection 2026-10-30",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2025/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/dft/cards/BroodheartEngine.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/j22/cards/AshcoatOfTheShadowSwarm.kt",
+        "https://github.com/AARMOU/arcana_table/blob/5a8b51a92b8a43bae77631ae0b3b5d069eecd344/docs/agents/generated/sdk-api.md",
+        "https://github.com/AARMOU/arcana_table/blob/5a8b51a92b8a43bae77631ae0b3b5d069eecd344/docs/agents/argentum-upstream/card-sdk-language-reference.md"
+      ],
+      "reviewedLines": [
+        {
+          "line": "{2}{B}{B}{B}, {T}, Exile this land: Mill four cards, then return a creature card from your graveyard to the battlefield. Activate only as a sorcery.",
+          "primitives": [
+            "Costs.ExileSelf",
+            "TimingRule.SorcerySpeed",
+            "Effects.Pipeline",
+            "CardSource.FromZone",
+            "Effects.Move",
+            "chooseExactly",
+            "Conditions.GraveyardContains"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "ecab8759b87239771472b6bbca4de559b43147b405938a40ac88c38f8da661c7",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Past in Flames": {
+      "summary": "Pipeline gathers current instant/sorcery cards from your graveyard, then Effects.ForEachInCollection applies Effects.GrantFlashback(IterationEntity, cost=null, EndOfTurn). Snapcaster/Slickshot prove the default original-mana-cost grant; SDK docs list collection iteration and explain that granted flashback is read by enumerator, cast handler and stack resolver. Test two eligible cards, creature exclusion, cards entering the graveyard later, cleanup expiry and exile after resolution.",
+      "verifiedBy": "GPT Work, pinned source and adopted SDK inspection 2026-10-30",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/otj/cards/SlickshotLockpicker.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/isd/cards/SnapcasterMage.kt",
+        "https://github.com/AARMOU/arcana_table/blob/5a8b51a92b8a43bae77631ae0b3b5d069eecd344/docs/agents/generated/sdk-api.md",
+        "https://github.com/AARMOU/arcana_table/blob/5a8b51a92b8a43bae77631ae0b3b5d069eecd344/docs/agents/argentum-upstream/card-sdk-language-reference.md"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Each instant and sorcery card in your graveyard gains flashback until end of turn. The flashback cost is equal to its mana cost.",
+          "primitives": [
+            "CardSource.FromZone",
+            "Effects.ForEachInCollection",
+            "Effects.GrantFlashback",
+            "EffectTarget.IterationEntity"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "796c81b3b94866675df9705b69f6c6ce0e1d0ae576a568e8ad6428825782fd72",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Tzaangor Shaman": {
+      "summary": "Sword of Wealth and Power proves combat damage to player creates CopyNextSpellCast restricted to instant/sorcery; change attached-source trigger to Triggers.self.dealsCombatDamage(Recipient.AnyPlayer). Flamehold Grappler proves explicit spellFilter support. Test no copy from noncombat damage, ignore next permanent, consume on next instant/sorcery, retarget and end-of-turn expiry.",
+      "verifiedBy": "GPT Work, pinned source and adopted SDK inspection 2026-10-30",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/big/cards/SwordOfWealthAndPower.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2025/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/tdm/cards/FlameholdGrappler.kt",
+        "https://github.com/AARMOU/arcana_table/blob/5a8b51a92b8a43bae77631ae0b3b5d069eecd344/docs/agents/generated/sdk-api.md",
+        "https://github.com/AARMOU/arcana_table/blob/5a8b51a92b8a43bae77631ae0b3b5d069eecd344/docs/agents/argentum-upstream/card-sdk-language-reference.md"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Sorcerous Elixir — Whenever this creature deals combat damage to a player, copy the next instant or sorcery spell you cast this turn when you cast it. You may choose new targets for the copy.",
+          "primitives": [
+            "Triggers.self.dealsCombatDamage",
+            "Recipient.AnyPlayer",
+            "Effects.CopyNextSpellCast"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "ab55b1a4097a7428acbccffe9075fdc986ea446b1d7d009e44b39ce0feda6f55",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Kozilek's Return": {
+      "summary": "Cast trigger in Zone.GRAVEYARD, filter Creature.withSubtype(Eldrazi).manaValueAtLeast(7); optional IfYouDo(Move Self from GRAVEYARD to EXILE, ForEachInGroup(AllCreatures, DealDamage(5))). SDK documents triggerZone and IfYouDo Auto terminal-zone-move success; do not replace the cast trigger with an enters trigger or require resolution of the creature spell. Test declining exile, intervening removal from graveyard, countered creature still triggering, and threshold 6 vs 7.",
+      "verifiedBy": "GPT Work, pinned source and adopted SDK inspection 2026-10-30",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2025/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/spm/cards/AngryRabble.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2026/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/ecl/cards/EnragedFlamecaster.kt",
+        "https://github.com/AARMOU/arcana_table/blob/5a8b51a92b8a43bae77631ae0b3b5d069eecd344/docs/agents/generated/sdk-api.md",
+        "https://github.com/AARMOU/arcana_table/blob/5a8b51a92b8a43bae77631ae0b3b5d069eecd344/docs/agents/argentum-upstream/card-sdk-language-reference.md"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Whenever you cast an Eldrazi creature spell with mana value 7 or greater, you may exile this card from your graveyard. If you do, this card deals 5 damage to each creature.",
+          "primitives": [
+            "Triggers.you.casts",
+            "triggerZone = Zone.GRAVEYARD",
+            "Effects.IfYouDo",
+            "Effects.Move",
+            "Effects.ForEachInGroup",
+            "Effects.DealDamage"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "8eec80dab7f8a94eab43f2ffe340385082787667cb39888806ee6bcedf060c18",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Purestrain Genestealer": {
+      "summary": "Attack trigger optionally IfYouDo(RemoveCounters(+1/+1,1,Self), Patterns.Library.searchLibrary(BasicLand, BATTLEFIELD, entersTapped=true), successCriterion=CountersRemoved). SDK explicitly documents CountersRemoved and no payoff if source left or has no counter. Primeval Herald/Worldwagon prove search and shuffle. Test decline, zero counters, source removed before resolution, tapped land and shuffle.",
+      "verifiedBy": "GPT Work, pinned source and adopted SDK inspection 2026-10-30",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2025/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/dft/cards/LumberingWorldwagon.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/j22/cards/PrimevalHerald.kt",
+        "https://github.com/AARMOU/arcana_table/blob/5a8b51a92b8a43bae77631ae0b3b5d069eecd344/docs/agents/generated/sdk-api.md",
+        "https://github.com/AARMOU/arcana_table/blob/5a8b51a92b8a43bae77631ae0b3b5d069eecd344/docs/agents/argentum-upstream/card-sdk-language-reference.md"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Vanguard Species — Whenever this creature attacks, you may remove a +1/+1 counter from it. If you do, search your library for a basic land card, put it onto the battlefield tapped, then shuffle.",
+          "primitives": [
+            "Triggers.self.attacks",
+            "Effects.IfYouDo",
+            "Effects.RemoveCounters",
+            "SuccessCriterion.CountersRemoved",
+            "Patterns.Library.searchLibrary"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "9af113d90d88bfd3020ec62dbf1552dd3d6916ffa1ef76f145fc731492411ab0",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Exocrine": {
+      "summary": "Spiteful Banditry proves ETB DynamicAmounts.xValue damage; apply ForEachPlayer(Each, DealDamage(x)) and ForEachInGroup(Creature, excludeSelf=true, DealDamage(x)). Pestilence proves the combined creature/player iteration shape; SDK lists both iteration forms; preserve X chosen on cast, not current counters/power. Existing Ravenous primitive covers its matched keyword. Test X=0, multiple players, source excluded, other creatures included and Ravenous threshold.",
+      "verifiedBy": "GPT Work, pinned source and adopted SDK inspection 2026-10-30",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/ltr/cards/SpitefulBanditry.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/ala/cards/CalderaHellion.kt",
+        "https://github.com/AARMOU/arcana_table/blob/5a8b51a92b8a43bae77631ae0b3b5d069eecd344/docs/agents/generated/sdk-api.md",
+        "https://github.com/AARMOU/arcana_table/blob/5a8b51a92b8a43bae77631ae0b3b5d069eecd344/docs/agents/argentum-upstream/card-sdk-language-reference.md",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/1993-1999/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/lea/cards/Pestilence.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Bio-plasmic Barrage — When this creature enters, it deals X damage to each player and each other creature.",
+          "primitives": [
+            "Triggers.self.enters",
+            "DynamicAmounts.xValue",
+            "Effects.ForEachPlayer",
+            "Effects.ForEachInGroup",
+            "Effects.DealDamage"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "e2d367819a226ea61891f6b9b454e421cb2c068bd457e6044a590b23ec40e124",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Rishkar's Expertise": {
+      "summary": "Electrodominance and Founding the Third Path prove gather HAND, filter Nonland.manaValueAtMost(5), chooseUpTo(1), CastFromCollectionWithoutPayingCost. This is optional casting during resolution, after drawing; do not create a lingering permission. Test newly drawn eligible card, MV6 rejection, decline, land exclusion and additional-cost/target handling through normal cast path.",
+      "verifiedBy": "GPT Work, pinned source and adopted SDK inspection 2026-10-30",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/rna/cards/Electrodominance.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/dmu/cards/FoundingTheThirdPath.kt",
+        "https://github.com/AARMOU/arcana_table/blob/5a8b51a92b8a43bae77631ae0b3b5d069eecd344/docs/agents/generated/sdk-api.md",
+        "https://github.com/AARMOU/arcana_table/blob/5a8b51a92b8a43bae77631ae0b3b5d069eecd344/docs/agents/argentum-upstream/card-sdk-language-reference.md"
+      ],
+      "reviewedLines": [
+        {
+          "line": "You may cast a spell with mana value 5 or less from your hand without paying its mana cost.",
+          "primitives": [
+            "CardSource.FromZone",
+            "GameObjectFilter.Nonland",
+            "manaValueAtMost",
+            "chooseUpTo",
+            "Effects.CastFromCollectionWithoutPayingCost"
+          ]
+        }
+      ],
+      "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
+      "oracleHash": "a3802e7576bd8201aab41db9341004e89fc2b4dabaaca9abec186839feca04bf",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
     }
   }
 }
