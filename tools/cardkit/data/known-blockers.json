@@ -121,6 +121,11 @@
       "reason": "reveal-or-pay additional cost",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
       "verified": true
+    },
+    "Treasure Nabber": {
+      "reason": "no trigger for 'whenever an opponent taps an artifact for mana': EventPattern.LandTappedForMana / Triggers.*.tapsLandForMana only cover lands, tappedForMana() is SELF/ATTACHED only, and taps(filter) is not mana-specific",
+      "source": "AARMOU/arcana_table#589",
+      "verified": false
     }
   },
   "keywords": {
