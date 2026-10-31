@@ -13,6 +13,21 @@ const WORKFLOWS = new Set(['Arcana Development CI', 'Arcana Cardkit', 'Arcana Ca
 const isOurs = c => c.user?.login === 'github-actions[bot]' && c.user?.type === 'Bot';
 const observeOnly = async () => ({ allowed: false, reason: 'observation only' });
 const DISPATCHER = 'Arcana Card Worker Dispatcher';
+// Independent certification: a red suite run usually means the CARD is wrong, but the suite PR's worker may not
+// edit the card, and the card PR's own checks are green, so nothing ever repaired it (2026-10-31: #609 Thunderhawk
+// Gunship, #552 Ancient Stone Idol stuck all day). Once the suite PR has had its own repair and the worker answered,
+// later failures of that suite go to the CARD PR as a bounded repair, with the card unit's admission and ceiling.
+// When the card PR then changes, the failed certification jobs are re-run once for the new card head; the suite
+// premerge only triggers on suite PR changes, so without this a fixed card would never be re-certified.
+const CERT = 'Arcana Card Certification Premerge';
+const CERT_JOB = /^Execute trusted independent card scenarios \(([a-z0-9]+(?:-[a-z0-9]+)*), (\d+), (\d+), /;
+const ESCALATED = '<!-- arcana-cert-card-repair-v1 -->';
+const RERUN = '<!-- arcana-cert-rerun-v1 -->';
+const isCopilotUser = u => ['copilot', 'copilot-swe-agent[bot]'].includes(String(u?.login || '').toLowerCase());
+function suiteHadItsTurn(comments, repairs) {
+  const first = Math.min(...repairs.map(c => Date.parse(c.created_at)).filter(Number.isFinite));
+  return Number.isFinite(first) && comments.some(c => isCopilotUser(c.user) && Date.parse(c.created_at) > first);
+}
 
 // CI can finish before the builder's session-finished event is visible. Revisit
 // withheld failures after dispatcher ticks, even when its builder queue is empty.
@@ -24,11 +39,12 @@ async function runRouter({ github, context, env, readBudget, delivery }) {
   if (ready.repair === 'off') return { state: 'repair-off' };
   const authorize = !forcedDry && ready.repair === 'request' ?
     createAuthorizer({ github, ...context.repo, env, readBudget }) : observeOnly;
+  const rerun = authorize === observeOnly ? null : createRerun({ github, ...context.repo, token: env.COPILOT_DISPATCH_TOKEN });
   if (context.eventName === 'schedule' || context.eventName === 'workflow_dispatch' ||
       (context.payload?.workflow_run?.name === DISPATCHER &&
        context.payload.workflow_run.conclusion === 'success'))
-    return reconcileFailures({ github, context, authorize, delivery });
-  return routeFailure({ github, context, authorize, delivery });
+    return reconcileFailures({ github, context, authorize, delivery, rerun });
+  return routeFailure({ github, context, authorize, delivery, rerun });
 }
 
 // Shared admission for repair requests: readiness, work unit, capacity, ceilings, budget.
@@ -84,7 +100,7 @@ function createAuthorizer({ github, owner, repo, env, readBudget, now = Date.now
 }
 
 // Trusted default-branch workflow calls this module. Never loads failed-branch code.
-async function routeFailure({ github, context, authorize = observeOnly, openPrs, delivery }) {
+async function routeFailure({ github, context, authorize = observeOnly, openPrs, delivery, rerun = null }) {
   const run = context.payload.workflow_run;
   const repoId = context.payload.repository.id;
   if (!run || run.conclusion !== 'failure' || run.event === 'workflow_run' ||
@@ -106,6 +122,8 @@ async function routeFailure({ github, context, authorize = observeOnly, openPrs,
     A.TRUSTED_ASSOCIATIONS.includes(c.author_association);
   const repairs = comments.filter(c => (isOurs(c) || ownerComment(c)) &&
     (c.body?.startsWith(MARKER) || c.body?.startsWith(OLD_MARKER)));
+  if (run.name === CERT && pr.head.sha === run.head_sha && suiteHadItsTurn(comments, repairs))
+    return escalateToCard({ github, owner, repo, repoId, run, suitePr: pr, suiteComments: comments, authorize, delivery, rerun });
   if (repairs.some(c => c.body.includes(fingerprint) ||
       new RegExp(`(?:^|\\n)run-id:${run.id}(?:\\n|$)`).test(c.body))) return {state:'already-routed'};
   const previous = ours.find(c => c.body?.startsWith(OBSERVED) && c.body.includes(fingerprint));
@@ -167,10 +185,88 @@ async function routeFailure({ github, context, authorize = observeOnly, openPrs,
   return {state:allowed?'repair-requested':'observed-only',pr:pr.number, reason: decision.reason};
 }
 
+// Owner token first (its re-run completion triggers Arcana Suite Auto-merge); else the job token.
+function createRerun({ github, owner, repo, token, fetchImpl = fetch }) {
+  return async runId => {
+    if (token) {
+      try {
+        const r = await fetchImpl(`https://api.github.com/repos/${owner}/${repo}/actions/runs/${runId}/rerun-failed-jobs`, {
+          method: 'POST', headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' } });
+        if (r.ok) return { ok: true, via: 'owner-token' };
+      } catch { /* fall through */ }
+    }
+    try { await github.rest.actions.reRunWorkflowFailedJobs({ owner, repo, run_id: runId }); return { ok: true, via: 'job-token' }; }
+    catch (e) { return { ok: false, reason: 'rerun-http-' + (e?.status || 'error') }; }
+  };
+}
+
+async function escalateToCard({ github, owner, repo, repoId, run, suitePr, suiteComments, authorize, delivery, rerun }) {
+  const jobs = await github.paginate(github.rest.actions.listJobsForWorkflowRun, { owner, repo, run_id: run.id, per_page: 100 });
+  // The job name comes from the trusted premerge matrix: (suite key, card PR, card unit, title).
+  const failed = jobs.filter(j => j.conclusion === 'failure').map(j => ({ j, m: String(j.name || '').match(CERT_JOB) })).filter(x => x.m);
+  if (failed.length !== 1) return { state: 'cert-unattributed', pr: suitePr.number };
+  const [, key, cardN, unitN] = failed[0].m;
+  let card;
+  try { card = (await github.rest.pulls.get({ owner, repo, pull_number: Number(cardN) })).data; }
+  catch { return { state: 'cert-card-unavailable', pr: Number(cardN) }; }
+  if (card.number !== Number(cardN) || card.state !== 'open' || !card.draft || card.head?.repo?.id !== repoId ||
+      !isCopilotUser(card.user) || !/^(gpt\/|copilot\/)/.test(card.head?.ref || '') || !/^[a-f0-9]{40}$/.test(card.head?.sha || ''))
+    return { state: 'cert-card-not-repairable', pr: card.number };
+  const cardComments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: card.number, per_page: 100 });
+  const ownerComment = c => String(c.user?.login || '').toLowerCase() === owner.toLowerCase() && A.TRUSTED_ASSOCIATIONS.includes(c.author_association);
+  const escalations = cardComments.filter(c => (isOurs(c) || ownerComment(c)) && String(c.body || '').startsWith(ESCALATED));
+  const heads = escalations.flatMap(c => [...String(c.body).matchAll(new RegExp(`^cert-fingerprint:run-${run.id}:card-([a-f0-9]{40})$`, 'gm'))].map(m => m[1]));
+  if (heads.includes(card.head.sha)) {
+    // Already sent to the card for this head. If certification was re-run for it and failed again, the next repair
+    // is due; otherwise wait for the card worker (or the ceiling, which admission enforces).
+    const reran = suiteComments.filter(c => isOurs(c) && String(c.body || '').startsWith(RERUN) &&
+      String(c.body).includes(`card-head:${card.head.sha}`) && String(c.body).includes(`run:${run.id}`));
+    return { state: reran.length ? 'cert-failed-again-waiting' : 'cert-already-escalated', pr: card.number };
+  }
+  if (heads.length) {
+    // The card changed since its certification repair request: re-run the failed certification job once per card head.
+    const marker = `run:${run.id} card-head:${card.head.sha}`;
+    const done = suiteComments.find(c => isOurs(c) && String(c.body || '').startsWith(RERUN) && String(c.body).includes(marker));
+    if (done) {
+      const attempt = Number((String(done.body).match(/attempt:(\d+)/) || [])[1]);
+      // Re-run finished and still failed on the new card head: fall through to the next bounded repair.
+      if (!(Number(run.run_attempt) > attempt)) return { state: 'cert-rerun-pending', pr: suitePr.number };
+    } else {
+      if (!rerun) return { state: 'cert-rerun-withheld', pr: suitePr.number, reason: 'observation only' };
+      await github.rest.issues.createComment({ owner, repo, issue_number: suitePr.number, body: [RERUN, marker + ` attempt:${Number(run.run_attempt) || 1}`,
+        `Card PR #${card.number} changed after its certification repair request. Re-running the failed independent certification job for card head \`${card.head.sha}\`.`].join('\n\n') });
+      const r = await rerun(run.id);
+      return { state: r.ok ? 'cert-rerun-requested' : 'cert-rerun-failed', pr: suitePr.number, card: card.number, reason: r.via || r.reason };
+    }
+  }
+  const sender = delivery || createCopilotDelivery({ owner, repo, token: null });
+  const proof = authorize === observeOnly ? { ok: true } : await sender.preflight();
+  const decision = proof.ok ? await authorize({ pr: card, run }) : { allowed: false, reason: proof.reason };
+  if (!decision.allowed) return { state: 'cert-escalation-withheld', pr: card.number, reason: String(decision.reason || '').replace(/[@\r\n]/g, ' ') };
+  if (decision.unit !== Number(unitN)) return { state: 'cert-unit-mismatch', pr: card.number, reason: `job names unit #${unitN}, PR links #${decision.unit}` };
+  const job = failed[0].j;
+  const step = (job.steps || []).find(s => s.conclusion === 'failure');
+  const body = [ESCALATED, `cert-fingerprint:run-${run.id}:card-${card.head.sha}`,
+    `@copilot The independent certification suite for this card failed against this PR's head \`${card.head.sha}\`. Repair the CARD on this branch so it implements its exact Oracle text.`,
+    `- Suite: \`certification/suites/${key}.json\` on suite PR #${suitePr.number} (its worker already checked the suite and could not fix this without changing the card; see that PR's conversation for the failing assertions).`,
+    `- Failing job: ${String(job.name).replace(/@/g, '＠')}${step ? ' / ' + String(step.name).replace(/@/g, '＠') : ''} (job ${job.id}).`,
+    `- Run: https://github.com/${owner}/${repo}/actions/runs/${run.id}`,
+    'The suite assertions are the specification: do NOT edit, weaken or skip the suite or any existing scenario test. Keep this PR card-only (card, its scenario test, registry, generated assets). If you are certain the suite contradicts the Oracle text, say exactly which assertion and why in a comment and change nothing.',
+    `Repair request ${decision.attempt} of ${A.CEILING.repair} for unit #${decision.unit}. Report the exact commit and commands. Never merge, release, change main/production or signing.`].join('\n\n');
+  const current = (await github.rest.pulls.get({ owner, repo, pull_number: card.number })).data;
+  if (current.head.sha !== card.head.sha || current.state !== 'open') return { state: 'stale-or-unmatched', pr: card.number };
+  const late = typeof decision.recheck === 'function' ? await decision.recheck() : 'untrusted-origin: recheck-missing';
+  if (late) return { state: 'withheld-at-trigger', pr: card.number, reason: late };
+  await decision.record();
+  const delivered = await sender.post({ issue_number: card.number, body });
+  if (!delivered.ok) return { state: 'delivery-uncertain', pr: card.number, reason: delivered.reason };
+  return { state: 'repair-requested', pr: card.number, reason: 'certification failure routed to card', suite: suitePr.number };
+}
+
 // Scheduled backfill also revisits capacity/billing-denied failures when repairs are enabled.
 // Never more than one paid request per tick, with the same exact-head/admission guards.
 // Default remains observation-only for callers that do not supply an authorizer.
-async function reconcileFailures({ github, context, authorize = observeOnly, delivery,
+async function reconcileFailures({ github, context, authorize = observeOnly, delivery, rerun = null,
   now = Date.now(), windowMs = 24 * 60 * 60 * 1000 }) {
   const { owner, repo } = context.repo;
   const since = new Date(now - windowMs).toISOString();
@@ -196,7 +292,7 @@ async function reconcileFailures({ github, context, authorize = observeOnly, del
     seen.add(fingerprint);
     if (run.conclusion !== 'failure') continue;
     const ctx = { repo: context.repo, payload: { repository: context.payload.repository, workflow_run: run } };
-    const r = await routeFailure({ github, context: ctx, openPrs, delivery,
+    const r = await routeFailure({ github, context: ctx, openPrs, delivery, rerun,
       authorize: requested < 1 && !admissionBlocked ? authorize : observeOnly });
     if (r.state === 'repair-requested' || r.state === 'delivery-uncertain') requested++;
     // Capacity and billing are shared gates: don't re-fetch the same admission
@@ -208,5 +304,5 @@ async function reconcileFailures({ github, context, authorize = observeOnly, del
   return results;
 }
 
-module.exports = { untrustedConversation,runRouter, routeFailure, reconcileFailures, createAuthorizer, MARKER, OBSERVED, WORKFLOWS};
+module.exports = { escalateToCard, createRerun, CERT, ESCALATED, RERUN, untrustedConversation,runRouter, routeFailure, reconcileFailures, createAuthorizer, MARKER, OBSERVED, WORKFLOWS};
 
