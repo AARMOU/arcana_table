@@ -2,8 +2,9 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.MonstrousOnslaught
 import com.arcanatable.customcards.support.*
-import com.wingedsheep.engine.core.DistributeDecision
-import com.wingedsheep.engine.core.DistributionResponse
+import com.wingedsheep.engine.core.CastSpell
+import com.wingedsheep.engine.core.PaymentStrategy
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
@@ -19,15 +20,19 @@ class MonstrousOnslaughtIndependentCertificationTest {
         giveMana(player, Color.GREEN, 2)
     }
 
-    private fun GameTestDriver.chooseDamage(distribution: Map<EntityId, Int>) {
-        val decision = state.pendingDecision
-        assertTrue("The spell must ask how to divide its damage", decision is DistributeDecision)
-        decision as DistributeDecision
-        assertEquals(decision.targets.toSet(), distribution.keys)
-        assertEquals(decision.totalAmount, distribution.values.sum())
-        assertTrue(distribution.values.all { it >= decision.minPerTarget })
-        submitDecision(decision.playerId, DistributionResponse(decision.id, distribution))
-    }
+    private fun GameTestDriver.castOnslaught(
+        player: EntityId,
+        spell: EntityId,
+        damageDistribution: Map<EntityId, Int>,
+    ) = submit(
+        CastSpell(
+            playerId = player,
+            cardId = spell,
+            targets = damageDistribution.keys.map { ChosenTarget.Permanent(it) },
+            paymentStrategy = PaymentStrategy.FromPool,
+            damageDistribution = damageDistribution,
+        ),
+    )
 
     @Test
     fun paysThreeGenericAndTwoGreenAndDealsItsFullDamageToOneCreature() {
@@ -38,8 +43,7 @@ class MonstrousOnslaughtIndependentCertificationTest {
         val spell = d.putCardInHand(player, name)
         d.payCost(player)
 
-        assertNull(d.castSpell(player, spell, listOf(target)).error)
-        d.chooseDamage(mapOf(target to 4))
+        assertNull(d.castOnslaught(player, spell, mapOf(target to 4)).error)
         d.resolveAll()
 
         assertTrue(d.getPermanents(player).contains(source))
@@ -57,8 +61,7 @@ class MonstrousOnslaughtIndependentCertificationTest {
         val spell = d.putCardInHand(player, name)
         d.payCost(player)
 
-        assertNull(d.castSpell(player, spell, listOf(spider, elves)).error)
-        d.chooseDamage(mapOf(spider to 3, elves to 1))
+        assertNull(d.castOnslaught(player, spell, mapOf(spider to 3, elves to 1)).error)
         d.resolveAll()
 
         assertTrue("Three damage leaves the Spider alive", d.getPermanents(d.player2).contains(spider))
@@ -75,8 +78,7 @@ class MonstrousOnslaughtIndependentCertificationTest {
         val spell = d.putCardInHand(player, name)
         d.payCost(player)
 
-        assertNull(d.castSpell(player, spell, listOf(chosen)).error)
-        d.chooseDamage(mapOf(chosen to 4))
+        assertNull(d.castOnslaught(player, spell, mapOf(chosen to 4)).error)
         d.resolveAll()
 
         assertFalse(d.getPermanents(d.player2).contains(chosen))
@@ -107,8 +109,7 @@ class MonstrousOnslaughtIndependentCertificationTest {
         val spell = d.putCardInHand(player, name)
         d.payCost(player)
 
-        assertNull(d.castSpell(player, spell, listOf(target)).error)
-        d.chooseDamage(mapOf(target to 2))
+        assertNull(d.castOnslaught(player, spell, mapOf(target to 2)).error)
         d.resolveAll()
 
         assertTrue("The opponent's greater creature does not increase X", d.getPermanents(d.player2).contains(target))
@@ -123,8 +124,7 @@ class MonstrousOnslaughtIndependentCertificationTest {
         val spell = d.putCardInHand(player, name)
         d.payCost(player)
 
-        assertNull(d.castSpell(player, spell, listOf(target)).error)
-        d.chooseDamage(mapOf(target to 4))
+        assertNull(d.castOnslaught(player, spell, mapOf(target to 4)).error)
         val murder = d.putCardInHand(d.player2, "Murder")
         d.giveMana(d.player2, Color.BLACK, 2)
         d.giveColorlessMana(d.player2, 1)
