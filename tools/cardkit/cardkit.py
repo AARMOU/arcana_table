@@ -10,6 +10,7 @@ Run from anywhere in the repository:  tools/cardkit/cardkit <command> --help
   newcard NAME          scaffold a card file + failing test, with references for every line
   check                 repository rules for card PRs (scaffolds unregistered, tests present, Oracle drift)
   blocker NAME          record an engine gap so the card routes to Claude instead of burning agent runs
+  review NAME           record an engineer review of weak lines (exact line + primitives), hashes computed
   oracle fetch|show     refresh / inspect the offline Scryfall cache
   assay-review          compare upstream Assay bake verdicts without authorizing cards
   patterns | sdk-index | docs-check   regenerate / verify the agent reference docs
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -212,6 +214,42 @@ def cmd_blocker(a) -> int:
     return 0
 
 
+def cmd_review(a) -> int:
+    """Write a verified-support.json reviewedLines entry bound to this card's Oracle record, the adopted engine JARs
+    and the current base commit (readiness.review_is_current). Prints the resulting verdict."""
+    if a.oracle_jsonl:
+        rec = json.loads(a.oracle_jsonl)
+        if repo.normalize_name(rec.get("name", "")) != repo.normalize_name(a.name) or not rec.get("oracle_text"):
+            print("--oracle-jsonl is not this card's Oracle record", file=sys.stderr)
+            return 2
+        oracle.save([rec])
+    card = oracle.cached(a.name)
+    if not card:
+        print(f"No cached Oracle record for {a.name}: pass --oracle-jsonl with the trusted record.", file=sys.stderr)
+        return 2
+    if len(a.line) != len(a.primitives):
+        print("Give one --primitives (comma-separated) per --line, in the same order.", file=sys.stderr)
+        return 2
+    runtime = readiness.review_runtime_hash()
+    if not runtime:
+        print("Engine JARs not found; cannot bind the review to the adopted runtime.", file=sys.stderr)
+        return 2
+    head = subprocess.run(["git", "-C", str(repo.ROOT), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    lines = [{"line": l.strip(), "primitives": [p.strip() for p in ps.split(",") if p.strip()]} for l, ps in zip(a.line, a.primitives)]
+    path = repo.DATA_DIR / "verified-support.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data.setdefault("cards", {})[card["name"]] = {
+        "summary": a.summary, "verifiedBy": a.verified_by, "references": a.reference, "reviewedLines": lines,
+        "baseSha": head, "oracleHash": readiness.review_oracle_hash(card), "runtimeHash": runtime}
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    readiness.verified_support.cache_clear()
+    v = readiness.classify(a.name)
+    print(f"Recorded review for {card['name']} in {repo.rel(path)}: now {v['readiness']} (route {v.get('route')}).")
+    for r in v["reasons"]:
+        print("  - " + r)
+    return 0 if v["readiness"] == "SUPPORTED" else 1
+
+
 def cmd_oracle(a) -> int:
     if a.action == "show":
         for n in a.names:
@@ -317,6 +355,16 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("--source", required=True, help="issue/PR/test that reproduced it")
     s.add_argument("--verified", action="store_true", help="reproduced on the pinned engine")
     s.set_defaults(func=cmd_blocker)
+
+    s = sub.add_parser("review", help="record an engineer review of a card's weak lines")
+    s.add_argument("name")
+    s.add_argument("--line", action="append", required=True, help="exact Oracle line below 0.88 (repeat per line)")
+    s.add_argument("--primitives", action="append", required=True, help="comma-separated engine primitives for that line")
+    s.add_argument("--reference", action="append", required=True, help="implemented card source using them (repeatable)")
+    s.add_argument("--summary", required=True)
+    s.add_argument("--verified-by", required=True, help="who reviewed, how, and when")
+    s.add_argument("--oracle-jsonl", help="trusted Oracle record (one JSON line) to seed the cache first")
+    s.set_defaults(func=cmd_review)
 
     s = sub.add_parser("oracle", help="Scryfall cache")
     s.add_argument("action", choices=["fetch", "show"])
