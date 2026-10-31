@@ -252,6 +252,7 @@ object CustomCards {
         Entry(TransmogrifyingWand, "CMM", "Six WotC precons"),
         Entry(UlamogsDreadsire, "M3C", "Six WotC precons"),
         Entry(Zoanthrope, "40K", "Six WotC precons"),
+        Entry(CollectiveEffort, "MSC", "Six WotC precons"),
         // Backported, isolated distinct precon batches: PRs #74, #76, #77, #84 and #85.
         Entry(ArcoFlagellant, "40K", "Six WotC precons"),
         Entry(UltramarinesHonourGuard, "40K", "Six WotC precons"),
