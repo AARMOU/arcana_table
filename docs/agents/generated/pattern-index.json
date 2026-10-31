@@ -1533,7 +1533,7 @@
    ]
   },
   "Effects.CreateToken": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -2942,7 +2942,7 @@
    ]
   },
   "Keyword.FLASH": {
-   "count": 9,
+   "count": 10,
    "examples": [
     {
      "card": "Sister of Silence",
@@ -3263,7 +3263,7 @@
    ]
   },
   "Keyword.TRAMPLE": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Atalan Jackal",
@@ -3864,13 +3864,19 @@
    ]
   },
   "Triggers.self.dies": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Dinosaur Egg",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DinosaurEgg.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DinosaurEggScenarioTest.kt"
+    },
+    {
+     "card": "Ancient Stone Idol",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AncientStoneIdol.kt",
+     "lines": 51,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AncientStoneIdolScenarioTest.kt"
     },
     {
      "card": "Power Depot",
@@ -4294,7 +4300,7 @@
    ]
   },
   "keywords()": {
-   "count": 78,
+   "count": 79,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4498,7 +4504,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 52,
+   "count": 53,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -4539,7 +4545,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5776,13 +5782,19 @@
    ]
   },
   "ModifySpellCost": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Herald of Slaanesh",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HeraldOfSlaanesh.kt",
      "lines": 28,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HeraldOfSlaaneshScenarioTest.kt"
+    },
+    {
+     "card": "Ancient Stone Idol",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AncientStoneIdol.kt",
+     "lines": 51,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AncientStoneIdolScenarioTest.kt"
     },
     {
      "card": "Primal Amulet",
@@ -6347,7 +6359,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 95,
+   "count": 96,
    "examples": [
     {
      "card": "Their Name Is Death",
