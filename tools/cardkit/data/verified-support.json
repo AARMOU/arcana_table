@@ -237,6 +237,31 @@
       "baseSha": "e26b0ef62fc510ede821afe09ab2fb26b271eb56",
       "oracleHash": "1ad0a0b730d67f8dbe88d6614d8196a41b055db8c91adf84a5bc4e637f6f7235",
       "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Arachnogenesis": {
+      "summary": "Effects.CreateToken with DynamicAmounts.battlefield(...).count() models X token creation as in Flurry of Wings; Sentry Bot scopes the count to creatures attacking the ability controller. Effects.PreventCombatDamageFrom with a notSubtype filter models the remaining sentence, as Harmless Assault and Moonmist demonstrate.",
+      "verifiedBy": "Copilot, pinned upstream source inspection 2026-10-31",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/arb/cards/FlurryOfWings.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/pip/cards/SentryBot.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/roe/cards/HarmlessAssault.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/isd/cards/Moonmist.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Create X 1/2 green Spider creature tokens with reach, where X is the number of creatures attacking you. Prevent all combat damage that would be dealt this turn by non-Spider creatures.",
+          "primitives": [
+            "Effects.CreateToken",
+            "DynamicAmounts.battlefield(...).count()",
+            "GameObjectFilter.Creature.attackingPlayer(EffectTarget.Controller)",
+            "Effects.PreventCombatDamageFrom",
+            "GameObjectFilter.Creature.notSubtype(Spider)"
+          ]
+        }
+      ],
+      "baseSha": "0b8c91cf71a8bd80706c59bbee136c18b6a48bdb",
+      "oracleHash": "41831f760bba2713d1b43501233ee67d5f3332e937628c743575d3223dbd0147",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
     }
   }
 }
