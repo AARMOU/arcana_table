@@ -1648,7 +1648,7 @@
    ]
   },
   "Effects.DealDamage": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Noise Marine",
@@ -1689,7 +1689,7 @@
    ]
   },
   "Effects.Destroy": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Immoral Bargain",
@@ -4422,7 +4422,7 @@
    ]
   },
   "spell { }": {
-   "count": 41,
+   "count": 42,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -6876,13 +6876,19 @@
    ]
   },
   "TargetFilter.Artifact": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Hull Breach",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HullBreach.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HullBreachScenarioTest.kt"
+    },
+    {
+     "card": "Kill! Maim! Burn!",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KillMaimBurn.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KillMaimBurnScenarioTest.kt"
     }
    ]
   },
@@ -6927,7 +6933,7 @@
    ]
   },
   "TargetFilter.Creature": {
-   "count": 15,
+   "count": 16,
    "examples": [
     {
      "card": "Defile",
@@ -7210,7 +7216,7 @@
    ]
   },
   "Targets.Player": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Necron Deathmark",
@@ -7223,6 +7229,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RiseOfTheEldrazi.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RiseOfTheEldraziScenarioTest.kt"
+    },
+    {
+     "card": "Kill! Maim! Burn!",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KillMaimBurn.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KillMaimBurnScenarioTest.kt"
     },
     {
      "card": "Suffer the Past",
@@ -7239,7 +7251,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 62,
+   "count": 63,
    "examples": [
     {
      "card": "Defile",
