@@ -237,6 +237,33 @@
       "baseSha": "e26b0ef62fc510ede821afe09ab2fb26b271eb56",
       "oracleHash": "1ad0a0b730d67f8dbe88d6614d8196a41b055db8c91adf84a5bc4e637f6f7235",
       "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Monstrous Onslaught": {
+      "summary": "Capture the battlefield greatest-power amount as the spell is cast, then read capturedAtCast as DividedDamage.dynamicTotal; cap any-number target selection by that same maxPower. Traverse the Outlands exercises maxPower, Undercity Upheaval proves cast-time amount capture and announcement, and Chandra proves divided damage among targets.",
+      "verifiedBy": "Copilot, source inspection 2026-10-31 (argentum-engine@7fb0733)",
+      "references": [
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TraverseTheOutlands.kt",
+        "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TraverseTheOutlandsScenarioTest.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mat/cards/UndercityUpheaval.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/tests/src/test/kotlin/com/wingedsheep/engine/scenarios/UndercityUpheavalScenarioTest.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/fdn/cards/ChandraFlameshaper.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/tests/src/test/kotlin/com/wingedsheep/engine/scenarios/ChandraFlameshaperScenarioTest.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Monstrous Onslaught deals X damage divided as you choose among any number of target creatures, where X is the greatest power among creatures you control as you cast this spell.",
+          "primitives": [
+            "captureAtCast",
+            "DynamicAmounts.capturedAtCast",
+            "DynamicAmounts.battlefield.maxPower",
+            "Effects.DividedDamage",
+            "dynamicMaxCount"
+          ]
+        }
+      ],
+      "baseSha": "997d860091f8a439db6a7c7016dbacbd66319e71",
+      "oracleHash": "452abb7610483ac128e8f5980c884986bb7b838b507081bdaee2fa7544e835ca",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
     }
   }
 }
