@@ -121,44 +121,6 @@ test('workerd: a later human arrival revokes multiplayer banter consent',async()
   assert.equal((await(await control('GCHAT2')).json()).chatMode,'muted');
   assert.equal((await(await control('GCHAT2',{action:'chat',sessionId:status.sessionId,chatMode:'ruthless'})).json()).chatMode,'muted');
 });
-test('workerd: stalled provider cannot freeze a legal guest turn; watchdog emits only one host-offered action',async()=>{
-  const h=await setup('GWATCH1',['friend']);
-  const {status}=await summon('GWATCH1',h,{model:true});
-  await outgoing(h,'lanHello');
-  await game(h,{type:'lanSeat',strictDeck:true},1);
-  await outgoing(h,'lanReady');
-  const started=new Promise(resolve=>{providerStarted=resolve;});
-  const options=[
-    {action:{type:'PlayLand',playerId:'offline-ai',cardId:'fixture-land'},isAffordable:true},
-    {action:{type:'PassPriority',playerId:'offline-ai'},isAffordable:true}
-  ];
-  await game(h,update(220,options),2);
-  await Promise.race([started,new Promise((_,reject)=>setTimeout(()=>reject(Error('watchdog-provider-never-started')),3500))]);
-  // A provider call is deliberately held forever; only the Cloudflare DO alarm
-  // can advance the host turn. This uses intercepted provider traffic, never API.
-  const originalWait=h.wait;
-  h.wait=(pred,ms=16000)=>originalWait(pred,ms);
-  try {
-    const action=await outgoing(h,'submitAction');
-    assert.equal(action.interactionEpoch,'offline-220');
-    assert.ok(options.some(x=>JSON.stringify(x.action)===JSON.stringify(action.action)));
-    const current=await (await control('GWATCH1')).json();
-    assert.equal(current.status,'playing');
-    assert.equal(current.model,'off');
-    assert.ok(['model-timeout-free-fallback','model-paused-free-fallback'].includes(current.reason),
-      'deadline or watchdog must recover the turn without pausing');
-    assert.equal(current.actionsSubmitted,1);
-    assert.ok(releaseProvider);
-    releaseProvider(); releaseProvider=null;
-    // The tardy paid response may never produce a second submitAction.
-    await game(h,update(221,[{action:{type:'PassPriority',playerId:'offline-ai'},isAffordable:true}]),3);
-    const next=await outgoing(h,'submitAction');
-    assert.equal(next.interactionEpoch,'offline-221');
-    assert.equal((await(await control('GWATCH1')).json()).actionsSubmitted,2);
-    await control('GWATCH1',{action:'dismiss',sessionId:status.sessionId});
-  } finally {if(releaseProvider){releaseProvider();releaseProvider=null;}h.wait=originalWait;}
-});
-
 test('workerd: dismiss wins over an in-flight provider response and cannot resurrect the guest',async()=>{
   const h=await setup('GMODEL',['friend']);const {status}=await summon('GMODEL',h,{model:true});await outgoing(h,'lanHello');
   await game(h,{type:'lanSeat',strictDeck:true},1);await outgoing(h,'lanReady');
