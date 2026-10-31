@@ -307,7 +307,7 @@
  },
  "Costs": {
   "Costs.Composite": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -404,7 +404,7 @@
    ]
   },
   "Costs.Mana": {
-   "count": 35,
+   "count": 36,
    "examples": [
     {
      "card": "Deepfathom Skulker",
@@ -541,7 +541,7 @@
    ]
   },
   "Costs.SacrificeSelf": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Tyrant Guard",
@@ -554,6 +554,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AcidicSliver.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AcidicSliverScenarioTest.kt"
+    },
+    {
+     "card": "Mirrorpool",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mirrorpool.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MirrorpoolScenarioTest.kt"
     },
     {
      "card": "Spawning Bed",
@@ -572,17 +578,11 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TectonicEdge.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TectonicEdgeScenarioTest.kt"
-    },
-    {
-     "card": "Warping Wail",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WarpingWail.kt",
-     "lines": 64,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WarpingWailScenarioTest.kt"
     }
    ]
   },
   "Costs.Tap": {
-   "count": 38,
+   "count": 39,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -1075,7 +1075,7 @@
    ]
   },
   "Effects.AddColorlessMana": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -1385,7 +1385,7 @@
    ]
   },
   "Effects.CopyTargetSpell": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Reverberate",
@@ -1398,6 +1398,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IronManBleedingEdge.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/IronManBleedingEdgeScenarioTest.kt"
+    },
+    {
+     "card": "Mirrorpool",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mirrorpool.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MirrorpoolScenarioTest.kt"
     },
     {
      "card": "Primal Amulet",
@@ -1596,7 +1602,7 @@
    ]
   },
   "Effects.CreateTokenCopyOfTarget": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -1609,6 +1615,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/FlashPhotography.kt",
      "lines": 40,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/FlashPhotographyScenarioTest.kt"
+    },
+    {
+     "card": "Mirrorpool",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mirrorpool.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MirrorpoolScenarioTest.kt"
     },
     {
      "card": "Sliver Gravemother",
@@ -4131,7 +4143,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 54,
+   "count": 55,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4364,7 +4376,7 @@
    ]
   },
   "replacementEffect()": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4705,7 +4717,7 @@
    ]
   },
   "manaAbility": {
-   "count": 25,
+   "count": 26,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4828,7 +4840,7 @@
    ]
   },
   "timing": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5341,7 +5353,7 @@
    ]
   },
   "TimingRule.ManaAbility": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5429,7 +5441,7 @@
    ]
   },
   "EntersTapped": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5450,6 +5462,12 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/LotusFieldScenarioTest.kt"
     },
     {
+     "card": "Mirrorpool",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mirrorpool.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MirrorpoolScenarioTest.kt"
+    },
+    {
      "card": "Ruins of Oran-Rief",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RuinsOfOranRief.kt",
      "lines": 47,
@@ -5460,12 +5478,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PowerDepot.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PowerDepotScenarioTest.kt"
-    },
-    {
-     "card": "Celestial Colonnade",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CelestialColonnade.kt",
-     "lines": 59,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CelestialColonnadeScenarioTest.kt"
     }
    ]
   },
@@ -6421,8 +6433,14 @@
    ]
   },
   "GameObjectFilter.InstantOrSorcery": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Mirrorpool",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mirrorpool.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MirrorpoolScenarioTest.kt"
+    },
     {
      "card": "Primal Amulet",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
@@ -6996,7 +7014,7 @@
    ]
   },
   "TargetFilter.CreatureYouControl": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Mandate of Abaddon",
@@ -7021,6 +7039,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SigardasAid.kt",
      "lines": 42,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SigardasAidScenarioTest.kt"
+    },
+    {
+     "card": "Mirrorpool",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Mirrorpool.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MirrorpoolScenarioTest.kt"
     }
    ]
   },
@@ -7239,7 +7263,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 62,
+   "count": 63,
    "examples": [
     {
      "card": "Defile",
