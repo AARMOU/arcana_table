@@ -33,7 +33,7 @@ function fake({ issues = [queue(68, [A.ONE_SHOT_LABEL])], ledger = {}, ci = true
       },
       pulls: { list: () => [] },
       repos: { getBranch: async () => ({ data: { commit: { sha: BASE_SHA } } }) },
-      actions: { listWorkflowRunsForRepo: a => ci ? [{ head_sha: BASE_SHA, name: 'Arcana Development CI', conclusion: 'success' }]
+      actions: { listWorkflowRunsForRepo: a => ci ? [{ head_sha: BASE_SHA, name: 'Arcana Development CI', status: 'completed', conclusion: 'success' }]
         : a.status === 'success' ? [] : otherCiRuns,
         createWorkflowDispatch: async a => { dispatches.push(a); } },
     },
@@ -294,7 +294,7 @@ test('ciEquivalent: a base that only changed non-build paths since its last gree
   const GREEN = 'a'.repeat(40), HEAD = 'b'.repeat(40);
   const gh = ({ files, status = 'ahead', runs } = {}) => ({ rest: {
     actions: { listWorkflowRuns: async () => ({ data: { workflow_runs: runs ?? [
-      { id: 7, name: 'Arcana Development CI', conclusion: 'success', head_sha: GREEN, created_at: '2026-10-31T15:00:00Z' }] } }) },
+      { id: 7, name: 'Arcana Development CI', status: 'completed', conclusion: 'success', head_sha: GREEN, created_at: '2026-10-31T15:00:00Z' }] } }) },
     repos: { compareCommitsWithBasehead: async a => { assert.equal(a.basehead, GREEN + '...' + HEAD);
       return { data: { status, ahead_by: 1, files: files.map(filename => ({ filename })) } }; } } } });
   const args = { owner: 'o', repo: 'r', base: 'b', baseSha: HEAD };
@@ -314,9 +314,17 @@ test('ciEquivalent: a base that only changed non-build paths since its last gree
 test('dispatcher proceeds past the CI gate when the base change is non-build only', async () => {
   const f = fake({ ci: false });
   f.github.rest.actions.listWorkflowRuns = async () => ({ data: { workflow_runs: [
-    { id: 7, name: 'Arcana Development CI', conclusion: 'success', head_sha: 'e'.repeat(40), created_at: '2026-10-31T15:00:00Z' }] } });
+    { id: 7, name: 'Arcana Development CI', status: 'completed', conclusion: 'success', head_sha: 'e'.repeat(40), created_at: '2026-10-31T15:00:00Z' }] } });
   f.github.rest.repos.compareCommitsWithBasehead = async () => ({ data: { status: 'ahead', ahead_by: 1, files: [{ filename: '.github/workflows/x.yml' }] } });
   const r = await runDispatch({ github: f.github, context: ctx, core: core(), env: env(), readBudget: async () => ({ snapshot: null }) });
   assert.notEqual(r.state, 'ci-not-ready');
   assert.equal(f.dispatches.length, 0);
+});
+
+test('the exact-head CI check filters by conclusion itself (the API status filter lags)', async () => {
+  const f = fake();
+  const orig = f.github.rest.actions.listWorkflowRunsForRepo;
+  f.github.rest.actions.listWorkflowRunsForRepo = a => (a.status === 'success' ? [] : orig(a));
+  const r = await runDispatch({ github: f.github, context: ctx, core: core(), env: env(), readBudget: async () => ({ snapshot: null }) });
+  assert.notEqual(r.state, 'ci-not-ready');
 });
