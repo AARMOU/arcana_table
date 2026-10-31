@@ -209,6 +209,28 @@
       "baseSha": "f27e2c6caf19296dd83e871b690dadcd89bfe04c",
       "oracleHash": "62ed74687ea9a962573a422fb6e7721af53c3fe2510b2ee1c0955f1225ba6152",
       "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Dragon's Rage Channeler": {
+      "summary": "Conditions.Delirium with four distinct card types gates conditional stat and keyword abilities in The Swarmweaver; MustAttack is Battle-Mad Ronin's attacks-each-combat ability.",
+      "verifiedBy": "Copilot, source inspection 2026-10-31 (argentum-engine@7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/dsk/cards/TheSwarmweaver.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2003-2007/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/chk/cards/BattleMadRonin.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Delirium — As long as there are four or more card types among cards in your graveyard, this creature gets +2/+2, has flying, and attacks each combat if able.",
+          "primitives": [
+            "Conditions.Delirium()",
+            "ModifyStats",
+            "GrantKeyword(Keyword.FLYING)",
+            "MustAttack()"
+          ]
+        }
+      ],
+      "baseSha": "e26b0ef62fc510ede821afe09ab2fb26b271eb56",
+      "oracleHash": "aacbe1c9180ea8d934acf8f40798f64452bfc981a84c42b8492ff2273de444d2",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
     }
   }
 }
