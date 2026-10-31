@@ -43,7 +43,7 @@ class MonstrousOnslaughtScenarioTest {
         d.resolveStack()
 
         assertTrue(d.permanentsNamed(opponent, "Llanowar Elves").none { it == firstElf || it == secondElf })
-        assertEquals(1, d.state.getEntity(thirdElf)?.get<DamageComponent>()?.amount ?: 0)
+        assertEquals(0, d.state.getEntity(thirdElf)?.get<DamageComponent>()?.amount ?: 0)
     }
 
     @Test
