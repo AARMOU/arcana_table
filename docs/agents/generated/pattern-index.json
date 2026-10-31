@@ -427,7 +427,7 @@
    ]
   },
   "Costs.Mana": {
-   "count": 39,
+   "count": 40,
    "examples": [
     {
      "card": "Copper Gnomes",
@@ -1717,7 +1717,7 @@
    ]
   },
   "Effects.CreateToken": {
-   "count": 31,
+   "count": 32,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -2001,7 +2001,7 @@
    ]
   },
   "Effects.DrawCards": {
-   "count": 35,
+   "count": 36,
    "examples": [
     {
      "card": "Ugin's Insight",
@@ -3247,7 +3247,7 @@
    ]
   },
   "Keyword.DOUBLE_STRIKE": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -3266,6 +3266,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KnucklesTheEchidna.kt",
      "lines": 35,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KnucklesTheEchidnaScenarioTest.kt"
+    },
+    {
+     "card": "Marneus Calgar",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MarneusCalgar.kt",
+     "lines": 45,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MarneusCalgarScenarioTest.kt"
     },
     {
      "card": "Kratos, God of War",
@@ -3718,7 +3724,7 @@
    ]
   },
   "Keyword.VIGILANCE": {
-   "count": 13,
+   "count": 14,
    "examples": [
     {
      "card": "Wilson, Refined Grizzly",
@@ -4174,13 +4180,19 @@
    ]
   },
   "Triggers.oneOrMore": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Knuckles the Echidna",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KnucklesTheEchidna.kt",
      "lines": 35,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KnucklesTheEchidnaScenarioTest.kt"
+    },
+    {
+     "card": "Marneus Calgar",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MarneusCalgar.kt",
+     "lines": 45,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MarneusCalgarScenarioTest.kt"
     }
    ]
   },
@@ -4632,7 +4644,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 62,
+   "count": 63,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4795,7 +4807,7 @@
    ]
   },
   "keywords()": {
-   "count": 96,
+   "count": 97,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -5074,7 +5086,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 146,
+   "count": 147,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -7292,8 +7304,14 @@
    ]
   },
   "GameObjectFilter.Token": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Marneus Calgar",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MarneusCalgar.kt",
+     "lines": 45,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MarneusCalgarScenarioTest.kt"
+    },
     {
      "card": "Leonardo, the Balance",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/LeonardoTheBalance.kt",
