@@ -516,16 +516,16 @@
    "count": 3,
    "examples": [
     {
-     "card": "Illuminor Szeras",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IlluminorSzeras.kt",
-     "lines": 35,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/IlluminorSzerasScenarioTest.kt"
-    },
-    {
      "card": "Chronomancer",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Chronomancer.kt",
      "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ChronomancerScenarioTest.kt"
+    },
+    {
+     "card": "Illuminor Szeras",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IlluminorSzeras.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/IlluminorSzerasScenarioTest.kt"
     },
     {
      "card": "Commissar Severina Raine",
@@ -891,7 +891,7 @@
     {
      "card": "Illuminor Szeras",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IlluminorSzeras.kt",
-     "lines": 35,
+     "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/IlluminorSzerasScenarioTest.kt"
     }
    ]
@@ -1213,7 +1213,7 @@
     {
      "card": "Illuminor Szeras",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IlluminorSzeras.kt",
-     "lines": 35,
+     "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/IlluminorSzerasScenarioTest.kt"
     },
     {

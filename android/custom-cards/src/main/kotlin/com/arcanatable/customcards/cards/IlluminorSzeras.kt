@@ -3,6 +3,7 @@ package com.arcanatable.customcards.cards
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.model.Rarity
+import com.wingedsheep.sdk.scripting.*
 
 val IlluminorSzeras = card("Illuminor Szeras") {
     manaCost = "{2}{B}"
