@@ -3,10 +3,18 @@
 const { loadUnits } = require('./units.cjs');
 const { summarizeUnits, publishStatus, freshStatus } = require('./control-status.cjs');
 // Event-driven refreshes within this window are skipped; schedule and manual runs always refresh.
+// GITHUB_TOKEN allows 1,000 requests/hour per repository, shared by every workflow, and a refresh costs
+// ~100. Only a Copilot session finishing changes what a worker is doing, so it keeps the short window;
+// issue/PR churn and dispatcher/feeder/router completions (the dispatcher publishes its own worker list)
+// wait for the long window, which matches the 15-minute schedule (event scans: up to 12/hour -> about 4).
 const MIN_EVENT_INTERVAL_MS = 5 * 60 * 1000;
+const LOW_VALUE_EVENT_INTERVAL_MS = 15 * 60 * 1000;
+const eventIntervalMs = context => context.eventName === 'workflow_run' &&
+  /^Running Copilot cloud agent$/.test(String(context.payload?.workflow_run?.name || ''))
+  ? MIN_EVENT_INTERVAL_MS : LOW_VALUE_EVENT_INTERVAL_MS;
 
 async function refreshWorkerStatus({ github, context, core, now = () => new Date(), load = loadUnits, publish = publishStatus,
-  fresh = freshStatus, minIntervalMs = MIN_EVENT_INTERVAL_MS }) {
+  fresh = freshStatus, minIntervalMs = eventIntervalMs(context) }) {
   const { owner, repo } = context.repo;
   const checkedAt = now();
   // Each refresh reads every open unit's timeline and comments (~100 API calls). Bursts of
@@ -37,4 +45,4 @@ async function refreshWorkerStatus({ github, context, core, now = () => new Date
   if (published.startsWith('failed')) throw Error('Worker status publication failed: ' + published);
   return { payload, published };
 }
-module.exports = { refreshWorkerStatus };
+module.exports = { refreshWorkerStatus, eventIntervalMs, MIN_EVENT_INTERVAL_MS, LOW_VALUE_EVENT_INTERVAL_MS };
