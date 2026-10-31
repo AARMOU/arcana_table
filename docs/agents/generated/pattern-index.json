@@ -1907,6 +1907,17 @@
     }
    ]
   },
+  "Effects.ForEachInCollection": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Past in Flames",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PastInFlames.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PastInFlamesScenarioTest.kt"
+    }
+   ]
+  },
   "Effects.ForEachInGroup": {
    "count": 25,
    "examples": [
@@ -2043,6 +2054,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UrzasSaga.kt",
      "lines": 92,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UrzasSagaScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.GrantFlashback": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Past in Flames",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PastInFlames.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PastInFlamesScenarioTest.kt"
     }
    ]
   },
@@ -2405,7 +2427,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -2432,16 +2454,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SufferThePastScenarioTest.kt"
     },
     {
+     "card": "Past in Flames",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PastInFlames.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PastInFlamesScenarioTest.kt"
+    },
+    {
      "card": "Szarekh, the Silent King",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SzarekhTheSilentKing.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SzarekhTheSilentKingScenarioTest.kt"
-    },
-    {
-     "card": "Traverse the Outlands",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TraverseTheOutlands.kt",
-     "lines": 42,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TraverseTheOutlandsScenarioTest.kt"
     }
    ]
   },
@@ -3479,7 +3501,7 @@
    ]
   },
   "KeywordAbility.flashback": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -3492,6 +3514,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/FlashPhotography.kt",
      "lines": 40,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/FlashPhotographyScenarioTest.kt"
+    },
+    {
+     "card": "Past in Flames",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PastInFlames.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PastInFlamesScenarioTest.kt"
     }
    ]
   },
@@ -4253,7 +4281,7 @@
    ]
   },
   "keywordAbility()": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4422,7 +4450,7 @@
    ]
   },
   "spell { }": {
-   "count": 41,
+   "count": 42,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -5007,7 +5035,7 @@
    ]
   },
   "Duration.EndOfTurn": {
-   "count": 9,
+   "count": 10,
    "examples": [
     {
      "card": "Silence",
@@ -5020,6 +5048,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RampagingBrontodon.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RampagingBrontodonScenarioTest.kt"
+    },
+    {
+     "card": "Past in Flames",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PastInFlames.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PastInFlamesScenarioTest.kt"
     },
     {
      "card": "Cyberdrive Awakener",
@@ -5038,12 +5072,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AllosaurusShepherd.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AllosaurusShepherdScenarioTest.kt"
-    },
-    {
-     "card": "Purphoros, God of the Forge",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PurphorosGodOfTheForge.kt",
-     "lines": 57,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PurphorosGodOfTheForgeScenarioTest.kt"
     }
    ]
   },
@@ -5945,7 +5973,7 @@
    ]
   },
   "EffectTarget.IterationEntity": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Mutilate",
@@ -6421,8 +6449,14 @@
    ]
   },
   "GameObjectFilter.InstantOrSorcery": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Past in Flames",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PastInFlames.kt",
+     "lines": 40,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PastInFlamesScenarioTest.kt"
+    },
     {
      "card": "Primal Amulet",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PrimalAmulet.kt",
@@ -6835,7 +6869,7 @@
    ]
   },
   "Player.You": {
-   "count": 33,
+   "count": 34,
    "examples": [
     {
      "card": "Defile",
