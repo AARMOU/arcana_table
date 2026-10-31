@@ -50,7 +50,43 @@ const statusText = (status, body) => {
   if (status === 409 && body?.error === 'already-assigned') return 'Copilot already has this card. No new work was authorized.';
   return 'Authorization refused (' + (body?.error || 'HTTP ' + status) + '). No work was launched.';
 };
-function render(container, units, checkedAt) {
+// In normal dispatch mode the guarded dispatcher starts every eligible card by itself, so the owner has nothing to
+// approve: show what is happening instead of an approval button (owner 2026-10-31: a greyed-out "Do it" was confusing).
+async function publicIssue(n) {
+  const pub = await fetch(API + '/v1/public/github?path=' + encodeURIComponent('/issues/' + n)).catch(() => null);
+  let info = pub?.ok ? await pub.json().catch(() => null) : null;
+  if (!info || info.number !== n) {
+    const direct = await fetch('https://api.github.com/repos/AARMOU/arcana_table/issues/' + n,
+      { cache: 'no-store', headers: { Accept: 'application/vnd.github+json' } }).catch(() => null);
+    info = direct?.ok ? await direct.json().catch(() => null) : null;
+  }
+  return info?.number === n ? info : null;
+}
+const COPILOT_LOGINS = ['copilot', 'copilot-swe-agent[bot]'];
+function automaticText(unit, info, verdict, age) {
+  if (info && info.state !== 'open') return 'Finished or closed · nothing to do';
+  if (info && (info.assignees || []).some(a => COPILOT_LOGINS.includes(String(a.login || '').toLowerCase())))
+    return 'Copilot is working on this · started automatically';
+  if (verdict.ok) return 'Starts automatically when a worker slot is free · nothing to approve' + age;
+  return verdict.reason + age;
+}
+function renderAutomatic(container, queued, age) {
+  for (const unit of queued) {
+    const row = el('div', 'list-row');
+    const main = el('div', 'row-main');
+    const link = el('a', 'row-title', 'Card work #' + unit.n);
+    link.href = issueUrl(unit.n); link.target = '_blank'; link.rel = 'noopener noreferrer';
+    const verdict = eligibility(unit);
+    const message = el('div', 'row-sub', automaticText(unit, null, verdict, age));
+    main.append(link, message); row.append(main); container.append(row);
+    publicIssue(unit.n).then(info => {
+      if (!info) return;
+      link.textContent = '#' + unit.n + ' · ' + String(info.title || '').replace(/^\[[^\]]*\]\s*/, '');
+      message.textContent = automaticText(unit, info, verdict, age);
+    }).catch(() => {});
+  }
+}
+function render(container, units, checkedAt, mode) {
   // How old the dispatcher verdicts are; shown so a stale snapshot never looks freshly verified.
   const ageMin = Math.round((Date.now() - Date.parse(checkedAt || '')) / 60000);
   const age = Number.isFinite(ageMin) && ageMin >= 0 ? ' · checked ' + (ageMin < 1 ? 'just now' : ageMin + ' min ago') : '';
@@ -58,6 +94,7 @@ function render(container, units, checkedAt) {
   container.replaceChildren();
   const queued = (Array.isArray(units) ? units : []).filter(u => safeNumber(u?.n) && u.state === 'queued').slice(0,25);
   if (!queued.length) { container.append(el('div', 'empty', 'No queued card units currently waiting. Check back when new work appears.')); return; }
+  if (mode === 'normal') { renderAutomatic(container, queued, age); return; }
   for (const unit of queued) {
     const row = el('div', 'list-row');
     row.style.cssText = 'flex-wrap:wrap;gap:10px';
@@ -180,7 +217,7 @@ function render(container, units, checkedAt) {
     });
   }
 }
-const api = { render, statusText, eligibility, reasonText };
+const api = { render, statusText, eligibility, reasonText, automaticText };
 root.ArcanaAuthorize = api;
 if (typeof module === 'object' && module.exports) module.exports = api;
 })(typeof globalThis === 'object' ? globalThis : this);
