@@ -104,7 +104,16 @@ export class GameRoom extends DurableObject<Env> {
 
   constructor(state: DurableObjectState, env: Env) {
     super(state, env);
-    this.ctx.blockConcurrencyWhile(async () => { this.room = await this.ctx.storage.get<RoomRecord>(ROOM_KEY) ?? null; });
+    this.ctx.blockConcurrencyWhile(async () => {
+      this.room = await this.ctx.storage.get<RoomRecord>(ROOM_KEY) ?? null;
+      const g = this.room?.goose;
+      if (g && !g.detached && this.env.GOOSEGETA_ENABLED !== 'true') await this.stopGoose();
+      if (g && !g.detached && (g.inFlight || g.chatPending)) {
+        g.status = 'needs attention'; g.reason = 'interrupted-model-request'; g.failures++;
+        g.chatPending = false; g.chatMode = 'muted'; delete g.inFlight;
+        await this.save();
+      }
+    });
   }
 
   async fetch(request: Request): Promise<Response> {
@@ -623,14 +632,19 @@ export class GameRoom extends DurableObject<Env> {
       if (packet.type !== 'stateUpdate' || g.epoch === oldEpoch || g.status !== 'playing' || g.failures) return;
       const playerId = g.seat === 1 ? 'offline-ai' : 'offline-ai-'+g.seat;
       const options = candidates(packet,playerId);
-      if (!options.length) { g.reason = 'unsupported-decision-or-action'; g.status = 'needs attention'; await this.save(); return; }
+      if (!options.length) {
+        // The host also sends interactive snapshots to seats without priority. Waiting is normal.
+        if (!packet.pendingDecision && (!Array.isArray(packet.legalActions) || packet.legalActions.length === 0)) return;
+        g.reason = 'unsupported-decision-or-action'; g.status = 'needs attention'; await this.save(); return;
+      }
+      g.reason = null;
       const epoch = g.epoch; let selected = options[0];
-      if (g.model) {
+      if (g.model && options.length > 1) {
         try {
           const limit = Number(this.env.GOOSEGETA_GAME_TOKENS);
           const {body,reserve} = modelRequest(this.env.GOOSEGETA_MODEL,packet,options);
           if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000000 || g.reservedTokens+reserve > limit) throw Error('game-budget');
-          g.reservedTokens += reserve;
+          g.reservedTokens += reserve; g.inFlight = String(epoch);
           await this.save();
           const result = await this.env.GOOSE_BUDGET!.get(this.env.GOOSE_BUDGET!.idFromName('account-daily')).fetch('https://budget/decide',
             {method:'POST',body:JSON.stringify({body,reserve,options})});
@@ -638,10 +652,14 @@ export class GameRoom extends DurableObject<Env> {
           const answer = await result.json() as {candidateId:string};
           selected = options.find(o => o.id === answer.candidateId)!;
           if (!selected) throw Error('model-output');
-        } catch { g.model = false; g.failures++; g.reason = 'model-paused-or-budget-limit'; g.status = 'needs attention'; await this.save(); return; }
+        } catch {
+          if (this.room?.goose === g && !g.detached) { delete g.inFlight; g.model = false; g.failures++; g.reason = 'model-paused-or-budget-limit'; g.status = 'needs attention'; await this.save(); }
+          return;
+        }
       }
       // Dismiss, newer state, host departure or expiry during an async model call invalidates result.
       if (this.room?.goose !== g || g.epoch !== epoch || g.status !== 'playing' || g.expires <= Date.now() || !this.room.seats[0].online) return;
+      delete g.inFlight;
       g.actions++;
       g.awaiting = {epoch,version:packet.stateVersion,type:selected.action.type} as any;
       await this.sendGoose({type:'submitAction',action:selected.action,interactionEpoch:packet.interactionEpoch});

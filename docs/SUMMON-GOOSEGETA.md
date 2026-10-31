@@ -100,7 +100,7 @@ approving a test build.
 
 | Gate | Status at draft preparation | Evidence still required |
 |---|---|---|
-| A: isolated code/local runtime | Node and local Worker gates passing; native CI pending | Exact-head native compile/chat/strict-deck JUnit; independent review |
+| A: isolated code/local runtime | Native source/targeted tests passed on fcbe23c; updated exact-head CI required | Exact-head native compile/chat/strict-deck JUnit; independent review |
 | B: Android-hosted remote game | NOT PERFORMED | Host-accepted exact deck, mulligan, accepted PlayLand/CastSpell, full turn each way, rejection and disconnect cases |
 | C: actual model gameplay/chat | NOT PERFORMED; disabled | Separately approved key/model/budget, fixed scenarios and live model-backed Android turn/chat |
 | D: owner experience / PC off | NOT PERFORMED | Phone on cellular, owner confirms PC off, remote guest lifecycle, native chat echo/taunt, gloat/HONK after a public event, dismiss |
@@ -108,10 +108,12 @@ approving a test build.
 ## One-screen owner setup — after engineering and approvals
 
 Nothing is deployed or ready to summon today. No subscription is required by this source.
-After the exact-head native gate and review, approve an **isolated test deployment** and
-compatible **test Android build**. The engineer configures the existing Control OAuth
-service binding, matching random service secret, disabled model, and the test room
-endpoint. No production room or Control deployment is implicit.
+After the exact-head native gate and review, approve an **isolated room-service test deployment**, the **gated existing Control Worker/Pages update**,
+and a compatible **test Android build**. The engineer points the existing owner OAuth Control
+service binding at the isolated test rooms, installs matching random service secrets, keeps
+the model disabled, and configures the phone's existing test room endpoint. The existing
+Control interface/Worker would change only after that explicit approval; production room
+hosting and live API spending remain outside it.
 
 On the Fold: host Internet Commander with an empty Friend seat → tap **Invite Goosegeta ·
 Test** → Control opens with the private invitation → select deck and optional trash-talk
@@ -130,3 +132,21 @@ keys or invitation capabilities. Do not label the mission complete before these 
 Primary references used for implementation:
 - https://developers.cloudflare.com/durable-objects/best-practices/websockets/
 - https://developers.openai.com/api/docs/guides/structured-outputs
+
+## Verified engineering evidence before live approval
+
+- Exact native-source head `fcbe23c8f007cb78a873cf2d65663ee6017dafd7`: isolated
+  no-APK run `41217272776` SUCCESS, Android job `124584326740` raw log `BUILD SUCCESSFUL`;
+  strict-deck, original chat, lobby and relay tests selected. JUnit artifact `13048493940`,
+  digest `sha256:be939833668564e6d9f3c0d514eaf177c59cedbae39e68138f1037807a2bcb9d`.
+  Exact counts are not inferred from a successful build; the next candidate logs XML counts.
+- Control head `de1dd2ef607c1e17a6130b9ba6a64bb674ed1daa`: exact-head stabilization
+  run `41217272952`, job `124584327239`: raw log **483 tests / 483 pass / 0 fail**.
+  Website validation and coordination guard also passed. Browser-based visual QA was
+  unavailable because this environment has no installed Chromium binary; mocked browser
+  lifecycle tests passed. Phone layout still needs device acceptance.
+- Local cloud latest changes: **19** pure/prototype tests and **7** real-workerd suites
+  passed, including late provider failure after dismiss and off-turn empty-action waiting.
+  All provider responses are fixtures, never live API calls. Native source has not changed
+  after its green compile gate. Initial invite callback compilation failure in run
+  `41217016167` was fixed, not waived.

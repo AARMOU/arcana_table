@@ -8,14 +8,16 @@ import { modelRequest } from '../../../tools/goosegeta/model.mjs';
 const KEY='local-test-control-key-32-characters-long';
 await build({entryPoints:[new URL('../src/index.ts',import.meta.url).pathname],bundle:true,format:'esm',
   outfile:new URL('../.local/worker.mjs',import.meta.url).pathname,external:['cloudflare:workers']});
-let external=0;
+let external=0, providerStarted, releaseProvider, failNextProvider=false;
 const mf=new Miniflare(convertV4MiniflareOptions({name:'rooms',host:'127.0.0.1',port:0,modules:true,
   scriptPath:new URL('../.local/worker.mjs',import.meta.url).pathname,compatibilityDate:'2026-10-01',
   durableObjects:{ROOMS:{className:'GameRoom',useSQLite:true},GOOSE_BUDGET:{className:'GooseBudget',useSQLite:true}},
   bindings:{GOOSEGETA_ENABLED:'true',GOOSEGETA_OPENAI_ENABLED:'true',OPENAI_API_KEY:'FAKE-LOCAL-ONLY',
     GOOSEGETA_MODEL:'approved-test-model',GOOSEGETA_GAME_TOKENS:'50000',GOOSEGETA_DAILY_TOKENS:'200000',GOOSEGETA_CONTROL_KEY:KEY},
   outboundService:async request=>{
-    external++;assert.equal(request.url,'https://api.openai.com/v1/responses');
+    external++;if(providerStarted){providerStarted();providerStarted=null;await new Promise(resolve=>{releaseProvider=resolve;});}
+    assert.equal(request.url,'https://api.openai.com/v1/responses');
+    if(failNextProvider){failNextProvider=false;return new LocalResponse('',{status:503});}
     // The ONLY provider traffic is intercepted in-process; never touches OpenAI.
     return LocalResponse.json({status:'completed',output:[{type:'message',content:[{type:'output_text',text:'{"candidateId":"0"}'}]}],usage:{total_tokens:10}});
   }}));
@@ -58,13 +60,16 @@ test('workerd: host-only invite, empty Friend isolation, single-use/idempotency,
   await game(host,{type:'mulliganDecision',hand:['my-hand']},2);await outgoing(host,'keepHand');
   await game(host,update(8),3);const action=await outgoing(host,'submitAction');
   assert.deepEqual(action.action,{type:'PlayLand',playerId:'offline-ai',cardId:'land-1'});assert.equal(action.interactionEpoch,'offline-8');
+  await game(host,update(9,[]),4);
+  for(let i=0;i<20;i++){if((await(await control('GOOSE2')).json()).lastTurn===2)break;await new Promise(r=>setTimeout(r,5));}
+  assert.equal((await(await control('GOOSE2')).json()).status,'playing');
   // Real eviction/reconstruction preserves accepted deck, last epoch and sequence; sockets hibernate.
   await mf.unsafeEvictDurableObject('rooms','GameRoom',{name:'GOOSE2',webSockets:'hibernate'});
-  await game(host,update(8),4);await game(host,update(9,[{action:{type:'PassPriority',playerId:'offline-ai'},isAffordable:true}]),5);
-  const next=await outgoing(host,'submitAction');assert.equal(next.interactionEpoch,'offline-9');assert.ok(next.seq>action.seq);
+  await game(host,update(8),5);await game(host,update(10,[{action:{type:'PassPriority',playerId:'offline-ai'},isAffordable:true}]),6);
+  const next=await outgoing(host,'submitAction');assert.equal(next.interactionEpoch,'offline-10');assert.ok(next.seq>action.seq);
   const report=await (await control('GOOSE2')).json();assert.equal(report.actionsSubmitted,2);
   assert.ok(!JSON.stringify(report).includes('my-hand'));assert.ok(!JSON.stringify(report).includes(input.capability));
-  await game(host,{type:'error',message:'host rejected'},6);await game(host,update(10),7);
+  await game(host,{type:'error',message:'host rejected'},7);await game(host,update(11),8);
   assert.equal((await (await control('GOOSE2')).json()).status,'needs attention');
   assert.equal((await control('GOOSE2',{action:'dismiss',sessionId:'old-session'})).status,409);
   await control('GOOSE2',{action:'dismiss',sessionId:status.sessionId});await outgoing(host,'arcanaBye');
@@ -111,6 +116,18 @@ test('workerd: a later human arrival revokes multiplayer banter consent',async()
   const other=await connect('GCHAT2','Second human',false);assert.equal(other.hello.seat,2);
   assert.equal((await(await control('GCHAT2')).json()).chatMode,'muted');
   assert.equal((await(await control('GCHAT2',{action:'chat',sessionId:status.sessionId,chatMode:'ruthless'})).json()).chatMode,'muted');
+});
+test('workerd: dismiss wins over an in-flight provider response and cannot resurrect the guest',async()=>{
+  const h=await setup('GMODEL',['friend']);const {status}=await summon('GMODEL',h,{model:true});await outgoing(h,'lanHello');
+  await game(h,{type:'lanSeat',strictDeck:true},1);await outgoing(h,'lanReady');
+  const started=new Promise(resolve=>{providerStarted=resolve;});
+  await game(h,update(90,[{action:{type:'PlayLand',playerId:'offline-ai',cardId:'land-1'},isAffordable:true},{action:{type:'PassPriority',playerId:'offline-ai'},isAffordable:true}]),2);await started;
+  const dismissed=await control('GMODEL',{action:'dismiss',sessionId:status.sessionId});assert.equal(dismissed.status,200);
+  await outgoing(h,'arcanaBye');failNextProvider=true;releaseProvider();
+  // A round trip on the host socket and owner status must not resurrect or submit.
+  h.send({type:'ping'});await h.wait(p=>p.type==='pong');
+  assert.equal((await(await control('GMODEL')).json()).status,'stopped');
+  assert.equal((await(await control('GMODEL')).json()).actionsSubmitted,0);
 });
 test('existing human directed-relay regressions on actual workerd, including privacy and reconnect',async()=>{
   const oldFetch=globalThis.fetch,oldWS=globalThis.WebSocket;

@@ -56,6 +56,21 @@ jobs:
             --tests 'com.arcanatable.ArgentumRoomChatTest' \
             --tests 'com.arcanatable.MultiplayerLobby*Test' \
             --tests 'com.arcanatable.RelayInboxTest'
+      - name: Verify exact JUnit counts (no skipped chat or strict-deck checks)
+        run: |
+          python3 - <<'PYXML'
+          from pathlib import Path
+          from xml.etree import ElementTree as ET
+          roots = {p.stem: ET.parse(p).getroot() for p in Path('android/app/build/test-results/testDebugUnitTest').glob('TEST-*.xml')}
+          assert roots, 'No Android JUnit evidence'
+          for name, root in sorted(roots.items()):
+              counts = {k: int(root.get(k, '0')) for k in ('tests','failures','errors','skipped')}
+              print(name, counts)
+              assert counts['tests'] > 0 and counts['failures'] == counts['errors'] == 0
+          for name, expected in [('GoosegetaStrictDeckTest', 2), ('ArgentumRoomChatTest', 7)]:
+              root = roots['TEST-com.arcanatable.' + name]
+              assert int(root.get('tests')) == expected and int(root.get('skipped','0')) == 0
+          PYXML
       - uses: actions/upload-artifact@v4
         if: always()
         with:
