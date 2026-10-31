@@ -231,9 +231,17 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
         selectedPlayer = active
     }
 
-    LaunchedEffect(roomHost, roomClient, cloudRoomClient, argentumEnabled) {
-        if (roomHost != null || roomClient != null || cloudRoomClient != null || argentumEnabled) LanConnectionService.start(context)
-        else if (!argentumEnabled) LanConnectionService.stop(context)
+    // The connection guard follows the *presence* of any live game, not individual socket
+    // identities. Replacing a room client must not cycle the foreground service off.
+    val keepGameConnectionActive = roomHost != null || roomClient != null || cloudRoomClient != null || argentumEnabled
+    LaunchedEffect(keepGameConnectionActive) {
+        if (keepGameConnectionActive) LanConnectionService.start(context)
+        else LanConnectionService.stop(context)
+    }
+    // Only a real screen teardown may stop the guard. A room/client key change is not a
+    // teardown: its keyed DisposableEffect below must close old sockets, never the service.
+    DisposableEffect(context) {
+        onDispose { LanConnectionService.stop(context) }
     }
     LaunchedEffect(argentumEnabled) {
         if (argentumEnabled && argentumStatus == ArgentumConnectionStatus.DISCONNECTED) argentumSocket.connect(lobbyPlayerName)
@@ -361,7 +369,8 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
             hostOwnedByEffect?.close()
             clientOwnedByEffect?.close()
             cloudClientOwnedByEffect?.close()
-            LanConnectionService.stop(context)
+            // Never stop LanConnectionService here: this runs whenever a room socket or
+            // host instance is replaced, including successful joins and reconnections.
         }
     }
     LaunchedEffect(players) { nextId = maxOf(nextId, (players.flatMap { it.library + it.hand + it.battlefield + it.graveyard + it.exile + it.revealed }.maxOfOrNull { it.id } ?: 0) + 1) }
