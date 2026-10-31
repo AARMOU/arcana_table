@@ -227,7 +227,7 @@ test('workerd: owner recovers a stalled SelectCardsDecision via host resync and 
   }
   assert.equal(stuck.reason,'unsupported-decision-or-action:decision-SelectCardsDecision');
   assert.equal((await control('GSELECT',{action:'recover',sessionId:'wrong'})).status,409);
-  const resume=await control('GSELECT',{action:'recover',sessionId:status.sessionId});
+  const resume=await control('GSELECT',{action:'chat',chatMode:'recover',model:true,sessionId:status.sessionId});
   assert.equal(resume.status,200);
   const request=await outgoing(h,'requestResync');
   assert.equal(request.type,'requestResync');
