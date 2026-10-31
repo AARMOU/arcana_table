@@ -1533,7 +1533,7 @@
    ]
   },
   "Effects.CreateToken": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -1908,7 +1908,7 @@
    ]
   },
   "Effects.ForEachInGroup": {
-   "count": 25,
+   "count": 26,
    "examples": [
     {
      "card": "Mutilate",
@@ -2047,7 +2047,7 @@
    ]
   },
   "Effects.GrantKeyword": {
-   "count": 15,
+   "count": 16,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -2983,7 +2983,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3304,7 +3304,7 @@
    ]
   },
   "Keyword.VIGILANCE": {
-   "count": 12,
+   "count": 13,
    "examples": [
     {
      "card": "Wilson, Refined Grizzly",
@@ -3421,7 +3421,7 @@
    ]
   },
   "KeywordAbility.crew": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Knight Paladin",
@@ -3452,6 +3452,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ShorikaiGenesisEngine.kt",
      "lines": 45,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ShorikaiGenesisEngineScenarioTest.kt"
+    },
+    {
+     "card": "Thunderhawk Gunship",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ThunderhawkGunship.kt",
+     "lines": 50,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ThunderhawkGunshipScenarioTest.kt"
     }
    ]
   },
@@ -3749,7 +3755,7 @@
    ]
   },
   "Triggers.self.attacks": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -3887,7 +3893,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 40,
+   "count": 41,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -4253,7 +4259,7 @@
    ]
   },
   "keywordAbility()": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4294,7 +4300,7 @@
    ]
   },
   "keywords()": {
-   "count": 78,
+   "count": 79,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4539,7 +4545,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -5945,7 +5951,7 @@
    ]
   },
   "EffectTarget.IterationEntity": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Mutilate",
@@ -6347,7 +6353,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 95,
+   "count": 96,
    "examples": [
     {
      "card": "Their Name Is Death",
