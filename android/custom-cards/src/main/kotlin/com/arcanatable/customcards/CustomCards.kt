@@ -191,6 +191,7 @@ object CustomCards {
         Entry(MageRingNetwork, "CMM", "Six WotC precons"),
         Entry(UginsInsight, "BFZ", "Six WotC precons"),
         Entry(GargoyleFlock, "40K", "Six WotC precons"),
+        Entry(MarneusCalgar, "40K", "Six WotC precons"),
         Entry(SifterOfSkulls, "M3C", "Six WotC precons"),
         Entry(DrownerOfHope, "M3C", "Six WotC precons"),
         Entry(MoltenSlagheap, "40K", "Six WotC precons"),
