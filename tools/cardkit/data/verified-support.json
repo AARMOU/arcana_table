@@ -406,6 +406,45 @@
         }
       ]
     },
+    "Tangleweave Armor": {
+      "summary": "Dynamic equipped-creature stats use GrantDynamicStats and Filters.EquippedCreature (Cranial Plating scenario-tested). Aggregate each commander-filtered zone's greatest mana value with DynamicAmounts.battlefield/zone(...).maxManaValue(), then combine zone values with DynamicAmounts.max; Zone.COMMAND, commander filtering, and zone aggregations are supported by the committed SDK API. Emissary Escort, Boon of Boseiju, and Wick's Patrol implement the constituent dynamic-stat and max-mana-value patterns; Akroma's Will scenario-tests commander filtering.",
+      "verifiedBy": "Copilot, inspected pinned Argentum sources, committed SDK API, and custom scenario tests 2026-10-31",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2025/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/eoe/cards/EmissaryEscort.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/neo/cards/BoonOfBoseiju.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/blb/cards/WicksPatrol.kt",
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CranialPlating.kt",
+        "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CranialPlatingScenarioTest.kt",
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AkromasWill.kt",
+        "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AkromasWillScenarioTest.kt",
+        "docs/agents/generated/sdk-api.md",
+        "docs/agents/argentum-upstream/card-sdk-language-reference.md"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Equipped creature gets +X/+X, where X is the greatest mana value among your commanders.",
+          "primitives": [
+            "GrantDynamicStats",
+            "Filters.EquippedCreature",
+            "DynamicAmounts.max",
+            "DynamicAmounts.battlefield.maxManaValue",
+            "DynamicAmounts.zone.maxManaValue",
+            "GameObjectFilter.commander",
+            "Zone.COMMAND"
+          ]
+        }
+      ],
+      "baseSha": "997d860091f8a439db6a7c7016dbacbd66319e71",
+      "oracleHash": "98b3957af8f25d1d493e967d67cbc1a8591d854c55e84ed7d675c7ab1963b7dc",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
     "Whiptongue Hydra": {
       "summary": "ETB: Triggers.self.enters() + Effects.DestroyAll(GameObjectFilter.Creature.withKeyword(Keyword.FLYING), storeDestroyedAs = collection) then Effects.AddDynamicCounters(PLUS_ONE_PLUS_ONE, collection.count, Self), as in Bane of Progress; Squall and Plummet show the flying filter",
       "verifiedBy": "Copilot, source inspection 2026-10-31 (pinned Argentum engine c1c04ca3265c61df913af6db65460ad4ce409614)",
