@@ -209,6 +209,34 @@
       "baseSha": "f27e2c6caf19296dd83e871b690dadcd89bfe04c",
       "oracleHash": "62ed74687ea9a962573a422fb6e7721af53c3fe2510b2ee1c0955f1225ba6152",
       "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Acolyte Hybrid": {
+      "summary": "Heavy Rock Cutter is an ability word. Attack trigger with up to one target artifact = Kellan, Inquisitive Prodigy. 'If an artifact is destroyed this way, its controller draws' = the pinned destroy-outcome pipeline: gather(ChosenTargets) -> moveTracked(MoveType.Destroy) (indestructible/regenerated/removed targets drop out) -> ifNotEmpty(destroyed) -> ForEachPlayer(Player.ControllerOf(target)) draw 1, exactly as Dire Strain Rampage ('its controller') and Break the Spell ('destroyed this way, draw'). The #141 Priority A blocker (unverified) is disproven; the 'outcome of a specific destroy' pattern blocker is removed.",
+      "verifiedBy": "Claude, 2026-10-31: read the pinned (7fb07333) sources of Kellan, Dire Strain Rampage and Break the Spell; gather/moveTracked/ifNotEmpty/CardSource$ChosenTargets/MoveType present in the committed SDK jar and sdk-api.md",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mkm/cards/KellanInquisitiveProdigy.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mid/cards/DireStrainRampage.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/woe/cards/BreakTheSpell.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Heavy Rock Cutter — Whenever this creature attacks, destroy up to one target artifact. If an artifact is destroyed this way, its controller draws a card.",
+          "primitives": [
+            "Triggers.self.attacks()",
+            "target(TargetFilter.Artifact",
+            "optional = true)",
+            "Effects.Pipeline{gather(CardSource.ChosenTargets)}",
+            "moveTracked(CardDestination.ToZone(Zone.GRAVEYARD)",
+            "moveType = MoveType.Destroy)",
+            "ifNotEmpty(destroyed)",
+            "Effects.ForEachPlayer(Player.ControllerOf(target)",
+            "Effects.DrawCards(1))"
+          ]
+        }
+      ],
+      "baseSha": "e26b0ef62fc510ede821afe09ab2fb26b271eb56",
+      "oracleHash": "1ad0a0b730d67f8dbe88d6614d8196a41b055db8c91adf84a5bc4e637f6f7235",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
     }
   }
 }
