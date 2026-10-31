@@ -2,9 +2,9 @@ package com.arcanatable.customcards.cards
 
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.dsl.*
-import com.wingedsheep.sdk.scripting.conditions.ComparisonOperator
 import com.wingedsheep.sdk.scripting.filters.unified.TargetFilter
 import com.wingedsheep.sdk.scripting.effects.CardSource
+import com.wingedsheep.sdk.scripting.effects.CardDestination
 import com.wingedsheep.sdk.scripting.references.Player
 import com.wingedsheep.sdk.scripting.GameObjectFilter
 import com.wingedsheep.sdk.core.Zone
@@ -25,22 +25,37 @@ val UlamogsNullifier = card("Ulamog's Nullifier") {
 
     triggeredAbility {
         trigger = Triggers.self.enters()
+        // The ETB must target a spell, even if the controller declines processing.
         target(TargetFilter.SpellOnStack)
-        effect = Effects.If(
-            Conditions.CompareAmounts(
-                DynamicAmounts.count(Player.EachOpponent, Zone.EXILE, GameObjectFilter.Any),
-                ComparisonOperator.GTE,
-                2,
-            ),
-            Effects.May(
-                Effects.Pipeline {
-                    val exiled = gather(CardSource.FromZone(Zone.EXILE, Player.EachOpponent))
-                    val two = chooseExactly(2, exiled)
-                    toGraveyard(two)
-                    run(Effects.CounterSpell())
-                },
-            ),
-        )
+        effect = Effects.Pipeline {
+            // Check actual ownership, not the controller of the effect that exiled a card.
+            val eligible = gather(
+                CardSource.FromZone(
+                    zone = Zone.EXILE,
+                    player = Player.Each,
+                    filter = GameObjectFilter.Any.ownedByOpponent(),
+                ),
+                name = "nullifierEligibleOpponentOwnedExiles",
+            )
+            ifNotEmpty(eligible, minSize = 2) {
+                run(Effects.May(Effects.Pipeline {
+                    val chosen = chooseExactly(
+                        2,
+                        from = eligible,
+                        prompt = "Choose two cards your opponents own from exile",
+                    )
+                    val moved = moveTracked(
+                        chosen,
+                        CardDestination.ToZone(Zone.GRAVEYARD),
+                        name = "nullifierProcessedCards",
+                    )
+                    // "If you do": counter only after two cards actually moved.
+                    ifNotEmpty(moved, minSize = 2) {
+                        run(Effects.CounterSpell())
+                    }
+                }))
+            }
+        }
     }
 
     metadata {

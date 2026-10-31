@@ -18,7 +18,7 @@
    ]
   },
   "Conditions.CompareAmounts": {
-   "count": 10,
+   "count": 9,
    "examples": [
     {
      "card": "Endless Atlas",
@@ -45,16 +45,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DefenseOfTheHeartScenarioTest.kt"
     },
     {
-     "card": "Ulamog's Nullifier",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
-     "lines": 53,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
-    },
-    {
      "card": "Purphoros, God of the Forge",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PurphorosGodOfTheForge.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PurphorosGodOfTheForgeScenarioTest.kt"
+    },
+    {
+     "card": "Tectonic Edge",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TectonicEdge.kt",
+     "lines": 57,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TectonicEdgeScenarioTest.kt"
     }
    ]
   },
@@ -766,17 +766,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AkromasWill.kt",
      "lines": 63,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AkromasWillScenarioTest.kt"
-    }
-   ]
-  },
-  "DynamicAmounts.count": {
-   "count": 1,
-   "examples": [
-    {
-     "card": "Ulamog's Nullifier",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
-     "lines": 53,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
     }
    ]
   },
@@ -1549,16 +1538,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RewindScenarioTest.kt"
     },
     {
-     "card": "Ulamog's Nullifier",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
-     "lines": 53,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
-    },
-    {
      "card": "Warping Wail",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WarpingWail.kt",
      "lines": 64,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WarpingWailScenarioTest.kt"
+    },
+    {
+     "card": "Ulamog's Nullifier",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
+     "lines": 68,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
     }
    ]
   },
@@ -2300,7 +2289,7 @@
    ]
   },
   "Effects.If": {
-   "count": 13,
+   "count": 12,
    "examples": [
     {
      "card": "Grey Knight Paragon",
@@ -7292,7 +7281,7 @@
    ]
   },
   "Player.Each": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Sautekh Immortal",
@@ -7333,7 +7322,7 @@
    ]
   },
   "Player.EachOpponent": {
-   "count": 19,
+   "count": 18,
    "examples": [
     {
      "card": "Silence",
@@ -7795,7 +7784,7 @@
     {
      "card": "Ulamog's Nullifier",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
-     "lines": 53,
+     "lines": 68,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
     }
    ]

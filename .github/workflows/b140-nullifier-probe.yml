@@ -1,0 +1,154 @@
+name: B140 Nullifier exact-head engine acceptance
+on:
+  push:
+    branches:
+      - gpt/b140-nullifier-processor-port-20261028
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: b140-nullifier-engine-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  nullifier-real-engine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Verify generated Cardkit pattern index is current
+        run: tools/cardkit/cardkit patterns --check
+      - name: Execute B140 registered Nullifier engine regressions
+        id: nullifier_tests
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :custom-cards:test --tests 'com.arcanatable.customcards.UlamogsNullifierScenarioTest'
+      - name: Summarize and require exactly thirty-seven passing scenarios
+        # Gradle exits nonzero on a real rules/privacy regression. Still inspect its
+        # JUnit XML so the exact failures are visible without weakening the gate.
+        if: ${{ !cancelled() && steps.nullifier_tests.outcome != 'skipped' }}
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          report = Path('android/custom-cards/build/test-results/test/TEST-com.arcanatable.customcards.UlamogsNullifierScenarioTest.xml')
+          assert report.is_file(), f'Missing JUnit XML: {report}'
+          root = ET.parse(report).getroot()
+          stats = {key: int(root.get(key, '0')) for key in ('tests', 'failures', 'errors', 'skipped')}
+          failed = [case.get('name', '<unnamed>') for case in root.findall('testcase')
+                    if case.find('failure') is not None or case.find('error') is not None]
+          print(f'Nullifier exact-head JUnit: {stats}; failing scenarios: {failed}')
+          summary = os.environ.get('GITHUB_STEP_SUMMARY')
+          if summary:
+              with open(summary, 'a', encoding='utf-8') as out:
+                  out.write(f"### Nullifier exact-head engine acceptance\n\n{stats}\n\n")
+                  for name in failed:
+                      out.write(f"- FAIL: `{name}`\n")
+          assert stats == {'tests': 37, 'failures': 0, 'errors': 0, 'skipped': 0}, stats
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: b140-nullifier-exact-head-junit
+          retention-days: 14
+          path: |
+            android/custom-cards/build/test-results/test/
+            android/custom-cards/build/reports/tests/test/
+
+  incursion-ai-differential:
+    # Diagnostic-only comparison; never mask a failing AI game or count it as playable.
+    # Both runs execute the same existing B140 mirror-game test with different card sources.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: b140-control
+            ref: f8c13fb9820d2452ae0412e1b1583090c0dc3174
+          # Independent JVM/workspace replay of the *same* B140 source, test fixture,
+          # seed and shuffled deck. Different results between these two controls
+          # demonstrate nondeterminism without attributing it to Nullifier.
+          - label: b140-control-replay
+            ref: f8c13fb9820d2452ae0412e1b1583090c0dc3174
+          - label: nullifier-candidate
+            ref: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+          persist-credentials: false
+      - name: Show exact checked-out source
+        run: |
+          git rev-parse HEAD
+          git diff --exit-code
+      - name: Reject stale B140 control refs before interpreting differential
+        if: matrix.label != 'nullifier-candidate'
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin gpt/b140-card-request-test-apk-20261028
+          live=$(git rev-parse FETCH_HEAD)
+          pinned=$(git rev-parse HEAD)
+          if [ "$live" != "$pinned" ]; then
+            echo "::error::B140 source advanced ($pinned -> $live); update both controls and rerun."
+            exit 1
+          fi
+      - name: Reject candidate missing any current B140 source integrations
+        if: matrix.label == 'nullifier-candidate'
+        run: |
+          set -euo pipefail
+          # Shallow fetch both exact histories. A missing ancestor fails closed;
+          # a candidate cannot be compared against newer B140 as if integrated.
+          git fetch --no-tags --depth=150 origin "${{ github.sha }}"
+          git fetch --no-tags --depth=150 origin gpt/b140-card-request-test-apk-20261028
+          live=$(git rev-parse FETCH_HEAD)
+          if ! git merge-base --is-ancestor "$live" HEAD; then
+            echo "::error::Nullifier candidate does not include current B140 source $live. Merge-forward and regenerate Cardkit patterns before interpreting the AI comparison."
+            exit 1
+          fi
+      - name: Use the same diagnostic-only AI mirror test on both engine sources
+        # The integrated B140 fixture already has deterministic engine seeds and
+        # strict per-action state replay. Overlay the same exact fixture on controls.
+        # Only the test fixture is overlaid: B140 runtime/cards/assets stay untouched.
+        run: |
+          set -euo pipefail
+          fixture=android/app/src/test/java/com/arcanatable/EldraziIncursionPlayableTest.kt
+          git fetch --no-tags --depth=1 origin "${{ github.sha }}"
+          git show "${{ github.sha }}:$fixture" > "$fixture"
+          expected=$(git rev-parse "${{ github.sha }}:$fixture")
+          actual=$(git hash-object "$fixture")
+          test "$actual" = "$expected"
+          echo "Mirror test fixture SHA: $actual"
+          echo "Engine source SHA: $(git rev-parse HEAD)"
+          git diff --name-only
+          unexpected=$(git diff --name-only | grep -v -x "$fixture" || true)
+          test -z "$unexpected"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Execute identical Eldrazi Incursion AI mirror on each exact source
+        working-directory: android
+        run: ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest --tests 'com.arcanatable.EldraziIncursionPlayableTest.incursionMirrorAiGame' --info
+      - name: Preserve seed, assertion and stack trace for differential triage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: incursion-ai-mirror-${{ matrix.label }}-${{ github.sha }}
+          retention-days: 14
+          path: |
+            android/app/build/test-results/test/
+            android/app/build/reports/tests/testDebugUnitTest/
