@@ -262,6 +262,7 @@ object CustomCards {
         Entry(Chronomancer, "40K", "Six WotC precons"),
         Entry(RoyalWarden, "40K", "Six WotC precons"),
         Entry(KeeperOfSecrets, "40K", "Six WotC precons"),
+        Entry(Poxwalkers, "40K", "Six WotC precons"),
         Entry(NurglesRot, "40K", "Six WotC precons"),
         Entry(MatterReshaper, "OGW", "Six WotC precons"),
         Entry(Scaretiller, "ELD", "Six WotC precons"),

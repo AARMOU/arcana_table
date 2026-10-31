@@ -2347,7 +2347,7 @@
    ]
   },
   "Effects.Move": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -2366,6 +2366,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ContinueQuestion.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ContinueQuestionScenarioTest.kt"
+    },
+    {
+     "card": "Poxwalkers",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Poxwalkers.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PoxwalkersScenarioTest.kt"
     },
     {
      "card": "Nurgle's Rot",
@@ -2787,7 +2793,7 @@
    ]
   },
   "Keyword.DEATHTOUCH": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Venomthrope",
@@ -2806,6 +2812,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SkorpekhDestroyer.kt",
      "lines": 35,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SkorpekhDestroyerScenarioTest.kt"
+    },
+    {
+     "card": "Poxwalkers",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Poxwalkers.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PoxwalkersScenarioTest.kt"
     }
    ]
   },
@@ -4066,7 +4078,7 @@
    ]
   },
   "Triggers.you.casts": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Skittering Cicada",
@@ -4093,16 +4105,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/IronManBleedingEdgeScenarioTest.kt"
     },
     {
+     "card": "Poxwalkers",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Poxwalkers.kt",
+     "lines": 41,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PoxwalkersScenarioTest.kt"
+    },
+    {
      "card": "Sai, Master Thopterist",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SaiMasterThopterist.kt",
      "lines": 49,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SaiMasterThopteristScenarioTest.kt"
-    },
-    {
-     "card": "The Fantasticar",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TheFantasticar.kt",
-     "lines": 56,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TheFantasticarScenarioTest.kt"
     }
    ]
   },
@@ -4294,7 +4306,7 @@
    ]
   },
   "keywords()": {
-   "count": 78,
+   "count": 79,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4539,7 +4551,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6044,7 +6056,7 @@
    ]
   },
   "EffectTarget.Self": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Compy Swarm",
