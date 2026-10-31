@@ -207,3 +207,165 @@ test('skip report posts approved, receipt-less, ineligible PRs on #78 only when 
   quiet.github.rest.issues.createComment=async()=>{throw Error('must not post');};
   assert.equal(await P.reportIntegrationSkips({github:quiet.github,owner:'AARMOU',repo:'arcana_table'}),'unchanged');
 });
+
+function transientReport(p=plan()) {
+  const r=result(p).report;
+  r.status='blocked';r.gates.find(g=>g.name==='custom-and-android').ok=false;
+  r.failureEvidence={complete:true,cases:[{
+    className:'com.arcanatable.FourPlayerLanTransportTest',
+    name:'threeGuestSocketsHavePrivateSendChannelsAndRejectFifthPhone',type:'java.lang.AssertionError',
+    message:'java.lang.AssertionError: LAN multi-host failed to bind: java.net.BindException: Address already in use'}]};
+  return r;
+}
+function retryMock() {
+  const m=githubMock(), refs=new Map(), comments=[], updates=[];
+  const getRef=m.github.rest.git.getRef;
+  m.github.rest.git.getRef=async a=>{
+    if (!a.ref.startsWith(P.RETRY_REF)) return getRef(a);
+    if (!refs.has(a.ref)) throw Object.assign(Error('Not found'),{status:404});
+    return {data:{object:{sha:refs.get(a.ref)}}};
+  };
+  m.github.rest.git.createRef=async a=>{
+    const ref=a.ref.replace(/^refs\//,'');
+    if(refs.has(ref))throw Object.assign(Error('Reference already exists'),{status:422});
+    refs.set(ref,a.sha);m.writes.push(['retry-ref',a]);return {data:{ref:a.ref}};
+  };
+  m.github.rest.actions={getWorkflowRun:async()=>({data:{
+    path:'.github/workflows/arcana-approved-card-integration.yml',head_branch:'main',head_sha:control,
+    head_repository:{full_name:cfg.policy.repository},event:'schedule',status:'completed',conclusion:'success'}})};
+  m.github.rest.issues.listComments=async({issue_number})=>({data:comments.filter(c=>c.issue===issue_number)});
+  m.github.rest.issues.createComment=async a=>{
+    const c={id:comments.length+1,issue:a.issue_number,user:{id:41898282,login:'github-actions[bot]'},body:a.body};
+    comments.push(c);m.writes.push(['comment',a]);return {data:c};
+  };
+  m.github.rest.issues.updateComment=async a=>{
+    const c=comments.find(c=>c.id===a.comment_id);assert.ok(c);c.body=a.body;updates.push(a);
+  };
+  return {...m,refs,comments,updates};
+}
+async function firstTransient(m) {
+  return P.publish({...common,github:m.github,plan:plan(),report:transientReport(),files:[],expectedSources:{}});
+}
+test('only the exact single LAN bind failure with all other gates green is retryable',()=>{
+  assert.equal(P.retryClassification(transientReport()),P.RETRY_CLASS);
+  const mutations=[r=>delete r.failureEvidence,r=>r.failureEvidence.complete=false,
+    r=>r.failureEvidence.cases.push({...r.failureEvidence.cases[0]}),r=>r.failureEvidence.cases=[],
+    r=>r.failureEvidence.cases[0].type='java.net.BindException',r=>r.failureEvidence.cases[0].name='other',
+    r=>r.failureEvidence.cases[0].message+=' plus something else',r=>r.gates[0].ok=false,
+    r=>r.gates.pop(),r=>r.gates[0]=r.gates[1],r=>r.reason='unrelated infrastructure failure',r=>r.status='passed'];
+  for(const mutate of mutations){const r=transientReport();mutate(r);assert.equal(P.retryClassification(r),null);}
+});
+test('full failure -> one atomic retry -> failure updates existing receipts and stays blocked',async()=>{
+  const m=retryMock();const initial=await firstTransient(m);
+  assert.equal(initial.recovery.state,'available');
+  assert.equal(m.writes.some(w=>['tree','ref','close'].includes(w[0])),false);
+  const p=await P.planNext({...common,github:m.github,controlSha:control});
+  assert.equal(p.autoRetry.key,initial.recovery.key);
+  await P.reserveRetry({...common,github:m.github,plan:p,runAttempt:1});
+  assert.equal(m.refs.size,1);
+  assert.equal(m.comments.length,2,'reservation edits the original PR and #81 notes');
+  assert.match(m.comments[0].body,/reserved/);
+  for(let i=0;i<4;i++)assert.equal(await P.planNext({...common,github:m.github,controlSha:control}),null);
+  await assert.rejects(P.reserveRetry({...common,github:m.github,plan:p,runAttempt:1}));
+  const receipt=await P.publish({...common,github:m.github,plan:p,report:transientReport(p),files:[],expectedSources:{}});
+  assert.equal(receipt.recovery.state,'exhausted');
+  assert.equal(m.comments.length,2,'second failure does not spam duplicate receipts');
+  assert.match(m.comments[0].body,/Automatic retry failed/);
+  assert.equal(await P.planNext({...common,github:m.github,controlSha:control}),null);
+  assert.equal(m.writes.some(w=>['tree','ref','close'].includes(w[0])),false);
+  assert.ok(await P.planNext({...common,github:m.github,controlSha:control,retry:true}),'explicit owner retry remains available');
+});
+test('one successful retry still requires every destination gate and reconstructed approved file',async()=>{
+  const m=retryMock();await firstTransient(m);
+  const p=await P.planNext({...common,github:m.github,controlSha:control});
+  await P.reserveRetry({...common,github:m.github,plan:p,runAttempt:1});
+  const r=result(p);r.report.gates[0].ok=false;
+  await assert.rejects(P.publish({...common,github:m.github,plan:p,...r}),/every gate/);
+  assert.equal(m.writes.some(w=>w[0]==='ref'),false);
+  const receipt=await P.publish({...common,github:m.github,plan:p,...result(p)});
+  assert.equal(receipt.status,'integrated');
+  assert.equal(m.writes.filter(w=>w[0]==='ref').length,1);
+});
+test('duplicate simultaneous reservations use one durable claim; cancellation never refunds it',async()=>{
+  const m=retryMock();await firstTransient(m);
+  const p=await P.planNext({...common,github:m.github,controlSha:control});
+  const results=await Promise.allSettled([1,2].map(()=>P.reserveRetry({...common,github:m.github,plan:p,runAttempt:1})));
+  assert.equal(results.filter(r=>r.status==='fulfilled').length,1);
+  assert.equal(m.refs.size,1);
+  // Simulate a new process/cron run after cancellation: only remote state survives.
+  assert.equal(await P.planNext({...common,github:m.github,controlSha:control}),null);
+  await assert.rejects(P.reserveRetry({...common,github:m.github,plan:p,runAttempt:2}));
+});
+test('retry provenance rejects bot comments from PRs, unrelated workflows and stale controls',async()=>{
+  const changes=[r=>r.event='pull_request',r=>r.head_branch='attacker',r=>r.path='other.yml',
+    r=>r.head_repository.full_name='attacker/fork',r=>r.head_sha=destination,r=>r.conclusion='failure',r=>r.status='in_progress'];
+  for(const mutate of changes){
+    const m=retryMock();await firstTransient(m);
+    const original=m.github.rest.actions.getWorkflowRun;
+    m.github.rest.actions.getWorkflowRun=async()=>{const r=await original();mutate(r.data);return r;};
+    assert.equal(await P.planNext({...common,github:m.github,controlSha:control}),null);
+    assert.equal(m.refs.size,0);
+  }
+  const m=retryMock();await firstTransient(m);
+  m.comments[0].user.id=7;
+  assert.equal((await P.planNext({...common,github:m.github,controlSha:control})).autoRetry,undefined);
+});
+test('recheck before reservation refuses changed source, owner, base or policy without spending retry',async()=>{
+  for(const kind of ['source','review','base','policy','api','rerun']){
+    const m=retryMock();await firstTransient(m);
+    const p=await P.planNext({...common,github:m.github,controlSha:control});
+    if(kind==='source')m.github.rest.pulls.get=async()=>({data:{...snapshot().pr,head:{...snapshot().pr.head,sha:destination}}});
+    if(kind==='review')m.github.rest.pulls.listReviews=async()=>({data:[]});
+    if(kind==='base'){
+      const get=m.github.rest.git.getRef;
+      m.github.rest.git.getRef=async a=>a.ref==='heads/'+P.TARGET?{data:{object:{sha:destination}}}:get(a);
+    }
+    if(kind==='api')m.github.rest.actions.getWorkflowRun=async()=>{throw Error('API unavailable');};
+    await assert.rejects(P.reserveRetry({...common,github:m.github,plan:p,
+      cfg:kind==='policy'?{...cfg,policyHash:'changed'}:cfg,runAttempt:kind==='rerun'?2:1}));
+    assert.equal(m.refs.size,0,kind);
+  }
+});
+test('durable retry identity binds source, target, base, PR and policy; API uncertainty stops planning',async()=>{
+  const p=plan();
+  for(const change of [{pr:411},{sourceSha:destination},{baseSha:destination},{target:'main'},{policyHash:'changed'}])
+    assert.notEqual(P.retryKey({...p,...change}),P.retryKey(p));
+  const m=retryMock();await firstTransient(m);
+  m.github.rest.git.getRef=async()=>{throw Object.assign(Error('Rate limited'),{status:403});};
+  await assert.rejects(P.planNext({...common,github:m.github,controlSha:control}),/Rate limited/);
+});
+test('workflow reserves before candidate execution, forbids automatic reruns and keeps PRs read-only',()=>{
+  const y=require('node:fs').readFileSync('.github/workflows/arcana-approved-card-integration.yml','utf8');
+  assert.match(y,/group: arcana-approved-card-integration\n  cancel-in-progress: false/);
+  const reservation=y.split('  retry-reservation:')[1].split('  destination-tests:')[0];
+  assert.match(reservation,/github.event_name != 'pull_request'/);
+  assert.match(reservation,/P.reserveRetry/);
+  assert.doesNotMatch(reservation,/path: candidate|python3|gradlew|@copilot/i);
+  const destination=y.split('  destination-tests:')[1].split('  receipt-contract:')[0];
+  assert.match(destination,/needs: \[plan, retry-reservation\]/);
+  assert.match(destination,/needs.retry-reservation.result == 'success'/);
+  assert.match(destination,/github.run_attempt == 1/);
+  assert.match(destination,/contents: read/);
+  assert.doesNotMatch(destination,/contents: write|issues: write/);
+  assert.match(y,/Manual blocked retry requires an owner workflow dispatch/);
+});
+test('partial reservation publication cannot refund the consumed attempt or run candidate code',async()=>{
+  const m=retryMock();await firstTransient(m);
+  const p=await P.planNext({...common,github:m.github,controlSha:control});
+  m.github.rest.issues.updateComment=async()=>{throw Error('Comments unavailable');};
+  await assert.rejects(P.reserveRetry({...common,github:m.github,plan:p,runAttempt:1}),/Comments unavailable/);
+  assert.equal(m.refs.size,1);
+  assert.equal(await P.planNext({...common,github:m.github,controlSha:control}),null);
+  assert.equal(m.writes.some(w=>['tree','ref','close'].includes(w[0])),false);
+});
+test('changed base or policy gets fresh full revalidation, not an unchanged automatic retry',async()=>{
+  const m=retryMock();await firstTransient(m);
+  const changed=await P.planNext({...common,github:m.github,controlSha:control,cfg:{...cfg,policyHash:'new-policy'}});
+  assert.equal(changed.autoRetry,undefined);
+  const get=m.github.rest.git.getRef;
+  m.github.rest.git.getRef=async a=>a.ref==='heads/'+P.TARGET?{data:{object:{sha:destination}}}:get(a);
+  const newBase=await P.planNext({...common,github:m.github,controlSha:control});
+  assert.equal(newBase.baseSha,destination);
+  assert.equal(newBase.autoRetry,undefined);
+  assert.equal(m.refs.size,0);
+});

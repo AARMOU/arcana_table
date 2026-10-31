@@ -55,11 +55,13 @@ jobs:
       pull-requests: read
       checks: read
       issues: read
+      actions: read
     outputs:
       eligible: ${{ steps.plan.outputs.eligible }}
       plan: ${{ steps.plan.outputs.plan }}
       base: ${{ steps.plan.outputs.base }}
       control: ${{ steps.plan.outputs.control }}
+      automatic_retry: ${{ steps.plan.outputs.automatic_retry }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -74,15 +76,18 @@ jobs:
             const P = require('./scripts/card-integration.cjs');
             const fs = require('node:fs');
             const controlSha = require('node:child_process').execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
+            if (process.env.RETRY_BLOCKED==='true' && (context.eventName!=='workflow_dispatch' || String(context.actor).toLowerCase()!=='aarmou'))
+              throw Error('Manual blocked retry requires an owner workflow dispatch');
             const plan = await P.planNext({github,...context.repo,cfg:P.config(),controlSha,
               retry:process.env.RETRY_BLOCKED==='true'});
-            if (!plan) { core.summary.addRaw('No eligible approved card awaiting integration; unchanged blocked cards are not retried automatically.').write(); return; }
+            if (!plan) { core.summary.addRaw('No eligible approved card awaiting integration. Unknown failures and consumed infrastructure retries remain blocked for owner review.').write(); return; }
             fs.mkdirSync('integration-plan',{recursive:true});
             fs.writeFileSync('integration-plan/plan.json',JSON.stringify(plan));
             core.setOutput('eligible','true');
             core.setOutput('plan',Buffer.from(JSON.stringify(plan)).toString('base64'));
             core.setOutput('base',plan.baseSha);
             core.setOutput('control',controlSha);
+            core.setOutput('automatic_retry',plan.autoRetry ? 'true' : 'false');
             core.summary.addRaw(`Queued approved PR #${plan.pr} on exact Android base ${plan.baseSha}. NO APK.`).write();
       - uses: actions/upload-artifact@v4
         if: steps.plan.outputs.eligible == 'true'
@@ -92,9 +97,36 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
-  destination-tests:
+  retry-reservation:
     needs: plan
-    if: needs.plan.outputs.eligible == 'true'
+    if: needs.plan.outputs.eligible == 'true' && github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: read
+      checks: read
+      issues: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.control }}
+          persist-credentials: false
+      - name: Atomically consume the one automatic retry before any candidate execution
+        uses: actions/github-script@v7
+        env:
+          PLAN_B64: ${{ needs.plan.outputs.plan }}
+        with:
+          script: |
+            const P = require('./scripts/card-integration.cjs');
+            const plan = JSON.parse(Buffer.from(process.env.PLAN_B64,'base64').toString());
+            await P.reserveRetry({github,...context.repo,cfg:P.config(),plan,runAttempt:Number(process.env.GITHUB_RUN_ATTEMPT)});
+
+  destination-tests:
+    needs: [plan, retry-reservation]
+    # Rerunning a failed automatic attempt must not bypass its durable reservation.
+    # PR probes remain read-only and cannot reserve a retry or publish a card.
+    if: always() && needs.plan.outputs.eligible == 'true' && (github.event_name == 'pull_request' || needs.retry-reservation.result == 'success') && (needs.plan.outputs.automatic_retry != 'true' || github.run_attempt == 1)
     runs-on: ubuntu-24.04
     timeout-minutes: 75
     permissions:

@@ -195,6 +195,31 @@ class ExportAndJUnitTests(unittest.TestCase):
                 with self.assertRaises(runner.Blocked):
                     runner.verify_junit(root, 'TEST-*.xml', expected=1)
 
+class RetryEvidenceTests(unittest.TestCase):
+    def test_complete_single_failure_is_structured_and_preserves_exact_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            custom = root / 'android/custom-cards/build/test-results/test/TEST-Card.xml'
+            android = root / 'android/app/build/test-results/testDebugUnitTest/TEST-LAN.xml'
+            custom.parent.mkdir(parents=True)
+            android.parent.mkdir(parents=True)
+            custom.write_text('<testsuite tests="1"><testcase name="card"/></testsuite>')
+            android.write_text('<testsuite tests="1" failures="1"><testcase classname="LAN" name="bind">'
+                               '<failure type="java.lang.AssertionError" message="bind error"/>'
+                               '</testcase></testsuite>')
+            self.assertEqual(runner.failure_evidence(root), {'complete': True, 'cases': [
+                {'className': 'LAN', 'name': 'bind', 'type': 'java.lang.AssertionError', 'message': 'bind error'}]})
+            # Every failed case is retained: a second failure cannot hide behind truncation.
+            android.write_text('<testsuite tests="2" failures="2">' +
+                               '<testcase><failure/></testcase>' * 2 + '</testsuite>')
+            self.assertEqual(len(runner.failure_evidence(root)['cases']), 2)
+            for bad in ('<testsuite tests="1" failures="2"><testcase><failure/></testcase></testsuite>',
+                        '<testsuite tests="2"><testcase/></testsuite>', '<broken>'):
+                android.write_text(bad)
+                self.assertFalse(runner.failure_evidence(root)['complete'])
+            android.unlink()
+            self.assertFalse(runner.failure_evidence(root)['complete'])
+
 
 if __name__ == '__main__':
     unittest.main()
