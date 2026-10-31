@@ -79,9 +79,9 @@ class AncientStoneIdolIndependentCertificationTest {
         val d = customScenario(AncientStoneIdol)
         val player = d.player1
         val idol = d.putCardInHand(player, "Ancient Stone Idol")
-        d.giveColorlessMana(player, 10)
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = d.player2)
         assertNull(d.passPriority(d.player2).error)
+        d.giveColorlessMana(player, 10)
 
         assertNull(d.castSpell(player, idol).error)
         d.resolveAll()
