@@ -1,0 +1,8 @@
+{
+  "key": "armory-automaton",
+  "name": "Armory Automaton",
+  "issue": 675,
+  "source": "certification/ArmoryAutomatonIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ArmoryAutomatonIndependentCertificationTest",
+  "tests": 5
+}
