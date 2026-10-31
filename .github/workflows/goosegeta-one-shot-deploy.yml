@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ff75c9bb6e0e1062ef5834f95109262d513aa66a
+          ref: 040bf9bf5cc955ef70b8016499a149da84e079a3
           path: cloud-source
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C cloud-source rev-parse HEAD)" = ff75c9bb6e0e1062ef5834f95109262d513aa66a
+          test "$(git -C cloud-source rev-parse HEAD)" = 040bf9bf5cc955ef70b8016499a149da84e079a3
           grep -q "goosegeta-lifetime-reserved-v1" cloud-source/android/cloud-room/src/goose-budget.ts
           npm --prefix cloud-source/android/cloud-room ci --ignore-scripts --no-audit --no-fund
           npm --prefix cloud-source/android/cloud-room run typecheck
