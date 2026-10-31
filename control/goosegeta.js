@@ -5,7 +5,7 @@
   if (!$('gooseForm')) return;
   const API = 'https://arcana-review.arcanamtg.workers.dev';
   const KEY = 'arcana-review-session-v1';
-  let requestId = crypto.randomUUID(), currentSession = null, submitted = false, room = '';
+  let requestId = crypto.randomUUID(), currentSession = null, submitted = false, room = '', recoverable = false;
   const invite = /^#goose-invite=([A-Z0-9]{6,8})\.([a-f0-9-]{64,100})$/.exec(window.location.hash);
   if (invite) {
     $('gooseCode').value = invite[1]; $('gooseInvite').value = invite[2];
@@ -18,6 +18,9 @@
   function show(data) {
     if (data.sessionId) currentSession = data.sessionId;
     $('gooseDismiss').disabled = !currentSession || ['idle','stopped'].includes(data.status);
+    recoverable = !!currentSession && data.status === 'needs attention' &&
+      typeof data.reason === 'string' && data.reason.startsWith('unsupported-decision-or-action');
+    $('gooseRecover').disabled = !recoverable;
     $('gooseStatus').textContent = (data.status || 'unknown') + ' · model ' + (data.model || 'off') +
       (data.sessionId ? ' · moves sent '+(data.actionsSubmitted||0)+' · host accepted '+(data.actionsAccepted||0)+' · later host updates '+(data.observedTransitions||0)+
       ' · reserved tokens '+(data.reservedTokens||0) : '') +
@@ -30,15 +33,21 @@
       window.location.href = API+'/auth/login?return='+encodeURIComponent('https://aarmou.github.io/arcana_table/control/'); return; }
     const code = $('gooseCode').value.trim().toUpperCase();
     if (!/^[A-Z0-9]{6,8}$/.test(code)) { $('gooseStatus').textContent='Enter the room code.'; return; }
-    if (room !== code) { room = code; currentSession = null; submitted = false; requestId = crypto.randomUUID(); }
+    if (room !== code) { room = code; currentSession = null; submitted = false; recoverable = false; requestId = crypto.randomUUID(); }
     if (action === 'dismiss' && !currentSession) return;
-    const buttons = ['gooseSummon','gooseDismiss','gooseRefresh','gooseApplyChat']; buttons.forEach(id => $(id).disabled=true);
+    if (action === 'recover' && (!currentSession || !recoverable)) return;
+    const buttons = ['gooseSummon','gooseDismiss','gooseRefresh','gooseApplyChat','gooseRecover']; buttons.forEach(id => $(id).disabled=true);
     try {
       if (action === 'summon') submitted = true;
+      // Reuse the existing owner-OAuth proxy; no new production Worker deployment.
+      // The isolated room Worker treats the reserved chatMode as an explicit resync
+      // instruction and leaves chat intensity and paid-model opt-in unchanged.
+      const wireAction = action === 'recover' ? 'chat' : action;
       const r = await fetch(API+'/v1/goosegeta'+(!action ? '?code='+code : ''), {
         method: action ? 'POST':'GET',cache:'no-store',headers:{Authorization:'Bearer '+session,...(action?{'Content-Type':'application/json'}:{})},
-        ...(action?{body:JSON.stringify({action,code,capability:$('gooseInvite').value,deckId:$('gooseDeck').value,
-          model:$('gooseModel').checked,requestId,sessionId:currentSession,chatMode:$('gooseChat').value})}:{}) });
+        ...(action?{body:JSON.stringify({action:wireAction,code,capability:$('gooseInvite').value,deckId:$('gooseDeck').value,
+          model:$('gooseModel').checked,requestId,sessionId:currentSession,
+          chatMode:action === 'recover' ? 'recover' : $('gooseChat').value})}:{}) });
       if (r.status === 401) {
         for (const k of ['localStorage','sessionStorage']) try { if(window[k].getItem(KEY)===session)window[k].removeItem(KEY); } catch {}
         throw Error('Owner session expired. Sign in again.');
@@ -48,11 +57,17 @@
       show(data);
       if (action === 'dismiss') { submitted = false; requestId = crypto.randomUUID(); $('gooseInvite').value=''; }
       if (action === 'summon') $('gooseStatus').textContent += ' · joining is not proof Android accepted the deck. Check status.';
+      if (action === 'recover') {
+        recoverable = false;
+        $('gooseStatus').textContent += ' · requested fresh Android state; check status to confirm movement.';
+      }
     } catch (e) { $('gooseStatus').textContent = 'Not confirmed: '+e.message; }
-    finally { $('gooseSummon').disabled=false; $('gooseRefresh').disabled=false; $('gooseDismiss').disabled=!currentSession;$('gooseApplyChat').disabled=!currentSession; }
+    finally { $('gooseSummon').disabled=false; $('gooseRefresh').disabled=false; $('gooseDismiss').disabled=!currentSession;
+      $('gooseApplyChat').disabled=!currentSession; $('gooseRecover').disabled=!recoverable; }
   }
   $('gooseForm').addEventListener('submit',event=>{event.preventDefault();void call('summon');});
   $('gooseRefresh').addEventListener('click',()=>void call(null));
+  $('gooseRecover').addEventListener('click',()=>void call('recover'));
   $('gooseApplyChat').addEventListener('click',()=>void call('chat'));
   $('gooseDismiss').addEventListener('click',()=>void call('dismiss'));
   // Changing setup starts a new idempotent request only before a previous submission.
