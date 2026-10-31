@@ -23,6 +23,44 @@ test('decision candidates use only offered player, option indices and target IDs
   assert.deepEqual(candidates(state({pendingDecision:{type:'ChooseOptionDecision',id:'d',playerId:'opponent',options:['a']}}),me),[]);
   assert.deepEqual(candidates(state({pendingDecision:{type:'UnknownDecision',id:'d',playerId:me}}),me),[]);
 });
+test('remote combat candidates use the host supplied attacker targets and safe empty blocks',()=>{
+  const attack=state({legalActions:[{
+    action:{type:'DeclareAttackers',playerId:me,attackers:{}},
+    validAttackers:['creature-1','creature-2'],
+    mandatoryAttackers:['creature-1'],
+    attackTargetsByAttacker:{'creature-1':['opponent-2'],'creature-2':['opponent-2']},
+  }]});
+  const attacking=candidates(attack,me);
+  assert.equal(attacking.length,1);
+  assert.deepEqual(attacking[0].action,{
+    type:'DeclareAttackers',playerId:me,
+    attackers:{'creature-1':'opponent-2','creature-2':'opponent-2'}
+  });
+  assert.deepEqual(candidates(state({legalActions:[{
+    action:{type:'DeclareAttackers',playerId:me,attackers:{}},
+    validAttackers:['creature-1'],mandatoryAttackers:['creature-1'],
+    attackTargetsByAttacker:{'creature-1':[]}
+  }]}),me),[],'no fabricated target for mandatory attacker');
+
+  const blocks=state({legalActions:[{
+    action:{type:'DeclareBlockers',playerId:me,blockers:{}},
+    mandatoryBlockerAssignments:{}
+  }]});
+  assert.deepEqual(candidates(blocks,me).map(c=>c.action),[
+    {type:'DeclareBlockers',playerId:me,blockers:{}}
+  ]);
+  assert.deepEqual(candidates(state({legalActions:[{
+    action:{type:'DeclareBlockers',playerId:me},
+    mandatoryBlockerAssignments:{'blocker-1':['attacker-1']}
+  }]}),me),[],'must not omit mandatory blocker assignments');
+  assert.deepEqual(candidates(state({legalActions:[{
+    action:{type:'DeclareBlockers',playerId:'opponent',blockers:{}}
+  }]}),me),[],'no opponent seat actions');
+  assert.deepEqual(candidates(state({
+    pendingDecision:{type:'PlayCardDecision',id:'card-choice',playerId:me},
+    legalActions:[{action:{type:'DeclareAttackers',playerId:me}}]
+  }),me),[],'combat never wrapped as a PlayCardResponse');
+});
 test('noninteractive/malformed/foreign actions cannot become a model candidate',()=>{
   assert.deepEqual(candidates(state({interactive:false}),me),[]);
   assert.deepEqual(candidates(state({legalActions:[{action:{type:'CastSpell',playerId:'other'}}]}),me),[]);
