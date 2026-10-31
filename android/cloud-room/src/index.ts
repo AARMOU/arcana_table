@@ -9,7 +9,7 @@ import { GooseBudget, type BudgetEnv } from './goose-budget';
 export { GooseBudget };
 
 type SafeFallback = { epoch: number; version: number; interactionEpoch: string; action: Record<string,unknown>; started: number };
-type GooseSession = Omit<ReturnType<typeof freshSession>, "reason"> & { reason: string | null; chatMode: string; lastChatId?: number; lastChatMs?: number; lastBanterTurn?: number; chatCount?: number; chatPending?: boolean; chatFallbacks?: number; lastChatSource?: string; resyncRequested?: boolean; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string; fallback?: SafeFallback };
+type GooseSession = Omit<ReturnType<typeof freshSession>, "reason"> & { reason: string | null; chatMode: string; lastChatId?: number; lastChatMs?: number; lastBanterTurn?: number; chatCount?: number; chatPending?: boolean; chatFallbacks?: number; lastChatSource?: string; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string; fallback?: SafeFallback };
 interface Env extends BudgetEnv {
   GOOSEGETA_ENABLED?: string;
   GOOSEGETA_CONTROL_KEY?: string;
@@ -110,17 +110,6 @@ export class GameRoom extends DurableObject<Env> {
       this.room = await this.ctx.storage.get<RoomRecord>(ROOM_KEY) ?? null;
       const g = this.room?.goose;
       if (g && !g.detached && this.env.GOOSEGETA_ENABLED !== 'true') await this.stopGoose();
-      // A cloud code update cannot inspect the old unsupported packet: the game
-      // host remains authoritative. Ask it ONCE to resend its current state
-      // after a previously blocked decision. Never guess or submit an action,
-      // and persist the bound before sending to survive DO eviction/restarts.
-      if (g && !g.detached && g.status === 'needs attention' &&
-          typeof g.reason === 'string' && g.reason.startsWith('unsupported-decision-or-action') &&
-          !g.resyncRequested && this.room?.seats[0]?.online) {
-        g.resyncRequested = true;
-        await this.save();
-        this.ctx.waitUntil(this.sendGoose({type:'requestResync'}));
-      }
       if (g && !g.detached && (g.inFlight || g.chatPending)) {
         // DO reloads must never leave an engine waiting for a model that cannot return.
         // The host-offered fallback is persisted before every provider request; the
