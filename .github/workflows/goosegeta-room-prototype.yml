@@ -99,7 +99,7 @@ jobs:
           BASE=d7d4017e9dc0e4896f49d50342e437fc998f4970
           git merge-base --is-ancestor "$BASE" HEAD
           git diff --name-only "$BASE" HEAD | sort > /tmp/handoff-paths
-          printf '%s\n' '.github/workflows/goosegeta-room-prototype.yml' 'android/app/src/main/java/com/arcanatable/TableController.kt' 'android/app/src/main/java/com/arcanatable/TableEffects.kt' 'android/app/src/test/java/com/arcanatable/LanConnectionServiceGuardTest.kt' | sort > /tmp/allowed-paths
+          printf '%s\n' '.github/workflows/goosegeta-room-prototype.yml' 'android/app/src/main/java/com/arcanatable/TableController.kt' 'android/app/src/main/java/com/arcanatable/TableEffects.kt' 'android/app/src/test/java/com/arcanatable/LanConnectionServiceGuardTest.kt' 'android/app/src/test/java/com/arcanatable/ui/ArgentumResilienceUiTest.kt' | sort > /tmp/allowed-paths
           diff -u /tmp/allowed-paths /tmp/handoff-paths
           for part in argentum-ai.jar argentum-mtg-sdk-tooling.jar argentum-mtg-sdk.jar argentum-rules-engine.jar; do
             p="android/app/libs/$part"
@@ -136,6 +136,7 @@ jobs:
           set -euo pipefail
           ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
             --tests 'com.arcanatable.LanConnectionServiceGuardTest' \
+            --tests 'com.arcanatable.ui.ArgentumResilienceUiTest.unsupportedDecisionMalformedDataBackgroundPauseAndResume' \
             -Parcana.debugApplicationIdSuffix=.goosegetahandoff
           ./gradlew --no-daemon --max-workers=2 :app:assembleDebug \
             -Parcana.debugApplicationIdSuffix=.goosegetahandoff \
@@ -150,9 +151,14 @@ jobs:
           xml=list(Path('android/app/build/test-results/testDebugUnitTest').glob('TEST-*LanConnectionServiceGuardTest.xml'))
           assert len(xml)==1, xml
           suite=ET.parse(xml[0]).getroot()
-          assert int(suite.attrib.get('tests','0'))==8, suite.attrib
+          assert int(suite.attrib.get('tests','0'))==10, suite.attrib
           assert all(int(suite.attrib.get(k,'0'))==0 for k in ('failures','errors','skipped')), suite.attrib
-          print('PASS: 8 lifecycle guard regression tests')
+          ui=list(Path('android/app/build/test-results/testDebugUnitTest').glob('TEST-*ArgentumResilienceUiTest.xml'))
+          assert len(ui)==1, ui
+          ui_suite=ET.parse(ui[0]).getroot()
+          assert int(ui_suite.attrib.get('tests','0'))==1, ui_suite.attrib
+          assert all(int(ui_suite.attrib.get(k,'0'))==0 for k in ('failures','errors','skipped')), ui_suite.attrib
+          print('PASS: 10 lifecycle guards + real simulated socket background/foreground recovery')
           PY
           APK=android/app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
