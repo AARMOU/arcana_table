@@ -6,16 +6,6 @@
       "source": "#134 / #135 / #141 Priority B",
       "verified": false
     },
-    "Fortified Village": {
-      "reason": "as-enters reveal-from-hand replacement",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
-    "Furycalm Snarl": {
-      "reason": "as-enters reveal-from-hand replacement",
-      "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
-      "verified": true
-    },
     "Alms Collector": {
       "reason": "replace only the extra cards of a multi-card draw and redistribute them",
       "source": "android/docs/CUSTOM_CARDS_HANDOFF.md",
@@ -146,13 +136,6 @@
     }
   },
   "patterns": [
-    {
-      "name": "as-enters reveal from hand",
-      "regex": "as ~ enters, you may reveal an? .* card from your hand",
-      "reason": "as-enters reveal-from-hand replacement",
-      "source": "#141 Priority C (Port Town); CUSTOM_CARDS_HANDOFF.md (Fortified Village, Furycalm Snarl)",
-      "verified": false
-    },
     {
       "name": "lose and can't have hexproof/shroud",
       "regex": "lose hexproof and shroud and can't have hexproof or shroud",
