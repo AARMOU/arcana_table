@@ -112,7 +112,7 @@ async function suiteCompletion({ github, owner, repo, issue, pr, now }) {
   const suite = JSON.parse(Buffer.from(f.content, 'base64').toString('utf8'));
   if (suite.key !== key || suite.issue !== cardUnit || suite.source !== test.filename) return null;
   const runs = await github.paginate(github.rest.actions.listWorkflowRuns, { owner, repo,
-    workflow_id: 'arcana-card-certification-premerge.yml', head_sha: pr.head.sha, event: 'pull_request', status: 'success', per_page: 100 });
+    workflow_id: 'arcana-card-certification-premerge.yml', head_sha: pr.head.sha, event: 'pull_request', per_page: 100 });  // conclusion checked below; the API status filter lags
   const cardPr = Number(field(issue.body, 'Card PR')?.slice(1));
   for (const run of runs) {
     if (run.name !== 'Arcana Card Certification Premerge' || run.event !== 'pull_request' || run.conclusion !== 'success' ||

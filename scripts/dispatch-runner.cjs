@@ -27,7 +27,7 @@ const NON_BUILD = /^(?:\.github\/|scripts\/|docs\/|control\/|engine-upgrade\/|to
 async function ciEquivalent({ github, owner, repo, base, baseSha }) {
   try {
     const runs = (await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: DEV_CI_WORKFLOW, branch: base,
-      status: 'success', per_page: 20 })).data.workflow_runs || [];
+      per_page: 30 })).data.workflow_runs || [];  // no status filter: it lags (see the exact-head check)
     const green = runs.filter(r => r.name === 'Arcana Development CI' && r.conclusion === 'success' && /^[a-f0-9]{40}$/.test(r.head_sha || ''))
       .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))[0];
     if (!green || green.head_sha === baseSha) return null;
@@ -320,8 +320,10 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   if (!base || !/^[A-Za-z0-9._\/-]+$/.test(base)) return done('base-not-configured');
   const baseSha = (await github.rest.repos.getBranch({ owner, repo, branch: base })).data.commit.sha;
   report.base = { branch: base, sha: baseSha };
-  const runs = await github.paginate(github.rest.actions.listWorkflowRunsForRepo,
-    { owner, repo, head_sha: baseSha, status: 'success', per_page: 100 });
+  // Filter by conclusion here, not with the API's status=success filter: that filtered listing lags behind
+  // (16:17Z: two successful runs for the head, filtered query returned none, dispatcher idled).
+  const runs = (await github.paginate(github.rest.actions.listWorkflowRunsForRepo,
+    { owner, repo, head_sha: baseSha, per_page: 100 })).filter(r => r.conclusion === 'success');
   const exact = runs.some(r => r.head_sha === baseSha && r.name === 'Arcana Development CI' && r.conclusion === 'success');
   const equivalent = exact ? null : await ciEquivalent({ github, owner, repo, base, baseSha });
   if (equivalent) report.ciEquivalent = equivalent;
