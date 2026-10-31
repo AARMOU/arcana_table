@@ -24,9 +24,10 @@ function calibrate({ reportedUsed, sessions, floor = FLOOR, cap = CAP, minSessio
 }
 
 async function copilotSessionsThisMonth({ github, owner, repo, now = new Date() }) {
-  const workflows = await github.paginate(github.rest.actions.listRepoWorkflows, { owner, repo, per_page: 100 });
-  const wf = workflows.find(w => w.path === COPILOT_WORKFLOW_PATH);
-  if (!wf) return null;
+  // GitHub's workflow list omits dynamic workflows, so find the Copilot workflow id from its own runs.
+  const recent = (await github.rest.actions.listWorkflowRunsForRepo({ owner, repo, event: 'dynamic', per_page: 20 })).data.workflow_runs || [];
+  const wf = { id: recent.find(r => r.path === COPILOT_WORKFLOW_PATH)?.workflow_id };
+  if (!Number.isSafeInteger(wf.id)) return null;
   const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString().replace('.000Z', 'Z');
   const end = now.toISOString().replace(/\.\d{3}Z$/, 'Z');
   const res = await github.rest.actions.listWorkflowRuns({ owner, repo, workflow_id: wf.id, created: `${start}..${end}`, per_page: 1 });
