@@ -7309,6 +7309,17 @@
     }
    ]
   },
+  "Player.ControllerOf": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Acolyte Hybrid",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AcolyteHybrid.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AcolyteHybridScenarioTest.kt"
+    }
+   ]
+  },
   "Player.ControllerOfSource": {
    "count": 1,
    "examples": [
@@ -8094,17 +8105,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DismantlingWave.kt",
      "lines": 44,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DismantlingWaveScenarioTest.kt"
-    }
-   ]
-  },
-  "Player.ControllerOf": {
-   "count": 1,
-   "examples": [
-    {
-     "card": "Acolyte Hybrid",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AcolyteHybrid.kt",
-     "lines": 44,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AcolyteHybridScenarioTest.kt"
     }
    ]
   }
