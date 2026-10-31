@@ -117,6 +117,27 @@ async function resolveInterrupted({ github, owner, repo, unit, runId, auto = fal
 // lane. Unknown outcomes stay unclassified, with their paid history preserved.
 const ENGINE_GAP_LABEL = 'arcana:engine-gap';
 const ENGINE_GAP_GRACE_MS = 30 * 60 * 1000;
+const DIAGNOSIS_LABEL = 'arcana:needs-diagnosis';
+function zeroDeliveryCandidates(units, now = Date.now()) {
+  return units.filter(u => String(u.raw.title).startsWith('[Arcana Queue]') && u.derived.state === 'review' && !u.prs.length && (() => {
+    const last = event => Math.max(-Infinity, ...(u.raw.sessions || []).filter(s => s.event === event).map(s => s.at));
+    return last('finished') > last('started') && now - last('finished') > ENGINE_GAP_GRACE_MS;
+  })());
+}
+async function labelDiagnosis({ github, owner, repo, units, now }) {
+  const confirmed = new Set(engineGapCandidates(units, now).map(u => u.raw.number));
+  const candidates = new Set(zeroDeliveryCandidates(units, now).filter(u => !u.raw.labels.includes(ENGINE_GAP_LABEL) && !confirmed.has(u.raw.number)).map(u => u.raw.number));
+  const changes = [];
+  for (const u of units) {
+    if (changes.length >= 5) break;
+    const labeled = u.raw.labels.includes(DIAGNOSIS_LABEL), needed = candidates.has(u.raw.number);
+    if (labeled === needed) continue;
+    if (needed) await github.rest.issues.addLabels({ owner, repo, issue_number: u.raw.number, labels: [DIAGNOSIS_LABEL] });
+    else await github.rest.issues.removeLabel({ owner, repo, issue_number: u.raw.number, name: DIAGNOSIS_LABEL });
+    changes.push(u.raw.number);
+  }
+  return changes;
+}
 function engineGapCandidates(units, now = Date.now()) {
   return units.filter(u => String(u.raw.title).startsWith('[Arcana Queue]') && u.derived.state === 'review' && !u.prs.length &&
     !u.raw.labels.includes(ENGINE_GAP_LABEL) && u.raw.engineGapEvidence && (() => {
@@ -219,7 +240,10 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   const data = await loadUnits({ github, owner, repo, now, approvers, lagMs: ready.billingLagMs });
   const units = data.units.map(u => u.derived);
   report.units = units;
-  if (!dry) report.engineGaps = await labelEngineGaps({ github, owner, repo, units: data.units, runId: String(context.runId), now: Math.max(now, Date.now()) });
+  if (!dry) {
+    report.engineGaps = await labelEngineGaps({ github, owner, repo, units: data.units, runId: String(context.runId), now: Math.max(now, Date.now()) });
+    report.diagnosis = await labelDiagnosis({ github, owner, repo, units: data.units, now: Math.max(now, Date.now()) });
+  }
   const interrupted = data.units.filter(u => u.derived.blocksAll);
   if (interrupted.length) {
     const resolved = [];
@@ -347,4 +371,4 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   return done('attempted', { issue: n, result, ...(reason ? { reason } : {}) });
 }
 
-module.exports = { engineGapCandidates, labelEngineGaps, ENGINE_GAP_LABEL, runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, suiteInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
+module.exports = { engineGapCandidates, labelEngineGaps, ENGINE_GAP_LABEL, zeroDeliveryCandidates, labelDiagnosis, DIAGNOSIS_LABEL, runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, suiteInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };

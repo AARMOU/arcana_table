@@ -251,3 +251,21 @@ test('engine gap requires positive engineer evidence, not just zero delivery', (
   assert.equal(engineGapCandidates([u({ engineGapEvidence: { at: now - 4e6 } })], now).length, 0, 'confirmation predates this attempt');
   assert.equal(engineGapCandidates([u({ engineGapEvidence: { at: now + 1 } })], now).length, 0, 'future confirmation');
 });
+
+test('zero-delivery #458 shape is diagnosis work, never an inferred engine gap or paid retry', async () => {
+  const {zeroDeliveryCandidates,labelDiagnosis,engineGapCandidates,DIAGNOSIS_LABEL} = require('./dispatch-runner.cjs');
+  const now = Date.now();
+  const u = {raw:{number:458,title:'[Arcana Queue] Kenrith',labels:[],ledger:[],sessions:[{event:'started',at:now-4e6},{event:'finished',at:now-3e6}]},derived:{state:'review'},prs:[]};
+  assert.equal(zeroDeliveryCandidates([u],now).length,1);
+  assert.deepEqual(engineGapCandidates([u],now),[]);
+  const writes=[];
+  const github={rest:{issues:{addLabels:async a=>writes.push(a),removeLabel:async a=>writes.push(a)}}};
+  await labelDiagnosis({github,owner:'AARMOU',repo:'arcana_table',units:[u],now});
+  assert.deepEqual(writes[0].labels,[DIAGNOSIS_LABEL]);
+  u.raw.labels=[DIAGNOSIS_LABEL];
+  await labelDiagnosis({github,owner:'AARMOU',repo:'arcana_table',units:[u],now});
+  assert.equal(writes.length,1,'repeat tick adds no label or assignment');
+  u.prs=[{number:540}];
+  await labelDiagnosis({github,owner:'AARMOU',repo:'arcana_table',units:[u],now});
+  assert.equal(writes[1].name,DIAGNOSIS_LABEL,'an actual PR resolves diagnosis supply');
+});

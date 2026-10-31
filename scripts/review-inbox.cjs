@@ -28,6 +28,7 @@ const A = require('./admission.cjs');
 const { unitCards } = require('./feasibility.cjs');
 const { contentWrittenAt, sessionsOf } = require('./units.cjs');
 const { oracleSnapshot } = require('./oracle-handoff.cjs');
+const { DIAGNOSIS_LABEL } = require('./dispatch-runner.cjs');
 const { isCardCheck } = require('./card-checks.cjs');
 const DECISION_MARKER = '<!-- arcana-owner-decision-v1 -->';
 
@@ -186,7 +187,10 @@ function applyWorkState(row, { unit, work, suite = null }) {
   const original = row.state;
   const failedSuite = row.certification !== 'certified' && suite && ['checks-failed', 'repair-exhausted'].includes(suite.state);
   if (row.state === 'integrated') return row;
-  if (unit.state === 'closed') {
+  if (row.integrationUnverified) {
+    row.state = 'held';
+    row.recovery = { who: 'Claude (automation)', next: 'retry integration evidence lookup; do not reopen or reassign this card', reason: 'Integration status unverified: receipt lookup unavailable' };
+  } else if (unit.state === 'closed') {
     row.state = 'orphaned';
     row.recovery = { who: 'Work GPT / Goose (coordination)', next: 'reconcile the closed queue request with its unfinished PR and current owner; preserve the attempt ledger',
       reason: 'Queue request closed without a verified Android integration receipt' };
@@ -235,7 +239,7 @@ async function suiteDependencies({ github, owner, repo, prs, now }) {
     if (!cardPr || !cardUnit) continue;
     const checks = (await github.rest.checks.listForRef({ owner, repo, ref: pr.head.sha, per_page: 100 })).data.check_runs || [];
     const row = classify(pr, checks);
-    const work = await workEvidence({ github, owner, repo, unit: request, pr, now });
+    const work = row.state === 'checks-failed' ? await workEvidence({ github, owner, repo, unit: request, pr, now }) : null;
     const suite = { pr: pr.number, issue: n, cardUnit, headSha: pr.head.sha, state: row.state, work,
       url: `https://github.com/${owner}/${repo}/pull/${pr.number}`, checkRuns: row.checkRuns };
     if (!byCard.has(cardPr) || row.state === 'checks-failed') byCard.set(cardPr, suite);
@@ -260,6 +264,7 @@ async function buildReviewInbox({ github, owner, repo, now = new Date() }) {
     // An integration automatically closes its queue issue. Keep the verified receipt in
     // the activity chart instead of dropping it on the very next inbox refresh.
     // A closed issue alone never proves integration.
+    let integrationUnverified = false;
     if (unit.state === 'closed') {
       try {
         const integration = await I.receiptFor({ github, owner, repo, pr });
@@ -272,13 +277,13 @@ async function buildReviewInbox({ github, owner, repo, now = new Date() }) {
             checks: {}, checkRuns: [{ name: 'Android integration', result: 'success', url: integration.runUrl }],
             certification: 'certified', abilities: [], problems: [], decidedIn: null,
             draft: !!pr.draft, kind: 'card', hasTest: true, reason: null, readyForOwner: false,
-            integration, oracle: await offlineOracle({ github, owner, repo, unit, name: identityOf(unit.body).name }),
+            integration,
             url: `https://github.com/${owner}/${repo}/commit/${integration.destinationSha}`,
             updatedAt: integration.at,
           });
           continue;
         }
-      } catch { /* Missing or unverified receipt is never counted as a completion. */ }
+      } catch { integrationUnverified = true; }
     }
     if (!['open', 'closed'].includes(unit.state)) continue;
     const checkRuns = (await github.rest.checks.listForRef({ owner, repo, ref: pr.head.sha, per_page: 100 })).data.check_runs || [];
@@ -289,7 +294,7 @@ async function buildReviewInbox({ github, owner, repo, now = new Date() }) {
         .map(f => f.filename);
     } catch { /* Unknown is not an implementation: fail closed, without dropping the row. */ }
     const row = classify(pr, checkRuns, reviews, unit.body, changedFiles);
-    row.oracle = await offlineOracle({ github, owner, repo, unit, name: row.name });
+    row.integrationUnverified = integrationUnverified;
     if (row.state === 'approved') {
       try {
         const integration = await I.receiptFor({github,owner,repo,pr});
@@ -306,11 +311,17 @@ async function buildReviewInbox({ github, owner, repo, now = new Date() }) {
           }
         }
       } catch {
+        row.integrationUnverified = true;
         row.problems.unshift('Android integration status could not be verified');
       }
     }
-    const work = await workEvidence({ github, owner, repo, unit: { ...unit, number: n }, pr, now });
     const suite = suites.get(pr.number);
+    const labels = (unit.labels || []).map(l => l?.name || l);
+    const needsWork = row.state !== 'integrated' && (row.state === 'checks-failed' ||
+      (suite?.cardUnit === n && suite.state === 'checks-failed' && row.certification !== 'certified') ||
+      labels.includes(A.HALTED_LABEL) || labels.includes('arcana:engine-gap'));
+    const work = needsWork ? await workEvidence({ github, owner, repo, unit: { ...unit, number: n }, pr, now }) : { repairs: null, limit: A.CEILING.repair, pickup: 'not-observed', halted: false };
+    row.oracle = row.kind === 'card' && row.state !== 'integrated' ? await offlineOracle({ github, owner, repo, unit, name: row.name }) : null;
     items.push(applyWorkState(row, { unit, work, suite: suite?.cardUnit === n ? suite : null }));
   }
   // Recently integrated cards (merged Copilot card PRs), so an approval visibly reaches "Integrated".
@@ -401,6 +412,8 @@ function stalls(payload, now = Date.now()) {
 async function reportStalls({ github, owner, repo, payload, issue = 78, now = Date.now() }) {
   const list = stalls(payload, now);
   const open = await github.paginate(github.rest.issues.listForRepo, { owner, repo, state: 'open', per_page: 100 });
+  const diagnosis = open.filter(i => !i.pull_request && String(i.title || '').startsWith('[Arcana Queue]') &&
+    (i.labels || []).some(l => (l?.name || l) === DIAGNOSIS_LABEL)).sort((a,b) => a.number-b.number).slice(0,20);
   const engine = open.filter(isBlockedUpgrade).map(i => ({ n: i.number, title: i.title, hours: (now - Date.parse(i.created_at || '')) / 36e5 }))
     .filter(e => Number.isFinite(e.hours) && e.hours >= ENGINE_STALL_HOURS).sort((a, b) => a.n - b.n);
   // Lane age: when the engine-gap label was applied is not in the issue list; the issue's creation (or last
@@ -409,7 +422,7 @@ async function reportStalls({ github, owner, repo, payload, issue = 78, now = Da
     .filter(e => Number.isFinite(e.hours) && e.hours >= LANE_HOURS).sort((a, b) => a.n - b.n).slice(0, 20);
   let build = null;
   try { build = await unreleasedBuild({ github, owner, repo, now }); } catch {}
-  const keys = [...engine.map(e => 'engine#' + e.n), ...lane.map(e => 'lane#' + e.n), ...(build ? ['build@' + build.sha.slice(0, 12)] : []),
+  const keys = [...diagnosis.map(i => 'zero-delivery#' + i.number), ...engine.map(e => 'engine#' + e.n), ...lane.map(e => 'lane#' + e.n), ...(build ? ['build@' + build.sha.slice(0, 12)] : []),
     ...list.map(i => i.pr + '@' + String(i.headSha).slice(0, 12) + ':' + i.state +
       (i.suite ? ':suite#' + i.suite.pr + '@' + String(i.suite.headSha).slice(0, 12) + ':' + i.suite.state : ''))].join(' ');
   const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number: issue, per_page: 100 });
@@ -419,6 +432,7 @@ async function reportStalls({ github, owner, repo, payload, issue = 78, now = Da
   const body = [STALL_MARKER, 'stalls: ' + keys, '### 🤖 Stalled work (automated)', '',
     keys ? 'Work stuck past its stage limit. Each line names the stage, who owns the next step, and what it is.'
       : 'Nothing is stalled.', '',
+    ...diagnosis.map(i => `- zero-delivery: #${i.number} — Copilot finished without a PR; unclassified, needs diagnosis. **Owner:** Work GPT / Goose (engineering). **Next:** inspect the session/output and Oracle handoff, then route the evidenced cause; preserve the ledger and existing retry ceiling. A label is not worker pickup.`),
     ...engine.map(e => `- #${e.n} ${String(e.title).replace(/[@\r\n]/g, ' ').slice(0, 70)}: blocked engine upgrade for ${Math.floor(e.hours)}h. ` +
       '**Owner:** Claude (engine lane). **Next:** fix on a `gpt/argentum-weekly-fix-*` branch per `engine-upgrade/HANDOFF.md`, dry run green, then merge into `gpt/arcana-integration-next`.'),
     ...lane.map(e => `- #${e.n} ${String(e.title).replace(/[@\r\n]/g, ' ').slice(0, 70)}: in the GPT engine lane with no activity for ${Math.floor(e.hours)}h (deadline ${LANE_HOURS}h). ` +

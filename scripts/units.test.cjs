@@ -217,3 +217,11 @@ test('engine confirmation needs an authenticated engineer, a positive statement 
   assert.equal(get({...comment,body:comment.body.replace('/AARMOU/arcana_table/','/other/repo/')}),null);
   assert.equal(get({...comment,body:comment.body.replace('/actions/runs/123','/blob/main/Test.kt')}),null);
 });
+
+test('editing an old engineer confirmation does not move it into a new attempt', () => {
+  const {engineEvidenceOf}=require('./units.cjs');
+  const created='2026-10-30T00:00:00Z';
+  const e=engineEvidenceOf([{user:{login:'AARMOU',type:'User'},author_association:'OWNER',created_at:created,updated_at:'2026-10-31T04:00:00Z',
+    body:'Engine gap confirmed: A confirmed missing engine primitive.\nEvidence: https://github.com/AARMOU/arcana_table/actions/runs/123'}],'AARMOU','arcana_table');
+  assert.equal(e.at,Date.parse(created));
+});

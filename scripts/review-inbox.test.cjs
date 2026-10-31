@@ -467,3 +467,32 @@ test('stall text points to the failing suite and changes once when its exact hea
   row.suite.headSha='c'.repeat(40);
   assert.equal(await go(),'posted 1');
 });
+
+test('green certified row reads no unit comments or timelines for optional work evidence', async () => {
+  const f=lifecycleFixture({checks:[run('toolkit','success'),certRun()]});
+  let comments=0,timelines=0;
+  f.github.rest.issues.listComments=async()=>{comments++;return {data:[]};};
+  f.github.rest.issues.listEventsForTimeline=async()=>{timelines++;return {data:[]};};
+  assert.equal((await f.go()).items[0].state,'certified');
+  assert.deepEqual([comments,timelines],[0,0]);
+});
+
+test('receipt lookup outage holds a closed integrated candidate instead of inventing an orphan', async () => {
+  const f=lifecycleFixture({state:'closed'});
+  f.github.rest.git={getRef:async()=>{throw Error('outage');}};
+  f.github.rest.issues.listComments=async()=>{throw Error('rate limit');};
+  const row=(await f.go()).items[0];
+  assert.equal(row.state,'held');
+  assert.match(row.recovery.reason,/Integration status unverified/);
+  assert.equal(row.readyForOwner,false);
+});
+
+test('zero-delivery diagnosis appears on #78 without PR rows, engine classification or extra unit loads', async () => {
+  let body;
+  const github={rest:{issues:{listForRepo(){},listComments(){},createComment:async a=>{body=a.body;}}},
+    paginate:async fn=>fn===github.rest.issues.listForRepo?[{number:458,title:'[Arcana Queue] Kenrith',labels:[{name:'arcana:needs-diagnosis'}]}]:[]};
+  await R.reportStalls({github,owner:'AARMOU',repo:'arcana_table',payload:{items:[]}});
+  assert.match(body,/zero-delivery: #458.*finished without a PR; unclassified/);
+  assert.match(body,/Owner:\*\* Work GPT \/ Goose \(engineering\)/);
+  assert.doesNotMatch(body,/engine#458|add the engine support/);
+});

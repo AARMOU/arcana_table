@@ -59,7 +59,7 @@ function engineEvidenceOf(comments, owner, repo) {
       if (!reason || url.origin !== 'https://github.com' || url.search || url.hash || url.username || url.password ||
           !url.pathname.startsWith(`/${owner}/${repo}/`) ||
           !/\/(?:actions\/runs\/\d+|blob\/[a-f0-9]{40}\/.+)$/.test(url.pathname)) return null;
-      return { reason, evidence, comment: c.html_url || null, at: Math.max(Date.parse(c.created_at), Date.parse(c.updated_at || c.created_at)) };
+      return { reason, evidence, comment: c.html_url || null, at: Date.parse(c.created_at) };
     }).filter(e => e && Number.isFinite(e.at)).sort((a, b) => b.at - a.at)[0] || null;
 }
 // GitHub's development link: `connected` names exactly one PR (`subject`); `disconnected` undoes it.
