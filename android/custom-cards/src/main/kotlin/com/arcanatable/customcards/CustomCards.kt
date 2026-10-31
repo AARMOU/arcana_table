@@ -188,6 +188,7 @@ object CustomCards {
         Entry(TendoIceBridge, "BOK", "Six WotC precons"),
         Entry(HullBreach, "PLS", "Six WotC precons"),
         Entry(KillMaimBurn, "40K", "Six WotC precons"),
+        Entry(Mirrorpool, "CMM", "Six WotC precons"),
         Entry(AtalanJackal, "40K", "Six WotC precons"),
         Entry(WingedHiveTyrant, "40K", "Six WotC precons"),
         Entry(TallymanOfNurgle, "40K", "Six WotC precons"),
