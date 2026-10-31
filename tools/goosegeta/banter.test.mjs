@@ -47,3 +47,18 @@ test('GPT-6 Luna chat requests reserve usable output and never need reasoning',(
   assert.deepEqual(body.tools,[]);
   assert.equal(body.store,false);
 });
+
+test('fallback addresses repetition complaints with varied safe lines instead of a two-line loop',()=>{
+  const generic=Array.from({length:12},(_,i)=>cannedBanter('ruthless',{kind:'reply',text:'hello'},i));
+  assert.equal(new Set(generic).size,12);
+  assert.ok(generic.every(s=>s.length <= 300 && typeof s === 'string'));
+  const complaint={kind:'reply',text:'why are you saying the same things?'};
+  const responses=Array.from({length:4},(_,i)=>cannedBanter('ruthless',complaint,i));
+  assert.equal(new Set(responses).size,4);
+  assert.ok(responses.some(s=>/repeat|recycl|loop|line/i.test(s)));
+  assert.match(cannedBanter('ruthless',{kind:'reply',text:"that's kinda rude"},0),/Rude/i);
+  assert.match(cannedBanter('ruthless',{kind:'reply',text:"goose"},0),/goose/i);
+  const context=chatRequest('gpt-6-luna','ruthless',{kind:'reply',text:'goose',sequence:8});
+  assert.match(context.body.instructions,/answer the opponent's actual message/i);
+  assert.equal(JSON.parse(context.body.input).sequence,8);
+});
