@@ -6,6 +6,10 @@ name: Arcana Card Worker Dispatcher
 on:
   schedule:
     - cron: '*/30 * * * *'
+  # A finished Copilot session frees a slot: look for the next unit right away instead of at the next tick.
+  workflow_run:
+    workflows: ['Running Copilot cloud agent']
+    types: [completed]
   # GitHub runs this schedule only every few hours in practice (observed 3.5-5 h gaps, Oct 2026),
   # so owner label actions also start a run instead of waiting for the next scheduled slot.
   issues:
@@ -94,6 +98,11 @@ jobs:
       contains(fromJSON('["arcana:authorize-once","wu:resolve-interrupted","wu:halted","arcana:feasibility-reviewed","arcana:owner-fix-requested"]'), github.event.label.name)) }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: write   # start the next dispatcher run after a confirmed assignment (fills free slots)
+      issues: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v4
         with:
