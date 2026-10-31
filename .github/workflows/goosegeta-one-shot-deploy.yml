@@ -1,4 +1,5 @@
-name: Goosegeta bounded GPT-6 game deployment (isolated only)
+# Claude lead approval under owner 15:22 delegation: #81 comment 6550467512. Exact-head no-provider tests required; isolated Worker ONLY.
+name: Goosegeta bounded rejection recovery deployment (isolated only)
 # Owner approved metered GPT-6 play within an existing $5 hard limit. Isolated test only; no production rooms/control/pages/APK or purchases.
 on:
   push:
@@ -25,7 +26,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: d7d4017e9dc0e4896f49d50342e437fc998f4970
+          ref: c03623a4617460847f9a11168877b1ecf9d795ed
           path: cloud-source
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -35,7 +36,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C cloud-source rev-parse HEAD)" = d7d4017e9dc0e4896f49d50342e437fc998f4970
+          test "$(git -C cloud-source rev-parse HEAD)" = c03623a4617460847f9a11168877b1ecf9d795ed
           grep -q "goosegeta-lifetime-reserved-v1" cloud-source/android/cloud-room/src/goose-budget.ts
           npm --prefix cloud-source/android/cloud-room ci --ignore-scripts --no-audit --no-fund
           npm --prefix cloud-source/android/cloud-room run typecheck
