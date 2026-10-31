@@ -598,3 +598,9 @@ test('normal dispatch mode shows automatic status, never an approval button (own
   assert.ok(src.includes("if (mode === 'normal') { renderAutomatic(container, queued, age); return; }"));
   assert.ok(!src.split('function renderAutomatic')[1].split('function render(')[0].includes("el('button'"));
 });
+
+test('Pages stages every approved Control script including Goosegeta',()=>{
+  const pages=fs.readFileSync(path.join(__dirname,'../.github/workflows/pages.yml'),'utf8');
+  for(const match of html.matchAll(/<script\s+src="\.\/([^"/]+\.js)"/g))
+    assert.ok(pages.includes('cp control/'+match[1]+' _site/control/'+match[1]),'Missing staged script '+match[1]);
+});
