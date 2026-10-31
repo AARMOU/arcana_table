@@ -19,7 +19,7 @@ test('private fragment is consumed in memory; default summon is muted/model-off;
 test('uncertain network submission retains idempotency key and expired owner credential cannot repeat writes',async()=>{
  const h=harness([{status:503,data:{error:'room-unavailable'}},{status:200,data:{status:'joining',sessionId:'s'}},{status:401,data:{}}]);h.nodes.get('gooseCode').value='GOOSE1';h.nodes.get('gooseInvite').value='private';
  await h.click('gooseForm');await h.click('gooseForm');assert.equal(JSON.parse(h.calls[0].body).requestId,JSON.parse(h.calls[1].body).requestId);
- await h.click('gooseRefresh');assert.equal(h.stores.size,0);await h.click('gooseForm');assert.equal(h.calls.length,3);assert.match(h.window.location.href,/auth\/login/);
+ await h.click('gooseRefresh');assert.equal(h.stores.has('arcana-review-session-v1'),false);assert.equal(h.stores.get('arcana-goosegeta-last-room-v1'),'GOOSE1');await h.click('gooseForm');assert.equal(h.calls.length,3);assert.match(h.window.location.href,/auth\/login/);
 });
 
 test('explicit owner retry goes through authorized existing proxy, without new invite or paid mode',async()=>{
