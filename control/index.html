@@ -545,7 +545,9 @@
           const body=await res.json().catch(()=>({}));
           // Fail over ONLY when GitHub's unauthenticated upstream rejects the edge.
           // Other 503s (Worker failure) and 403s (path disallowed) retain the error.
-          if(res.status===503&&body?.error==='github-upstream-http-403'){
+          // Rock-solid reads (owner 2026-10-31): any edge outage, overload or rate limit (5xx/429) also fails over
+          // to this browser's own GitHub read path. 4xx path refusals still surface as errors.
+          if(res.status>=500||res.status===429){
             const direct=await publicGithubDirect(path);
             if(direct)return direct;
           }
@@ -841,8 +843,22 @@
         updateWorkerFreshness();
         if(document.visibilityState==='visible'&&navigator.onLine!==false&&Date.now()-controlLastAttempt>=WORKER_POLL_MS)
           void fetchControl({summaryOnly:true});
+        if(document.visibilityState==='visible')recoverSoon(0);
       });
-      refresh();
+      // Rock-solid connection (owner 2026-10-31): when the signal returns, or a full refresh had failing feeds,
+      // retry by itself with backoff (2s, 5s, 15s, 30s, then every 60s) while the app is visible. No paid work.
+      let recoverTimer=null,recoverStep=0;const RECOVER_MS=[2000,5000,15000,30000,60000];
+      function needsRecovery(){return /Partial|Unavailable|offline|Offline|failed|Cannot/i.test($('connectionText')?.textContent||'');}
+      function recoverSoon(delay){
+        if(recoverTimer||document.visibilityState!=='visible'||navigator.onLine===false||!needsRecovery())return;
+        recoverTimer=setTimeout(async()=>{recoverTimer=null;if(loading||!needsRecovery()){recoverStep=0;return;}
+          await refresh();
+          if(needsRecovery()){recoverStep=Math.min(recoverStep+1,RECOVER_MS.length-1);recoverSoon(RECOVER_MS[recoverStep]);}else recoverStep=0;
+        },delay??RECOVER_MS[recoverStep]);
+      }
+      window.addEventListener('online',()=>{recoverStep=0;if(!loading)void refresh().then(()=>recoverSoon());});
+      window.addEventListener('offline',()=>{text('connectionText','Offline · showing the last loaded data; reconnects automatically');$('connectionDot').className='pulse';});
+      refresh().then(()=>recoverSoon());
     })();
   </script>
   <script>

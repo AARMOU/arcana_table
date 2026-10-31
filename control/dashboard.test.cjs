@@ -398,7 +398,7 @@ test('rate-limited public edge falls back to read-only GitHub with a bounded per
   assert.equal(direct,1);
 });
 
-test('dashboard never treats arbitrary edge 503 as permission to bypass its public feed',async()=>{
+test('edge outage (5xx/429) fails over to a bounded direct read: at most one per feed per 5 minutes',async()=>{
   const from=script.indexOf('const directFeedCache=new Map();');
   const to=script.indexOf('function statusForRun(run)',from);
   let direct=0;
@@ -411,8 +411,10 @@ test('dashboard never treats arbitrary edge 503 as permission to bypass its publ
     }
   });
   vm.runInContext(script.slice(from,to)+'\nthis.callApi=api;',context);
-  await assert.rejects(context.callApi('/issues/78/comments?per_page=100&page=1'),/GitHub feed HTTP 503/);
-  assert.equal(direct,0);
+  const first=await context.callApi('/issues/78/comments?per_page=100&page=1');
+  assert.deepEqual(first.data,{});
+  await context.callApi('/issues/78/comments?per_page=100&page=1');
+  assert.equal(direct,1,'second read within 5 minutes reuses the direct copy; no extra GitHub request');
 });
 
 test('independent review refresh requires no Copilot worker, dispatcher or paid authorization',()=>{
