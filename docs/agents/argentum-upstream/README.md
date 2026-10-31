@@ -1,7 +1,7 @@
 # Vendored Argentum SDK reference
 
 Copied unmodified from [`wingedsheep/argentum-engine`](https://github.com/wingedsheep/argentum-engine) at
-commit `7fb073337e4389cfabe2ebf4c6416633a7fc63d2` — the commit Arcana's engine jars are built from. The
+commit `c1c04ca3265c61df913af6db65460ad4ce409614` — the commit Arcana's engine jars are built from. The
 patches in `argentum-patches/` adjust some engine and AI behaviour but add no card-DSL vocabulary.
 Licensed MIT; see [`LICENSE`](LICENSE).
 
