@@ -237,14 +237,17 @@ test('an interrupted attempt older than an hour is resolved automatically, never
   assert.equal((await run(fresh, { ARCANA_DISPATCH_MODE: 'normal' }, { fetchImpl: fetchOk(calls) })).state, 'interrupted-attempt');
 });
 
-test('engine gap: Copilot finished, commented, no PR -> candidate; otherwise not', () => {
+test('engine gap requires positive engineer evidence, not just zero delivery', () => {
   const { engineGapCandidates } = require('./dispatch-runner.cjs');
   const now = Date.now(), u = (over = {}) => ({ prs: [], derived: { state: 'review' }, raw: { title: '[Arcana Queue] X', labels: [],
+    engineGapEvidence: { reason: 'Confirmed engine primitive missing', evidence: 'https://github.com/AARMOU/arcana_table/actions/runs/1', at: now - 2e6 },
     commenters: [{ login: 'Copilot', type: 'Bot' }], sessions: [{ event: 'started', at: now - 3e6 }, { event: 'finished', at: now - 2e6 }], ...over } });
   assert.equal(engineGapCandidates([u()], now).length, 1);
-  assert.equal(engineGapCandidates([u({ commenters: [] })], now).length, 0, 'no Copilot explanation');
+  assert.equal(engineGapCandidates([u({ engineGapEvidence: null })], now).length, 0, 'no engineer confirmation, even with Copilot comment');
   assert.equal(engineGapCandidates([{ ...u(), prs: [{ number: 1 }] }], now).length, 0, 'has a PR');
   assert.equal(engineGapCandidates([u({ labels: ['arcana:engine-gap'] })], now).length, 0, 'already labeled');
   assert.equal(engineGapCandidates([u({ sessions: [{ event: 'started', at: now - 60e3 }] })], now).length, 0, 'still working');
   assert.equal(engineGapCandidates([u({ title: '[Arcana Suite] X' })], now).length, 0, 'suites are not cards');
+  assert.equal(engineGapCandidates([u({ engineGapEvidence: { at: now - 4e6 } })], now).length, 0, 'confirmation predates this attempt');
+  assert.equal(engineGapCandidates([u({ engineGapEvidence: { at: now + 1 } })], now).length, 0, 'future confirmation');
 });
