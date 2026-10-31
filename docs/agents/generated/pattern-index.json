@@ -1225,7 +1225,7 @@
    ]
   },
   "Effects.AddCounters": {
-   "count": 21,
+   "count": 22,
    "examples": [
     {
      "card": "Bone Sabres",
@@ -1885,7 +1885,7 @@
    ]
   },
   "Effects.Destroy": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Immoral Bargain",
@@ -2121,7 +2121,7 @@
    ]
   },
   "Effects.ForEachInGroup": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Mutilate",
@@ -4923,7 +4923,7 @@
    ]
   },
   "spell { }": {
-   "count": 48,
+   "count": 49,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -5461,7 +5461,7 @@
    ]
   },
   "CounterType.PLUS_ONE_PLUS_ONE": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Bone Sabres",
@@ -6587,7 +6587,7 @@
    ]
   },
   "EffectTarget.IterationEntity": {
-   "count": 28,
+   "count": 29,
    "examples": [
     {
      "card": "Mutilate",
@@ -7006,7 +7006,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 107,
+   "count": 108,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -7754,13 +7754,19 @@
    ]
   },
   "TargetFilter.Enchantment": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Hull Breach",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HullBreach.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HullBreachScenarioTest.kt"
+    },
+    {
+     "card": "Collective Effort",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CollectiveEffort.kt",
+     "lines": 49,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CollectiveEffortScenarioTest.kt"
     }
    ]
   },
@@ -7968,7 +7974,7 @@
    ]
   },
   "Targets.Player": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Necron Deathmark",
@@ -8001,15 +8007,15 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PrimarisEliminatorScenarioTest.kt"
     },
     {
-     "card": "Malanthrope",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Malanthrope.kt",
-     "lines": 54,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MalanthropeScenarioTest.kt"
+     "card": "Collective Effort",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CollectiveEffort.kt",
+     "lines": 49,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CollectiveEffortScenarioTest.kt"
     }
    ]
   },
   "target(\u2026)": {
-   "count": 75,
+   "count": 76,
    "examples": [
     {
      "card": "Defile",
