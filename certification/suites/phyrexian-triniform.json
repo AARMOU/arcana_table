@@ -1,0 +1,8 @@
+{
+  "key": "phyrexian-triniform",
+  "name": "Phyrexian Triniform",
+  "issue": 660,
+  "source": "certification/PhyrexianTriniformIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.PhyrexianTriniformIndependentCertificationTest",
+  "tests": 7
+}
