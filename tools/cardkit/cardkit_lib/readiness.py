@@ -132,6 +132,10 @@ def keyword_known(keyword: str) -> bool:
     vocab = sdk.vocabulary()
     if key in vocab or key + "ability" in vocab:
         return True
+    # Scryfall lists predefined token types as keywords (Treasure, Food, Clue, Map, Powerstone ...) because
+    # "create a Treasure token" is a keyword action. The SDK models each as a create<Type> helper.
+    if "create" + key in vocab or "create" + key + "token" in vocab:
+        return True
     k = keyword.casefold()
     return any(h.startswith(k) and (len(h) == len(k) or h[len(k)] in " {,:-n") for h in _implemented_line_heads())
 

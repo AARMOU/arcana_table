@@ -187,6 +187,28 @@
       "baseSha": "5a8b51a92b8a43bae77631ae0b3b5d069eecd344",
       "oracleHash": "20532c4d8ba4db7eb8e67ef214b505642d28245c301151341dc31dee8cfccb14",
       "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Knuckles the Echidna": {
+      "summary": "Treasure Hunter is an ability word (no rules meaning, CR 207.2c); 'Treasure' in Scryfall keywords is the token type, created by Effects.CreateTreasure (Professional Face-Breaker, 1.00 match). The win line is an upkeep intervening-if trigger: Inventors' Fair's YouControlAtLeast(N, Artifact) condition with Simic Ascendancy's WinGame effect.",
+      "verifiedBy": "Claude, 2026-10-31: read pinned upstream sources of Inventors' Fair, Simic Ascendancy and Professional Face-Breaker; all members present in docs/agents/generated/sdk-api.md",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/kld/cards/InventorsFair.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/blc/cards/SimicAscendancy.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Treasure Hunter — At the beginning of your upkeep, if you control thirty or more artifacts, you win the game.",
+          "primitives": [
+            "Triggers.you.beginningOf(Step.UPKEEP)",
+            "interveningIf=Conditions.YouControlAtLeast(30",
+            "GameObjectFilter.Artifact)",
+            "Effects.WinGame(EffectTarget.Controller)"
+          ]
+        }
+      ],
+      "baseSha": "f27e2c6caf19296dd83e871b690dadcd89bfe04c",
+      "oracleHash": "62ed74687ea9a962573a422fb6e7721af53c3fe2510b2ee1c0955f1225ba6152",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
     }
   }
 }
