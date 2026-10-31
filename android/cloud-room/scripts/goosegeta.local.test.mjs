@@ -122,9 +122,16 @@ test('workerd: unsolicited turn honk survives a failed GPT chat reply without mu
   // Only one host-legal action => no strategic provider call. Chat provider fixture
   // deliberately returns a decision JSON instead of chat JSON, proving free fallback.
   await game(h,{...update(301),state:{turnNumber:1,cards:{}}},2);
-  const outputs=[await outgoing(h,'arcanaChatSend'),await outgoing(h,'submitAction')];
-  assert.match(outputs[0].text,/HONK/);
-  assert.equal(outputs[1].interactionEpoch,'offline-301');
+  const outputs=[];
+  for(let n=0;n<2;n++) {
+    const relay=await h.wait(p=>p.type==='relay');
+    outputs.push(await unpack(relay.data));
+  }
+  const spoken=outputs.find(p=>p.type==='arcanaChatSend');
+  const move=outputs.find(p=>p.type==='submitAction');
+  assert.ok(spoken && move,'chat must coexist with gameplay regardless of delivery order');
+  assert.match(spoken.text,/HONK/);
+  assert.equal(move.interactionEpoch,'offline-301');
   const state=await (await control('GCHAT3')).json();
   assert.equal(state.chatMode,'ruthless','chat inference failure cannot revoke explicit consent');
   assert.equal(state.model,'opted in');
