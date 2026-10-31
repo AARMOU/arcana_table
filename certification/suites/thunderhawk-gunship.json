@@ -1,0 +1,8 @@
+{
+  "key": "thunderhawk-gunship",
+  "name": "Thunderhawk Gunship",
+  "issue": 595,
+  "source": "certification/ThunderhawkGunshipIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.ThunderhawkGunshipIndependentCertificationTest",
+  "tests": 6
+}
