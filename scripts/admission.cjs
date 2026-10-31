@@ -324,8 +324,9 @@ function budgetWithReservations({ snapshot, active, pendingRepairs, recentFinish
 }
 
 // Dynamic capacity (owner 2026-10-30: "scale between 1-3 workers depending on load").
-// normal -> the owner ceiling; warn -> at most 2; slow -> 1; paused/unknown -> 0 (budget denies).
-const SCALE_BY_LEVEL = { normal: Infinity, warn: 2, slow: 1 };
+// normal and warn -> the owner ceiling (warn is a 50% notice, not a spending stop; owner 2026-10-31: "as much usage as
+// I can get"); slow -> 1 (existing rule); paused/unknown -> 0 (budget denies).
+const SCALE_BY_LEVEL = { normal: Infinity, warn: Infinity, slow: 1 };
 function scaledCapacity(ceiling, level) {
   if (!Number.isSafeInteger(ceiling) || ceiling < 1) return 0;
   return Math.min(ceiling, SCALE_BY_LEVEL[level] ?? 0);
