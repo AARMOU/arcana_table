@@ -40,10 +40,11 @@ test('credit calculator is private and guides only authorized GitHub settings ch
  assert.ok(creditJs.includes('Math.ceil(total*0.1)'));
  assert.ok(credits.includes('cannot purchase credits or directly change GitHub'));
 });
-test('app shell never caches scanner, billing or GitHub API data',()=>{
- assert.ok(worker.includes('shellUrls.has(url.href)'));
+test('app shell never caches the scanner data; live GitHub data is network-first with an offline-only copy',()=>{
+ assert.ok(worker.includes('shellUrls.has(key)'));
  assert.ok(!worker.includes("'./card-gaps.json'"));
- assert.ok(!worker.includes("'https://api.github.com"));
+ assert.ok(!worker.includes("'https://api.github.com'"));
+ assert.ok(worker.includes("catch(error){\n  const cached=await caches.match(request,{cacheName:DATA})"));
 });
 
 test('dual source browser labels indexed names as unverified and counts deck gaps separately',()=>{
@@ -57,7 +58,7 @@ test('dual source browser labels indexed names as unverified and counts deck gap
  assert.ok(script.includes('Indexed · rules unverified'));
  assert.ok(script.includes('Outside scanned decks'));
  assert.ok(workflow.includes('--json _site/control/argentum-catalog.json'));
- assert.ok(worker.includes('shellUrls.has(url.href)'));
+ assert.ok(worker.includes('shellUrls.has(key)'));
  assert.ok(!worker.includes("'./argentum-catalog.json'"));
 });
 

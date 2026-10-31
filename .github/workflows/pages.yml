@@ -82,6 +82,9 @@ jobs:
           cp control/credit-budget.js _site/control/credit-budget.js
           cp control/manifest.webmanifest _site/control/manifest.webmanifest
           cp control/sw.js _site/control/sw.js
+          # Stamp the build so every deploy installs a new app worker: fast cached opens, immediate updates.
+          sed -i "s/^const BUILD='dev';/const BUILD='${GITHUB_SHA::12}';/" _site/control/sw.js
+          grep -q "^const BUILD='${GITHUB_SHA::12}';" _site/control/sw.js
           cp -R control/icons _site/control/icons
       - name: Upload site files
         uses: actions/upload-pages-artifact@v3
