@@ -184,7 +184,8 @@ test('syncCardWork closes resolved work, opens one new issue, and is inert when 
   const created = calls.find(c => c[0] === 'create')[1];
   assert.equal(created.title, '[Card Work] Ulalek, Fused Atrocity — needs engine work');
   assert.equal(created.assignees, undefined);
-  assert.equal(created.labels, undefined);
+  assert.deepEqual(created.labels, ['priority:owner', 'lane:engine']);
+  assert.match(created.body, /score 1001/);
 });
 
 test('control site is redeployed only when the integration base actually moved', () => {
@@ -251,11 +252,14 @@ test('demand reorders only Copilot-ready cards, after the owner\'s own requests'
   assert.deepEqual(r.names, ['Darksteel Monolith', 'Shield Sphere', 'Celestine, the Living Saint']);
   assert.deepEqual(r.publicRequests.map(x => [x.name, x.status]),
     [['Shield Sphere', 'copilot-ready'], ['Celestine, the Living Saint', 'copilot-ready'], ['Treasure Nabber', 'not-copilot-ready']]);
-  // Demand never creates GPT work: only owner selections do.
-  assert.deepEqual(r.workRequests, []);
+  // Owner decision 2026-10-30: a blocked app request becomes review work, ranked after owner requests.
+  assert.deepEqual(r.workRequests.map(w => [w.name, w.source, w.votes, w.issue]), [['Treasure Nabber', 'app', 2, 321]]);
   assert.ok(!r.blockedRequests.some(b => b.name === 'Treasure Nabber'));
   const p = Q.queuePayload({ result: r, units: [], base: BASE, baseSha: SHA });
-  assert.equal(Q.planCardWork(p, []).create, null);
+  const plan = Q.planCardWork(p, []);
+  assert.equal(plan.create.name, 'Treasure Nabber');
+  assert.deepEqual(Q.cardWorkLabels(plan.create), ['priority:app', 'lane:review']);
+  assert.match(Q.cardWorkBody(plan.create, { runId: 1, baseSha: SHA, base: BASE }), /## App request[\s\S]*2\*\* opt-in vote/);
   assert.match(Q.queueSummary(p).join('\n'), /Shield Sphere ×9 \(ready\)/);
 });
 
@@ -295,4 +299,21 @@ test('duplicate owner card lines count once, blocked cards never become Copilot 
   assert.equal(Q.ownerRequestCounts([owner]).get('supported a'),1);
   assert.equal(r.blockedRequests[0].outcome,'engine-work');
   assert.deepEqual(r.workRequests.map(w=>w.name),['Blocked B']);
+});
+
+test('work priority: every owner request outranks app votes; app ranks by votes; resolved app work closes', () => {
+  const precons = gaps([]);
+  const owner = request(30, ['Owner Card']);
+  const demand = [{ name: 'Popular', votes: 50 }, { name: 'Quiet', votes: 1 }, { name: 'Done Already', votes: 9 }];
+  const requested = gaps([card('Owner Card', 'NEEDS_REVIEW', 'gpt'), card('Popular', 'NEEDS_REVIEW', 'claude'),
+    card('Quiet', 'NEEDS_REVIEW', 'gpt'), card('Done Already', 'SUPPORTED', 'copilot')]);
+  const r = Q.candidates({ gaps: precons, requestedGaps: requested, openIssues: [owner], demand, max: 5 });
+  assert.deepEqual(r.workRequests.map(w => w.name), ['Owner Card', 'Popular', 'Quiet']);
+  assert.equal(r.workRequests[1].outcome, 'engine-work');
+  assert.ok(Q.priorityScore(r.workRequests[0]) > Q.priorityScore({ source: 'app', votes: 5000 }));
+  assert.ok(r.resolvedRequests.includes('Done Already'));
+  const p = Q.queuePayload({ result: r, units: [], base: BASE, baseSha: SHA });
+  // Highest score first even if an existing (closed) issue already covers the owner card.
+  const existing = [{ number: 9, state: 'closed', title: '[Card Work] Owner Card — needs rules review', body: Q.CARD_WORK_MARKER + '\n', user: { login: 'github-actions[bot]', type: 'Bot' } }];
+  assert.equal(Q.planCardWork(p, existing).create.name, 'Popular');
 });
