@@ -969,8 +969,14 @@
    ]
   },
   "DynamicAmounts.triggeringToughness": {
-   "count": 2,
+   "count": 3,
    "examples": [
+    {
+     "card": "Verdant Sun's Avatar",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/VerdantSunsAvatar.kt",
+     "lines": 27,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VerdantSunsAvatarScenarioTest.kt"
+    },
     {
      "card": "Dinosaur Egg",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DinosaurEgg.kt",
@@ -1995,13 +2001,19 @@
    ]
   },
   "Effects.GainLife": {
-   "count": 8,
+   "count": 9,
    "examples": [
     {
      "card": "Sister Hospitaller",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SisterHospitaller.kt",
      "lines": 21,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SisterHospitallerScenarioTest.kt"
+    },
+    {
+     "card": "Verdant Sun's Avatar",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/VerdantSunsAvatar.kt",
+     "lines": 27,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VerdantSunsAvatarScenarioTest.kt"
     },
     {
      "card": "Sword of Light and Shadow",
@@ -2026,12 +2038,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SavaiThundermane.kt",
      "lines": 41,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SavaiThundermaneScenarioTest.kt"
-    },
-    {
-     "card": "Sword of War and Peace",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfWarAndPeace.kt",
-     "lines": 43,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfWarAndPeaceScenarioTest.kt"
     }
    ]
   },
@@ -3520,13 +3526,19 @@
  },
  "Triggers": {
   "Triggers.a": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Assault Intercessor",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AssaultIntercessor.kt",
      "lines": 22,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AssaultIntercessorScenarioTest.kt"
+    },
+    {
+     "card": "Verdant Sun's Avatar",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/VerdantSunsAvatar.kt",
+     "lines": 27,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/VerdantSunsAvatarScenarioTest.kt"
     },
     {
      "card": "Pantlaza, Sun-Favored",
@@ -3551,12 +3563,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/CuriousAltisaur.kt",
      "lines": 35,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CuriousAltisaurScenarioTest.kt"
-    },
-    {
-     "card": "Skorpekh Destroyer",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SkorpekhDestroyer.kt",
-     "lines": 35,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SkorpekhDestroyerScenarioTest.kt"
     }
    ]
   },
@@ -4539,7 +4545,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6347,7 +6353,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 95,
+   "count": 96,
    "examples": [
     {
      "card": "Their Name Is Death",
