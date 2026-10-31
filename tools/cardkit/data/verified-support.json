@@ -209,6 +209,28 @@
       "baseSha": "f27e2c6caf19296dd83e871b690dadcd89bfe04c",
       "oracleHash": "62ed74687ea9a962573a422fb6e7721af53c3fe2510b2ee1c0955f1225ba6152",
       "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Overwhelming Stampede": {
+      "summary": "The spell's X is the greatest power among creatures its controller controls at resolution, using DynamicAmounts.battlefield(Player.You, Creature).maxPower() (pinned Tumbleweed Rising). An EOT effect applies +X/+X and trample to the creatures controlled at resolution via Effects.ForEachInGroup(AllCreaturesYouControl, ModifyStats(X,X) then GrantKeyword(TRAMPLE)) (pinned Nissa, Ascended Animist). This is candidate authoring support only; gameplay tests must prove X's timing, multiplayer scope, zero/negative power, snapshot and expiry.",
+      "verifiedBy": "Goose, pinned Argentum source inspection 2026-10-31 (7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/otj/cards/TumbleweedRising.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/one/cards/NissaAscendedAnimist.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Until end of turn, creatures you control gain trample and get +X/+X, where X is the greatest power among creatures you control.",
+          "primitives": [
+            "DynamicAmounts.battlefield(Player.You, GameObjectFilter.Creature).maxPower",
+            "Effects.ForEachInGroup(GroupFilter.AllCreaturesYouControl)",
+            "Effects.ModifyStats(dynamicPower, dynamicToughness, EffectTarget.IterationEntity)",
+            "Effects.GrantKeyword(Keyword.TRAMPLE, EffectTarget.IterationEntity)"
+          ]
+        }
+      ],
+      "baseSha": "e26b0ef62fc510ede821afe09ab2fb26b271eb56",
+      "oracleHash": "213ff2baaeadfaa2f9d18877ecf914a9e5f6337062d6ad49cbe3e94b1cc10419",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
     }
   }
 }

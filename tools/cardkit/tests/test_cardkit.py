@@ -246,6 +246,27 @@ class ReadinessTests(unittest.TestCase):
         with mock.patch.object(readiness, "verified_support", return_value={repo.normalize_name("Ancient Stone Idol"): entry}):
             self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "NEEDS_REVIEW")  # no primitives named
 
+    def test_overwhelming_stampede_review_fails_closed_on_scope_duration_and_runtime_drift(self):
+        # #613 is a source-readiness review, never proof that the card plays correctly.
+        verdict = readiness.classify("Overwhelming Stampede")
+        self.assertEqual((verdict["readiness"], verdict["route"], bool(verdict.get("verifiedSupport"))),
+                         ("SUPPORTED", "copilot", True), verdict["reasons"])
+        entry = readiness.verified_support()[repo.normalize_name("Overwhelming Stampede")]
+        self.assertEqual(len(entry["reviewedLines"]), 1)
+        self.assertTrue(any("maxPower" in p for p in entry["reviewedLines"][0]["primitives"]))
+        original = oracle.cached("Overwhelming Stampede")
+        for altered in (
+            original["oracle_text"].replace("creatures you control gain", "creatures your opponents control gain"),
+            original["oracle_text"].replace("greatest power", "greatest toughness"),
+            original["oracle_text"].replace("Until end of turn", "Until your next turn"),
+        ):
+            with mock.patch.object(oracle, "cached", return_value={**original, "oracle_text": altered}):
+                self.assertEqual(readiness.classify("Overwhelming Stampede")["readiness"], "NEEDS_REVIEW")
+        with mock.patch.object(readiness, "review_runtime_hash", return_value="0" * 64):
+            self.assertEqual(readiness.classify("Overwhelming Stampede")["readiness"], "NEEDS_REVIEW")
+        with mock.patch.object(oracle, "cached", return_value=None):
+            self.assertEqual(readiness.classify("Overwhelming Stampede")["readiness"], "NEEDS_REVIEW")
+
     def test_review_binding_rejects_numeric_cost_or_unreviewed_line_changes(self):
         import copy
         original = oracle.cached("Ancient Stone Idol")
