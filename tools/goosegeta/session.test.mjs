@@ -121,3 +121,32 @@ test('accepted receipt retains version until later host snapshot; no double coun
   assert.equal(g.transitions,2);
   assert.equal(g.receipts,1,'snapshots do not prove host acceptance');
 });
+
+
+test('host-authored SelectCardsDecision yields bounded typed card selections and rejects constraints',()=>{
+  const mk=extra=>state({pendingDecision:{type:'SelectCardsDecision',id:'c-select',playerId:me,
+    options:['a','b','c'],minSelections:1,maxSelections:1,...extra}});
+  const res=candidates(mk(),me);
+  assert.deepEqual(res.map(o=>o.action.response),[
+    {type:'CardsSelectedResponse',decisionId:'c-select',selectedCards:['a']},
+    {type:'CardsSelectedResponse',decisionId:'c-select',selectedCards:['b']},
+    {type:'CardsSelectedResponse',decisionId:'c-select',selectedCards:['c']},
+  ]);
+  assert.deepEqual(candidates(mk({minSelections:2,maxSelections:2}),me).map(o=>o.action.response.selectedCards),
+    [['a','b'],['b','c']]);
+  assert.deepEqual(candidates(mk({minSelections:0,maxSelections:1}),me).map(o=>o.action.response.selectedCards),
+    [[],['a'],['b'],['c']]);
+  assert.deepEqual(candidates(mk({options:[],minSelections:0,maxSelections:1}),me).map(o=>o.action.response.selectedCards),[[]]);
+  assert.deepEqual(candidates(mk({options:['a'],minSelections:2,maxSelections:3}),me),[]);
+  assert.deepEqual(candidates(mk({minSelections:2,maxSelections:1}),me),[]);
+  assert.deepEqual(candidates(mk({minSelections:1,maxSelections:1,onePerCardType:true}),me),[]);
+  assert.deepEqual(candidates(mk({minSelections:0,maxSelections:3,onePerCardName:true}),me).map(o=>o.action.response.selectedCards),[[]]);
+  assert.deepEqual(candidates(mk({minSelections:0,maxSelections:3,minTotalManaValue:5}),me),[]);
+  assert.deepEqual(candidates(mk({minSelections:2,maxSelections:2,selectionLimits:{a:2}}),me),[]);
+  assert.deepEqual(candidates(mk({options:['a','a'],minSelections:1}),me),[]);
+  assert.deepEqual(candidates(mk({playerId:'offline-you'}),me),[]);
+  assert.deepEqual(candidates(state({interactive:false,pendingDecision:mk().pendingDecision}),me),[]);
+  const many=Array.from({length:120},(_,i)=>'card-'+i);
+  assert.equal(candidates(mk({options:many}),me).length,24);
+  assert.ok(candidates(mk({options:many,minSelections:33,maxSelections:33}),me).length===0);
+});
