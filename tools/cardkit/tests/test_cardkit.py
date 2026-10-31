@@ -306,6 +306,12 @@ class ReadinessTests(unittest.TestCase):
         self.assertEqual(v["readiness"], "NEEDS_REVIEW")
         self.assertIn("Flibberjig", " ".join(v["reasons"]))
 
+    def test_predefined_token_types_are_known_keywords(self):
+        # Scryfall lists "Treasure" etc. as keywords; the SDK creates them with Effects.CreateTreasure etc.
+        for k in ("Treasure", "Food", "Clue", "Map", "Powerstone"):
+            self.assertTrue(readiness.keyword_known(k), k)
+        self.assertFalse(readiness.keyword_known("Flibberjig"))
+
     @with_fake_oracle
     def test_blocked_keyword(self):
         v = readiness.classify("Cardkit Test Plaguebearer")
