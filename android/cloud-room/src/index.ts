@@ -9,7 +9,7 @@ import { GooseBudget, type BudgetEnv } from './goose-budget';
 export { GooseBudget };
 
 type SafeFallback = { epoch: number; version: number; interactionEpoch: string; action: Record<string,unknown>; started: number };
-type GooseSession = Omit<ReturnType<typeof freshSession>, "reason"> & { reason: string | null; chatMode: string; lastChatId?: number; lastChatMs?: number; lastBanterTurn?: number; chatCount?: number; chatPending?: boolean; chatFallbacks?: number; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string; fallback?: SafeFallback };
+type GooseSession = Omit<ReturnType<typeof freshSession>, "reason"> & { reason: string | null; chatMode: string; lastChatId?: number; lastChatMs?: number; lastBanterTurn?: number; chatCount?: number; chatPending?: boolean; chatFallbacks?: number; lastChatSource?: string; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string; fallback?: SafeFallback };
 interface Env extends BudgetEnv {
   GOOSEGETA_ENABLED?: string;
   GOOSEGETA_CONTROL_KEY?: string;
@@ -583,6 +583,23 @@ export class GameRoom extends DurableObject<Env> {
     if (input.action === 'chat') {
       const g = this.room.goose;
       if (!g || g.id !== input.sessionId || g.status === 'stopped') return json({error:'session-mismatch'},409);
+      // The existing Control checkbox explicitly requests paid-model opt-in on Apply
+      // chat. The prior implementation ignored it, requiring a brand-new Android game.
+      // Only enable from an originally free session; never revive a model that a
+      // budget/provider/interrupted failure deliberately disabled for safety.
+      if (input.model === true && !g.model) {
+        if (g.reason === 'model-paused-free-fallback' ||
+            g.reason === 'interrupted-model-free-fallback' ||
+            g.reason === 'interrupted-model-missing-fallback')
+          return json({error:'model-previously-paused'},409);
+        if (this.env.GOOSEGETA_OPENAI_ENABLED !== 'true' || !this.env.GOOSE_BUDGET ||
+            !this.env.OPENAI_API_KEY || !this.room.seats[0].online || g.detached || g.expires <= Date.now())
+          return json({error:'model-disabled'},403);
+        g.model = true;
+        g.lastChatSource = 'model-ready';
+      }
+      // Unchecked input does not silently turn an already-enabled game model off;
+      // muting chat is separate from playing legal actions.
       g.chatMode = this.otherPeople() ? 'muted' : chatSettings(input.chatMode);
       await this.save(); return json(publicStatus(g));
     }
@@ -734,9 +751,10 @@ export class GameRoom extends DurableObject<Env> {
     const mode = g.chatMode;
     await this.save();
     let text = cannedBanter(mode,trigger,g.chatCount);
+    let source = 'canned';
     try {
       if (g.model) {
-        const {body,reserve} = chatRequest(this.env.GOOSEGETA_MODEL, mode, trigger);
+        const {body,reserve} = chatRequest(this.env.GOOSEGETA_MODEL, mode, {...trigger,sequence:g.chatCount});
         const limit = Number(this.env.GOOSEGETA_GAME_TOKENS);
         if (!Number.isSafeInteger(limit) || limit < 1 || limit > 9000000 || g.reservedTokens+reserve > limit) throw Error('game-budget');
         g.reservedTokens += reserve;
@@ -746,15 +764,17 @@ export class GameRoom extends DurableObject<Env> {
         if (!result.ok) throw Error('chat-paused');
         text = (await result.json() as {text:string}).text;
         if (typeof text !== 'string' || text.length > 300) throw Error('chat-output');
+        source = 'model';
       }
     } catch {
+      source = 'fallback';
       // Paid chat is optional. On model errors, retain explicit chat consent and
       // deliver the already-selected free taunt instead of silently muting forever.
       g.chatFallbacks = (g.chatFallbacks ?? 0) + 1;
     }
     try {
       if (this.room?.goose === g && !g.detached && g.chatMode === mode && !this.otherPeople() && g.expires > Date.now())
-        await this.sendGoose({type:'arcanaChatSend',text}); // Android assigns author/seat, then echoes.
+        { await this.sendGoose({type:'arcanaChatSend',text}); g.lastChatSource = source; } // Android assigns author/seat, then echoes.
     } finally { g.chatPending = false; if (this.room?.goose === g) await this.save(); }
   }
 
