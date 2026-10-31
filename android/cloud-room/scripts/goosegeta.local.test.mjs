@@ -147,7 +147,11 @@ test('existing human directed-relay regressions on actual workerd, including pri
 });
 test('workerd: unsolicited turn honk survives a failed GPT chat reply without muting or stopping moves',async()=>{
   const h=await setup('GCHAT3',['friend']);
-  const {status}=await summon('GCHAT3',h,{chatMode:'ruthless',model:true});await outgoing(h,'lanHello');
+  const {status}=await summon('GCHAT3',h,{chatMode:'ruthless',model:false});await outgoing(h,'lanHello');
+  assert.equal(status.model,'off','guest starts free');
+  const switched=await control('GCHAT3',{action:'chat',sessionId:status.sessionId,chatMode:'ruthless',model:true});
+  assert.equal(switched.status,200,'the owner's existing Apply chat can explicitly opt in mid-match');
+  assert.equal((await switched.json()).model,'opted in');
   await game(h,{type:'lanSeat',strictDeck:true},1);await outgoing(h,'lanReady');
   // Only one host-legal action => no strategic provider call. Chat provider fixture
   // deliberately returns a decision JSON instead of chat JSON, proving free fallback.
@@ -165,6 +169,7 @@ test('workerd: unsolicited turn honk survives a failed GPT chat reply without mu
   const state=await (await control('GCHAT3')).json();
   assert.equal(state.chatMode,'ruthless','chat inference failure cannot revoke explicit consent');
   assert.equal(state.model,'opted in');
+  assert.equal(state.banter,'fallback','Control must disclose canned output after a failed provider chat');
   assert.equal(state.status,'playing');
   await control('GCHAT3',{action:'dismiss',sessionId:status.sessionId});await outgoing(h,'arcanaBye');
 });
