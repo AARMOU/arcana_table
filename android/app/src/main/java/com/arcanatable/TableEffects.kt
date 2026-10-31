@@ -143,6 +143,18 @@ import kotlinx.coroutines.CoroutineScope
 internal fun shouldFollowActivePlayerToBoard(followEnabled: Boolean, showingTable: Boolean, active: Int, playerCount: Int): Boolean =
     followEnabled && !showingTable && active in 0 until playerCount
 
+/**
+ * Protect both an already-started game and a Wi-Fi/directed-cloud host lobby.
+ * The lobby's multi-transport is not in the legacy roomHost/cloudRoomClient fields.
+ */
+internal fun shouldKeepMultiplayerConnectionGuard(
+    legacyHost: Boolean,
+    legacyClient: Boolean,
+    cloudClient: Boolean,
+    multiTransport: Boolean,
+    argentumEnabled: Boolean,
+): Boolean = legacyHost || legacyClient || cloudClient || multiTransport || argentumEnabled
+
 /** All of the main screen's effects (LaunchedEffect / SideEffect / DisposableEffect). */
 @Composable
 internal fun TableController.TableEffects(darkMode: Boolean) {
@@ -233,7 +245,13 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
 
     // The connection guard follows the *presence* of any live game, not individual socket
     // identities. Replacing a room client must not cycle the foreground service off.
-    val keepGameConnectionActive = roomHost != null || roomClient != null || cloudRoomClient != null || argentumEnabled
+    val keepGameConnectionActive = shouldKeepMultiplayerConnectionGuard(
+        legacyHost = roomHost != null,
+        legacyClient = roomClient != null,
+        cloudClient = cloudRoomClient != null,
+        multiTransport = wifiServer != null,
+        argentumEnabled = argentumEnabled,
+    )
     LaunchedEffect(keepGameConnectionActive) {
         if (keepGameConnectionActive) LanConnectionService.start(context)
         else LanConnectionService.stop(context)
