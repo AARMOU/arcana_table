@@ -82,6 +82,33 @@ class MirrorpoolIndependentCertificationTest {
     }
 
     @Test
+    fun copyAbilityCanBeActivatedAtOpponentPriority() {
+        val d = customScenario(Mirrorpool, "Shock")
+        val p = d.player1
+        val opponent = d.player2
+        val mirrorpool = d.playMirrorpool(p)
+        d.untapPermanent(mirrorpool)
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = opponent)
+        assertNull(d.passPriority(opponent).error)
+
+        val shock = d.putCardInHand(p, "Shock")
+        d.giveMana(p, Color.RED)
+        assertNull(d.castSpell(p, shock, listOf(opponent)).error)
+        val original = d.getTopOfStack()!!
+        d.giveMana(p, Color.GREEN)
+        d.giveMana(p, Color.GREEN)
+        d.giveColorlessMana(p, 1)
+
+        assertNull(d.activateTargetingAbility(
+            p, mirrorpool, 1, ChosenTarget.Spell(original),
+        ).error)
+        d.resolveAll(Choices(yes = true, targets = listOf(p)))
+
+        assertEquals(18, d.getLifeTotal(p))
+        assertEquals(18, d.getLifeTotal(opponent))
+    }
+
+    @Test
     fun copiesYourSorcerySpell() {
         val d = customScenario(Mirrorpool, "Divination")
         val p = d.player1
@@ -124,6 +151,29 @@ class MirrorpoolIndependentCertificationTest {
 
         assertEquals(3, d.manaPool(p).green)
         assertEquals(0, d.manaPool(p).colorless)
+        assertFalse(d.isTapped(mirrorpool))
+        assertFalse(d.getGraveyardCardNames(p).contains("Mirrorpool"))
+    }
+
+    @Test
+    fun theInstantOrSorceryCopyCostRequiresTwoGenericMana() {
+        val d = customScenario(Mirrorpool, "Shock")
+        val p = d.player1
+        val mirrorpool = d.playMirrorpool(p)
+        d.untapPermanent(mirrorpool)
+        val shock = d.putCardInHand(p, "Shock")
+        d.giveMana(p, Color.RED)
+        assertNull(d.castSpell(p, shock, listOf(d.player2)).error)
+        val original = d.getTopOfStack()!!
+        d.giveMana(p, Color.GREEN)
+        d.giveColorlessMana(p, 1)
+
+        assertNotNull(d.activateTargetingAbility(
+            p, mirrorpool, 1, ChosenTarget.Spell(original),
+        ).error)
+
+        assertEquals(1, d.manaPool(p).green)
+        assertEquals(1, d.manaPool(p).colorless)
         assertFalse(d.isTapped(mirrorpool))
         assertFalse(d.getGraveyardCardNames(p).contains("Mirrorpool"))
     }
@@ -204,6 +254,57 @@ class MirrorpoolIndependentCertificationTest {
         val copy = creatures.single { it != bears }
         assertEquals(2, d.projected.getPower(copy))
         assertEquals(2, d.projected.getToughness(copy))
+    }
+
+    @Test
+    fun bothSacrificeAbilitiesRequireMirrorpoolToBeUntapped() {
+        val d = customScenario(Mirrorpool, "Shock", "Grizzly Bears")
+        val p = d.player1
+        val mirrorpool = d.playMirrorpool(p)
+        d.untapPermanent(mirrorpool)
+        val bears = d.putCreatureOnBattlefield(p, "Grizzly Bears")
+        assertNull(d.activate(p, mirrorpool, index = 0).error)
+        d.resolveAll()
+        assertTrue(d.isTapped(mirrorpool))
+
+        val shock = d.putCardInHand(p, "Shock")
+        d.giveMana(p, Color.RED)
+        assertNull(d.castSpell(p, shock, listOf(d.player2)).error)
+        val original = d.getTopOfStack()!!
+        repeat(6) { d.giveMana(p, Color.GREEN) }
+        d.giveColorlessMana(p, 2)
+
+        assertNotNull(d.activateTargetingAbility(
+            p, mirrorpool, 1, ChosenTarget.Spell(original),
+        ).error)
+        assertNotNull(d.activateTargetingAbility(
+            p, mirrorpool, 2, ChosenTarget.Permanent(bears),
+        ).error)
+
+        assertTrue(d.isTapped(mirrorpool))
+        assertFalse(d.getGraveyardCardNames(p).contains("Mirrorpool"))
+        assertEquals(1, d.permanentsNamed(p, "Grizzly Bears").size)
+    }
+
+    @Test
+    fun theCreatureCopyCostRequiresFourGenericMana() {
+        val d = customScenario(Mirrorpool, "Grizzly Bears")
+        val p = d.player1
+        val mirrorpool = d.playMirrorpool(p)
+        d.untapPermanent(mirrorpool)
+        val bears = d.putCreatureOnBattlefield(p, "Grizzly Bears")
+        repeat(3) { d.giveMana(p, Color.GREEN) }
+        d.giveColorlessMana(p, 1)
+
+        assertNotNull(d.activateTargetingAbility(
+            p, mirrorpool, 2, ChosenTarget.Permanent(bears),
+        ).error)
+
+        assertEquals(3, d.manaPool(p).green)
+        assertEquals(1, d.manaPool(p).colorless)
+        assertFalse(d.isTapped(mirrorpool))
+        assertFalse(d.getGraveyardCardNames(p).contains("Mirrorpool"))
+        assertEquals(1, d.permanentsNamed(p, "Grizzly Bears").size)
     }
 
     @Test
