@@ -8,7 +8,8 @@ import { pack, unpack } from './goose-wire.mjs';
 import { GooseBudget, type BudgetEnv } from './goose-budget';
 export { GooseBudget };
 
-type GooseSession = Omit<ReturnType<typeof freshSession>, "reason"> & { reason: string | null; chatMode: string; lastChatId?: number; lastChatMs?: number; chatCount?: number; chatPending?: boolean; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string };
+type SafeFallback = { epoch: number; version: number; interactionEpoch: string; action: Record<string,unknown>; started: number };
+type GooseSession = Omit<ReturnType<typeof freshSession>, "reason"> & { reason: string | null; chatMode: string; lastChatId?: number; lastChatMs?: number; chatCount?: number; chatPending?: boolean; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string; fallback?: SafeFallback };
 interface Env extends BudgetEnv {
   GOOSEGETA_ENABLED?: string;
   GOOSEGETA_CONTROL_KEY?: string;
@@ -110,8 +111,15 @@ export class GameRoom extends DurableObject<Env> {
       const g = this.room?.goose;
       if (g && !g.detached && this.env.GOOSEGETA_ENABLED !== 'true') await this.stopGoose();
       if (g && !g.detached && (g.inFlight || g.chatPending)) {
-        g.status = 'needs attention'; g.reason = 'interrupted-model-request'; g.failures++;
-        g.chatPending = false; g.chatMode = 'muted'; delete g.inFlight;
+        // DO reloads must never leave an engine waiting for a model that cannot return.
+        // The host-offered fallback is persisted before every provider request; the
+        // alarm delivers it exactly once if the request was interrupted.
+        if (g.inFlight) {
+          g.model = false;
+          g.reason = 'interrupted-model-free-fallback';
+          if (!g.fallback) { g.status = 'needs attention'; g.reason = 'interrupted-model-missing-fallback'; }
+        }
+        if (g.chatPending) { g.chatPending = false; g.chatMode = 'muted'; }
         await this.save();
       }
     });
@@ -172,8 +180,20 @@ export class GameRoom extends DurableObject<Env> {
   async webSocketError(socket: WebSocket): Promise<void> { await this.handleDisconnect(socket); }
 
   async alarm(): Promise<void> {
-    if (this.room?.goose && this.room.goose.expires <= Date.now()) {
-      await this.stopGoose();
+    const g = this.room?.goose;
+    if (g && g.expires <= Date.now()) { await this.stopGoose(); return; }
+    if (g?.inFlight && g.fallback) {
+      if (Date.now() < g.fallback.started + 12000) { await this.save(); return; }
+      const fallback = g.fallback;
+      delete g.inFlight; delete g.fallback;
+      g.model = false;
+      if (g.status === 'playing' && !g.detached && this.room?.seats[0].online &&
+          g.epoch === fallback.epoch && !g.awaiting) {
+        g.reason = 'model-timeout-free-fallback';
+        g.actions++;
+        g.awaiting = {epoch:fallback.epoch,version:fallback.version,type:String(fallback.action.type)} as any;
+        await this.sendGoose({type:'submitAction',action:fallback.action,interactionEpoch:fallback.interactionEpoch});
+      } else await this.save();
       return;
     }
     for (const socket of this.ctx.getWebSockets()) try { socket.close(4001, 'room expired'); } catch { /* closed */ }
@@ -656,6 +676,10 @@ export class GameRoom extends DurableObject<Env> {
           const {body,reserve} = modelRequest(this.env.GOOSEGETA_MODEL,packet,options);
           if (!Number.isSafeInteger(limit) || limit < 1 || limit > 1000000 || g.reservedTokens+reserve > limit) throw Error('game-budget');
           g.reservedTokens += reserve; g.inFlight = String(epoch);
+          // One fallback action is derived exclusively from the Android host's
+          // offered candidates; no guessed target, illegal spell or hidden data.
+          g.fallback = {epoch,version:packet.stateVersion,interactionEpoch:String(packet.interactionEpoch),
+            action:selected.action,started:Date.now()};
           await this.save();
           const result = await this.env.GOOSE_BUDGET!.get(this.env.GOOSE_BUDGET!.idFromName('account-daily')).fetch('https://budget/decide',
             {method:'POST',body:JSON.stringify({body,reserve,options})});
@@ -663,13 +687,16 @@ export class GameRoom extends DurableObject<Env> {
           const answer = await result.json() as {candidateId:string};
           selected = options.find(o => o.id === answer.candidateId)!;
           if (!selected) throw Error('model-output');
+          if (g.inFlight !== String(epoch)) return; // watchdog already resolved this epoch
         } catch {
           // A spent one-shot allowance or provider error must not deadlock a valid host game.
           // Disable paid inference permanently for this session and use the already offered
           // deterministic legal candidate; never retry the paid provider or invent an action.
           if (this.room?.goose !== g || g.detached || g.epoch !== epoch ||
-              g.status !== 'playing' || g.expires <= Date.now() || !this.room.seats[0].online) return;
-          delete g.inFlight;
+              g.status !== 'playing' || g.expires <= Date.now() || !this.room.seats[0].online ||
+              (g.inFlight && g.inFlight !== String(epoch))) return;
+          if (!g.inFlight) return; // watchdog or another request already resolved it
+          delete g.inFlight; delete g.fallback;
           g.model = false;
           g.reason = 'model-paused-free-fallback';
           await this.save();
@@ -677,7 +704,7 @@ export class GameRoom extends DurableObject<Env> {
       }
       // Dismiss, newer state, host departure or expiry during an async model call invalidates result.
       if (this.room?.goose !== g || g.epoch !== epoch || g.status !== 'playing' || g.expires <= Date.now() || !this.room.seats[0].online) return;
-      delete g.inFlight;
+      delete g.inFlight; delete g.fallback;
       g.actions++;
       g.awaiting = {epoch,version:packet.stateVersion,type:selected.action.type} as any;
       await this.sendGoose({type:'submitAction',action:selected.action,interactionEpoch:packet.interactionEpoch});
@@ -732,7 +759,9 @@ export class GameRoom extends DurableObject<Env> {
   private async save(): Promise<void> {
     if (!this.room) return;
     await this.ctx.storage.put(ROOM_KEY, this.room);
-    await this.ctx.storage.setAlarm(this.room.goose && this.room.goose.status !== 'stopped'
-      ? Math.min(this.room.goose.expires, Date.now() + ROOM_TTL_MS) : Date.now() + ROOM_TTL_MS);
+    const g = this.room.goose;
+    const idleExpiry = g && g.status !== 'stopped' ? Math.min(g.expires, Date.now() + ROOM_TTL_MS) : Date.now() + ROOM_TTL_MS;
+    await this.ctx.storage.setAlarm(g?.inFlight && g.fallback
+      ? Math.min(idleExpiry, g.fallback.started + 12000) : idleExpiry);
   }
 }
