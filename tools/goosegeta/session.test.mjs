@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { candidates, freshSession, receive, publicStatus, unsupportedReason } from './session.mjs';
+import { candidates, freshSession, receive, publicStatus, unsupportedReason, rejectionCategory,
+  actionKey, snapshotKey, canRecoverRejection, beginRejectionRecovery } from './session.mjs';
 import { modelRequest, modelDecision } from './model.mjs';
 const me='offline-ai';
 const state=(extra={})=>({type:'stateUpdate',interactive:true,interactionEpoch:'offline-2',stateVersion:2,
@@ -149,4 +150,55 @@ test('host-authored SelectCardsDecision yields bounded typed card selections and
   const many=Array.from({length:120},(_,i)=>'card-'+i);
   assert.equal(candidates(mk({options:many}),me).length,24);
   assert.ok(candidates(mk({options:many,minSelections:33,maxSelections:33}),me).length===0);
+});
+
+test('rejection recovery is correlated, finite, persisted and fenced by a fresh interactive epoch',async()=>{
+  const g=freshSession('id',1,'deck',100);g.hostLink='host-link';
+  receive(g,{type:'lanSeat',strictDeck:true},100);
+  const original=state({state:{turnNumber:2,cards:{a:{name:'private-name'}}}});
+  receive(g,original,101);
+  const key=await snapshotKey(original), action=candidates(original,me)[0].action;
+  g.awaiting={epoch:2,version:2,type:action.type,stateKey:key,actionKey:actionKey(action)};
+  const error={type:'error',code:'INVALID_ACTION',message:'The game moved on before that arrived. Nothing was done; try again.'};
+  receive(g,error,102);
+  assert.equal(g.reason,'host-rejected:stale-epoch');assert.equal(canRecoverRejection(g),true);
+  assert.equal(beginRejectionRecovery(g),true);assert.equal(beginRejectionRecovery(g),false);
+  const restored=JSON.parse(JSON.stringify(g));
+  receive(restored,{type:'actionReceipt',accepted:true,interactionEpoch:'offline-2'},103);
+  assert.equal(restored.receipts,0,'late receipt cannot accept the discarded action');
+  receive(restored,state({interactionEpoch:'offline-3',interactive:false}),104);
+  assert.equal(restored.rejection.waiting,true);assert.equal(restored.epoch,2);
+  receive(restored,original,105);assert.equal(restored.rejection.waiting,true);
+  receive(restored,{...original,interactionEpoch:'offline-4',stateVersion:4},106);
+  assert.equal(restored.status,'playing');assert.equal(restored.rejection.waiting,false);
+  assert.equal(await snapshotKey({...original,interactionEpoch:'offline-4',stateVersion:4}),key,
+    'a resync version increment is not a new game state');
+  restored.awaiting={epoch:4,version:4,type:'PlayLand',stateKey:key,actionKey:'other-action'};
+  receive(restored,error,107);
+  assert.equal(restored.reason,'host-rejected:retry-limit');assert.equal(canRecoverRejection(restored),false);
+  receive(restored,state({interactionEpoch:'offline-5'}),108);
+  assert.equal(restored.status,'needs attention');
+  const report=JSON.stringify(publicStatus(restored));
+  for(const secret of ['private-name',key,'other-action','host-link',error.message]) assert.ok(!report.includes(secret));
+});
+
+test('fatal, uncorrelated and legacy rejections cannot recover; categories are an allowlist',()=>{
+  for(const [packet,expected] of [
+    [{code:'LOCAL_ENGINE',message:'secret'},'local-engine'],
+    [{code:'INVALID_ACTION',message:'That action belongs to another seat.'},'wrong-seat'],
+    [{code:'WIFI',message:'secret'},'link-note'],
+    [{code:'UNRECOGNIZED_PRIVATE',message:'secret'},'unknown'],
+    [{code:'INVALID_ACTION',message:'Choose your opening hand first.'},'not-actionable'],
+    [{code:'INVALID_ACTION'},'unknown']]) {
+    assert.equal(rejectionCategory(packet),expected);
+    const g=freshSession('id',1,'deck',100);g.hostLink='host';g.accepted=true;
+    g.awaiting={epoch:1,version:1,stateKey:'state',actionKey:'action'};
+    receive(g,{type:'error',...packet},101);
+    assert.equal(beginRejectionRecovery(g),false);
+  }
+  for(const awaiting of [null,{epoch:1,version:1}]) {
+    const g=freshSession('id',1,'deck',100);g.accepted=true;g.hostLink='host';g.awaiting=awaiting;
+    receive(g,{type:'error',code:'INVALID_ACTION',message:'engine rejection'},101);
+    assert.equal(beginRejectionRecovery(g),false,'no action correlation on legacy/current stuck match');
+  }
 });

@@ -109,15 +109,67 @@ export function unsupportedReason(packet) {
 export function freshSession(id, seat, deckId, now) {
   return { id, seat, deckId, link: id, seq: 0, hostLink: '', hostSeq: 0, epoch: -1,
     status: 'joining', reason: null, receipts: 0, accepted: false, ready: false, actions: 0, failures: 0, reservedTokens: 0,
-    expires: now + 4 * 60 * 60 * 1000, awaiting: null, lastTurn: null, transitions: 0, acceptedVersion: null };
+    expires: now + 4 * 60 * 60 * 1000, awaiting: null, lastTurn: null, transitions: 0, acceptedVersion: null,
+    rejection: null };
+}
+
+// Fingerprints remain inside the authenticated room record. Public status never
+// contains packets, error text, card IDs, targets, or the fingerprints themselves.
+const canonical = value => JSON.stringify(value, (_, v) => v && typeof v === 'object' && !Array.isArray(v)
+  ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
+export const actionKey = action => canonical(action);
+export async function snapshotKey(packet) {
+  const {gameLog, ...state} = packet.state ?? {};
+  const bytes = new TextEncoder().encode(canonical({state, decision:packet.pendingDecision ?? null}));
+  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)), b=>b.toString(16).padStart(2,'0')).join('');
+}
+export function rejectionCategory(packet) {
+  if (packet.code === 'LOCAL_ENGINE') return 'local-engine';
+  if (packet.code === 'WIFI') return 'link-note';
+  if (packet.code !== 'INVALID_ACTION') return 'unknown';
+  if (packet.message === 'That action belongs to another seat.') return 'wrong-seat';
+  if (packet.message === 'The game moved on before that arrived. Nothing was done; try again.') return 'stale-epoch';
+  if (['Choose your opening hand first.', 'Waiting for your opponent to answer a question.',
+    'Waiting for your opponent to keep their hand.', 'The opening hands are already settled.'].includes(packet.message)) return 'not-actionable';
+  return typeof packet.message === 'string' && packet.message.length > 0 ? 'engine-illegal' : 'unknown';
+}
+export function canRecoverRejection(g) {
+  const r = g.rejection;
+  return !!r && r.eligible && !r.used && !r.waiting && g.failures === 1 &&
+    g.status === 'needs attention' && g.accepted && !g.detached && !g.inFlight &&
+    g.reason === 'host-rejected:' + r.category &&
+    !!g.hostLink && r.hostLink === g.hostLink;
+}
+export function beginRejectionRecovery(g, now = Date.now()) {
+  if (!canRecoverRejection(g)) return false;
+  g.rejection.used = true;
+  g.rejection.waiting = true;
+  g.rejection.deadline = now + 12000;
+  g.failures = 0;
+  g.status = 'recovering';
+  return true;
+}
+export function canRecoverUnsupported(g) {
+  return g.status === 'needs attention' && typeof g.reason === 'string' &&
+    g.reason.startsWith('unsupported-decision-or-action') && !g.failures &&
+    g.accepted && !g.detached && !g.inFlight && (g.recoveries ?? 0) < 2;
 }
 export function receive(session, packet, now) {
   if (session.expires <= now || ['stopped','error'].includes(session.status)) return null;
   if (packet.type === 'error') {
+    const awaiting = session.awaiting;
+    const category = rejectionCategory(packet);
+    const eligible = ['stale-epoch','engine-illegal'].includes(category) &&
+      !!awaiting?.stateKey && !!awaiting?.actionKey && !!session.hostLink;
+    const used = session.rejection?.stateKey === awaiting?.stateKey && session.rejection?.used === true;
+    session.rejection = {category, eligible:eligible && !used, used:!!used, waiting:false,
+      epoch:awaiting?.epoch ?? session.epoch, stateKey:awaiting?.stateKey ?? null,
+      actionKey:awaiting?.actionKey ?? null, hostLink:session.hostLink};
     session.failures++;
-    session.reason = 'host-rejected';
+    session.reason = 'host-rejected:' + (used ? 'retry-limit' : category);
     session.status = 'needs attention';
     session.awaiting = null;
+    delete session.inFlight; delete session.fallback;
     return null; // no blind retry of a host-rejected action
   }
   if (packet.type === 'actionReceipt') {
@@ -152,6 +204,12 @@ export function receive(session, packet, now) {
   if (packet.type !== 'stateUpdate' || !session.accepted || session.failures) return null;
   const epoch = /^offline-(\d+)$/.exec(String(packet.interactionEpoch));
   if (!epoch || !Number.isSafeInteger(Number(epoch[1])) || Number(epoch[1]) <= session.epoch) return null;
+  if (session.rejection?.waiting) {
+    // A noninteractive snapshot cannot release recovery, nor can a receipt for
+    // the discarded action. Require a strictly newer, authoritative interaction.
+    if (packet.interactive !== true || Number(epoch[1]) <= session.rejection.epoch) return null;
+    session.rejection.waiting = false;
+  }
   session.epoch = Number(epoch[1]);
   if (Number.isSafeInteger(session.acceptedVersion) && packet.stateVersion > session.acceptedVersion) {
     session.transitions++;
@@ -172,5 +230,7 @@ export function publicStatus(session) {
   if (!session) return { status: 'idle', model: 'off' };
   return { sessionId: session.id, seat: session.seat, deckId: session.deckId, status: session.status,
     actionsSubmitted: session.actions, actionsAccepted: session.receipts, reason: session.reason, observedTransitions: session.transitions, lastTurn: session.lastTurn,
+    rejectionCategory: session.rejection?.category ?? null,
+    recoveryAvailable:canRecoverRejection(session) || canRecoverUnsupported(session),
     awaitingHost: !!session.awaiting, reservedTokens: session.reservedTokens, chatMode: session.chatMode ?? 'muted', banter: session.lastChatSource ?? (session.model ? 'model-ready' : 'canned'), model: session.model ? 'opted in' : 'off' };
 }

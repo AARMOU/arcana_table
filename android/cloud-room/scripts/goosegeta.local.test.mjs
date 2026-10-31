@@ -109,7 +109,8 @@ test('workerd: authenticated chat echo, free ruthless HONK, duplicate suppressio
   // Canonical echo and repeated delivery must never produce another chat response.
   await game(h,{type:'arcanaChat',id:2,seat:1,author:'GOOSEGETA',text:reply.text},4);
   await game(h,{type:'arcanaChat',id:1,seat:0,text:'replayed'},5);
-  await game(h,update(40),6);assert.equal((await outgoing(h,'submitAction')).interactionEpoch,'offline-40');
+  await game(h,{type:'actionReceipt',accepted:true,interactionEpoch:'offline-39'},6);
+  await game(h,update(40),7);assert.equal((await outgoing(h,'submitAction')).interactionEpoch,'offline-40');
   h.send({type:'goosegetaMute'});
   for(let i=0;i<20;i++){if((await(await control('GCHAT1')).json()).chatMode==='muted')break;await new Promise(r=>setTimeout(r,5));}
   assert.equal((await(await control('GCHAT1')).json()).chatMode,'muted');
@@ -227,7 +228,8 @@ test('workerd: owner recovers a stalled SelectCardsDecision via host resync and 
   }
   assert.equal(stuck.reason,'unsupported-decision-or-action:decision-SelectCardsDecision');
   assert.equal((await control('GSELECT',{action:'recover',sessionId:'wrong'})).status,409);
-  const resume=await control('GSELECT',{action:'chat',chatMode:'recover',model:true,sessionId:status.sessionId});
+  assert.equal((await control('GSELECT',{action:'chat',chatMode:'recover',sessionId:'wrong'})).status,409);
+  const resume=await control('GSELECT',{action:'recover',sessionId:status.sessionId});
   assert.equal(resume.status,200);
   const request=await outgoing(h,'requestResync');
   assert.equal(request.type,'requestResync');
@@ -246,6 +248,120 @@ test('workerd: owner recovers a stalled SelectCardsDecision via host resync and 
   assert.equal((await control('GSELECT',{action:'recover',sessionId:status.sessionId})).status,409);
   await control('GSELECT',{action:'dismiss',sessionId:status.sessionId});
   await outgoing(h,'arcanaBye');
+});
+
+
+async function statusUntil(code,predicate){
+  for(let i=0;i<100;i++){
+    const report=await(await control(code)).json();if(predicate(report))return report;
+    await new Promise(r=>setTimeout(r,5));
+  }
+  throw Error('status-timeout '+code);
+}
+async function acceptedGuest(code){
+  const h=await setup(code,['friend']);const {status}=await summon(code,h);
+  await outgoing(h,'lanHello');await game(h,{type:'lanSeat',strictDeck:true},1);
+  await outgoing(h,'lanReady');return {h,status};
+}
+const staleError={type:'error',code:'INVALID_ACTION',message:'The game moved on before that arrived. Nothing was done; try again.'};
+const retryActions=[
+  {action:{type:'PlayLand',playerId:'offline-ai',cardId:'private-land'},isAffordable:true},
+  {action:{type:'PassPriority',playerId:'offline-ai'},isAffordable:true}
+];
+test('workerd: stale rejection resyncs once, fresh epoch excludes rejected candidate, accepted receipt and next turn survive reconstruction',async()=>{
+  const before=external;const {h,status}=await acceptedGuest('GRETRY1');
+  await game(h,update(601,retryActions),2);const first=await outgoing(h,'submitAction');
+  assert.equal(first.action.type,'PlayLand');
+  await game(h,staleError,3);await outgoing(h,'requestResync');
+  const waiting=await statusUntil('GRETRY1',s=>s.status==='recovering');
+  assert.equal(waiting.rejectionCategory,'stale-epoch');assert.equal(waiting.recoveryAvailable,false);
+  assert.equal((await control('GRETRY1',{action:'recover',sessionId:status.sessionId},'wrong')).status,403);
+  assert.equal((await control('GRETRY1',{action:'recover',sessionId:status.sessionId})).status,409);
+  await mf.unsafeEvictDurableObject('rooms','GameRoom',{name:'GRETRY1',webSockets:'hibernate'});
+  await game(h,{type:'actionReceipt',accepted:true,interactionEpoch:'offline-601'},4);
+  await game(h,{...update(602,retryActions),interactive:false},5);
+  await game(h,update(601,retryActions),6); // no renewed interaction epoch
+  assert.equal((await(await control('GRETRY1')).json()).status,'recovering');
+  await game(h,update(603,retryActions),7);
+  const next=await outgoing(h,'submitAction');
+  assert.equal(next.action.type,'PassPriority');assert.equal(next.interactionEpoch,'offline-603');
+  assert.ok(next.seq>first.seq);assert.notDeepEqual(next.action,first.action);
+  await game(h,update(604,retryActions),8);
+  assert.equal((await(await control('GRETRY1')).json()).actionsSubmitted,2,'unchanged resync must not duplicate the outstanding retry');
+  await game(h,{type:'actionReceipt',accepted:true,interactionEpoch:'offline-601'},9);
+  await game(h,{type:'actionReceipt',accepted:true,interactionEpoch:'offline-603'},10);
+  await game(h,{...update(605,[]),state:{turnNumber:3,cards:{}}},11);
+  const report=await statusUntil('GRETRY1',s=>s.lastTurn===3);
+  assert.equal(report.actionsSubmitted,2);assert.equal(report.actionsAccepted,1);
+  assert.equal(report.status,'playing');assert.equal(external,before,'recovery never invokes a provider');
+  for(const privateText of ['private-land','host-link',staleError.message,status.usedInvite])
+    if(privateText)assert.ok(!JSON.stringify(report).includes(privateText));
+  await control('GRETRY1',{action:'dismiss',sessionId:status.sessionId});await outgoing(h,'arcanaBye');
+});
+test('workerd: second rejection on unchanged state exhausts recovery even with increasing versions, owner retry cannot bypass cap',async()=>{
+  const {h,status}=await acceptedGuest('GRETRY2');
+  await game(h,update(701,retryActions),2);await outgoing(h,'submitAction');
+  await game(h,{type:'error',code:'INVALID_ACTION',message:'engine-illegal private-card-name'},3);
+  await outgoing(h,'requestResync');
+  await game(h,update(702,retryActions),4);await outgoing(h,'submitAction');
+  await game(h,{type:'error',code:'INVALID_ACTION',message:'another engine rejection'},5);
+  const report=await statusUntil('GRETRY2',s=>s.reason==='host-rejected:retry-limit');
+  assert.equal(report.recoveryAvailable,false);
+  assert.equal((await control('GRETRY2',{action:'recover',sessionId:status.sessionId})).status,409);
+  await game(h,update(703,retryActions),6);
+  assert.equal((await(await control('GRETRY2')).json()).actionsSubmitted,2);
+  await mf.unsafeEvictDurableObject('rooms','GameRoom',{name:'GRETRY2',webSockets:'hibernate'});
+  assert.equal((await control('GRETRY2',{action:'recover',sessionId:status.sessionId})).status,409);
+});
+test('workerd: no replacement candidate, fatal errors, uncorrelated errors, wrong seat and host replacement stay stopped',async()=>{
+  for(const [code,error,reason] of [
+    ['GFATAL1',{type:'error',code:'LOCAL_ENGINE',message:'private-engine-text'},'host-rejected:local-engine'],
+    ['GFATAL2',{type:'error',code:'INVALID_ACTION',message:'That action belongs to another seat.'},'host-rejected:wrong-seat'],
+    ['GFATAL3',{type:'error',code:'WIFI',message:'private-link-note'},'host-rejected:link-note'],
+    ['GFATAL4',{type:'error',code:'UNKNOWN',message:'private-name'},'host-rejected:unknown']
+  ]){
+    const {h,status}=await acceptedGuest(code);await game(h,update(801,retryActions),2);await outgoing(h,'submitAction');
+    await game(h,error,3);await statusUntil(code,s=>s.reason===reason);
+    assert.equal((await control(code,{action:'recover',sessionId:status.sessionId})).status,409);
+    await game(h,update(802,retryActions),4);
+    assert.equal((await(await control(code)).json()).actionsSubmitted,1);
+  }
+  const {h,status}=await acceptedGuest('GNONE1');
+  await game(h,update(901,[retryActions[0]]),2);await outgoing(h,'submitAction');
+  await game(h,staleError,3);await outgoing(h,'requestResync');
+  await game(h,update(902,[retryActions[0]]),4);
+  await statusUntil('GNONE1',s=>s.reason==='host-rejected:no-new-candidate');
+  assert.equal((await(await control('GNONE1')).json()).actionsSubmitted,1);
+  assert.equal((await control('GNONE1',{action:'recover',sessionId:status.sessionId})).status,409);
+  const other=await acceptedGuest('GLINK1');
+  await game(other.h,update(1001,retryActions),2);await outgoing(other.h,'submitAction');
+  await game(other.h,staleError,3);await outgoing(other.h,'requestResync');
+  other.h.send({type:'relay',to:1,seq:4,data:await pack({...update(1002,retryActions),_relayLink:'replacement-host'})});
+  await statusUntil('GLINK1',s=>s.reason==='host-process-restarted');
+  assert.equal((await control('GLINK1',{action:'recover',sessionId:other.status.sessionId})).status,409);
+  assert.equal((await(await control('GLINK1')).json()).actionsSubmitted,1);
+  const race=await acceptedGuest('GRACE1');
+  await game(race.h,update(1101,retryActions),2);await outgoing(race.h,'submitAction');
+  await game(race.h,{type:'actionReceipt',accepted:true,interactionEpoch:'offline-1101'},3);
+  await game(race.h,staleError,4);
+  const raced=await statusUntil('GRACE1',s=>s.status==='needs attention');
+  assert.equal(raced.actionsAccepted,1);assert.equal(raced.recoveryAvailable,false);
+  assert.equal((await control('GRACE1',{action:'recover',sessionId:race.status.sessionId})).status,409);
+});
+
+test('workerd: missing resync response times out visibly without retrying or deleting the room',async()=>{
+  const {h,status}=await acceptedGuest('GTIME1');
+  await game(h,update(1201,retryActions),2);await outgoing(h,'submitAction');
+  await game(h,staleError,3);await outgoing(h,'requestResync');
+  await mf.unsafeEvictDurableObject('rooms','GameRoom',{name:'GTIME1',webSockets:'hibernate'});
+  let report;
+  for(let i=0;i<75;i++){
+    report=await(await control('GTIME1')).json();if(report.reason==='host-rejected:resync-timeout')break;
+    await new Promise(r=>setTimeout(r,200));
+  }
+  assert.equal(report.reason,'host-rejected:resync-timeout');assert.equal(report.status,'needs attention');
+  assert.equal(report.actionsSubmitted,1);assert.equal(report.recoveryAvailable,false);
+  assert.equal((await control('GTIME1',{action:'recover',sessionId:status.sessionId})).status,409);
 });
 
 test.after(async()=>{for(const s of sockets)try{s.close();}catch{}await mf.dispose();});

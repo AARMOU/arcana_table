@@ -1,15 +1,18 @@
 import { DurableObject } from "cloudflare:workers";
 
 import { chatSettings, chatTrigger, cannedBanter, chatRequest } from '../../../tools/goosegeta/banter.mjs';
-import { candidates, freshSession, receive, publicStatus, unsupportedReason } from '../../../tools/goosegeta/session.mjs';
+import { candidates, freshSession, receive, publicStatus, unsupportedReason, actionKey, snapshotKey,
+  canRecoverRejection, beginRejectionRecovery, canRecoverUnsupported } from '../../../tools/goosegeta/session.mjs';
 import { modelRequest } from '../../../tools/goosegeta/model.mjs';
 import manifest from './goose-decks.json';
 import { pack, unpack } from './goose-wire.mjs';
 import { GooseBudget, type BudgetEnv } from './goose-budget';
 export { GooseBudget };
 
-type SafeFallback = { epoch: number; version: number; interactionEpoch: string; action: Record<string,unknown>; started: number };
-type GooseSession = Omit<ReturnType<typeof freshSession>, "reason"> & { reason: string | null; chatMode: string; lastChatId?: number; lastChatMs?: number; lastBanterTurn?: number; chatCount?: number; chatPending?: boolean; chatFallbacks?: number; lastChatSource?: string; recoveries?: number; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string; fallback?: SafeFallback };
+type SafeFallback = { epoch: number; version: number; interactionEpoch: string; action: Record<string,unknown>; started: number; stateKey: string; actionKey: string };
+type Rejection = { category: string; eligible: boolean; used: boolean; waiting: boolean; deadline?: number; epoch: number; stateKey: string | null; actionKey: string | null; hostLink: string };
+type AwaitingAction = { epoch: number; version: number; type: string; stateKey?: string; actionKey?: string };
+type GooseSession = Omit<ReturnType<typeof freshSession>, "reason" | "rejection" | "awaiting"> & { awaiting: AwaitingAction | null; rejection: Rejection | null; reason: string | null; chatMode: string; lastChatId?: number; lastChatMs?: number; lastBanterTurn?: number; chatCount?: number; chatPending?: boolean; chatFallbacks?: number; lastChatSource?: string; recoveries?: number; model: boolean; requestId: string; usedInvite: string; detached?: boolean; inFlight?: string; fallback?: SafeFallback };
 interface Env extends BudgetEnv {
   GOOSEGETA_ENABLED?: string;
   GOOSEGETA_CONTROL_KEY?: string;
@@ -182,6 +185,12 @@ export class GameRoom extends DurableObject<Env> {
   async alarm(): Promise<void> {
     const g = this.room?.goose;
     if (g && g.expires <= Date.now()) { await this.stopGoose(); return; }
+    if (g?.rejection?.waiting) {
+      if (Date.now() < (g.rejection.deadline ?? 0)) { await this.save(); return; }
+      g.rejection.waiting = false; g.rejection.eligible = false;
+      g.failures = 1; g.status = 'needs attention'; g.reason = 'host-rejected:resync-timeout';
+      await this.save(); return;
+    }
     if (g?.inFlight && g.fallback) {
       if (Date.now() < g.fallback.started + 12000) { await this.save(); return; }
       const fallback = g.fallback;
@@ -191,7 +200,7 @@ export class GameRoom extends DurableObject<Env> {
           g.epoch === fallback.epoch && !g.awaiting) {
         g.reason = 'model-timeout-free-fallback';
         g.actions++;
-        g.awaiting = {epoch:fallback.epoch,version:fallback.version,type:String(fallback.action.type)} as any;
+        g.awaiting = {epoch:fallback.epoch,version:fallback.version,type:String(fallback.action.type),stateKey:fallback.stateKey,actionKey:fallback.actionKey} as any;
         await this.sendGoose({type:'submitAction',action:fallback.action,interactionEpoch:fallback.interactionEpoch});
       } else await this.save();
       return;
@@ -580,11 +589,11 @@ export class GameRoom extends DurableObject<Env> {
     let input: Record<string,unknown>;
     try { input = JSON.parse(raw); } catch { return json({error:'bad-json'},400); }
     if (!input || Array.isArray(input) || typeof input !== 'object') return json({error:'bad-json'},400);
-    // The existing authenticated Control proxy permits the 'chat' verb and forwards
-    // chatMode. The reserved 'recover' value is an explicit recovery command, NOT a
-    // chat setting. It leaves both chat consent and paid-model selection unchanged.
-    const requestRecovery = input.action === 'recover' ||
-      (input.action === 'chat' && input.chatMode === 'recover');
+    // Compatibility for the currently published unsupported-decision Retry button.
+    // Host-rejection recovery NEVER uses this old chat transport. New clients use
+    // the dedicated recover action through the owner-authenticated proxy.
+    const legacyRecovery = input.action === 'chat' && input.chatMode === 'recover';
+    const requestRecovery = input.action === 'recover' || legacyRecovery;
     if (input.action === 'chat' && !requestRecovery) {
       const g = this.room.goose;
       if (!g || g.id !== input.sessionId || g.status === 'stopped') return json({error:'session-mismatch'},409);
@@ -615,13 +624,17 @@ export class GameRoom extends DurableObject<Env> {
       const g = this.room.goose;
       if (!g || g.id !== input.sessionId || g.status === 'stopped')
         return json({error:'session-mismatch'},409);
-      if (g.status !== 'needs attention' || typeof g.reason !== 'string' ||
-          !g.reason.startsWith('unsupported-decision-or-action') ||
-          g.failures || !g.accepted || g.detached || g.inFlight ||
+      const rejected = canRecoverRejection(g);
+      const unsupported = canRecoverUnsupported(g);
+      if (legacyRecovery && !unsupported) return json({error:'use-recover-action'},400);
+      if ((!rejected && !unsupported) || !g.accepted || g.detached || g.inFlight ||
           g.expires <= Date.now() || !this.room.seats[0]?.online)
         return json({error:'decision-not-recoverable'},409);
-      if ((g.recoveries ?? 0) >= 2) return json({error:'recover-limit'},409);
-      g.recoveries = (g.recoveries ?? 0) + 1;
+      if (rejected) beginRejectionRecovery(g);
+      else {
+        if ((g.recoveries ?? 0) >= 2) return json({error:'recover-limit'},409);
+        g.recoveries = (g.recoveries ?? 0) + 1;
+      }
       await this.save(); // count attempt first, including in cases of disconnect or DO restart
       await this.sendGoose({type:'requestResync'});
       return json(publicStatus(g)); // host has not yet certified any legal action
@@ -696,21 +709,46 @@ export class GameRoom extends DurableObject<Env> {
       else if (trigger) this.ctx.waitUntil(this.banter(g, trigger));
       if (packet.type === 'arcanaChat') { await this.save(); return; }
       const oldEpoch = g.epoch;
+      const recovering = g.rejection?.waiting === true;
+      const outstanding = g.awaiting;
+      const previousTransitions = g.transitions, previousReceipts = g.receipts;
       const reply = receive(g,packet,Date.now());
       if (g.status === 'stopped') { await this.stopGoose(); return; }
       await this.save();
       if (reply) await this.sendGoose(reply);
+      if (packet.type === 'error' && this.room?.seats[0]?.online && beginRejectionRecovery(g)) {
+        await this.save(); // spend the one attempt before any resync emission
+        await this.sendGoose({type:'requestResync'});
+        return;
+      }
       if (packet.type !== 'stateUpdate' || g.epoch === oldEpoch || g.status !== 'playing' || g.failures) return;
       const playerId = g.seat === 1 ? 'offline-ai' : 'offline-ai-'+g.seat;
-      const options = candidates(packet,playerId);
+      const epoch = g.epoch;
+      const stateKey = await snapshotKey(packet);
+      if (this.room?.goose !== g || g.epoch !== epoch || g.status !== 'playing' || g.failures) return;
+      const offered = candidates(packet,playerId);
+      if (outstanding?.stateKey === stateKey && g.receipts === previousReceipts && !g.awaiting &&
+          offered.some(o => actionKey(o.action) === outstanding.actionKey)) {
+        // Resync increments the host version without committing a move. It is
+        // neither acceptance nor permission to send the outstanding move twice.
+        g.awaiting = outstanding; g.transitions = previousTransitions;
+        await this.save(); return;
+      }
+      const rejection = g.rejection;
+      const options = rejection?.used && rejection.stateKey === stateKey
+        ? offered.filter(o => actionKey(o.action) !== rejection.actionKey) : offered;
       if (!options.length) {
+        if (offered.length) {
+          g.reason = 'host-rejected:no-new-candidate'; g.status = 'needs attention';
+          g.failures = 1; await this.save(); return;
+        }
         // The host also sends interactive snapshots to seats without priority. Waiting is normal.
         if (!packet.pendingDecision && (!Array.isArray(packet.legalActions) || packet.legalActions.length === 0)) return;
         g.reason = unsupportedReason(packet); g.status = 'needs attention'; await this.save(); return;
       }
       g.reason = null;
-      const epoch = g.epoch; let selected = options[0];
-      if (g.model && options.length > 1) {
+      let selected = options[0];
+      if (g.model && options.length > 1 && !recovering) {
         try {
           const limit = Number(this.env.GOOSEGETA_GAME_TOKENS);
           const {body,reserve} = modelRequest(this.env.GOOSEGETA_MODEL,packet,options);
@@ -719,7 +757,7 @@ export class GameRoom extends DurableObject<Env> {
           // One fallback action is derived exclusively from the Android host's
           // offered candidates; no guessed target, illegal spell or hidden data.
           g.fallback = {epoch,version:packet.stateVersion,interactionEpoch:String(packet.interactionEpoch),
-            action:selected.action,started:Date.now()};
+            action:selected.action,started:Date.now(),stateKey,actionKey:actionKey(selected.action)};
           await this.save();
           // Bound the entire round trip, including a provider that ignores
           // AbortSignal. A slow OpenAI request must not block a Magic turn.
@@ -758,7 +796,7 @@ export class GameRoom extends DurableObject<Env> {
       if (this.room?.goose !== g || g.epoch !== epoch || g.status !== 'playing' || g.expires <= Date.now() || !this.room.seats[0].online) return;
       delete g.inFlight; delete g.fallback;
       g.actions++;
-      g.awaiting = {epoch,version:packet.stateVersion,type:selected.action.type} as any;
+      g.awaiting = {epoch,version:packet.stateVersion,type:selected.action.type,stateKey,actionKey:actionKey(selected.action)} as any;
       await this.sendGoose({type:'submitAction',action:selected.action,interactionEpoch:packet.interactionEpoch});
     } catch { if (this.room?.goose === g && g.status !== 'stopped') { g.status = 'needs attention'; await this.save(); } }
   }
@@ -822,7 +860,8 @@ export class GameRoom extends DurableObject<Env> {
     await this.ctx.storage.put(ROOM_KEY, this.room);
     const g = this.room.goose;
     const idleExpiry = g && g.status !== 'stopped' ? Math.min(g.expires, Date.now() + ROOM_TTL_MS) : Date.now() + ROOM_TTL_MS;
-    await this.ctx.storage.setAlarm(g?.inFlight && g.fallback
-      ? Math.min(idleExpiry, g.fallback.started + 12000) : idleExpiry);
+    let alarmAt = g?.inFlight && g.fallback ? Math.min(idleExpiry, g.fallback.started + 12000) : idleExpiry;
+    if (g?.rejection?.waiting) alarmAt = Math.min(alarmAt, g.rejection.deadline ?? Date.now());
+    await this.ctx.storage.setAlarm(alarmAt);
   }
 }
