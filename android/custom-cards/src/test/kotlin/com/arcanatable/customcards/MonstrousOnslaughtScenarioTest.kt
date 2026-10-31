@@ -28,7 +28,7 @@ class MonstrousOnslaughtScenarioTest {
         assertTrue(offer.requiresDamageDistribution)
         assertEquals(2, offer.totalDamageToDistribute)
         assertEquals(1, offer.minDamagePerTarget)
-        assertEquals(2, offer.targetCount)
+        assertNotNull(d.castSpell(p, spell, listOf(firstElf, secondElf, thirdElf)).error)
 
         val result = d.submit(
             CastSpell(

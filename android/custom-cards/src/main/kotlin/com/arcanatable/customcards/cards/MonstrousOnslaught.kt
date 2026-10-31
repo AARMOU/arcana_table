@@ -20,7 +20,7 @@ val MonstrousOnslaught = card("Monstrous Onslaught") {
             TargetFilter.Creature,
             minCount = 0,
             unlimited = true,
-            dynamicMaxCount = DynamicAmounts.capturedAtCast("x"),
+            dynamicMaxCount = greatestPower,
         )
         effect = Effects.DividedDamage(
             total = 0,
