@@ -2,3 +2,4 @@
 # Maintained automatically by the weekly Argentum upgrade (engine-upgrade/weekly.py reconcile):
 # a card is listed here when Argentum's version fails Arcana's scenario tests for that card,
 # and removed again once Argentum's version passes them. One card name per line.
+Sifter of Skulls
