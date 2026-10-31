@@ -259,7 +259,7 @@
         if(item.certification==='running')return {step:2,label:'Independent certification running'};
         const checks=item.checks||{};
         const tested=['toolkit','cards-and-android'].every(name=>checks[name]==='success');
-        if(tested)return {step:1,label:'Tests passed · awaiting independent certification'};
+        if(tested)return {step:1,label:'Implementation tests passed · independent certification pending'};
         const results=Object.entries(checks).filter(([name])=>!['suggest','publish','observe','copilot','publish-oracle-cache'].includes(name));
         if(results.length)return {step:1,label:'Checks pending or incomplete · inspect CI'};
         return {step:0,label:'Implementation PR · test evidence not yet reported'};
