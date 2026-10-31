@@ -97,7 +97,7 @@ function blockAction(info, state) {
 
 export function selectAction(message) {
   if (message?.type !== "stateUpdate" || message.interactive !== true) return null;
-  if (message.pendingDecision != null) return null;
+  if (message.pendingDecision != null && message.pendingDecision.type !== "PlayCardDecision") return null;
   const actions = Array.isArray(message.legalActions) ? message.legalActions : [];
   const matching = type => actions.filter(info => info?.action?.type === type);
   const land = matching("PlayLand").find(safeOption);
