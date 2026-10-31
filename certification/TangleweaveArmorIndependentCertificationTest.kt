@@ -97,7 +97,7 @@ class TangleweaveArmorIndependentCertificationTest {
         assertTrue(d.projected.hasSubtype(germ, "GERM"))
         val germColors = d.projected.getColors(germ)
         assertEquals(1, germColors.size)
-        assertTrue(germColors.contains(Color.BLACK))
+        assertEquals(Color.BLACK.toString(), germColors.single().toString())
         val germCard = d.state.getEntity(germ)!!.get<CardComponent>()
         assertNotNull(germCard?.baseStats)
         assertEquals(0, germCard!!.baseStats!!.power)
