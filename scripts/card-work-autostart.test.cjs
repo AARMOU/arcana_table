@@ -44,7 +44,8 @@ test('trusted only when the feeder bot wrote it unedited', () => {
 test('engineers get first pick: grace period and a fresh CLAIM hold the automatic start', () => {
   const b = body(workRequest());
   assert.equal(D.verdictOf(review(1, b), 'base', ok, ok).cls, 'eligible');
-  assert.equal(D.verdictOf(review(1, b, { createdAt: Date.now() - 30 * 60e3 }), 'base', ok, ok).cls, 'waiting');
+  assert.equal(D.verdictOf(review(1, b, { createdAt: Date.now() - 10 * 60e3 }), 'base', ok, ok).cls, 'waiting');
+  assert.equal(D.verdictOf(review(1, b, { createdAt: Date.now() - 20 * 60e3 }), 'base', ok, ok).cls, 'eligible');
   assert.equal(D.verdictOf(review(1, b, { claimedAt: Date.now() - HOUR }), 'base', ok, ok).cls, 'engineer-claimed');
   assert.equal(D.verdictOf(review(1, b, { claimedAt: Date.now() - 30 * HOUR }), 'base', ok, ok).cls, 'eligible', 'a stale claim expires');
   const linked = review(1, b); linked.prs = [{ number: 9 }];

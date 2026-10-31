@@ -12,10 +12,12 @@ const isSuite = u => String(u?.raw?.title || '').startsWith(A.SUITE_TITLE);
 const isReview = u => String(u?.raw?.title || '').startsWith(A.CARD_WORK_TITLE) && String(u?.raw?.body || '').startsWith(A.CARD_WORK_MARKER + '\n');
 const actionableOf = (title, body, base) => String(title || '').startsWith(A.SUITE_TITLE) ? A.suiteActionable(body)
   : String(title || '').startsWith(A.CARD_WORK_TITLE) ? A.reviewActionable(body) : A.unitActionable(body, base);
-// A card-work item is offered to engineers first: Copilot starts it only after REVIEW_GRACE_MS with no engineer
-// CLAIM in the last REVIEW_CLAIM_MS. Highest priority (owner requests, then app votes) first.
+// A card-work item (review OR engine lane) is offered to engineers first: Copilot starts it after REVIEW_GRACE_MS
+// with no engineer CLAIM in the last REVIEW_CLAIM_MS. Highest priority (owner requests, then app votes) first.
+// Owner 2026-10-31: cards must move without requiring a specific engineer; the old 2 h grace was dead time
+// overnight, so a short window remains only to let an active engineer CLAIM first.
 const DEV_CI_WORKFLOW = 'arcana-development-ci.yml';
-const REVIEW_GRACE_MS = 2 * 60 * 60 * 1000;
+const REVIEW_GRACE_MS = 15 * 60 * 1000;
 const REVIEW_CLAIM_MS = 24 * 60 * 60 * 1000;
 const reviewPriority = u => Number((String(u?.raw?.body || '').match(/priority:(\d{1,4})/) || [])[1]) || 0;
 const kindOf = u => isSuite(u) ? 'suite' : isReview(u) ? 'review' : 'card';
@@ -210,7 +212,7 @@ function verdictOf(u, base, feasible, actionable = A.unitActionable) {
   if (review) {
     const now = Date.now();
     if (Number.isFinite(u.raw.claimedAt) && now - u.raw.claimedAt < REVIEW_CLAIM_MS) return { cls: 'engineer-claimed', reason: 'engineer claimed within 24h' };
-    if (!Number.isFinite(u.raw.createdAt) || now - u.raw.createdAt < REVIEW_GRACE_MS) return { cls: 'waiting', reason: 'offered to engineers for 2h first' };
+    if (!Number.isFinite(u.raw.createdAt) || now - u.raw.createdAt < REVIEW_GRACE_MS) return { cls: 'waiting', reason: 'offered to engineers for 15 min first' };
   }
   // An unknown/missing code is treated as blocked: the approval is kept, never discarded.
   if (!feas.ok) return { cls: FEAS_CLASS[feas.code] || 'blocked', reason: 'feasibility: ' + (feas.reason || 'not Copilot-ready') };
