@@ -24,8 +24,8 @@ test('uncertain network submission retains idempotency key and expired owner cre
 
 test('explicit owner retry goes through authorized existing proxy, without new invite or paid mode',async()=>{
  const h=harness([
-  {status:200,data:{status:'needs attention',sessionId:'s',model:'off',reason:'unsupported-decision-or-action:decision-SelectCardsDecision',chatMode:'ruthless'}},
-  {status:200,data:{status:'needs attention',sessionId:'s',model:'off',reason:'unsupported-decision-or-action:decision-SelectCardsDecision',chatMode:'ruthless'}},
+  {status:200,data:{status:'needs attention',sessionId:'s',model:'off',recoveryAvailable:true,reason:'unsupported-decision-or-action:decision-SelectCardsDecision',chatMode:'ruthless'}},
+  {status:200,data:{status:'needs attention',sessionId:'s',model:'off',recoveryAvailable:true,reason:'unsupported-decision-or-action:decision-SelectCardsDecision',chatMode:'ruthless'}},
   {status:200,data:{status:'playing',sessionId:'s',model:'off',chatMode:'ruthless'}},
  ]);
  h.nodes.get('gooseCode').value='GOOSE1';
@@ -34,8 +34,8 @@ test('explicit owner retry goes through authorized existing proxy, without new i
  assert.equal(h.nodes.get('gooseRecover').disabled,false);
  await h.click('gooseRecover');
  const body=JSON.parse(h.calls[1].body);
- assert.equal(body.action,'chat','existing owner proxy accepts the verb');
- assert.equal(body.chatMode,'recover','reserved explicit recovery route');
+ assert.equal(body.action,'recover','dedicated owner-authenticated recovery verb');
+ assert.equal(body.chatMode,'ruthless','recovery is not a chat mode');
  assert.equal(body.model,false,'no paid model re-enable');
  assert.equal(body.sessionId,'s');
  assert.equal(h.nodes.get('gooseChat').value,'ruthless');
@@ -47,7 +47,7 @@ test('explicit owner retry goes through authorized existing proxy, without new i
 
 test('refresh restores authenticated existing room and session without storing the host invitation',async()=>{
  const first=harness([{status:200,data:{
-  sessionId:'game-still-live',status:'needs attention',reason:'unsupported-decision-or-action:decision-SelectCardsDecision',
+  sessionId:'game-still-live',status:'needs attention',recoveryAvailable:true,reason:'unsupported-decision-or-action:decision-SelectCardsDecision',
   model:'off',chatMode:'ruthless',deckId:'goosegeta-flock',actionsSubmitted:18,actionsAccepted:18
  }}]);
  first.nodes.get('gooseCode').value='GOOSE1';
@@ -56,7 +56,7 @@ test('refresh restores authenticated existing room and session without storing t
  assert.equal(first.stores.get('arcana-goosegeta-last-room-v1'),'GOOSE1');
  assert.ok(![...first.stores.values()].some(x=>String(x).includes('private-should-never-be-stored')));
  const reloaded=harness([{status:200,data:{
-  sessionId:'game-still-live',status:'needs attention',reason:'unsupported-decision-or-action:decision-SelectCardsDecision',
+  sessionId:'game-still-live',status:'needs attention',recoveryAvailable:true,reason:'unsupported-decision-or-action:decision-SelectCardsDecision',
   model:'off',chatMode:'ruthless',deckId:'goosegeta-flock',actionsSubmitted:18,actionsAccepted:18
  }}],'',true,first.stores);
  await new Promise(resolve=>setImmediate(resolve));
@@ -93,4 +93,17 @@ test('dismiss clears persisted room locator, next reload does not auto-query a s
  await new Promise(resolve=>setImmediate(resolve));
  assert.equal(again.calls.length,0);
  assert.equal(again.nodes.get('gooseInvite').value,'');
+});
+
+test('host-rejected retry eligibility comes from the authenticated server, never the reason string',async()=>{
+ const h=harness([
+  {status:200,data:{status:'needs attention',sessionId:'s',model:'off',recoveryAvailable:false,reason:'host-rejected:retry-limit'}},
+  {status:200,data:{status:'needs attention',sessionId:'s',model:'off',recoveryAvailable:true,reason:'host-rejected:stale-epoch'}},
+  {status:200,data:{status:'recovering',sessionId:'s',model:'off',recoveryAvailable:false}},
+ ]);
+ h.nodes.get('gooseCode').value='GOOSE1';
+ await h.click('gooseRefresh');assert.equal(h.nodes.get('gooseRecover').disabled,true);
+ await h.click('gooseRefresh');assert.equal(h.nodes.get('gooseRecover').disabled,false);
+ await h.click('gooseRecover');assert.equal(JSON.parse(h.calls[2].body).action,'recover');
+ assert.equal(h.nodes.get('gooseRecover').disabled,true);
 });

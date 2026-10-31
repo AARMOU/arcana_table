@@ -32,7 +32,7 @@
     }
     $('gooseDismiss').disabled = !currentSession || ['idle','stopped'].includes(data.status);
     recoverable = !!currentSession && data.status === 'needs attention' &&
-      typeof data.reason === 'string' && data.reason.startsWith('unsupported-decision-or-action');
+      data.recoveryAvailable === true;
     $('gooseRecover').disabled = !recoverable;
     $('gooseStatus').textContent = (data.status || 'unknown') + ' · model ' + (data.model || 'off') +
       (data.sessionId ? ' · moves sent '+(data.actionsSubmitted||0)+' · host accepted '+(data.actionsAccepted||0)+' · later host updates '+(data.observedTransitions||0)+
@@ -53,15 +53,11 @@
     const buttons = ['gooseSummon','gooseDismiss','gooseRefresh','gooseApplyChat','gooseRecover']; buttons.forEach(id => $(id).disabled=true);
     try {
       if (action === 'summon') submitted = true;
-      // Reuse the existing owner-OAuth proxy; no new production Worker deployment.
-      // The isolated room Worker treats the reserved chatMode as an explicit resync
-      // instruction and leaves chat intensity and paid-model opt-in unchanged.
-      const wireAction = action === 'recover' ? 'chat' : action;
       const r = await fetch(API+'/v1/goosegeta'+(!action ? '?code='+code : ''), {
         method: action ? 'POST':'GET',cache:'no-store',headers:{Authorization:'Bearer '+session,...(action?{'Content-Type':'application/json'}:{})},
-        ...(action?{body:JSON.stringify({action:wireAction,code,capability:$('gooseInvite').value,deckId:$('gooseDeck').value,
+        ...(action?{body:JSON.stringify({action,code,capability:$('gooseInvite').value,deckId:$('gooseDeck').value,
           model:$('gooseModel').checked,requestId,sessionId:currentSession,
-          chatMode:action === 'recover' ? 'recover' : $('gooseChat').value})}:{}) });
+          chatMode:$('gooseChat').value})}:{}) });
       if (r.status === 401) {
         for (const k of ['localStorage','sessionStorage']) try { if(window[k].getItem(KEY)===session)window[k].removeItem(KEY); } catch {}
         throw Error('Owner session expired. Sign in again.');

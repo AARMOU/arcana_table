@@ -35,3 +35,16 @@ test('Goosegeta rejects URLs and invalid methods; status read never summons',asy
   assert.equal((await h.run(h.request({}, {}, 'GET'))).status,200);
   assert.equal(h.calls[0].init.method,'GET');assert.equal(h.calls[0].init.body,undefined);
 });
+
+test('dedicated recover is owner and origin authenticated and forwards only session identity',async()=>{
+ const h=await harness();
+ const input={action:'recover',sessionId:'current-session',model:true,capability:'must-not-forward',chatMode:'recover'};
+ assert.equal((await h.run(h.request(input,{Authorization:''}))).status,401);
+ assert.equal((await h.run(h.request(input,{Origin:'https://evil.test'}))).status,403);
+ assert.equal(h.calls.length,0);
+ assert.equal((await h.run(h.request({...input,sessionId:null}))).status,400);
+ const r=await h.run(h.request(input));assert.equal(r.status,200);
+ assert.deepEqual(JSON.parse(h.calls[0].init.body),{action:'recover',sessionId:'current-session'});
+ assert.ok(!JSON.stringify(h.calls).includes('must-not-forward'));
+ assert.equal((await h.run(h.request({action:'chat',sessionId:'s',chatMode:'recover'}))).status,400);
+});
