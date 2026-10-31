@@ -66,11 +66,11 @@ class MarneusCalgarScenarioTest {
         val player = d.player1
         val marneus = d.putCreatureOnBattlefield(player, "Marneus Calgar")
 
-        assertTrue(d.abilityActions(player, marneus).isEmpty())
+        assertFalse(d.abilityActions(player, marneus).any { it.affordable })
         d.giveColorlessMana(player, 5)
-        assertTrue(d.abilityActions(player, marneus).isEmpty())
+        assertFalse(d.abilityActions(player, marneus).any { it.affordable })
         d.giveColorlessMana(player, 1)
-        assertEquals(1, d.abilityActions(player, marneus).size)
+        assertTrue(d.abilityActions(player, marneus).any { it.affordable })
         assertNull(d.activate(player, marneus).error)
         d.resolveAll()
 
