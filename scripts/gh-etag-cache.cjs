@@ -75,7 +75,7 @@ function install(github, { file = DEFAULT_FILE, core = null, now = () => Date.no
         .sort((a, b) => Number(b[1].at) - Number(a[1].at)).slice(0, MAX_ENTRIES);
       fs.mkdirSync(path.dirname(file), { recursive: true });
       fs.writeFileSync(file, zlib.gzipSync(JSON.stringify({ v: 1, entries: Object.fromEntries(entries) })));
-      if (core) core.info(`GitHub API ETag cache: ${stats.hits} not-modified (free), ${stats.misses} fetched, ${stats.uncached} uncached; ${entries.length} entries saved.`);
+      if (core) (core.notice || core.info)(`GitHub API ETag cache: ${stats.hits} not-modified (free), ${stats.misses} fetched, ${stats.uncached} uncached; ${entries.length} entries saved.`);
     } catch (error) {
       if (core) core.warning('GitHub API ETag cache not saved: ' + String(error?.message || error).slice(0, 200));
     }
