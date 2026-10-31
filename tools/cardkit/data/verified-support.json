@@ -372,6 +372,40 @@
         }
       ]
     },
+    "Monstrous Onslaught": {
+      "summary": "Capture the battlefield greatest-power amount as the spell is cast, then read capturedAtCast as DividedDamage.dynamicTotal; cap any-number target selection by that same maxPower. Traverse the Outlands exercises maxPower, Undercity Upheaval proves cast-time amount capture and announcement, and Chandra proves divided damage among targets.",
+      "verifiedBy": "Copilot, source inspection 2026-10-31 (argentum-engine@7fb0733)",
+      "references": [
+        "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TraverseTheOutlands.kt",
+        "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TraverseTheOutlandsScenarioTest.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mat/cards/UndercityUpheaval.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/tests/src/test/kotlin/com/wingedsheep/engine/scenarios/UndercityUpheavalScenarioTest.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/fdn/cards/ChandraFlameshaper.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/tests/src/test/kotlin/com/wingedsheep/engine/scenarios/ChandraFlameshaperScenarioTest.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Monstrous Onslaught deals X damage divided as you choose among any number of target creatures, where X is the greatest power among creatures you control as you cast this spell.",
+          "primitives": [
+            "captureAtCast",
+            "DynamicAmounts.capturedAtCast",
+            "DynamicAmounts.battlefield.maxPower",
+            "Effects.DividedDamage",
+            "dynamicMaxCount"
+          ]
+        }
+      ],
+      "baseSha": "997d860091f8a439db6a7c7016dbacbd66319e71",
+      "oracleHash": "452abb7610483ac128e8f5980c884986bb7b838b507081bdaee2fa7544e835ca",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+      "restamps": [
+        {
+          "fromRuntimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524",
+          "toRuntimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4",
+          "check": "Oracle unchanged; no named SDK member removed by the upgrade"
+        }
+      ]
+    },
     "Tangleweave Armor": {
       "summary": "Dynamic equipped-creature stats use GrantDynamicStats and Filters.EquippedCreature (Cranial Plating scenario-tested). Aggregate each commander-filtered zone's greatest mana value with DynamicAmounts.battlefield/zone(...).maxManaValue(), then combine zone values with DynamicAmounts.max; Zone.COMMAND, commander filtering, and zone aggregations are supported by the committed SDK API. Emissary Escort, Boon of Boseiju, and Wick's Patrol implement the constituent dynamic-stat and max-mana-value patterns; Akroma's Will scenario-tests commander filtering.",
       "verifiedBy": "Copilot, inspected pinned Argentum sources, committed SDK API, and custom scenario tests 2026-10-31",
