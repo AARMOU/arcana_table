@@ -36,6 +36,7 @@
     .ops-grid{display:grid;grid-template-columns:1.05fr 1.15fr .9fr;gap:12px}.ops-cell{border:1px solid #2a4550;border-radius:14px;background:rgba(6,18,28,.35);padding:16px;min-width:0}
     .ops-cell h3{margin:0 0 13px;font-size:13px;font-weight:800}.ops-cell-head{display:flex;align-items:center;justify-content:space-between;gap:9px}.ops-cell-head strong{color:var(--teal);font-size:13px;white-space:nowrap}
     .ops-buttons{display:grid;grid-template-columns:1fr 1fr;gap:8px}.ops-buttons .btn{display:flex;flex-direction:column;align-items:center;gap:5px;padding:13px 7px;min-height:72px;font-size:16px;white-space:normal}.ops-count{font-size:11px;opacity:.82}
+    .ops-buttons .btn.all-hands-button{grid-column:1/-1;min-height:61px;border-color:var(--teal)}.all-hands-agents{display:grid;gap:3px;margin-top:9px;color:var(--muted);font-size:11px}.all-hands-agents a,.all-hands-link{font-size:11px;color:var(--teal);text-decoration:none}.all-hands-link{display:inline-block;margin-top:8px}.all-hands-link[hidden]{display:none}
     .ops-cell p{color:var(--muted);font-size:11px;line-height:1.45;margin:11px 0 0}.ops-workers{display:grid;gap:9px}.ops-worker{border-left:3px solid var(--amber);padding-left:10px;min-width:0}.ops-worker a{color:var(--ink);font-size:13px;font-weight:750;display:block;overflow-wrap:anywhere}.ops-worker a:hover{color:var(--teal)}.ops-worker span,.ops-placeholder{font-size:11px;color:var(--muted)}
     .ops-total{display:flex;align-items:baseline;gap:9px}.ops-total strong{font-size:42px;line-height:1;color:var(--teal)}.ops-total span,.ops-counter-label{font-size:11px;color:var(--muted)}
     .ops-bars{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;align-items:end;min-height:65px;margin-top:12px}.ops-day{display:flex;flex-direction:column;gap:5px;align-items:center;min-width:0}.ops-bar{display:block;width:100%;max-width:28px;min-height:3px;border-radius:5px 5px 2px 2px;background:#4a837d}.ops-day:last-child .ops-bar{background:var(--teal)}.ops-day label{font-size:9px;color:var(--muted);white-space:nowrap}
@@ -136,7 +137,12 @@
               <div class="ops-cell ops-decisions"><h3>Decide what happens next</h3><div class="ops-buttons">
                 <button type="button" class="btn accent" id="quickVerify"><span>✓ Verify</span><span class="ops-count" id="quickVerifyCount">—</span></button>
                 <button type="button" class="btn" id="quickDoIt"><span>↗ Do It</span><span class="ops-count" id="quickDoItCount">—</span></button>
-              </div><p id="opsActionDetail">Verify opens the next card review. Do It takes you to exact-card authorization; nothing starts automatically.</p></div>
+                <button type="button" class="btn all-hands-button" id="allHandsCheckIn"><span>🪿 All Hands — Check In</span><span class="ops-count">Goose · Claude · Boneknuckles</span></button>
+              </div>
+              <p id="allHandsStatus" role="status" aria-live="polite">Owner-only request to #81. Does not wake inactive sessions or dispatch paid workers.</p>
+              <div id="allHandsAgents" class="all-hands-agents" aria-label="Agent check-in acknowledgments"></div>
+              <a id="allHandsIssue" class="all-hands-link" target="_blank" rel="noopener noreferrer" hidden>Open check-in request ↗</a>
+              <p id="opsActionDetail">Verify opens the next card review. Do It takes you to exact-card authorization; nothing starts automatically.</p></div>
               <div class="ops-cell"><div class="ops-cell-head"><h3>Current workers</h3><strong id="opsWorkerCount">—</strong></div><div id="opsWorkers" class="ops-workers"><span class="ops-placeholder">Checking dispatcher assignments…</span></div><p id="opsWorkerFresh" role="status">Dispatcher status, not a live Copilot session feed.</p><p id="opsWorkerChecked">App refresh: waiting for first read.</p></div>
               <div class="ops-cell"><div class="ops-cell-head"><h3>Daily card count</h3><span class="ops-counter-label">Merged</span></div><div class="ops-total"><strong id="dailyCardCount">—</strong><span>today · Mountain Time</span></div><div class="ops-bars" id="dailyBars" aria-label="Last seven days of merged Copilot card pull requests"></div><p id="dailyFresh">Awaiting card integration activity.</p></div>
             </div>
@@ -216,6 +222,7 @@
   <nav class="mobile-nav" aria-label="Mobile navigation"><button data-view="overview" aria-current="page"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1"/><rect x="13" y="3" width="8" height="5" rx="1"/><rect x="13" y="10" width="8" height="11" rx="1"/><rect x="3" y="13" width="8" height="8" rx="1"/></svg>Overview</button><button data-view="work"><svg class="icon" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="15" rx="2"/><path d="M8 5V3h8v2M8 12h8"/></svg>Work</button><a class="mobile-card-link" href="./cards.html">♧<span>Cards</span></a><a class="mobile-card-link" href="./credits.html">◈<span>Credits</span></a><button data-view="safety"><svg class="icon" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/><path d="m9 12 2 2 4-4"/></svg>Safety</button></nav>
   <script src="./review.js" defer></script>
   <script src="./authorize.js" defer></script>
+  <script src="./team-checkin.js" defer></script>
   <script>
     (() => {
       'use strict';
