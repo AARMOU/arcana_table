@@ -659,7 +659,7 @@
  },
  "DynamicAmounts": {
   "DynamicAmounts.battlefield": {
-   "count": 20,
+   "count": 21,
    "examples": [
     {
      "card": "Defile",
@@ -696,6 +696,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DenyTheWitch.kt",
      "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DenyTheWitchScenarioTest.kt"
+    }
+   ]
+  },
+  "DynamicAmounts.capturedAtCast": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Monstrous Onslaught",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MonstrousOnslaught.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MonstrousOnslaughtScenarioTest.kt"
     }
    ]
   },
@@ -1801,6 +1812,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PantlazaSunFavored.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PantlazaSunFavoredScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.DividedDamage": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Monstrous Onslaught",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MonstrousOnslaught.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MonstrousOnslaughtScenarioTest.kt"
     }
    ]
   },
@@ -4422,7 +4444,7 @@
    ]
   },
   "spell { }": {
-   "count": 41,
+   "count": 42,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -6347,7 +6369,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 95,
+   "count": 96,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -6835,7 +6857,7 @@
    ]
   },
   "Player.You": {
-   "count": 33,
+   "count": 34,
    "examples": [
     {
      "card": "Defile",
@@ -6927,7 +6949,7 @@
    ]
   },
   "TargetFilter.Creature": {
-   "count": 15,
+   "count": 16,
    "examples": [
     {
      "card": "Defile",
@@ -7280,7 +7302,7 @@
    ]
   },
   "targets(\u2026)": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Immoral Bargain",
@@ -7293,6 +7315,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Rewind.kt",
      "lines": 28,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RewindScenarioTest.kt"
+    },
+    {
+     "card": "Monstrous Onslaught",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MonstrousOnslaught.kt",
+     "lines": 37,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/MonstrousOnslaughtScenarioTest.kt"
     },
     {
      "card": "Continue?",
@@ -7311,12 +7339,6 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DismantlingWave.kt",
      "lines": 44,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DismantlingWaveScenarioTest.kt"
-    },
-    {
-     "card": "Bronzebeak Foragers",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BronzebeakForagers.kt",
-     "lines": 67,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BronzebeakForagersScenarioTest.kt"
     }
    ]
   }

@@ -99,6 +99,7 @@ object CustomCards {
         Entry(KratosGodOfWar, "SLD", POOL),
         Entry(BlightsteelColossus, "MBS", POOL),
         Entry(NekusarTheMindrazer, "CMM", POOL),
+        Entry(MonstrousOnslaught, "CMR", POOL),
         Entry(MichelangeloTheHeart, "TMC", POOL),
         Entry(VenomEddieBrock, "SPE", POOL),
         Entry(PurphorosGodOfTheForge, "CMM", POOL),
