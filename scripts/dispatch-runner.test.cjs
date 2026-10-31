@@ -288,3 +288,35 @@ test('zero-delivery #458 shape is diagnosis work, never an inferred engine gap o
   await labelDiagnosis({github,owner:'AARMOU',repo:'arcana_table',units:[u],now});
   assert.equal(writes[1].name,DIAGNOSIS_LABEL,'an actual PR resolves diagnosis supply');
 });
+
+test('ciEquivalent: a base that only changed non-build paths since its last green CI counts as green', async () => {
+  const { ciEquivalent } = require('./dispatch-runner.cjs');
+  const GREEN = 'a'.repeat(40), HEAD = 'b'.repeat(40);
+  const gh = ({ files, status = 'ahead', runs } = {}) => ({ rest: {
+    actions: { listWorkflowRuns: async () => ({ data: { workflow_runs: runs ?? [
+      { id: 7, name: 'Arcana Development CI', conclusion: 'success', head_sha: GREEN, created_at: '2026-10-31T15:00:00Z' }] } }) },
+    repos: { compareCommitsWithBasehead: async a => { assert.equal(a.basehead, GREEN + '...' + HEAD);
+      return { data: { status, ahead_by: 1, files: files.map(filename => ({ filename })) } }; } } } });
+  const args = { owner: 'o', repo: 'r', base: 'b', baseSha: HEAD };
+  const ok = await ciEquivalent({ ...args, github: gh({ files: ['.github/workflows/x.yml', 'scripts/a.cjs', 'tools/cardkit/data/verified-support.json', 'README.md'] }) });
+  assert.deepEqual(ok, { greenSha: GREEN, run: 7, files: 4 });
+  for (const [why, g] of [
+    ['android change', gh({ files: ['scripts/a.cjs', 'android/app/src/main/X.kt'] })],
+    ['engine patch', gh({ files: ['argentum-patches/0001-a.patch'] })],
+    ['cardkit code', gh({ files: ['tools/cardkit/cardkit.py'] })],
+    ['certification', gh({ files: ['certification/suites/x.json'] })],
+    ['diverged', gh({ files: ['scripts/a.cjs'], status: 'diverged' })],
+    ['no green run', gh({ files: ['scripts/a.cjs'], runs: [] })],
+  ]) assert.equal(await ciEquivalent({ ...args, github: g }), null, why);
+  assert.equal(await ciEquivalent({ ...args, github: { rest: { actions: { listWorkflowRuns: async () => { throw Error('403'); } } } } }), null);
+});
+
+test('dispatcher proceeds past the CI gate when the base change is non-build only', async () => {
+  const f = fake({ ci: false });
+  f.github.rest.actions.listWorkflowRuns = async () => ({ data: { workflow_runs: [
+    { id: 7, name: 'Arcana Development CI', conclusion: 'success', head_sha: 'e'.repeat(40), created_at: '2026-10-31T15:00:00Z' }] } });
+  f.github.rest.repos.compareCommitsWithBasehead = async () => ({ data: { status: 'ahead', ahead_by: 1, files: [{ filename: '.github/workflows/x.yml' }] } });
+  const r = await runDispatch({ github: f.github, context: ctx, core: core(), env: env(), readBudget: async () => ({ snapshot: null }) });
+  assert.notEqual(r.state, 'ci-not-ready');
+  assert.equal(f.dispatches.length, 0);
+});
