@@ -237,6 +237,42 @@
       "baseSha": "e26b0ef62fc510ede821afe09ab2fb26b271eb56",
       "oracleHash": "1ad0a0b730d67f8dbe88d6614d8196a41b055db8c91adf84a5bc4e637f6f7235",
       "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Ugin, the Spirit Dragon": {
+      "summary": "−X combines loyaltyAbilityX and the manaValueAtMostX/IsColored permanent filter with the Decree of Annihilation exile sweep. −10 chains GainLife(7), DrawCards(7), and the up-to-seven permanent-from-hand pattern.",
+      "verifiedBy": "Copilot, source inspection at Argentum engine 7fb073337e4389cfabe2ebf4c6416633a7fc63d2, 2026-10-31",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2003-2007/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/lrw/cards/ChandraNalaar.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2003-2007/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/scg/cards/DecreeOfAnnihilation.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mh3/cards/KozileksCommand.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2000-2002/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/inv/cards/ProtectiveSphere.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/m10/cards/AngelsMercy.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2008-2016/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/avr/cards/Griselbrand.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/dmu/cards/TheWorldSpell.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "−X: Exile each permanent with mana value X or less that's one or more colors.",
+          "primitives": [
+            "loyaltyAbilityX",
+            "GroupFilter(GameObjectFilter.Permanent.manaValueAtMostX().withCardPredicate(CardPredicate.IsColored))",
+            "Effects.ForEachInGroup",
+            "Effects.Move(Zone.EXILE)"
+          ]
+        },
+        {
+          "line": "−10: You gain 7 life, draw seven cards, then put up to seven permanent cards from your hand onto the battlefield.",
+          "primitives": [
+            "Effects.GainLife(7)",
+            "Effects.DrawCards(7)",
+            "Patterns.Hand.putFromHand",
+            "GameObjectFilter.Permanent"
+          ]
+        }
+      ],
+      "baseSha": "00295fdc7961e8b2e3b3a6d84221a38a47ba3a38",
+      "oracleHash": "ae7621b337c989d34e5e6af3b23b7e741f7b6a026cb303e7a57d1b3140636325",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
     }
   }
 }
