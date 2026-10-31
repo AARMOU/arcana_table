@@ -129,6 +129,9 @@ jobs:
           EXPECTED_SHA: ${{ needs.gate.outputs.sha }}
           EXPECTED_KEY: ${{ needs.gate.outputs.key }}
           SCENARIOS_RESULT: ${{ needs.independent-scenarios.result }}
+          # GITHUB_TOKEN cannot run markPullRequestReadyForReview on Copilot's PRs: every certified card
+          # (#560, #564, #586) stayed a draft. Use the same person token as the review/suite auto-merges.
+          READY_TOKEN: ${{ secrets.ARCANA_SUITE_MERGE_TOKEN || secrets.COPILOT_DISPATCH_TOKEN }}
         with:
           script: |
             const P = require('./certification/policy.cjs');
@@ -161,8 +164,9 @@ jobs:
             // The existing review-inbox workflow runs on this workflow's completion.
             if (ok) {
               try {
+                const writer = process.env.READY_TOKEN ? new github.constructor({ auth: process.env.READY_TOKEN }) : github;
                 const ready = await P.markReadyAfterCertification({
-                  github, owner, repo, number, sha, certified:ok
+                  github: writer, owner, repo, number, sha, certified:ok
                 });
                 core.info(ready
                   ? 'Certified Copilot PR #'+number+' marked ready for OWNER review.'
@@ -171,6 +175,6 @@ jobs:
                 // Certification remains factually valid; a permission/GraphQL error
                 // must not invent approval or block the normal inbox refresh.
                 core.warning('Certification passed, but GitHub could not mark PR #'+number+
-                  ' ready for review (HTTP '+(Number(error?.status)||'unknown')+').');
+                  ' ready for review (HTTP '+(Number(error?.status)||'unknown')+'): '+String(error?.message||error).slice(0,200));
               }
             }
