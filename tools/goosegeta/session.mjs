@@ -19,6 +19,45 @@ export function candidates(packet, playerId) {
       d.options.forEach((_, optionIndex) => response({ type: 'OptionChosenResponse', optionIndex }));
     if (d.type === 'ChooseNumberDecision' && Number.isSafeInteger(d.minValue) && Number.isSafeInteger(d.maxValue) && d.minValue <= d.maxValue)
       for (const number of [...new Set([d.minValue, d.maxValue])]) response({ type: 'NumberChosenResponse', number });
+    // Argentum's typed card selection. Only host-offered IDs, respecting exact
+    // min/max counts; custom cross-card constraints must never be guessed.
+    if (d.type === 'SelectCardsDecision') {
+      const options = d.options;
+      const min = d.minSelections, max = d.maxSelections;
+      const constrained = d.onePerCardType === true || d.onePerColor === true ||
+        d.onePerCardName === true || d.onePerBasicLandType === true ||
+        d.onePerPower === true || d.selectionLimits != null ||
+        d.maxTotalManaValue != null || d.minTotalManaValue != null ||
+        d.maxTotalPower != null ||
+        (Array.isArray(d.conditionalMinimums) && d.conditionalMinimums.length > 0);
+      const validOptions = Array.isArray(options) && options.length <= 4096 &&
+        options.every(id => typeof id === 'string' && id.length > 0 && id.length <= 200) &&
+        new Set(options).size === options.length;
+      if (validOptions && Number.isSafeInteger(min) && Number.isSafeInteger(max) &&
+          min >= 0 && max >= min && min <= 32 &&
+          (!Array.isArray(d.nonSelectableOptions) ||
+            !options.some(id => d.nonSelectableOptions.includes(id)))) {
+        if (!constrained) {
+          // A zero-selection is a legal decline when minimum is zero.
+          if (min === 0) response({type:'CardsSelectedResponse',selectedCards:[]});
+          // For simple choices every offered ID is independently selectable.
+          // Bound the model's decision space; never truncate a *required* selection.
+          if (min > 0 && options.length >= min) {
+            const slots = min === 1 ? Math.min(options.length,24) : Math.min(options.length-min+1,8);
+            for (let offset=0; offset<slots; offset++)
+              response({type:'CardsSelectedResponse',selectedCards:options.slice(offset,offset+min)});
+          } else if (min === 0 && max > 0) {
+            for (const id of options.slice(0,Math.min(options.length,24)))
+              response({type:'CardsSelectedResponse',selectedCards:[id]});
+          }
+        } else if (min === 0 && d.minTotalManaValue == null &&
+                   (!Array.isArray(d.conditionalMinimums) || d.conditionalMinimums.length === 0)) {
+          // Optional constrained selection can safely decline, but never fake
+          // category/colour/power/counter allocations from incomplete metadata.
+          response({type:'CardsSelectedResponse',selectedCards:[]});
+        }
+      }
+    }
     // Single-slot/single-pick targets only; coupled/aggregate constraints must pause.
     if (d.type === 'ChooseTargetsDecision' && d.targetRequirements?.length === 1) {
       const r = d.targetRequirements[0];
