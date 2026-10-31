@@ -125,15 +125,22 @@ test('PWA metadata and manifest are scoped to the control dashboard',()=>{
     assert.equal(bytes.readUInt32BE(20),size);
   }
 });
-test('service worker does not cache API or third-party data',()=>{
+test('service worker keeps live data network-first; last good public copy only when offline; never authenticated data',()=>{
   const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
   assert.doesNotThrow(()=>new vm.Script(sw));
-  assert.ok(sw.includes("url.origin!==scope.origin"));
+  assert.ok(sw.includes("url.origin===scope.origin"));
   assert.ok(sw.includes("url.pathname.startsWith(scope.pathname)"));
   assert.ok(sw.includes("request.method!=='GET'"));
-  assert.ok(sw.includes("shellUrls.has(url.href)"));
+  assert.ok(sw.includes("shellUrls.has(key)"));
+  assert.ok(sw.includes("!request.headers.has('Authorization')"));
+  const data=sw.split('async function data(event){')[1].split('\n}\n')[0];
+  assert.ok(data.indexOf('await fetch(request)')<data.indexOf('caches.match'),'network first; cache only in the catch');
+  assert.ok(/catch\(error\)\{\s*const cached=await caches\.match/.test(data));
+  assert.ok(!sw.includes('/v1/authorization')&&!sw.includes('/v1/authorize'));
   assert.ok(!sw.includes("'./card-gaps.json'"));
-  assert.ok(!sw.includes('api.github.com'));
+  // Only this repository's public read-only GitHub API is eligible for the offline copy.
+  assert.ok(sw.includes("'https://api.github.com/repos/AARMOU/arcana_table/'"));
+  assert.equal((sw.match(/api\.github\.com/g)||[]).length,1);
 });
 test('Pages publishes the install manifest, worker and icons',()=>{
   const workflow=fs.readFileSync(path.join(__dirname,'../.github/workflows/pages.yml'),'utf8');
@@ -221,10 +228,15 @@ test('authorization button follows the dispatcher verdict, not a client copy of 
   assert.match(reasonText('feasibility: feasibility-stale (classified a, base is b)'),/pending/);
   assert.match(reasonText('not-actionable: cards-or-discovery,acceptance,base-missing'),/Old-format/);
 });
-test('service worker revalidates the shell so a deploy reaches the installed app',()=>{
+test('service worker opens the shell from cache, revalidates it, and every deploy installs a new worker',()=>{
   const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
   assert.ok(sw.includes("fetch(request,{cache:'no-cache'})"));
-  assert.ok(sw.includes('caches.match(request)'),'offline fallback kept');
+  assert.ok(sw.includes('if(cached){event.waitUntil(network.catch(()=>{}));return cached;}'),'instant open from cache');
+  assert.ok(sw.includes("const BUILD='dev';")&&sw.includes("'arcana-control-shell-v18-'+BUILD"));
+  const pages=fs.readFileSync(path.join(__dirname,'..','.github','workflows','pages.yml'),'utf8');
+  assert.ok(pages.includes("s/^const BUILD='dev';/const BUILD='${GITHUB_SHA::12}';/"),'deploy stamps the build');
+  assert.match(html,/controllerchange[\s\S]*location\.reload\(\)/,'page moves onto a new deploy');
+  assert.match(html,/rel="preconnect" href="https:\/\/arcana-review\.arcanamtg\.workers\.dev"/);
 });
 test('an approved card that cannot run yet says why it is waiting',()=>{
   const src=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
@@ -341,7 +353,7 @@ test('periodic status refresh is bounded, read-only, visibility gated and coales
   assert.ok(!script.includes("fetch('/actions/workflows/"));
   assert.ok(!/method:\s*['"](?:POST|PUT|PATCH|DELETE)/.test(script));
   const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
-  assert.ok(sw.includes('arcana-control-shell-v17'));
+  assert.ok(sw.includes('arcana-control-shell-v18-'));
 });
 
 test('rate-limited public edge falls back to read-only GitHub with a bounded per-path browser cache',async()=>{
