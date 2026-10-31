@@ -246,6 +246,23 @@ class ReadinessTests(unittest.TestCase):
         with mock.patch.object(readiness, "verified_support", return_value={repo.normalize_name("Ancient Stone Idol"): entry}):
             self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "NEEDS_REVIEW")  # no primitives named
 
+    def test_hellkite_tyrant_review_is_bound_to_exact_rules_and_runtime(self):
+        # Regression for app-requested #588: a source review, not a gameplay certification.
+        v = readiness.classify("Hellkite Tyrant")
+        self.assertEqual((v["readiness"], v["route"], v.get("reviewed")),
+                         ("SUPPORTED", "copilot", True), v["reasons"])
+        entry = readiness.verified_support()[repo.normalize_name("Hellkite Tyrant")]
+        self.assertEqual(len(entry["reviewedLines"]), 2)
+        original = oracle.cached("Hellkite Tyrant")
+        for changed_text in (
+            original["oracle_text"].replace("twenty or more", "nineteen or more"),
+            original["oracle_text"].replace("damage to a player", "damage to a planeswalker"),
+        ):
+            with mock.patch.object(oracle, "cached", return_value={**original, "oracle_text": changed_text}):
+                self.assertEqual(readiness.classify("Hellkite Tyrant")["readiness"], "NEEDS_REVIEW")
+        with mock.patch.object(readiness, "review_runtime_hash", return_value="0" * 64):
+            self.assertEqual(readiness.classify("Hellkite Tyrant")["readiness"], "NEEDS_REVIEW")
+
     def test_review_binding_rejects_numeric_cost_or_unreviewed_line_changes(self):
         import copy
         original = oracle.cached("Ancient Stone Idol")
