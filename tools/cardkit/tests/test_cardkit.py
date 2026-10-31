@@ -234,6 +234,23 @@ class ReadinessTests(unittest.TestCase):
         for name, entry in readiness.verified_support().items():
             self.assertTrue(entry["summary"] and entry["references"], name)
 
+
+    def test_reviewed_line_makes_card_supported_only_for_exact_wording(self):
+        v = readiness.classify("Ancient Stone Idol")
+        self.assertEqual((v["readiness"], v["route"], v.get("reviewed")), ("SUPPORTED", "copilot", True), v["reasons"])
+        entry = dict(readiness.verified_support()[repo.normalize_name("Ancient Stone Idol")])
+        entry["reviewedLines"] = [{"line": "When this creature dies, create a 6/6 token.", "primitives": ["x"]}]
+        with mock.patch.object(readiness, "verified_support", return_value={repo.normalize_name("Ancient Stone Idol"): entry}):
+            self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "NEEDS_REVIEW")
+        entry["reviewedLines"] = [{"line": readiness.classify("Ancient Stone Idol")["lines"][-1]["text"]}]
+        with mock.patch.object(readiness, "verified_support", return_value={repo.normalize_name("Ancient Stone Idol"): entry}):
+            self.assertEqual(readiness.classify("Ancient Stone Idol")["readiness"], "NEEDS_REVIEW")  # no primitives named
+
+    def test_every_reviewed_line_names_primitives(self):
+        for name, entry in readiness.verified_support().items():
+            for r in entry.get("reviewedLines", []):
+                self.assertTrue(r.get("line") and r.get("primitives"), name)
+
     @with_fake_oracle
     def test_unmatched_line_is_review_with_gap_hint(self):
         v = readiness.classify("Cardkit Test Oddity")

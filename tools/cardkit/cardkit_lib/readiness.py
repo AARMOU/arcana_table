@@ -77,6 +77,14 @@ def verified_support() -> dict:
     return {repo.normalize_name(k): v for k, v in data.get("cards", {}).items()}
 
 
+def _reviewed_lines(entry: dict | None) -> set:
+    """Normalized Oracle lines an engineer reviewed (verified-support.json `reviewedLines[].line`)."""
+    if not entry:
+        return set()
+    return {text.normalize_line(r["line"]) for r in entry.get("reviewedLines", [])
+            if isinstance(r, dict) and r.get("line") and r.get("primitives")}
+
+
 def _blocked_keyword(keyword: str) -> dict | None:
     kws = {k.casefold(): v for k, v in blockers().get("keywords", {}).items()}
     return kws.get(keyword.casefold())
@@ -229,8 +237,17 @@ def classify(name: str, use_refs: bool = True) -> dict:
             result["verifiedSupport"] = verified
             result["reasons"].append(f"wording differences verified against engine source: {verified['summary']}")
         return result
+    weak = [l["text"] for l in result["lines"] if l["kind"] == "rules" and l["score"] < SUPPORTED_SCORE]
+    reviewed = _reviewed_lines(verified)
+    if (use_refs and weak and reviewed and not unknown and card.get("layout") not in MULTI_FACE and not result["reasons"]
+            and all(text.normalize_line(l) in reviewed for l in weak)):
+        # An engineer checked each weak line against engine source and named the primitive. The entry is bound to
+        # the exact Oracle wording: if Scryfall's text changes, the line no longer matches and review is needed again.
+        result.update(readiness="SUPPORTED", route="copilot", verifiedSupport=verified, reviewed=True)
+        result["reasons"].append(f"{len(weak)} line(s) below {SUPPORTED_SCORE} reviewed against engine source: "
+                                 + verified["summary"])
+        return result
     if worst < SUPPORTED_SCORE:
-        weak = [l["text"] for l in result["lines"] if l["kind"] == "rules" and l["score"] < SUPPORTED_SCORE]
         result["reasons"].append(f"{len(weak)} line(s) without a close implemented match (best {worst:.2f})")
     result["readiness"] = "NEEDS_REVIEW"
     result["route"] = "claude" if (gap or unknown) else "gpt"
