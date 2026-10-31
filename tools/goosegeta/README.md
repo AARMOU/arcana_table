@@ -24,7 +24,7 @@ Each has exactly 100 cards, its commander once, and every name in B140's bundled
 
 From the repository root using Node 22 or later, with a B140-source checkout that includes the bundled card indexes:
 
-    node --test tools/goosegeta/room-bot.test.mjs
+    node --test tools/goosegeta/*.test.mjs
     node tools/goosegeta/room-bot.mjs --list-decks
     node tools/goosegeta/room-bot.mjs --deck goosegeta-flock --check-deck
     node tools/goosegeta/room-bot.mjs --code ABC123 --deck goosegeta-flock
