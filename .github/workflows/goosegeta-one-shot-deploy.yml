@@ -25,7 +25,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: 9e66aa689e2224eefde38374fa33f510750a3186
+          ref: 2f7550525b42ceece6abb0747f58150c2e64d547
           path: cloud-source
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -35,7 +35,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test "$(git -C cloud-source rev-parse HEAD)" = 9e66aa689e2224eefde38374fa33f510750a3186
+          test "$(git -C cloud-source rev-parse HEAD)" = 2f7550525b42ceece6abb0747f58150c2e64d547
           grep -q "goosegeta-ever-used-canary-v1" cloud-source/android/cloud-room/src/goose-budget.ts
           npm --prefix cloud-source/android/cloud-room ci --ignore-scripts --no-audit --no-fund
           npm --prefix cloud-source/android/cloud-room run typecheck
