@@ -84,7 +84,7 @@ test('compact tracker is near the top, uses transparent goose over current dot, 
 });
 test('self-contained dashboard exists',()=>{assert.ok(html.startsWith('<!doctype html>'));assert.ok(html.includes('<title>Arcana Control'));assert.ok(script);
   // Only approved same-origin review and owner authorization modules may load; the inline dashboard script stays read-only.
-  assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"','<script src="./authorize.js"','<script src="./team-checkin.js"']);});
+  assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"','<script src="./authorize.js"','<script src="./team-checkin.js"','<script src="./goosegeta.js"']);});
 test('all-hands check-in is a separate owner-authenticated module, not a dashboard dispatch',()=>{
   assert.match(html,/id="allHandsCheckIn"/);
   assert.match(html,/id="allHandsStatus"/);
@@ -232,7 +232,7 @@ test('service worker opens the shell from cache, revalidates it, and every deplo
   const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
   assert.ok(sw.includes("fetch(request,{cache:'no-cache'})"));
   assert.ok(sw.includes('if(cached){event.waitUntil(network.catch(()=>{}));return cached;}'),'instant open from cache');
-  assert.ok(sw.includes("const BUILD='dev';")&&sw.includes("'arcana-control-shell-v18-'+BUILD"));
+  assert.ok(sw.includes("const BUILD='dev';")&&sw.includes("'arcana-control-shell-v19-'+BUILD"));
   const pages=fs.readFileSync(path.join(__dirname,'..','.github','workflows','pages.yml'),'utf8');
   assert.ok(pages.includes("s/^const BUILD='dev';/const BUILD='${GITHUB_SHA::12}';/"),'deploy stamps the build');
   assert.match(html,/controllerchange[\s\S]*location\.reload\(\)/,'page moves onto a new deploy');
@@ -353,7 +353,7 @@ test('periodic status refresh is bounded, read-only, visibility gated and coales
   assert.ok(!script.includes("fetch('/actions/workflows/"));
   assert.ok(!/method:\s*['"](?:POST|PUT|PATCH|DELETE)/.test(script));
   const sw=fs.readFileSync(path.join(__dirname,'sw.js'),'utf8');
-  assert.ok(sw.includes('arcana-control-shell-v18-'));
+  assert.ok(sw.includes('arcana-control-shell-v19-'));
 });
 
 test('rate-limited public edge falls back to read-only GitHub with a bounded per-path browser cache',async()=>{
@@ -597,4 +597,10 @@ test('normal dispatch mode shows automatic status, never an approval button (own
   const src=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
   assert.ok(src.includes("if (mode === 'normal') { renderAutomatic(container, queued, age); return; }"));
   assert.ok(!src.split('function renderAutomatic')[1].split('function render(')[0].includes("el('button'"));
+});
+
+test('Pages stages every approved Control script including Goosegeta',()=>{
+  const pages=fs.readFileSync(path.join(__dirname,'../.github/workflows/pages.yml'),'utf8');
+  for(const match of html.matchAll(/<script\s+src="\.\/([^"/]+\.js)"/g))
+    assert.ok(pages.includes('cp control/'+match[1]+' _site/control/'+match[1]),'Missing staged script '+match[1]);
 });

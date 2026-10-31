@@ -1,0 +1,267 @@
+name: Owner-approved Goosegeta test rollout
+# Explicit owner approval in active session 2026-10-31: isolated rooms + Control/Pages + test APK.
+# No main/B140 merge, production room replacement, Play release, paid agent or OpenAI spend.
+on:
+  push:
+    branches: [gpt/summon-goosegeta-approved-test-20261031]
+    paths:
+      - '.github/workflows/goosegeta-approved-test.yml'
+      - 'tools/goosegeta-rollout/**'
+permissions:
+  contents: read
+concurrency:
+  group: goosegeta-approved-test-rollout
+  cancel-in-progress: false
+jobs:
+  deploy-workers:
+    if: github.repository == 'AARMOU/arcana_table' && github.ref == 'refs/heads/gpt/summon-goosegeta-approved-test-20261031'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: arcana-review-worker-deploy
+      cancel-in-progress: false
+    outputs:
+      ready: ${{ steps.smoke.outputs.ready }}
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CLIENT_ID: ${{ vars.REVIEW_OAUTH_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.REVIEW_OAUTH_CLIENT_SECRET }}
+      SESSION_SECRET: ${{ secrets.REVIEW_SESSION_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 98477f80583858f3091c4d78bf0689f4751f5beb
+          path: cloud-source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check credentials and unchanged production Control baseline
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in CLOUDFLARE_API_TOKEN CLOUDFLARE_ACCOUNT_ID CLIENT_ID CLIENT_SECRET SESSION_SECRET; do
+            test -n "${!name}" || { echo "Missing existing deployment credential: $name"; exit 1; }
+          done
+          test "${#SESSION_SECRET}" -ge 32
+          git fetch --no-tags origin main
+          git diff --exit-code 67ffa33025a1d6d8e6892ccd0b1e93c4b6d8a2f3 FETCH_HEAD -- control
+          test "$(git -C cloud-source rev-parse HEAD)" = 98477f80583858f3091c4d78bf0689f4751f5beb
+      - name: Tests and pinned local tools
+        run: |
+          node --test scripts/*.test.cjs control/*.test.cjs control/review-worker/tests/*.test.mjs
+          node --test tools/goosegeta-rollout/prepare.test.mjs
+          node cloud-source/tools/goosegeta/build-decks.mjs --check
+          node --test cloud-source/tools/goosegeta/*.test.mjs
+          npm --prefix cloud-source/android/cloud-room ci --ignore-scripts --no-audit --no-fund
+          npm --prefix cloud-source/android/cloud-room run typecheck
+          node --test cloud-source/android/cloud-room/scripts/goosegeta.local.test.mjs
+      - name: Prepare isolated service binding and masked private credential
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/goosegeta-rollout/prepare.mjs . cloud-source
+          key="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(32).toString("hex"))')"
+          echo "::add-mask::$key"
+          printf 'GOOSE_CONTROL_KEY=%s\n' "$key" >> "$GITHUB_ENV"
+      - name: Deploy isolated rooms only, model disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          wrangler=cloud-source/android/cloud-room/node_modules/.bin/wrangler
+          config=cloud-source/android/cloud-room/wrangler.toml
+          "$wrangler" deploy --config "$config"
+          printf '%s' "$GOOSE_CONTROL_KEY" | "$wrangler" secret put GOOSEGETA_CONTROL_KEY --config "$config"
+          "$wrangler" deploy --config "$config" --var GOOSEGETA_ENABLED:true --var GOOSEGETA_OPENAI_ENABLED:false
+          curl --fail --silent --show-error https://arcana-table-rooms-goosegeta-test.arcanamtg.workers.dev/health
+      - name: Configure existing review secrets and deploy gated Control backend
+        id: review
+        shell: bash
+        run: |
+          set -euo pipefail
+          wrangler=cloud-source/android/cloud-room/node_modules/.bin/wrangler
+          config=control/review-worker/wrangler.toml
+          printf '%s' "$CLIENT_SECRET" | "$wrangler" secret put GITHUB_OAUTH_CLIENT_SECRET --config "$config"
+          printf '%s' "$SESSION_SECRET" | "$wrangler" secret put SESSION_SECRET --config "$config"
+          printf '%s' "$GOOSE_CONTROL_KEY" | "$wrangler" secret put GOOSEGETA_CONTROL_KEY --config "$config"
+          "$wrangler" deploy --config "$config" --var "GITHUB_OAUTH_CLIENT_ID:$CLIENT_ID"
+          echo 'changed=true' >> "$GITHUB_OUTPUT"
+      - name: Verify live isolated transport and production auth boundary
+        id: smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tools/goosegeta-rollout/remote-smoke.mjs
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          const origin='https://arcana-review.arcanamtg.workers.dev';
+          const health=await fetch(origin+'/health');assert.equal(health.status,200);
+          const denied=await fetch(origin+'/v1/goosegeta?code=SMOKE1',{headers:{Origin:'https://aarmou.github.io'}});
+          assert.equal(denied.status,401,'Existing owner OAuth must remain required');
+          const login=await fetch(origin+'/auth/login?return='+encodeURIComponent('https://aarmou.github.io/arcana_table/control/'),{redirect:'manual'});
+          assert.equal(login.status,302,'Existing owner sign-in remains available');
+          console.log('PASS Control health, login redirect and unauthenticated Goosegeta denial. No owner session fabricated.');
+          JS
+          echo 'ready=true' >> "$GITHUB_OUTPUT"
+      - name: Restore previous Control backend if post-deploy verification failed
+        if: failure() && steps.review.outputs.changed == 'true'
+        run: cloud-source/android/cloud-room/node_modules/.bin/wrangler rollback --name arcana-review --yes
+  test-apk:
+    if: github.repository == 'AARMOU/arcana_table'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: 98477f80583858f3091c4d78bf0689f4751f5beb
+          path: cloud-source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Pin isolated endpoint and capture exact source overlay
+        run: |
+          node tools/goosegeta-rollout/prepare.mjs . cloud-source
+          mkdir -p test-output
+          git -C cloud-source diff -- android/app/src/main/java/com/arcanatable/TableModel.kt > test-output/isolated-endpoint.patch
+          printf '%s\n' 'SOURCE=98477f80583858f3091c4d78bf0689f4751f5beb' 'MODEL=OFF' 'ROOMS=https://arcana-table-rooms-goosegeta-test.arcanamtg.workers.dev' 'PACKAGE=com.arcanatable.goosegetatest' > test-output/BUILD-PROVENANCE.txt
+      - name: Build owner-approved isolated debug test APK, no production signing
+        working-directory: cloud-source/android
+        run: |
+          ./gradlew --no-daemon --max-workers=2 :app:assembleDebug \
+            -Parcana.debugApplicationIdSuffix=.goosegetatest '-Parcana.debugLabel=Goosegeta Test - B140 source'
+      - name: Verify test identity, debug signature and archive hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk=cloud-source/android/app/build/outputs/apk/debug/app-debug.apk
+          test -s "$apk"
+          "$ANDROID_HOME/build-tools/36.0.0/aapt" dump badging "$apk" > test-output/apk-badging.txt
+          grep -q "package: name='com.arcanatable.goosegetatest'" test-output/apk-badging.txt
+          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --print-certs "$apk" > test-output/debug-signature.txt
+          python3 - <<'PYASSETS'
+          from pathlib import Path
+          from zipfile import ZipFile
+          import hashlib,json
+          source=Path('cloud-source/android/app/src/main/assets/argentum')
+          with ZipFile('cloud-source/android/app/build/outputs/apk/debug/app-debug.apk') as z:
+              records=[]
+              for p in sorted(source.iterdir()):
+                  if not p.is_file(): continue
+                  member='assets/argentum/'+p.name
+                  assert z.namelist().count(member)==1, member
+                  data=z.read(member)
+                  assert data==p.read_bytes(), 'Packaged runtime asset drift: '+p.name
+                  records.append({'name':p.name,'sha256':hashlib.sha256(data).hexdigest()})
+              assert records
+          Path('test-output/PACKAGED-ASSETS.json').write_text(json.dumps(records,indent=2)+'\n')
+          print('Verified packaged Argentum assets:',len(records))
+          PYASSETS
+          cp "$apk" test-output/Goosegeta-Test.apk
+          sha256sum test-output/Goosegeta-Test.apk | tee test-output/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Goosegeta-Test-APK
+          retention-days: 14
+          if-no-files-found: error
+          path: test-output/
+  publish-control:
+    needs: deploy-workers
+    if: needs.deploy-workers.outputs.ready == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: rollout
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          path: site-source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: gpt/arcana-integration-next
+          path: integration-source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: gpt/b140-card-request-test-apk-20261028
+          path: b140-source
+          sparse-checkout: android/app/src/main/assets/argentum
+          persist-credentials: false
+      - name: Keep current landing page and overlay only the approved Control candidate
+        run: |
+          git -C site-source diff --exit-code 67ffa33025a1d6d8e6892ccd0b1e93c4b6d8a2f3 HEAD -- control
+          cp -R rollout/control/. site-source/control/
+          cp rollout/.github/workflows/pages.yml site-source/.github/workflows/pages.yml
+          git -C site-source rev-parse HEAD > deployed-main-sha.txt
+          node --test site-source/control/dashboard.test.cjs site-source/control/card-queue.test.cjs site-source/control/review-auth-browser.test.cjs
+      - name: Stage complete current site and data
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _site/control
+          cp site-source/index.html site-source/privacy.html site-source/closed-testing.html _site/
+          cp -R site-source/assets _site/assets
+          cp site-source/control/*.html site-source/control/*.js site-source/control/manifest.webmanifest _site/control/
+          cp -R site-source/control/icons _site/control/icons
+          test -s _site/control/goosegeta.js
+          sed -i "s/^const BUILD='dev';/const BUILD='${GITHUB_SHA::12}';/" _site/control/sw.js
+          idx=android/app/src/main/assets/argentum/custom-cards.index.tsv
+          cat "b140-source/$idx" >> "integration-source/$idx"
+          SOURCE_SHA="$(git -C integration-source rev-parse HEAD)"
+          node site-source/tools/deck-gap-audit.cjs --root integration-source --source-ref "gpt/arcana-integration-next@$SOURCE_SHA" --json _site/control/card-gaps.json --markdown /tmp/gaps.md
+          node site-source/tools/argentum-catalog.cjs --root integration-source --source-ref "gpt/arcana-integration-next@$SOURCE_SHA" --json _site/control/argentum-catalog.json
+      - uses: actions/configure-pages@v5
+        continue-on-error: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - name: Refuse to overwrite newer main publication
+        run: |
+          current="$(git -C site-source ls-remote origin refs/heads/main | cut -f1)"
+          test "$current" = "$(cat deployed-main-sha.txt)"
+      - name: Publish approved Control update
+        id: deployment
+        uses: actions/deploy-pages@v4
+      - name: Verify new script is published
+        run: |
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          const root='https://aarmou.github.io/arcana_table/control/';
+          const script=await fetch(root+'goosegeta.js?rollout='+Date.now());assert.equal(script.status,200);
+          assert.ok((await script.text()).includes('/v1/goosegeta'));
+          const page=await fetch(root+'?rollout='+Date.now());assert.ok((await page.text()).includes('id="gooseSummon"'));
+          console.log('PASS published Control includes Summon Goosegeta and its script.');
+          JS
