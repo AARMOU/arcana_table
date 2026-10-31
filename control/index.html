@@ -31,6 +31,7 @@
     @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;scroll-behavior:auto!important}}
 
 
+    .goose-controls{display:grid;gap:12px}.goose-controls label{display:grid;gap:5px;font-size:13px;min-width:0}.goose-controls input:not([type=checkbox]),.goose-controls select{font:inherit;width:100%;min-width:0;min-height:44px;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--ink);padding:8px}.goose-controls .goose-optin{display:flex;gap:8px;align-items:flex-start}.goose-controls .goose-optin input{margin-top:4px}.goose-controls input:focus-visible,.goose-controls select:focus-visible{outline:2px solid var(--teal)}.goose-controls p{overflow-wrap:anywhere}
     /* High-priority owner work replaces the decorative overview banner. */
     .ops-hub{border:1px solid #2c5556;border-radius:19px;padding:20px;background:linear-gradient(135deg,#142734,#101e2b 67%,#122a2d);margin-bottom:19px}
     .ops-header{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:15px}.ops-header h2{margin:4px 0 0;font-size:24px;letter-spacing:-.035em}
@@ -151,14 +152,14 @@
           <section class="ops-hub" aria-label="Goosegeta opponent">
             <div class="ops-header"><h2>🪿 Goosegeta</h2><span class="tag amber">Experimental · setup required</span></div>
             <p>Host an Internet Commander room with an open Friend seat. Use the host’s test invite, then summon here.</p>
-            <form id="gooseForm" class="ops-cell">
+            <form id="gooseForm" class="ops-cell goose-controls">
               <label>Room code <input id="gooseCode" maxlength="8" pattern="[A-Za-z0-9]{6,8}" autocomplete="off" required></label>
               <label>Private host invitation <input id="gooseInvite" type="password" maxlength="100" autocomplete="off" required></label>
               <label>Goosegeta’s deck <select id="gooseDeck"><option value="goosegeta-flock">Baylen · Token flock</option><option value="goosegeta-glue">Bello · Glue factory</option></select></label>
               <label>Trash talk <select id="gooseChat"><option value="muted">Muted</option><option value="basic">Playful · I opt in</option><option value="ruthless">Ruthless · I opt in to profane table roasts</option></select></label>
               <button class="btn" id="gooseApplyChat" type="button" disabled>Apply chat / mute</button>
               <p>Free mode uses limited canned banter. OpenAI mode generates replies within the game budget. Extra human guests automatically mute banter until individual consent is supported.</p>
-              <label><input id="gooseModel" type="checkbox"> Use OpenAI · requires separate spending approval and setup</label>
+              <label class="goose-optin"><input id="gooseModel" type="checkbox"> Use OpenAI · requires separate spending approval and setup</label>
               <div class="ops-buttons"><button class="btn accent" id="gooseSummon" type="submit">Summon Goosegeta</button>
                 <button class="btn" id="gooseRefresh" type="button">Check status</button>
                 <button class="btn" id="gooseDismiss" type="button" disabled>Dismiss</button></div>

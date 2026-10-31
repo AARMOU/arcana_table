@@ -26,5 +26,5 @@ API credentials/model and game/daily consumption limits, shared by gameplay and 
 The UI does not activate API billing. No PC process or PowerShell is intended.
 
 Local validation: `node --test scripts/*.test.cjs control/*.test.cjs control/review-worker/tests/*.test.mjs`
-passes 481 source/mocked binding regressions. No actual deployed Control, Android-hosted
+passes 483 source/mocked binding regressions. No actual deployed Control, Android-hosted
 game/chat, model call, phone layout acceptance or PC-off proof is claimed.
