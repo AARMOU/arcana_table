@@ -99,7 +99,7 @@ jobs:
           BASE=d7d4017e9dc0e4896f49d50342e437fc998f4970
           git merge-base --is-ancestor "$BASE" HEAD
           git diff --name-only "$BASE" HEAD | sort > /tmp/handoff-paths
-          printf '%s\n' '.github/workflows/goosegeta-room-prototype.yml' 'android/app/src/main/java/com/arcanatable/TableEffects.kt' 'android/app/src/test/java/com/arcanatable/LanConnectionServiceGuardTest.kt' | sort > /tmp/allowed-paths
+          printf '%s\n' '.github/workflows/goosegeta-room-prototype.yml' 'android/app/src/main/java/com/arcanatable/TableController.kt' 'android/app/src/main/java/com/arcanatable/TableEffects.kt' 'android/app/src/test/java/com/arcanatable/LanConnectionServiceGuardTest.kt' | sort > /tmp/allowed-paths
           diff -u /tmp/allowed-paths /tmp/handoff-paths
           for part in argentum-ai.jar argentum-mtg-sdk-tooling.jar argentum-mtg-sdk.jar argentum-rules-engine.jar; do
             p="android/app/libs/$part"
@@ -150,9 +150,9 @@ jobs:
           xml=list(Path('android/app/build/test-results/testDebugUnitTest').glob('TEST-*LanConnectionServiceGuardTest.xml'))
           assert len(xml)==1, xml
           suite=ET.parse(xml[0]).getroot()
-          assert int(suite.attrib.get('tests','0'))==2, suite.attrib
+          assert int(suite.attrib.get('tests','0'))==8, suite.attrib
           assert all(int(suite.attrib.get(k,'0'))==0 for k in ('failures','errors','skipped')), suite.attrib
-          print('PASS: 2 lifecycle guard regression tests')
+          print('PASS: 8 lifecycle guard regression tests')
           PY
           APK=android/app/build/outputs/apk/debug/app-debug.apk
           test -s "$APK"
