@@ -126,7 +126,7 @@ class CollectiveEffortIndependentCertificationTest {
         assertEquals(3, d.projected.getPower(targetBear))
         assertEquals(3, d.projected.getToughness(targetBear))
         assertEquals(3, d.projected.getPower(targetSpider))
-        assertEquals(4, d.projected.getToughness(targetSpider))
+        assertEquals(5, d.projected.getToughness(targetSpider))
     }
 
     @Test
