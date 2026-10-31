@@ -325,3 +325,32 @@ test('work priority: every owner request outranks app votes; app ranks by votes;
   const existing = [{ number: 9, state: 'closed', title: '[Card Work] Owner Card — needs rules review', body: Q.CARD_WORK_MARKER + '\n', user: { login: 'github-actions[bot]', type: 'Bot' } }];
   assert.equal(Q.planCardWork(p, existing).create.name, 'Popular');
 });
+
+test('six-precon gaps get card work after owner requests and app votes; recorded blockers are left out', () => {
+  const precons = gaps([
+    card('Celestine, the Living Saint', 'SUPPORTED', 'copilot'),
+    card('Precon Review Card', 'NEEDS_REVIEW', 'gpt'),
+    card('Precon Possible Gap', 'NEEDS_REVIEW', 'claude', { reviewHint: 'possible-engine-gap' }),
+    card('Precon Known Blocker', 'ENGINE_BLOCKED', 'claude'),
+    card('Precon Done', 'IMPLEMENTED_AND_TESTED'),
+    card('Broodlord', 'NEEDS_REVIEW', 'gpt'),
+  ]);
+  const issues = [request(12, ['Broodlord'])];
+  const r = Q.candidates({ gaps: precons, requestedGaps: gaps([card('Broodlord', 'NEEDS_REVIEW', 'gpt')]), openIssues: issues });
+  const sources = r.workRequests.map(w => [w.name, w.source]);
+  assert.deepEqual(sources, [['Broodlord', 'owner'], ['Precon Review Card', 'precon'], ['Precon Possible Gap', 'precon']]);
+  const precon = r.workRequests.find(w => w.name === 'Precon Review Card');
+  assert.equal(Q.priorityScore(precon), 0);
+  assert.equal(Q.priorityLabel(precon), 'priority:precon');
+  // The issue it opens is a valid, auto-startable card-work item without an owner/app issue number.
+  const oracle = JSON.stringify({ name: 'Precon Review Card', oracle_text: 'Flying', type_line: 'Creature', mana_cost: '{1}', scryfall_uri: 'https://scryfall.com/card/x/1/precon-review-card' });
+  const body = Q.cardWorkBody({ ...precon, oracle }, { runId: 5, baseSha: SHA, base: BASE });
+  assert.match(body, /precon-gap:six-precons; priority:0/);
+  assert.match(body, /## Precon gap/);
+  assert.deepEqual(A.reviewActionable(body), { ok: true, missing: [] });
+  const payload = { ok: true, requestedClassified: true, base: BASE, baseSha: SHA, workRequests: r.workRequests.map(w => ({ ...w, oracle })) };
+  const plan = Q.planCardWork(payload, []);
+  assert.equal(plan.create.name, 'Broodlord'); // owner first
+  const next = Q.planCardWork({ ...payload, workRequests: payload.workRequests.filter(w => w.source === 'precon') }, []);
+  assert.equal(next.create.name, 'Precon Review Card');
+});
