@@ -22,7 +22,7 @@ class KnucklesTheEchidnaScenarioTest {
         assertNull("Haste lets Knuckles attack without removing summoning sickness",
             d.declareAttackers(p, listOf(knuckles), d.player2).error)
         d.passPriorityUntil(Step.DECLARE_BLOCKERS)
-        assertNull(d.declareBlockers(d.player2, mapOf(knuckles to listOf(memnite))).error)
+        assertNull(d.declareBlockers(d.player2, mapOf(memnite to listOf(knuckles))).error)
         d.passPriorityUntil(Step.POSTCOMBAT_MAIN)
         d.resolveAll()
 

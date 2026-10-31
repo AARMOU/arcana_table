@@ -1,8 +1,9 @@
 package com.arcanatable.customcards.cards
 
-import com.wingedsheep.sdk.core.Keyword
+import com.wingedsheep.sdk.core.*
 import com.wingedsheep.sdk.dsl.*
 import com.wingedsheep.sdk.model.Rarity
+import com.wingedsheep.sdk.scripting.GameObjectFilter
 
 val KnucklesTheEchidna = card("Knuckles the Echidna") {
     manaCost = "{2}{R}{R}"

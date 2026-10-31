@@ -114,6 +114,7 @@ object CustomCards {
         Entry(ViolentOutburst, "ARB", POOL),
         Entry(EleshNornGrandCenobite, "NPH", POOL),
         Entry(RampagingFerocidon, "XLN", POOL),
+        Entry(KnucklesTheEchidna, "SLD", POOL),
         Entry(SpittingDilophosaurus, "REX", POOL),
         Entry(DescendantsPath, "TLE", POOL),
         Entry(CloudExSoldier, "FIC", POOL),
