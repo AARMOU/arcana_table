@@ -1,0 +1,8 @@
+{
+  "key": "kill-maim-burn",
+  "name": "Kill! Maim! Burn!",
+  "issue": 561,
+  "source": "certification/KillMaimBurnIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.KillMaimBurnIndependentCertificationTest",
+  "tests": 10
+}
