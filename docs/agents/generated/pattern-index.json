@@ -1533,7 +1533,7 @@
    ]
   },
   "Effects.CreateToken": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -3864,13 +3864,19 @@
    ]
   },
   "Triggers.self.dies": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Dinosaur Egg",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DinosaurEgg.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DinosaurEggScenarioTest.kt"
+    },
+    {
+     "card": "Phyrexian Triniform",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PhyrexianTriniform.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PhyrexianTriniformScenarioTest.kt"
     },
     {
      "card": "Power Depot",
@@ -4185,6 +4191,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SavageOrder.kt",
      "lines": 33,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SavageOrderScenarioTest.kt"
+    }
+   ]
+  },
+  "encore()": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Phyrexian Triniform",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PhyrexianTriniform.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PhyrexianTriniformScenarioTest.kt"
     }
    ]
   },
@@ -4539,7 +4556,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",

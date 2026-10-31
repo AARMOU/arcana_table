@@ -2,23 +2,117 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.PhyrexianTriniform
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.ActivateAbility
+import com.wingedsheep.engine.state.components.combat.AttackingComponent
+import com.wingedsheep.engine.state.components.identity.CardComponent
+import com.wingedsheep.engine.state.components.identity.TokenComponent
+import com.wingedsheep.sdk.core.Color
+import com.wingedsheep.sdk.core.Step
+import com.wingedsheep.sdk.core.Zone
+import com.wingedsheep.sdk.model.Deck
 import org.junit.Assert.*
 import org.junit.Test
 
 class PhyrexianTriniformScenarioTest {
-    // CARDKIT-SCAFFOLD: replace this whole test with real scenarios on the engine, e.g.
-    //   val d = customScenario(PhyrexianTriniform)            // a real game, card round-tripped through its JSON data
-    //   val p = d.player1
-    //   val card = d.putCardInHand(p, "Phyrexian Triniform")
-    //   d.giveMana(p, Color.WHITE); d.giveColorlessMana(p, 2)
-    //   assertNull(d.castSpell(p, card).error)
-    //   d.resolveAll(Choices(yes = true))
-    // Cover, for every line below, the positive case AND a negative/edge case (declined "may",
-    // no legal target, intervening-if false, wrong controller, source gone before resolution):
-    //   - When this creature dies, create three 3/3 colorless Phyrexian Golem artifact creature tokens.
-    //   - Encore {12}
     @Test
-    fun scaffoldIsNotImplementedYet() {
-        fail("Phyrexian Triniform is a cardkit scaffold: implement its abilities and real scenarios first")
+    fun createsThreeColorlessArtifactGolemsWhenItDies() {
+        val d = customScenario(PhyrexianTriniform, "Murder")
+        val p = d.player1
+        val triniform = d.putCreatureOnBattlefield(p, "Phyrexian Triniform")
+        val murder = d.putCardInHand(p, "Murder")
+        d.giveMana(p, Color.BLACK)
+        d.giveMana(p, Color.BLACK)
+        d.giveColorlessMana(p, 1)
+
+        assertNull(d.castSpell(p, murder, listOf(triniform)).error)
+        d.resolveAll()
+
+        val tokens = d.permanentsNamed(p, "Phyrexian Golem")
+        assertEquals(3, tokens.size)
+        tokens.forEach { token ->
+            assertTrue(d.state.getEntity(token)!!.has<TokenComponent>())
+            val card = d.state.getEntity(token)!!.get<CardComponent>()!!
+            assertTrue(card.typeLine.isArtifactCreature)
+            assertEquals(setOf("Golem", "Phyrexian"), card.typeLine.subtypes.map { it.value }.toSet())
+            assertTrue(card.colors.isEmpty())
+            assertEquals(3, card.baseStats!!.basePower)
+            assertEquals(3, card.baseStats!!.baseToughness)
+        }
+    }
+
+    @Test
+    fun anotherCreaturesDeathDoesNotCreateGolems() {
+        val d = customScenario(PhyrexianTriniform, "Murder", "Grizzly Bears")
+        val p = d.player1
+        val triniform = d.putCreatureOnBattlefield(p, "Phyrexian Triniform")
+        val bears = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
+        val murder = d.putCardInHand(p, "Murder")
+        d.giveMana(p, Color.BLACK)
+        d.giveMana(p, Color.BLACK)
+        d.giveColorlessMana(p, 1)
+
+        assertNull(d.castSpell(p, murder, listOf(bears)).error)
+        d.resolveAll()
+
+        assertEquals(listOf(triniform), d.permanentsNamed(p, "Phyrexian Triniform"))
+        assertTrue(d.permanentsNamed(p, "Phyrexian Golem").isEmpty())
+    }
+
+    @Test
+    fun encoreCreatesHastyAttackerForEachOpponentAndSacrificesThemAtEndStep() {
+        val d = customScenario(PhyrexianTriniform)
+        val players = d.initMultiplayer(List(4) { Deck.of("Plains" to 40) })
+        val p = players.first()
+        val opponents = players.drop(1).toSet()
+        d.passPriorityUntil(Step.PRECOMBAT_MAIN, p)
+        val card = d.putCardInGraveyard(p, "Phyrexian Triniform")
+        d.giveColorlessMana(p, 12)
+
+        val action = d.legalActions(p).mapNotNull { it.action as? ActivateAbility }
+            .single { it.sourceId == card }
+        d.submitSuccess(action)
+        assertEquals(listOf("Phyrexian Triniform"), d.zoneNames(p, Zone.EXILE))
+        d.resolveAll()
+
+        val tokens = d.permanentsNamed(p, "Phyrexian Triniform")
+            .filter { d.state.getEntity(it)?.has<TokenComponent>() == true }
+        assertEquals(opponents.size, tokens.size)
+        val defenders = tokens.map { token ->
+            val attacker = d.state.getEntity(token)?.get<AttackingComponent>()
+            assertNotNull("Each encore copy should enter attacking", attacker)
+            assertTrue(
+                "Each encore copy should have haste",
+                d.projected.hasKeyword(token, com.wingedsheep.sdk.core.Keyword.HASTE),
+            )
+            attacker!!.defenderId
+        }.toSet()
+        assertEquals(opponents, defenders)
+
+        d.passPriorityUntil(Step.END, p)
+        d.resolveAll()
+        assertTrue(d.permanentsNamed(p, "Phyrexian Triniform")
+            .none { d.state.getEntity(it)?.has<TokenComponent>() == true })
+        assertEquals(listOf("Phyrexian Triniform"), d.zoneNames(p, Zone.EXILE))
+    }
+
+    @Test
+    fun encoreRequiresGraveyardTwelveManaAndSorceryTiming() {
+        val d = customScenario(PhyrexianTriniform)
+        val p = d.player1
+        val permanent = d.putCreatureOnBattlefield(p, "Phyrexian Triniform")
+        d.giveColorlessMana(p, 12)
+
+        fun encoreActions() = d.legalActions(p).mapNotNull { it.action as? ActivateAbility }
+            .filter { it.sourceId == permanent }
+
+        assertTrue("Encore is unavailable from the battlefield", encoreActions().isEmpty())
+        d.moveToGraveyard(permanent)
+        d.giveColorlessMana(p, 11)
+        assertTrue("Encore requires all twelve mana", encoreActions().isEmpty())
+        d.giveColorlessMana(p, 1)
+        assertEquals(1, encoreActions().size)
+
+        d.passPriorityUntil(Step.END, p)
+        assertTrue("Encore is only available at sorcery timing", encoreActions().isEmpty())
     }
 }
