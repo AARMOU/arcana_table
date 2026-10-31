@@ -4,6 +4,7 @@ import com.arcanatable.customcards.cards.TangleweaveArmor
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.engine.state.components.battlefield.AttachedToComponent
+import com.wingedsheep.engine.state.components.identity.CardComponent
 import com.wingedsheep.engine.state.components.identity.TokenComponent
 import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
@@ -27,11 +28,14 @@ class TangleweaveArmorIndependentCertificationTest {
     ): GameTestDriver {
         val cards = listOfNotNull(ownCommander, ownPartner, opponentCommander) + libraryCards
         val d = customScenario(TangleweaveArmor, *cards.toTypedArray())
+        val ownDeck = if (ownPartner == null) {
+            Deck.of("Forest" to 50, "Island" to 49)
+        } else {
+            Deck.of("Forest" to 33, "Island" to 33, "Plains" to 32)
+        }
+        val opponentDeck = Deck.of("Forest" to 50, "Island" to 49)
         d.initMultiplayer(
-            decks = listOf(
-                Deck.of("Forest" to if (ownPartner == null) 99 else 98),
-                Deck.of("Forest" to 99),
-            ),
+            decks = listOf(ownDeck, opponentDeck),
             format = Format.Commander(),
             commanders = listOf(ownCommander, opponentCommander),
             partners = listOf(ownPartner, null),
@@ -39,6 +43,14 @@ class TangleweaveArmorIndependentCertificationTest {
         d.passPriorityUntil(Step.PRECOMBAT_MAIN)
         return d
     }
+
+    private fun germTokens(d: GameTestDriver, player: EntityId): List<EntityId> =
+        d.getPermanents(player).filter { token ->
+            d.state.getEntity(token)?.has<TokenComponent>() == true &&
+                d.projected.hasType(token, "CREATURE") &&
+                d.projected.hasSubtype(token, "PHYREXIAN") &&
+                d.projected.hasSubtype(token, "GERM")
+        }
 
     private fun castArmor(d: GameTestDriver, player: EntityId): EntityId {
         val armor = d.putCardInHand(player, name)
@@ -76,7 +88,7 @@ class TangleweaveArmorIndependentCertificationTest {
         val d = commanderScenario(sourceCommander)
         val p = d.player1
         val armor = castArmor(d, p)
-        val germ = d.permanentsNamed(p, "Phyrexian Germ").single()
+        val germ = germTokens(d, p).single()
 
         assertTrue(d.permanentsNamed(p, name).contains(armor))
         assertTrue(d.state.getEntity(germ)!!.has<TokenComponent>())
@@ -84,6 +96,10 @@ class TangleweaveArmorIndependentCertificationTest {
         assertTrue(d.projected.hasSubtype(germ, "PHYREXIAN"))
         assertTrue(d.projected.hasSubtype(germ, "GERM"))
         assertEquals(setOf(Color.BLACK), d.projected.getColors(germ))
+        val germCard = d.state.getEntity(germ)!!.get<CardComponent>()
+        assertNotNull(germCard?.baseStats)
+        assertEquals(0, germCard!!.baseStats!!.power)
+        assertEquals(0, germCard.baseStats!!.toughness)
         assertEquals(7, d.projected.getPower(germ))
         assertEquals(7, d.projected.getToughness(germ))
         assertAttachedTo(d, armor, germ)
@@ -91,8 +107,8 @@ class TangleweaveArmorIndependentCertificationTest {
 
     @Test
     fun bonusUsesTheGreatestManaValueAmongYourCommandersOnly() {
-        val ownCommander = "Ikra Shidiqi, the Usurper"
-        val ownPartner = "Tana, the Bloodsower"
+        val ownCommander = "Thrasios, Triton Hero"
+        val ownPartner = "Ishai, Ojutai Dragonspeaker"
         val opponentCommander = "Koma, Cosmos Serpent"
         val d = commanderScenario(ownCommander, opponentCommander, ownPartner, listOf("Grizzly Bears"))
 
@@ -104,9 +120,9 @@ class TangleweaveArmorIndependentCertificationTest {
 
         val creature = d.putCreatureOnBattlefield(player, "Grizzly Bears")
         val armor = castArmor(d, player)
-        val germ = d.permanentsNamed(player, "Phyrexian Germ").single()
-        assertEquals(5, d.projected.getPower(germ))
-        assertEquals(5, d.projected.getToughness(germ))
+        val germ = germTokens(d, player).single()
+        assertEquals(4, d.projected.getPower(germ))
+        assertEquals(4, d.projected.getToughness(germ))
 
         d.giveColorlessMana(player, 4)
         assertNull(equip(d, player, armor, creature).error)
@@ -114,8 +130,8 @@ class TangleweaveArmorIndependentCertificationTest {
 
         assertAttachedTo(d, armor, creature)
         assertFalse(d.getPermanents(player).contains(germ))
-        assertEquals(7, d.projected.getPower(creature))
-        assertEquals(7, d.projected.getToughness(creature))
+        assertEquals(6, d.projected.getPower(creature))
+        assertEquals(6, d.projected.getToughness(creature))
     }
 
     @Test
@@ -124,7 +140,7 @@ class TangleweaveArmorIndependentCertificationTest {
         val player = d.player1
         val creature = d.putCreatureOnBattlefield(player, "Grizzly Bears")
         val armor = castArmor(d, player)
-        val germ = d.permanentsNamed(player, "Phyrexian Germ").single()
+        val germ = germTokens(d, player).single()
         d.giveColorlessMana(player, 3)
 
         assertNotNull(equip(d, player, armor, creature).error)
@@ -148,7 +164,7 @@ class TangleweaveArmorIndependentCertificationTest {
         val opponent = d.player2
         val opponentCreature = d.putCreatureOnBattlefield(opponent, "Grizzly Bears")
         val armor = castArmor(d, player)
-        val germ = d.permanentsNamed(player, "Phyrexian Germ").single()
+        val germ = germTokens(d, player).single()
         d.giveColorlessMana(player, 4)
 
         assertNotNull(equip(d, player, armor, opponentCreature).error)
@@ -162,7 +178,7 @@ class TangleweaveArmorIndependentCertificationTest {
         val player = d.player1
         val creature = d.putCreatureOnBattlefield(player, "Grizzly Bears")
         val armor = castArmor(d, player)
-        val germ = d.permanentsNamed(player, "Phyrexian Germ").single()
+        val germ = germTokens(d, player).single()
         d.passPriorityUntil(Step.DECLARE_ATTACKERS)
         d.giveColorlessMana(player, 4)
 
