@@ -1805,7 +1805,7 @@
    ]
   },
   "Effects.DrawCards": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Ugin's Insight",
@@ -1949,13 +1949,19 @@
    ]
   },
   "Effects.ForEachPlayer": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Geier Reach Sanitarium",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/GeierReachSanitarium.kt",
      "lines": 32,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/GeierReachSanitariumScenarioTest.kt"
+    },
+    {
+     "card": "Acolyte Hybrid",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AcolyteHybrid.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AcolyteHybridScenarioTest.kt"
     },
     {
      "card": "Great Unclean One",
@@ -2405,7 +2411,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -3749,7 +3755,7 @@
    ]
   },
   "Triggers.self.attacks": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -4539,7 +4545,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6632,6 +6638,17 @@
     }
    ]
   },
+  "Player.ControllerOf": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Acolyte Hybrid",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AcolyteHybrid.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AcolyteHybridScenarioTest.kt"
+    }
+   ]
+  },
   "Player.ControllerOfSource": {
    "count": 1,
    "examples": [
@@ -6876,13 +6893,19 @@
    ]
   },
   "TargetFilter.Artifact": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Hull Breach",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HullBreach.kt",
      "lines": 29,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HullBreachScenarioTest.kt"
+    },
+    {
+     "card": "Acolyte Hybrid",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AcolyteHybrid.kt",
+     "lines": 44,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AcolyteHybridScenarioTest.kt"
     }
    ]
   },
@@ -7239,7 +7262,7 @@
    ]
   },
   "target(\u2026)": {
-   "count": 62,
+   "count": 63,
    "examples": [
     {
      "card": "Defile",
