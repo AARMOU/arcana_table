@@ -2,9 +2,9 @@
 // the background; the deploy stamps BUILD (pages.yml), so every deployment installs a new worker that pre-caches the
 // new shell and the page reloads once onto it (index.html controllerchange). The UI itself is unchanged.
 const BUILD='dev';
-const CACHE='arcana-control-shell-v18-'+BUILD;
+const CACHE='arcana-control-shell-v19-'+BUILD;
 const DATA='arcana-control-data-v1';
-const SHELL=['./','./index.html','./cards.html','./credits.html','./card-queue.js','./card-preflight.js','./review.js','./authorize.js','./team-checkin.js','./credit-budget.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
+const SHELL=['./','./index.html','./cards.html','./credits.html','./card-queue.js','./card-preflight.js','./review.js','./authorize.js','./team-checkin.js','./goosegeta.js','./credit-budget.js','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
 const scope=new URL(self.registration.scope);
 const shellUrls=new Set(SHELL.map(s=>new URL(s,scope).href));
 // Public, read-only status feeds the dashboard reads. They are always fetched from the network first; the last good

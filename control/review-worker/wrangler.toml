@@ -14,3 +14,11 @@ enabled = true
 # Each cron must match a key of SCHEDULE there. Inert without GITHUB_ACTIONS_DISPATCH_TOKEN.
 [triggers]
 crons = ["*/15 * * * *", "41 * * * *"]
+
+# SUMMON GOOSEGETA: disabled. Bind only to an owner-approved isolated rooms test service.
+# [vars]
+# GOOSEGETA_ENABLED = "false"
+# [[services]]
+# binding = "GOOSEGETA_ROOMS"
+# service = "<approved-isolated-rooms-service>"
+# Secret: GOOSEGETA_CONTROL_KEY (same random >=32-character value in both services).
