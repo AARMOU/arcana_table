@@ -135,18 +135,21 @@ jobs:
           set -euo pipefail
           # Robolectric's runtime MavenArtifactFetcher uses its own HTTP stack, not Gradle.
           # Pin and verify the exact SDK 34 framework jar in a runner-local test-only dir.
-          version=14-robolectric-10818077-i7
-          jar="android-all-instrumented-${version}.jar"
-          url="https://repo.maven.apache.org/maven2/org/robolectric/android-all-instrumented/${version}/${jar}"
+          # SDK 34 runs the test; Robolectric 4.14.1 also loads the app package with its newest SDK (35), so both
+          # instrumented jars must be local (run 41249008131: "Path is not a file: ...-15-robolectric-12650502-i7.jar").
           dest="$RUNNER_TEMP/arcana-robolectric"
           mkdir -p "$dest"
-          curl --fail --location --retry 2 --connect-timeout 10 --max-time 240 --silent --show-error "$url" -o "$dest/$jar"
-          curl --fail --location --retry 2 --connect-timeout 10 --max-time 60 --silent --show-error "$url.sha1" -o "$dest/$jar.sha1"
-          expected="$(cut -c1-40 "$dest/$jar.sha1")"
-          actual="$(sha1sum "$dest/$jar" | awk '{print $1}')"
-          test -s "$dest/$jar"
-          test "$actual" = "$expected"
-          echo 'PASS: exact Robolectric SDK 34 instrumented jar verified against Maven checksum'
+          for version in 14-robolectric-10818077-i7 15-robolectric-12650502-i7; do
+            jar="android-all-instrumented-${version}.jar"
+            url="https://repo.maven.apache.org/maven2/org/robolectric/android-all-instrumented/${version}/${jar}"
+            curl --fail --location --retry 2 --connect-timeout 10 --max-time 240 --silent --show-error "$url" -o "$dest/$jar"
+            curl --fail --location --retry 2 --connect-timeout 10 --max-time 60 --silent --show-error "$url.sha1" -o "$dest/$jar.sha1"
+            expected="$(cut -c1-40 "$dest/$jar.sha1")"
+            actual="$(sha1sum "$dest/$jar" | awk '{print $1}')"
+            test -s "$dest/$jar"
+            test "$actual" = "$expected"
+            echo "PASS: $jar verified against Maven checksum"
+          done
       - name: Run lifecycle guard regression and assemble isolated Android APK
         shell: bash
         working-directory: android
