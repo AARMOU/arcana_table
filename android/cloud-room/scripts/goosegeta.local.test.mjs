@@ -173,4 +173,44 @@ test('workerd: unsolicited turn honk survives a failed GPT chat reply without mu
   assert.equal(state.status,'playing');
   await control('GCHAT3',{action:'dismiss',sessionId:status.sessionId});await outgoing(h,'arcanaBye');
 });
+
+test('workerd: an unsupported game gets only one host-authoritative resync after DO reload',async()=>{
+  const h=await setup('GPROBE',['friend']);
+  const {status}=await summon('GPROBE',h);
+  await outgoing(h,'lanHello');
+  await game(h,{type:'lanSeat',strictDeck:true},1);
+  await outgoing(h,'lanReady');
+  const unsupported=(n)=>({...update(n,[{
+    action:{type:'ActivateAbility',playerId:'offline-ai',sourceId:'not-public'},
+    isAffordable:true,requiresTargets:true
+  }]),state:{turnNumber:4}});
+  await game(h,unsupported(90),2);
+  let before;
+  for(let n=0;n<50;n++){
+    before=await (await control('GPROBE')).json();
+    if(before.status==='needs attention')break;
+    await new Promise(resolve=>setTimeout(resolve,5));
+  }
+  assert.equal(before.status,'needs attention');
+  assert.equal(before.reason,'unsupported-decision-or-action:actions-ActivateAbility');
+  await mf.unsafeEvictDurableObject('rooms','GameRoom',{name:'GPROBE',webSockets:'hibernate'});
+  const probe=await outgoing(h,'requestResync');
+  assert.equal(probe.type,'requestResync','probe must ask the real host, not fabricate an action');
+  await game(h,unsupported(91),3);
+  let after;
+  for(let n=0;n<50;n++){
+    after=await (await control('GPROBE')).json();
+    if(after.status==='needs attention')break;
+    await new Promise(resolve=>setTimeout(resolve,5));
+  }
+  assert.equal(after.reason,'unsupported-decision-or-action:actions-ActivateAbility');
+  await mf.unsafeEvictDurableObject('rooms','GameRoom',{name:'GPROBE',webSockets:'hibernate'});
+  h.send({type:'ping'});
+  assert.equal((await h.wait(p=>p.type==='pong')).type,'pong');
+  await assert.rejects(h.wait(p=>p.type==='relay',180),/packet-timeout/,
+    'an unsupported engine question may not create an unlimited resync loop');
+  await control('GPROBE',{action:'dismiss',sessionId:status.sessionId});
+  await outgoing(h,'arcanaBye');
+});
+
 test.after(async()=>{for(const s of sockets)try{s.close();}catch{}await mf.dispose();});
