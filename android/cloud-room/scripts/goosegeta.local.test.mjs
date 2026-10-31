@@ -121,18 +121,6 @@ test('workerd: a later human arrival revokes multiplayer banter consent',async()
   assert.equal((await(await control('GCHAT2')).json()).chatMode,'muted');
   assert.equal((await(await control('GCHAT2',{action:'chat',sessionId:status.sessionId,chatMode:'ruthless'})).json()).chatMode,'muted');
 });
-test('workerd: dismiss wins over an in-flight provider response and cannot resurrect the guest',async()=>{
-  const h=await setup('GMODEL',['friend']);const {status}=await summon('GMODEL',h,{model:true});await outgoing(h,'lanHello');
-  await game(h,{type:'lanSeat',strictDeck:true},1);await outgoing(h,'lanReady');
-  const started=new Promise(resolve=>{providerStarted=resolve;});
-  await game(h,update(90,[{action:{type:'PlayLand',playerId:'offline-ai',cardId:'land-1'},isAffordable:true},{action:{type:'PassPriority',playerId:'offline-ai'},isAffordable:true}]),2);await started;
-  const dismissed=await control('GMODEL',{action:'dismiss',sessionId:status.sessionId});assert.equal(dismissed.status,200);
-  await outgoing(h,'arcanaBye');failNextProvider=true;releaseProvider();
-  // A round trip on the host socket and owner status must not resurrect or submit.
-  h.send({type:'ping'});await h.wait(p=>p.type==='pong');
-  assert.equal((await(await control('GMODEL')).json()).status,'stopped');
-  assert.equal((await(await control('GMODEL')).json()).actionsSubmitted,0);
-});
 test('workerd: stalled provider cannot freeze a legal guest turn; watchdog emits only one host-offered action',async()=>{
   const h=await setup('GWATCH1',['friend']);
   const {status}=await summon('GWATCH1',h,{model:true});
@@ -171,6 +159,18 @@ test('workerd: stalled provider cannot freeze a legal guest turn; watchdog emits
   } finally {if(releaseProvider){releaseProvider();releaseProvider=null;}h.wait=originalWait;}
 });
 
+test('workerd: dismiss wins over an in-flight provider response and cannot resurrect the guest',async()=>{
+  const h=await setup('GMODEL',['friend']);const {status}=await summon('GMODEL',h,{model:true});await outgoing(h,'lanHello');
+  await game(h,{type:'lanSeat',strictDeck:true},1);await outgoing(h,'lanReady');
+  const started=new Promise(resolve=>{providerStarted=resolve;});
+  await game(h,update(90,[{action:{type:'PlayLand',playerId:'offline-ai',cardId:'land-1'},isAffordable:true},{action:{type:'PassPriority',playerId:'offline-ai'},isAffordable:true}]),2);await started;
+  const dismissed=await control('GMODEL',{action:'dismiss',sessionId:status.sessionId});assert.equal(dismissed.status,200);
+  await outgoing(h,'arcanaBye');failNextProvider=true;releaseProvider();
+  // A round trip on the host socket and owner status must not resurrect or submit.
+  h.send({type:'ping'});await h.wait(p=>p.type==='pong');
+  assert.equal((await(await control('GMODEL')).json()).status,'stopped');
+  assert.equal((await(await control('GMODEL')).json()).actionsSubmitted,0);
+});
 test('existing human directed-relay regressions on actual workerd, including privacy and reconnect',async()=>{
   const oldFetch=globalThis.fetch,oldWS=globalThis.WebSocket;
   globalThis.fetch=(url,init)=>mf.dispatchFetch(url,init);
