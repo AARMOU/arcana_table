@@ -64,6 +64,7 @@ class AncientStoneIdolIndependentCertificationTest {
         d.removeSummoningSickness(spider)
         d.passPriorityUntil(Step.DECLARE_ATTACKERS, activePlayer = opponent)
         assertNull(d.declareAttackers(opponent, listOf(bear, spider), player).error)
+        assertNull(d.passPriority(opponent).error)
 
         val idol = d.putCardInHand(player, "Ancient Stone Idol")
         d.giveColorlessMana(player, 7)
@@ -80,6 +81,7 @@ class AncientStoneIdolIndependentCertificationTest {
         val idol = d.putCardInHand(player, "Ancient Stone Idol")
         d.giveColorlessMana(player, 10)
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = d.player2)
+        assertNull(d.passPriority(d.player2).error)
 
         assertNull(d.castSpell(player, idol).error)
         d.resolveAll()
