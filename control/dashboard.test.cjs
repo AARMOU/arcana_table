@@ -85,7 +85,7 @@ test('compact tracker is near the top, uses transparent goose over current dot, 
 test('self-contained dashboard exists',()=>{assert.ok(html.startsWith('<!doctype html>'));assert.ok(html.includes('<title>Arcana Control'));assert.ok(script);
   // Only approved same-origin review and owner authorization modules may load; the inline dashboard script stays read-only.
   assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"','<script src="./authorize.js"']);});
-test('owner authorization has a visible queue panel and guarded client module',()=>{assert.match(html,/id="authorizationList"/);assert.match(html,/authorize\.js/);assert.ok(html.includes('I agree. Do it'));});
+test('owner authorization has a visible queue panel and guarded client module',()=>{assert.match(html,/id="authorizationList"/);assert.match(html,/authorize\.js/);assert.ok(fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8').includes('I agree. Do it'));assert.ok(html.includes('Cards start automatically'));});
 test('inline JavaScript parses',()=>{assert.doesNotThrow(()=>new vm.Script(script));});
 test('all mobile navigation targets exist',()=>{for(const id of ['overview','work','safety']){assert.match(html,new RegExp('id="'+id+'"'));assert.match(html,new RegExp('data-view="'+id+'"'));}});
 test('read only public API data sources',()=>{assert.match(script,/arcana-review\.arcanamtg\.workers\.dev\/v1\/public\/github/);assert.ok(script.includes("fetch('https://api.github.com/repos/'+REPO+path"));for(const path of ['/pulls?state=open','/actions/runs?per_page=30','/issues/81/comments?'])assert.ok(script.includes(path),path);assert.ok(!/\b(method:\s*['"](?:POST|PUT|PATCH|DELETE))/.test(script));});
@@ -224,8 +224,8 @@ test('closed issues are never shown as candidates and verdict age is shown',()=>
   const src=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
   assert.ok(src.includes("if (info.state !== 'open') {"));
   assert.ok(src.includes('row.remove();'));
-  assert.ok(src.includes('function render(container, units, checkedAt)'));
-  assert.ok(html.includes("window.ArcanaAuthorize.render($('authorizationList'),d.workers?.list||[],d.checkedAt);"));
+  assert.ok(src.includes('function render(container, units, checkedAt, mode)'));
+  assert.ok(html.includes("window.ArcanaAuthorize.render($('authorizationList'),d.workers?.list||[],d.checkedAt,d.readiness?.dispatch);"));
 });
 test('stale public feed falls back to fresh GitHub without polling',()=>{
   assert.ok(html.includes("if(res.ok&&isStaleFeed(res)){"));
@@ -419,7 +419,7 @@ test('fresh independent worker observations never change dispatcher authorizatio
   assert.ok(script.includes("d.kind==='workers'"));
   assert.ok(script.includes("Date.parse(observed.checkedAt)>Date.parse(d.checkedAt)"));
   assert.ok(script.includes("renderOpsWorkers(workerReport)"));
-  assert.ok(script.includes("window.ArcanaAuthorize.render($('authorizationList'),d.workers?.list||[],d.checkedAt)"));
+  assert.ok(script.includes("window.ArcanaAuthorize.render($('authorizationList'),d.workers?.list||[],d.checkedAt,d.readiness?.dispatch)"));
 });
 
 test('aging review snapshot rechecks only its known bot comment, avoids rollback and respects 5m throttle',async()=>{
@@ -560,4 +560,16 @@ test('worker visibility uses bounded, trust-checked read-only refresh',async()=>
   await refresh({workers:{data:{kind:'workers',checkedAt:old,workers:{running:0}}}},valid);
   await refresh({workers:{data:{kind:'workers',checkedAt:old,workers:{running:0}}}},valid);
   assert.equal(calls,1,'one request per 5-minute window, even on invalid return data');
+});
+
+test('normal dispatch mode shows automatic status, never an approval button (owner 2026-10-31)',()=>{
+  const Auth=require('./authorize.js');
+  const ok={eligible:true},no={eligible:false,skip:'feasibility: not-ready'};
+  assert.match(Auth.automaticText(ok,null,Auth.eligibility(ok),''),/Starts automatically.*nothing to approve/);
+  assert.match(Auth.automaticText(ok,{state:'open',assignees:[{login:'Copilot'}]},Auth.eligibility(ok),''),/Copilot is working on this/);
+  assert.match(Auth.automaticText(ok,{state:'closed',assignees:[]},Auth.eligibility(ok),''),/nothing to do/);
+  assert.match(Auth.automaticText(no,{state:'open',assignees:[]},Auth.eligibility(no),''),/Not Copilot-ready/);
+  const src=fs.readFileSync(path.join(__dirname,'authorize.js'),'utf8');
+  assert.ok(src.includes("if (mode === 'normal') { renderAutomatic(container, queued, age); return; }"));
+  assert.ok(!src.split('function renderAutomatic')[1].split('function render(')[0].includes("el('button'"));
 });
