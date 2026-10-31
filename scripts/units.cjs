@@ -47,6 +47,21 @@ async function timeline(github, owner, repo, issue_number) {
   return github.paginate(github.rest.issues.listEventsForTimeline, { owner, repo, issue_number, per_page: 100 });
 }
 const sessionsOf = events => events.filter(e => SESSION[e.event]).map(e => ({ event: SESSION[e.event], at: Date.parse(e.created_at) }));
+// A missing PR is not a diagnosis. Engine routing requires an explicit engineer
+// confirmation with a source/run link; ordinary Copilot comments cannot supply it.
+function engineEvidenceOf(comments, owner, repo) {
+  return comments.filter(c => c.user?.type === 'User' && ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(c.author_association))
+    .map(c => {
+      const reason = String(c.body || '').match(/^Engine gap confirmed:\s*(\S[^\r\n]{9,299})\s*$/m)?.[1];
+      const evidence = String(c.body || '').match(/^Evidence:\s*(https:\/\/github\.com\/\S+)\s*$/m)?.[1];
+      let url;
+      try { url = new URL(evidence); } catch { return null; }
+      if (!reason || url.origin !== 'https://github.com' || url.search || url.hash || url.username || url.password ||
+          !url.pathname.startsWith(`/${owner}/${repo}/`) ||
+          !/\/(?:actions\/runs\/\d+|blob\/[a-f0-9]{40}\/.+)$/.test(url.pathname)) return null;
+      return { reason, evidence, comment: c.html_url || null, at: Date.parse(c.created_at) };
+    }).filter(e => e && Number.isFinite(e.at)).sort((a, b) => b.at - a.at)[0] || null;
+}
 // GitHub's development link: `connected` names exactly one PR (`subject`); `disconnected` undoes it.
 function connectedPrs(events) {
   const linked = new Set();
@@ -167,6 +182,7 @@ async function loadUnits({ github, owner, repo, now = Date.now(), approvers, lag
       assignedToCopilot: (issue.assignees || []).some(isCopilot), ledger: parseLedger(comments), sessions,
       authorAssociation: issue.author_association, authorLogin: issue.user?.login,
       authorType: issue.user?.type, commenters: commentersOf(comments) };
+    raw.engineGapEvidence = engineEvidenceOf(comments, owner, repo);
     if (raw.authorLogin === 'github-actions[bot]' && raw.authorType === 'Bot') {
       // Comment and assignment timestamps do not constitute body edits.
       const writtenAt = await contentWrittenAt(github, owner, repo, issue.number);
@@ -181,4 +197,4 @@ async function loadUnits({ github, owner, repo, now = Date.now(), approvers, lag
   return { units, prsByUnit, numbers };
 }
 
-module.exports = { unitOf, loadUnits, isCopilot, contentWrittenAt, approvalOf, commentersOf };
+module.exports = { unitOf, loadUnits, isCopilot, contentWrittenAt, approvalOf, commentersOf, sessionsOf, engineEvidenceOf };

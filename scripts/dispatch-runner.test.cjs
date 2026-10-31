@@ -237,14 +237,35 @@ test('an interrupted attempt older than an hour is resolved automatically, never
   assert.equal((await run(fresh, { ARCANA_DISPATCH_MODE: 'normal' }, { fetchImpl: fetchOk(calls) })).state, 'interrupted-attempt');
 });
 
-test('engine gap: Copilot finished, commented, no PR -> candidate; otherwise not', () => {
+test('engine gap requires positive engineer evidence, not just zero delivery', () => {
   const { engineGapCandidates } = require('./dispatch-runner.cjs');
   const now = Date.now(), u = (over = {}) => ({ prs: [], derived: { state: 'review' }, raw: { title: '[Arcana Queue] X', labels: [],
+    engineGapEvidence: { reason: 'Confirmed engine primitive missing', evidence: 'https://github.com/AARMOU/arcana_table/actions/runs/1', at: now - 2e6 },
     commenters: [{ login: 'Copilot', type: 'Bot' }], sessions: [{ event: 'started', at: now - 3e6 }, { event: 'finished', at: now - 2e6 }], ...over } });
   assert.equal(engineGapCandidates([u()], now).length, 1);
-  assert.equal(engineGapCandidates([u({ commenters: [] })], now).length, 0, 'no Copilot explanation');
+  assert.equal(engineGapCandidates([u({ engineGapEvidence: null })], now).length, 0, 'no engineer confirmation, even with Copilot comment');
   assert.equal(engineGapCandidates([{ ...u(), prs: [{ number: 1 }] }], now).length, 0, 'has a PR');
   assert.equal(engineGapCandidates([u({ labels: ['arcana:engine-gap'] })], now).length, 0, 'already labeled');
   assert.equal(engineGapCandidates([u({ sessions: [{ event: 'started', at: now - 60e3 }] })], now).length, 0, 'still working');
   assert.equal(engineGapCandidates([u({ title: '[Arcana Suite] X' })], now).length, 0, 'suites are not cards');
+  assert.equal(engineGapCandidates([u({ engineGapEvidence: { at: now - 4e6 } })], now).length, 0, 'confirmation predates this attempt');
+  assert.equal(engineGapCandidates([u({ engineGapEvidence: { at: now + 1 } })], now).length, 0, 'future confirmation');
+});
+
+test('zero-delivery #458 shape is diagnosis work, never an inferred engine gap or paid retry', async () => {
+  const {zeroDeliveryCandidates,labelDiagnosis,engineGapCandidates,DIAGNOSIS_LABEL} = require('./dispatch-runner.cjs');
+  const now = Date.now();
+  const u = {raw:{number:458,title:'[Arcana Queue] Kenrith',labels:[],ledger:[],sessions:[{event:'started',at:now-4e6},{event:'finished',at:now-3e6}]},derived:{state:'review'},prs:[]};
+  assert.equal(zeroDeliveryCandidates([u],now).length,1);
+  assert.deepEqual(engineGapCandidates([u],now),[]);
+  const writes=[];
+  const github={rest:{issues:{addLabels:async a=>writes.push(a),removeLabel:async a=>writes.push(a)}}};
+  await labelDiagnosis({github,owner:'AARMOU',repo:'arcana_table',units:[u],now});
+  assert.deepEqual(writes[0].labels,[DIAGNOSIS_LABEL]);
+  u.raw.labels=[DIAGNOSIS_LABEL];
+  await labelDiagnosis({github,owner:'AARMOU',repo:'arcana_table',units:[u],now});
+  assert.equal(writes.length,1,'repeat tick adds no label or assignment');
+  u.prs=[{number:540}];
+  await labelDiagnosis({github,owner:'AARMOU',repo:'arcana_table',units:[u],now});
+  assert.equal(writes[1].name,DIAGNOSIS_LABEL,'an actual PR resolves diagnosis supply');
 });

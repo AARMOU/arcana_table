@@ -19,7 +19,7 @@ const cardFiles = ['android/custom-cards/src/main/kotlin/com/arcanatable/customc
   'android/custom-cards/src/main/kotlin/com/arcanatable/customcards/CustomCards.kt'];
 
 test('states: running, failed, awaiting review, approved and changes requested', () => {
-  assert.equal(R.classify(pr(), []).state, 'checks-running');
+  assert.equal(R.classify(pr(), []).state, 'no-checks');
   assert.equal(R.classify(pr(), [run('toolkit', null, 'in_progress')]).state, 'checks-running');
   assert.equal(R.classify(pr(), [run('toolkit', 'success'), run('cards-and-android', 'failure')]).state, 'checks-failed');
   const green = [run('toolkit', 'success'), run('cards-and-android', 'success'), run('publish-oracle-cache', 'skipped')];
@@ -35,7 +35,7 @@ test('only the owner\'s review of the CURRENT head counts', () => {
   assert.equal(R.classify(pr(), green, [review('APPROVED', 'old-sha')]).state, 'awaiting-review');
   assert.equal(R.classify(pr(), green, [review('APPROVED', 'a'.repeat(40), 'stranger')]).state, 'awaiting-review');
   // Check runs from an older head are ignored.
-  assert.equal(R.classify(pr(), [run('toolkit', 'failure', 'completed', 'old')]).state, 'checks-running');
+  assert.equal(R.classify(pr(), [run('toolkit', 'failure', 'completed', 'old')]).state, 'no-checks');
 });
 
 test('payload puts cards needing the owner first and counts the badge', () => {
@@ -180,7 +180,8 @@ test('auto-closed queue issues preserve only authenticated Android integration h
   let author = {id:41898282, login:'github-actions[bot]'};
   let ancestry = 'ahead';
   const github = {rest:{
-    pulls:{list:async ({state})=>({data:state==='open'?[pr()]:[]})},
+    pulls:{list:async ({state})=>({data:state==='open'?[pr()]:[]}), listReviews:async()=>({data:[]}), listFiles:async()=>({data:cardFiles.map(filename=>({filename}))})},
+    checks:{listForRef:async()=>({data:{check_runs:[]}})},
     issues:{
       get:async()=>({data:{state:'closed',title:'[Arcana Queue] Celestine, the Living Saint — Cardkit SUPPORTED, unclaimed'}}),
       listComments:async()=>({data:[{user:author,body:I.receiptBody(receipt)}]})
@@ -198,12 +199,13 @@ test('auto-closed queue issues preserve only authenticated Android integration h
   author={id:12345,login:'someone'};
   const forged=await get('2026-10-30T13:00:00Z');
   assert.deepEqual(forged.integratedActivity,[]);
-  assert.deepEqual(forged.items,[]);
+  assert.equal(forged.items[0].state,'orphaned');
+  assert.equal(forged.items[0].readyForOwner,false);
   author={id:41898282,login:'github-actions[bot]'};
   ancestry='diverged';
   const invalid=await get('2026-10-30T13:00:00Z');
   assert.deepEqual(invalid.integratedActivity,[]);
-  assert.deepEqual(invalid.items,[]);
+  assert.equal(invalid.items[0].state,'orphaned');
   ancestry='ahead';
   // The seven-day graph rolls by calendar window; historical cards stay marked integrated.
   const old=await get('2026-11-09T13:00:00Z');
@@ -323,4 +325,174 @@ test('stall report times the GPT engine lane (48h) and the B140 build trigger (7
   release = { tag_name: 'B141', published_at: h(1) };
   assert.equal(await R.reportStalls({ github, owner: 'o', repo: 'r', payload: { items: [] }, now }), 'posted 0');
   assert.match(comments[1].body, /^stalls: lane#50 lane#51$/m);
+});
+
+// Durable unit/PR/check/ledger joins, without workflow writes or an extra worker.
+function lifecycleFixture({ state = 'open', labels = [], checks = [run('toolkit', 'success')], repairs = [],
+  events = [], suite = false, suiteChecks = [run('premerge', 'failure')], suiteRepairs = [], body = '## Cards\n- Surge Conductor\n' } = {}) {
+  const now = new Date('2026-10-31T02:00:00Z');
+  const card = pr({ title: 'Add Surge Conductor artifact-entry proliferation', base: { ref: 'gpt/arcana-integration-next' } });
+  const unit = { number: 358, state, labels, body, title: '[Arcana Queue] Surge Conductor',
+    user: { login: 'AARMOU', type: 'User' }, author_association: 'OWNER' };
+  const suitePr = pr({ number: 535, body: 'Unit: #534', title: 'Add independent Surge Conductor certification', base: { ref: 'main' } });
+  const suiteUnit = { number: 534, state: 'open', title: '[Arcana Suite] Surge Conductor',
+    user: { login: 'github-actions[bot]', type: 'Bot' },
+    body: '<!-- arcana-suite-request-v1 -->\nCard unit: #358\nCard PR: #360\nSuite key: surge-conductor\n' };
+  const ledger = records => records.map((at, i) => ({ user: { login: 'github-actions[bot]', type: 'Bot' },
+    body: require('./admission.cjs').formatLedger({ op: 'repair-request', issue: records === repairs ? 358 : 534, run: String(i), at }) }));
+  const github = { rest: {
+    pulls: { list: async ({state}) => ({data: state === 'open' ? [card, ...(suite ? [suitePr] : [])] : []}),
+      listFiles: async () => ({data: cardFiles.map(filename => ({filename}))}), listReviews: async () => ({data: []}) },
+    issues: { get: async ({issue_number}) => ({data: issue_number === 358 ? unit : suiteUnit}),
+      listComments: async ({issue_number}) => ({data: issue_number === 358 ? ledger(repairs) : issue_number === 534 ? ledger(suiteRepairs) : []}),
+      listEventsForTimeline: async () => ({data: events}) },
+    checks: { listForRef: async () => ({data:{check_runs: checks}}) },
+  }, paginate: async (fn, args) => (await fn(args)).data };
+  // The suite gets a distinct head so the check responses cannot be confused.
+  suitePr.head = {sha: 'b'.repeat(40)};
+  github.rest.checks.listForRef = async ({ref}) => ({data:{check_runs: ref === suitePr.head.sha ? suiteChecks.map(c => ({...c, head_sha: ref})) : checks}});
+  return { github, unit, suiteUnit, go: () => R.buildReviewInbox({github, owner:'AARMOU', repo:'arcana_table', now}) };
+}
+
+test('no-checks is distinct from a running job, including control-only and previous-head observations', () => {
+  for (const checks of [[], [run('observe', 'success')], [run('toolkit','success','completed','old')]]) {
+    const row = R.classify(pr(), checks, [], '', cardFiles);
+    assert.equal(row.state, 'no-checks');
+    assert.equal(row.readyForOwner, false);
+    assert.match(row.problems[0], /No card checks observed/);
+  }
+});
+
+test('closed unfinished card requests stay orphaned and never appear ready or integrated', async () => {
+  const f = lifecycleFixture({state:'closed', checks:[run('toolkit','success'),certRun()]});
+  const p = await f.go();
+  assert.equal(p.items[0].state,'orphaned');
+  assert.equal(p.items[0].validationState,'certified');
+  assert.match(p.items[0].recovery.next,/preserve the attempt ledger/);
+  assert.equal(p.awaitingReview,0);
+  assert.deepEqual(p.integratedActivity,[]);
+});
+
+test('existing holds override a certified ready row without replacing certification evidence', async () => {
+  for (const label of ['wu:halted','arcana:engine-gap']) {
+    const p = await lifecycleFixture({labels:[{name:label}], checks:[run('toolkit','success'),certRun()]}).go();
+    assert.equal(p.items[0].state,'held');
+    assert.equal(p.items[0].certification,'certified');
+    assert.equal(p.awaitingReview,0);
+    assert.ok(p.items[0].recovery.who);
+  }
+});
+
+const exhaustedRepairs = ['2026-10-31T00:00:00Z','2026-10-31T00:20:00Z'];
+const finishedRepair = [{event:'copilot_work_started',created_at:'2026-10-31T00:21:00Z'},
+  {event:'copilot_work_finished',created_at:'2026-10-31T00:50:00Z'}];
+test('trusted two-repair ledger plus finished session and red checks exposes engineering escalation', async () => {
+  const p = await lifecycleFixture({checks:[run('toolkit','failure')],repairs:exhaustedRepairs,events:finishedRepair}).go();
+  const row = p.items[0];
+  assert.equal(row.state,'repair-exhausted');
+  assert.equal(row.work.repairs,2);
+  assert.equal(row.work.limit,2);
+  assert.equal(row.work.pickup,'finished');
+  assert.match(row.recovery.next,/without another paid attempt/);
+  assert.equal(row.readyForOwner,false);
+});
+
+test('exhausted budget does not imply a live repair finished; lost timeline reads remain unknown', async () => {
+  const f = lifecycleFixture({checks:[run('toolkit','failure')], repairs:exhaustedRepairs,events:finishedRepair.slice(0,1)});
+  let row = (await f.go()).items[0];
+  assert.equal(row.state,'checks-failed');
+  assert.notEqual(row.work.pickup,'finished');
+  f.github.rest.issues.listEventsForTimeline = async () => {throw Error('unavailable');};
+  row = (await f.go()).items[0];
+  assert.equal(row.work.pickup,'unknown');
+  assert.equal(row.work.repairs,2);
+  assert.notEqual(row.state,'repair-exhausted');
+});
+
+test('a failing existing suite PR is named as the recovery destination, including its own exhausted budget', async () => {
+  const f = lifecycleFixture({suite:true,suiteRepairs:exhaustedRepairs,events:finishedRepair});
+  let row = (await f.go()).items[0];
+  assert.equal(row.state,'repair-exhausted');
+  assert.equal(row.suite.pr,535);
+  assert.equal(row.work.repairs,0,'card repair ledger is not the suite ledger');
+  assert.equal(row.suite.work.repairs,2);
+  assert.match(row.recovery.next,/suite PR #535/);
+  f.suiteUnit.user.login = 'someone';
+  row = (await f.go()).items[0];
+  assert.equal(row.suite,undefined,'untrusted request cannot bind a dependency');
+  assert.equal(row.state,'awaiting-review');
+});
+
+test('canonical Oracle identity comes from the queue and never from descriptive PR titles', async () => {
+  const record = {name:'Surge Conductor',type_line:'Artifact Creature',oracle_text:'When an artifact enters, proliferate.',scryfall_uri:'https://scryfall.com/card/xx/1/surge-conductor'};
+  const body = '## Cards\n- Surge Conductor\n\n## Offline Oracle record (trusted feeder snapshot)\n\n    ' + JSON.stringify(record);
+  const f = lifecycleFixture({body});
+  let row = (await f.go()).items[0];
+  assert.equal(row.name,'Surge Conductor');
+  assert.equal(row.title,'Add Surge Conductor artifact-entry proliferation');
+  assert.equal(row.oracle.record.name,'Surge Conductor');
+  assert.equal(row.oracle.source,'trusted-queue-snapshot');
+  f.unit.user.login = 'stranger';
+  assert.equal((await f.go()).items[0].oracle,null);
+  f.unit.user.login = 'AARMOU';
+  f.unit.body = body.replace('"name":"Surge Conductor"','"name":"Different Card"');
+  assert.equal((await f.go()).items[0].oracle,null,'wrong-name snapshots never reach Control');
+  assert.equal(R.identityOf('## Cards\n- A\n- B\n').name,null,'ambiguous names never fall back to title');
+});
+
+test('feeder Oracle data requires an unedited trusted snapshot and failed provenance is unavailable', async () => {
+  const f = lifecycleFixture();
+  f.unit.user = {login:'github-actions[bot]',type:'Bot'};
+  f.unit.created_at = '2026-10-30T22:00:00Z';
+  const record = JSON.stringify({name:'Surge Conductor',type_line:'Artifact',oracle_text:'Proliferate.',scryfall_uri:'https://scryfall.com/card/xx/1'});
+  f.unit.body = '<!-- arcana-auto-queue-v1 -->\nsource: trusted-main-queue-feeder\n## Cards\n- Surge Conductor\n## Offline Oracle record\n    ' + record;
+  f.github.graphql = async () => ({repository:{issue:{createdAt:f.unit.created_at,lastEditedAt:null}}});
+  assert.equal((await f.go()).items[0].oracle.record.name,'Surge Conductor');
+  f.github.graphql = async () => ({repository:{issue:{createdAt:f.unit.created_at,lastEditedAt:'2026-10-31T00:00:00Z'}}});
+  assert.equal((await f.go()).items[0].oracle,null);
+});
+
+test('stall text points to the failing suite and changes once when its exact head changes', async () => {
+  const now = Date.parse('2026-10-31T02:00:00Z');
+  const row = (await lifecycleFixture({suite:true}).go()).items[0];
+  row.updatedAt = new Date(now - 26*36e5).toISOString();
+  const comments = [];
+  const github = {rest:{issues:{listComments(){},listForRepo(){},createComment:async ({body})=>comments.push({body,user:{login:'github-actions[bot]',type:'Bot'}})}},
+    paginate:async fn=>fn===github.rest.issues.listComments?comments:[]};
+  const go = () => R.reportStalls({github,owner:'AARMOU',repo:'arcana_table',payload:{items:[row]},now});
+  assert.equal(await go(),'posted 1');
+  assert.match(comments[0].body,/suite PR #535 \(checks-failed\)/);
+  assert.doesNotMatch(comments[0].body,/add the certification suite, or label/);
+  assert.equal(await go(),'unchanged');
+  row.suite.headSha='c'.repeat(40);
+  assert.equal(await go(),'posted 1');
+});
+
+test('green certified row reads no unit comments or timelines for optional work evidence', async () => {
+  const f=lifecycleFixture({checks:[run('toolkit','success'),certRun()]});
+  let comments=0,timelines=0;
+  f.github.rest.issues.listComments=async()=>{comments++;return {data:[]};};
+  f.github.rest.issues.listEventsForTimeline=async()=>{timelines++;return {data:[]};};
+  assert.equal((await f.go()).items[0].state,'certified');
+  assert.deepEqual([comments,timelines],[0,0]);
+});
+
+test('receipt lookup outage holds a closed integrated candidate instead of inventing an orphan', async () => {
+  const f=lifecycleFixture({state:'closed'});
+  f.github.rest.git={getRef:async()=>{throw Error('outage');}};
+  f.github.rest.issues.listComments=async()=>{throw Error('rate limit');};
+  const row=(await f.go()).items[0];
+  assert.equal(row.state,'held');
+  assert.match(row.recovery.reason,/Integration status unverified/);
+  assert.equal(row.readyForOwner,false);
+});
+
+test('zero-delivery diagnosis appears on #78 without PR rows, engine classification or extra unit loads', async () => {
+  let body;
+  const github={rest:{issues:{listForRepo(){},listComments(){},createComment:async a=>{body=a.body;}}},
+    paginate:async fn=>fn===github.rest.issues.listForRepo?[{number:458,title:'[Arcana Queue] Kenrith',labels:[{name:'arcana:needs-diagnosis'}]}]:[]};
+  await R.reportStalls({github,owner:'AARMOU',repo:'arcana_table',payload:{items:[]}});
+  assert.match(body,/zero-delivery: #458.*finished without a PR; unclassified/);
+  assert.match(body,/Owner:\*\* Work GPT \/ Goose \(engineering\)/);
+  assert.doesNotMatch(body,/engine#458|add the engine support/);
 });

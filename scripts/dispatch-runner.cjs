@@ -112,18 +112,39 @@ async function resolveInterrupted({ github, owner, repo, unit, runId, auto = fal
   return { issue: n, runs: open, observed, actor };
 }
 
-// A card unit whose Copilot session finished, that has no PR and on which Copilot commented, is a card
-// Copilot reported it cannot implement exactly (unitInstructions tells it to comment instead of opening a
-// PR). Label it arcana:engine-gap so it leaves the suite path and enters the GPT engine lane, which the #78
-// stall report times. Never spends; a ledger observation records why.
+// Zero delivery has several causes (Oracle/network/implementation/engine). Only
+// an explicit engineer-confirmed engine defect with linked evidence enters this
+// lane. Unknown outcomes stay unclassified, with their paid history preserved.
 const ENGINE_GAP_LABEL = 'arcana:engine-gap';
 const ENGINE_GAP_GRACE_MS = 30 * 60 * 1000;
+const DIAGNOSIS_LABEL = 'arcana:needs-diagnosis';
+function zeroDeliveryCandidates(units, now = Date.now()) {
+  return units.filter(u => String(u.raw.title).startsWith('[Arcana Queue]') && u.derived.state === 'review' && !u.prs.length && (() => {
+    const last = event => Math.max(-Infinity, ...(u.raw.sessions || []).filter(s => s.event === event).map(s => s.at));
+    return last('finished') > last('started') && now - last('finished') > ENGINE_GAP_GRACE_MS;
+  })());
+}
+async function labelDiagnosis({ github, owner, repo, units, now }) {
+  const confirmed = new Set(engineGapCandidates(units, now).map(u => u.raw.number));
+  const candidates = new Set(zeroDeliveryCandidates(units, now).filter(u => !u.raw.labels.includes(ENGINE_GAP_LABEL) && !confirmed.has(u.raw.number)).map(u => u.raw.number));
+  const changes = [];
+  for (const u of units) {
+    if (changes.length >= 5) break;
+    const labeled = u.raw.labels.includes(DIAGNOSIS_LABEL), needed = candidates.has(u.raw.number);
+    if (labeled === needed) continue;
+    if (needed) await github.rest.issues.addLabels({ owner, repo, issue_number: u.raw.number, labels: [DIAGNOSIS_LABEL] });
+    else await github.rest.issues.removeLabel({ owner, repo, issue_number: u.raw.number, name: DIAGNOSIS_LABEL });
+    changes.push(u.raw.number);
+  }
+  return changes;
+}
 function engineGapCandidates(units, now = Date.now()) {
   return units.filter(u => String(u.raw.title).startsWith('[Arcana Queue]') && u.derived.state === 'review' && !u.prs.length &&
-    !u.raw.labels.includes(ENGINE_GAP_LABEL) && (u.raw.commenters || []).some(c => isCopilot(c)) && (() => {
+    !u.raw.labels.includes(ENGINE_GAP_LABEL) && u.raw.engineGapEvidence && (() => {
       const at = s => Math.max(-Infinity, ...(u.raw.sessions || []).filter(x => x.event === s).map(x => x.at));
       const fin = at('finished');
-      return fin > at('started') && now - fin > ENGINE_GAP_GRACE_MS;
+      return fin > at('started') && now - fin > ENGINE_GAP_GRACE_MS &&
+        u.raw.engineGapEvidence.at >= at('started') && u.raw.engineGapEvidence.at <= now;
     })());
 }
 async function labelEngineGaps({ github, owner, repo, units, runId, now }) {
@@ -132,7 +153,8 @@ async function labelEngineGaps({ github, owner, repo, units, runId, now }) {
     try {
       await github.rest.issues.addLabels({ owner, repo, issue_number: u.raw.number, labels: [ENGINE_GAP_LABEL] });
       await github.rest.issues.createComment({ owner, repo, issue_number: u.raw.number, body: A.formatLedger({ op: 'observation',
-        issue: u.raw.number, run: runId, reason: 'labeled arcana:engine-gap: Copilot finished, commented, and opened no PR', at: new Date().toISOString() }) });
+        issue: u.raw.number, run: runId, reason: ('engine gap confirmed: ' + u.raw.engineGapEvidence.reason + ' ' + u.raw.engineGapEvidence.evidence)
+          .replace(/[@\r\n]/g, ' ').slice(0, 500), at: new Date().toISOString() }) });
       out.push(u.raw.number);
     } catch { /* retried on the next run */ }
   }
@@ -218,7 +240,10 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   const data = await loadUnits({ github, owner, repo, now, approvers, lagMs: ready.billingLagMs });
   const units = data.units.map(u => u.derived);
   report.units = units;
-  if (!dry) report.engineGaps = await labelEngineGaps({ github, owner, repo, units: data.units, runId: String(context.runId), now: Math.max(now, Date.now()) });
+  if (!dry) {
+    report.engineGaps = await labelEngineGaps({ github, owner, repo, units: data.units, runId: String(context.runId), now: Math.max(now, Date.now()) });
+    report.diagnosis = await labelDiagnosis({ github, owner, repo, units: data.units, now: Math.max(now, Date.now()) });
+  }
   const interrupted = data.units.filter(u => u.derived.blocksAll);
   if (interrupted.length) {
     const resolved = [];
@@ -346,4 +371,4 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   return done('attempted', { issue: n, result, ...(reason ? { reason } : {}) });
 }
 
-module.exports = { engineGapCandidates, labelEngineGaps, ENGINE_GAP_LABEL, runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, suiteInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };
+module.exports = { engineGapCandidates, labelEngineGaps, ENGINE_GAP_LABEL, zeroDeliveryCandidates, labelDiagnosis, DIAGNOSIS_LABEL, runDispatch, selectCandidate, verdictOf, skipReason, assignCopilot, unitInstructions, suiteInstructions, reportInterrupted, resolveInterrupted, revalidate, INTERRUPT_MARKER };

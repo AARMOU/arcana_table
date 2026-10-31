@@ -204,3 +204,24 @@ test('every workflow using the shared unit loader can read its completion-run ev
     assert.match(permissions, /^  actions: read(?: |$)/m, name);
   }
 });
+
+test('engine confirmation needs an authenticated engineer, a positive statement and exact source/run evidence', () => {
+  const {engineEvidenceOf} = require('./units.cjs');
+  const comment = {user:{login:'AARMOU',type:'User'},author_association:'OWNER',created_at:'2026-10-31T02:00:00Z',
+    body:'Engine gap confirmed: CardProjector exposes face-down exile to unauthorized viewers.\nEvidence: https://github.com/AARMOU/arcana_table/actions/runs/123'};
+  const get = c => engineEvidenceOf([c],'AARMOU','arcana_table');
+  assert.match(get(comment).reason,/CardProjector/);
+  assert.equal(get({...comment,user:{login:'Copilot',type:'Bot'}}),null);
+  assert.equal(get({...comment,author_association:'NONE'}),null);
+  assert.equal(get({...comment,body:'No PR: could not fetch Oracle text'}),null);
+  assert.equal(get({...comment,body:comment.body.replace('/AARMOU/arcana_table/','/other/repo/')}),null);
+  assert.equal(get({...comment,body:comment.body.replace('/actions/runs/123','/blob/main/Test.kt')}),null);
+});
+
+test('editing an old engineer confirmation does not move it into a new attempt', () => {
+  const {engineEvidenceOf}=require('./units.cjs');
+  const created='2026-10-30T00:00:00Z';
+  const e=engineEvidenceOf([{user:{login:'AARMOU',type:'User'},author_association:'OWNER',created_at:created,updated_at:'2026-10-31T04:00:00Z',
+    body:'Engine gap confirmed: A confirmed missing engine primitive.\nEvidence: https://github.com/AARMOU/arcana_table/actions/runs/123'}],'AARMOU','arcana_table');
+  assert.equal(e.at,Date.parse(created));
+});
