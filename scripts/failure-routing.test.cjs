@@ -328,3 +328,87 @@ test('router: a late untrusted comment withholds the repair before any ledger wr
   assert.equal((await routeFailure(missing.args)).state,'withheld-at-trigger','no recheck means no spend');
   assert.equal(missing.records.length,0);
 });
+
+// ---- Independent certification failures go to the card PR ----
+{
+  const F = require('./failure-routing.cjs');
+  const SUITE_SHA = 'c'.repeat(40), CARD_A = 'd'.repeat(40), CARD_B = 'e'.repeat(40);
+  function certFixture({ suiteComments, cardComments = [], cardHead = CARD_A, jobName, attempt = 1, authorize, rerunOk = true } = {}) {
+    const posted = [], created = [], records = [], reruns = [];
+    const suite = { number: 611, draft: true, state: 'open', body: 'Unit: #610', head: { ref: 'copilot/suite', sha: SUITE_SHA, repo: { id: 1 } } };
+    const card = { number: 609, draft: true, state: 'open', body: 'Unit: #595', user: { login: 'Copilot' }, head: { ref: 'copilot/card', sha: cardHead, repo: { id: 1 } } };
+    const run = { id: 77, workflow_id: 9, name: F.CERT, conclusion: 'failure', event: 'pull_request', run_attempt: attempt,
+      head_branch: 'copilot/suite', head_sha: SUITE_SHA, head_repository: { id: 1 } };
+    const comments = { 611: suiteComments ?? [
+      { body: F.MARKER + '\nrun-id:70', user: { login: 'AARMOU' }, author_association: 'OWNER', created_at: '2026-10-31T11:34:00Z' },
+      { body: 'Inspected: card is missing its ETB tokens', user: { login: 'Copilot' }, created_at: '2026-10-31T11:35:00Z' }], 609: cardComments };
+    const github = {
+      rest: {
+        pulls: { list: 'prs', get: async ({ pull_number }) => ({ data: pull_number === 609 ? card : suite }) },
+        issues: { listComments: 'comments', createComment: async x => { created.push(x); } },
+        actions: { listJobsForWorkflowRun: 'jobs' },
+      },
+      paginate: async (name, args) => name === 'comments' ? comments[args.issue_number] : name === 'prs' ? [suite, card]
+        : [{ id: 5, conclusion: 'failure', name: jobName ?? 'Execute trusted independent card scenarios (thunderhawk-gunship, 609, 595, Add Thunderhawk Gunship)',
+          steps: [{ name: 'Run suite', conclusion: 'failure' }] }],
+    };
+    const delivery = { preflight: async () => ({ ok: true }), post: async x => { posted.push(x); return { ok: true, id: 1 }; } };
+    authorize ??= async ({ pr }) => ({ allowed: true, attempt: 1, unit: pr.number === 609 ? 595 : 610, record: async () => records.push(pr.number), recheck: async () => null });
+    const rerun = async id => { reruns.push(id); return rerunOk ? { ok: true, via: 'owner-token' } : { ok: false, reason: 'x' }; };
+    const context = { repo: { owner: 'AARMOU', repo: 'arcana_table' }, payload: { repository: { id: 1 }, workflow_run: run } };
+    return { posted, created, records, reruns, args: { github, context, delivery, authorize, rerun } };
+  }
+  const escalation = head => ({ body: `${F.ESCALATED}\ncert-fingerprint:run-77:card-${head}`, user: { login: 'AARMOU' }, author_association: 'OWNER' });
+
+  test('after the suite had its own repair, a red certification run requests a bounded repair on the CARD PR', async () => {
+    const x = certFixture();
+    const r = await F.routeFailure(x.args);
+    assert.equal(r.state, 'repair-requested');
+    assert.equal(r.pr, 609);
+    assert.deepEqual(x.records, [609], 'the card unit is charged, not the suite unit');
+    assert.equal(x.posted[0].issue_number, 609);
+    assert.match(x.posted[0].body, /cert-fingerprint:run-77:card-d{40}/);
+    assert.match(x.posted[0].body, /do NOT edit, weaken or skip the suite/);
+    assert.equal(x.posted[0].body.match(/@/g).length, 1, 'exactly one mention');
+  });
+  test('a suite failure without an answered suite repair still goes to the suite first', async () => {
+    const x = certFixture({ suiteComments: [] });
+    const r = await F.routeFailure(x.args);
+    assert.notEqual(r.pr, 609);
+  });
+  test('the same card head is never escalated twice', async () => {
+    const x = certFixture({ cardComments: [escalation(CARD_A)] });
+    assert.equal((await F.routeFailure(x.args)).state, 'cert-already-escalated');
+    assert.equal(x.posted.length + x.records.length, 0);
+  });
+  test('a changed card head re-runs certification once, then waits', async () => {
+    const x = certFixture({ cardComments: [escalation(CARD_A)], cardHead: CARD_B });
+    assert.equal((await F.routeFailure(x.args)).state, 'cert-rerun-requested');
+    assert.deepEqual(x.reruns, [77]);
+    assert.match(x.created[0].body, new RegExp(`run:77 card-head:${CARD_B} attempt:1`));
+    const again = certFixture({ cardComments: [escalation(CARD_A)], cardHead: CARD_B,
+      suiteComments: [{ body: F.MARKER, user: { login: 'AARMOU' }, author_association: 'OWNER', created_at: '2026-10-31T11:34:00Z' },
+        { body: 'answer', user: { login: 'Copilot' }, created_at: '2026-10-31T11:35:00Z' },
+        { body: `${F.RERUN}\n\nrun:77 card-head:${CARD_B} attempt:1`, user: { login: 'github-actions[bot]', type: 'Bot' } }] });
+    assert.equal((await F.routeFailure(again.args)).state, 'cert-rerun-pending');
+    assert.equal(again.reruns.length, 0);
+  });
+  test('a re-run that failed again on the new head requests the next bounded repair', async () => {
+    const x = certFixture({ cardComments: [escalation(CARD_A)], cardHead: CARD_B, attempt: 2,
+      suiteComments: [{ body: F.MARKER, user: { login: 'AARMOU' }, author_association: 'OWNER', created_at: '2026-10-31T11:34:00Z' },
+        { body: 'answer', user: { login: 'Copilot' }, created_at: '2026-10-31T11:35:00Z' },
+        { body: `${F.RERUN}\n\nrun:77 card-head:${CARD_B} attempt:1`, user: { login: 'github-actions[bot]', type: 'Bot' } }] });
+    const r = await F.routeFailure(x.args);
+    assert.equal(r.state, 'repair-requested');
+    assert.match(x.posted[0].body, new RegExp(`card-${CARD_B}`));
+  });
+  test('admission, attribution and unit checks fail closed without spending', async () => {
+    const denied = certFixture({ authorize: async () => ({ allowed: false, reason: 'capacity: 3 of 3 active' }) });
+    const r = await F.routeFailure(denied.args);
+    assert.equal(r.state, 'cert-escalation-withheld'); assert.match(r.reason, /^capacity:/);
+    assert.equal((await F.routeFailure(certFixture({ jobName: 'something else' }).args)).state, 'cert-unattributed');
+    const wrong = certFixture({ authorize: async () => ({ allowed: true, attempt: 1, unit: 999, record: async () => { throw Error('must not record'); }, recheck: async () => null }) });
+    assert.equal((await F.routeFailure(wrong.args)).state, 'cert-unit-mismatch');
+    for (const d of [denied, wrong]) assert.equal(d.posted.length, 0);
+  });
+}

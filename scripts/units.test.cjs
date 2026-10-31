@@ -201,7 +201,7 @@ test('every workflow using the shared unit loader can read its completion-run ev
   for (const name of ['arcana-card-dispatcher', 'arcana-ci-failure-router', 'arcana-worker-status-observer']) {
     const yml = fs.readFileSync(`.github/workflows/${name}.yml`, 'utf8');
     const permissions = yml.match(/^permissions:\n((?:[ \t]+.*\n)+)/m)?.[1] || '';
-    assert.match(permissions, /^  actions: read(?: |$)/m, name);
+    assert.match(permissions, /^  actions: (?:read|write)(?: |$)/m, name);  // write includes read (router re-runs certification)
   }
 });
 
