@@ -73,6 +73,22 @@ function connectedPrs(events) {
   return [...linked];
 }
 
+// Closed Copilot PRs in this repository that explicitly answer item n ("Unit: #n", or exactly one closing
+// reference), from the item's cross-reference events. Newest first.
+function answeringPrs(events, n, repository) {
+  const out = [];
+  for (const e of events || []) {
+    const pr = e.event === 'cross-referenced' ? e.source?.issue : null;
+    if (!pr?.pull_request || !isCopilot(pr.user) || pr.state !== 'closed' || out.includes(pr.number)) continue;
+    if (pr.repository?.full_name && pr.repository.full_name !== repository) continue;
+    const body = String(pr.body || '');
+    const explicit = body.match(/^Unit:\s*#(\d+)\s*$/m);
+    const refs = [...new Set([...body.matchAll(/\b(?:fix(?:e[sd])?|close[sd]?|resolve[sd]?)\s+#(\d+)\b/gi)].map(m => Number(m[1])))];
+    if (explicit ? Number(explicit[1]) === n : refs.length === 1 && refs[0] === n) out.push(pr.number);
+  }
+  return out.reverse();
+}
+
 // Only repository-authored suite requests are retained after closure. Do not use a time
 // cutoff: a PR can emit a late session start/finish without updating its closed issue.
 const isCardWork = i => !i.pull_request && isBot(i) &&
@@ -178,6 +194,13 @@ async function loadUnits({ github, owner, repo, now = Date.now(), approvers, lag
     const linked = prsByUnit.get(issue.number) || [];
     const sessions = sessionsOf(events.get(issue.number));
     let completion = null;
+    // A card-work review PR is merged by Review Auto-merge and then drops out of the open-PR list, taking its
+    // session events with it: the item looked "assigned, never started" and held a builder slot for the full
+    // 6 h auto-release (2026-10-31: #589, #596 blocked 9 eligible builds). Recover the session record from the
+    // Copilot PR that explicitly answers this item. Sessions only: a closed PR never claims the unit.
+    if (isCardWork(issue) && !linked.length && (issue.assignees || []).some(isCopilot))
+      for (const pr of answeringPrs(events.get(issue.number), issue.number, owner + '/' + repo).slice(0, 3))
+        sessions.push(...sessionsOf(await timeline(github, owner, repo, pr)));
     for (const pr of linked) {
       sessions.push(...sessionsOf(await timeline(github, owner, repo, pr.number)));
       if (isSuiteRequest(issue) && pr.merged === true && !ambiguous.has(issue.number)) {
@@ -208,4 +231,4 @@ async function loadUnits({ github, owner, repo, now = Date.now(), approvers, lag
   return { units, prsByUnit, numbers };
 }
 
-module.exports = { unitOf, loadUnits, isCopilot, contentWrittenAt, approvalOf, commentersOf, sessionsOf, engineEvidenceOf, claimedAtOf, isCardWork };
+module.exports = { answeringPrs, unitOf, loadUnits, isCopilot, contentWrittenAt, approvalOf, commentersOf, sessionsOf, engineEvidenceOf, claimedAtOf, isCardWork };

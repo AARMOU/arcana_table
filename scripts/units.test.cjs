@@ -225,3 +225,22 @@ test('editing an old engineer confirmation does not move it into a new attempt',
     body:'Engine gap confirmed: A confirmed missing engine primitive.\nEvidence: https://github.com/AARMOU/arcana_table/actions/runs/123'}],'AARMOU','arcana_table');
   assert.equal(e.at,Date.parse(created));
 });
+
+test('answeringPrs recovers only closed Copilot PRs that explicitly answer the item', () => {
+  const { answeringPrs } = require('./units.cjs');
+  const xref = (number, body, extra = {}) => ({ event: 'cross-referenced', source: { issue: { number, body, state: 'closed',
+    pull_request: {}, user: { login: 'Copilot' }, repository: { full_name: 'o/r' }, ...extra } } });
+  const events = [
+    xref(10, 'Unit: #5'),
+    xref(11, 'Fixes #5'),
+    xref(12, 'Fixes #5 and closes #6'),                    // ambiguous
+    xref(13, 'Unit: #6\nFixes #5'),                         // explicit Unit wins
+    xref(14, 'Unit: #5', { user: { login: 'someone' } }),   // not Copilot
+    xref(15, 'Unit: #5', { state: 'open' }),                // open PRs are linked the normal way
+    xref(16, 'Unit: #5', { pull_request: undefined }),      // an issue, not a PR
+    xref(17, 'Unit: #5', { repository: { full_name: 'x/y' } }),
+    { event: 'labeled' },
+  ];
+  assert.deepEqual(answeringPrs(events, 5, 'o/r'), [11, 10]);
+  assert.deepEqual(answeringPrs([], 5, 'o/r'), []);
+});
