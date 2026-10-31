@@ -1157,13 +1157,19 @@
    ]
   },
   "Effects.AddDynamicCounters": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Death's Presence",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DeathsPresence.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DeathsPresenceScenarioTest.kt"
+    },
+    {
+     "card": "Whiptongue Hydra",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WhiptongueHydra.kt",
+     "lines": 49,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WhiptongueHydraScenarioTest.kt"
     },
     {
      "card": "Power Depot",
@@ -1730,7 +1736,7 @@
    ]
   },
   "Effects.DestroyAll": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -1761,6 +1767,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DismantlingWave.kt",
      "lines": 44,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DismantlingWaveScenarioTest.kt"
+    },
+    {
+     "card": "Whiptongue Hydra",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WhiptongueHydra.kt",
+     "lines": 49,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WhiptongueHydraScenarioTest.kt"
     }
    ]
   },
@@ -2405,7 +2417,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -2983,7 +2995,7 @@
    ]
   },
   "Keyword.FLYING": {
-   "count": 26,
+   "count": 27,
    "examples": [
     {
      "card": "Venomthrope",
@@ -3211,7 +3223,7 @@
    ]
   },
   "Keyword.REACH": {
-   "count": 7,
+   "count": 8,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -3238,16 +3250,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/CuriousAltisaurScenarioTest.kt"
     },
     {
+     "card": "Whiptongue Hydra",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/WhiptongueHydra.kt",
+     "lines": 49,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/WhiptongueHydraScenarioTest.kt"
+    },
+    {
      "card": "Barret, Avalanche Leader",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/BarretAvalancheLeader.kt",
      "lines": 56,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/BarretAvalancheLeaderScenarioTest.kt"
-    },
-    {
-     "card": "Zacama, Primal Calamity",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ZacamaPrimalCalamity.kt",
-     "lines": 57,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ZacamaPrimalCalamityScenarioTest.kt"
     }
    ]
   },
@@ -3887,7 +3899,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 40,
+   "count": 41,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -4294,7 +4306,7 @@
    ]
   },
   "keywords()": {
-   "count": 78,
+   "count": 79,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4539,7 +4551,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -4938,7 +4950,7 @@
    ]
   },
   "CounterType.PLUS_ONE_PLUS_ONE": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Bone Sabres",
@@ -6044,7 +6056,7 @@
    ]
   },
   "EffectTarget.Self": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -6347,7 +6359,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 95,
+   "count": 96,
    "examples": [
     {
      "card": "Their Name Is Death",
