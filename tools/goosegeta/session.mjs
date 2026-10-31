@@ -103,5 +103,5 @@ export function publicStatus(session) {
   if (!session) return { status: 'idle', model: 'off' };
   return { sessionId: session.id, seat: session.seat, deckId: session.deckId, status: session.status,
     actionsSubmitted: session.actions, actionsAccepted: session.receipts, reason: session.reason, observedTransitions: session.transitions, lastTurn: session.lastTurn,
-    awaitingHost: !!session.awaiting, reservedTokens: session.reservedTokens, chatMode: session.chatMode ?? 'muted', banter: session.model ? 'model' : 'canned', model: session.model ? 'opted in' : 'off' };
+    awaitingHost: !!session.awaiting, reservedTokens: session.reservedTokens, chatMode: session.chatMode ?? 'muted', banter: session.lastChatSource ?? (session.model ? 'model-ready' : 'canned'), model: session.model ? 'opted in' : 'off' };
 }
