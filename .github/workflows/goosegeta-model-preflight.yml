@@ -1,0 +1,24 @@
+name: Goosegeta paid-model fixture preflight (no API, no APK)
+on:
+  push:
+    branches: [gpt/goosegeta-paid-model-preflight-20261031]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  model-fixtures-only:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check model syntax and strict local tests, no network or paid provider
+        run: |
+          node --check tools/goosegeta/model.mjs
+          node --check tools/goosegeta/banter.mjs
+          node --check tools/goosegeta/paid-model-preflight.test.mjs
+          node --test tools/goosegeta/session.test.mjs tools/goosegeta/paid-model-preflight.test.mjs
