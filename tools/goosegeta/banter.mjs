@@ -1,11 +1,15 @@
 /** Sideband only: never returns an engine action or obeys chat as instructions. */
 export function chatSettings(mode) { return ['muted','basic','ruthless'].includes(mode) ? mode : 'muted'; }
 export function chatTrigger(g, packet, now) {
+  // Consume every canonical delivery ID even while muted, busy or rate-limited.
+  // A replay must not become a new prompt when the cooldown or mute ends.
+  if (packet.type === 'arcanaChat') {
+    if (!Number.isSafeInteger(packet.id) || packet.id <= (g.lastChatId ?? 0) || !Number.isInteger(packet.seat) || packet.seat < 0 || packet.seat > 3) return null;
+    g.lastChatId = packet.id;
+  }
   if (!g.accepted || g.chatMode === 'muted' || ['stopped','error'].includes(g.status) || g.expires <= now ||
       g.chatPending || (g.chatCount ?? 0) >= 30 || now - (g.lastChatMs ?? 0) < 15000) return null;
   if (packet.type === 'arcanaChat') {
-    if (!Number.isSafeInteger(packet.id) || packet.id <= (g.lastChatId ?? 0) || !Number.isInteger(packet.seat) || packet.seat < 0 || packet.seat > 3) return null;
-    g.lastChatId = packet.id; // echoes/replays consumed even when we refuse to reply
     if (packet.seat === g.seat || packet.seat !== 0 || packet.isBot === true || typeof packet.text !== 'string' ||
         !packet.text.trim() || packet.text.length > 500 || packet.text.includes('\0')) return null;
     return {kind:'reply',text:packet.text}; // host-only until per-player multiplayer consent exists
