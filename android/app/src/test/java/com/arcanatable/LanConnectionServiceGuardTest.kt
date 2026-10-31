@@ -29,6 +29,56 @@ class LanConnectionServiceGuardTest {
         )
     }
 
+    @Test fun wifiHostLobbyStartsConnectionGuardBeforeGameStarts() {
+        assertTrue(shouldKeepMultiplayerConnectionGuard(
+            legacyHost = false, legacyClient = false, cloudClient = false,
+            multiTransport = true, argentumEnabled = false,
+        ))
+    }
+
+    @Test fun directedCloudHostLobbyStartsConnectionGuardBeforeGameStarts() {
+        // Cloud host lives in wifiServer (ArgentumHostLink), not legacy cloudRoomClient.
+        assertTrue(shouldKeepMultiplayerConnectionGuard(
+            legacyHost = false, legacyClient = false, cloudClient = false,
+            multiTransport = true, argentumEnabled = false,
+        ))
+    }
+
+    @Test fun activeArgentumGameStillStartsConnectionGuard() {
+        assertTrue(shouldKeepMultiplayerConnectionGuard(
+            legacyHost = false, legacyClient = false, cloudClient = false,
+            multiTransport = false, argentumEnabled = true,
+        ))
+    }
+
+    @Test fun legacyMultiplayerConnectionsStillStartGuard() {
+        for (host in 0..2) {
+            assertTrue(shouldKeepMultiplayerConnectionGuard(
+                legacyHost = host == 0, legacyClient = host == 1,
+                cloudClient = host == 2, multiTransport = false, argentumEnabled = false,
+            ))
+        }
+    }
+
+    @Test fun idleTableWithoutAnyRoomStopsConnectionGuard() {
+        assertFalse(shouldKeepMultiplayerConnectionGuard(
+            legacyHost = false, legacyClient = false, cloudClient = false,
+            multiTransport = false, argentumEnabled = false,
+        ))
+    }
+
+    @Test fun actualWifiHostStateIsObservableAndIncludedInServiceLifecycle() {
+        val controller = File("src/main/java/com/arcanatable/TableController.kt").readText()
+        assertTrue(
+            "wifiServer must be Compose-observable or the foreground service misses lobby joins",
+            controller.contains("var wifiServer by run { mutableStateOf<ArgentumHostLink?>(null) }")
+        )
+        assertTrue(
+            "Live host must count as active even before Argentum is enabled",
+            effects.contains("multiTransport = wifiServer != null")
+        )
+    }
+
     @Test fun guardStopsOnlyAfterLastGameEndsOrScreenActuallyDisposes() {
         val activeGuard = effects.substringAfter(
             "LaunchedEffect(keepGameConnectionActive)"
