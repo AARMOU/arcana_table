@@ -681,8 +681,20 @@ export class GameRoom extends DurableObject<Env> {
           g.fallback = {epoch,version:packet.stateVersion,interactionEpoch:String(packet.interactionEpoch),
             action:selected.action,started:Date.now()};
           await this.save();
-          const result = await this.env.GOOSE_BUDGET!.get(this.env.GOOSE_BUDGET!.idFromName('account-daily')).fetch('https://budget/decide',
-            {method:'POST',body:JSON.stringify({body,reserve,options})});
+          // Bound the entire round trip, including a provider that ignores
+          // AbortSignal. A slow OpenAI request must not block a Magic turn.
+          let timeoutId: ReturnType<typeof setTimeout> | undefined;
+          const deadline = new Promise<Response>((_,reject)=>{
+            timeoutId = setTimeout(()=>reject(Error('model-deadline')),10000);
+          });
+          let result: Response;
+          try {
+            result = await Promise.race([
+              this.env.GOOSE_BUDGET!.get(this.env.GOOSE_BUDGET!.idFromName('account-daily')).fetch('https://budget/decide',
+                {method:'POST',body:JSON.stringify({body,reserve,options})}),
+              deadline
+            ]);
+          } finally { if(timeoutId !== undefined) clearTimeout(timeoutId); }
           if (!result.ok) throw Error('model-paused');
           const answer = await result.json() as {candidateId:string};
           selected = options.find(o => o.id === answer.candidateId)!;
