@@ -194,6 +194,7 @@ test('workerd: an unsupported game gets only one host-authoritative resync after
   assert.equal(before.status,'needs attention');
   assert.equal(before.reason,'unsupported-decision-or-action:actions-ActivateAbility');
   await mf.unsafeEvictDurableObject('rooms','GameRoom',{name:'GPROBE',webSockets:'hibernate'});
+  await control('GPROBE'); // wake the hibernated DO so its one-shot startup probe runs
   const probe=await outgoing(h,'requestResync');
   assert.equal(probe.type,'requestResync','probe must ask the real host, not fabricate an action');
   await game(h,unsupported(91),3);
