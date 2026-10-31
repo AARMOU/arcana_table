@@ -152,11 +152,28 @@ jobs:
         working-directory: android
         run: |
           set -euo pipefail
-          ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
+          # Print the *actual missing path or assertion* from JUnit on failure, without
+          # weakening the mandatory UI test or building an APK on a red result.
+          if ! ./gradlew --no-daemon --max-workers=2 :app:testDebugUnitTest \
             --tests 'com.arcanatable.LanConnectionServiceGuardTest' \
             --tests 'com.arcanatable.ui.ArgentumResilienceUiTest.unsupportedDecisionMalformedDataBackgroundPauseAndResume' \
             -Parcana.robolectricJarDir="$RUNNER_TEMP/arcana-robolectric" \
-            -Parcana.debugApplicationIdSuffix=.goosegetahandoff
+            -Parcana.debugApplicationIdSuffix=.goosegetahandoff; then
+            echo '--- EXACT JUnit failure details ---'
+            python3 - <<'PYJUNIT'
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          for p in sorted(Path('app/build/test-results/testDebugUnitTest').glob('TEST-*.xml')):
+              root = ET.parse(p).getroot()
+              for testcase in root.iter('testcase'):
+                  for failure in list(testcase.findall('failure'))+list(testcase.findall('error')):
+                      print('TEST:', p.name, testcase.attrib.get('name'), 'MESSAGE:', failure.attrib.get('message'))
+                      print((failure.text or '')[-9000:])
+          PYJUNIT
+            echo '--- available runner-local Robolectric JARs ---'
+            ls -lh "$RUNNER_TEMP/arcana-robolectric" || true
+            exit 1
+          fi
           ./gradlew --no-daemon --max-workers=2 :app:assembleDebug \
             -Parcana.debugApplicationIdSuffix=.goosegetahandoff \
             '-Parcana.debugLabel=Goosegeta Handoff Test'
