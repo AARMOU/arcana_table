@@ -4,6 +4,7 @@ import com.arcanatable.customcards.cards.PhyrexianTriniform
 import com.arcanatable.customcards.support.*
 import com.wingedsheep.engine.core.ActivateAbility
 import com.wingedsheep.engine.state.components.combat.AttackingComponent
+import com.wingedsheep.engine.state.components.combat.MustAttackPlayerThisTurnComponent
 import com.wingedsheep.engine.state.components.identity.CardComponent
 import com.wingedsheep.engine.state.components.identity.TokenComponent
 import com.wingedsheep.sdk.core.Color
@@ -77,14 +78,15 @@ class PhyrexianTriniformScenarioTest {
         val tokens = d.permanentsNamed(p, "Phyrexian Triniform")
             .filter { d.state.getEntity(it)?.has<TokenComponent>() == true }
         assertEquals(opponents.size, tokens.size)
+        assertTrue(tokens.all { d.projected.hasKeyword(it, com.wingedsheep.sdk.core.Keyword.HASTE) })
+        val attackers = tokens.associateWith { token ->
+            d.state.getEntity(token)!!.get<MustAttackPlayerThisTurnComponent>()!!.defenderIds.single()
+        }
+        assertEquals(opponents, attackers.values.toSet())
+        d.passPriorityUntil(Step.DECLARE_ATTACKERS, p)
+        assertNull(d.declareAttackers(p, attackers).error)
         val defenders = tokens.map { token ->
-            val attacker = d.state.getEntity(token)?.get<AttackingComponent>()
-            assertNotNull("Each encore copy should enter attacking", attacker)
-            assertTrue(
-                "Each encore copy should have haste",
-                d.projected.hasKeyword(token, com.wingedsheep.sdk.core.Keyword.HASTE),
-            )
-            attacker!!.defenderId
+            d.state.getEntity(token)!!.get<AttackingComponent>()!!.defenderId
         }.toSet()
         assertEquals(opponents, defenders)
 
@@ -99,14 +101,10 @@ class PhyrexianTriniformScenarioTest {
     fun encoreRequiresGraveyardTwelveManaAndSorceryTiming() {
         val d = customScenario(PhyrexianTriniform)
         val p = d.player1
-        val permanent = d.putCreatureOnBattlefield(p, "Phyrexian Triniform")
-        d.giveColorlessMana(p, 12)
-
+        val card = d.putCardInGraveyard(p, "Phyrexian Triniform")
         fun encoreActions() = d.legalActions(p).mapNotNull { it.action as? ActivateAbility }
-            .filter { it.sourceId == permanent }
+            .filter { it.sourceId == card }
 
-        assertTrue("Encore is unavailable from the battlefield", encoreActions().isEmpty())
-        d.moveToGraveyard(permanent)
         d.giveColorlessMana(p, 11)
         assertTrue("Encore requires all twelve mana", encoreActions().isEmpty())
         d.giveColorlessMana(p, 1)
@@ -114,5 +112,16 @@ class PhyrexianTriniformScenarioTest {
 
         d.passPriorityUntil(Step.END, p)
         assertTrue("Encore is only available at sorcery timing", encoreActions().isEmpty())
+    }
+
+    @Test
+    fun encoreIsUnavailableFromTheBattlefield() {
+        val d = customScenario(PhyrexianTriniform)
+        val p = d.player1
+        val permanent = d.putCreatureOnBattlefield(p, "Phyrexian Triniform")
+        d.giveColorlessMana(p, 12)
+
+        assertTrue(d.legalActions(p).mapNotNull { it.action as? ActivateAbility }
+            .none { it.sourceId == permanent })
     }
 }
