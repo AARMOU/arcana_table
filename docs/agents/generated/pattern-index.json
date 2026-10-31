@@ -2272,8 +2272,14 @@
    ]
   },
   "Effects.MayPay": {
-   "count": 1,
+   "count": 2,
    "examples": [
+    {
+     "card": "Hormagaunt Horde",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HormagauntHorde.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HormagauntHordeScenarioTest.kt"
+    },
     {
      "card": "Savai Thundermane",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SavaiThundermane.kt",
@@ -2347,7 +2353,7 @@
    ]
   },
   "Effects.Move": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -2366,6 +2372,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ContinueQuestion.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ContinueQuestionScenarioTest.kt"
+    },
+    {
+     "card": "Hormagaunt Horde",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HormagauntHorde.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HormagauntHordeScenarioTest.kt"
     },
     {
      "card": "Nurgle's Rot",
@@ -3520,7 +3532,7 @@
  },
  "Triggers": {
   "Triggers.a": {
-   "count": 16,
+   "count": 17,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -4335,7 +4347,7 @@
    ]
   },
   "ravenous()": {
-   "count": 4,
+   "count": 5,
    "examples": [
     {
      "card": "Zoanthrope",
@@ -4354,6 +4366,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TyrantGuard.kt",
      "lines": 37,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TyrantGuardScenarioTest.kt"
+    },
+    {
+     "card": "Hormagaunt Horde",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HormagauntHorde.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HormagauntHordeScenarioTest.kt"
     },
     {
      "card": "Tervigon",
@@ -4539,7 +4557,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6044,7 +6062,7 @@
    ]
   },
   "EffectTarget.Self": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Compy Swarm",
@@ -6432,7 +6450,7 @@
    ]
   },
   "GameObjectFilter.Land": {
-   "count": 15,
+   "count": 16,
    "examples": [
     {
      "card": "Defile",
@@ -6459,16 +6477,16 @@
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/EndlessAtlasScenarioTest.kt"
     },
     {
+     "card": "Hormagaunt Horde",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/HormagauntHorde.kt",
+     "lines": 38,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/HormagauntHordeScenarioTest.kt"
+    },
+    {
      "card": "Rampaging Brontodon",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/RampagingBrontodon.kt",
      "lines": 38,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/RampagingBrontodonScenarioTest.kt"
-    },
-    {
-     "card": "Sword of Feast and Famine",
-     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SwordOfFeastAndFamine.kt",
-     "lines": 41,
-     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SwordOfFeastAndFamineScenarioTest.kt"
     }
    ]
   },
