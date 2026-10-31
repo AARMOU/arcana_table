@@ -1,0 +1,27 @@
+name: Goosegeta one-shot canary security CI (NO API)
+on:
+  push:
+    branches: [gpt/goosegeta-one-shot-canary-20261031]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify-no-network:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Prove branch identity, model fixture and durable one-shot gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm --prefix android/cloud-room ci --ignore-scripts --no-audit --no-fund
+          npm --prefix android/cloud-room run typecheck
+          node --test tools/goosegeta/paid-model-preflight.test.mjs tools/goosegeta/session.test.mjs
+          node --test android/cloud-room/scripts/goosegeta.one-shot.test.mjs
+          node --test android/cloud-room/scripts/goosegeta.local.test.mjs
