@@ -64,6 +64,8 @@ jobs:
           restore-keys: gh-etag-v1-
       - name: List owner-selected cards (trusted main code)
         uses: actions/github-script@v7
+        env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
         with:
           script: |
             try { require('./ctl/scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
@@ -98,6 +100,8 @@ jobs:
           fi
       - name: Pick unqueued Copilot-ready cards (trusted main code)
         uses: actions/github-script@v7
+        env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
         with:
           script: |
             try { require('./ctl/scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
@@ -150,6 +154,8 @@ jobs:
       - id: pick
         name: Assemble suggestions (trusted main code)
         uses: actions/github-script@v7
+        env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
         with:
           script: |
             try { require('./ctl/scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
@@ -208,6 +214,7 @@ jobs:
           restore-keys: gh-etag-v1-
       - uses: actions/github-script@v7
         env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
           ARCANA_INTEGRATION_BASE: ${{ vars.ARCANA_INTEGRATION_BASE }}
           ARCANA_AUTOMATION_READY: ${{ vars.ARCANA_AUTOMATION_READY }}
           ARCANA_DISPATCH_MODE: ${{ vars.ARCANA_DISPATCH_MODE }}

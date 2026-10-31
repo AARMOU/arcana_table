@@ -41,7 +41,7 @@ test('second run sends the stored ETag and serves the cached body on 304', async
   assert.equal(r2.status, 200);
   assert.deepEqual(r2.data, [{ id: 1 }]);
   assert.equal(r2.headers.link, '<next>; rel="next"'); // pagination keeps working from cache
-  assert.deepEqual(c2.stats, { hits: 1, misses: 0, uncached: 0 });
+  assert.deepEqual(c2.stats, { hits: 1, misses: 0, uncached: 0, fallback: 0, readToken: false });
 });
 
 test('changed data (200) replaces the entry; writes and other errors pass through untouched', async () => {
@@ -65,7 +65,7 @@ test('changed data (200) replaces the entry; writes and other errors pass throug
   await g.request({ method: 'POST', url: '/repos/x/issues/{n}/comments', n: 1, headers: {} });
   assert.deepEqual(writes, [null]);
   await assert.rejects(g.request({ method: 'GET', url: '/repos/x/missing/{n}', n: 1, headers: {} }), e => e.status === 404);
-  assert.deepEqual(c.stats, { hits: 2, misses: 2, uncached: 1 });
+  assert.deepEqual(c.stats, { hits: 2, misses: 2, uncached: 1, fallback: 0, readToken: false });
 });
 
 test('a 304 without a cached body is never fabricated; corrupt cache files are ignored', async () => {
@@ -89,4 +89,37 @@ test('install is idempotent and the store is pruned by age', async () => {
   await g.request({ method: 'GET', url: '/r/{n}', n: 2, headers: {} });
   c.save();
   assert.deepEqual(Object.values(load(file)).map(e => e.data), [2]);
+});
+
+test('with a read token, GETs go through the reader (own ETag scope); writes keep the job token', async () => {
+  const file = tmp();
+  const jobCalls = [], readCalls = [];
+  const g = fakeGithub(o => { jobCalls.push(o.method); return { status: 201, headers: {}, data: {} }; });
+  const reader = { request: async o => { readCalls.push(o.headers?.['if-none-match'] || null);
+    if (o.headers?.['if-none-match'] === '"r"') throw notModified();
+    return { status: 200, url: 'u', headers: { etag: '"r"' }, data: { via: 'reader' } }; } };
+  const c = install(g, { file, saveOnExit: false, reader });
+  const get = () => g.request({ method: 'GET', url: '/repos/x/issues/{n}', n: 3, headers: {} });
+  assert.deepEqual((await get()).data, { via: 'reader' });
+  assert.deepEqual((await get()).data, { via: 'reader' });
+  await g.request({ method: 'POST', url: '/repos/x/issues/{n}/comments', n: 3, headers: {} });
+  assert.deepEqual(readCalls, [null, '"r"']);
+  assert.deepEqual(jobCalls, ['POST']);
+  assert.equal(c.stats.readToken, true);
+  c.save();
+  assert.ok(Object.keys(load(file)).every(k => k.startsWith('read|')));
+});
+
+test('a read-token refusal falls back to the job token instead of failing the workflow', async () => {
+  const jobCalls = [];
+  const g = fakeGithub(o => { jobCalls.push(o.url); return { status: 200, url: 'u', headers: {}, data: { via: 'job' } }; });
+  const reader = { request: async () => { throw Object.assign(new Error('Resource not accessible'), { status: 403 }); } };
+  const c = install(g, { file: tmp(), saveOnExit: false, reader });
+  const r = await g.request({ method: 'GET', url: '/repos/x/commits/{n}/check-runs', n: 'abc', headers: {} });
+  assert.deepEqual(r.data, { via: 'job' });
+  assert.equal(c.stats.fallback, 1);
+  const boom = { request: async () => { throw Object.assign(new Error('server'), { status: 500 }); } };
+  const g2 = fakeGithub(() => ({ status: 200, headers: {}, data: {} }));
+  install(g2, { file: tmp(), saveOnExit: false, reader: boom });
+  await assert.rejects(g2.request({ method: 'GET', url: '/r/{n}', n: 1, headers: {} }), e => e.status === 500);
 });

@@ -76,6 +76,7 @@ jobs:
       - uses: actions/github-script@v7
         id: plan
         env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
           RETRY_BLOCKED: ${{ inputs.retry_blocked == true }}
         with:
           script: |
@@ -145,6 +146,7 @@ jobs:
       - name: Atomically consume the one automatic retry before any candidate execution
         uses: actions/github-script@v7
         env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
           PLAN_B64: ${{ needs.plan.outputs.plan }}
         with:
           script: |
@@ -226,6 +228,7 @@ jobs:
       - name: Verify real artifact/report contract without a write token
         uses: actions/github-script@v7
         env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
           PLAN_B64: ${{ needs.plan.outputs.plan }}
         with:
           script: |
@@ -301,6 +304,7 @@ jobs:
       - name: Recheck live approval/base/policy, integrate only passed files, publish receipt
         uses: actions/github-script@v7
         env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
           PLAN_B64: ${{ needs.plan.outputs.plan }}
         with:
           script: |

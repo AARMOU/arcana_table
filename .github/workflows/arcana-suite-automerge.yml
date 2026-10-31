@@ -38,6 +38,7 @@ jobs:
       - id: merge
         uses: actions/github-script@v7
         env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
           # The workflow token cannot mark a draft ready for review; a person-scoped token can.
           MERGE_TOKEN: ${{ secrets.ARCANA_SUITE_MERGE_TOKEN || secrets.COPILOT_DISPATCH_TOKEN }}
         with:
@@ -59,6 +60,8 @@ jobs:
           persist-credentials: false
       - if: steps.merge.outputs.merged == 'true'
         uses: actions/github-script@v7
+        env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
         with:
           script: |
             try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }

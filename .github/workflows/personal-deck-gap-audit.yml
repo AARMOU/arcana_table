@@ -60,6 +60,8 @@ jobs:
           restore-keys: gh-etag-v1-
       - name: Refresh machine section of issue 321 (no labels or paid dispatch)
         uses: actions/github-script@v7
+        env:
+          ARCANA_READ_TOKEN: ${{ github.event_name != 'pull_request' && secrets.ARCANA_READ_TOKEN || '' }}
         with:
           script: |
             try { require('./code/scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
