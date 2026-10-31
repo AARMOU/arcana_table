@@ -4,6 +4,7 @@ export interface BudgetEnv {
   GOOSEGETA_OPENAI_ENABLED?: string;
   OPENAI_API_KEY?: string;
   GOOSEGETA_DAILY_TOKENS?: string;
+  GOOSEGETA_CANARY_ONE_SHOT?: string;
 }
 /** One account-wide ledger, shared by every room. Internal DO binding only. */
 export class GooseBudget extends DurableObject<BudgetEnv> {
@@ -18,11 +19,15 @@ export class GooseBudget extends DurableObject<BudgetEnv> {
     if (!Number.isSafeInteger(cap) || cap < 1 || cap > 1000000 || !Number.isSafeInteger(input.reserve) || input.reserve < 1)
       return Response.json({error:'budget-config'}, {status:503});
     const day = new Date().toISOString().slice(0,10);
+    const oneShot = this.env.GOOSEGETA_CANARY_ONE_SHOT === 'true';
     const allowed = await this.ctx.storage.transaction(async tx => {
+      // Persistent across UTC days and durable-object reconstruction: at most one paid provider attempt.
+      if (oneShot && await tx.get<boolean>('goosegeta-ever-used-canary-v1')) return false;
       const ledger = await tx.get<{day:string;tokens:number;failed:boolean}>('ledger');
       const tokens = ledger?.day === day ? ledger.tokens : 0;
       if ((ledger?.day === day && ledger.failed) || tokens + input.reserve > cap) return false;
       await tx.put('ledger', {day, tokens:tokens+input.reserve, failed:false});
+      if (oneShot) await tx.put('goosegeta-ever-used-canary-v1', true);
       return true;
     });
     if (!allowed) return Response.json({error:'daily-limit-or-circuit'}, {status:429});
