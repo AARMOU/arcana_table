@@ -13,7 +13,10 @@ const SUITE_MARKER = '<!-- arcana-suite-request-v1 -->';
 const SUITE_BASE = 'main';
 const HALTED_LABEL = 'wu:halted';
 const RESOLVE_LABEL = 'wu:resolve-interrupted';
-const HARD_MAX_UNITS = 2;
+// Owner ceiling for concurrent Copilot units (ARCANA_MAX_ACTIVE_UNITS, 1..3). Effective capacity scales
+// below it with budget headroom (scaledCapacity); demand fills it, because a slot is only taken when an
+// eligible build or repair exists.
+const HARD_MAX_UNITS = 3;
 const CEILING = { assign: 1, repair: 2 };
 const PICKUP_TIMEOUT_MS = 30 * 60 * 1000;
 // A Copilot session that started but never reported finishing for this long is reported as stale.
@@ -320,6 +323,24 @@ function budgetWithReservations({ snapshot, active, pendingRepairs, recentFinish
       reportedCredits: Number.isFinite(snapshot.reportedUsed) ? snapshot.reportedUsed : null, allowance: snapshot.allowance } };
 }
 
+// Dynamic capacity (owner 2026-10-30: "scale between 1-3 workers depending on load").
+// normal -> the owner ceiling; warn -> at most 2; slow -> 1; paused/unknown -> 0 (budget denies).
+const SCALE_BY_LEVEL = { normal: Infinity, warn: 2, slow: 1 };
+function scaledCapacity(ceiling, level) {
+  if (!Number.isSafeInteger(ceiling) || ceiling < 1) return 0;
+  return Math.min(ceiling, SCALE_BY_LEVEL[level] ?? 0);
+}
+// With 2+ slots neither lane may take every slot: builds and repairs each get at most capacity-1,
+// so a red card PR can always be repaired while new cards are building, and the reverse.
+function laneDenial({ op, holders, capacity }) {
+  if (capacity < 2) return null;
+  if (holders.some(u => u.lane !== 'build' && u.lane !== 'repair')) return 'capacity: existing active unit has unknown lane';
+  const lane = op === 'assign' ? 'build' : 'repair';
+  const occupied = holders.filter(u => u.lane === lane);
+  return occupied.length >= capacity - 1
+    ? `capacity: ${op === 'assign' ? 'builder' : 'repair'} slot occupied by ${occupied.map(u => '#' + u.number).join(', ')}` : null;
+}
+
 // op: 'assign' | 'repair'. units: deriveUnit() results for every known unit.
 function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = Date.now() }) {
   const deny = reason => ({ allowed: false, reason });
@@ -351,30 +372,24 @@ function admit({ op, unit, units = [], labeledCount = 0, ready, snapshot, now = 
     const who = holders.map(u => `#${u.number} ${u.state}${u.reason ? ':' + u.reason : ''}`).join(', ');
     return deny(`capacity: ${active} of ${ready.maxUnits} active${who ? ' (' + who + ')' : ''}`);
   }
-  // Determine lane capacity, but still evaluate budget below. This preserves
-  // budget diagnostics and fail-closed spending thresholds even for a busy lane.
-  // The total active-worker cap above continues to reject immediately.
-  let laneDenied = null;
-  if (ready.maxUnits === 2) {
-    if (holders.some(u => u.lane !== 'build' && u.lane !== 'repair'))
-      laneDenied = 'capacity: existing active unit has unknown lane';
-    else {
-      const occupied = holders.filter(u => u.lane === (op === 'assign' ? 'build' : 'repair'));
-      if (occupied.length)
-        laneDenied = `capacity: ${op === 'assign' ? 'builder' : 'repair'} slot occupied by ${occupied.map(u => '#'+u.number).join(', ')}`;
-    }
-  }
+  // Lane capacity at the owner ceiling is decided before budget so budget diagnostics stay complete;
+  // the total-ceiling check above still rejects immediately.
+  const laneDenied = laneDenial({ op, holders, capacity: ready.maxUnits });
   const pendingRepairs = units.filter(u => u.state === 'repairing').length;
   const recentFinished = units.filter(u => u.recentlyFinished && !u.holdsSlot).length;
   const budget = budgetWithReservations({ snapshot, active, pendingRepairs, recentFinished, candidate: op, ready, now });
   if (!budget.maxNewAssignments) return { ...deny('budget: ' + budget.level + (budget.reason ? ' (' + budget.reason + ')' : '')), budget };
   if (budget.level === 'slow' && active > 0) return { ...deny('budget: slow allows one operation at a time'), budget };
   if (laneDenied) return { ...deny(laneDenied), budget };
+  const capacity = scaledCapacity(ready.maxUnits, budget.level);
+  if (active >= capacity) return { ...deny(`capacity: scaled to ${capacity} of ${ready.maxUnits} for budget ${budget.level}`), budget, capacity };
+  const scaledLane = capacity < ready.maxUnits ? laneDenial({ op, holders, capacity }) : null;
+  if (scaledLane) return { ...deny(scaledLane), budget, capacity };
   return dryRun ? { allowed: false, dryRun: true, wouldAllow: true, reason: 'dry-run', budget }
-    : { allowed: true, reason: 'admitted', budget };
+    : { allowed: true, reason: 'admitted', budget, capacity };
 }
 
 module.exports = { LEDGER, AUTO_QUEUE_MARKER, SUITE_TITLE, SUITE_MARKER, SUITE_BASE, suiteActionable, ONE_SHOT_LABEL, HALTED_LABEL, RESOLVE_LABEL, HARD_MAX_UNITS, CEILING, PICKUP_TIMEOUT_MS,
   SESSION_STALE_MS, AUTO_RELEASE_MS, INTERRUPT_AUTO_RESOLVE_MS, DEFAULT_BILLING_LAG_HOURS,
-  readiness, formatLedger, parseLedger, deriveUnit, unitActionable, budgetWithReservations, admit, isBot,
+  readiness, formatLedger, parseLedger, deriveUnit, unitActionable, budgetWithReservations, admit, isBot, scaledCapacity, laneDenial,
   provenance, trustedCommenter, TRUSTED_ASSOCIATIONS };
