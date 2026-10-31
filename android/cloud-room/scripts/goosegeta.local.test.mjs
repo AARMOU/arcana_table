@@ -207,4 +207,45 @@ test('workerd: host offered attacker and blocker declarations reach Android with
   await control('GCOMBAT',{action:'dismiss',sessionId:status.sessionId});
   await outgoing(h,'arcanaBye');
 });
+
+test('workerd: owner recovers a stalled SelectCardsDecision via host resync and receives typed legal choice',async()=>{
+  const h=await setup('GSELECT',['friend']);
+  const {status}=await summon('GSELECT',h);
+  await outgoing(h,'lanHello');
+  await game(h,{type:'lanSeat',strictDeck:true},1);
+  await outgoing(h,'lanReady');
+  const blocked={...update(501,[]),pendingDecision:{
+    type:'SelectCardsDecision',id:'pick-old',playerId:'offline-ai',
+    options:['hidden-card'],minSelections:2,maxSelections:2
+  }};
+  await game(h,blocked,2);
+  let stuck;
+  for(let i=0;i<30;i++) {
+    stuck=await (await control('GSELECT')).json();
+    if(stuck.status==='needs attention')break;
+    await new Promise(resolve=>setTimeout(resolve,5));
+  }
+  assert.equal(stuck.reason,'unsupported-decision-or-action:decision-SelectCardsDecision');
+  assert.equal((await control('GSELECT',{action:'recover',sessionId:'wrong'})).status,409);
+  const resume=await control('GSELECT',{action:'recover',sessionId:status.sessionId});
+  assert.equal(resume.status,200);
+  const request=await outgoing(h,'requestResync');
+  assert.equal(request.type,'requestResync');
+  const renewed={...update(502,[]),pendingDecision:{
+    type:'SelectCardsDecision',id:'pick-current',playerId:'offline-ai',
+    options:['host-a','host-b'],minSelections:1,maxSelections:1
+  }};
+  await game(h,renewed,3);
+  const played=await outgoing(h,'submitAction');
+  assert.deepEqual(played.action,{type:'SubmitDecision',playerId:'offline-ai',
+    response:{type:'CardsSelectedResponse',decisionId:'pick-current',selectedCards:['host-a']}});
+  assert.equal(played.interactionEpoch,'offline-502');
+  const updated=await (await control('GSELECT')).json();
+  assert.equal(updated.status,'playing');
+  assert.equal(updated.model,'off');
+  assert.equal((await control('GSELECT',{action:'recover',sessionId:status.sessionId})).status,409);
+  await control('GSELECT',{action:'dismiss',sessionId:status.sessionId});
+  await outgoing(h,'arcanaBye');
+});
+
 test.after(async()=>{for(const s of sockets)try{s.close();}catch{}await mf.dispose();});
