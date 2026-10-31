@@ -1,4 +1,5 @@
 'use strict';
+const { calibrateReady } = require('./credit-calibration.cjs');
 const A = require('./admission.cjs');
 const { loadUnits, unitOf } = require('./units.cjs');
 const { createCopilotDelivery } = require('./copilot-delivery.cjs');
@@ -69,8 +70,9 @@ function createAuthorizer({ github, owner, repo, env, readBudget, now = Date.now
     const untrusted = await untrustedConversation({ github, owner, repo, pr });
     if (untrusted) return { allowed: false, reason: untrusted };
     const { snapshot } = await readBudget(env);
+    const cal = await calibrateReady({ github, owner, repo, env, ready, snapshot });
     // Evaluate after the billing read: a fresh measurement must not look like it came from the future.
-    const d = A.admit({ op: 'repair', unit: unit.derived, units: data.units.map(u => u.derived), ready, snapshot, now: Math.max(now, Date.now()) });
+    const d = A.admit({ op: 'repair', unit: unit.derived, units: data.units.map(u => u.derived), ready: cal.ready, snapshot, now: Math.max(now, Date.now()) });
     if (!d.allowed) return { allowed: false, reason: d.reason };
     return { allowed: true, reason: d.reason, attempt: unit.derived.repairs + 1, unit: n,
       // Re-run right before the ledger write and the Copilot trigger: text added after admission counts.

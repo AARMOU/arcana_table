@@ -5,6 +5,7 @@
 const A = require('./admission.cjs');
 const { loadUnits, isCopilot, contentWrittenAt, approvalOf, commentersOf } = require('./units.cjs');
 const F = require('./feasibility.cjs');
+const { calibrateReady } = require('./credit-calibration.cjs');
 
 // A certification-suite request (certification/suite-requests.cjs): test-only work on main.
 const isSuite = u => String(u?.raw?.title || '').startsWith(A.SUITE_TITLE);
@@ -363,9 +364,12 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
   const billing = await readBudget(env);
   report.billing = billing;
   const { snapshot } = billing;
+  // Measured credits per session (owner: auto-calibrate). Only the source is reported: figures are private.
+  const cal = await calibrateReady({ github, owner, repo, env, ready, snapshot });
+  report.estimateSource = cal.source;
   const decision = A.admit({ op: 'assign', unit: { ...candidate.derived, labeled: labeled.includes(candidate),
     actionable },
-    units, labeledCount: labeled.length, ready, snapshot, now: Math.max(now, Date.now()) });
+    units, labeledCount: labeled.length, ready: cal.ready, snapshot, now: Math.max(now, Date.now()) });
   report.decision = { issue: n, ...decision };
   // Job summaries of a public repository are public: no usage ratio or credit totals.
   await core.summary.addHeading('Admission decision').addCodeBlock(JSON.stringify({ issue: n, allowed: !!decision.allowed,

@@ -177,8 +177,14 @@ function publicDecision(d) {
 }
 // Estimated reservations are configuration x unit counts; the fixed reserve, totals, reported credits
 // and allowance would reveal private usage, so they are dropped.
-function publicLiabilities(l) {
+function publicLiabilities(l, estimateSource = null) {
   if (!l) return null;
+  // A calibrated estimate is derived from private usage: estimate x public session counts would reveal it.
+  if (estimateSource === 'calibrated') {
+    const p = 'private (calibrated from usage)';
+    return { activeUnits: p, pendingRepairs: p, recentlyFinished: p, candidate: p, fixedReserve: 'private (10% of allowance)',
+      estimate: 'calibrated' };
+  }
   return { activeUnits: l.activeUnits, pendingRepairs: l.pendingRepairs, recentlyFinished: l.recentlyFinished, candidate: l.candidate,
     fixedReserve: 'private (10% of allowance)' };
 }
@@ -210,7 +216,7 @@ function dispatcherPayload({ result, report = {}, ready, now = new Date(), runId
       errors: ready.errors, billingLagHours: ready.billingLagMs !== undefined ? ready.billingLagMs / 3600000 : null } : null,
     state, reason, action: ciAction(state, result, report) || dispatcherAction(state, reason), issue: result?.issue || null, result: result?.result || null,
     dispatchReady, workers: report.units ? summarizeUnits(report.units) : null,
-    decision: publicDecision(report.decision), liabilities: publicLiabilities(report.decision?.budget?.liabilities),
+    decision: publicDecision(report.decision), liabilities: publicLiabilities(report.decision?.budget?.liabilities, report.estimateSource),
     base: report.base || null, ciRuns: report.ciRuns || null,
     feasibility: report.feasibility || null, candidateFeasibility: report.candidateFeasibility || null,
   };
