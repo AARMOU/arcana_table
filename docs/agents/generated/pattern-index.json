@@ -1955,7 +1955,7 @@
    ]
   },
   "Effects.DrawCards": {
-   "count": 33,
+   "count": 34,
    "examples": [
     {
      "card": "Ugin's Insight",
@@ -4262,7 +4262,7 @@
    ]
   },
   "Triggers.self.enters": {
-   "count": 45,
+   "count": 46,
    "examples": [
     {
      "card": "Sister Hospitaller",
@@ -4925,7 +4925,7 @@
    ]
   },
   "staticAbility { }": {
-   "count": 58,
+   "count": 59,
    "examples": [
     {
      "card": "Hexmark Destroyer",
@@ -4966,7 +4966,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 143,
+   "count": 144,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6286,6 +6286,17 @@
     }
    ]
   },
+  "LoseAllAbilities": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Kenrith's Transformation",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KenrithsTransformation.kt",
+     "lines": 49,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KenrithsTransformationScenarioTest.kt"
+    }
+   ]
+  },
   "ModifySpellCost": {
    "count": 5,
    "examples": [
@@ -6381,6 +6392,28 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PurphorosGodOfTheForge.kt",
      "lines": 57,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PurphorosGodOfTheForgeScenarioTest.kt"
+    }
+   ]
+  },
+  "SetBasePowerToughnessStatic": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Kenrith's Transformation",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KenrithsTransformation.kt",
+     "lines": 49,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KenrithsTransformationScenarioTest.kt"
+    }
+   ]
+  },
+  "TransformPermanent": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Kenrith's Transformation",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KenrithsTransformation.kt",
+     "lines": 49,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KenrithsTransformationScenarioTest.kt"
     }
    ]
   }
@@ -7519,7 +7552,7 @@
    ]
   },
   "TargetFilter.Creature": {
-   "count": 17,
+   "count": 18,
    "examples": [
     {
      "card": "Defile",
