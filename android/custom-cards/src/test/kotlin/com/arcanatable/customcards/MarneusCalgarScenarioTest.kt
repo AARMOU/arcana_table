@@ -39,11 +39,15 @@ class MarneusCalgarScenarioTest {
         val player = d.player1
         val opponent = d.player2
         d.putCreatureOnBattlefield(player, "Marneus Calgar")
-        d.putCreatureOnBattlefield(player, "Grizzly Bears")
-        val handSize = d.zoneNames(player, Zone.HAND).size
+        val bear = d.putCardInHand(player, "Grizzly Bears")
+        val handSizeBeforeCast = d.zoneNames(player, Zone.HAND).size
+        d.giveMana(player, Color.GREEN)
+        d.giveColorlessMana(player, 1)
+        assertNull(d.castSpell(player, bear).error)
 
         d.resolveAll()
-        assertEquals(handSize, d.zoneNames(player, Zone.HAND).size)
+        assertEquals(handSizeBeforeCast - 1, d.zoneNames(player, Zone.HAND).size)
+        val handSize = d.zoneNames(player, Zone.HAND).size
 
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, opponent)
         val cavalry = d.putCardInHand(opponent, "Call the Cavalry")
@@ -75,8 +79,9 @@ class MarneusCalgarScenarioTest {
         tokens.forEach { token ->
             val characteristics = d.state.getEntity(token)!!.get<CardComponent>()!!
             assertEquals(setOf(Color.WHITE), characteristics.colors)
-            assertTrue(characteristics.typeLine.hasSubtype("Astartes"))
-            assertTrue(characteristics.typeLine.hasSubtype("Warrior"))
+            val subtypes = characteristics.typeLine.subtypes.map { it.value }.toSet()
+            assertTrue("Astartes" in subtypes)
+            assertTrue("Warrior" in subtypes)
             assertEquals(2, characteristics.baseStats?.basePower)
             assertEquals(2, characteristics.baseStats?.baseToughness)
             assertTrue(d.projected.hasKeyword(token, Keyword.VIGILANCE))
