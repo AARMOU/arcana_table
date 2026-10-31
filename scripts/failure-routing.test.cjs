@@ -284,7 +284,7 @@ test('router workflow revisits failures after dispatcher success and keeps share
   assert.match(yaml,/cron: '8,23,38,53 \* \* \* \*'/);
   assert.match(yaml,/group: arcana-copilot-control\n  cancel-in-progress: false/);
   assert.match(yaml,/runRouter\(\{github,context,env:process.env,readBudget,delivery\}\)/);
-  const blocks=[...yaml.matchAll(/          script: \|\n([\s\S]*?)(?=\n[^ ]|$)/g)];
+  const blocks=[...yaml.matchAll(/          script: \|\n([\s\S]*?)(?=\n {0,11}\S|$)/g)];
   assert.equal(blocks.length,1);
   const AsyncFunction=Object.getPrototypeOf(async function(){}).constructor;
   new AsyncFunction('github','context','core','require',blocks[0][1].replace(/^            /gm,''));

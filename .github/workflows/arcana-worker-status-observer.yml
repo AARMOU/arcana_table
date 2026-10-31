@@ -32,9 +32,22 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - name: Publish observed workers (NO assignment)
         uses: actions/github-script@v7
         with:
           script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const { refreshWorkerStatus } = require('./scripts/worker-status.cjs');
             await refreshWorkerStatus({ github, context, core });
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}

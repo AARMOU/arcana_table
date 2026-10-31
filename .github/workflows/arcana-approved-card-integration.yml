@@ -67,12 +67,19 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
           persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - uses: actions/github-script@v7
         id: plan
         env:
           RETRY_BLOCKED: ${{ inputs.retry_blocked == true }}
         with:
           script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             // Runs on every Review Inbox Refresh completion. When that run's review job was skipped (a
             // certification that published nothing), nothing integration reads has changed: skip the
             // ~150-call plan scan. One call; the inbox's own 15-minute schedule always rebuilds.
@@ -107,6 +114,12 @@ jobs:
           path: integration-plan/plan.json
           retention-days: 14
           if-no-files-found: error
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
 
   retry-reservation:
     needs: plan
@@ -123,15 +136,28 @@ jobs:
         with:
           ref: ${{ needs.plan.outputs.control }}
           persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - name: Atomically consume the one automatic retry before any candidate execution
         uses: actions/github-script@v7
         env:
           PLAN_B64: ${{ needs.plan.outputs.plan }}
         with:
           script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const P = require('./scripts/card-integration.cjs');
             const plan = JSON.parse(Buffer.from(process.env.PLAN_B64,'base64').toString());
             await P.reserveRetry({github,...context.repo,cfg:P.config(),plan,runAttempt:Number(process.env.GITHUB_RUN_ATTEMPT)});
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
 
   destination-tests:
     needs: [plan, retry-reservation]
@@ -191,12 +217,19 @@ jobs:
         with:
           name: card-integration-result
           path: result
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - name: Verify real artifact/report contract without a write token
         uses: actions/github-script@v7
         env:
           PLAN_B64: ${{ needs.plan.outputs.plan }}
         with:
           script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const fs=require('node:fs'), P=require('./scripts/card-integration.cjs');
             const plan=JSON.parse(Buffer.from(process.env.PLAN_B64,'base64').toString());
             const report=JSON.parse(fs.readFileSync('result/report.json','utf8'));
@@ -206,6 +239,12 @@ jobs:
             core.summary.addHeading('PR #'+plan.pr+' destination result: '+report.status)
               .addList([...blocked,...(report.failures||[]).slice(0,8)])
               .addRaw('NO APK. A blocked card is not integrated.').write();
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
 
   publish:
     needs: [plan, destination-tests, receipt-contract]
@@ -253,12 +292,19 @@ jobs:
           else:
               Path('expected-sources.json').write_text('{}')
           PY
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - name: Recheck live approval/base/policy, integrate only passed files, publish receipt
         uses: actions/github-script@v7
         env:
           PLAN_B64: ${{ needs.plan.outputs.plan }}
         with:
           script: |
+            try { require('./trusted/scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const fs = require('node:fs');
             const P = require('./trusted/scripts/card-integration.cjs');
             const plan = JSON.parse(Buffer.from(process.env.PLAN_B64,'base64').toString());
@@ -273,3 +319,9 @@ jobs:
             const payload = await R.buildReviewInbox({github,...context.repo});
             const status = await S.publishStatus({github,...context.repo,kind:'review',payload,summary:R.inboxSummary(payload)});
             if (status.startsWith('failed')) core.setFailed(status);
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}

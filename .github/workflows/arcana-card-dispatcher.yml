@@ -50,10 +50,17 @@ jobs:
           ref: ${{ github.workflow_sha }}
           path: ctl
           persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - name: List card names in open queue issues (trusted main code)
         uses: actions/github-script@v7
         with:
           script: |
+            try { require('./ctl/scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const {collectNames}=require('./ctl/scripts/feasibility.cjs');
             const issues=await github.paginate(github.rest.issues.listForRepo,{...context.repo,state:'open',per_page:100});
             const names=collectNames(issues);
@@ -83,6 +90,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
+            try { require('./ctl/scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const fs=require('fs');const {buildVerdicts}=require('./ctl/scripts/feasibility.cjs');
             let v=null;
             try{v=buildVerdicts({baseSha:fs.readFileSync('base-sha.txt','utf8').trim(),classified:JSON.parse(fs.readFileSync('classified.json','utf8'))});}catch(e){core.warning('Cardkit output unreadable: '+e.message);}
@@ -90,6 +98,12 @@ jobs:
             core.setOutput('verdicts',JSON.stringify(v));
             const summary=Object.values(v.cards).map(c=>c.name+': '+c.readiness+(c.route?' / '+c.route:'')).join('\n');
             await core.summary.addHeading('Cardkit feasibility @ '+v.baseSha.slice(0,7)).addCodeBlock(summary||'(no queue cards)').write();
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
   dispatch:
     needs: feasibility
     # Runs even if the feasibility job failed: the gate then fails closed with a stated reason.
@@ -108,6 +122,12 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
+      - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
+        uses: actions/cache/restore@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
+          restore-keys: gh-etag-v1-
       - uses: actions/github-script@v7
         env:
           ARCANA_AUTOMATION_READY: ${{ vars.ARCANA_AUTOMATION_READY }}
@@ -131,5 +151,12 @@ jobs:
           ARCANA_FEASIBILITY: ${{ needs.feasibility.outputs.verdicts }}
         with:
           script: |
+            try { require('./scripts/gh-etag-cache.cjs').install(github, { core }); } catch (e) { core.info('GitHub API ETag cache unavailable: ' + e.message); }
             const {dispatcher}=require('./scripts/control-workflows.cjs');
             await dispatcher({github,context,core,env:process.env});
+      - name: Save GitHub API ETag cache
+        if: always() && hashFiles('.gh-etag-cache/cache.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: .gh-etag-cache
+          key: gh-etag-v1-${{ github.run_id }}-${{ github.run_attempt }}-${{ github.job }}
