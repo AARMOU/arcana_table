@@ -307,7 +307,7 @@
  },
  "Costs": {
   "Costs.Composite": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Tendo Ice Bridge",
@@ -513,13 +513,19 @@
    ]
   },
   "Costs.SacrificeAnother": {
-   "count": 2,
+   "count": 3,
    "examples": [
     {
      "card": "Chronomancer",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/Chronomancer.kt",
      "lines": 36,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ChronomancerScenarioTest.kt"
+    },
+    {
+     "card": "Illuminor Szeras",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IlluminorSzeras.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/IlluminorSzerasScenarioTest.kt"
     },
     {
      "card": "Commissar Severina Raine",
@@ -582,7 +588,7 @@
    ]
   },
   "Costs.Tap": {
-   "count": 38,
+   "count": 39,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -876,6 +882,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/PlagueDrone.kt",
      "lines": 35,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/PlagueDroneScenarioTest.kt"
+    }
+   ]
+  },
+  "DynamicAmounts.sacrificedManaValue": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Illuminor Szeras",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IlluminorSzeras.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/IlluminorSzerasScenarioTest.kt"
     }
    ]
   },
@@ -1185,13 +1202,19 @@
    ]
   },
   "Effects.AddMana": {
-   "count": 5,
+   "count": 6,
    "examples": [
     {
      "card": "Desert of the Glorified",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/DesertOfTheGlorified.kt",
      "lines": 20,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/DesertOfTheGlorifiedScenarioTest.kt"
+    },
+    {
+     "card": "Illuminor Szeras",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/IlluminorSzeras.kt",
+     "lines": 36,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/IlluminorSzerasScenarioTest.kt"
     },
     {
      "card": "Sunken Ruins",
@@ -4131,7 +4154,7 @@
  },
  "block": {
   "activatedAbility { }": {
-   "count": 54,
+   "count": 55,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4705,7 +4728,7 @@
    ]
   },
   "manaAbility": {
-   "count": 25,
+   "count": 26,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -4828,7 +4851,7 @@
    ]
   },
   "timing": {
-   "count": 30,
+   "count": 31,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -5341,7 +5364,7 @@
    ]
   },
   "TimingRule.ManaAbility": {
-   "count": 27,
+   "count": 28,
    "examples": [
     {
      "card": "Desert of the Glorified",
@@ -6347,7 +6370,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 95,
+   "count": 96,
    "examples": [
     {
      "card": "Their Name Is Death",
