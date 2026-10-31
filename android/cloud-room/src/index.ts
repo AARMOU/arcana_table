@@ -664,8 +664,15 @@ export class GameRoom extends DurableObject<Env> {
           selected = options.find(o => o.id === answer.candidateId)!;
           if (!selected) throw Error('model-output');
         } catch {
-          if (this.room?.goose === g && !g.detached) { delete g.inFlight; g.model = false; g.failures++; g.reason = 'model-paused-or-budget-limit'; g.status = 'needs attention'; await this.save(); }
-          return;
+          // A spent one-shot allowance or provider error must not deadlock a valid host game.
+          // Disable paid inference permanently for this session and use the already offered
+          // deterministic legal candidate; never retry the paid provider or invent an action.
+          if (this.room?.goose !== g || g.detached || g.epoch !== epoch ||
+              g.status !== 'playing' || g.expires <= Date.now() || !this.room.seats[0].online) return;
+          delete g.inFlight;
+          g.model = false;
+          g.reason = 'model-paused-free-fallback';
+          await this.save();
         }
       }
       // Dismiss, newer state, host departure or expiry during an async model call invalidates result.
