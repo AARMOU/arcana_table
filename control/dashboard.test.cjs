@@ -84,7 +84,18 @@ test('compact tracker is near the top, uses transparent goose over current dot, 
 });
 test('self-contained dashboard exists',()=>{assert.ok(html.startsWith('<!doctype html>'));assert.ok(html.includes('<title>Arcana Control'));assert.ok(script);
   // Only approved same-origin review and owner authorization modules may load; the inline dashboard script stays read-only.
-  assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"','<script src="./authorize.js"']);});
+  assert.deepEqual(html.match(/<script\s+src="[^"]*"/g),['<script src="./review.js"','<script src="./authorize.js"','<script src="./team-checkin.js"']);});
+test('all-hands check-in is a separate owner-authenticated module, not a dashboard dispatch',()=>{
+  assert.match(html,/id="allHandsCheckIn"/);
+  assert.match(html,/id="allHandsStatus"/);
+  assert.match(html,/id="allHandsAgents"/);
+  assert.match(html,/id="allHandsIssue"/);
+  const src=fs.readFileSync(path.join(__dirname,'team-checkin.js'),'utf8');
+  assert.match(src,/\/v1\/team-checkin/);
+  assert.match(src,/arcana-review-session-v1/);
+  assert.match(src,/method, cache: 'no-store'/);
+  assert.ok(!/workflow_dispatch|arcana:authorize-once|\/v1\/authorize/.test(src));
+});
 test('owner authorization has a visible queue panel and guarded client module',()=>{assert.match(html,/id="authorizationList"/);assert.match(html,/authorize\.js/);assert.ok(html.includes('I agree. Do it'));});
 test('inline JavaScript parses',()=>{assert.doesNotThrow(()=>new vm.Script(script));});
 test('all mobile navigation targets exist',()=>{for(const id of ['overview','work','safety']){assert.match(html,new RegExp('id="'+id+'"'));assert.match(html,new RegExp('data-view="'+id+'"'));}});
