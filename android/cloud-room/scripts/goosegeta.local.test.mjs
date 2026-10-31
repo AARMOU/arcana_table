@@ -173,4 +173,38 @@ test('workerd: unsolicited turn honk survives a failed GPT chat reply without mu
   assert.equal(state.status,'playing');
   await control('GCHAT3',{action:'dismiss',sessionId:status.sessionId});await outgoing(h,'arcanaBye');
 });
+test('workerd: host offered attacker and blocker declarations reach Android without model or fabricated targets',async()=>{
+  const h=await setup('GCOMBAT',['friend']);
+  const {status}=await summon('GCOMBAT',h);
+  await outgoing(h,'lanHello');
+  await game(h,{type:'lanSeat',strictDeck:true},1);
+  await outgoing(h,'lanReady');
+  await game(h,update(201,[{
+    action:{type:'DeclareAttackers',playerId:'offline-ai',attackers:{}},
+    validAttackers:['a1','a2'],
+    mandatoryAttackers:['a1'],
+    attackTargetsByAttacker:{a1:['opponent'],a2:['opponent']}
+  }]),2);
+  const attacking=await outgoing(h,'submitAction');
+  assert.equal(attacking.interactionEpoch,'offline-201');
+  assert.deepEqual(attacking.action,{
+    type:'DeclareAttackers',playerId:'offline-ai',
+    attackers:{a1:'opponent',a2:'opponent'}
+  });
+  await game(h,{type:'actionReceipt',accepted:true,interactionEpoch:'offline-201'},3);
+  await game(h,update(202,[{
+    action:{type:'DeclareBlockers',playerId:'offline-ai',blockers:{}},
+    mandatoryBlockerAssignments:{}
+  }]),4);
+  const blocking=await outgoing(h,'submitAction');
+  assert.deepEqual(blocking.action,{
+    type:'DeclareBlockers',playerId:'offline-ai',blockers:{}
+  });
+  const stateNow=await (await control('GCOMBAT')).json();
+  assert.equal(stateNow.actionsSubmitted,2);
+  assert.equal(stateNow.actionsAccepted,1);
+  assert.equal(stateNow.model,'off');
+  await control('GCOMBAT',{action:'dismiss',sessionId:status.sessionId});
+  await outgoing(h,'arcanaBye');
+});
 test.after(async()=>{for(const s of sockets)try{s.close();}catch{}await mf.dispose();});
