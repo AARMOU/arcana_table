@@ -209,6 +209,28 @@
       "baseSha": "f27e2c6caf19296dd83e871b690dadcd89bfe04c",
       "oracleHash": "62ed74687ea9a962573a422fb6e7721af53c3fe2510b2ee1c0955f1225ba6152",
       "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
+    },
+    "Dungrove Elder": {
+      "summary": "Dynamic P/T uses the same characteristic-defining dynamicStats as pinned Ashaya, Soul of the Wild, but counts only Forest-subtype lands controlled by this creature's controller via DynamicAmounts.landsWithSubtype(Subtype.FOREST). Pinned SDK implementation filters Player.You + Land.withSubtype(Forest); this includes nonbasic Forests, excludes other lands, and updates as Forest count changes. Hexproof is a supported keyword. Gameplay implementation must test 0/0 state-based death, basic/nonbasic Forest changes, Forest-granting type effects, opposing lands, and hexproof targeting.",
+      "verifiedBy": "Goose, pinned Argentum SDK/source inspection 2026-10-31 (7fb0733)",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2017-2022/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/znr/cards/AshayaSoulOfTheWild.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/dsl/DynamicAmounts.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/7fb073337e4389cfabe2ebf4c6416633a7fc63d2/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/ltr/cards/MirkwoodChanneler.kt",
+        "docs/agents/generated/sdk-api.md"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Dungrove Elder's power and toughness are each equal to the number of Forests you control.",
+          "primitives": [
+            "CardBuilder.dynamicStats(DynamicAmounts.landsWithSubtype(Subtype.FOREST))",
+            "DynamicAmounts.battlefield(Player.You, GameObjectFilter.Land.withSubtype(Subtype.FOREST)).count"
+          ]
+        }
+      ],
+      "baseSha": "e26b0ef62fc510ede821afe09ab2fb26b271eb56",
+      "oracleHash": "30ed6154c9c53d2cea38986210dd8143137fd39c5115779856b94bd6d765615b",
+      "runtimeHash": "8e2d25eba190f810c15e35d8509df23dec2db95b9a831261a60bb7f998225524"
     }
   }
 }
