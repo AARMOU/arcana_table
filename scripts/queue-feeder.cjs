@@ -255,7 +255,7 @@ function queueSummary(p) {
   ...((work.closed || []).length ? ['Card work handed back to the Copilot queue: ' + work.closed.map(c => '#' + c.issue + ' (' + c.name + ')').join(', ') + '.'] : []),
   ...((p.autoQueue?.stuck || []).length ? ['Queue issues Copilot cannot take now (dispatcher will skip them; owner review): ' +
     p.autoQueue.stuck.map(x => '#' + x.issue + ' (' + x.cards.join(', ') + ')').join(', ').slice(0, 600)] : []),
-  ...((p.autoQueue?.held || []).length ? ['Not re-queued automatically because an earlier queue issue for the card was closed without it landing: ' +
+  ...((p.autoQueue?.held || []).length ? ['Held for the owner after two closed queue attempts that did not land (one automatic retry already used): ' +
     p.autoQueue.held.map(x => x.name + ' (#' + x.issue + ')').join(', ').slice(0, 600)] : []),
   ...(p.autoQueue?.created ? ['Auto-queued #' + p.autoQueue.issue + ' (' + p.autoQueue.name + '); guarded dispatcher requested.'] :
     ['Auto-queue: ' + (p.autoQueue?.reason || 'not attempted') +
@@ -267,8 +267,11 @@ const isCopilotAssigned = i => (i.assignees || []).some(a => ['copilot', 'copilo
 // Queue at most one new issue per pass, and never when a complete unassigned
 // queue issue already awaits the normal dispatcher. No billable operation here.
 // closedIssues: closed issues (REST shape); a card whose earlier trusted queue issue was closed while
-// the card is still Copilot-eligible did not land, so it is held for the owner instead of being paid
-// for again automatically.
+// the card is still Copilot-eligible did not land. The first such attempt is retried automatically ONCE
+// (typically it was closed on a blocker that has since been fixed, e.g. Acolyte Hybrid #137 after the
+// destroy-outcome review); after two closed attempts the card is held for the owner instead of being paid
+// for again. Bounded: at most one extra session per card.
+const MAX_AUTO_ATTEMPTS = 2;
 function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
   if (!payload?.ok || !/^[a-f0-9]{40}$/.test(String(payload.baseSha || '')) ||
       !/^[A-Za-z0-9._/-]+$/.test(String(payload.base || ''))) return { reason: 'invalid-cardkit-result' };
@@ -286,15 +289,22 @@ function chooseAutoQueue(payload, openIssues = [], closedIssues = []) {
   if (pending) return { pendingIssue: pending.number, reason: 'eligible-queue-item-already-waiting', stuck };
   const attempted = new Map();
   for (const i of closedIssues.filter(i => trustedIssue(i) && String(i.title || '').startsWith('[Arcana Queue]')))
-    for (const n of F.unitCards(i.body)) if (!attempted.has(F.normName(n))) attempted.set(F.normName(n), i.number);
+    for (const n of F.unitCards(i.body)) {
+      const k = F.normName(n);
+      if (!attempted.has(k)) attempted.set(k, []);
+      if (!attempted.get(k).includes(i.number)) attempted.get(k).push(i.number);
+    }
   const held = [];
+  let retryOf = null;
   const s = (payload.suggestions || []).find(x => {
     if (!(x.ready && x.body && A.unitActionable(x.body, payload.base).ok && !queued.has(F.normName(x.name)) &&
       !safeIssues.some(i => String(i.title || '') === x.title))) return false;
-    if (attempted.has(F.normName(x.name))) { held.push({ name: x.name, issue: attempted.get(F.normName(x.name)) }); return false; }
+    const prior = attempted.get(F.normName(x.name)) || [];
+    if (prior.length >= MAX_AUTO_ATTEMPTS) { held.push({ name: x.name, issue: Math.max(...prior) }); return false; }
+    retryOf = prior.length ? Math.max(...prior) : null;
     return true;
   });
-  return s ? { suggestion: s, stuck, held } : { reason: 'no-unclaimed-ready-card', stuck, held };
+  return s ? { suggestion: s, stuck, held, ...(retryOf ? { retryOf } : {}) } : { reason: 'no-unclaimed-ready-card', stuck, held };
 }
 
 async function createNextAutoQueue({ github, owner, repo, payload, runId, enabled }) {
@@ -314,11 +324,12 @@ async function createNextAutoQueue({ github, owner, repo, payload, runId, enable
   const body = [A.AUTO_QUEUE_MARKER,
     '<!-- source: trusted-main-queue-feeder; run:' + runId + '; base-sha:' + payload.baseSha + ' -->',
     ...(s.requestedIssue ? ['<!-- owner-selected-card-request: #' + s.requestedIssue + ' -->'] : []),
+    ...(pick.retryOf ? ['<!-- automatic-retry-of: #' + pick.retryOf + ' (one retry; a second closed attempt holds the card for the owner) -->'] : []),
     s.body.trim(), ''].join('\n');
   const issue = (await github.rest.issues.create({ owner, repo, title: s.title, body })).data;
   if (issue.user?.login !== 'github-actions[bot]' || issue.user?.type !== 'Bot')
     throw Error('auto-queue-issuer-not-github-actions-bot; no dispatch');
-  return { created: true, issue: issue.number, name: s.name, url: issue.html_url, ...notes };
+  return { created: true, issue: issue.number, name: s.name, url: issue.html_url, ...(pick.retryOf ? { retryOf: pick.retryOf } : {}), ...notes };
 }
 
 // ---- Blocked owner requests -> GPT card work -> back to the Copilot queue -------------------------
