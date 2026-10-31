@@ -78,11 +78,11 @@ class ZephyrimScenarioTest {
         val d = customScenario(Zephyrim)
         val p = d.player1
         d.putCardOnTopOfLibrary(p, "Zephyrim")
-        d.giveMana(p, Color.WHITE)
-        d.giveColorlessMana(p, 1)
 
         d.passPriorityUntil(Step.DRAW, activePlayer = p)
         assertTrue(d.pendingDecision is YesNoDecision)
+        d.giveMana(p, Color.WHITE)
+        d.giveColorlessMana(p, 1)
         d.decide(Choices(yes = true))
         d.resolveAll(Choices(yes = true))
 
@@ -95,11 +95,11 @@ class ZephyrimScenarioTest {
         val firstDraw = customScenario(Zephyrim)
         val player = firstDraw.player1
         firstDraw.putCardOnTopOfLibrary(player, "Zephyrim")
-        firstDraw.giveMana(player, Color.WHITE)
-        firstDraw.giveColorlessMana(player, 1)
 
         firstDraw.passPriorityUntil(Step.DRAW, activePlayer = player)
         assertTrue(firstDraw.pendingDecision is YesNoDecision)
+        firstDraw.giveMana(player, Color.WHITE)
+        firstDraw.giveColorlessMana(player, 1)
         firstDraw.decide(Choices(yes = false))
         firstDraw.resolveAll()
         assertTrue(firstDraw.getHand(player).any { firstDraw.getCardName(it) == "Zephyrim" })
