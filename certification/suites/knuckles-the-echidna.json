@@ -1,0 +1,8 @@
+{
+  "key": "knuckles-the-echidna",
+  "name": "Knuckles the Echidna",
+  "issue": 584,
+  "source": "certification/KnucklesTheEchidnaIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.KnucklesTheEchidnaIndependentCertificationTest",
+  "tests": 8
+}
