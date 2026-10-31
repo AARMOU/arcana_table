@@ -337,9 +337,12 @@ async function runDispatch({ github, context, core, env, readBudget, now = Date.
     } catch { ciRuns = null; }
     report.ciRuns = ciRuns;
     // Merges made with an app/workflow token do not start CI, which used to stall every slot until someone ran
-    // it by hand. When the base head has NO Development CI run at all, start one (workflow_dispatch is allowed
+    // it by hand. When the base head has NO usable Development CI run, start one (workflow_dispatch is allowed
     // for GITHUB_TOKEN). Any existing run - queued, running or failed - is left alone: no loops, no retries.
-    if (!dry && Array.isArray(ciRuns) && ciRuns.length === 0) {
+    // A run waiting for approval (action_required: started by an automation token) never starts by itself, but a
+    // workflow_dispatch from this job's token runs without approval - so it counts as "no usable run" too, once.
+    const usable = Array.isArray(ciRuns) ? ciRuns.filter(r => r.conclusion !== 'action_required') : null;
+    if (!dry && Array.isArray(usable) && usable.length === 0 && !ciRuns.some(r => r.event === 'workflow_dispatch')) {
       try {
         await github.rest.actions.createWorkflowDispatch({ owner, repo, workflow_id: DEV_CI_WORKFLOW, ref: base });
         report.ciStarted = true;
