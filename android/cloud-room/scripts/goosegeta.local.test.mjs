@@ -150,7 +150,7 @@ test('workerd: unsolicited turn honk survives a failed GPT chat reply without mu
   const {status}=await summon('GCHAT3',h,{chatMode:'ruthless',model:false});await outgoing(h,'lanHello');
   assert.equal(status.model,'off','guest starts free');
   const switched=await control('GCHAT3',{action:'chat',sessionId:status.sessionId,chatMode:'ruthless',model:true});
-  assert.equal(switched.status,200,'the owner's existing Apply chat can explicitly opt in mid-match');
+  assert.equal(switched.status,200,"the owner's existing Apply chat can explicitly opt in mid-match");
   assert.equal((await switched.json()).model,'opted in');
   await game(h,{type:'lanSeat',strictDeck:true},1);await outgoing(h,'lanReady');
   // Only one host-legal action => no strategic provider call. Chat provider fixture
