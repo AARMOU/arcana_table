@@ -39,11 +39,15 @@ test('calibrateReady uses the measurement only when the variable is unset and ev
 
 test('copilotSessionsThisMonth counts runs of the dynamic Copilot workflow from the 1st of the month', async () => {
   let asked;
-  const github = { rest: { actions: { listRepoWorkflows() {}, listWorkflowRuns: async a => { asked = a; return { data: { total_count: 98 } }; } } },
-    paginate: async () => [{ id: 1, path: '.github/workflows/x.yml' }, { id: 393690358, path: COPILOT_WORKFLOW_PATH }] };
+  const github = { rest: { actions: {
+    listWorkflowRunsForRepo: async a => { assert.equal(a.event, 'dynamic'); return { data: { workflow_runs: [
+      { workflow_id: 5, path: 'dynamic/other/thing' }, { workflow_id: 393690358, path: COPILOT_WORKFLOW_PATH }] } }; },
+    listWorkflowRuns: async a => { asked = a; return { data: { total_count: 98 } }; } } } };
   assert.equal(await copilotSessionsThisMonth({ github, owner: 'o', repo: 'r', now: NOW }), 98);
   assert.equal(asked.workflow_id, 393690358);
   assert.equal(asked.created, '2026-10-01T00:00:00Z..2026-10-31T15:00:00Z');
+  const none = { rest: { actions: { listWorkflowRunsForRepo: async () => ({ data: { workflow_runs: [] } }), listWorkflowRuns() { throw Error('unused'); } } } };
+  assert.equal(await copilotSessionsThisMonth({ github: none, owner: 'o', repo: 'r', now: NOW }), null);
 });
 
 test('the calibrated estimate releases phantom reservations: 16 recent sessions no longer push warn into slow', () => {
