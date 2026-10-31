@@ -11,6 +11,7 @@ import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Format
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
+import com.wingedsheep.sdk.model.CharacteristicValue
 import com.wingedsheep.sdk.model.Deck
 import com.wingedsheep.sdk.model.EntityId
 import org.junit.Assert.*
@@ -100,8 +101,8 @@ class TangleweaveArmorIndependentCertificationTest {
         assertEquals(Color.BLACK.toString(), germColors.single().toString())
         val germCard = d.state.getEntity(germ)!!.get<CardComponent>()
         assertNotNull(germCard?.baseStats)
-        assertEquals(0, germCard!!.baseStats!!.power.value)
-        assertEquals(0, germCard.baseStats!!.toughness.value)
+        assertEquals(CharacteristicValue.Fixed(0), germCard!!.baseStats!!.power)
+        assertEquals(CharacteristicValue.Fixed(0), germCard.baseStats!!.toughness)
         assertEquals(7, d.projected.getPower(germ))
         assertEquals(7, d.projected.getToughness(germ))
         assertAttachedTo(d, armor, germ)
