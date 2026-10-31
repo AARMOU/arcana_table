@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import re
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -258,6 +259,28 @@ class ReadinessTests(unittest.TestCase):
                 result = readiness.classify("Ancient Stone Idol")
                 self.assertEqual(result["readiness"], "NEEDS_REVIEW", changes)
                 self.assertFalse(result.get("reviewed"))
+
+    def test_restamp_carries_unchanged_reviews_onto_a_new_engine_only(self):
+        import copy
+        key = repo.normalize_name("Ancient Stone Idol")
+        card = oracle.cached("Ancient Stone Idol")
+        current = readiness.review_runtime_hash()
+        entry = copy.deepcopy(readiness.verified_support()[key])
+        self.assertEqual(readiness.restamp_review(entry, card, set(), set(), current), "current")
+        entry["runtimeHash"] = "1" * 64  # reviewed on the previous engine
+        self.assertFalse(readiness.review_is_current(entry, card))
+        prims = [p for r in entry["reviewedLines"] for p in r["primitives"]]
+        token = re.sub(r"[^a-z0-9]", "", re.findall(r"[A-Za-z_][A-Za-z0-9_]*", prims[0])[0].casefold())
+        gone = copy.deepcopy(entry)
+        self.assertTrue(readiness.restamp_review(gone, card, {token}, set(), current).startswith("sdk-members-removed"))
+        self.assertEqual(gone["runtimeHash"], "1" * 64)
+        changed = {**card, "oracle_text": card["oracle_text"] + "\nDraw a card."}
+        self.assertEqual(readiness.restamp_review(copy.deepcopy(entry), changed, set(), set(), current), "oracle-changed")
+        self.assertEqual(readiness.restamp_review(copy.deepcopy(entry), card, set(), set(), None), "no-runtime")
+        ok = copy.deepcopy(entry)
+        self.assertEqual(readiness.restamp_review(ok, card, {token}, {token}, current), "restamped")
+        self.assertTrue(readiness.review_is_current(ok, card))
+        self.assertEqual(ok["restamps"][-1]["fromRuntimeHash"], "1" * 64)
 
     def test_review_binding_requires_runtime_base_reviewer_and_full_oracle_hash(self):
         key = repo.normalize_name("Ancient Stone Idol")
