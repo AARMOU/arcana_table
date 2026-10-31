@@ -180,6 +180,32 @@ def failures(candidate):
     return out[:40]
 
 
+def failure_evidence(candidate):
+    """Complete structured JUnit evidence; malformed/missing results never permit retry."""
+    cases = []
+    try:
+        for module in ('custom-cards', 'app'):
+            pattern = ('test' if module == 'custom-cards' else 'testDebugUnitTest')
+            files = list((candidate / 'android' / module / 'build/test-results' / pattern).glob('TEST-*.xml'))
+            if not files:
+                return {'complete': False, 'cases': []}
+            for path in files:
+                suite = ET.parse(path).getroot()
+                tests = suite.findall('testcase')
+                failed = [f for c in tests for f in list(c) if f.tag in ('failure', 'error')]
+                if (len(tests) != int(suite.get('tests', '-1')) or
+                        len(failed) != int(suite.get('failures', '0')) + int(suite.get('errors', '0'))):
+                    return {'complete': False, 'cases': []}
+                for case in tests:
+                    for failure in list(case):
+                        if failure.tag in ('failure', 'error'):
+                            cases.append({'className': case.get('classname'), 'name': case.get('name'),
+                                          'type': failure.get('type'), 'message': failure.get('message')})
+        return {'complete': True, 'cases': cases}
+    except (ET.ParseError, ValueError, OSError):
+        return {'complete': False, 'cases': []}
+
+
 def validate(plan, trusted, candidate, output):
     trusted, candidate, output = Path(trusted).resolve(), Path(candidate).resolve(), Path(output).resolve()
     output.mkdir(parents=True, exist_ok=True)
@@ -280,6 +306,7 @@ def validate(plan, trusted, candidate, output):
         present = {g['name'] for g in report['gates']}
         report['gates'] += [{'name': name, 'ok': False, 'detail': 'Not run after earlier blocker'} for name in GATES if name not in present]
         report['failures'] = failures(candidate)
+        report['failureEvidence'] = failure_evidence(candidate)
         if all(g['ok'] for g in report['gates']):
             report['status'] = 'passed'
         (output / 'report.json').write_text(json.dumps(report, indent=2) + '\n')

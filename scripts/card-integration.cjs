@@ -15,6 +15,42 @@ const GENERATED = ['android/app/src/main/assets/argentum/custom-cards.jsonl',
 const GATES = ['engine-pins','export','patterns','cardkit','scenario','independent',
   'custom-and-android','release-safety','scope'];
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
+const RETRY_CLASS = 'lan-multi-host-address-in-use-v1';
+const RETRY_REF = 'tags/arcana-integration-retry/';
+function retryKey(plan) {
+  return hash(JSON.stringify([plan.pr,plan.sourceSha,plan.target,plan.baseSha,plan.policyHash,RETRY_CLASS]));
+}
+function retryClassification(report) {
+  const evidence = report.failureEvidence;
+  if (report.status !== 'blocked' || report.reason || !Array.isArray(report.gates) ||
+      report.gates.length !== GATES.length || new Set(report.gates.map(g=>g.name)).size !== GATES.length ||
+      !GATES.every(name=>report.gates.some(g=>g.name===name && g.ok===(name!=='custom-and-android'))) ||
+      evidence?.complete !== true || !Array.isArray(evidence.cases) || evidence.cases.length !== 1) return null;
+  const f = evidence.cases[0];
+  return f.className === 'com.arcanatable.FourPlayerLanTransportTest' &&
+    f.name === 'threeGuestSocketsHavePrivateSendChannelsAndRejectFifthPhone' &&
+    f.type === 'java.lang.AssertionError' &&
+    f.message === 'java.lang.AssertionError: LAN multi-host failed to bind: java.net.BindException: Address already in use'
+    ? RETRY_CLASS : null;
+}
+async function retryConsumed({github,owner,repo,key}) {
+  try { await github.rest.git.getRef({owner,repo,ref:RETRY_REF+key}); return true; }
+  catch (error) { if (error.status === 404) return false; throw error; }
+}
+function retryAvailable(receipt, plan) {
+  return receipt?.status==='blocked' && receipt.baseSha===plan.baseSha && receipt.policyHash===plan.policyHash &&
+    receipt.recovery?.classification===RETRY_CLASS && receipt.recovery?.key===retryKey(plan) &&
+    receipt.recovery?.state==='available' && SHA.test(receipt.controlSha || '');
+}
+async function trustedRetryReceipt({github,owner,repo,receipt}) {
+  const runId = Number(receipt.runUrl.split('/').at(-1));
+  if (!Number.isSafeInteger(runId)) return false;
+  const run = (await github.rest.actions.getWorkflowRun({owner,repo,run_id:runId})).data;
+  return run.path === '.github/workflows/arcana-approved-card-integration.yml' &&
+    run.head_repository?.full_name === owner+'/'+repo && run.head_branch === 'main' &&
+    run.head_sha === receipt.controlSha && run.status === 'completed' && run.conclusion === 'success' &&
+    ['push','schedule','workflow_run','workflow_dispatch'].includes(run.event);
+}
 
 function validatePolicy(p) {
   if (p?.schema !== 1 || typeof p.enabled !== 'boolean' || p.repository !== 'AARMOU/arcana_table' ||
@@ -103,7 +139,7 @@ function parseReceipt(comment) {
         !['blocked','integrated'].includes(r.status) ||
         !/^https:\/\/github\.com\/AARMOU\/arcana_table\/actions\/runs\/\d+$/.test(r.runUrl) ||
         (r.status === 'integrated' && !SHA.test(r.destinationSha))) return null;
-    return {...r,commentUrl:comment.html_url};
+    return {...r,commentUrl:comment.html_url,commentId:comment.id};
   } catch { return null; }
 }
 async function receiptFor({github,owner,repo,pr,verifyIntegrated=true}) {
@@ -133,11 +169,16 @@ async function planNext({github,owner,repo,cfg,controlSha,retry=false}) {
     if (!suite) continue;
     const receipt = await receiptFor({github,owner,repo,pr:snap.pr});
     if (receipt?.status === 'integrated') continue;
-    if (!retry && receipt?.status === 'blocked' && receipt.baseSha === baseSha && receipt.policyHash === cfg.policyHash) continue;
-    return {schema:1,pr:pr.number,sourceSha:snap.pr.head.sha,sourceBase:snap.pr.base.sha,
+    const plan = {schema:1,pr:pr.number,sourceSha:snap.pr.head.sha,sourceBase:snap.pr.base.sha,
       sourceBaseRef:snap.pr.base.ref,baseSha,target:cfg.policy.target,controlSha,policyHash:cfg.policyHash,
       reviewId:ownerDecision(snap.reviews,snap.pr.head.sha,cfg.policy).id,
       suite,paths:paths(suite),sourceFiles:snap.files.map(f=>f.filename)};
+    if (!retry && receipt?.status === 'blocked' && receipt.baseSha === baseSha && receipt.policyHash === cfg.policyHash) {
+      if (!retryAvailable(receipt,plan) || !await trustedRetryReceipt({github,owner,repo,receipt}) ||
+          await retryConsumed({github,owner,repo,key:retryKey(plan)})) continue;
+      plan.autoRetry = {classification:RETRY_CLASS,key:retryKey(plan)};
+    }
+    return plan;
   }
   return null;
 }
@@ -163,7 +204,43 @@ function validateReport(plan, report, files) {
 function receiptBody(receipt, reason='') {
   return MARKER+'\n```json\n'+JSON.stringify(receipt,null,2)+'\n```\n'+
     (receipt.status==='integrated' ? '**Integrated into Android source; ready for a separately authorized APK build.** No APK built.' :
-      '**Integration blocked.** '+String(reason).replace(/@/g,'＠').slice(0,1400));
+      '**Integration blocked.** '+String(reason).replace(/@/g,'＠').slice(0,1400))+
+    (receipt.recovery ? '\n\n'+({available:'One automatic infrastructure retry is available; all destination gates must run again.',
+      consumed:'The one automatic retry was reserved. No further automatic attempts; if interrupted, owner review is required.',
+      exhausted:'Automatic retry failed. No more automatic attempts; owner review is required.'}[receipt.recovery.state] || '') : '');
+}
+// The workflow's existing concurrency group serializes this with publication. The ref
+// creation is an atomic durable claim even across duplicate events/process restarts.
+async function reserveRetry({github,owner,repo,cfg,plan,runAttempt}) {
+  if (!plan.autoRetry) return;
+  if (runAttempt !== 1 || plan.autoRetry.classification!==RETRY_CLASS || plan.autoRetry.key!==retryKey(plan) ||
+      cfg.policyHash!==plan.policyHash || cfg.policy.target!==plan.target ||
+      !await controlUnchanged({github,owner,repo,controlSha:plan.controlSha})) throw Error('Stale or invalid automatic retry');
+  const snap = await snapshot(github,owner,repo,plan.pr);
+  if (snap.pr.head.sha!==plan.sourceSha || sourceEligible(cfg,snap)?.key!==plan.suite.key ||
+      ownerDecision(snap.reviews,plan.sourceSha,cfg.policy)?.id!==plan.reviewId) throw Error('Retry approval or source changed');
+  const base = (await github.rest.git.getRef({owner,repo,ref:'heads/'+plan.target})).data.object.sha;
+  const receipt = await receiptFor({github,owner,repo,pr:snap.pr});
+  if (base!==plan.baseSha || !retryAvailable(receipt,plan) ||
+      !await trustedRetryReceipt({github,owner,repo,receipt})) throw Error('Retry base or blocker changed');
+  // Never update/delete this ref. An existing ref (including a concurrent claim)
+  // rejects createRef and stops validation. Interrupted attempts stay consumed.
+  await github.rest.git.createRef({owner,repo,ref:'refs/'+RETRY_REF+retryKey(plan),sha:plan.controlSha});
+  const consumed = {...receipt,recovery:{...receipt.recovery,state:'consumed'}};
+  delete consumed.commentId; delete consumed.commentUrl;
+  await github.rest.issues.updateComment({owner,repo,comment_id:receipt.commentId,body:receiptBody(consumed,receipt.reason)});
+  await updateCoordinationReceipt({github,owner,repo,receipt:consumed});
+}
+async function updateCoordinationReceipt({github,owner,repo,receipt}) {
+  const comments = await github.paginate(github.rest.issues.listComments,{owner,repo,issue_number:81,per_page:100});
+  const previous = [...comments].reverse().find(c=>{
+    const r=parseReceipt(c);
+    return r?.pr===receipt.pr && r.sourceSha===receipt.sourceSha && r.baseSha===receipt.baseSha &&
+      r.policyHash===receipt.policyHash && r.status==='blocked';
+  });
+  const body=receiptBody(receipt,receipt.reason);
+  if (previous) await github.rest.issues.updateComment({owner,repo,comment_id:previous.id,body});
+  else await github.rest.issues.createComment({owner,repo,issue_number:81,body});
 }
 // Paths whose change on main means the tested plan no longer reflects trusted policy/code.
 const CONTROL_PATHS = ['integration/','certification/','scripts/card-integration.cjs',
@@ -193,7 +270,9 @@ async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,
   const ref = (await github.rest.git.getRef({owner,repo,ref:'heads/'+plan.target})).data.object.sha;
   if (ref !== plan.baseSha) throw Error('Android target advanced; revalidate on next pass');
   const receipt = {schema:1,pr:plan.pr,card:suite.name,sourceSha:plan.sourceSha,baseSha:plan.baseSha,
-    target:plan.target,policyHash:plan.policyHash,status:'blocked',runUrl,at:new Date().toISOString()};
+    target:plan.target,policyHash:plan.policyHash,controlSha:plan.controlSha,status:'blocked',runUrl,at:new Date().toISOString()};
+  if (plan.autoRetry && (plan.autoRetry.classification!==RETRY_CLASS || plan.autoRetry.key!==retryKey(plan) ||
+      !await retryConsumed({github,owner,repo,key:retryKey(plan)}))) throw Error('Automatic retry has no durable reservation');
   if (report.status === 'passed') {
     validateReport(plan,report,files);
     for (const path of [plan.paths.source,plan.paths.scenario,REGISTRY]) {
@@ -212,7 +291,11 @@ async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,
   const previous = await receiptFor({github,owner,repo,pr:snap.pr,verifyIntegrated:false});
   const reason = ((report.gates || []).filter(g=>!g.ok).map(g=>g.name+': '+g.detail).join('\n') || report.reason || 'Validation did not pass')+
     '\n'+(report.failures||[]).slice(0,4).join('\n');
-  if (receipt.status==='blocked') receipt.reason=String(reason).slice(0,2000);
+  if (receipt.status==='blocked') {
+    receipt.reason=String(reason).slice(0,2000);
+    if (plan.autoRetry || retryClassification(report)) receipt.recovery={classification:RETRY_CLASS,key:retryKey(plan),
+      state:plan.autoRetry || await retryConsumed({github,owner,repo,key:retryKey(plan)}) ? 'exhausted' : 'available'};
+  }
   const body = receiptBody(receipt,reason);
   // Dedupe blocked notifications for unchanged source/base/policy. Integrated receipts
   // remain permanent source-PR evidence even if the source PR targets a legacy branch.
@@ -220,6 +303,9 @@ async function publish({github,owner,repo,cfg,plan,report,files,expectedSources,
       previous.policyHash!==receipt.policyHash || previous.status!==receipt.status) {
     await github.rest.issues.createComment({owner,repo,issue_number:plan.pr,body});
     await github.rest.issues.createComment({owner,repo,issue_number:81,body});
+  } else if (receipt.status==='blocked' && receipt.recovery) {
+    await github.rest.issues.updateComment({owner,repo,comment_id:previous.commentId,body});
+    await updateCoordinationReceipt({github,owner,repo,receipt});
   }
   // The card is done: close its queue request so Control's queue lists only open work.
   // Best effort; the integration itself already landed.
@@ -258,4 +344,5 @@ async function reportIntegrationSkips({github,owner,repo,root='.',issue=78}) {
   return 'posted ' + skipped.length;
 }
 module.exports={MARKER,TARGET,REGISTRY,GENERATED,GATES,CONTROL_PATHS,hash,config,validatePolicy,paths,ownerDecision,controlUnchanged,
+  RETRY_CLASS,RETRY_REF,retryKey,retryClassification,retryConsumed,retryAvailable,trustedRetryReceipt,reserveRetry,
   integrationBlockers,reportIntegrationSkips,SKIP_MARKER,sourceEligible,snapshot,parseReceipt,receiptFor,planNext,validateOutcome,validateReport,receiptBody,publish};
