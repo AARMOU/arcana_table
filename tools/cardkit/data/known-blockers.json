@@ -1,11 +1,6 @@
 {
   "_about": "Engine gaps recorded by earlier verified work. cardkit marks matching cards ENGINE_BLOCKED and routes them to Claude. Add an entry only with a source (issue, PR, doc) that reproduced the gap on the pinned engine; remove it when the primitive lands. 'verified': false = reported by a worker but not yet independently reproduced. 'patterns' match normalized rules text (card name → ~, numbers → n) so every card that needs the same missing primitive is classified the same way.",
   "cards": {
-    "Acolyte Hybrid": {
-      "reason": "needs the outcome of one specific Destroy (did it destroy that artifact?) to give its controller a draw; no effect-local destroy result",
-      "source": "#137 / #138 / #141 Priority A",
-      "verified": false
-    },
     "Arcane Lighthouse": {
       "reason": "until end of turn, opponents' creatures lose hexproof and shroud AND can't have either; only hexproof suppression exists",
       "source": "#134 / #135 / #141 Priority B",
@@ -158,13 +153,6 @@
       "regex": "lose hexproof and shroud and can't have hexproof or shroud",
       "reason": "duration effect that removes hexproof/shroud and prevents gaining them",
       "source": "#141 Priority B (Arcane Lighthouse)",
-      "verified": false
-    },
-    {
-      "name": "outcome of a specific destroy",
-      "regex": "if (that|the) [^.]* (is|was) destroyed this way|if [^.]* destroyed this way, its controller",
-      "reason": "branching on whether one particular Destroy actually destroyed its target",
-      "source": "#141 Priority A (Acolyte Hybrid)",
       "verified": false
     }
   ]
