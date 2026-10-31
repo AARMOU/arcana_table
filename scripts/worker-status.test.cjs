@@ -50,10 +50,10 @@ test('read failure cannot overwrite last known status with invented zeros', asyn
 });
 
 test('event bursts skip the expensive reload while the published status is fresh', async () => {
-  const run = async (eventName, isFresh) => {
+  const run = async (eventName, isFresh, payload = {}) => {
     let loads = 0, asked;
     const r = await refreshWorkerStatus({
-      github: {}, context: { ...ctx, eventName }, core, now,
+      github: {}, context: { ...ctx, eventName, payload }, core, now,
       fresh: async args => { asked = args; return isFresh; },
       load: async () => { loads++; return { units: [] }; },
       publish: async () => 'updated',
@@ -64,7 +64,16 @@ test('event bursts skip the expensive reload while the published status is fresh
   assert.deepEqual(skipped.r, { skipped: true });
   assert.equal(skipped.loads, 0);
   assert.equal(skipped.asked.kind, 'workers');
-  assert.equal(skipped.asked.maxAgeMs, 5 * 60 * 1000);
+  assert.equal(skipped.asked.maxAgeMs, 15 * 60 * 1000);
+  // Only a finished Copilot session keeps the short window; dispatcher/feeder/router completions and
+  // issue/PR churn wait 15 min (GITHUB_TOKEN has 1,000 requests/hour shared by every workflow).
+  const agent = await run('workflow_run', true, { workflow_run: { name: 'Running Copilot cloud agent' } });
+  assert.equal(agent.asked.maxAgeMs, 5 * 60 * 1000);
+  for (const name of ['Arcana Card Worker Dispatcher', 'Arcana Queue Feeder', 'Arcana CI Failure Router']) {
+    assert.equal((await run('workflow_run', true, { workflow_run: { name } })).asked.maxAgeMs, 15 * 60 * 1000);
+  }
+  assert.equal((await run('issues', true)).asked.maxAgeMs, 15 * 60 * 1000);
+  assert.equal((await run('pull_request_target', true)).asked.maxAgeMs, 15 * 60 * 1000);
   assert.equal(skipped.asked.now, Date.parse('2026-10-29T05:00:00Z'));
   assert.equal((await run('issues', false)).loads, 1);
   // Scheduled and manual refreshes never consult freshness.
