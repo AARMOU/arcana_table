@@ -51,6 +51,10 @@ async function dispatcher({ github, context, core, env, readBudget = defaultRead
   // Display only: if the run never reached admission, read billing once so the dashboard stays fresh.
   let billing = report.billing;
   if (!billing) { try { billing = await readBudget(runEnv); } catch { billing = null; } }
+  // The unit list was read before this run's assignment: show the unit it just started as pending pickup, so
+  // Control never reports "N queued, 0 working" in the minute a worker starts (owner 2026-10-31).
+  if (result?.state === 'attempted' && result?.result === 'confirmed' && Array.isArray(report.units))
+    report.units = report.units.map(u => u.number === result.issue ? { ...u, state: 'pending-pickup', holdsSlot: true, eligible: false, skip: null } : u);
   const payload = S.dispatcherPayload({ result, report, ready: report.ready, now: now(), runId: context.runId, event: context.eventName });
   payload.forcedDryRun = forcedDry;
   payload.ownerFixes = ownerFixes.slice(0, 10);
