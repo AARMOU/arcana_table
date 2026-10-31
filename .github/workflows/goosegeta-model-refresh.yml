@@ -1,0 +1,82 @@
+name: Goosegeta isolated model-code refresh (model OFF)
+# Owner-approved refresh of ONLY the existing Goosegeta test Worker.
+# Never deploys production rooms, Control, Pages, Android APK, or a paid provider call.
+on:
+  push:
+    branches: [gpt/summon-goosegeta-approved-test-20261031]
+    paths: ['.github/workflows/goosegeta-model-refresh.yml']
+permissions:
+  contents: read
+concurrency:
+  group: goosegeta-isolated-model-refresh
+  cancel-in-progress: false
+jobs:
+  refresh-isolated-only:
+    if: github.repository == 'AARMOU/arcana_table' && github.ref == 'refs/heads/gpt/summon-goosegeta-approved-test-20261031'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production
+    concurrency:
+      group: goosegeta-isolated-room-writer
+      cancel-in-progress: false
+    env:
+      WRANGLER_SEND_METRICS: 'false'
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Checkout exact certified Goosegeta candidate (not production)
+        uses: actions/checkout@v4
+        with:
+          ref: 5373e61a3bc9c3e19225a965f654a8af5197f0ba
+          path: cloud-source
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify pinned code, local model fixtures and budget/relay tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git -C cloud-source rev-parse HEAD)" = 5373e61a3bc9c3e19225a965f654a8af5197f0ba
+          node cloud-source/tools/goosegeta/build-decks.mjs --check
+          node --test cloud-source/tools/goosegeta/*.test.mjs
+          npm --prefix cloud-source/android/cloud-room ci --ignore-scripts --no-audit --no-fund
+          npm --prefix cloud-source/android/cloud-room run typecheck
+          node --test cloud-source/android/cloud-room/scripts/goosegeta.local.test.mjs
+      - name: Isolate Worker config; preserve stored Cloudflare secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('cloud-source/android/cloud-room/wrangler.toml')
+          s=p.read_text()
+          assert s.count('name = "arcana-table-rooms"')==1
+          assert 'GOOSEGETA_OPENAI_ENABLED = "false"' in s
+          s=s.replace('name = "arcana-table-rooms"','name = "arcana-table-rooms-goosegeta-test"',1)
+          p.write_text(s)
+          PY
+      - name: Deploy only isolated Worker with GPT-6 code but paid model disabled
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_API_TOKEN" && test -n "$CLOUDFLARE_ACCOUNT_ID"
+          wrangler=cloud-source/android/cloud-room/node_modules/.bin/wrangler
+          "$wrangler" deploy --config cloud-source/android/cloud-room/wrangler.toml \
+            --var GOOSEGETA_ENABLED:true \
+            --var GOOSEGETA_OPENAI_ENABLED:false \
+            --var GOOSEGETA_MODEL:gpt-6-luna \
+            --var GOOSEGETA_GAME_TOKENS:8192 \
+            --var GOOSEGETA_DAILY_TOKENS:8192
+      - name: Verify isolated health and unprivileged Control rejection
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'JS'
+          import assert from 'node:assert/strict';
+          const origin='https://arcana-table-rooms-goosegeta-test.arcanamtg.workers.dev';
+          const health=await fetch(origin+'/health');assert.equal(health.status,200,'isolated Worker health');
+          const denied=await fetch(origin+'/control/goosegeta',{method:'POST'});
+          assert.ok([401,403,404,405].includes(denied.status),'unauthorized Control access denied');
+          console.log('Isolated Goosegeta Worker refresh healthy. Paid model is OFF; no API calls made.');
+          JS
