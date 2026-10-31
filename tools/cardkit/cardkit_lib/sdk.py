@@ -215,10 +215,11 @@ def member_exists(facade: str, member: str) -> bool:
     return False
 
 
-def vocabulary() -> set[str]:
-    """Lower-cased, separator-free names of every SDK keyword, helper and facade member."""
+def vocabulary(data: dict | None = None) -> set[str]:
+    """Lower-cased, separator-free names of every SDK keyword, helper and facade member
+    (of the committed index, or of `data` - e.g. the previous engine's index during an upgrade)."""
     vocab = set()
-    data = committed()
+    data = committed() if data is None else data
     for v in data.get("enums", {}).get("Keyword", []):
         vocab.add(v.replace("_", "").casefold())
     for fq, members in data.get("classes", {}).items():

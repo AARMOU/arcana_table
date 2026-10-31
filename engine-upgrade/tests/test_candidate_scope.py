@@ -7,6 +7,7 @@ the checker against it.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
@@ -33,6 +34,20 @@ def audit(pin: str, names: list[str], extra: str = "") -> str:
     return AUDIT.format(pin=pin, items="".join(f'    "{n}",\n' for n in names)) + extra
 
 
+H1, H2 = "1" * 64, "2" * 64
+VS = {"_about": "x", "cards": {"Idol": {"summary": "s", "runtimeHash": H1, "reviewedLines": [{"line": "l", "primitives": ["p"]}]},
+                               "Other": {"summary": "t", "runtimeHash": H1}}}
+
+
+def restamped(card="Idol", to=H2, **extra):
+    data = json.loads(json.dumps(VS))
+    e = data["cards"][card]
+    e["restamps"] = [{"fromRuntimeHash": e["runtimeHash"], "toRuntimeHash": to, "check": "c"}]
+    e["runtimeHash"] = to
+    e.update(extra)
+    return json.dumps(data, indent=2)
+
+
 class CandidateScope(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -53,6 +68,7 @@ class CandidateScope(unittest.TestCase):
         self.write("android/app/libs/argentum-rules-engine.jar", "jar\n")
         self.write("android/app/src/main/assets/argentum/cards.jsonl", "{}\n")
         self.write(".github/workflows/argentum-weekly-upgrade.yml", "on: push\n")
+        self.write("tools/cardkit/data/verified-support.json", json.dumps(VS, indent=2))
         self.git("add", "-A")
         self.git("commit", "-qm", "base")
 
@@ -97,6 +113,28 @@ class CandidateScope(unittest.TestCase):
         self.stage()
         code, out = self.check()
         self.assertEqual(code, 0, out)
+
+    def test_review_restamp_is_in_scope(self):
+        self.write("tools/cardkit/data/verified-support.json", restamped())
+        self.stage()
+        code, out = self.check()
+        self.assertEqual(code, 0, out)
+
+    def test_review_changes_beyond_a_restamp_are_rejected(self):
+        for bad, needle in ((restamped(summary="rewritten"), "changes beyond a runtime restamp"),
+                            (restamped(to="zz"), "does not match the hash change"),
+                            (json.dumps({**VS, "cards": {"Idol": VS["cards"]["Idol"]}}), "cards added or removed"),
+                            (json.dumps({**VS, "_about": "y"}), "changes outside the card entries")):
+            with self.subTest(needle=needle):
+                self.write("tools/cardkit/data/verified-support.json", bad)
+                self.stage()
+                self.assertRejected(needle)
+        two = json.loads(restamped())
+        two["cards"]["Other"]["restamps"] = [{"fromRuntimeHash": H1, "toRuntimeHash": "3" * 64, "check": "c"}]
+        two["cards"]["Other"]["runtimeHash"] = "3" * 64
+        self.write("tools/cardkit/data/verified-support.json", json.dumps(two))
+        self.stage()
+        self.assertRejected("more than one runtime hash")
 
     def test_empty_candidate_is_rejected(self):
         self.assertRejected("changes nothing")

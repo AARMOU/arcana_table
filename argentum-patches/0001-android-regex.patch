@@ -39,10 +39,10 @@ index dd525a18e0..4f9467e9fa 100644
          if (bracketMatch != null) {
              val index = GameStateFormatter.letterToIndex(bracketMatch.groupValues[1])
 diff --git a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt
-index 5cd610418e..88c908a261 100644
+index 3891b9ca44..ff50d4d9e5 100644
 --- a/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt
 +++ b/mtg-sdk/src/main/kotlin/com/wingedsheep/sdk/core/ManaCost.kt
-@@ -436,7 +436,7 @@ data class ManaCost(val symbols: List<ManaSymbol>) {
+@@ -443,7 +443,7 @@ data class ManaCost(val symbols: List<ManaSymbol>) {
              if (costString.isBlank()) return ZERO
  
              val symbols = mutableListOf<ManaSymbol>()
@@ -65,10 +65,10 @@ index 4df6ecf22a..11e6600b3f 100644
  /** Offers a single FROM/TO decision constrained to the effect's word categories. */
  class ChangeWordInTextExecutor(
 diff --git a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardFacesProjector.kt b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardFacesProjector.kt
-index 7f51774e89..8bb047a704 100644
+index 5c2edec2ce..e9d765dae2 100644
 --- a/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardFacesProjector.kt
 +++ b/rules-engine/src/main/kotlin/com/wingedsheep/engine/view/projection/CardFacesProjector.kt
-@@ -176,7 +176,7 @@ internal class CardFacesProjector(
+@@ -209,7 +209,7 @@ internal class CardFacesProjector(
       */
      private fun parseOracleLoyaltyLines(oracleText: String): Map<Int, List<String>> {
          if (oracleText.isBlank()) return emptyMap()
