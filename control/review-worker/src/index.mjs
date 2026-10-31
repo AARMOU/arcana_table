@@ -17,6 +17,7 @@
 import { publicGithub } from './public-github.mjs';
 import { runScheduled } from './scheduled.mjs';
 import { authorizationInfo, authorizeUnit } from './authorize.mjs';
+import { checkInStatus, requestAllHandsCheckIn } from './team-checkin.mjs';
 import { certificationStatus } from './verified-certification.mjs';
 
 const REPO = "AARMOU/arcana_table";
@@ -249,6 +250,32 @@ export default {
       const session = await openSession(env.SESSION_SECRET, (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, ""));
       if (!session) return json({ error: "sign-in-required" }, 401, origin);
       return json({ ok: true, login: session.login, expiresAt: session.exp }, 200, origin);
+    }
+
+    // Owner-authenticated all-hands status request: one issue #81 comment, no workflow/worker dispatch.
+    if (url.pathname === "/v1/team-checkin") {
+      if (request.method === "OPTIONS") return new Response(null, {
+        status: origin === PWA_ORIGIN ? 204 : 403,
+        headers: origin === PWA_ORIGIN ? {
+          "Access-Control-Allow-Origin": PWA_ORIGIN, "Access-Control-Allow-Methods": "GET, POST",
+          "Access-Control-Allow-Headers": "Authorization, Content-Type",
+          "Access-Control-Max-Age": "600", "Vary": "Origin", "Cache-Control": "no-store"
+        } : { "Cache-Control": "no-store" }
+      });
+      if (request.method !== "GET" && request.method !== "POST") return json({ error: "wrong-method" }, 405, origin);
+      if (origin !== PWA_ORIGIN) return json({ error: "origin-not-allowed" }, 403, origin);
+      const session = await openSession(env.SESSION_SECRET,
+        (request.headers.get("Authorization") || "").replace(/^Bearer\\s+/i, ""));
+      if (!session || String(session.login).toLowerCase() !== OWNER)
+        return json({ error: "sign-in-required" }, 401, origin);
+      try {
+        const [status, result] = request.method === "POST"
+          ? await requestAllHandsCheckIn(gh(session.t, fetchImpl))
+          : await checkInStatus(gh(session.t, fetchImpl));
+        return json(result, status, origin);
+      } catch {
+        return json({ error: "coordination-unavailable" }, 503, origin);
+      }
     }
 
     // Owner-only work permission. An uncached GET pins the live issue before the single tap's
