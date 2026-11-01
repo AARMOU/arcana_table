@@ -71,8 +71,7 @@ internal fun TableController.startWifiHost(online: Boolean = false) {
             recordDiagnostic("Wi-Fi host waiting at $address", DiagnosticCategory.CONNECTION)
         } catch (error: Throwable) {
             stopWifi()
-            argentumLastError = "Couldn't start hosting: ${error.javaClass.simpleName}: ${error.message?.take(200)}"
-            message = argentumLastError
+            message = "Couldn't start hosting: ${error.javaClass.simpleName}: ${error.message?.take(200)}"
             recordDiagnostic("Wi-Fi host failed: ${error.javaClass.simpleName}: ${error.message}", DiagnosticCategory.ERROR)
         } finally {
             offlineStarting = false
@@ -180,8 +179,7 @@ internal fun TableController.joinWifiGame(address: String) {
         } catch (error: Throwable) {
             guest.close()
             argentumSocket.close()
-            argentumLastError = "Couldn't join $address. Check both phones are on the same Wi-Fi and the other phone is hosting. (${error.javaClass.simpleName})"
-            message = argentumLastError
+            message = "Couldn't join $address. Check both phones are on the same Wi-Fi and the other phone is hosting. (${error.javaClass.simpleName})"
             recordDiagnostic("Wi-Fi join failed: ${error.javaClass.simpleName}: ${error.message}", DiagnosticCategory.ERROR)
         } finally {
             wifiConnecting = false
@@ -208,8 +206,7 @@ internal fun TableController.joinOnlineGame(code: String) {
             if (failure != null) {
                 guest.close()
                 argentumSocket.close()
-                argentumLastError = "Couldn't join room $clean: $failure"
-                message = argentumLastError
+                message = "Couldn't join room $clean: $failure"
                 recordDiagnostic("Online join failed: $failure", DiagnosticCategory.ERROR)
                 return@launch
             }

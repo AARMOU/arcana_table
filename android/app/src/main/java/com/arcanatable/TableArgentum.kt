@@ -526,11 +526,16 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
             recordDiagnostic("Online: ${incoming.optString("message")}", DiagnosticCategory.CONNECTION)
         } else if (incoming.optString("code") == "WIFI_NOTE") {
             // An information note from the host (e.g. a card left out of a deck), not a problem.
-            message = "Note: " + incoming.optString("message")
+            // Logged only, so joining a game doesn't open a pop-up per card.
             recordDiagnostic("Note from host: ${incoming.optString("message")}", DiagnosticCategory.ENGINE)
         } else {
-            argentumLastError = incoming.optString("message", "Argentum returned an error."); message = argentumLastError; argentumAwaitingUpdate = false; argentumXChecking = null
-            recordDiagnostic("Argentum error ${incoming.optString("code")}: ${argentumLastError}", DiagnosticCategory.ERROR)
+            val text = incoming.optString("message", "Argentum returned an error.")
+            message = text
+            // Before a game the waiting screen also shows it. During a game the pop-up is enough; it
+            // must not linger and reappear later on the home screen.
+            if (argentumSnapshot == null && !homeOpen) argentumLastError = text
+            argentumAwaitingUpdate = false; argentumXChecking = null
+            recordDiagnostic("Argentum error ${incoming.optString("code")}: $text", DiagnosticCategory.ERROR)
         }
     }
 }
@@ -671,7 +676,7 @@ internal fun TableController.startArgentumPractice(vsAi: Boolean = true, joinLob
             }
             if (unsupported.isNotEmpty()) {
                 // Substitutions apply to this Argentum game only; the saved Arcana deck is untouched.
-                message = "For this Argentum game, ${unsupported.size} unsupported card(s) were left out${if (replacementCommander) " and $commanderForGame is commander" else ""}; ${replacementBasics.size} supported basic land(s) fill the gap. Your saved deck is unchanged."
+                // Logged, not shown: the deck editor already lists unsupported cards and swaps.
                 recordDiagnostic("Player chose to play without ${unsupported.size} unsupported card(s); ${replacementBasics.size} basic land(s) added for this game only", DiagnosticCategory.UNSUPPORTED)
             }
             argentumDeckForLobby = submitted
@@ -726,6 +731,8 @@ internal fun TableController.closeArgentumSession(concede: Boolean) {
     argentumLastCompletedEngineMs = null
     argentumEnabled = false
     argentumOffline = false
+    // A finished or abandoned session's last error must not reappear on the home screen.
+    argentumLastError = null
     setArgentumGameActive(false)
     argentumSnapshot = null
     argentumPendingDecision = null
