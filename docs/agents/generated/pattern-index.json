@@ -634,7 +634,7 @@
    ]
   },
   "Costs.additional": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Acorn Harvest",
@@ -653,6 +653,12 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/SavageOrder.kt",
      "lines": 33,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/SavageOrderScenarioTest.kt"
+    },
+    {
+     "card": "Anrakyr the Traveller",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AnrakyrTheTraveller.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AnrakyrTheTravellerScenarioTest.kt"
     }
    ]
   }
@@ -1359,6 +1365,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ViolentOutburst.kt",
      "lines": 44,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ViolentOutburstScenarioTest.kt"
+    }
+   ]
+  },
+  "Effects.CastFromCollectionByPaying": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Anrakyr the Traveller",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AnrakyrTheTraveller.kt",
+     "lines": 46,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AnrakyrTheTravellerScenarioTest.kt"
     }
    ]
   },
@@ -2405,7 +2422,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -3749,7 +3766,7 @@
    ]
   },
   "Triggers.self.attacks": {
-   "count": 14,
+   "count": 15,
    "examples": [
     {
      "card": "Ulamog's Crusher",
@@ -4539,7 +4556,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 121,
+   "count": 122,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6225,7 +6242,7 @@
    ]
   },
   "GameObjectFilter.Artifact": {
-   "count": 18,
+   "count": 19,
    "examples": [
     {
      "card": "Skorpekh Destroyer",
@@ -6835,7 +6852,7 @@
    ]
   },
   "Player.You": {
-   "count": 33,
+   "count": 34,
    "examples": [
     {
      "card": "Defile",
