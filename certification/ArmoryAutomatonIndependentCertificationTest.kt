@@ -73,6 +73,21 @@ class ArmoryAutomatonIndependentCertificationTest {
     }
 
     @Test
+    fun choosingNoEquipmentIsLegal() {
+        val d = customScenario(ArmoryAutomaton, "Bonesplitter")
+        val player = d.player1
+        val equipment = d.putPermanentOnBattlefield(player, "Bonesplitter")
+        val card = d.putCardInHand(player, "Armory Automaton")
+        d.giveColorlessMana(player, 3)
+
+        assertNull(d.castSpell(player, card).error)
+        d.resolveAll(Choices(yes = true))
+
+        assertNull(d.state.getEntity(equipment)?.get<AttachedToComponent>())
+        assertTrue(d.permanentsNamed(player, "Armory Automaton").contains(card))
+    }
+
+    @Test
     fun attackingTriggersAnOptionalEquipmentAttachment() {
         val d = customScenario(ArmoryAutomaton, "Bonesplitter")
         val player = d.player1
