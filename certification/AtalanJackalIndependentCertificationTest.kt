@@ -2,6 +2,7 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.AtalanJackal
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.CombatResolutionDecision
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Keyword
 import com.wingedsheep.sdk.core.Step
@@ -119,6 +120,9 @@ class AtalanJackalIndependentCertificationTest {
         assertNull(d.declareBlockers(opponent, mapOf(blocker to listOf(jackal))).error)
         d.passPriorityUntil(Step.COMBAT_DAMAGE)
 
+        // Reaching the damage step pauses on the damage assignment board.
+        assertTrue(d.state.pendingDecision is CombatResolutionDecision)
+        assertNull(d.confirmCombatDamage().error)
         assertEquals(19, d.getLifeTotal(opponent))
         assertTrue(d.getGraveyardCardNames(opponent).contains("Llanowar Elves"))
         d.resolveAll(Choices(yes = true, pick = listOf("Forest")))
