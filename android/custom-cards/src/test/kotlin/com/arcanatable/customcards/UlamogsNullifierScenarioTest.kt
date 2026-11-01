@@ -1063,7 +1063,8 @@ class UlamogsNullifierScenarioTest {
         val choice = d.state.pendingDecision as? com.wingedsheep.engine.core.SelectCardsDecision
             ?: throw AssertionError("Nullifier must present a real two-card selection")
         assertTrue(granted in choice.options)
-        assertTrue(unrelated in choice.options)
+        assertTrue("Unrelated face-down opponent-owned exile must be selectable; unrelated=$unrelated granted=$granted options=${choice.options} opponentExile=${d.getExileCardNames(d.player2)}",
+            unrelated in choice.options)
         val visibility = com.wingedsheep.engine.view.Visibility(
             d.cardRegistry, conditionEvaluator = d.services.conditionEvaluator)
         val masker = com.wingedsheep.engine.view.DecisionMasker(visibility)
