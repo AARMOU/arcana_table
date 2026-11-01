@@ -1,0 +1,9 @@
+{
+  "key": "bane-of-bala-ged",
+  "name": "Bane of Bala Ged",
+  "issue": 790,
+  "source": "certification/BaneOfBalaGedIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.BaneOfBalaGedIndependentCertificationTest",
+  "tests": 3,
+  "target": "build"
+}
