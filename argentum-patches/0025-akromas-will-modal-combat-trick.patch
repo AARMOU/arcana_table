@@ -45,7 +45,7 @@ index e5b1afd15d..6c0466d1b5 100644
  
          val repeatable = repeatableOf(card, scripts)
          val arrivalTags = arrivalTagsOf(card, scripts, tags)
-@@ -516,6 +524,31 @@ object CardIntentAnalyzer {
+@@ -516,6 +524,30 @@ object CardIntentAnalyzer {
                  isExpiringPump(it) && (it as ModifyStatsEffect).target == EffectTarget.IterationEntity
              }
  
