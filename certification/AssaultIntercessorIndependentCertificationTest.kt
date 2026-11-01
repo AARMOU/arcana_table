@@ -50,16 +50,16 @@ class AssaultIntercessorIndependentCertificationTest {
     }
 
     @Test
-    fun firstStrikeKillsTheBlockerBeforeItDealsDamageAndChainswordTriggers() {
+    fun firstStrikeKillsTheAttackerBeforeItDealsDamageAndChainswordTriggers() {
         val d = customScenario(AssaultIntercessor, "Grizzly Bears")
         val intercessor = d.putCreatureOnBattlefield(d.player1, name)
         val blocker = d.putCreatureOnBattlefield(d.player2, "Grizzly Bears")
-        d.removeSummoningSickness(intercessor)
-        d.passPriorityUntil(Step.DECLARE_ATTACKERS)
+        d.removeSummoningSickness(blocker)
+        d.passPriorityUntil(Step.DECLARE_ATTACKERS, activePlayer = d.player2)
 
-        assertNull(d.declareAttackers(d.player1, listOf(intercessor), d.player2).error)
+        assertNull(d.declareAttackers(d.player2, listOf(blocker), d.player1).error)
         d.passPriorityUntil(Step.DECLARE_BLOCKERS)
-        assertNull(d.declareBlockers(d.player2, mapOf(blocker to listOf(intercessor))).error)
+        assertNull(d.declareBlockers(d.player1, mapOf(intercessor to listOf(blocker))).error)
         d.passPriorityUntil(Step.POSTCOMBAT_MAIN)
         d.resolveAll()
 
