@@ -40,7 +40,7 @@ class BaneOfBalaGedIndependentCertificationTest {
         val ring = d.putPermanentOnBattlefield(defender, "Sol Ring")
         val bear = d.putPermanentOnBattlefield(defender, "Grizzly Bears")
         val arena = d.putPermanentOnBattlefield(defender, "Phyrexian Arena")
-        val ownPermanent = d.putPermanentOnBattlefield(d.player1, "Llanowar Elves")
+        val ownPermanent = d.putPermanentOnBattlefield(d.player1, "Sol Ring")
 
         d.attackBane(bane)
         d.resolveAll(Choices(pick = listOf("Sol Ring", "Grizzly Bears")))
