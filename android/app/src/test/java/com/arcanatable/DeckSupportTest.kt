@@ -215,8 +215,16 @@ class DeckSupportTest {
         val upstreamRows = matchingRows(upstreamFile)
         assertEquals("every probed card must remain in the shipped library",
             names, customRows.keys + upstreamRows.keys)
-        assertTrue("upstream cards must not retain shadowing custom definitions",
-            customRows.keys.intersect(upstreamRows.keys).isEmpty())
+        // The weekly keeps every Arcana definition (custom-cards.jsonl), so a card Argentum adopted may
+        // appear in both files. It must not be shadowed: the deck builder resolves it to Argentum's row,
+        // unless custom-overrides.txt keeps Arcana's version in play, exactly as the game does.
+        val overrides = File(assets, "argentum/custom-overrides.txt").takeIf(File::isFile)
+            ?.useLines(OfflineCardLibrary::parseOverrides).orEmpty()
+        val catalog = SupportedCardCatalog.load { path -> File(assets, path).takeIf(File::isFile)?.inputStream() }
+        customRows.keys.intersect(upstreamRows.keys).forEach { name ->
+            assertEquals("$name resolves to Argentum's card unless overridden",
+                name.lowercase() in overrides, catalog.find(name)!!.custom)
+        }
         (customRows.mapValues { true to it.value } + upstreamRows.mapValues { false to it.value })
             .forEach { (name, source) ->
                 val (custom, line) = source
