@@ -1,0 +1,9 @@
+{
+  "key": "cranial-plating",
+  "name": "Cranial Plating",
+  "issue": 832,
+  "source": "certification/CranialPlatingIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.CranialPlatingIndependentCertificationTest",
+  "tests": 9,
+  "target": "build"
+}
