@@ -147,6 +147,7 @@ class ArcoFlagellantIndependentCertificationTest {
         d.giveColorlessMana(opponent, 1)
 
         assertNull(d.castSpell(opponent, murder, listOf(arco)).error)
+        assertNull(d.passPriority(opponent).error)
         assertNull(d.activate(p, arco).error)
         assertEquals(17, d.getLifeTotal(p))
         assertFalse(d.projected.hasKeyword(arco, Keyword.INDESTRUCTIBLE))
