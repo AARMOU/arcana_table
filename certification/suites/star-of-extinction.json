@@ -1,0 +1,8 @@
+{
+  "key": "star-of-extinction",
+  "name": "Star of Extinction",
+  "issue": 748,
+  "source": "certification/StarOfExtinctionIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.StarOfExtinctionIndependentCertificationTest",
+  "tests": 7
+}
