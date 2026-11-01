@@ -1,0 +1,9 @@
+{
+  "key": "bismuth-mindrender",
+  "name": "Bismuth Mindrender",
+  "issue": 799,
+  "source": "certification/BismuthMindrenderIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.BismuthMindrenderIndependentCertificationTest",
+  "tests": 4,
+  "target": "build"
+}
