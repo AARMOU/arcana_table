@@ -11,6 +11,10 @@ on:
     - cron: '19 7 * * *'
 permissions:
   contents: read
+# Owner-confirmed numbered build source; fail closed on drift.
+env:
+  ARCANA_DECK_AUDIT_SOURCE_REF: gpt/b140-card-request-test-apk-20261028
+  ARCANA_DECK_AUDIT_SOURCE_SHA: f0728e20d1013fe3d9202e0cb5d1cb366c62a4ef
 jobs:
   test:
     if: github.event_name == 'pull_request'
@@ -39,7 +43,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@v4
         with:
-          ref: gpt/arcana-integration-next
+          ref: ${{ env.ARCANA_DECK_AUDIT_SOURCE_SHA }}
           path: source
           persist-credentials: false
       - uses: actions/setup-node@v4
@@ -51,7 +55,13 @@ jobs:
         run: |
           set -euo pipefail
           SRC_SHA="$(git -C source rev-parse HEAD)"
-          node code/tools/deck-gap-audit.cjs --root source --source-ref "gpt/arcana-integration-next@$SRC_SHA" --json output/report.json --markdown output/report.md
+          test "$SRC_SHA" = "$ARCANA_DECK_AUDIT_SOURCE_SHA"
+          REMOTE_SHA="$(git ls-remote https://github.com/AARMOU/arcana_table.git "refs/heads/$ARCANA_DECK_AUDIT_SOURCE_REF" | cut -f1)"
+          if [ "$REMOTE_SHA" != "$SRC_SHA" ]; then
+            echo "::error::Confirmed build branch moved or cannot be verified. Reconcile owner-confirmed build before updating #321."
+            exit 1
+          fi
+          node code/tools/deck-gap-audit.cjs --root source --source-ref "$ARCANA_DECK_AUDIT_SOURCE_REF@$SRC_SHA" --json output/report.json --markdown output/report.md
       - name: Restore GitHub API ETag cache (304 Not Modified does not count against the API quota)
         uses: actions/cache/restore@v4
         with:
