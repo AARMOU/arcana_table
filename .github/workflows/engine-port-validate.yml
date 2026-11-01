@@ -51,7 +51,7 @@ jobs:
             ./scripts/gradle-locked --no-daemon --max-workers=2 --continue \
             -PkotlinCompileParallelism=1 -Pkotlin.compiler.execution.strategy=in-process \
             '-Dorg.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=768m' \
-            :mtg-sdk:test :rules-engine:test :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar
+            :mtg-sdk:test :rules-engine:test :mtg-sdk:jar :mtg-sdk-tooling:jar :rules-engine:jar :ai:jar :arcana-export:run
       - name: Engine test summary (failures listed)
         id: enginesummary
         if: always()
@@ -70,22 +70,10 @@ jobs:
           print({"tests":t,"failed":f}); print("\n".join(bad[:200]))
           assert t>1000 and f==0
           PY
-      - name: Swap the four JARs into the app workspace (not committed)
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import zipfile,struct,shutil
-          mods={"argentum-mtg-sdk.jar":"mtg-sdk","argentum-mtg-sdk-tooling.jar":"mtg-sdk-tooling",
-                "argentum-rules-engine.jar":"rules-engine","argentum-ai.jar":"ai"}
-          for dest,mod in mods.items():
-            jars=[p for p in Path(f"argentum-engine/{mod}/build/libs").glob("*.jar")
-                  if not any(s in p.name for s in ("sources","javadoc","test"))]
-            assert len(jars)==1,(mod,jars)
-            with zipfile.ZipFile(jars[0]) as z:
-              v=max(struct.unpack(">H",z.read(n)[6:8])[0] for n in z.namelist() if n.endswith(".class"))
-            assert v<=61,(mod,v)
-            shutil.copyfile(jars[0],Path("android/app/libs")/dest); print(dest,v)
-          PY
+      - name: Keep the shipped card data for comparison
+        run: cp -r android/app/src/main/assets/argentum "$RUNNER_TEMP/old-assets"
+      - name: Install the ported engine into the app workspace, as the weekly does (not committed)
+        run: python3 engine-upgrade/weekly.py install argentum-engine
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -98,19 +86,31 @@ jobs:
         run: |
           set -euo pipefail
           cp -rv engine-upgrade/upstream-port-wip/cards/. android/
-      - name: Every Arcana custom-card test on the ported engine
+      - name: Imported cards against the new library
+        continue-on-error: true
+        run: python3 engine-upgrade/weekly.py cards "$RUNNER_TEMP/old-assets"
+      - name: Custom cards on the ported engine (export, scenario tests, collisions reconciled as the weekly does)
+        id: custom
+        continue-on-error: true
+        run: |
+          python3 engine-upgrade/weekly.py reconcile
+          cat engine-upgrade/weekly/reconcile.md >> "$GITHUB_STEP_SUMMARY" || true
+      - name: App unit tests on the ported engine
+        id: app
+        continue-on-error: true
         working-directory: android
         run: |
-          bash ../engine-upgrade/build140/run_gradle.sh port-custom-cards \
-            ./gradlew --no-daemon --max-workers=2 --continue :custom-cards:test
-      - name: Card test summary (failures listed)
+          bash ../engine-upgrade/build140/run_gradle.sh port-app \
+            ./gradlew --no-daemon --max-workers=2 --continue :app:testDebugUnitTest
+      - name: Card and app test summary (failures listed)
         if: always()
         run: |
           python3 - <<'PY'
           from xml.etree import ElementTree as E
           from pathlib import Path
           t=f=0; bad=[]
-          for p in Path("android/custom-cards/build/test-results/test").glob("TEST-*.xml"):
+          for p in [*Path("android/custom-cards/build/test-results/test").glob("TEST-*.xml"),
+                    *Path("android/app/build/test-results/testDebugUnitTest").glob("TEST-*.xml")]:
             r=E.parse(p).getroot(); t+=int(r.get("tests","0"))
             for tc in r.iter("testcase"):
               if tc.find("failure") is not None or tc.find("error") is not None:
@@ -118,6 +118,11 @@ jobs:
           print({"tests":t,"failed":f}); print("\n".join(bad[:200]))
           assert t>500 and f==0
           PY
+      - name: Show the override list and engine diff summary
+        if: always()
+        run: |
+          cat android/app/src/main/assets/argentum/custom-overrides.txt 2>/dev/null || true
+          git status --short | head -40
       - name: Gate - engine suites green
         if: always()
         run: |
@@ -133,3 +138,5 @@ jobs:
             argentum-engine/rules-engine/build/test-results/test/*.xml
             argentum-engine/mtg-sdk/build/test-results/test/*.xml
             android/custom-cards/build/test-results/test/*.xml
+            android/app/build/test-results/testDebugUnitTest/*.xml
+            engine-upgrade/weekly/
