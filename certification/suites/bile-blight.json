@@ -1,0 +1,9 @@
+{
+  "key": "bile-blight",
+  "name": "Bile Blight",
+  "issue": 798,
+  "source": "certification/BileBlightIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.BileBlightIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
