@@ -1,0 +1,9 @@
+{
+  "key": "ugin-the-ineffable",
+  "name": "Ugin, the Ineffable",
+  "issue": 769,
+  "source": "certification/UginTheIneffableIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.UginTheIneffableIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
