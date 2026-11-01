@@ -68,9 +68,9 @@ class ArchOfOrazcaIndependentCertificationTest {
 
     @Test
     fun drawAbilityRequiresAllFiveGenericMana() {
-        val d = customScenario(ArchOfOrazca, "Grizzly Bears", "Sol Ring")
+        val d = customScenario(ArchOfOrazca, "Grizzly Bears")
         val p = d.player1
-        repeat(9) { d.putPermanentOnBattlefield(p, "Sol Ring") }
+        repeat(9) { d.putCreatureOnBattlefield(p, "Grizzly Bears") }
         val arch = d.playArch(p)
         d.giveColorlessMana(p, 4)
         val handBefore = d.getHandSize(p)
