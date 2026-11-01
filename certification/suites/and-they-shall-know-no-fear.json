@@ -4,5 +4,6 @@
   "issue": 781,
   "source": "certification/AndTheyShallKnowNoFearIndependentCertificationTest.kt",
   "testClass": "com.arcanatable.customcards.AndTheyShallKnowNoFearIndependentCertificationTest",
-  "tests": 14
+  "tests": 14,
+  "target": "build"
 }
