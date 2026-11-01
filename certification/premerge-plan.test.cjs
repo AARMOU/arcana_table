@@ -21,7 +21,7 @@ test('shared infrastructure or manifest changes re-run every suite with an open 
   for (const f of ['certification/policy.cjs', 'certification/suites.json', '.github/workflows/arcana-card-certification-premerge.yml']) {
     const r = planPremerge({ manifest, changedFiles: [f, orb.source], openPrs: open });
     assert.deepEqual(r.include.map(i => i.key).sort(), ['poxwalkers', 'resurrection-orb']);
-    assert.ok(r.missing.length === manifest.suites.length - 2);
+    assert.ok(r.missing.length === manifest.suites.filter(s => s.target !== 'build').length - 2);
   }
 });
 
