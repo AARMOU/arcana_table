@@ -3456,7 +3456,7 @@
     {
      "card": "Thunderhawk Gunship",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/ThunderhawkGunship.kt",
-     "lines": 50,
+     "lines": 51,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/ThunderhawkGunshipScenarioTest.kt"
     }
    ]

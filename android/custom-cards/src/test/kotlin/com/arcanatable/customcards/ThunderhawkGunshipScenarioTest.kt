@@ -27,6 +27,7 @@ class ThunderhawkGunshipScenarioTest {
         assertTrue(d.projected.hasKeyword(vehicle, Keyword.FLYING))
         val tokens = d.getCreatures(p).filter { d.state.getEntity(it)!!.has<TokenComponent>() }
         assertEquals(2, tokens.size)
+        assertEquals(2, d.permanentsNamed(p, "Astartes Warrior").size)
         tokens.forEach { token ->
             assertEquals(2, d.projected.getPower(token))
             assertEquals(2, d.projected.getToughness(token))

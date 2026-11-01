@@ -29,6 +29,7 @@ val ThunderhawkGunship = card("Thunderhawk Gunship") {
             colors = setOf(Color.WHITE),
             creatureTypes = setOf("Astartes", "Warrior"),
             keywords = setOf(Keyword.VIGILANCE),
+            name = "Astartes Warrior",
         )
     }
 
