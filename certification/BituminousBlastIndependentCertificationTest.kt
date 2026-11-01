@@ -30,6 +30,7 @@ class BituminousBlastIndependentCertificationTest {
         val player = d.player1
         val target = d.putCreatureOnBattlefield(d.player2, "Colossal Dreadmaw")
         val spell = d.putCardInHand(player, "Bituminous Blast")
+        val initialLibrary = d.zoneNames(player, Zone.LIBRARY)
         d.putCardOnTopOfLibrary(player, "Island")
         d.putCardOnTopOfLibrary(player, "Grizzly Bears")
         d.putCardOnTopOfLibrary(player, "Serra Angel")
@@ -53,9 +54,9 @@ class BituminousBlastIndependentCertificationTest {
         assertEquals(0, d.manaPool(player).black)
         assertEquals(0, d.manaPool(player).red)
         val library = d.zoneNames(player, Zone.LIBRARY)
-        assertEquals(43, library.size)
+        assertEquals(initialLibrary.size + 3, library.size)
         assertEquals("Island", library.first())
-        assertEquals(40, library.count { it == "Plains" })
+        assertEquals(initialLibrary.count { it == "Plains" }, library.count { it == "Plains" })
         assertEquals(setOf("Forest", "Serra Angel"), library.takeLast(2).toSet())
         assertTrue(d.zoneNames(player, Zone.EXILE).isEmpty())
     }
