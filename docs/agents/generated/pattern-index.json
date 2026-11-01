@@ -1636,7 +1636,7 @@
     {
      "card": "Ulamog's Nullifier",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
-     "lines": 68,
+     "lines": 74,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
     }
    ]
@@ -8128,7 +8128,7 @@
     {
      "card": "Ulamog's Nullifier",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UlamogsNullifier.kt",
-     "lines": 68,
+     "lines": 74,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UlamogsNullifierScenarioTest.kt"
     }
    ]
