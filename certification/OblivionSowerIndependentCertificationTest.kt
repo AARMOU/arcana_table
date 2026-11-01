@@ -65,12 +65,12 @@ class OblivionSowerIndependentCertificationTest {
         assertNotNull(d.services.targetValidator.validateTargets(
             state = d.state, targets = listOf(ChosenTarget.Player(player)),
             requirements = binding.targetRequirements, casterId = player,
-            sourceId = sower, targetingSourceType = TargetingSourceType.ABILITY,
+            sourceId = sower, targetingSourceType = TargetingSourceType.TRIGGERED_ABILITY,
         ))
         assertNull(d.services.targetValidator.validateTargets(
             state = d.state, targets = listOf(ChosenTarget.Player(opponent)),
             requirements = binding.targetRequirements, casterId = player,
-            sourceId = sower, targetingSourceType = TargetingSourceType.ABILITY,
+            sourceId = sower, targetingSourceType = TargetingSourceType.TRIGGERED_ABILITY,
         ))
         d.resolveAll(Choices(pick = emptyList()))
 
