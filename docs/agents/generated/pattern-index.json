@@ -17,6 +17,17 @@
     }
    ]
   },
+  "Conditions.CollectionContainsMatch": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Aspiring Champion",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AspiringChampion.kt",
+     "lines": 60,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AspiringChampionScenarioTest.kt"
+    }
+   ]
+  },
   "Conditions.CompareAmounts": {
    "count": 10,
    "examples": [
@@ -982,6 +993,17 @@
     }
    ]
   },
+  "DynamicAmounts.powerOf": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Aspiring Champion",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AspiringChampion.kt",
+     "lines": 60,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AspiringChampionScenarioTest.kt"
+    }
+   ]
+  },
   "DynamicAmounts.replacementLifeGainAmount": {
    "count": 1,
    "examples": [
@@ -1878,7 +1900,7 @@
    ]
   },
   "Effects.DealDamage": {
-   "count": 22,
+   "count": 23,
    "examples": [
     {
      "card": "Noise Marine",
@@ -2431,7 +2453,7 @@
    ]
   },
   "Effects.If": {
-   "count": 13,
+   "count": 14,
    "examples": [
     {
      "card": "Grey Knight Paragon",
@@ -2472,13 +2494,19 @@
    ]
   },
   "Effects.IfYouDo": {
-   "count": 3,
+   "count": 4,
    "examples": [
     {
      "card": "Kozilek's Return",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/KozileksReturn.kt",
      "lines": 58,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/KozileksReturnScenarioTest.kt"
+    },
+    {
+     "card": "Aspiring Champion",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AspiringChampion.kt",
+     "lines": 60,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AspiringChampionScenarioTest.kt"
     },
     {
      "card": "Matter Reshaper",
@@ -2767,7 +2795,7 @@
    ]
   },
   "Effects.Pipeline": {
-   "count": 23,
+   "count": 24,
    "examples": [
     {
      "card": "Bane of Bala Ged",
@@ -3039,13 +3067,19 @@
    ]
   },
   "Effects.ShuffleLibrary": {
-   "count": 1,
+   "count": 2,
    "examples": [
     {
      "card": "Traverse the Outlands",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/TraverseTheOutlands.kt",
      "lines": 42,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/TraverseTheOutlandsScenarioTest.kt"
+    },
+    {
+     "card": "Aspiring Champion",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AspiringChampion.kt",
+     "lines": 60,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AspiringChampionScenarioTest.kt"
     }
    ]
   },
@@ -3636,7 +3670,7 @@
    ]
   },
   "Keyword.MENACE": {
-   "count": 6,
+   "count": 7,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -4375,7 +4409,7 @@
    ]
   },
   "Triggers.self.dealsCombatDamage": {
-   "count": 9,
+   "count": 10,
    "examples": [
     {
      "card": "Atalan Jackal",
@@ -4876,7 +4910,7 @@
    ]
   },
   "keywords()": {
-   "count": 99,
+   "count": 100,
    "examples": [
     {
      "card": "Frog-Squirrels",
@@ -4924,6 +4958,17 @@
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/UginTheIneffable.kt",
      "lines": 96,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/UginTheIneffableScenarioTest.kt"
+    }
+   ]
+  },
+  "move()": {
+   "count": 1,
+   "examples": [
+    {
+     "card": "Aspiring Champion",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AspiringChampion.kt",
+     "lines": 60,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AspiringChampionScenarioTest.kt"
     }
    ]
   },
@@ -5020,9 +5065,26 @@
     }
    ]
   },
-  "run()": {
-   "count": 2,
+  "reveal()": {
+   "count": 1,
    "examples": [
+    {
+     "card": "Aspiring Champion",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AspiringChampion.kt",
+     "lines": 60,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AspiringChampionScenarioTest.kt"
+    }
+   ]
+  },
+  "run()": {
+   "count": 3,
+   "examples": [
+    {
+     "card": "Aspiring Champion",
+     "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AspiringChampion.kt",
+     "lines": 60,
+     "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AspiringChampionScenarioTest.kt"
+    },
     {
      "card": "Matter Reshaper",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/MatterReshaper.kt",
@@ -5161,7 +5223,7 @@
    ]
   },
   "triggeredAbility { }": {
-   "count": 150,
+   "count": 151,
    "examples": [
     {
      "card": "Chaos Terminator Lord",
@@ -6794,7 +6856,7 @@
    ]
   },
   "EffectTarget.PlayerRef": {
-   "count": 23,
+   "count": 24,
    "examples": [
     {
      "card": "Assault Intercessor",
@@ -7155,7 +7217,7 @@
    ]
   },
   "GameObjectFilter.Creature": {
-   "count": 110,
+   "count": 111,
    "examples": [
     {
      "card": "Their Name Is Death",
@@ -7591,7 +7653,7 @@
    ]
   },
   "Player.EachOpponent": {
-   "count": 19,
+   "count": 20,
    "examples": [
     {
      "card": "Silence",
@@ -7707,7 +7769,7 @@
    ]
   },
   "Player.You": {
-   "count": 40,
+   "count": 41,
    "examples": [
     {
      "card": "Defile",
