@@ -143,6 +143,18 @@ import kotlinx.coroutines.CoroutineScope
 internal fun shouldFollowActivePlayerToBoard(followEnabled: Boolean, showingTable: Boolean, active: Int, playerCount: Int): Boolean =
     followEnabled && !showingTable && active in 0 until playerCount
 
+/**
+ * A 2–4 seat lobby is already a live connection, even before Argentum starts a game.
+ * The legacy room fields are null for both ArgentumLanMultiServer and ArgentumCloudMultiHost.
+ */
+internal fun shouldKeepMultiplayerConnectionGuard(
+    legacyHost: Boolean,
+    legacyClient: Boolean,
+    cloudClient: Boolean,
+    multiTransport: Boolean,
+    argentumEnabled: Boolean,
+): Boolean = legacyHost || legacyClient || cloudClient || multiTransport || argentumEnabled
+
 /** All of the main screen's effects (LaunchedEffect / SideEffect / DisposableEffect). */
 @Composable
 internal fun TableController.TableEffects(darkMode: Boolean) {
@@ -231,9 +243,15 @@ internal fun TableController.TableEffects(darkMode: Boolean) {
         selectedPlayer = active
     }
 
-    LaunchedEffect(roomHost, roomClient, cloudRoomClient, argentumEnabled) {
-        if (roomHost != null || roomClient != null || cloudRoomClient != null || argentumEnabled) LanConnectionService.start(context)
-        else if (!argentumEnabled) LanConnectionService.stop(context)
+    // New multiplayer lobbies use wifiServer (LAN or directed cloud), not the legacy roomHost.
+    // Observe it as a key so the connection guard starts before a game is launched.
+    LaunchedEffect(roomHost, roomClient, cloudRoomClient, wifiServer, argentumEnabled) {
+        if (shouldKeepMultiplayerConnectionGuard(
+                roomHost != null, roomClient != null, cloudRoomClient != null,
+                wifiServer != null, argentumEnabled
+            )
+        ) LanConnectionService.start(context)
+        else LanConnectionService.stop(context)
     }
     LaunchedEffect(argentumEnabled) {
         if (argentumEnabled && argentumStatus == ArgentumConnectionStatus.DISCONNECTED) argentumSocket.connect(lobbyPlayerName)

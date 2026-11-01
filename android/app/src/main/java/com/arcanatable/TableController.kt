@@ -652,7 +652,8 @@ internal class TableController(
     /** Offline: card id whose real maximum X the engine is still working out for the open composer. */
     var argentumXChecking by run { mutableStateOf<String?>(null) }
     // Wi-Fi play (one phone hosts the engine, the other joins).
-    var wifiServer: ArgentumHostLink? = null
+    // Observable: a newly opened 2–4 seat lobby must activate the connection foreground service.
+    var wifiServer by run { mutableStateOf<ArgentumHostLink?>(null) }
     var onlineRoomCode by run { mutableStateOf<String?>(null) } // host: the code to share
     var onlineJoinOpen by run { mutableStateOf(false) }
     var onlineCodeInput by run { mutableStateOf("") }
@@ -730,6 +731,7 @@ internal class TableController(
     var aiRecaps by run { mutableStateOf(emptyList<TurnRecapEntry>()) }
     var recapText by run { mutableStateOf<String?>(null) }
     var argentumMulliganPrompt by run { mutableStateOf(false) }
+    var argentumOpeningHand by run { mutableStateOf<List<GameCard>>(emptyList()) }
     var argentumBottomCardIds by run { mutableStateOf<List<String>?>(null) }
     var argentumBottomCardCount by run { mutableIntStateOf(0) }
     var argentumBottomSelection by run { mutableStateOf<Set<String>>(emptySet()) }

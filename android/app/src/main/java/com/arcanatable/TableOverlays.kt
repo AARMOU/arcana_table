@@ -499,8 +499,10 @@ internal fun TableController.TableOverlays() {
         dismissButton = { TextButton(onClick = { argentumLeaveConfirm = false }) { Text("CANCEL") } }
     )
 
+    // The hand Argentum dealt (kept from the mulligan decision), falling back to the seat's hand.
+    val openingHand = argentumOpeningHand.ifEmpty { players.getOrNull(localSeat)?.hand.orEmpty() }
     if (argentumMulliganPrompt && argentumSnapshot == null) ArgentumOpeningHandScreen(
-        cards = players.getOrNull(localSeat)?.hand.orEmpty(),
+        cards = openingHand,
         title = "Opening hand",
         subtitle = argentumMulliganInfo?.let { (count, onPlay, cardsToBottom) ->
             listOfNotNull(
@@ -513,7 +515,7 @@ internal fun TableController.TableOverlays() {
             ).joinToString(" · ")
         } ?: "Argentum dealt your opening seven.",
         selectable = false, selection = emptySet(), onToggle = {},
-        primaryLabel = "KEEP ${players.getOrNull(localSeat)?.hand?.size ?: 7}", primaryEnabled = !argentumAwaitingUpdate,
+        primaryLabel = "KEEP ${openingHand.size}", primaryEnabled = !argentumAwaitingUpdate && openingHand.isNotEmpty(),
         onPrimary = { if (argentumSocket.keepHand()) { argentumMulliganPrompt = false; argentumAwaitingUpdate = true; tutorialKeepPending = tutorialPracticeActive; recordDiagnostic("Kept opening hand", DiagnosticCategory.ACTION) } },
         secondaryLabel = "MULLIGAN", secondaryEnabled = !argentumAwaitingUpdate,
         onSecondary = { if (argentumSocket.mulligan()) { argentumAwaitingUpdate = true; tutorialMulliganPending = tutorialPracticeActive; recordDiagnostic("Took a mulligan", DiagnosticCategory.ACTION) } },
@@ -521,7 +523,7 @@ internal fun TableController.TableOverlays() {
 
     argentumBottomCardIds?.let { ids ->
         val idFor = { serverId: String -> (serverId.hashCode() and 0x7fffffff).coerceAtLeast(1) }
-        val hand = players.getOrNull(localSeat)?.hand.orEmpty()
+        val hand = openingHand
         ArgentumOpeningHandScreen(
             cards = ids.mapNotNull { id -> hand.firstOrNull { it.id == idFor(id) } },
             title = "Put ${argentumBottomCardCount} on the bottom",

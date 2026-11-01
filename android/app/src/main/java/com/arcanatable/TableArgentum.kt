@@ -554,6 +554,9 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                     toughness = detail.opt("toughness")?.toString()?.takeUnless { it == "null" }
                 )
             }
+            // Keep the dealt hand for the opening-hand screens: a guest's seat state can lag or be
+            // replaced by a state update before the decision is answered (#304).
+            argentumOpeningHand = hand
             if (hand.isNotEmpty()) players = players.mapIndexed { index, player ->
                 if (index == localSeat) player.copy(hand = hand) else player
             }
@@ -577,7 +580,7 @@ internal fun TableController.handleArgentumMessage(incoming: JSONObject) {
                 recordDiagnostic("X for ${plan.description}: up to $max (engine ${incoming.optLong("engineMs", -1)} ms)", DiagnosticCategory.ENGINE)
             }
         }
-        "mulliganComplete" -> { argentumMulliganPrompt = false; argentumAwaitingUpdate = false }
+        "mulliganComplete" -> { argentumMulliganPrompt = false; argentumOpeningHand = emptyList(); argentumAwaitingUpdate = false }
         "gameOver" -> {
             argentumMatchUnfinished = incoming.optBoolean("matchUnfinished")
             setArgentumGameActive(false)
