@@ -1,0 +1,9 @@
+{
+  "key": "bloodcrusher-of-khorne",
+  "name": "Bloodcrusher of Khorne",
+  "issue": 810,
+  "source": "certification/BloodcrusherOfKhorneIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.BloodcrusherOfKhorneIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
