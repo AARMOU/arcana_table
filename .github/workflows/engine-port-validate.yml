@@ -94,6 +94,10 @@ jobs:
         with:
           packages: platform-tools
       - run: sdkmanager 'platforms;android-36' 'build-tools;36.0.0'
+      - name: Card sources that must change with the engine (port overlay, not committed)
+        run: |
+          set -euo pipefail
+          cp -rv engine-upgrade/upstream-port-wip/cards/. android/
       - name: Every Arcana custom-card test on the ported engine
         working-directory: android
         run: |

@@ -1,39 +1,44 @@
-# Upstream engine port: work in progress (NOT used by B141)
+# Upstream engine port (catch-up)
 
-Saved 2026-11-01 so the later full upgrade resumes from here instead of starting over. B141 does not use this; it
-ships the exact B140 engine plus targeted backports (`engine-upgrade/b141/`).
+Goal: put Arcana on current upstream Argentum once, so the Monday weekly upgrade can carry the app forward from then
+on. B141 still ships the B140 engine plus targeted backports (`engine-upgrade/b141/`) until this port is validated
+and the owner approves the swap.
 
-## What is done
-- **Target upstream:** `wingedsheep/argentum-engine@c1c04ca3265c61df913af6db65460ad4ce409614` (int-base's weekly upgrade).
-- `series/0001–0008`: int-base's rebased Arcana patches 0001–0008. They apply cleanly in order on `c1c04ca`.
-- `series/0009`: B140's `0012-colorless-hybrid-sdk`, replayed cleanly on top.
-- B140's exact engine reproduces as upstream `61e71e58` + the 19 manifest patches, in manifest order. 0004/0007
-  must use `engine-upgrade/forward-ports/` for that upstream.
+## State (2026-11-01)
+- **Upstream:** `UPSTREAM` = `wingedsheep/argentum-engine@c1c04ca3265c61df913af6db65460ad4ce409614`. It already
+  contains Encore, so the B141 Encore backport is not needed on this base.
+- **`series/`:** all 19 B140 manifest patches, ported in manifest order. They apply cleanly with `git am` on `UPSTREAM`.
+- **Local checks done:** `:rules-engine:compileKotlin` and `:rules-engine:compileTestKotlin` pass. The 0011
+  stack-copy engine tests pass (60/60), as does `StackObjectCopySdkTest`.
+- **CI:** `.github/workflows/engine-port-validate.yml` runs the full mtg-sdk and rules-engine suites, builds the four
+  JARs, and runs every Arcana custom-card test on them. It is validation only: no staging and no APK.
 
-## What remains (3-way cherry-pick from the B140 series onto the above)
-Conflicts measured each in isolation (some only conflict because a predecessor isn't applied yet):
+## How conflicts were resolved
+In every case Arcana's behaviour is kept, built on upstream's newer code. Where upstream already provides a
+capability, upstream's version is used.
 
-| B140 patch | Conflicting files on `c1c04ca` |
+| Patch | Resolution |
 |---|---|
-| 0011 stack-object copying | `docs/sdk-index.md`, `CopyEachTargetSpellExecutor.kt` (deleted upstream), `CopyTargetSpellOrAbilityExecutor.kt`, `CopyTargetTriggeredAbilityExecutor.kt`, `SpellCopyTargets.kt`, `StackPlacement.kt` |
-| 0013 colorless-hybrid floating payment | `ManaPool.kt` |
-| 0014 colorless-hybrid auto-tap | `ManaSolver.kt` |
-| 0015 granted cascade | `GrantedKeywordResolver.kt` |
-| 0016 granted-keyword MV cap | `CastTriggers.kt`, `GrantedKeywordResolver.kt` |
-| Temple 0001 | `ManaRestriction.kt`, `sdk-surface-baseline.txt`, `ManaPool.kt` |
-| Devoid 0002 | `ManaPool.kt`, `PaymentSubtypes.kt` |
-| build140 0001 Devoid SDK surface | `sdk-surface-baseline.txt` |
-| build140 0002 Temple subtypes | `ManaPool.kt` |
-| build140 0003 Azlask exact colors | `TriggerMatcher.kt` |
+| 0011 stack-object copying | Upstream deleted `CopyEachTargetSpellExecutor`; Twinning Staff now goes through `CopyTargetSpellExecutor`. Kept upstream's `triggerCause` and departed-ability last-known info, added Arcana's `emitTriggerEvent` and multi-object copy. |
+| 0013 colorless-hybrid pool | Built on upstream's `spendAsAnyColor` / snow `allocatesExactly`. `{C/x}` added to `substitutes` and the partial-pay options. |
+| 0014 colorless-hybrid auto-tap | Built on upstream's generic-barred retry pass, `remainingSources`, `colorlessPays` and snow stand-in. |
+| 0015 / 0016 granted cascade, MV cap | Upstream's projected spell `colors` (Mycosynth Lattice) is threaded alongside Arcana's cast-time mana value and `grantActive`. |
+| Temple / Devoid / build140 0001–0002 | Added next to upstream's `ColoredSpellsOnly` and `isClassLevelUpActivation`. Devoid and colorless checks read the projected spell colors. SDK surface baseline is the sorted union. |
+| build140 0003 Azlask | `HasExactlyColors` uses upstream's own `colors()` helper (layer 5, off-battlefield, then printed), so the patch is three lines. |
 
-Per-row intent, existing tests and `upstream-native / port-needed / blocked` classification: Work/Codex's 1a
-matrix on #81 (comment 6549165806). Int-base reconciliation (1b): #81 comment 6552272962.
+## Card sources that change with the engine
+`cards/` mirrors `android/`. It holds card files that must be swapped in together with the new JARs, because
+upstream retired an SDK type they use:
+- `PrimalAmulet.kt`: `ManaSpellRider.CopySpellWhenSpent` became `TriggersWhenSpent(filter, CopyTargetSpell(TriggeringEntity))`.
+  This is upstream #3746, which is how upstream migrated Pyromancer's Goggles. Taken from int-base (6ea1936).
 
-## How to resume
+## Reproduce
 ```
-git -C argentum-engine checkout c1c04ca3265c61df913af6db65460ad4ce409614
-git -C argentum-engine am engine-upgrade/upstream-port-wip/series/*.patch
-# build the B140 series (61e71e58 + 19 patches as commits), then for each remaining patch in manifest order:
-git -C argentum-engine cherry-pick <b140-series-commit>   # resolve; prefer upstream-native where upstream now has it
+git -C argentum-engine checkout $(cat engine-upgrade/upstream-port-wip/UPSTREAM)
+git -C argentum-engine am --3way engine-upgrade/upstream-port-wip/series/*.patch
 ```
-Gate each patch on its embedded engine tests before the next.
+
+## Next
+1. CI green on the engine suites and the card tests. Fix any failures in the series.
+2. Point the weekly upgrade's manifest and pin at this series and `UPSTREAM`, so Monday runs start from here.
+3. With owner approval, stage these JARs on the B141 candidate in place of the B140-plus-backports JARs.
