@@ -299,6 +299,7 @@ object CustomCards {
         Entry(OblivionSower, "M3C", "Eldrazi Incursion"),
         Entry(SireOfStagnation, "BFZ", "Eldrazi Incursion"),
         Entry(SufferThePast, "ROE", "Eldrazi Incursion"),
+        Entry(AspiringChampion, "40K", "Six WotC precons"),
         Entry(DragonsRageChanneler, "MH2", POOL),
         Entry(ArmoryAutomaton, "C16", POOL),
         Entry(KenrithsTransformation, "AFC", "Six WotC precons"),
