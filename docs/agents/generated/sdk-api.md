@@ -966,6 +966,7 @@ Kotlin properties appear as `name: Type` (`Triggers.self`, `Costs.Tap`).
 - `colorsAmongPermanents(Player, GameObjectFilter): DynamicAmount`*
 - `colorsOfManaSpent(ManaPayment): DynamicAmount`*
 - `colorsSpentOnTriggeringSpell(): DynamicAmount`
+- `commanderCastsFromCommandZone(Player): DynamicAmount`*
 - `commanderColorIdentityCount(Player): DynamicAmount`*
 - `conditional(Condition, DynamicAmount, DynamicAmount): DynamicAmount`
 - `conditional(Condition, Int, Int): DynamicAmount`

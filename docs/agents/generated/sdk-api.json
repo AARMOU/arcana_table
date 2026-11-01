@@ -2545,6 +2545,9 @@
    "colorsSpentOnTriggeringSpell": [
     "colorsSpentOnTriggeringSpell(): DynamicAmount"
    ],
+   "commanderCastsFromCommandZone": [
+    "commanderCastsFromCommandZone(Player): DynamicAmount"
+   ],
    "commanderColorIdentityCount": [
     "commanderColorIdentityCount(Player): DynamicAmount"
    ],
@@ -9271,6 +9274,7 @@
   "colorPairsAmongPermanents",
   "colorsAmongPermanents",
   "colorsOfManaSpent",
+  "commanderCastsFromCommandZone",
   "commanderColorIdentityCount",
   "connive",
   "conniveTargeting",
