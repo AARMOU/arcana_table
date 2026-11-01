@@ -100,9 +100,21 @@ function gh(token, fetchImpl) {
     const remaining = res.headers.get("x-ratelimit-remaining");
     const retryAfter = res.headers.get("retry-after");
     const message = String(body?.message || "");
-    const rateLimited = (res.status === 403 || res.status === 429) &&
-      (remaining === "0" || retryAfter !== null || /rate limit|secondary rate|abuse detection/i.test(message));
-    return { ok: res.ok, status: res.status, body, rateLimited };
+    const rateLimited = res.status === 429 || (res.status === 403 &&
+      (remaining === "0" || retryAfter !== null || /rate limit|secondary rate|abuse detection/i.test(message)));
+    const diagnostics = {};
+    const resource = res.headers.get("x-ratelimit-resource");
+    if (["core", "graphql", "search", "code_search", "integration_manifest"].includes(resource)) diagnostics.rateLimitResource = resource;
+    const reset = res.headers.get("x-ratelimit-reset");
+    // The primary reset is useful only when that quota is exhausted. Secondary limits
+    // use Retry-After; never automatically replay an owner decision or a GitHub write.
+    const resetMs = remaining === "0" && /^\d{1,11}$/.test(reset || "") ? Number(reset) * 1000 : NaN;
+    const retryMs = /^\d{1,5}$/.test(retryAfter || "") ? Date.now() + Number(retryAfter) * 1000 : Date.parse(retryAfter || "");
+    const retryAt = Math.max(Number.isFinite(resetMs) ? resetMs : 0, Number.isFinite(retryMs) ? retryMs : 0);
+    if (rateLimited && retryAt > Date.now() && retryAt <= Date.now() + 86400000) diagnostics.retryAt = new Date(retryAt).toISOString();
+    const requestId = res.headers.get("x-github-request-id");
+    if (/^[A-Za-z0-9:-]{1,100}$/.test(requestId || "")) diagnostics.requestId = requestId;
+    return { ok: res.ok, status: res.status, body, rateLimited, diagnostics };
   };
 }
 
@@ -118,6 +130,12 @@ export function prReadFailure(result) {
     upstreamStatus: Number.isInteger(result.status) ? result.status : null }];
 }
 
+function decisionFailure(result, stage, fallback) {
+  const failure = [401, 403, 429].includes(result.status) || stage === 'pr'
+    ? prReadFailure(result) : fallback;
+  return [failure[0], { ...failure[1], stage, ...(result.diagnostics || {}) }];
+}
+
 export function cleanNote(note) {
   // No mentions (so no agent or person is pinged), no HTML comments, bounded length.
   return String(note || "").replace(/@/g, "＠").replace(/<!--|-->/g, "").replace(/\r/g, "").trim().slice(0, 1000);
@@ -130,17 +148,18 @@ export async function decide(api, { pr, sha, decision, note }) {
   const text = cleanNote(note);
   if (decision === "request-fix" && text.length < 3) return [400, { error: "describe-the-fix" }];
   const p = await api(`/pulls/${pr}`);
-  if (!p.ok) return prReadFailure(p);
+  if (!p.ok) return decisionFailure(p, "pr");
   if (p.body.state !== "open") return [409, { error: "pr-not-open" }];
   if (!COPILOT.has(String(p.body.user?.login || "").toLowerCase())) return [422, { error: "not-a-copilot-card-pr" }];
   if (p.body.head?.sha !== sha) return [409, { error: "stale-commit", head: p.body.head?.sha || null }];
   const unitNo = Number((String(p.body.body || "").match(/(?:Fixes|Closes|Resolves|Unit:)\s*#(\d+)/i) || [])[1]);
   const unit = unitNo ? await api(`/issues/${unitNo}`) : { ok: false };
+  if (!unit.ok && unit.status) return decisionFailure(unit, "unit", [502, { error: "unit-unavailable" }]);
   if (!unit.ok || unit.body.state !== "open" || !String(unit.body.title || "").startsWith("[Arcana Queue]"))
     return [422, { error: "no-open-card-unit" }];
   const event = decision === "approve" ? "APPROVED" : "CHANGES_REQUESTED";
   const reviews = await api(`/pulls/${pr}/reviews?per_page=100`);
-  if (!reviews.ok) return [502, { error: "reviews-unavailable" }];
+  if (!reviews.ok) return decisionFailure(reviews, "reviews", [502, { error: "reviews-unavailable" }]);
   const mine = (reviews.body || []).filter(r => String(r.user?.login || "").toLowerCase() === OWNER && r.commit_id === sha &&
     ["APPROVED", "CHANGES_REQUESTED"].includes(r.state));
   if (mine.length && mine[mine.length - 1].state === event)
@@ -149,7 +168,8 @@ export async function decide(api, { pr, sha, decision, note }) {
     // The OAuth decision endpoint must enforce the same file-evidence gate as the read-only inbox.
     // A linked [Arcana Queue] issue or a green check is NOT evidence that a card exists.
     const changed = await api(`/pulls/${pr}/files?per_page=100`);
-    if (!changed.ok || !Array.isArray(changed.body)) return [502, { error: "changed-files-unavailable" }];
+    if (!changed.ok) return decisionFailure(changed, "files", [502, { error: "changed-files-unavailable" }]);
+    if (!Array.isArray(changed.body)) return [502, { error: "changed-files-unavailable" }];
     const filenames = changed.body.map(f => f.filename);
     // Pagination must not silently certify a partial file list.
     if (filenames.length >= 100) return [422, { error: "not-a-verified-card-implementation" }];
@@ -157,7 +177,7 @@ export async function decide(api, { pr, sha, decision, note }) {
     const hasScenarioTest = filenames.some(f => /^android\/custom-cards\/src\/test\/.+Test\.kt$/.test(f));
     if (!hasCardSource || !hasScenarioTest) return [422, { error: "not-a-verified-card-implementation" }];
     const checks = await api(`/commits/${sha}/check-runs?per_page=100`);
-    if (!checks.ok) return [502, { error: "checks-unavailable" }];
+    if (!checks.ok) return decisionFailure(checks, "checks", [502, { error: "checks-unavailable" }]);
     const runs = checks.body?.check_runs || [];
     const notGreen = runs.filter(r => !CONTROL_PLANE_CHECKS.has(r.name) && (r.status !== "completed" || !GREEN.has(r.conclusion))).map(r => r.name);
     if (!runs.length || notGreen.length) return [422, { error: "checks-not-green", checks: notGreen.slice(0, 10) }];
@@ -173,7 +193,8 @@ export async function decide(api, { pr, sha, decision, note }) {
       const ready = await api("https://api.github.com/graphql", { method: "POST", body: JSON.stringify({
         query: "mutation($id: ID!) { markPullRequestReadyForReview(input: {pullRequestId: $id}) { pullRequest { isDraft } } }",
         variables: { id: p.body.node_id } }) });
-      if (!ready.ok || ready.body?.errors || ready.body?.data?.markPullRequestReadyForReview?.pullRequest?.isDraft !== false)
+      if (!ready.ok) return decisionFailure(ready, "ready", [502, { error: "ready-for-review-failed" }]);
+      if (ready.body?.errors || ready.body?.data?.markPullRequestReadyForReview?.pullRequest?.isDraft !== false)
         return [502, { error: "ready-for-review-failed" }];
     }
   }
@@ -181,7 +202,7 @@ export async function decide(api, { pr, sha, decision, note }) {
     ? "**Owner verified this card** (Arcana Control). Sign-off for integration review only: not a merge, build, signing or release approval."
     : "**Owner requested a fix** (Arcana Control):\n\n" + text, decision === "approve" && text ? "\nNote: " + text : ""].join("\n");
   const r = await api(`/pulls/${pr}/reviews`, { method: "POST", body: JSON.stringify({ commit_id: sha, event: decision === "approve" ? "APPROVE" : "REQUEST_CHANGES", body }) });
-  if (!r.ok) return [r.status === 422 ? 422 : 502, { error: "review-not-recorded", status: r.status }];
+  if (!r.ok) return decisionFailure(r, "review", [r.status === 422 ? 422 : 502, { error: "review-not-recorded", status: r.status }]);
   if (decision === "request-fix") {
     const l = await api(`/issues/${unitNo}/labels`, { method: "POST", body: JSON.stringify({ labels: [FIX_LABEL] }) });
     if (!l.ok) return [207, { ok: true, state: "changes-requested", sha, warning: "fix-request-not-queued" }];

@@ -36,7 +36,7 @@ const memory = blocked => {
   };
 };
 function browser({ hash='', localBlocked=false, sessionBlocked=false, authStatus=200,
-  decisionStatus=200, decisionBody={ok:true,state:'approved'}, decisionThrows=false, decisionHold=null }={}) {
+  decisionStatus=200, decisionBody={ok:true,state:'approved'}, decisionThrows=false, decisionHold=null, reviewItem={}, oracleThrows=false }={}) {
   const localStorage=memory(localBlocked),sessionStorage=memory(sessionBlocked);
   const requests=[], listeners={}, location={ hash, pathname:'/arcana_table/control/',search:'',href:'' };
   const body = new Element('body');
@@ -52,7 +52,7 @@ function browser({ hash='', localBlocked=false, sessionBlocked=false, authStatus
       if(decisionThrows) throw Error('network-blocked');
       return new Response(JSON.stringify(decisionBody),{status:decisionStatus});
     }
-    if(url.includes('api.scryfall.com')) return new Response('{}');
+    if(url.includes('api.scryfall.com')) { if(oracleThrows) throw Error('offline'); return new Response('{}'); }
     throw Error('Unexpected network call');
   };
   const sandbox = {
@@ -61,7 +61,7 @@ function browser({ hash='', localBlocked=false, sessionBlocked=false, authStatus
   };
   vm.runInNewContext(src,sandbox,{filename:'review.js'});
   const item={ pr:360, headSha:'a'.repeat(40), state:'certified', certification:'certified',
-    card:'Test Card',kind:'card',hasTest:true,draft:false,checks:[],checkRuns:[],problems:[],abilities:[] };
+    card:'Test Card',kind:'card',hasTest:true,draft:false,checks:[],checkRuns:[],problems:[],abilities:[],...reviewItem };
   const host = new Element('div');
   const open = () => {
     sandbox.ArcanaReview.render(host,{items:[item]});
@@ -209,4 +209,16 @@ test('PR-read failure diagnostics tell the owner the next safe action and do not
     assert.equal(b.requests.filter(x=>x.url.endsWith('/v1/decision')).length,1);
     assert.ok(items(b.body).some(x=>x.textContent.includes('No approval recorded')));
   }
+});
+
+
+test('real review sheet shows the canonical card title and trusted Oracle while Scryfall is offline',async()=>{
+  const b=browser({oracleThrows:true,reviewItem:{card:'Zephyrim with Squad and Miracle',name:'Zephyrim',issue:703,
+    oracle:{source:'trusted-queue-snapshot',issue:703,record:{name:'Zephyrim',type_line:'Creature',oracle_text:'Squad {2}'}}}});
+  b.open();
+  await tick();
+  assert.ok(b.find('Zephyrim'));
+  assert.ok(items(b.body).some(x=>x.textContent.includes('Squad {2}') && x.textContent.includes('trusted queue Oracle snapshot')));
+  assert.equal(b.requests.some(x=>x.url.includes('scryfall')),false);
+  assert.equal(b.requests.some(x=>x.opts.method==='POST'),false);
 });

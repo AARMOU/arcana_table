@@ -82,3 +82,53 @@ test('dashboard loads it, the shell caches it and Pages publishes it', () => {
   assert.ok(fs.readFileSync(path.join(__dirname, '../.github/workflows/pages.yml'), 'utf8').includes('cp control/review.js _site/control/review.js'));
 });
 
+
+test('descriptive PR titles use the verified identity and trusted offline Oracle without a network call', async () => {
+  const item = {card:'Zephyrim with Squad and Miracle',name:'Zephyrim',issue:703,
+    oracle:{source:'trusted-queue-snapshot',issue:703,record:{name:'Zephyrim',mana_cost:'{3}{W}',
+      type_line:'Creature — Human Warrior',oracle_text:'Squad {2}\nFlying, vigilance\nMiracle {1}{W}'}}};
+  let calls=0;
+  const text = await R.loadOracle(item, async()=>{calls++;throw Error('offline');});
+  assert.match(text,/Squad \{2\}/);
+  assert.match(text,/Source: trusted queue Oracle snapshot/);
+  assert.equal(calls,0);
+});
+
+test('Oracle fallback uses the exact single-card identity and refuses unrelated or untrusted snapshots', async () => {
+  for (const oracle of [null,
+    {source:'untrusted',issue:703,record:{name:'Zephyrim',type_line:'WRONG'}},
+    {source:'trusted-queue-snapshot',issue:999,record:{name:'Zephyrim',type_line:'WRONG'}},
+    {source:'trusted-queue-snapshot',issue:703,record:{name:'Other Card',type_line:'WRONG'}}]) {
+    const text=await R.loadOracle({card:'Zephyrim with Squad and Miracle',name:'Zephyrim',issue:703,oracle},async url=>{
+      assert.equal(url,'https://api.scryfall.com/cards/named?exact=Zephyrim');
+      return new Response(JSON.stringify({name:'Zephyrim',type_line:'Creature',oracle_text:'Flying, vigilance'}));
+    });
+    assert.match(text,/Flying, vigilance/);
+    assert.doesNotMatch(text,/WRONG/);
+  }
+});
+
+test('missing identity, wrong-name Scryfall, and offline fallback never invent Oracle rules', async () => {
+  let calls=0;
+  assert.match(await R.loadOracle({card:'Implement any of two cards'},async()=>{calls++;}),/no single verified card name/);
+  assert.equal(calls,0);
+  assert.match(await R.loadOracle({name:'Zephyrim'},async()=>new Response(JSON.stringify({name:'Other',type_line:'WRONG'}))),/unavailable/);
+  assert.match(await R.loadOracle({name:'Zephyrim'},async()=>{throw Error('offline');}),/offline/);
+  assert.match(await R.loadOracle({name:'Plains'},async()=>new Response(JSON.stringify({name:'Plains',type_line:'Basic Land — Plains',oracle_text:''}))),/Basic Land/);
+});
+
+test('multi-face Oracle rules survive exact-name fallback', async () => {
+  const text=await R.loadOracle({name:'Front // Back'},async()=>new Response(JSON.stringify({name:'Front // Back',type_line:'Creature // Creature',
+    card_faces:[{name:'Front',oracle_text:'Flying'},{name:'Back',oracle_text:'Vigilance'}]})));
+  assert.match(text,/Front: Flying\nBack: Vigilance/);
+});
+
+test('quota errors show a bounded recovery time and the failed approval stage', () => {
+  const text=R.decisionMessage(503,{error:'github-rate-limited',upstreamStatus:403,stage:'checks',
+    rateLimitResource:'core',retryAt:new Date(Date.now()+120000).toISOString()}).text;
+  assert.match(text,/reading checks/);
+  assert.match(text,/GitHub quota: core/);
+  assert.match(text,/Retry in about [23] minute/);
+  assert.match(text,/No approval recorded/);
+  assert.doesNotMatch(R.decisionMessage(503,{error:'github-rate-limited',upstreamStatus:429,stage:'<private>',retryAt:'invalid'}).text,/<private>|NaN|Invalid Date/);
+});

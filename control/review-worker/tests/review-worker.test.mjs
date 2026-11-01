@@ -314,3 +314,58 @@ test("control-plane feeder/observer runs never block Verify; real failing checks
     assert.equal(blocked.writes.length, 0);
   }
 });
+
+test('quota reset, resource and request ID are safe diagnostics; raw GitHub bodies and secrets stay private', async () => {
+  const reset = Math.floor(Date.now()/1000)+600;
+  const gh=fakeGitHub({prError:{status:403,message:'sensitive upstream message gho_owner',headers:{
+    'x-ratelimit-remaining':'0','x-ratelimit-reset':String(reset),'x-ratelimit-resource':'core',
+    'x-github-request-id':'ABCD:123:456','x-private-header':'gho_owner'}}});
+  const r=await decision(gh,{pr:360,sha:SHA,decision:'approve'});
+  assert.deepEqual(r.body,{error:'github-rate-limited',upstreamStatus:403,stage:'pr',rateLimitResource:'core',
+    retryAt:new Date(reset*1000).toISOString(),requestId:'ABCD:123:456'});
+  assert.equal(gh.writes.length,0);
+  assert.doesNotMatch(JSON.stringify(r.body),/gho_owner|sensitive|x-private/);
+});
+
+test('429 without headers is quota-limited; secondary Retry-After overrides a later non-exhausted primary reset', async () => {
+  for(const headers of [{},{'retry-after':'60','x-ratelimit-remaining':'100',
+    'x-ratelimit-reset':String(Math.floor(Date.now()/1000)+3600)}]) {
+    const start=Date.now();
+    const gh=fakeGitHub({prError:{status:429,headers}});
+    const r=await decision(gh,{pr:360,sha:SHA,decision:'approve'});
+    assert.equal(r.status,503);
+    assert.equal(r.body.error,'github-rate-limited');
+    if(headers['retry-after']) assert.ok(Date.parse(r.body.retryAt)>=start+59000 && Date.parse(r.body.retryAt)<=Date.now()+61000);
+    else assert.equal(r.body.retryAt,undefined);
+    assert.equal(gh.writes.length,0);
+  }
+});
+
+test('quota and access failures at every decision stage stay distinct, fail closed and are never replayed', async () => {
+  const stages={unit:'/issues/358',reviews:'/pulls/360/reviews?',files:'/pulls/360/files?',
+    checks:'/check-runs?',ready:'https://api.github.com/graphql',review:'/pulls/360/reviews'};
+  for(const [stage,path] of Object.entries(stages)) for(const limited of [true,false]) {
+    const gh=fakeGitHub({draft:stage==='ready'});
+    const original=gh.fetchImpl;
+    let failures=0;
+    gh.fetchImpl=async(url,init={})=>{
+      const method=init.method||'GET';
+      const matches=String(url).includes(path) && (stage==='review' ? method==='POST' : stage==='ready' ? true : method==='GET');
+      if(!matches)return original(url,init);
+      failures++;
+      return new Response(JSON.stringify({message:limited?'API rate limit exceeded':'Resource not accessible'}),{status:403});
+    };
+    const r=await decision(gh,{pr:360,sha:SHA,decision:'approve'});
+    assert.deepEqual([r.status,r.body.error,r.body.stage],[limited?503:403,limited?'github-rate-limited':'github-access-denied',stage]);
+    assert.equal(failures,1,'no retry of a user decision or mutation');
+    assert.equal(gh.writes.length,0,'no subsequent ready/review after failure');
+  }
+});
+
+test('malformed quota headers are omitted and cannot carry response text to Control', async () => {
+  const gh=fakeGitHub({prError:{status:403,message:'API rate limit exceeded',headers:{
+    'x-ratelimit-remaining':'0','x-ratelimit-reset':'9999999999999999999','retry-after':'nonsense',
+    'x-ratelimit-resource':'private token value','x-github-request-id':'private token value'}}});
+  const r=await decision(gh,{pr:360,sha:SHA,decision:'approve'});
+  assert.deepEqual(r.body,{error:'github-rate-limited',upstreamStatus:403,stage:'pr'});
+});
