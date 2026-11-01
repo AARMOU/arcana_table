@@ -9,37 +9,78 @@ import com.wingedsheep.engine.state.components.identity.TokenComponent
 import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Format
+import com.wingedsheep.sdk.core.ManaCost
+import com.wingedsheep.sdk.core.Subtype
+import com.wingedsheep.sdk.core.Supertype
 import com.wingedsheep.sdk.core.Step
 import com.wingedsheep.sdk.core.Zone
+import com.wingedsheep.sdk.model.CardDefinition
 import com.wingedsheep.sdk.model.CharacteristicValue
 import com.wingedsheep.sdk.model.Deck
 import com.wingedsheep.sdk.model.EntityId
+import com.wingedsheep.sdk.scripting.KeywordAbility
 import org.junit.Assert.*
 import org.junit.Test
 
 class TangleweaveArmorIndependentCertificationTest {
     private val name = "Tangleweave Armor"
-    private val sourceCommander = "Koma, Cosmos Serpent"
+    // Test-only legendary cards isolate Tangleweave's real commander-mana-value logic
+    // from unrelated cards absent from the B140 runtime (Koma and Thrasios).
+    private val sourceCommander = CardDefinition.creature(
+        name = "Fixture Seven-Mana Commander",
+        manaCost = ManaCost.parse("{5}{G}{U}"),
+        subtypes = setOf(Subtype("Beast")),
+        power = 7,
+        toughness = 7,
+        supertypes = setOf(Supertype.LEGENDARY),
+    )
+    private val fixturePartnerTwo = CardDefinition.creature(
+        name = "Fixture Two-Mana Partner",
+        manaCost = ManaCost.parse("{1}{G}"),
+        subtypes = setOf(Subtype("Elf")),
+        power = 2,
+        toughness = 2,
+        supertypes = setOf(Supertype.LEGENDARY),
+        oracleText = "Partner",
+    ).copy(keywordAbilities = listOf(KeywordAbility.partner()))
+    private val fixturePartnerFour = CardDefinition.creature(
+        name = "Fixture Four-Mana Partner",
+        manaCost = ManaCost.parse("{3}{U}"),
+        subtypes = setOf(Subtype("Wizard")),
+        power = 4,
+        toughness = 4,
+        supertypes = setOf(Supertype.LEGENDARY),
+        oracleText = "Partner",
+    ).copy(keywordAbilities = listOf(KeywordAbility.partner()))
+    private val fixtureOpponentSeven = CardDefinition.creature(
+        name = "Fixture Opponent Seven-Mana Commander",
+        manaCost = ManaCost.parse("{5}{G}{U}"),
+        subtypes = setOf(Subtype("Beast")),
+        power = 7,
+        toughness = 7,
+        supertypes = setOf(Supertype.LEGENDARY),
+    )
 
     private fun commanderScenario(
-        ownCommander: String,
-        opponentCommander: String = ownCommander,
-        ownPartner: String? = null,
+        ownCommander: CardDefinition,
+        opponentCommander: CardDefinition = ownCommander,
+        ownPartner: CardDefinition? = null,
         libraryCards: List<String> = emptyList(),
     ): GameTestDriver {
-        val cards = listOfNotNull(ownCommander, ownPartner, opponentCommander) + libraryCards
-        val d = customScenario(TangleweaveArmor, *cards.toTypedArray())
+        val d = customScenario(TangleweaveArmor, *libraryCards.toTypedArray())
+        // Register actual SDK definitions: no mocked mana value, partner status or game state.
+        d.registerCards(listOfNotNull(ownCommander, ownPartner, opponentCommander).distinctBy { it.name })
         val ownDeck = if (ownPartner == null) {
             Deck.of("Forest" to 50, "Island" to 49)
         } else {
-            Deck.of("Forest" to 33, "Island" to 33, "Plains" to 32)
+            Deck.of("Forest" to 49, "Island" to 49)
         }
         val opponentDeck = Deck.of("Forest" to 50, "Island" to 49)
         d.initMultiplayer(
             decks = listOf(ownDeck, opponentDeck),
             format = Format.Commander(),
-            commanders = listOf(ownCommander, opponentCommander),
-            partners = listOf(ownPartner, null),
+            commanders = listOf(ownCommander.name, opponentCommander.name),
+            partners = listOf(ownPartner?.name, null),
         )
         d.passPriorityUntil(Step.PRECOMBAT_MAIN)
         return d
@@ -110,16 +151,16 @@ class TangleweaveArmorIndependentCertificationTest {
 
     @Test
     fun bonusUsesTheGreatestManaValueAmongYourCommandersOnly() {
-        val ownCommander = "Thrasios, Triton Hero"
-        val ownPartner = "Ishai, Ojutai Dragonspeaker"
-        val opponentCommander = "Koma, Cosmos Serpent"
+        val ownCommander = fixturePartnerTwo
+        val ownPartner = fixturePartnerFour
+        val opponentCommander = fixtureOpponentSeven
         val d = commanderScenario(ownCommander, opponentCommander, ownPartner, listOf("Grizzly Bears"))
 
         val player = d.player1
         val ownCommanders = d.zoneNames(player, Zone.COMMAND)
-        assertTrue(ownCommanders.contains(ownCommander))
-        assertTrue(ownCommanders.contains(ownPartner))
-        assertTrue(d.zoneNames(d.player2, Zone.COMMAND).contains(opponentCommander))
+        assertTrue(ownCommanders.contains(ownCommander.name))
+        assertTrue(ownCommanders.contains(ownPartner.name))
+        assertTrue(d.zoneNames(d.player2, Zone.COMMAND).contains(opponentCommander.name))
 
         val creature = d.putCreatureOnBattlefield(player, "Grizzly Bears")
         val armor = castArmor(d, player)
