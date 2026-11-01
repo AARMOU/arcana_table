@@ -254,7 +254,7 @@ internal class TableController(
     var respondGlow by run { mutableStateOf(optionPrefs.getBoolean("adjust_respond_glow", true)) }
     var autoOpenHand by run { mutableStateOf(optionPrefs.getBoolean("adjust_auto_open_hand", true)) }
     var playedPopupSeconds by run { mutableFloatStateOf(optionPrefs.getFloat("adjust_notice_seconds", 4f).coerceIn(1f, 8f)) }
-    var combatCardScale by run { mutableFloatStateOf(optionPrefs.getFloat(COMBAT_ZOOM_KEY, 1f).coerceIn(MIN_COMBAT_ZOOM, MAX_COMBAT_ZOOM)) }
+    var combatCardScale by CombatZoom.state(optionPrefs)
     var showEngineStatus by run { mutableStateOf(optionPrefs.getBoolean("show_engine_status", BuildConfig.DEBUG)) }
     val defaultQuickActionOrder get() = argentumQuickActionIds.joinToString("|")
     var nextId by run { mutableIntStateOf(20) }

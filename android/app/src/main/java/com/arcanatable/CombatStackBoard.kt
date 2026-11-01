@@ -80,12 +80,20 @@ const val COMBAT_ZOOM_KEY = "adjust_combat_card_scale"
 const val MIN_COMBAT_ZOOM = 0.6f
 const val MAX_COMBAT_ZOOM = 1.8f
 
-/** The combat card size, shared by both combat screens and Adjust UI; saved when it changes. */
-@Composable
-private fun rememberCombatZoom(): MutableFloatState {
-    val prefs = LocalContext.current.getSharedPreferences("arcana_options", android.content.Context.MODE_PRIVATE)
-    return remember { mutableFloatStateOf(prefs.getFloat(COMBAT_ZOOM_KEY, 1f).coerceIn(MIN_COMBAT_ZOOM, MAX_COMBAT_ZOOM)) }
+/**
+ * The combat card size: one in-memory state for both combat screens and Adjust UI (so a pinch
+ * shows up on the Adjust UI slider and the reverse), loaded once from preferences and saved by
+ * whoever changes it.
+ */
+internal object CombatZoom {
+    private var shared: MutableFloatState? = null
+    fun state(prefs: android.content.SharedPreferences): MutableFloatState =
+        shared ?: mutableFloatStateOf(prefs.getFloat(COMBAT_ZOOM_KEY, 1f).coerceIn(MIN_COMBAT_ZOOM, MAX_COMBAT_ZOOM)).also { shared = it }
 }
+
+@Composable
+private fun rememberCombatZoom(): MutableFloatState =
+    CombatZoom.state(LocalContext.current.getSharedPreferences("arcana_options", android.content.Context.MODE_PRIVATE))
 
 /**
  * Tile and card widths at [zoom]. At 100% a phone shows two whole cards per row; zooming out fits
@@ -145,7 +153,8 @@ private fun CombatStepBar(active: Int) {
 private fun CombatScreen(
     title: String, subtitle: String, dismissable: Boolean, onDismiss: () -> Unit,
     step: Int, zoom: MutableFloatState,
-    tray: @Composable ColumnScope.() -> Unit, top: @Composable ColumnScope.() -> Unit, bottom: @Composable ColumnScope.() -> Unit,
+    tray: @Composable ColumnScope.() -> Unit, actions: @Composable () -> Unit,
+    top: @Composable ColumnScope.() -> Unit, bottom: @Composable ColumnScope.() -> Unit,
 ) {
     val config = LocalConfiguration.current
     val prefs = LocalContext.current.getSharedPreferences("arcana_options", android.content.Context.MODE_PRIVATE)
@@ -175,12 +184,15 @@ private fun CombatScreen(
                         CenteredScroll(Modifier.weight(1f), top)
                         CenteredScroll(Modifier.weight(1f), bottom)
                     } else CenteredScroll(Modifier.weight(1f).fillMaxWidth().then(pinch)) { top(); bottom() }
+                    // Details scroll inside the tray; the actions under them never scroll away.
                     Column(
-                        Modifier.fillMaxWidth().heightIn(max = (config.screenHeightDp * if (sideBySide) 0.34f else 0.4f).dp)
-                            .padding(start = 10.dp, end = 10.dp, bottom = 10.dp).clip(RoundedCornerShape(14.dp))
-                            .background(Panel).border(1.dp, PanelLight, RoundedCornerShape(14.dp)).verticalScroll(rememberScrollState()).padding(10.dp),
-                        content = tray,
-                    )
+                        Modifier.fillMaxWidth().padding(start = 10.dp, end = 10.dp, bottom = 10.dp).clip(RoundedCornerShape(14.dp))
+                            .background(Panel).border(1.dp, PanelLight, RoundedCornerShape(14.dp)).padding(10.dp),
+                    ) {
+                        Column(Modifier.fillMaxWidth().heightIn(max = (config.screenHeightDp * if (sideBySide) 0.2f else 0.26f).dp)
+                            .verticalScroll(rememberScrollState()), content = tray)
+                        actions()
+                    }
                 }
                 TutorialLayer(Modifier.matchParentSize())
             }
@@ -222,6 +234,17 @@ private fun RoundStep(label: String, description: String, enabled: Boolean, size
             .clickable(enabled = enabled, onClick = onClick).semantics { contentDescription = description },
         contentAlignment = Alignment.Center,
     ) { Text(label, color = if (enabled) SoftWhite else Muted, fontSize = (size.value * 0.45f).sp, fontWeight = FontWeight.Bold) }
+}
+
+/** Tiles narrower than this get the compact "3 of 12 ▾" count instead of − / +. */
+private val StepperTileWidth = 150.dp
+
+/** "3 of 12 ▾": opens the exact-count picker; used when the tile is too narrow for − / +. */
+@Composable
+private fun CompactCount(count: Int, total: Int, verb: String, onOpen: () -> Unit) {
+    Text("$count of $total ▾", color = if (count > 0) Mint else SoftWhite, fontSize = 13.sp, fontWeight = FontWeight.Black, maxLines = 1,
+        modifier = Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(22.dp)).background(Ink).clickable(onClick = onOpen)
+            .semantics { contentDescription = "$count of $total $verb. Change how many" }.padding(horizontal = 12.dp, vertical = 12.dp))
 }
 
 /** − n / N + under a stack. */
@@ -408,10 +431,14 @@ private fun TrayButton(label: String, color: Color = SoftWhite, onClick: () -> U
 }
 
 @Composable
-private fun LossBox(label: String, names: String, color: Color, modifier: Modifier) {
-    Column(modifier.clip(RoundedCornerShape(10.dp)).background(Ink).padding(horizontal = 10.dp, vertical = 6.dp)) {
+private fun LossBox(label: String, names: String, count: Int, unclear: Int, color: Color, modifier: Modifier) {
+    var open by remember { mutableStateOf(false) }
+    Column(modifier.clip(RoundedCornerShape(10.dp)).background(Ink).clickable { open = !open }.padding(horizontal = 10.dp, vertical = 6.dp)) {
         Text(label, color = Muted, fontSize = 10.sp)
-        Text(names, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        // The count is always shown, so a cut-off list never hides how many; tap to see every name.
+        Text((if (count > 0) "$count: " else "") + names, color = color, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+            maxLines = if (open) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
+        if (unclear > 0) Text("+ $unclear unclear", color = Muted, fontSize = 10.sp)
     }
 }
 
@@ -439,8 +466,27 @@ fun ArgentumAttackBoard(
     val missing = plan.missingMandatory(selection)
     val zoom = rememberCombatZoom()
     val sizing = combatSizing(zoom.floatValue)
-    val theirBlockers = opponentBlockers.flatMap { it.second }
     val playerOf = players.associateBy { it.id }
+    // The defending player for a target: the player, or a planeswalker's controller. A battle's
+    // protector isn't necessarily its controller, so battles have no known defender here.
+    fun defenderOf(target: String): TablePlayer? {
+        playerOf[target]?.let { return it }
+        val card = piece(target).card ?: return null
+        if (card.type.contains("Battle", ignoreCase = true)) return null
+        return players.firstOrNull { pl -> pl.battlefield.any { it.id == card.id } }
+    }
+    // What a stack risks, judged only against the creatures of the player(s) it actually attacks.
+    fun riskFor(card: GameCard?, attackedTargets: Collection<String>): AttackRisk? {
+        if (players.isEmpty() || attackedTargets.isEmpty()) return null
+        val risks = attackedTargets.map { target ->
+            val defender = defenderOf(target) ?: return@map AttackRisk("Outcome unclear: unknown defender", false, unclear = true)
+            attackRisk(card, defender.battlefield.filter { it.type.contains("Creature", ignoreCase = true) && !it.tapped })
+        }.filterNotNull().distinct()
+        return when {
+            risks.size <= 1 -> risks.firstOrNull()
+            else -> AttackRisk("Risk differs by target", risks.any { it.warn })
+        }
+    }
     val damage = attackPreview(selection, piece)
     val replay = viewerId?.let { CombatMemory.replay(it, stacks, base, optionFor, piece) }?.takeIf { it != selection }
 
@@ -460,6 +506,9 @@ fun ArgentumAttackBoard(
                     color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (missing.isNotEmpty()) Text("Must attack: ${missing.joinToString { piece(it).name }}", color = CounterGold, fontSize = 11.sp)
+            if (attacking > 0) Text("Previews assume the current board and no further spells or abilities.", color = Muted, fontSize = 10.sp)
+        },
+        actions = {
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     TrayButton("LATER", Muted, onDismiss)
@@ -495,9 +544,11 @@ fun ArgentumAttackBoard(
                         ?: p.card?.type?.substringBefore('—')?.trim()
                     detail?.let { Text(it, color = if (chosen) Ink else Muted, fontSize = 10.sp, maxLines = 1) }
                     if (incoming > 0) {
-                        // "38 → 33 if unblocked" for a player (or a planeswalker's loyalty); otherwise "−5".
+                        // "38 → 33 if unblocked" only when the damage is plain life (or loyalty) loss;
+                        // infect, toxic, prevention or unknown cards show "N potential damage" instead.
                         val now = player?.life ?: p.life
-                        Text(now?.let { "$it → ${it - incoming} if unblocked" } ?: "−$incoming if unblocked",
+                        val after = lifeAfterUnblocked(now, selection.filterValues { it == target }.keys.map { piece(it).card }, incoming)
+                        Text(if (after != null) "$now → $after if unblocked" else "$incoming potential damage if unblocked",
                             color = if (chosen) Ink else Danger, fontSize = 11.sp, fontWeight = FontWeight.Black, modifier = Modifier.testTag("combat-life-preview"))
                     }
                     if (player != null) commanderDamageLines(player, commanderPreview(selection, target, piece)).forEach { (line, lethal) ->
@@ -510,7 +561,7 @@ fun ArgentumAttackBoard(
             TextButton(onClick = { showBlockers = !showBlockers }) {
                 Text(if (showBlockers) "HIDE WHO CAN BLOCK ▴" else "WHO CAN BLOCK ▾", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             }
-            if (showBlockers) OpponentBlockersStrip(opponentBlockers, cardWidth = (72f * zoom.floatValue).coerceIn(48f, 140f).dp)
+            if (showBlockers) OpponentBlockersStrip(opponentBlockers, cardWidth = (96f * zoom.floatValue).coerceIn(56f, 170f).dp)
         }
         },
     ) {
@@ -530,8 +581,8 @@ fun ArgentumAttackBoard(
                         else -> selection = stepStack(selection, stack, +1, optionFor, preferred)
                     }
                 }
-                // Once it's attacking: what it risks against the creatures that can block it.
-                val risk = if (count > 0 && opponentBlockers.isNotEmpty()) attackRisk(p.card, theirBlockers) else null
+                // Once it's attacking: what it risks against the defending player's untapped creatures.
+                val risk = if (count > 0) riskFor(p.card, allocation.keys) else null
                 StackTile(
                     stack, p, sizing, chosen = count, selected = false, enabled = true,
                     note = when {
@@ -543,13 +594,14 @@ fun ArgentumAttackBoard(
                     },
                     noteColor = when {
                         mandatoryCount > 0 -> CounterGold
-                        risk != null -> if (risk.warn) CounterGold else Mint
+                        risk != null -> if (risk.warn) CounterGold else if (risk.unclear) Muted else Mint
                         count > 0 -> Mint
                         else -> Muted
                     },
                     onTap = onTap,
                     stepper = if (stack.size > 1) ({
-                        StackStepper(count, stack.size, canMinus = count > mandatoryCount, canPlus = count < stack.size,
+                        if (sizing.tile < StepperTileWidth) CompactCount(count, stack.size, "attacking") { picking = stack }
+                        else StackStepper(count, stack.size, canMinus = count > mandatoryCount, canPlus = count < stack.size,
                             onMinus = { selection = stepStack(selection, stack, -1, optionFor, preferred) },
                             onPlus = { selection = stepStack(selection, stack, +1, optionFor, preferred) })
                     }) else null,
@@ -632,7 +684,9 @@ fun ArgentumBlockBoard(
 
     CombatScreen(
         title = "DECLARE BLOCKERS",
-        subtitle = if (focusStack != null) "Choose how many of your creatures block ${piece(focusStack.rep).name}${if (focusStack.size > 1) " (×${focusStack.size})" else ""}."
+        // The focused attacker stays named here, with its stats, while the cards scroll.
+        subtitle = if (focusStack != null) "Blocking: " + listOf(piece(focusStack.rep).name + if (focusStack.size > 1) " ×${focusStack.size}" else "",
+            combatStats(piece(focusStack.rep).card)).filter(String::isNotBlank).joinToString(" · ") + ". Choose your blockers; pinch to resize."
             else "Tap an attacker, then choose your blockers. Hold a card to read it; pinch to resize.",
         dismissable = false, onDismiss = {}, step = 2, zoom = zoom,
         tray = {
@@ -640,24 +694,35 @@ fun ArgentumBlockBoard(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.testTag("combat-summary").tutorialTarget("combat-summary")) {
                 Text("Estimated: you take ", color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                 Text("$damage", color = if (life != null && damage >= life) Danger else CounterGold, fontSize = 16.sp, fontWeight = FontWeight.Black)
-                Text(" damage" + (life?.let { " · ${it - damage} life left" } ?: ""), color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                // Life left only when the damage coming through is plain life loss (not infect, prevention, ...).
+                val through = againstMe.filter { a -> damageThrough(a, selection, piece) > 0 }.map { piece(it).card }
+                val after = lifeAfterUnblocked(life, through, damage)
+                Text(" damage" + (after?.let { " · $it life left" } ?: if (damage > 0 && life != null) " (may not all be life loss)" else ""),
+                    color = SoftWhite, fontSize = 14.sp, fontWeight = FontWeight.Bold)
             }
             defender?.let { d -> commanderDamageLines(d, commanderHits).forEach { (line, lethal) -> Text(line, color = if (lethal) Danger else CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Bold) } }
             blockSummary(plan.attackers.map(piece), plan.blockers.map(piece), selection).forEach {
                 Text(it, color = Muted, fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (selection.isNotEmpty()) {
-                // What the declared blocks trade, using the same estimate as the labels on each attacker.
-                val results = plan.attackers.associateWith { blockResult(it, selection, piece) }
-                val theyLose = results.filterValues { it.attackerDies }.keys.map { piece(it).name }
-                val youLose = results.values.flatMap { it.blockersDying }.distinct().map { piece(it).name }
+                // Creatures each side is expected to lose, from the same estimate as the labels on the
+                // attackers. Anything the estimate can't call is counted as "unclear", never guessed.
+                val results = plan.attackers.associateWith { blockResult(it, selection, piece) }.filterValues { it.outcome != BlockOutcome.UNBLOCKED }
+                val theirs = results.filterValues { it.attackerDies == true }.keys.map { piece(it).name }
+                val theirsUnclear = results.values.count { it.attackerDies == null }
+                val yours = results.values.flatMap { it.blockersDying.orEmpty() }.distinct().map { piece(it).name }
+                val yoursUnclear = results.values.count { it.blockersDying == null }
                 Row(Modifier.fillMaxWidth().padding(vertical = 2.dp).testTag("combat-losses"), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    LossBox("You lose", namesWithCounts(youLose), CounterGold, Modifier.weight(1f))
-                    LossBox("They lose", namesWithCounts(theyLose), Mint, Modifier.weight(1f))
+                    LossBox("Your creatures lost (est.)", namesWithCounts(yours), yours.size, yoursUnclear, CounterGold, Modifier.weight(1f))
+                    LossBox("Their creatures lost (est.)", namesWithCounts(theirs), theirs.size, theirsUnclear, Mint, Modifier.weight(1f))
                 }
+                Text("Estimates assume the current board and no further spells or abilities.", color = Muted, fontSize = 10.sp)
             }
-            menace.forEach { Text("${piece(it).name} has menace: add a second blocker or remove the block.", color = CounterGold, fontSize = 11.sp) }
             warning?.let { Text(it, color = CounterGold, fontSize = 11.sp) }
+        },
+        actions = {
+            // Menace problems stay visible next to the button they disable.
+            if (menace.isNotEmpty()) Text("Menace: ${menace.joinToString { piece(it).name }} needs a second blocker.", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
             Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                     TrayButton("SUGGEST BLOCKS", Mint) {
@@ -679,15 +744,19 @@ fun ArgentumBlockBoard(
                 val blocked = stack.ids.count { (counts[it] ?: 0) > 0 }
                 val canBlock = blockable(stack.rep)
                 val target = plan.attackTargets[stack.rep]?.takeIf { it != defender?.id }
-                // The likely result of the blocks on it: Trade, Kills it, Chump block, Held off, Unblocked.
-                val outcome = blockResult(stack.rep, selection, piece).outcome
+                // The likely result for each creature in the stack: Trade, Kills it, Chump block, Held off,
+                // Unclear (with why) or Unblocked with the damage it would deal (double strike, trample).
+                val result = blockResult(stack.rep, selection, piece)
+                val outcome = result.outcome
+                val through = stack.ids.sumOf { damageThrough(it, selection, piece) }
                 StackTile(
                     stack, p, small, chosen = 0, selected = stack.rep == focus, enabled = canBlock,
                     note = when {
                         !canBlock -> "attacking ${target?.let { piece(it).name } ?: "someone else"}"
-                        blocked == 0 -> (if (target != null) "→ ${piece(target).name} · " else "") + "unblocked · ${combatPower(p.card)} damage"
-                        stack.size > 1 -> "$blocked of ${stack.size} blocked · ${outcome.label}"
-                        else -> "blocked · ${outcome.label}"
+                        blocked == 0 -> (if (target != null) "→ ${piece(target).name} · " else "") + "unblocked · $through damage"
+                        stack.size > 1 -> stackOutcomeSummary(stack.ids, selection, piece) + if (through > 0) " · $through damage through" else ""
+                        outcome == BlockOutcome.UNCLEAR -> "blocked · unclear (${result.reason})"
+                        else -> "blocked · ${outcome.label}" + if (through > 0) " · $through tramples over" else ""
                     },
                     noteColor = when {
                         !canBlock -> Muted
@@ -736,7 +805,8 @@ fun ArgentumBlockBoard(
                         }
                     },
                     stepper = if (stack.size > 1 && focusStack != null) ({
-                        StackStepper(here, maxHere, canMinus = here > 0, canPlus = focusOk && free > 0,
+                        if (sizing.tile < StepperTileWidth) CompactCount(here, maxHere, "blocking") { picking = stack }
+                        else StackStepper(here, maxHere, canMinus = here > 0, canPlus = focusOk && free > 0,
                             onMinus = { selection = removeBlock(selection, stack, focusStack, plan.mandatory) },
                             onPlus = { selection = addBlock(selection, stack, focusStack, plan.maxBlocks, piece) })
                     }) else null,
