@@ -1,0 +1,9 @@
+{
+  "key": "blight-grenade",
+  "name": "Blight Grenade",
+  "issue": 805,
+  "source": "certification/BlightGrenadeIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.BlightGrenadeIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
