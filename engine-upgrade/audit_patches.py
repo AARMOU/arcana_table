@@ -39,6 +39,7 @@ MANDATORY = [
     "0020-temple-projected-source-subtypes.patch",
     "0021-azlask-exact-colors-trigger.patch",
     "0022-cant-be-sacrificed-by-effects.patch",
+    "0023-face-down-exile-hidden-from-owner.patch",
 ]
 EXPERIMENTAL = "0010-enumeration-absence-index.patch"
 

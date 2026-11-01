@@ -47,9 +47,15 @@ class ReconcileHelpers(unittest.TestCase):
             self.assertEqual(weekly.read_overrides(), [])
             self.assertEqual(target.read_text(), weekly.OVERRIDES_HEADER)
 
-    def test_shipped_override_file_is_the_clean_header(self):
-        # The base ships no overrides; only the weekly run adds them, inside the upgrade candidate.
-        self.assertEqual((weekly.ASSETS / "custom-overrides.txt").read_text(), weekly.OVERRIDES_HEADER)
+    def test_shipped_override_file_is_the_header_plus_card_names(self):
+        # The base ships the header plus whatever a merged weekly upgrade reconciled (e.g. Sifter of Skulls
+        # after the c1c04ca upgrade): one card name per line, nothing else.
+        text = (weekly.ASSETS / "custom-overrides.txt").read_text()
+        self.assertTrue(text.startswith(weekly.OVERRIDES_HEADER))
+        names = text[len(weekly.OVERRIDES_HEADER):].splitlines()
+        for name in names:
+            self.assertTrue(name.strip() and name == name.strip() and not name.startswith("#"), repr(name))
+        self.assertEqual(len(names), len(set(names)))
 
     def test_collisions_no_longer_block_the_card_check(self):
         source = Path(weekly.__file__).read_text()
