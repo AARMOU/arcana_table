@@ -390,7 +390,14 @@ internal fun DeckPickerSheet(decks: List<DeckChoice>, activeId: String?, onPick:
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Column(Modifier.weight(1f)) {
-                            Text(d.name, color = SoftWhite, fontSize = 15.sp, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(d.name.removeSuffix(" · WIP"), color = SoftWhite, fontSize = 15.sp, fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f, fill = false), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                if (d.name.endsWith(" · WIP")) {
+                                    Text("WIP", color = CounterGold, fontSize = 11.sp, fontWeight = FontWeight.Black,
+                                        modifier = Modifier.padding(start = 8.dp))
+                                }
+                            }
                             d.commander?.let { Text(it, color = Muted, fontSize = 12.sp, maxLines = 1, overflow = TextOverflow.Ellipsis) }
                         }
                         if (d.id == activeId) Text("PLAYING", color = Mint, fontSize = 11.sp, fontWeight = FontWeight.Black)
