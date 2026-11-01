@@ -29,6 +29,7 @@ class DeathsPresenceIndependentCertificationTest {
         assertNull(withoutGreen.castSpell(withoutGreen.player1, card).error)
         withoutGreen.resolveAll()
         assertTrue(withoutGreen.permanentsNamed(withoutGreen.player1, name).contains(card))
+        assertTrue(withoutGreen.projected.hasType(card, "ENCHANTMENT"))
 
         val shortOnGeneric = customScenario(DeathsPresence)
         val underpaid = shortOnGeneric.putCardInHand(shortOnGeneric.player1, name)
