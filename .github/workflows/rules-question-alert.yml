@@ -1,0 +1,29 @@
+name: Rules question owner alert
+# Owner request 2026-11-01: notify the owner the moment an agent asks a card-rules question.
+# Agents post as the owner's account, so their own @-mentions are silent; this bot comment notifies.
+on:
+  issues:
+    types: [opened]
+permissions:
+  issues: write
+concurrency:
+  group: rules-question-alert-${{ github.event.issue.number }}
+jobs:
+  alert:
+    if: startsWith(github.event.issue.title, '❓ Rules question')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: issue.number,
+              body: [
+                '@AARMOU **New rules question from an agent.** Your answer helps get this card in correctly.',
+                '',
+                'Reply here with `✅ OWNER RULING — <Card>: <A, B, C or your own words>`.',
+                'Agents keep working on other cards meanwhile; nothing is blocked on you except this card.',
+              ].join('\n'),
+            });
