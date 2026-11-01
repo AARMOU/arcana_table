@@ -142,3 +142,11 @@ test('mixed unrelated Actions usage excluded by Copilot product',()=>{
   {product:'Copilot',sku:'Unrecognized AI Credit SKU',unitType:'ai-credits',grossQuantity:471.4}
  ]),now),471.4);
 });
+
+test('rate-limited billing reads are reported as rate limiting, not a token permission problem', async () => {
+  const B = require('./billing-monitor.cjs');
+  const res = (status, headers) => ({ ok: false, status, headers: { get: k => headers[k] ?? null } });
+  const fetchImpl = async () => res(403, { 'x-ratelimit-remaining': '0' });
+  const r = await B.collect({ token: 't', budget: '3500', now: new Date('2026-11-01T18:00:00Z'), fetchImpl, retryDelayMs: 0 }).catch(e => e);
+  assert.match(String(r?.message || r?.reason || JSON.stringify(r)), /billing-rate-limited/);
+});

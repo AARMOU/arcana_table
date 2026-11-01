@@ -2,7 +2,7 @@
 const {budgetFromEnv}=require('./usage-gate.cjs');
 const ACCOUNT='AARMOU', API='https://api.github.com';
 const MARKER='<!-- arcana-billing-alert-v1 -->';
-const KNOWN_REASON=/^(invalid-owner-budget|invalid-reservation|missing-token|billing-http-\d{3}|billing-timeout|billing-network-error|invalid-billing-response|wrong-account|wrong-period|wrong-unit-or-quantity|overflow|empty-billing-usage-items|unrecognized-copilot-sku|no-copilot-usage-items|unverified-snapshot)$/;
+const KNOWN_REASON=/^(invalid-owner-budget|invalid-reservation|missing-token|billing-http-\d{3}|billing-rate-limited|billing-timeout|billing-network-error|invalid-billing-response|wrong-account|wrong-period|wrong-unit-or-quantity|overflow|empty-billing-usage-items|unrecognized-copilot-sku|no-copilot-usage-items|unverified-snapshot)$/;
 const SETUP='docs/BILLING-SETUP.md';
 const EMPTY_MONTH_START_DAYS=3;
 // Owner-facing next step for every fail-closed billing reason. Never includes secrets or response bodies.
@@ -14,6 +14,7 @@ function billingAction(reason,env={}){
   (legacy?'. ARCANA_PREMIUM_REQUEST_BUDGET is a retired variable and is ignored.':'.');
  if(r==='invalid-reservation')return 'Owner: ARCANA_AI_CREDIT_RESERVE must be a whole number of credits, or unset for the 10% default.';
  if(r==='billing-http-401')return 'Owner: COPILOT_BILLING_READ_TOKEN is invalid or expired. Create a new token and replace the secret ('+SETUP+').';
+ if(r==='billing-rate-limited')return 'None: GitHub is rate-limiting billing reads; new work waits until the next check succeeds.';
  if(r==='billing-http-403')return 'Owner: the token is not allowed to read AARMOU billing. Recreate it from the AARMOU account with the permission in '+SETUP+'.';
  if(r==='billing-http-404')return 'Owner: GitHub did not find personal AI-credit billing for AARMOU. Confirm the token belongs to AARMOU and Copilot is billed to that personal account.';
  if(/^billing-http-5\d\d$|^billing-timeout$|^billing-network-error$/.test(r))return 'None: GitHub billing was temporarily unavailable (retried once). The next scheduled check retries.';
@@ -71,6 +72,10 @@ async function fetchReport({url,token,fetchImpl,retryDelayMs}){
    continue;
   }
   if(response.ok)return response;
+  // GitHub answers rate limiting with 403 or 429 plus x-ratelimit-remaining: 0 or retry-after; that is not a
+  // permission problem, and admission still fails closed while it lasts.
+  const h=k=>response.headers?.get?.(k);
+  if((response.status===403||response.status===429)&&(h('x-ratelimit-remaining')==='0'||h('retry-after')!=null)){lastError=Error('billing-rate-limited');break;}
   lastError=Error('billing-http-'+response.status);
   if(!TRANSIENT.has(response.status))break;
  }
