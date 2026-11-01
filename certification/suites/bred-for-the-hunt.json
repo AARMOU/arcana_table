@@ -1,0 +1,9 @@
+{
+  "key": "bred-for-the-hunt",
+  "name": "Bred for the Hunt",
+  "issue": 812,
+  "source": "certification/BredForTheHuntIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.BredForTheHuntIndependentCertificationTest",
+  "tests": 6,
+  "target": "build"
+}
