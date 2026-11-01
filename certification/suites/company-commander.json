@@ -1,0 +1,9 @@
+{
+  "key": "company-commander",
+  "name": "Company Commander",
+  "issue": 828,
+  "source": "certification/CompanyCommanderIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.CompanyCommanderIndependentCertificationTest",
+  "tests": 9,
+  "target": "build"
+}
