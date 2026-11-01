@@ -582,6 +582,41 @@
       "baseSha": "759c35233bae183e4f061ee2e89be65e7c8a98b7",
       "oracleHash": "cac1f05df7aefc0a7cb3166c5f3dbfee9fc370b36d4e3f74329ce69965164e9b",
       "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
+    },
+    "Assault Suit": {
+      "summary": "Existing equipment stats/haste, equipped-creature attack and sacrifice restrictions, opponent-upkeep may/if-you-do flow, target-player control transfer and untap primitives cover both lines.",
+      "verifiedBy": "Copilot, source inspection of pinned Argentum c1c04ca3265c61df913af6db65460ad4ce409614 on 2026-11-01",
+      "references": [
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2024/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/otj/cards/LavaspurBoots.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2023/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/woe/cards/ErietteOfTheCharmedApple.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2025/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/tdm/cards/ZurgoThundersDecree.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2026/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/sos/cards/LoreholdTheHistorian.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/2025/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/tla/cards/IrohTeaMaster.kt",
+        "https://github.com/wingedsheep/argentum-engine/blob/c1c04ca3265c61df913af6db65460ad4ce409614/mtg-sets/1993-1999/src/main/kotlin/com/wingedsheep/mtg/sets/definitions/mir/cards/Wellspring.kt"
+      ],
+      "reviewedLines": [
+        {
+          "line": "Equipped creature gets +2/+2, has haste, can't attack you or planeswalkers you control, and can't be sacrificed.",
+          "primitives": [
+            "ModifyStats",
+            "GrantKeyword(Keyword.HASTE)",
+            "CantAttackYou(coversPlaneswalkers = true)",
+            "CantBeSacrificed(scope = ANY)"
+          ]
+        },
+        {
+          "line": "At the beginning of each opponent's upkeep, you may have that player gain control of equipped creature until end of turn. If you do, untap it.",
+          "primitives": [
+            "Triggers.anOpponent.beginningOf(Step.UPKEEP)",
+            "Effects.May(Effects.IfYouDo(...))",
+            "Effects.GiveControl",
+            "Effects.Untap"
+          ]
+        }
+      ],
+      "baseSha": "bbf3ec8cbc6f5533578a4b69f637d28e05fc7f0f",
+      "oracleHash": "67cec29a87564650b16e0e9b480a02effd58946ea9f1700612131b3efda6820e",
+      "runtimeHash": "2e12400d17ef0080420fdf7aef63c81a9a6de17b49db1db9861c7ae4e2c09da4"
     }
   }
 }
