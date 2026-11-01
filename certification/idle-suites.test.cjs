@@ -104,8 +104,11 @@ test('burst: up to `parallel` open at once, ignores other eligible work, keeps b
   assert.equal(p.slots, 3);
   assert.equal(p.burst, true);
   const open = k => idleIssue(k, { state: 'open', assignees: [{ login: 'Copilot' }], created_at: new Date(NOW - 60e3).toISOString() });
-  assert.equal(I.plan({ cards, manifest, requests: [open('a'), open('b')], status: busy, now: NOW, burst }).slots, 1);
-  assert.match(I.plan({ cards, manifest, requests: [open('a'), open('b'), open('c')], status: busy, now: NOW, burst }).skip, /3\/3 idle suites already open/);
+  const waiting = k => idleIssue(k, { state: 'open', assignees: [], created_at: new Date(NOW - 60e3).toISOString() });
+  assert.equal(I.plan({ cards, manifest, requests: [open('a'), open('b')], status: busy, now: NOW, burst }).slots, 3, 'finished sessions with open issues hold no worker');
+  const running = status({ state: 'attempted', workers: { running: 1, pendingPickup: 1 } });
+  assert.equal(I.plan({ cards, manifest, requests: [], status: running, now: NOW, burst }).slots, 1);
+  assert.match(I.plan({ cards, manifest, requests: [waiting('w')], status: running, now: NOW, burst }).skip, /3\/3 workers busy or waiting/);
   assert.match(I.plan({ cards, manifest, requests: [], status: status({ state: 'attempted', billing: { level: 'slow' } }), now: NOW, burst }).skip, /billing/);
   const many = Array.from({ length: 39 }, (_, i) => idleIssue('m' + i, { created_at: new Date(NOW - 3600e3).toISOString() }));
   assert.equal(I.plan({ cards, manifest, requests: many, status: busy, now: NOW, burst }).slots, 1, 'cap limits slots');
