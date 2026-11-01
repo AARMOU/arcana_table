@@ -87,7 +87,7 @@ new file mode 100644
 index 0000000000..0c0ff91ecd
 --- /dev/null
 +++ b/rules-engine/src/test/kotlin/com/wingedsheep/engine/scenarios/CommanderCastsFromCommandZoneTest.kt
-@@ -0,0 +1,69 @@
+@@ -0,0 +1,70 @@
 +package com.wingedsheep.engine.scenarios
 +
 +import com.wingedsheep.engine.core.CastSpell
@@ -104,6 +104,7 @@ index 0000000000..0c0ff91ecd
 +import io.kotest.matchers.shouldBe
 +
 +class CommanderCastsFromCommandZoneTest : ScenarioTestBase() {
++    // ScenarioTestBase exposes its shared services; TestGame keeps its service field private.
 +    private val commander = card("Commander Cast Count Test") {
 +        manaCost = "{0}"
 +        typeLine = "Legendary Creature — Test"
