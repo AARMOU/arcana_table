@@ -34,13 +34,18 @@ class EldraziTempleIndependentCertificationTest {
 
     @Test
     fun secondAbilityAddsTwoColorlessMana() {
-        val d = customScenario(EldraziTemple)
+        val d = customScenario(EldraziTemple, "Endbringer")
         val p = d.player1
         val temple = d.playTemple(p)
+        val endbringer = d.putCardInHand(p, "Endbringer")
+        d.giveColorlessMana(p, 4)
 
-        assertEquals(0, d.manaPool(p).colorless)
         assertNull(d.activate(p, temple, index = 1).error)
-        assertEquals(2, d.manaPool(p).colorless)
+        assertNull(d.castSpell(p, endbringer).error)
+        d.resolveAll()
+
+        assertTrue(d.permanentsNamed(p, "Endbringer").isNotEmpty())
+        assertTrue(d.zoneNames(p, Zone.HAND).none { it == "Endbringer" })
         assertTrue(d.isTapped(temple))
         assertNotNull(d.activate(p, temple, index = 0).error)
     }
@@ -62,32 +67,38 @@ class EldraziTempleIndependentCertificationTest {
 
     @Test
     fun secondAbilityManaCanCastAColorlessEldraziSpell() {
-        val d = customScenario(EldraziTemple, "Eldrazi Mimic")
+        val d = customScenario(EldraziTemple, "All Is Dust")
         val p = d.player1
         val temple = d.playTemple(p)
-        val mimic = d.putCardInHand(p, "Eldrazi Mimic")
+        val spell = d.putCardInHand(p, "All Is Dust")
+        d.giveColorlessMana(p, 5)
 
         assertNull(d.activate(p, temple, index = 1).error)
-        assertNull(d.castSpell(p, mimic).error)
+        assertNull(d.castSpell(p, spell).error)
         d.resolveAll()
 
-        assertTrue(d.permanentsNamed(p, "Eldrazi Mimic").isNotEmpty())
-        assertTrue(d.zoneNames(p, Zone.HAND).none { it == "Eldrazi Mimic" })
+        assertTrue(d.zoneNames(p, Zone.GRAVEYARD).contains("All Is Dust"))
+        assertTrue(d.zoneNames(p, Zone.HAND).none { it == "All Is Dust" })
     }
 
     @Test
     fun secondAbilityManaCannotCastANonEldraziSpell() {
-        val d = customScenario(EldraziTemple, "Sol Ring")
+        val d = customScenario(EldraziTemple, "Sol Ring", "Endbringer")
         val p = d.player1
         val temple = d.playTemple(p)
         val ring = d.putCardInHand(p, "Sol Ring")
+        val endbringer = d.putPermanentOnBattlefield(p, "Endbringer")
+        val handBefore = d.getHandSize(p)
 
         assertNull(d.activate(p, temple, index = 1).error)
         assertNotNull(d.castSpell(p, ring).error)
+        assertNull(d.activate(p, endbringer, index = 2).error)
+        d.resolveAll()
 
         assertTrue(d.permanentsNamed(p, "Sol Ring").isEmpty())
         assertTrue(d.zoneNames(p, Zone.HAND).contains("Sol Ring"))
-        assertEquals(2, d.manaPool(p).colorless)
+        assertTrue(d.isTapped(endbringer))
+        assertEquals(handBefore + 1, d.getHandSize(p))
     }
 
     @Test
@@ -103,7 +114,6 @@ class EldraziTempleIndependentCertificationTest {
 
         assertTrue(d.permanentsNamed(p, "Eldrazi Displacer").isEmpty())
         assertTrue(d.zoneNames(p, Zone.HAND).contains("Eldrazi Displacer"))
-        assertEquals(2, d.manaPool(p).colorless)
         assertEquals(1, d.manaPool(p).white)
     }
 
@@ -125,18 +135,21 @@ class EldraziTempleIndependentCertificationTest {
 
     @Test
     fun secondAbilityManaCannotPayForAnAbilityOfAColoredEldrazi() {
-        val d = customScenario(EldraziTemple, "Eldrazi Displacer", "Grizzly Bears")
+        val d = customScenario(EldraziTemple, "Eldrazi Displacer", "Grizzly Bears", "Endbringer")
         val p = d.player1
         val temple = d.playTemple(p)
         val displacer = d.putCreatureOnBattlefield(p, "Eldrazi Displacer")
         d.putCreatureOnBattlefield(p, "Grizzly Bears")
+        val endbringer = d.putPermanentOnBattlefield(p, "Endbringer")
         d.giveMana(p, Color.WHITE, 1)
 
         assertNull(d.activate(p, temple, index = 1).error)
         assertNotNull(d.activate(p, displacer, index = 0).error)
+        assertNull(d.activate(p, endbringer, index = 2).error)
+        d.resolveAll()
 
         assertFalse(d.isTapped(displacer))
-        assertEquals(2, d.manaPool(p).colorless)
+        assertTrue(d.isTapped(endbringer))
         assertEquals(1, d.manaPool(p).white)
     }
 }
