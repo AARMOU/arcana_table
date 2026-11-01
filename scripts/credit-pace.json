@@ -1,0 +1,7 @@
+{
+  "dailyCredits": 30,
+  "startDate": "2026-11-01",
+  "startUsed": 495,
+  "timeZone": "America/Denver",
+  "why": "Owner 2026-11-01 14:33 MT: limit Copilot AI credits to 30 per day so spending stays inside the included allowance. Running total from 495 used on Nov 1 (unused days carry forward); resets to 0 at each new billing month. New assignments and repairs pause once month-to-date usage reaches the limit; running jobs finish."
+}

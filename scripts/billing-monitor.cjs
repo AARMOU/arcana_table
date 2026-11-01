@@ -2,7 +2,7 @@
 const {budgetFromEnv}=require('./usage-gate.cjs');
 const ACCOUNT='AARMOU', API='https://api.github.com';
 const MARKER='<!-- arcana-billing-alert-v1 -->';
-const KNOWN_REASON=/^(invalid-owner-budget|invalid-reservation|missing-token|billing-http-\d{3}|billing-rate-limited|billing-timeout|billing-network-error|invalid-billing-response|wrong-account|wrong-period|wrong-unit-or-quantity|overflow|empty-billing-usage-items|unrecognized-copilot-sku|no-copilot-usage-items|unverified-snapshot)$/;
+const KNOWN_REASON=/^(invalid-owner-budget|invalid-reservation|missing-token|billing-http-\d{3}|billing-rate-limited|daily-credit-limit|billing-timeout|billing-network-error|invalid-billing-response|wrong-account|wrong-period|wrong-unit-or-quantity|overflow|empty-billing-usage-items|unrecognized-copilot-sku|no-copilot-usage-items|unverified-snapshot)$/;
 const SETUP='docs/BILLING-SETUP.md';
 const EMPTY_MONTH_START_DAYS=3;
 // Owner-facing next step for every fail-closed billing reason. Never includes secrets or response bodies.
@@ -14,6 +14,7 @@ function billingAction(reason,env={}){
   (legacy?'. ARCANA_PREMIUM_REQUEST_BUDGET is a retired variable and is ignored.':'.');
  if(r==='invalid-reservation')return 'Owner: ARCANA_AI_CREDIT_RESERVE must be a whole number of credits, or unset for the 10% default.';
  if(r==='billing-http-401')return 'Owner: COPILOT_BILLING_READ_TOKEN is invalid or expired. Create a new token and replace the secret ('+SETUP+').';
+ if(r==='daily-credit-limit')return 'None: the owner\'s daily AI credit limit (scripts/credit-pace.json) is reached; new work resumes the next day.';
  if(r==='billing-rate-limited')return 'None: GitHub is rate-limiting billing reads; new work waits until the next check succeeds.';
  if(r==='billing-http-403')return 'Owner: the token is not allowed to read AARMOU billing. Recreate it from the AARMOU account with the permission in '+SETUP+'.';
  if(r==='billing-http-404')return 'Owner: GitHub did not find personal AI-credit billing for AARMOU. Confirm the token belongs to AARMOU and Copilot is billed to that personal account.';
@@ -81,7 +82,26 @@ async function fetchReport({url,token,fetchImpl,retryDelayMs}){
  }
  throw lastError;
 }
-async function collect({token,budget:raw,reserveCredits,now=new Date(),fetchImpl=fetch,retryDelayMs=2000}){
+function readPace(){
+ try{return JSON.parse(require('fs').readFileSync(require('path').join(__dirname,'credit-pace.json'),'utf8'));}
+ catch{return null;}
+}
+// Month-to-date credits allowed so far: base + dailyCredits x (local days elapsed, today included). In the start
+// month the base is the usage recorded at startDate; in later billing months it is 0 from the 1st.
+function paceLimit(pace,now,period){
+ if(!pace)return null;
+ const daily=Number(pace.dailyCredits),startUsed=Number(pace.startUsed);
+ if(!Number.isFinite(daily)||daily<0||!Number.isFinite(startUsed)||startUsed<0||!/^\d{4}-\d{2}-\d{2}$/.test(String(pace.startDate)))return null;
+ let today;
+ try{today=new Intl.DateTimeFormat('en-CA',{timeZone:pace.timeZone||'UTC',year:'numeric',month:'2-digit',day:'2-digit'}).format(now);}
+ catch{return null;}
+ const inStartMonth=pace.startDate.slice(0,7)===period;
+ if(!inStartMonth&&pace.startDate.slice(0,7)>period)return null;
+ const from=inStartMonth?pace.startDate:period+'-01',base=inStartMonth?startUsed:0;
+ const days=Math.floor((Date.parse(today+'T00:00:00Z')-Date.parse(from+'T00:00:00Z'))/864e5)+1;
+ return base+daily*Math.max(1,days);
+}
+async function collect({token,budget:raw,reserveCredits,now=new Date(),fetchImpl=fetch,retryDelayMs=2000,pace}){
  const allowance=positiveBudget(raw),pendingReserve=reserve(allowance,reserveCredits);
  if(!token)throw Error('missing-token');
  const period=now.toISOString().slice(0,7);
@@ -110,8 +130,15 @@ async function collect({token,budget:raw,reserveCredits,now=new Date(),fetchImpl
  sourceUrl:API+'/users/'+ACCOUNT+'/settings/billing/ai_credit/usage',
  period,allowanceSource:'owner-configured-budget',used:measured+pendingReserve,
  allowance,measuredAt:now.toISOString(),reportedUsed:measured,reserved:pendingReserve,...(basis?{basis}:{})};
- const status=budgetFromEnv(JSON.stringify(snapshot),now.getTime());
+ let status=budgetFromEnv(JSON.stringify(snapshot),now.getTime());
  if(status.level==='unknown')throw Error('unverified-snapshot');
+ // Owner's daily credit limit (scripts/credit-pace.json): a running total, so unused days carry forward.
+ const limit=paceLimit(pace===undefined?readPace():pace,now,period);
+ if(limit!==null){
+  snapshot.paceLimit=limit;
+  if(measured>=limit&&status.maxNewAssignments>0)
+   status={...status,level:'paused',maxNewAssignments:0,warn:true,reason:'daily-credit-limit'};
+ }
  return {snapshot,status};
 }
 async function readBudget(env=process.env,opts={}){
@@ -127,7 +154,7 @@ async function readBudget(env=process.env,opts={}){
  }
 }
 const messages={normal:'Usage returned below the warning threshold',warn:'Copilot AI credit usage at warning level (50%)',
- slow:'Copilot AI credit usage at throttling level (75%)',paused:'Copilot AI credit usage at pause level (90%)',
+ slow:'Copilot AI credit usage at throttling level (75%)',paused:'Copilot AI credit usage paused (90% of the month, or the owner\'s daily credit limit; it resumes the next day)',
  unknown:'Copilot billing data unavailable; new assignments blocked'};
 async function alertChange({github,level,period,reason,env={}}){
  if(!Object.hasOwn(messages,level)||! /^\d{4}-\d{2}$/.test(period))throw Error('invalid-alert');
@@ -146,4 +173,4 @@ async function alertChange({github,level,period,reason,env={}}){
  await github.rest.issues.createComment({owner,repo,issue_number,body});
  return 'posted';
 }
-module.exports={positiveBudget,reserve,usageQuantity,collect,readBudget,alertChange,billingAction,fetchReport,MARKER};
+module.exports={paceLimit,positiveBudget,reserve,usageQuantity,collect,readBudget,alertChange,billingAction,fetchReport,MARKER};

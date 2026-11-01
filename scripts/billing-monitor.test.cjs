@@ -150,3 +150,29 @@ test('rate-limited billing reads are reported as rate limiting, not a token perm
   const r = await B.collect({ token: 't', budget: '3500', now: new Date('2026-11-01T18:00:00Z'), fetchImpl, retryDelayMs: 0 }).catch(e => e);
   assert.match(String(r?.message || r?.reason || JSON.stringify(r)), /billing-rate-limited/);
 });
+
+test('owner daily credit limit: running total from the start usage, carries forward, resets each billing month',async()=>{
+ const pace={dailyCredits:30,startDate:'2026-11-01',startUsed:495,timeZone:'America/Denver'};
+ const lim=(iso,period)=>m.paceLimit(pace,new Date(iso),period);
+ assert.equal(lim('2026-11-01T21:00:00Z','2026-11'),525,'Nov 1 MT: 495 + 30');
+ assert.equal(lim('2026-11-02T05:00:00Z','2026-11'),525,'still Nov 1 in Denver at 22:00 MT');
+ assert.equal(lim('2026-11-02T08:00:00Z','2026-11'),555,'Nov 2 MT');
+ assert.equal(lim('2026-11-11T18:00:00Z','2026-11'),825,'unused days carry forward');
+ assert.equal(lim('2026-12-01T18:00:00Z','2026-12'),30,'new billing month starts from 0');
+ assert.equal(lim('2026-10-15T18:00:00Z','2026-10'),null,'not active before its start month');
+ assert.equal(m.paceLimit(null,new Date(),'2026-11'),null);
+ assert.equal(m.paceLimit({...pace,dailyCredits:'x'},new Date(),'2026-11'),null);
+});
+test('reaching the daily credit limit pauses new assignments with a plain reason; below it nothing changes',async()=>{
+ const nov=new Date('2026-11-01T21:00:00Z');
+ const f=q=>async()=>({ok:true,json:async()=>({user:'AARMOU',timePeriod:{year:2026,month:11},usageItems:[item(q)]})});
+ const pace={dailyCredits:30,startDate:'2026-11-01',startUsed:495,timeZone:'America/Denver'};
+ const over=await m.collect({token:'x',budget:'1500',now:nov,fetchImpl:f(530),pace});
+ assert.equal(over.status.level,'paused');assert.equal(over.status.maxNewAssignments,0);
+ assert.equal(over.status.reason,'daily-credit-limit');assert.equal(over.snapshot.paceLimit,525);
+ assert.match(m.billingAction('daily-credit-limit'),/resumes the next day/);
+ const under=await m.collect({token:'x',budget:'1500',now:nov,fetchImpl:f(500),pace});
+ assert.notEqual(under.status.level,'paused');assert.ok(under.status.maxNewAssignments>0);
+ const none=await m.collect({token:'x',budget:'1500',now:nov,fetchImpl:f(530),pace:null});
+ assert.notEqual(none.status.reason,'daily-credit-limit','no pace file: monthly thresholds only');
+});
