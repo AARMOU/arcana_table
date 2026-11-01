@@ -296,6 +296,7 @@ object CustomCards {
         Entry(OblivionSower, "M3C", "Eldrazi Incursion"),
         Entry(SireOfStagnation, "BFZ", "Eldrazi Incursion"),
         Entry(SufferThePast, "ROE", "Eldrazi Incursion"),
+        Entry(ArmoryAutomaton, "C16", POOL),
         Entry(KenrithsTransformation, "AFC", "Six WotC precons"),
         Entry(SurgeConductor, "EOC", POOL),
         Entry(ShieldSphere, "ME1", POOL),
