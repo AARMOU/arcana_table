@@ -3875,7 +3875,7 @@
     {
      "card": "Ancient Stone Idol",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AncientStoneIdol.kt",
-     "lines": 51,
+     "lines": 52,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AncientStoneIdolScenarioTest.kt"
     },
     {
@@ -5793,7 +5793,7 @@
     {
      "card": "Ancient Stone Idol",
      "file": "android/custom-cards/src/main/kotlin/com/arcanatable/customcards/cards/AncientStoneIdol.kt",
-     "lines": 51,
+     "lines": 52,
      "test": "android/custom-cards/src/test/kotlin/com/arcanatable/customcards/AncientStoneIdolScenarioTest.kt"
     },
     {
