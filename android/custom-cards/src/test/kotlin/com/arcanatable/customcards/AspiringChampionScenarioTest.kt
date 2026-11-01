@@ -83,6 +83,7 @@ class AspiringChampionScenarioTest {
         val d = customScenario(AspiringChampion)
         val player = d.player1
         val champion = d.putCreatureOnBattlefield(player, "Aspiring Champion")
+        repeat(7) { d.putCardOnTopOfLibrary(player, "Plains") }
         d.removeSummoningSickness(champion)
 
         d.passPriorityUntil(Step.DECLARE_ATTACKERS, activePlayer = player)
