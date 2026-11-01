@@ -1,0 +1,9 @@
+{
+  "key": "all-is-dust",
+  "name": "All Is Dust",
+  "issue": 747,
+  "source": "certification/AllIsDustIndependentCertificationTest.kt",
+  "testClass": "com.arcanatable.customcards.AllIsDustIndependentCertificationTest",
+  "tests": 3,
+  "target": "build"
+}
