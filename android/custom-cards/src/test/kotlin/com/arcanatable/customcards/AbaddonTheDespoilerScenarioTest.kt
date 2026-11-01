@@ -26,7 +26,7 @@ class AbaddonTheDespoilerScenarioTest {
 
     @Test
     fun cascadesWhenTheTotalLifeLostByAllOpponentsMeetsTheSpellManaValue() {
-        val d = CardPool.driver("Shock", "Worn Powerstone", "Grizzly Bears", "Ornithopter")
+        val d = CardPool.driver("Shock", "Murder", "Grizzly Bears", "Ornithopter")
         d.registerCard(AbaddonTheDespoiler)
         val (p, opponent1, opponent2) = d.initMultiplayer(List(3) { Deck.of("Plains" to 40) })
         d.passPriorityUntil(Step.PRECOMBAT_MAIN, activePlayer = p)
@@ -47,14 +47,18 @@ class AbaddonTheDespoilerScenarioTest {
 
         d.passPriorityTo(p)
         d.putCardOnTopOfLibrary(p, "Grizzly Bears")
-        val powerstone = d.putCardInHand(p, "Worn Powerstone")
-        d.giveColorlessMana(p, 3)
-        assertNull(d.castSpell(p, powerstone).error)
+        val victim = d.putCreatureOnBattlefield(opponent1, "Grizzly Bears")
+        val murder = d.putCardInHand(p, "Murder")
+        d.giveMana(p, Color.BLACK, 2)
+        d.giveColorlessMana(p, 1)
+        assertEquals(p, d.activePlayer)
+        assertNull(d.castSpell(p, murder, listOf(victim)).error)
         d.resolveAll(Choices(yes = true))
 
         assertEquals(18, d.getLifeTotal(opponent1))
         assertEquals(18, d.getLifeTotal(opponent2))
         assertEquals(1, d.permanentsNamed(p, "Grizzly Bears").size)
+        assertTrue(d.permanentsNamed(p, "Ornithopter").size >= 1)
     }
 
     @Test
