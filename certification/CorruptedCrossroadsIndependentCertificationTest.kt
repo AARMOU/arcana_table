@@ -2,6 +2,9 @@ package com.arcanatable.customcards
 
 import com.arcanatable.customcards.cards.CorruptedCrossroads
 import com.arcanatable.customcards.support.*
+import com.wingedsheep.engine.core.CastSpell
+import com.wingedsheep.engine.core.PaymentStrategy
+import com.wingedsheep.engine.state.components.stack.ChosenTarget
 import com.wingedsheep.sdk.core.Color
 import com.wingedsheep.sdk.core.Zone
 import org.junit.Assert.*
@@ -44,12 +47,8 @@ class CorruptedCrossroadsIndependentCertificationTest {
             d.resolveAll(Choices(color = color))
 
             val pool = d.manaPool(p)
-            assertEquals(if (color == Color.WHITE) 1 else 0, pool.white)
-            assertEquals(if (color == Color.BLUE) 1 else 0, pool.blue)
-            assertEquals(if (color == Color.BLACK) 1 else 0, pool.black)
-            assertEquals(if (color == Color.RED) 1 else 0, pool.red)
-            assertEquals(if (color == Color.GREEN) 1 else 0, pool.green)
-            assertEquals(0, pool.colorless)
+            assertEquals(listOf(color), pool.restrictedMana.map { it.color })
+            assertEquals(0, pool.white + pool.blue + pool.black + pool.red + pool.green + pool.colorless)
             assertNotNull(d.activate(p, crossroads, index = 1).error)
             assertEquals(initialLife - 1, d.getLifeTotal(p))
         }
@@ -68,24 +67,34 @@ class CorruptedCrossroadsIndependentCertificationTest {
         assertFalse(d.isTapped(crossroads))
         val pool = d.manaPool(p)
         assertEquals(0, pool.white + pool.blue + pool.black + pool.red + pool.green + pool.colorless)
+        assertTrue(pool.restrictedMana.isEmpty())
     }
 
     @Test
     fun coloredManaCanBeSpentToCastADevoidSpell() {
-        val d = customScenario(CorruptedCrossroads, "Eldrazi Mimic")
+        val d = customScenario(CorruptedCrossroads, "Ornithopter")
         val p = d.player1
+        val target = d.putCreatureOnBattlefield(d.player2, "Ornithopter")
         val crossroads = d.putLandOnBattlefield(p, "Corrupted Crossroads")
-        val mimic = d.putCardInHand(p, "Eldrazi Mimic")
+        val wail = d.putCardInHand(p, "Warping Wail")
 
         assertNull(d.activate(p, crossroads, index = 1).error)
         d.resolveAll(Choices(color = Color.RED))
         d.giveColorlessMana(p, 1)
 
-        assertNull(d.castSpell(p, mimic).error)
+        assertNull(d.submit(CastSpell(
+            playerId = p,
+            cardId = wail,
+            targets = listOf(ChosenTarget.Permanent(target)),
+            paymentStrategy = PaymentStrategy.FromPool,
+            chosenModes = listOf(0),
+            modeTargetsOrdered = listOf(listOf(ChosenTarget.Permanent(target))),
+        )).error)
         d.resolveAll()
 
-        assertTrue(d.permanentsNamed(p, "Eldrazi Mimic").contains(mimic))
-        assertFalse(d.zoneNames(p, Zone.HAND).contains("Eldrazi Mimic"))
+        assertFalse(d.zoneNames(d.player2, Zone.BATTLEFIELD).contains("Ornithopter"))
+        assertTrue(d.zoneNames(d.player2, Zone.EXILE).contains("Ornithopter"))
+        assertFalse(d.zoneNames(p, Zone.HAND).contains("Warping Wail"))
         assertEquals(19, d.getLifeTotal(p))
     }
 
@@ -103,7 +112,7 @@ class CorruptedCrossroadsIndependentCertificationTest {
 
         assertTrue(d.zoneNames(p, Zone.HAND).contains("Sol Ring"))
         assertTrue(d.permanentsNamed(p, "Sol Ring").isEmpty())
-        assertEquals(1, d.manaPool(p).green)
+        assertEquals(listOf(Color.GREEN), d.manaPool(p).restrictedMana.map { it.color })
         assertEquals(19, d.getLifeTotal(p))
         assertTrue(d.isTapped(crossroads))
     }
