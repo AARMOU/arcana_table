@@ -29,7 +29,7 @@ class ChronomancerIndependentCertificationTest {
 
     @Test
     fun atomicTransmutationPaysOneTapsSacrificesAnotherArtifactAndDraws() {
-        val d = customScenario(Chronomancer)
+        val d = customScenario(Chronomancer, "Sol Ring")
         val player = d.player1
         val chronomancer = d.putCreatureOnBattlefield(player, "Chronomancer")
         d.removeSummoningSickness(chronomancer)
@@ -49,7 +49,7 @@ class ChronomancerIndependentCertificationTest {
 
     @Test
     fun atomicTransmutationCannotBeActivatedWithoutItsManaCost() {
-        val d = customScenario(Chronomancer)
+        val d = customScenario(Chronomancer, "Sol Ring")
         val player = d.player1
         val chronomancer = d.putCreatureOnBattlefield(player, "Chronomancer")
         d.removeSummoningSickness(chronomancer)
@@ -81,7 +81,7 @@ class ChronomancerIndependentCertificationTest {
 
     @Test
     fun atomicTransmutationCannotBeActivatedAgainWhileChronomancerIsTapped() {
-        val d = customScenario(Chronomancer, "Ornithopter")
+        val d = customScenario(Chronomancer, "Sol Ring", "Ornithopter")
         val player = d.player1
         val chronomancer = d.putCreatureOnBattlefield(player, "Chronomancer")
         d.removeSummoningSickness(chronomancer)
@@ -108,7 +108,7 @@ class ChronomancerIndependentCertificationTest {
         d.giveColorlessMana(player, 2)
         d.giveMana(player, Color.BLACK)
 
-        assertNull(d.activate(player, chronomancer).error)
+        assertNull(d.activate(player, chronomancer, index = 1).error)
         assertEquals(0, d.manaPool(player).colorless)
         assertEquals(0, d.manaPool(player).black)
         d.resolveAll()
@@ -131,7 +131,7 @@ class ChronomancerIndependentCertificationTest {
         val chronomancer = d.putCardInGraveyard(player, "Chronomancer")
         d.giveColorlessMana(player, 3)
 
-        assertNotNull(d.activate(player, chronomancer).error)
+        assertNotNull(d.activate(player, chronomancer, index = 1).error)
 
         assertTrue(d.zoneNames(player, Zone.GRAVEYARD).contains("Chronomancer"))
         assertTrue(d.permanentsNamed(player, "Chronomancer").isEmpty())
@@ -149,7 +149,7 @@ class ChronomancerIndependentCertificationTest {
         d.giveColorlessMana(player, 2)
         d.giveMana(player, Color.BLACK)
 
-        assertNotNull(d.activate(player, chronomancer).error)
+        assertNotNull(d.activate(player, chronomancer, index = 1).error)
 
         assertTrue(d.zoneNames(player, Zone.GRAVEYARD).contains("Chronomancer"))
         assertTrue(d.permanentsNamed(player, "Chronomancer").isEmpty())
@@ -164,7 +164,7 @@ class ChronomancerIndependentCertificationTest {
         val chronomancer = d.putCardInGraveyard(player, "Chronomancer")
         d.giveColorlessMana(player, 2)
         d.giveMana(player, Color.BLACK)
-        assertNull(d.activate(player, chronomancer).error)
+        assertNull(d.activate(player, chronomancer, index = 1).error)
         d.resolveAll()
         val returned = d.findPermanent(player, "Chronomancer")!!
         val shock = d.putCardInHand(player, "Shock")
