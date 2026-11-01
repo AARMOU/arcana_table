@@ -488,6 +488,7 @@ internal fun TableController.joinWifiGame(address: String) {
 
 /** Stops hosting or waiting (the game itself ends through closeArgentumSession). */
 internal fun TableController.stopWifi() {
+    activeLobbyViewerOpen = false
     wifiServer?.close()
     wifiServer = null
     wifiWaitingAddress = null
